@@ -375,10 +375,104 @@ pub fn spawn_doorway_registration_task(
 // Heartbeat
 // =============================================================================
 
+/// Probe rounds a roster member may go without liveness evidence before the
+/// peer-health probe stops dialing it.
+///
+/// A probe round is every 5th heartbeat tick: 5 x `heartbeat_interval_secs`
+/// (60 s from `FederationConfig::from_args`, so 300 s; the 2026-09-24 store
+/// report measured 150 s). Three rounds is 15 minutes at 300 s and 7.5 at
+/// 150 s, so a scenario doorway that lived four minutes leaves the roster
+/// within ~15 minutes of its last sign of life, while a sibling that is merely
+/// slow keeps being probed as long as it answers at all.
+///
+/// Why this exists: every probe writes an immutable
+/// `attestation:device-health` Content node, and the roster is every doorway
+/// ever registered. 27,317 of 30,787 lamad entries on the household were
+/// these, 25,973 of them `unreachable` about doorways torn down minutes after
+/// birth (`genesis/docs/content/elohim-protocol/architecture/
+/// 2026-09-24-conductor-store-growth-report.md` §3 and §7.1 option (a)).
+/// This bounds WHO is probed; what one probe writes is unchanged.
+pub const PROBE_ROSTER_EXPIRY_ROUNDS: u64 = 3;
+
+/// Per-attestor liveness book for the peer-health probe roster.
+///
+/// Liveness evidence for a peer is any of: first appearing in the roster;
+/// answering a probe at all (`online` or `degraded` — only a transport failure
+/// is `unreachable`); or its registration's `record_serial` changing, which a
+/// doorway does on every boot. There is no `active|<ts>` link on doorway
+/// registrations; these three are the freshness markers that exist. A peer
+/// with no evidence for [`PROBE_ROSTER_EXPIRY_ROUNDS`] rounds is skipped, and
+/// re-enters the moment it re-registers.
+///
+/// Pure bookkeeping on round numbers (no clock), so the expiry is testable
+/// without sleeping. Entries for ids that leave the roster are dropped, so the
+/// book never outgrows the roster itself.
+#[derive(Debug, Default)]
+pub struct ProbeRoster {
+    round: u64,
+    peers: std::collections::HashMap<String, ProbeRosterEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct ProbeRosterEntry {
+    last_live_round: u64,
+    record_serial: Option<u64>,
+}
+
+impl ProbeRoster {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start a probe round over `roster`: returns `(to_probe, skipped_ids)`.
+    pub fn begin_round(&mut self, roster: &[PeerDoorway]) -> (Vec<PeerDoorway>, Vec<String>) {
+        self.round += 1;
+        let round = self.round;
+        let present: std::collections::HashSet<&str> =
+            roster.iter().map(|peer| peer.id.as_str()).collect();
+        self.peers.retain(|id, _| present.contains(id.as_str()));
+
+        let mut to_probe = Vec::new();
+        let mut skipped = Vec::new();
+        for peer in roster {
+            let entry = self
+                .peers
+                .entry(peer.id.clone())
+                .or_insert_with(|| ProbeRosterEntry {
+                    last_live_round: round,
+                    record_serial: peer.record_serial,
+                });
+            if peer.record_serial.is_some() && peer.record_serial != entry.record_serial {
+                entry.record_serial = peer.record_serial;
+                entry.last_live_round = round;
+            }
+            if round.saturating_sub(entry.last_live_round) >= PROBE_ROSTER_EXPIRY_ROUNDS {
+                skipped.push(peer.id.clone());
+            } else {
+                to_probe.push(peer.clone());
+            }
+        }
+        (to_probe, skipped)
+    }
+
+    /// Record one probe's outcome in the current round. `answered` is true for
+    /// any HTTP response (`online` / `degraded`), false for `unreachable`.
+    pub fn observe(&mut self, peer_id: &str, answered: bool) {
+        if answered {
+            if let Some(entry) = self.peers.get_mut(peer_id) {
+                entry.last_live_round = self.round;
+            }
+        }
+    }
+}
+
 /// Spawn periodic peer-health-probe task (every heartbeat_interval_secs).
 ///
 /// On every Nth tick it probes cached federation peers' `/health` endpoints and
 /// records peer-witnessed health attestations via the infrastructure zome.
+/// Only the LIVE roster is probed: [`ProbeRoster`] skips a peer with no
+/// liveness evidence for [`PROBE_ROSTER_EXPIRY_ROUNDS`] rounds, counted as
+/// `doorway_federation_doorbell_total{side="probe",outcome="skipped_expired"}`.
 /// Logs warnings on failure but does not crash.
 ///
 /// NOTE: This task no longer reports a *self*-heartbeat to the conductor. The
@@ -408,6 +502,7 @@ pub fn spawn_heartbeat_task(
 
         let mut probe_counter: u32 = 0;
         let probe_interval: u32 = 5; // Every 5th interval (~5 minutes)
+        let mut roster = ProbeRoster::new();
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
@@ -422,7 +517,21 @@ pub fn spawn_heartbeat_task(
                 probe_counter = 0;
 
                 let cached_peers = get_cached_peers(&state.peer_cache).await;
-                for peer in &cached_peers {
+                let (live_roster, expired) = roster.begin_round(&cached_peers);
+                if !expired.is_empty() {
+                    for _ in &expired {
+                        crate::metrics::record_doorbell(
+                            crate::services::federation_doorbell::SIDE_PROBE,
+                            crate::services::federation_doorbell::OUTCOME_SKIPPED_EXPIRED,
+                        );
+                    }
+                    debug!(
+                        probed = live_roster.len(),
+                        skipped = expired.len(),
+                        "Peer-health probe skipped roster members with no liveness evidence"
+                    );
+                }
+                for peer in &live_roster {
                     let probe_start = std::time::Instant::now();
                     let health_url = format!("{}/health", peer.url.trim_end_matches('/'));
 
@@ -448,6 +557,7 @@ pub fn spawn_heartbeat_task(
                             }
                             Err(_) => ("unreachable".to_string(), None, None),
                         };
+                    roster.observe(&peer.id, observed_status != "unreachable");
 
                     let attestation_input = RecordHealthAttestationInput {
                         attestor_doorway_id: config.doorway_id.clone(),
@@ -565,6 +675,12 @@ pub struct PeerDoorway {
     pub region: Option<String>,
     pub capabilities: Vec<String>,
     pub source_peer: String,
+    /// The registration's monotonic signed serial, when the reporting peer
+    /// read it from the DHT (`None` for a peer-cache echo). It bumps on every
+    /// (re-)registration, so a change is liveness evidence for [`ProbeRoster`]:
+    /// a doorway that restarts re-registers and re-enters the probe roster.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_serial: Option<u64>,
 }
 
 /// Shared cache of known peer doorways, refreshed periodically
@@ -825,6 +941,7 @@ fn jwks_trust_anchors(registrations: &[DoorwayRegistration]) -> Vec<PeerDoorway>
             region: reg.region.clone(),
             capabilities: Vec::new(),
             source_peer: "dht-registration".to_string(),
+            record_serial: Some(reg.record_serial),
         })
         .collect()
 }
@@ -1344,6 +1461,8 @@ async fn fetch_single_peer(client: &reqwest::Client, peer_url: &str) -> Vec<Peer
                 capabilities: Vec<String>,
                 #[allow(dead_code)]
                 status: Option<String>,
+                #[serde(default)]
+                record_serial: Option<u64>,
             }
 
             match resp.json::<PeerResponse>().await {
@@ -1356,6 +1475,7 @@ async fn fetch_single_peer(client: &reqwest::Client, peer_url: &str) -> Vec<Peer
                         region: d.region,
                         capabilities: d.capabilities,
                         source_peer: peer_url.to_string(),
+                        record_serial: d.record_serial,
                     })
                     .collect(),
                 Err(e) => {
@@ -2134,6 +2254,7 @@ mod tests {
                 region: None,
                 capabilities: vec![],
                 source_peer: "seed".into(),
+                record_serial: None,
             });
             assert_eq!(cache.read().await.len(), 1);
 
@@ -2481,6 +2602,7 @@ mod tests {
                 region: None,
                 capabilities: vec![],
                 source_peer: "seed".into(),
+                record_serial: None,
             }];
 
             refresh_peer_jwks_cache(&peers, &client, &cache).await;
@@ -2615,6 +2737,151 @@ mod tests {
             assert_eq!(cache.get("anchored"), Some(pubkey));
             // wiremock's `.expect(0)` panics on drop if the keyless doorway
             // was contacted at all.
+        }
+    }
+
+    // ── Probe roster expiry (conductor-store growth report §3 / §7.1 (a)) ────
+    //
+    // The heartbeat wrote one immutable attestation per registered doorway
+    // per round, forever, including every a2o scenario doorway that lived four
+    // minutes. These pin that only the live roster is probed.
+    mod probe_roster {
+        use super::*;
+
+        fn peer(id: &str, serial: Option<u64>) -> PeerDoorway {
+            PeerDoorway {
+                id: id.into(),
+                url: format!("http://{id}.invalid"),
+                region: None,
+                capabilities: vec![],
+                source_peer: "seed".into(),
+                record_serial: serial,
+            }
+        }
+
+        fn ids(peers: &[PeerDoorway]) -> Vec<&str> {
+            peers.iter().map(|p| p.id.as_str()).collect()
+        }
+
+        #[test]
+        fn a_short_lived_doorway_leaves_the_roster_after_the_expiry_rounds() {
+            let mut roster = ProbeRoster::new();
+            let members = vec![peer("sibling", Some(1)), peer("scenario", Some(7))];
+
+            // Round 1: both are new, both probed; both answer.
+            let (probe, skipped) = roster.begin_round(&members);
+            assert_eq!(ids(&probe), vec!["sibling", "scenario"]);
+            assert!(skipped.is_empty());
+            roster.observe("sibling", true);
+            roster.observe("scenario", true);
+
+            // The scenario doorway is torn down: it stops answering.
+            for round in 2..=PROBE_ROSTER_EXPIRY_ROUNDS {
+                let (probe, skipped) = roster.begin_round(&members);
+                assert_eq!(ids(&probe), vec!["sibling", "scenario"], "round {round}");
+                assert!(skipped.is_empty(), "round {round}");
+                roster.observe("sibling", true);
+                roster.observe("scenario", false);
+            }
+
+            // Expiry: no liveness evidence for PROBE_ROSTER_EXPIRY_ROUNDS rounds.
+            for _ in 0..5 {
+                let (probe, skipped) = roster.begin_round(&members);
+                assert_eq!(ids(&probe), vec!["sibling"]);
+                assert_eq!(skipped, vec!["scenario".to_string()]);
+                roster.observe("sibling", true);
+            }
+        }
+
+        #[test]
+        fn a_degraded_answer_is_liveness_only_unreachable_is_not() {
+            let mut roster = ProbeRoster::new();
+            let members = vec![peer("slow", None)];
+            for _ in 0..(PROBE_ROSTER_EXPIRY_ROUNDS * 3) {
+                let (probe, skipped) = roster.begin_round(&members);
+                assert_eq!(ids(&probe), vec!["slow"]);
+                assert!(skipped.is_empty());
+                // `degraded` (HTTP answered, conductor down) is still an answer.
+                roster.observe("slow", true);
+            }
+        }
+
+        #[test]
+        fn a_doorway_that_was_never_alive_is_probed_only_for_the_grace_rounds() {
+            // A freshly booted attestor finds 170-odd dead registrations: each
+            // gets PROBE_ROSTER_EXPIRY_ROUNDS probes, then silence.
+            let mut roster = ProbeRoster::new();
+            let members = vec![peer("dead", Some(3))];
+            let mut probed = 0;
+            for _ in 0..20 {
+                let (probe, _) = roster.begin_round(&members);
+                probed += probe.len() as u64;
+                roster.observe("dead", false);
+            }
+            assert_eq!(probed, PROBE_ROSTER_EXPIRY_ROUNDS);
+        }
+
+        #[test]
+        fn re_registration_readmits_an_expired_doorway() {
+            let mut roster = ProbeRoster::new();
+            let dead = vec![peer("restarting", Some(10))];
+            for _ in 0..(PROBE_ROSTER_EXPIRY_ROUNDS + 2) {
+                roster.begin_round(&dead);
+                roster.observe("restarting", false);
+            }
+            let (probe, skipped) = roster.begin_round(&dead);
+            assert!(probe.is_empty());
+            assert_eq!(skipped, vec!["restarting".to_string()]);
+
+            // It boots again: register/update_doorway bumps record_serial.
+            let back = vec![peer("restarting", Some(11))];
+            let (probe, skipped) = roster.begin_round(&back);
+            assert_eq!(ids(&probe), vec!["restarting"]);
+            assert!(skipped.is_empty());
+
+            // A peer-cache echo with no serial is not evidence either way.
+            roster.observe("restarting", false);
+            let echo = vec![peer("restarting", None)];
+            let (probe, _) = roster.begin_round(&echo);
+            assert_eq!(ids(&probe), vec!["restarting"]);
+        }
+
+        #[test]
+        fn ids_that_leave_the_roster_are_forgotten() {
+            let mut roster = ProbeRoster::new();
+            for _ in 0..(PROBE_ROSTER_EXPIRY_ROUNDS + 1) {
+                roster.begin_round(&[peer("gone", Some(1))]);
+                roster.observe("gone", false);
+            }
+            roster.begin_round(&[]);
+            assert!(
+                roster.peers.is_empty(),
+                "the book never outgrows the roster"
+            );
+            // Seen again later (e.g. the registry answered again): a new member.
+            let (probe, _) = roster.begin_round(&[peer("gone", Some(1))]);
+            assert_eq!(ids(&probe), vec!["gone"]);
+        }
+
+        #[test]
+        fn expiry_lands_within_fifteen_minutes_at_the_configured_cadence() {
+            // Probe round = 5 heartbeat ticks (spawn_heartbeat_task).
+            let round_secs = 5 * 60; // FederationConfig::from_args heartbeat
+            assert!(PROBE_ROSTER_EXPIRY_ROUNDS * round_secs <= 15 * 60);
+            assert!(
+                PROBE_ROSTER_EXPIRY_ROUNDS >= 2,
+                "one missed probe is not death"
+            );
+        }
+
+        #[test]
+        fn a_skip_is_counted_in_the_doorbell_family() {
+            use crate::services::federation_doorbell::{OUTCOME_SKIPPED_EXPIRED, SIDE_PROBE};
+            let series = crate::metrics::DOORWAY_FEDERATION_DOORBELL_TOTAL
+                .with_label_values(&[SIDE_PROBE, OUTCOME_SKIPPED_EXPIRED]);
+            let before = series.get();
+            crate::metrics::record_doorbell(SIDE_PROBE, OUTCOME_SKIPPED_EXPIRED);
+            assert!(series.get() > before);
         }
     }
 }

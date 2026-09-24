@@ -69,6 +69,7 @@ async fn dashboard_topology_reports_federation_peers_from_cache() {
         region: None,
         capabilities: vec![],
         source_peer: "self".into(),
+        record_serial: None,
     });
 
     let svc = make_service(cache_stats, peer_cache);

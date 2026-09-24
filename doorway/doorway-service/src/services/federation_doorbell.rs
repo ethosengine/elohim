@@ -58,6 +58,10 @@ pub const OLD_SIBLING_MUTE: Duration = Duration::from_secs(600);
 pub const SIDE_RING: &str = "ring";
 /// The receiver side of `doorway_federation_doorbell_total{side=...}`.
 pub const SIDE_RECEIVE: &str = "receive";
+/// The federation peer-health probe (`federation::spawn_heartbeat_task`) —
+/// a third side of the same sibling-contact family, so its roster skips are
+/// counted without minting a new metric family.
+pub const SIDE_PROBE: &str = "probe";
 
 /// Ring outcome: the peer answered 2xx.
 pub const OUTCOME_ACCEPTED: &str = "accepted";
@@ -88,6 +92,10 @@ pub const OUTCOME_GARBAGE_BODY: &str = "garbage_body";
 /// Receive outcome: a pull was already running for this holder — queued
 /// behind it via the dirty bit (C6a).
 pub const OUTCOME_QUEUED: &str = "queued";
+/// Probe outcome: the roster member had no liveness evidence for
+/// `federation::PROBE_ROSTER_EXPIRY_ROUNDS` rounds — not dialed, nothing
+/// attested this round.
+pub const OUTCOME_SKIPPED_EXPIRED: &str = "skipped_expired";
 
 /// The full closed outcome vocabulary, for metric pre-touch. Some values only
 /// ever occur on one `side`; pre-touching both is harmless (a handful of
@@ -106,6 +114,7 @@ pub const ALL_OUTCOMES: &[&str] = &[
     OUTCOME_ID_MISMATCH,
     OUTCOME_GARBAGE_BODY,
     OUTCOME_QUEUED,
+    OUTCOME_SKIPPED_EXPIRED,
 ];
 
 // ── Receiver-side pull coordination (C6a) ────────────────────────────────────

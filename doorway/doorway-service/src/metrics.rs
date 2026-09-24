@@ -453,7 +453,7 @@ lazy_static! {
     pub static ref DOORWAY_FEDERATION_DOORBELL_TOTAL: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "doorway_federation_doorbell_total",
-            "Doorbell ring/receive events, by side (ring|receive) and outcome.",
+            "Doorbell ring/receive events and peer-health probe roster skips, by side (ring|receive|probe) and outcome.",
         ),
         &["side", "outcome"],
     )
@@ -795,6 +795,7 @@ pub fn register_all() {
         for side in [
             crate::services::federation_doorbell::SIDE_RING,
             crate::services::federation_doorbell::SIDE_RECEIVE,
+            crate::services::federation_doorbell::SIDE_PROBE,
         ] {
             for outcome in crate::services::federation_doorbell::ALL_OUTCOMES {
                 DOORWAY_FEDERATION_DOORBELL_TOTAL
@@ -1092,7 +1093,7 @@ pub fn set_holders_demoted(n: i64) {
 }
 
 /// Story 4.2 slice 1: record one doorbell event. `side` is
-/// `services::federation_doorbell::{SIDE_RING, SIDE_RECEIVE}`; `outcome` is
+/// `services::federation_doorbell::{SIDE_RING, SIDE_RECEIVE, SIDE_PROBE}`; `outcome` is
 /// one of `services::federation_doorbell::ALL_OUTCOMES`.
 pub fn record_doorbell(side: &str, outcome: &str) {
     DOORWAY_FEDERATION_DOORBELL_TOTAL
