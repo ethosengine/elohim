@@ -1832,6 +1832,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-error"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+ "serde_json",
+ "sled",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "elohim-facings"
 version = "0.1.0"
 dependencies = [
@@ -1912,6 +1922,18 @@ name = "elohim-seam-contracts"
 version = "0.1.0"
 
 [[package]]
+name = "elohim-settings"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "elohim-cache-core",
+ "serde",
+ "serde_json",
+ "toml 0.8.23",
+ "tracing",
+]
+
+[[package]]
 name = "elohim-storage"
 version = "0.1.0"
 dependencies = [
@@ -1940,10 +1962,12 @@ dependencies = [
  "elohim-chrome-asset",
  "elohim-compute",
  "elohim-epr",
+ "elohim-error",
  "elohim-facings",
  "elohim-peer-fabric",
  "elohim-sdk",
  "elohim-seam-contracts",
+ "elohim-settings",
  "elohim-views",
  "flate2",
  "fs4",
@@ -1954,6 +1978,7 @@ dependencies = [
  "hex",
  "holochain_client",
  "holochain_types",
+ "holochain_websocket",
  "hostname 0.4.2",
  "http-body-util",
  "hyper 1.8.1",

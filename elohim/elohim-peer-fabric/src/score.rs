@@ -16,7 +16,7 @@ pub struct Candidate {
     pub attested_rtt_ms: Option<u32>,
     pub household_id: String, // fault-domain key
     pub bonded: bool,         // backed by a replicates-* / delegates-compute commitment
-    pub delivery_score: f64, // 0.0..=1.0 decaying delivery-success (advertise-then-drop decays it)
+    pub delivery_score: f64,  // 0.0..=1.0 decaying delivery-success (advertise-then-drop decays it)
 }
 
 /// A ranked peer. Higher `score` = preferred.

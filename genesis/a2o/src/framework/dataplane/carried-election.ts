@@ -424,7 +424,7 @@ export async function authorDeclare(opts: AuthorDeclareOptions): Promise<string>
     recordStagingWrite('POST', `${storageUrl}/db/content/bulk`);
     const bulk = await fetch(`${storageUrl}/db/content/bulk`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
       body: JSON.stringify([
         {
           id,

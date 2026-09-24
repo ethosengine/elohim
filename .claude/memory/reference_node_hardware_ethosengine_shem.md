@@ -1,6 +1,7 @@
 ---
 name: reference-node-hardware-ethosengine-shem
 title: Node hardware — ethosengine + shem
+id: reference-node-hardware-ethosengine-shem
 description: "ethosengine = X470D4U/3900X/64G, worn QLC mirror; shem = T7610 dual E5/135G/ZFS — before storage/reboot/placement."
 metadata: 
   node_type: memory

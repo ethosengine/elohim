@@ -34,7 +34,7 @@ async function main() {
   // 2. ensure a manifesto row exists (bulk is idempotent — skipped if present)
   await fetch(`${STORAGE}/db/content/bulk`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
     body: JSON.stringify([
       {
         id: ID,

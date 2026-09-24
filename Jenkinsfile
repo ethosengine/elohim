@@ -348,11 +348,39 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
     // bucket (that swallows the verdict and never reaches the post-Phase-2
     // error()).
     def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
-    // Wall-clock of the author leg (fail-over included, declare fan-out excluded).
+    // Wall-clock of the author leg (serving-order probe and fail-over included,
+    // declare fan-out excluded).
     def msKey = "ms|author|${bundle.slug}|${kind}".toString()
     def authorStart = System.currentTimeMillis()
-    for (int i = 0; i < doorwayEprUrls.size(); i++) {
-        def doorwayEprUrl = doorwayEprUrls[i]
+    // Serving-first order (app #1725, 2026-09-23). stage-spa-blob.sh's readiness
+    // wait spends the run's ONE 7200 s deadline (stamped by the first not-ready
+    // answer, shared by every host and leg) on whichever host is offered first,
+    // and this loop offered the hosts in a fixed order: #1725 spent all of it on
+    // alpha (matthew, catching-up) from 21:40Z to ~23:42Z; elohim.host (adam)
+    // was offered the head only after the clock was gone, answered 503
+    // catching-up once (circuit closed, errorStreak 1 — the DEGRADING arm), and
+    // every bundle read NO doorway could author. Whether adam would have taken
+    // the PATCH earlier is unmeasured (its conductor had logged "apps enabled"
+    // at 22:48Z — a log line, not a serving reading); what is measured is that
+    // the other host was never asked while there was time. So ask each
+    // doorway's /health/serving NOW (one bounded GET each; HTTP 200 = the
+    // doorway's own five-arm verdict, plus the two body fields the author leg
+    // needs) and offer the head to the serving hosts first. Only the AUTHOR
+    // loop takes this order; the DECLARE_ONLY fan-out below and
+    // verifyProjectedHeads keep the canonical list. The script exits 0 always
+    // and prints the same URLs re-ordered; anything else falls back to the
+    // canonical order, so this can only ever change WHICH host waits first.
+    def urlArgs = ''
+    for (int k = 0; k < doorwayEprUrls.size(); k++) { urlArgs += " '${doorwayEprUrls[k]}'" }
+    def orderOut = sh(returnStdout: true, script: "bash '${env.WORKSPACE}/scripts/ci/doorway-serving-order.sh'${urlArgs}").trim()
+    def authorOrder = []
+    for (line in orderOut.split('\n')) {
+        if (line.trim()) { authorOrder << line.trim() }
+    }
+    if (authorOrder.size() != doorwayEprUrls.size()) { authorOrder = doorwayEprUrls }
+    echo "authorHeadOnce: ${bundle.slug} (${kind}) — author order (serving doorways first): ${authorOrder.join(' -> ')}"
+    for (int i = 0; i < authorOrder.size(); i++) {
+        def doorwayEprUrl = authorOrder[i]
         def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
         def rc = 1
         // returnStatus (not throw): a 503 here is EXPECTED on a bridgeless
@@ -386,7 +414,9 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
             // retry ladder exhausted) — surface that as stage/build UNSTABLE
             // so it isn't silently swallowed.
             for (int j = 0; j < doorwayEprUrls.size(); j++) {
-                if (j == i) { continue }
+                // Skip the authoring host by URL: `i` indexes the serving-first
+                // order above, not the canonical list this fan-out walks.
+                if (doorwayEprUrls[j] == doorwayEprUrl) { continue }
                 // DECLARE_MAX_ATTEMPTS=24 (~36min worst-case): cross-conductor
                 // retrievability lands 18-50min post-author on the live pair —
                 // the default 12-attempt ladder (~18min) misses the tail. One

@@ -1,6 +1,7 @@
 ---
 name: feedback-limit-raises-are-design-signals-not-capacity
 title: "Limit raises are design signals, not capacity"
+id: feedback-limit-raises-are-design-signals-not-capacity
 description: "Operator 2026-09-13: a conductor limit raise is an emergent loop in a capacity costume — run a VSM design pass."
 metadata: 
   node_type: memory

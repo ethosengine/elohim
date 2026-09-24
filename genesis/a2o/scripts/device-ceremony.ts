@@ -162,7 +162,7 @@ async function declare() {
   if (r.status === 404) {
     const bulk = await fetch(`${base}/db/content/bulk`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
       body: JSON.stringify([{ ...node, id: 'manifesto' }]),
     });
     console.log('bulk create manifesto:', bulk.status, (await bulk.text()).slice(0, 150));

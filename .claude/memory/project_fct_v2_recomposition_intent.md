@@ -1,6 +1,7 @@
 ---
 name: fct-v2-recomposition-intent
 title: "FCT v2 recomposition intent"
+id: project-fct-v2-recomposition-intent
 description: "FCT v2 is seeded only as an html5-app \"teacher's workbook\"; the real job is re-composing it into EPR atoms so the medium reveals the protocol"
 metadata:
   node_type: memory

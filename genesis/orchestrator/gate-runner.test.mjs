@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { loadManifests } from './manifest-utils.mjs';
 import { gateChildEnv, oracleMode, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
+import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -309,7 +310,13 @@ describe('the oracle flip', () => {
 
 describe('the hook parses stdout as project names — diagnostics never ride on it', () => {
   const cli = resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs');
-  test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr', () => {
+  // The shadow assertion needs the REAL oracle: without a `rakia` binary the runner
+  // honestly prints "rakia unavailable — path-only selection" (covered by the next test),
+  // and the oracle-diff line cannot exist. The pinned elohim/rakia builds no CLI, so a
+  // checkout without one skips this case instead of failing every other developer's gate.
+  const rakiaBin = resolveRakiaBin(process.env);
+  test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr',
+    { skip: rakiaBin ? false : 'no rakia binary on PATH or RAKIA_BIN — the shadow oracle-diff needs the real oracle' }, () => {
     const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
       cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'shadow' },
     });
