@@ -6,8 +6,8 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-09-17"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence); re-triaged 2026-09-17 (runtime-triage — node condition unchanged and flat; third flap traced to CLOSE_STREAK == predicate window, fixed)"
+updated: "2026-09-24"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence); re-triaged 2026-09-17 (runtime-triage — node condition unchanged and flat; third flap traced to CLOSE_STREAK == predicate window, fixed); fourth filing 2026-09-24 (runtime-triage — the chronic ceiling CLEARED and closed honestly; re-filed by a fresh post-deploy process that has not yet converged)"
 status: "wip"
 priority: "high"
 self_heal_status: blocked
@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure]
 cites:
   - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
@@ -771,3 +771,189 @@ fingerprint stays present and dispatch stays suppressed. The stasis sweep owns t
 - **New signature for the sensing fix**: fp `79f357281ca5` should now hold `status:
   blocked` with `seen` advancing monotonically. Another `seen: 1` re-file on this fp means
   `CLOSE_STREAK` was insufficient and the `_heals_nothing` quorum change above is required.
+
+---
+
+# 2026-09-24 — fourth filing: the chronic ceiling CLEARED and closed honestly; a fresh post-deploy process re-filed it
+
+## What is exhausted
+
+The ledger line was re-filed as NEW (`.claude/data/runtime-findings.jsonl`, poll 161):
+
+```json
+{"fp": "79f357281ca5", "class": "self-heal-exhaustion", "node": "alpha-b",
+ "provenance": "projector:reconcile",
+ "line": "projector healed NOTHING (healedTotal 0 over 7-45 sweeps, divergentAnchor 59, converged=false) sustained >= 3 polls",
+ "status": "open", "seen": 1, "first_poll": 161, "last_poll": 161,
+ "clean_poll_streak": 0, "ts": "2026-09-24T00:38:46+00:00"}
+```
+
+The 2026-09-17 section predicted that "another `seen: 1` re-file on this fp means
+`CLOSE_STREAK` was insufficient". **That prediction does not hold for this re-file.** The
+stored alpha-b window in `.claude/data/runtime-cursor.json`, polls 154–161, replayed
+read-only through `_heals_nothing`:
+
+| poll | sweeps | healedTotal | divergentAnchor | pending | peersAsked | converged | `_heals_nothing` |
+|---|---|---|---|---|---|---|---|
+| 154 | 125 | 0 | 59 | 0 | 6 | **true** | False |
+| 155 | 144 | 0 | 59 | 0 | 6 | **true** | False |
+| 156 | 150 | 0 | 59 | 0 | 6 | **true** | False |
+| 157 | 163 | 0 | 59 | 0 | 6 | **true** | False |
+| 158 | 166 | 0 | 59 | 0 | 6 | **true** | False |
+| 159 | **7** | 0 | 2 | 1 | **0** | false | True |
+| 160 | **7** | 0 | 2 | 1 | **0** | false | True |
+| 161 | 45 | 0 | 59 | 2 | 6 | false | True |
+
+Polls 154–158 are ONE process (sweeps monotonic 125 → 166), and it reported `converged:
+true, caughtUp: true, pending: 0` on every poll. That is the projector's own SLO field
+saying all 59 divergent anchors are adjudicated. The 2026-09-17 incarnation was therefore
+deleted because **the condition really ended**, over five clean polls from one monotonic
+series. It was not deleted by sampling noise. `CLOSE_STREAK = 5` behaved as designed, and
+the `_heals_nothing` quorum change proposed on 2026-09-17 is **not** indicated by this event.
+
+The chronic ceiling cleared somewhere between 2026-09-17 (144 sweeps, pending 22,
+unconverged) and poll 154. The storage cures that landed in that interval are the likely
+cause. The record cannot attribute it more precisely because Prometheus was unreachable
+from this pass. The cures are: `0ff361417` (chain writes queued without holding
+admission), `c52651ebe` (the REA heal leg reads on the background lane and remembers a
+verdict it cannot change), `ef18d08a4` (an id the conductor cannot see is retried on the
+clock, backing off), and `aa55b2e71`/`2402a3fd8` (held candidates and standing contests
+are not re-minted every sweep).
+
+The re-file comes from a **new process**. Sweeps reset to 7 with `peersAsked: 0` and
+`divergentAnchor: 2`: a process still inside its first discovery pass, which had asked no
+peers. `/db/p2p/conductor-diagnostics` on both doorways shows every iroh connection opened
+at `1790198196`–`1790199588` (≈ 2026-09-23 21:16–21:40Z). `https://elohim.host/health`
+reported `uptime: 12968` at 00:40:11Z (boot ≈ 21:04Z). A fleet roll happened around 21:05Z,
+consistent with the conductor pin commits `d8b8aa19f` (19:20Z) and `d3d7175ce` (20:37Z).
+Polls 159 and 160 are byte-identical, so they landed inside the same sweep. "Sustained >= 3
+polls" covered minutes of wall-clock here, not hours.
+
+## Re-fetch at triage — LIVE, but this is post-deploy catch-up, not the chronic ceiling
+
+`https://elohim.host/p2p/status`, sampled once a minute for ten minutes (HTTP 200 each time):
+
+```
+00:40:11Z {"pending": 2,  "failed": 0, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 45, "converged": false}
+00:40:53Z {"pending": 5,  "failed": 3, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 46, "converged": false}
+00:47:54Z {"pending": 55, "failed": 3, "caughtUp": false, "peersAsked": 5, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 47, "converged": false}
+00:49:54Z {"pending": 55, "failed": 3, "caughtUp": false, "peersAsked": 5, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 47, "converged": false}
+```
+
+One sweep takes about **7 minutes** on adam right now (46 → 47). `https://elohim.host/admin/self-healing`
+at the same time returned: `admission {maxInflight: 256, available: 256, shedTotal: 0}`,
+upstream circuit `closed`, **all seven conductor peers `Healthy`** (they were `Degraded` on
+2026-09-17), `warmup.completed: true`, `conductor {connected: true, connectedWorkers: 4/4}`,
+and `projector {caughtUp: false, divergentAnchor: 59}`.
+
+A-side control, `https://doorway-alpha.elohim.host/p2p/status`, from the same restart:
+
+```
+~00:38Z  {"pending": 0, "caughtUp": true,  "divergentAnchor": 59, "healedTotal": 0, "sweeps": 58, "converged": true}
+00:50:10Z {"pending": 2, "caughtUp": false, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 60, "converged": false}
+```
+
+Matthew's fresh process has converged at least once (sweep 58). Its `converged` then
+switches sweep to sweep as new pending rows appear and are adjudicated. Adam has not been
+seen converged in any sample of its fresh process: sweep 7, sweep 45, or the live 45–47. So
+adam still catches up more slowly than matthew after a roll, which is the original July
+shape of this concern ("catch-up stalls after a deploy restart"). It is no longer the
+weeks-long ceiling the 2026-09-13 and 2026-09-17 sections measured. **That ceiling
+converged before this deploy.**
+
+## Root-cause inventory
+
+- **The re-file itself.** Nothing is defective. The predicate
+  (`.claude/scripts/_lib/runtime_harvest.py` `_projector_lag` / `_heals_nothing`) read three
+  samples from a real, currently unconverged process. Closure by disappearance
+  (`reconcile`, `CLOSE_STREAK = 5`) retired the previous line on genuine convergence. The
+  agent contract calls this "regression handling for free". The cost is that each fleet
+  roll can re-file this fp during adam's post-restart catch-up window.
+- **`healedTotal` no longer discriminates.** Both nodes now report `healedTotal: 0` and the
+  same `divergentAnchor: 59`, in converged and unconverged samples alike. The verdict-memory
+  cures mean rows now **adjudicate** rather than heal. `healedTotal: 0` is the fleet's
+  healthy norm, and in practice `_heals_nothing` has become `converged is False` held across
+  `LAG_POLLS` samples. On matthew, `converged` switches sweep to sweep (58 true, 60 false).
+  Three polls that each land on an unconverged sweep would file a matthew finding. Nothing
+  has done so yet, because matthew's window holds 6 converged samples out of 8. The risk is
+  latent and named here. It is not fixed.
+- **Poll count is not a duration.** `LAG_POLLS = 3` counts SessionStart-driven polls. Polls
+  159 and 160 were the same sweep. The per-sample `sweeps >= MIN_SWEEPS (3)` floor treats a
+  7-sweep process with `peersAsked: 0` as having a "base". The `booted` fixture in
+  `.claude/scripts/_lib/__tests__/runtime_harvest_test.py` models a fresh boot as sweeps
+  0–2, but a real fresh boot measured here is 7 sweeps, 0 peers asked.
+- **Substrate (unchanged owner).** Adam's post-roll convergence rate is still set by
+  conductor admission and full-arc saturation on its conductor:
+  `elohim/elohim-storage/src/conductor_admission.rs` (capacity = `db_max_readers − 3`) and
+  `elohim/elohim-storage/src/p2p/projection_reconcile.rs` (the sweep and the `converged`
+  fold). The cure design (coordinated warm-up and a reconcile ramp keyed on
+  `elohim_conductor_admission_*`) is owned by
+  `genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md`.
+
+## Fix path
+
+**No code change in this pass. That is deliberate.** Each candidate poller change trades a
+flap for a blind spot, and this predicate family has already been rewritten twice for that
+exact trade:
+
+- *A `peersAsked > 0` abstain term* would have kept polls 159 and 160 from counting. That
+  only delays this filing by two polls if adam is still unconverged then. It also blinds
+  the predicate to an isolated projector that never reaches a peer ("cannot sweep"), which
+  is a real exhaustion.
+- *Raising `MIN_SWEEPS`* adds a warm-up grace measured in sweeps. Sweep length depends on load.
+  It is about 7 minutes on adam now, and sweeps 7 → 45 took roughly three hours, so no
+  sweep count maps to a stable duration.
+  The genuine 2026-09-13 filing happened at 21–23 sweeps. Any floor above that would have
+  delayed a real detection by hours.
+- *Detecting a process reset* by comparing `sweeps` across polls would break the standing
+  lesson on this poller: a counter on these endpoints belongs to a process, not a node.
+
+The honest cure is a **duration-denominated warm-up grace**. It needs storage to publish its
+process age on `/p2p/status`, for example a `projectionReconcile.startedAt` or an
+`uptimeSecs` field. The predicate would then abstain while `uptime < restart-churn
+envelope`, the "~20 min churn + hours of catch-up" the substrate trust contract names.
+Adding that field is a storage change plus a fleet roll, and `projection_reconcile.rs` is
+under operator WIP in the working tree. The change is named here and not taken.
+
+## Current decision
+
+**BLOCKED.** The verdict is the same, but it now rests on a narrower concern. The chronic
+ceiling is **resolved** (five converged polls on one process, polls 154–158). What remains
+live is adam's slow post-deploy convergence. Its lever is the coordinated warm-up and
+reconcile ramp owned by the fleet saturation record. That is an **actuation** loop, and
+this agent's remit excludes it.
+
+Ledger line `79f357281ca5` is set to `status: blocked` and cites this file, so dispatch
+stays suppressed while adam's fresh process catches up. **Expected next state:** adam
+converges the way its previous process did. After five clean polls the poller deletes the
+line by disappearance, and that deletion is honest. The next fleet roll may re-file the fp
+during catch-up. That filing is known to be this post-deploy shape, and the fix for it is
+the uptime-graded grace above.
+
+**Stasis-sweep re-check criterion:** if adam is still `converged: false` on every sampled
+sweep more than 12 hours after the 21:05Z 2026-09-23 roll (so by about 2026-09-24T09:00Z),
+the chronic ceiling has regressed under conductor pin `7e553f9c3`. The 2026-09-13
+Prometheus families (`elohim_projection_heal_outcomes_total`,
+`elohim_conductor_admission_shed_total`, `elohim_conductor_admission_in_flight`) are then
+the next read.
+
+## Verification
+
+- 2026-09-24 00:40–00:50Z: `https://elohim.host/p2p/status` sampled once a minute for 10
+  minutes. `https://elohim.host/admin/self-healing`, `https://elohim.host/health`,
+  `https://doorway-alpha.elohim.host/p2p/status` and `/db/p2p/conductor-diagnostics` on both
+  doorways were read once each. All returned HTTP 200 and are quoted above. The condition
+  is **LIVE**: sweeps 45 → 47, `converged: false` throughout, pending 2 → 55, failed 0 → 3.
+- Cursor window replay (read-only, table above): converged on 5 of 5 samples from the prior
+  process; three affirming samples from the fresh process, two of them with `peersAsked: 0`.
+- `git diff HEAD -- .claude/data/runtime-findings.jsonl` shows the committed `blocked` line
+  (poll 91) removed and replaced by the `seen: 1` line (poll 161). This is consistent with
+  the honest closure shown in the window.
+- Not verified here: Prometheus heal-outcome and admission-shed families. The observability
+  datasource was not reachable from this pass, so attribution of the clearing to the
+  2026-09-17..21 storage cures is inferred from commit timing, not measured.
+- No cargo, mesh, cluster action or push in this pass.
+- **Correction to the 2026-09-17 signature:** a `seen: 1` re-file of this fp is evidence
+  that `CLOSE_STREAK` was insufficient **only if** the cursor window before the re-file
+  contains no run of 5 converged samples from one monotonic sweep series. Check the window
+  before concluding.
