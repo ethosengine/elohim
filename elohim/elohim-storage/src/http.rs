@@ -500,6 +500,11 @@ pub struct HttpServer {
     /// Manifest registry for projector status endpoint.
     /// Wired at startup via `with_manifest_registry`. None = endpoint returns empty cursors.
     manifest_registry: Option<Arc<crate::projector::ManifestRegistry>>,
+    /// The node's observation manager — one append-only log per local
+    /// observer, resumed from `observation_logs`, with the manifest-declared
+    /// observation kinds (`ELOHIM_PILLAR_MANIFEST_DIR`). Built with the server
+    /// at boot so every observation write goes through one chokepoint.
+    observation_manager: Arc<crate::observation::manager::ObservationManagerBackend>,
     /// Conductor signing client for /api/v1/signal/emit (EPR Phase 2B Task C.2).
     /// Wired at startup via `with_signing_client`. None = endpoint returns 503.
     signing_client: Option<Arc<crate::signing::ConductorSigningClient>>,
@@ -1073,6 +1078,62 @@ fn is_spa_route_subpath(sub: &str) -> bool {
     !final_segment.contains('.')
 }
 
+/// True when `path` is one of the three observation-*session* routes:
+/// `/api/v1/observations/begin`, `/api/v1/observations/{id}/entries` and
+/// `/api/v1/observations/{id}/report`.
+///
+/// Namespace collision: the observation *sessions* API (session-scoped entries
+/// and reports) and the observation *layer* API (`api/observations.rs` — the
+/// `by-subject`/`by-observer`/`diversity` reads and the observation write and
+/// stream routes) share the `/api/v1/observations` prefix. A bare prefix match
+/// sent every observation-layer path to the session handler, so the layer's
+/// routes never served. Only these exact shapes are captured here; everything
+/// else under the prefix falls through to the `/api/v1/` catch-all. Separating
+/// the two namespaces is the backlog atom
+/// `observation-session-route-namespace-collision`.
+fn is_observation_session_path(path: &str) -> bool {
+    let Some(sub) = path.strip_prefix("/api/v1/observations/") else {
+        return false;
+    };
+    if sub == "begin" {
+        return true;
+    }
+    match sub.split_once('/') {
+        Some((id, action)) => !id.is_empty() && matches!(action, "entries" | "report"),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod observation_session_arm_tests {
+    use super::is_observation_session_path;
+
+    #[test]
+    fn observation_session_arm_does_not_capture_bare_path() {
+        const BASE: &str = "/api/v1/observations";
+        // The observation layer's own routes (POST bare path, the stream, the
+        // reads) fall through to the `/api/v1/` catch-all.
+        for sub in [
+            "",
+            "/",
+            "/stream",
+            "/by-subject",
+            "/by-observer",
+            "/diversity",
+            "//entries",
+            "/abc/entries/x",
+        ] {
+            let path = format!("{BASE}{sub}");
+            assert!(!is_observation_session_path(&path), "captured {path}");
+        }
+        // The three session routes still reach the session handler.
+        for sub in ["/begin", "/abc/entries", "/abc/report"] {
+            let path = format!("{BASE}{sub}");
+            assert!(is_observation_session_path(&path), "missed {path}");
+        }
+    }
+}
+
 /// Preserve transport stats while making byte-serialized DNA hashes valid JSON keys.
 fn project_transport_stats(
     stats: &holochain_types::network::HolochainTransportStats,
@@ -1184,6 +1245,13 @@ impl HttpServer {
             render_capability: None,
             extensions: None,
             manifest_registry: None,
+            observation_manager: Arc::new(
+                crate::observation::manager::ObservationManagerBackend::new().with_kind_registry(
+                    Arc::new(
+                        crate::services::observation_kinds::ObservationKindRegistry::load_default(),
+                    ),
+                ),
+            ),
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
@@ -1266,6 +1334,13 @@ impl HttpServer {
     ) -> Self {
         self.manifest_registry = Some(registry);
         self
+    }
+
+    /// The node's observation manager (per-observer logs + declared kinds).
+    pub fn observation_manager(
+        &self,
+    ) -> &Arc<crate::observation::manager::ObservationManagerBackend> {
+        &self.observation_manager
     }
 
     /// Set the conductor signing client for `/api/v1/signal/emit`.
@@ -2527,8 +2602,10 @@ impl HttpServer {
                 self.handle_remove_pin(&id_str).await
             }
 
-            // Observation Session API -- must be matched before the /api/v1/ catch-all
-            (method, p) if p.starts_with("/api/v1/observations") => {
+            // Observation Session API -- must be matched before the /api/v1/ catch-all.
+            // Only the three session shapes are captured (`is_observation_session_path`);
+            // the rest of `/api/v1/observations*` belongs to `api/observations.rs`.
+            (method, p) if is_observation_session_path(p) => {
                 if let Some(ref pool) = self.db_pool {
                     let sub_path = p.strip_prefix("/api/v1/observations").unwrap_or("");
                     self.handle_observation_request(req, method, sub_path, pool.clone())

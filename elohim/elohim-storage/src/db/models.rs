@@ -3533,6 +3533,36 @@ pub struct NewObservationRow<'a> {
 }
 
 // ============================================================================
+// observation_logs (Category C — per-observer log head roster). Source of
+// truth: the observer's own append-only log; this row records its latest
+// root and next offset so a restarted manager resumes the chain instead of
+// re-minting offset 0. Rebuildable by log replay. Classification: C.
+// ============================================================================
+
+/// Queryable row from the `observation_logs` table (SELECT).
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = crate::db::diesel_schema::observation_logs)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ObservationLogRow {
+    pub observer_cid: String,
+    pub latest_log_cid: String,
+    /// Next offset to be written (= count of observations in the log).
+    pub latest_offset: i64,
+    pub retention_class: String,
+    pub last_attested_at: Option<i64>,
+}
+
+/// Insertable row for the `observation_logs` table (INSERT / upsert).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = crate::db::diesel_schema::observation_logs)]
+pub struct NewObservationLogRow<'a> {
+    pub observer_cid: &'a str,
+    pub latest_log_cid: &'a str,
+    pub latest_offset: i64,
+    pub retention_class: &'a str,
+}
+
+// ============================================================================
 // observation_diversity_summary (Category C — SQLite view, aggregation of
 // the observations table). Source of truth: aggregation over observations.
 // Rebuildable by re-running the CREATE VIEW DDL. Classification: C.

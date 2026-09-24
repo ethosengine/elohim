@@ -15,12 +15,21 @@ use thiserror::Error;
 pub enum ObservationLogError {
     #[error("encoding error: {0}")]
     Encoding(String),
+    /// The SQL projection or the persisted log head could not be written.
+    #[error("persistence error: {0}")]
+    Persistence(String),
 }
 
 /// Per-observer append-only log. Maintains a rolling BLAKE3 root over the
 /// MessagePack encoding of each appended observation.
+///
+/// A log is either fresh ([`ObservationLog::new_in_memory`], offset 0) or
+/// resumed from a persisted head ([`ObservationLog::resume`]). A resumed log
+/// holds only the observations appended since it resumed; `base_offset` is the
+/// number of observations that precede them.
 pub struct ObservationLog {
     observer_cid: String,
+    base_offset: u64,
     entries: Vec<Observation>,
     rolling_hasher: blake3::Hasher,
     current_root: String,
@@ -33,9 +42,40 @@ impl ObservationLog {
         let initial = format!("blake3:{}", hasher.finalize().to_hex());
         Self {
             observer_cid,
+            base_offset: 0,
             entries: Vec::new(),
             rolling_hasher: hasher,
             current_root: initial,
+        }
+    }
+
+    /// Resume a log from its persisted head (`observation_logs.latest_offset`,
+    /// `observation_logs.latest_log_cid`), so offsets continue instead of
+    /// re-minting 0 after a restart.
+    ///
+    /// A `blake3::Hasher` is not serialisable, so the rolling state cannot be
+    /// restored. Instead the resumed hasher is seeded with the stored root
+    /// (its `blake3:<hex>` text) and every later append is hashed after it.
+    /// From a resume onwards, `log_cid` therefore means a **chained** root —
+    /// BLAKE3 over (previous root ‖ observations since) — not the root of one
+    /// uninterrupted stream over every observation: a log resumed at offset N
+    /// and a log that never stopped reach different roots for the same bytes.
+    /// Both are stable, and each still commits to everything before it through
+    /// the stored root. The signed, persisted iroh-backed log named in the
+    /// `attention-witnessed-privately` habit's retire-when replaces both this
+    /// in-memory log and the chaining.
+    ///
+    /// The observations before `latest_offset` are not held in memory: the SQL
+    /// projection keeps them, and `read_from` serves only the resumed tail.
+    pub fn resume(observer_cid: String, latest_offset: u64, latest_log_cid: String) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(latest_log_cid.as_bytes());
+        Self {
+            observer_cid,
+            base_offset: latest_offset,
+            entries: Vec::new(),
+            rolling_hasher: hasher,
+            current_root: latest_log_cid,
         }
     }
 
@@ -47,8 +87,10 @@ impl ObservationLog {
         self.current_root.clone()
     }
 
+    /// The next offset to be written (= the number of observations in the log,
+    /// including those before a resume).
     pub fn latest_offset(&self) -> u64 {
-        self.entries.len() as u64
+        self.base_offset + self.entries.len() as u64
     }
 
     /// Append an observation. Hashes its MessagePack encoding into the rolling
@@ -62,8 +104,11 @@ impl ObservationLog {
         Ok(())
     }
 
-    /// Read all observations at or after the given offset, in append order.
+    /// Read all observations held in memory at or after the given offset, in
+    /// append order. For a resumed log, offsets before the resume point are not
+    /// held and are skipped.
     pub async fn read_from(&self, offset: u64) -> Result<Vec<Observation>, ObservationLogError> {
-        Ok(self.entries.iter().skip(offset as usize).cloned().collect())
+        let skip = offset.saturating_sub(self.base_offset) as usize;
+        Ok(self.entries.iter().skip(skip).cloned().collect())
     }
 }

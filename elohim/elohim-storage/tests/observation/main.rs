@@ -7,6 +7,7 @@
 //! changed: the crate-root-only `#![cfg(...)]` gates are hoisted onto the
 //! `mod` declarations here, verbatim.
 
+mod manager_resume_test;
 mod observation_diversity_view_test;
 mod observation_gossip_test;
 #[cfg(feature = "p2p-iroh")]
