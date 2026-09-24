@@ -193,8 +193,9 @@ pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
 /// Fuse `screen`'s lexical candidates with the recipe's other producers, in place, asking each
 /// over `scope` with the typed question. Nothing happens when the contract declares no fusion.
 /// A producer that could not rank (absent, unavailable, undeclared) adds ONE omission line and is
-/// left out of the fusion, charged nothing; a known ranking's own omissions (a stale fold's
-/// `fold N files behind`) ride into the screen's and its usage is charged as part of the screen.
+/// left out of the fusion — charged as part of the screen only if an embedding process ran; a
+/// known ranking's own omissions (a stale fold's `fold N files behind`) ride into the screen's and
+/// its usage is charged as part of the screen.
 pub(super) fn fuse_screen(
     args: &Args,
     contract: &Contract,
@@ -238,8 +239,14 @@ pub(super) fn fuse_screen(
                 continue;
             }
         };
+        // Metered whenever the call answered or an embedding process actually ran — a spawned
+        // then failed embedder still cost its seconds; a route refused before any spawn (no
+        // fold, another method, a label mismatch) cost nothing and is charged nothing.
+        let ran = answer.usage["embedding_processes"].as_u64().unwrap_or(0) > 0;
+        if answer.ranking_known || ran {
+            charge_screen_call(usage, producer, &answer);
+        }
         if !answer.ranking_known {
-            // An absent route ran nothing the screen should be charged for.
             let why = if answer.unresolved.is_empty() {
                 "ranking unknown; not fused".to_string()
             } else {
@@ -256,7 +263,6 @@ pub(super) fn fuse_screen(
             );
             continue;
         }
-        charge_screen_call(usage, producer, &answer);
         for line in answer.omissions {
             push_omission(screen, line);
         }

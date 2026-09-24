@@ -82,6 +82,17 @@ impl EmbedBudget {
 /// Texts in, one vector per text out, under the budget the caller resolved from the contract.
 pub trait Embedder {
     fn embed(&self, texts: &[String], budget: EmbedBudget) -> FlowResult<Embedding>;
+
+    /// `embed`, also saying whether an embedding PROCESS actually ran — the metering fact a
+    /// caller charges on (a process that ran and then failed still cost its seconds; a call
+    /// refused before any spawn cost nothing). An in-process embedder spawns nothing.
+    fn embed_metered(
+        &self,
+        texts: &[String],
+        budget: EmbedBudget,
+    ) -> (FlowResult<Embedding>, bool) {
+        (self.embed(texts, budget), false)
+    }
 }
 
 fn within_batch(texts: &[String], budget: EmbedBudget) -> FlowResult<()> {
@@ -261,6 +272,28 @@ pub fn interpreter_from(configured: Option<String>) -> String {
 
 impl Embedder for PinnedProcedure {
     fn embed(&self, texts: &[String], budget: EmbedBudget) -> FlowResult<Embedding> {
+        self.embed_metered(texts, budget).0
+    }
+
+    fn embed_metered(
+        &self,
+        texts: &[String],
+        budget: EmbedBudget,
+    ) -> (FlowResult<Embedding>, bool) {
+        let mut spawned = false;
+        let result = self.run(texts, budget, &mut spawned);
+        (result, spawned)
+    }
+}
+
+impl PinnedProcedure {
+    /// The embedding itself; `spawned` turns true the moment the interpreter process started.
+    fn run(
+        &self,
+        texts: &[String],
+        budget: EmbedBudget,
+        spawned: &mut bool,
+    ) -> FlowResult<Embedding> {
         within_batch(texts, budget)?;
         self.verify_procedure()?;
         let model_dir = self.manifest.resolve_model_dir().ok_or_else(|| {
@@ -295,6 +328,7 @@ impl Embedder for PinnedProcedure {
                 self.interpreter
             ))
         })?;
+        *spawned = true;
         if let Some(reason) = outcome.error {
             return Err(unavailable(format!("embedding procedure: {reason}")));
         }

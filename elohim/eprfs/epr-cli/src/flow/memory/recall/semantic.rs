@@ -19,7 +19,8 @@
 //!    the passage.
 //!
 //! The vector scan reads a DERIVED store: it is reported in `usage` (`semantic_chunks_scanned`,
-//! `semantic_query_ms`, `provider_seconds`), never charged to `source_bytes` or `scan_bytes`.
+//! `semantic_query_ms`, `provider_seconds`, and `embedding_processes` when an embedding process
+//! actually ran — answered or not), never charged to `source_bytes` or `scan_bytes`.
 //! Locating the winner's heading reads the source file itself, and that outline read is charged
 //! to the scan counters exactly as the first screen's is.
 //!
@@ -346,9 +347,12 @@ fn answer_into(
     }
     // The question, embedded once.
     let embedding_began = Instant::now();
-    let embedding = embedder
-        .embed(&[query.to_string()], budget)
-        .map_err(unavailable);
+    let (embedding, spawned) = embedder.embed_metered(&[query.to_string()], budget);
+    if spawned {
+        // A process ran: its cost is metered whether or not it answered.
+        answer["usage"]["embedding_processes"] = json!(1);
+    }
+    let embedding = embedding.map_err(unavailable);
     answer["usage"]["provider_seconds"] =
         json!((embedding_began.elapsed().as_secs_f64() * 1e6).round() / 1e6);
     let question = embedding?

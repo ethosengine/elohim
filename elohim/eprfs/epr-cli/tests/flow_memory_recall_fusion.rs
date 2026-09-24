@@ -611,16 +611,13 @@ fn the_root_authority_screen_fuses() {
         "{screen}"
     );
 }
-
-/// Ruling 2: `open --purpose bootstrap` asks the semantic route nothing — no embedding process
-/// spawns. The store is a pinned one the declared procedure would embed against, and the
-/// interpreter is a script that leaves a mark when run: a focused open with a typed `--need`
-/// leaves it (the control), a bootstrap open does not.
-#[test]
-fn bootstrap_spawns_no_embedding_process() {
-    use elohim_epr_cli::flow::memory::recall::embedder::{
-        INTERPRETER_ENV, MODEL_MANIFEST_REL, PROCEDURE_REL,
-    };
+/// A tree whose semantic route reads a PINNED store the declared procedure would embed against,
+/// with an interpreter script that leaves a mark each time it runs and then exits 1 (so every
+/// embedding that spawns fails). `label` relabels the store's embedder (`None` keeps the
+/// procedure's own label). Returns (tree, marker, interpreter).
+fn pinned_marker_tree(label: Option<&str>) -> (TempDir, std::path::PathBuf, std::path::PathBuf) {
+    use elohim_epr_cli::flow::memory::recall::embedder::{MODEL_MANIFEST_REL, PROCEDURE_REL};
+    use std::os::unix::fs::PermissionsExt;
     let dir = tree();
     let root = dir.path();
     let mut contract_value = contract(root).value;
@@ -643,7 +640,7 @@ fn bootstrap_spawns_no_embedding_process() {
     )
     .unwrap();
     let mut manifest = live(MODEL_MANIFEST_REL);
-    let label = format!(
+    let procedure_label = format!(
         "procedure {} on model {}",
         manifest["procedure"].as_str().unwrap(),
         manifest["model_bytes"].as_str().unwrap()
@@ -651,7 +648,7 @@ fn bootstrap_spawns_no_embedding_process() {
     let conn = rusqlite::Connection::open(pinned.join("fold.sqlite")).unwrap();
     conn.execute(
         "UPDATE meta SET value = ?1 WHERE key = 'embedder'",
-        [&label],
+        [label.unwrap_or(&procedure_label)],
     )
     .unwrap();
     drop(conn);
@@ -671,16 +668,42 @@ fn bootstrap_spawns_no_embedding_process() {
         ),
     )
     .unwrap();
-    use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&interpreter, std::fs::Permissions::from_mode(0o755)).unwrap();
-    let env = [(INTERPRETER_ENV, interpreter.as_path())];
+    (dir, marker, interpreter)
+}
 
+/// A focused open under the marking interpreter, as JSON; asserts exit 0.
+fn focused_with_interpreter(root: &Path, session: &str, interpreter: &Path) -> Value {
+    use elohim_epr_cli::flow::memory::recall::embedder::INTERPRETER_ENV;
+    let (code, stdout, stderr) = cli_with(
+        root,
+        CONTRACT_REL,
+        session,
+        &["open", "--need", NEED, "--scope", "genesis", "--json"],
+        &[(INTERPRETER_ENV, interpreter)],
+    );
+    assert_eq!(
+        code,
+        Some(0),
+        "an unavailable route never exits the screen: {stdout}{stderr}"
+    );
+    serde_json::from_str(&stdout).unwrap()
+}
+
+/// Ruling 2: `open --purpose bootstrap` asks the semantic route nothing — no embedding process
+/// spawns. A focused open with a typed `--need` leaves the interpreter's mark (the control), a
+/// bootstrap open does not.
+#[test]
+fn bootstrap_spawns_no_embedding_process() {
+    use elohim_epr_cli::flow::memory::recall::embedder::INTERPRETER_ENV;
+    let (dir, marker, interpreter) = pinned_marker_tree(None);
+    let root = dir.path();
     let (code, stdout, stderr) = cli_with(
         root,
         CONTRACT_REL,
         "boot",
         &["open", "--purpose", "bootstrap", "--json"],
-        &env,
+        &[(INTERPRETER_ENV, interpreter.as_path())],
     );
     assert_eq!(code, Some(0), "{stdout}{stderr}");
     assert!(!marker.exists(), "bootstrap spawned an embedding process");
@@ -688,26 +711,63 @@ fn bootstrap_spawns_no_embedding_process() {
     assert!(boot["first_screen"].is_null(), "{boot}");
 
     // The control: a typed --need does ask the route, so the harness would have seen a spawn.
-    let (code, stdout, stderr) = cli_with(
-        root,
-        CONTRACT_REL,
-        "focused",
-        &["open", "--need", NEED, "--scope", "genesis", "--json"],
-        &env,
-    );
-    assert_eq!(
-        code,
-        Some(0),
-        "an unavailable route never exits the screen: {stdout}{stderr}"
-    );
+    let view = focused_with_interpreter(root, "focused", &interpreter);
     assert!(marker.exists(), "the control asked the pinned embedder");
-    let view: Value = serde_json::from_str(&stdout).unwrap();
     let absent = semantic_lines(&view["first_screen"]);
     assert_eq!(absent.len(), 1, "{view}");
     assert!(
         absent[0].starts_with("semantic: unavailable:"),
         "{absent:?}"
     );
+}
+
+/// Metering (fix round 1, item 7): an embedding process that ran and then failed is charged as
+/// the screen's call — `first_screen_semantic_calls: 1` plus its seconds — though it ranked
+/// nothing; never as the packet's `search_queries`.
+#[test]
+fn a_spawned_then_failed_embedder_is_charged_to_the_screen() {
+    let (dir, marker, interpreter) = pinned_marker_tree(None);
+    let root = dir.path();
+    let view = focused_with_interpreter(root, "spawned", &interpreter);
+    assert!(marker.exists(), "precondition: the embedding process ran");
+    assert!(view["first_screen"]
+        .get("fusion")
+        .is_none_or(Value::is_null));
+    let usage = &view["usage"];
+    assert_eq!(usage["first_screen_semantic_calls"], 1, "{usage}");
+    assert_eq!(usage["embedding_processes"], 1, "{usage}");
+    assert!(
+        usage["provider_seconds"].as_f64().unwrap_or(0.0) > 0.0,
+        "{usage}"
+    );
+    assert_eq!(
+        usage["search_queries"], 1,
+        "the lexical traversal's own, only: {usage}"
+    );
+}
+
+/// Metering (fix round 1, item 7): a route refused before any spawn — here a store folded under
+/// another embedder label — ran nothing and is charged nothing.
+#[test]
+fn a_route_refused_before_any_spawn_is_charged_nothing() {
+    let (dir, marker, interpreter) = pinned_marker_tree(Some("fixture"));
+    let root = dir.path();
+    let view = focused_with_interpreter(root, "refused", &interpreter);
+    assert!(!marker.exists(), "precondition: nothing spawned");
+    assert_eq!(
+        semantic_lines(&view["first_screen"]),
+        vec!["semantic: the fold was built under another method — refold".to_string()]
+    );
+    let usage = &view["usage"];
+    for key in [
+        "first_screen_semantic_calls",
+        "embedding_processes",
+        "provider_seconds",
+        "semantic_query_ms",
+        "semantic_chunks_scanned",
+    ] {
+        assert!(usage.get(key).is_none(), "{key} charged: {usage}");
+    }
 }
 
 /// Fix round 1, finding 1: the generated habit register is never offered on a first screen,
