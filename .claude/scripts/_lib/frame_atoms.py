@@ -27,6 +27,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import unicodedata
 from pathlib import Path
 
@@ -80,6 +81,91 @@ def _strict(path: Path, value: dict, keys: set[str]) -> None:
                              f"missing {sorted(keys - set(value))}, unknown {sorted(set(value) - keys)}")
 
 
+_ID_RE = re.compile(r"^frame-[a-z][a-z0-9-]*$")
+_VALIDATOR_RE = re.compile(r"^epr:validator-[a-z][a-z0-9-]*$")
+_FRAME_ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+_MARKER_RE = re.compile(r"^[a-z][a-z-]*:$")
+_CONSTS = (("family", "defeater"), ("polarity", "incriminating"), ("cost_class", "high-fp-cost"),
+           ("binding", "binding-local"))
+_RUBRIC_KEYS = {"question", "legitimate_frames", "apex_answer"}
+
+
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_str_list(value) -> bool:
+    return isinstance(value, list) and all(isinstance(v, str) for v in value)
+
+
+def _validate(atom: dict) -> str | None:
+    """The constraints `frame.schema.json` states beyond the key shape — the twin of the native
+    `frames::validate_atom` (ruling R-C12, review M1). Returns why the atom breaks its own
+    schema, or None. An empty phrase used to make `str.find("")` return the same offset forever
+    (the host hung); an uppercase one could never match the lowercased shadow."""
+    for key in ("id", "validator", "apex_concept", "family", "polarity", "cost_class", "binding",
+                "linguistic_definition", "reason_clause", "established_by"):
+        if not isinstance(atom[key], str):
+            return f"`{key}` must be a string"
+    for key in ("apex_concept", "linguistic_definition", "reason_clause", "established_by"):
+        if not atom[key]:
+            return f"`{key}` must not be empty"
+    if not _ID_RE.match(atom["id"]):
+        return f"`id` `{atom['id']}` must match {_ID_RE.pattern}"
+    if not _VALIDATOR_RE.match(atom["validator"]):
+        return f"`validator` `{atom['validator']}` must match {_VALIDATOR_RE.pattern}"
+    if not _is_int(atom["version"]) or atom["version"] < 1:
+        return "`version` must be an integer of at least 1"
+    for key, want in _CONSTS:
+        if atom[key] != want:
+            return f"`{key}` must be `{want}`, not `{atom[key]}`"
+    rubric = atom["rubric"]
+    if not isinstance(rubric, dict) or set(rubric) != _RUBRIC_KEYS:
+        return "`rubric` must carry exactly question, legitimate_frames, apex_answer"
+    if not isinstance(rubric["question"], str) or not rubric["question"]:
+        return "`rubric.question` must not be empty"
+    if rubric["apex_answer"] != APEX_ANSWER:
+        return f"`rubric.apex_answer` must be `{APEX_ANSWER}`"
+    frames = rubric["legitimate_frames"]
+    if not isinstance(frames, list) or not frames:
+        return "`rubric.legitimate_frames` needs at least one frame"
+    for frame in frames:
+        if not isinstance(frame, dict) or set(frame) != {"id", "description"}:
+            return "a legitimate frame carries exactly id and description"
+        if not isinstance(frame["id"], str) or not _FRAME_ID_RE.match(frame["id"]):
+            return f"legitimate frame id `{frame['id']}` must match {_FRAME_ID_RE.pattern}"
+        if not isinstance(frame["description"], str) or not frame["description"]:
+            return f"legitimate frame `{frame['id']}` needs a description"
+    if not _is_str_list(atom["cites"]) or not atom["cites"] or not all(atom["cites"]):
+        return "`cites` needs at least one non-empty cite"
+    signal = atom["recall_signal"]
+    phrases, markers = signal["phrases"], signal["markers"]
+    if not _is_str_list(phrases) or not phrases:
+        return "`recall_signal.phrases` needs at least one phrase"
+    for i, phrase in enumerate(phrases):
+        if not phrase:
+            return "an empty recall_signal phrase would match everywhere"
+        if any("A" <= c <= "Z" for c in phrase):
+            return (f"recall_signal phrase `{phrase}` has uppercase letters; the shadow is "
+                    f"lowercased, so it could never match")
+        if phrase in phrases[:i]:
+            return f"recall_signal phrase `{phrase}` is listed twice"
+    if not _is_str_list(markers) or not markers:
+        return "`recall_signal.markers` needs at least one marker"
+    for i, marker in enumerate(markers):
+        if not _MARKER_RE.match(marker):
+            return f"recall_signal marker `{marker}` must match {_MARKER_RE.pattern}"
+        if marker in markers[:i]:
+            return f"recall_signal marker `{marker}` is listed twice"
+    for key, low, high in (("min_net_new", 1, None), ("scan_cap_bytes", 1, None),
+                           ("cosine_floor_permille", 0, 1000), ("probe_min_net_new_bytes", 0, None)):
+        value = signal[key]
+        if not _is_int(value) or value < low or (high is not None and value > high):
+            bound = f"between {low} and {high}" if high is not None else f"at least {low}"
+            return f"`recall_signal.{key}` must be an integer {bound}"
+    return None
+
+
 def frame_ref(atom: dict) -> str:
     """The atom's CID: the registry-row recipe, spelled as CIDv1 dag-cbor / sha2-256."""
     from _lib import epr_meta  # lazy: epr_meta's guards import this module
@@ -106,6 +192,9 @@ def load_frames(root: Path | None = None) -> dict[str, tuple[dict, str]]:
         if not isinstance(atom.get("recall_signal"), dict):
             raise FrameAtomError(f"{path}: recall_signal is not an object")
         _strict(path, atom["recall_signal"], _SIGNAL_KEYS)
+        broken = _validate(atom)
+        if broken is not None:
+            raise FrameAtomError(f"{path}: breaks frame.schema.json — {broken}")
         ref = atom["validator"]
         if ref in frames:
             raise FrameAtomError(f"two frame atoms bind validator `{ref}`")
@@ -118,6 +207,13 @@ def load_ontology(root: Path | None = None) -> dict:
     ontology = _read(path)
     _strict(path, ontology, _ONTOLOGY_KEYS)
     return ontology
+
+
+def ontology_ref(root: Path | None = None) -> str:
+    """The ontology atom's CID by the same registry-row recipe as `frame_ref` (review W2): the
+    fold table decides what a hit is, so the evidence names it — a classification reproduces
+    from `(targetCid, frameRef, ontologyRef)`. Equal to native `frames::load_ontology`'s CID."""
+    return frame_ref(load_ontology(root))
 
 
 def short_cid(cid: str) -> str:
@@ -196,6 +292,8 @@ def _scan(lines, phrases, folder: _Folder, cap: int) -> dict:
         folded, origin, beyond = folder.shadow(line, base, cap)
         beyond_cap = beyond_cap or beyond
         for phrase in phrases:
+            if not phrase:
+                continue  # refused by the loader (R-C12); never let `find("")` spin
             at = folded.find(phrase)
             while at != -1:
                 hits += 1
@@ -211,6 +309,8 @@ def _declared_markers(post: str, markers: list[str]) -> list[tuple[str, str]]:
     low = post.lower()
     found = []
     for marker in markers:
+        if not marker:
+            continue  # refused by the loader (R-C12); never let `find("")` spin
         at = low.find(marker)
         while at != -1:
             value = low[at + len(marker):].split("\n", 1)[0]
@@ -232,13 +332,15 @@ def _prior(write: dict) -> str:
 
 def classify(write: dict, validator: str, root: Path | None = None) -> dict | None:
     """Mirror of `frames::classify` → `{frameRef, verdict, spans, confidence, reason,
-    classificationCid: None}`, or `None` when the write adds no net-new apex phrases.
+    classificationCid: None, ontologyRef, …}`, or `None` when the write adds no net-new apex
+    phrases.
     Raises `FrameAtomError` when the atom or ontology cannot be read."""
     frames = load_frames(root)
     if validator not in frames:
         raise FrameAtomError(f"no frame atom binds validator `{validator}`")
     atom, ref = frames[validator]
-    folder = _Folder(load_ontology(root))
+    ontology = load_ontology(root)
+    folder = _Folder(ontology)
     signal = atom["recall_signal"]
     post = write.get("content") or ""
     added, removed = _line_delta(_prior(write), post)
@@ -269,6 +371,7 @@ def classify(write: dict, validator: str, root: Path | None = None) -> dict | No
         "confidence": confidence,
         "reason": reason_line(atom, ref, None, verdict),
         "classificationCid": None,
+        "ontologyRef": frame_ref(ontology),
         "netNew": net_new,
         "matchedRecallSignal": matched,
         "rubricAnswer": rubric_answer,

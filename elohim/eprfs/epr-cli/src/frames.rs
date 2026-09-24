@@ -161,7 +161,147 @@ fn read_json(path: &Path) -> Result<Value, FrameError> {
     })
 }
 
-/// Parse one atom strictly and mint its CID.
+/// `^<head>[<tail>]*$` over ASCII classes, the shape every id pattern in `frame.schema.json` has.
+fn ascii_pattern(value: &str, prefix: &str, first: fn(u8) -> bool, rest: fn(u8) -> bool) -> bool {
+    let Some(body) = value.strip_prefix(prefix) else {
+        return false;
+    };
+    let bytes = body.as_bytes();
+    !bytes.is_empty() && first(bytes[0]) && bytes[1..].iter().all(|b| rest(*b))
+}
+
+fn lower_alnum_dash(b: u8) -> bool {
+    b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'
+}
+
+/// The constraints `frame.schema.json` states beyond the shape serde already enforces
+/// (ruling R-C12, review M1). An atom that breaks its own schema is refused as
+/// [`FrameError::Invalid`], so the guard degrades to `Unavailable` — the declared class — rather
+/// than looping, panicking, or silently never matching. The Python loader
+/// (`frame_atoms._validate`) refuses exactly the same atoms.
+pub fn validate_atom(atom: &FrameAtom) -> Result<(), String> {
+    let non_empty = [
+        ("apex_concept", &atom.apex_concept),
+        ("linguistic_definition", &atom.linguistic_definition),
+        ("reason_clause", &atom.reason_clause),
+        ("rubric.question", &atom.rubric.question),
+        ("established_by", &atom.established_by),
+    ];
+    for (key, value) in non_empty {
+        if value.is_empty() {
+            return Err(format!("`{key}` must not be empty"));
+        }
+    }
+    if !ascii_pattern(
+        &atom.id,
+        "frame-",
+        |b| b.is_ascii_lowercase(),
+        lower_alnum_dash,
+    ) {
+        return Err(format!(
+            "`id` `{}` must match ^frame-[a-z][a-z0-9-]*$",
+            atom.id
+        ));
+    }
+    if !ascii_pattern(
+        &atom.validator,
+        "epr:validator-",
+        |b| b.is_ascii_lowercase(),
+        lower_alnum_dash,
+    ) {
+        return Err(format!(
+            "`validator` `{}` must match ^epr:validator-[a-z][a-z0-9-]*$",
+            atom.validator
+        ));
+    }
+    if atom.version < 1 {
+        return Err("`version` must be at least 1".into());
+    }
+    for (key, value, want) in [
+        ("family", &atom.family, "defeater"),
+        ("polarity", &atom.polarity, "incriminating"),
+        ("cost_class", &atom.cost_class, "high-fp-cost"),
+        ("binding", &atom.binding, "binding-local"),
+        ("rubric.apex_answer", &atom.rubric.apex_answer, APEX_ANSWER),
+    ] {
+        if value != want {
+            return Err(format!("`{key}` must be `{want}`, not `{value}`"));
+        }
+    }
+    if atom.rubric.legitimate_frames.is_empty() {
+        return Err("`rubric.legitimate_frames` needs at least one frame".into());
+    }
+    for frame in &atom.rubric.legitimate_frames {
+        if !ascii_pattern(&frame.id, "", |b| b.is_ascii_lowercase(), lower_alnum_dash) {
+            return Err(format!(
+                "legitimate frame id `{}` must match ^[a-z][a-z0-9-]*$",
+                frame.id
+            ));
+        }
+        if frame.description.is_empty() {
+            return Err(format!(
+                "legitimate frame `{}` needs a description",
+                frame.id
+            ));
+        }
+    }
+    if atom.cites.is_empty() || atom.cites.iter().any(String::is_empty) {
+        return Err("`cites` needs at least one non-empty cite".into());
+    }
+    let signal = &atom.recall_signal;
+    if signal.phrases.is_empty() {
+        return Err("`recall_signal.phrases` needs at least one phrase".into());
+    }
+    for (i, phrase) in signal.phrases.iter().enumerate() {
+        // `minLength: 1` — an empty phrase matches at every offset with length 0.
+        if phrase.is_empty() {
+            return Err("an empty recall_signal phrase would match everywhere".into());
+        }
+        // `^[^A-Z]+$` — phrases match the LOWERCASED shadow; an uppercase one never matches.
+        if phrase.bytes().any(|b| b.is_ascii_uppercase()) {
+            return Err(format!(
+                "recall_signal phrase `{phrase}` has uppercase letters; the shadow is lowercased, \
+                 so it could never match"
+            ));
+        }
+        if signal.phrases[..i].contains(phrase) {
+            return Err(format!("recall_signal phrase `{phrase}` is listed twice"));
+        }
+    }
+    if signal.markers.is_empty() {
+        return Err("`recall_signal.markers` needs at least one marker".into());
+    }
+    for (i, marker) in signal.markers.iter().enumerate() {
+        let well_formed = marker.strip_suffix(':').is_some_and(|body| {
+            ascii_pattern(
+                body,
+                "",
+                |b| b.is_ascii_lowercase(),
+                |b| b.is_ascii_lowercase() || b == b'-',
+            )
+        });
+        if !well_formed {
+            return Err(format!(
+                "recall_signal marker `{marker}` must match ^[a-z][a-z-]*:$"
+            ));
+        }
+        if signal.markers[..i].contains(marker) {
+            return Err(format!("recall_signal marker `{marker}` is listed twice"));
+        }
+    }
+    if signal.min_net_new < 1 {
+        return Err("`recall_signal.min_net_new` must be at least 1".into());
+    }
+    if signal.scan_cap_bytes < 1 {
+        return Err("`recall_signal.scan_cap_bytes` must be at least 1".into());
+    }
+    if signal.cosine_floor_permille > 1000 {
+        return Err("`recall_signal.cosine_floor_permille` must be at most 1000".into());
+    }
+    Ok(())
+}
+
+/// Parse one atom strictly, check it against its schema's constraints, and mint its CID.
 pub fn load_atom(path: &Path) -> Result<LoadedFrame, FrameError> {
     let raw = read_json(path)?;
     let invalid = |message: String| FrameError::Invalid {
@@ -170,6 +310,7 @@ pub fn load_atom(path: &Path) -> Result<LoadedFrame, FrameError> {
     };
     let atom: FrameAtom =
         serde_json::from_value(raw.clone()).map_err(|error| invalid(error.to_string()))?;
+    validate_atom(&atom).map_err(invalid)?;
     let cid = atom_cid(&raw).map_err(invalid)?;
     Ok((atom, cid))
 }
@@ -206,21 +347,30 @@ pub fn load_frames(repo_root: &Path) -> Result<BTreeMap<String, LoadedFrame>, Fr
     Ok(frames)
 }
 
-/// The ontology atom, read strictly.
-pub fn load_ontology(repo_root: &Path) -> Result<FrameOntology, FrameError> {
+/// The ontology atom paired with its content address (`ontologyRef`).
+pub type LoadedOntology = (FrameOntology, Cid);
+
+/// The ontology atom, read strictly, with its CID by the same registry-row recipe as a frame
+/// atom's (review W2): the fold table is part of what a classification means, so the evidence
+/// names it and a classification reproduces from `(targetCid, frameRef, ontologyRef)`.
+pub fn load_ontology(repo_root: &Path) -> Result<LoadedOntology, FrameError> {
     let path = repo_root.join(FRAMES_DIR).join(ONTOLOGY_FILE);
     let raw = read_json(&path)?;
-    serde_json::from_value(raw).map_err(|error| FrameError::Invalid {
-        path,
-        message: error.to_string(),
-    })
+    let invalid = |message: String| FrameError::Invalid {
+        path: path.clone(),
+        message,
+    };
+    let ontology: FrameOntology =
+        serde_json::from_value(raw.clone()).map_err(|error| invalid(error.to_string()))?;
+    let cid = atom_cid(&raw).map_err(invalid)?;
+    Ok((ontology, cid))
 }
 
 /// The frame bound to `validator` plus the ontology, or why they could not be read.
 pub fn frame_for(
     repo_root: &Path,
     validator: &str,
-) -> Result<(LoadedFrame, FrameOntology), FrameError> {
+) -> Result<(LoadedFrame, LoadedOntology), FrameError> {
     let mut frames = load_frames(repo_root)?;
     let frame = frames
         .remove(validator)
@@ -414,7 +564,9 @@ fn scan(lines: &[(usize, &str)], phrases: &[String], folder: &Folder, cap: usize
         }
         let (shadow, beyond) = folder.shadow(line, *base, cap);
         out.beyond_cap |= beyond;
-        for phrase in phrases {
+        // An empty phrase is refused by the loader (R-C12); skipping it here keeps a hand-built
+        // atom from underflowing `at + len - 1`.
+        for phrase in phrases.iter().filter(|phrase| !phrase.is_empty()) {
             for (at, matched) in shadow.folded.match_indices(phrase.as_str()) {
                 out.hits += 1;
                 out.spans.push(Span {
@@ -438,7 +590,7 @@ fn scan(lines: &[(usize, &str)], phrases: &[String], folder: &Folder, cap: usize
 fn declared_markers(post: &str, markers: &[String]) -> Vec<(String, String)> {
     let lowered = post.to_lowercase();
     let mut found = Vec::new();
-    for marker in markers {
+    for marker in markers.iter().filter(|marker| !marker.is_empty()) {
         for (at, _) in lowered.match_indices(marker.as_str()) {
             let rest = &lowered[at + marker.len()..];
             let value = rest.split('\n').next().unwrap_or("");
@@ -513,12 +665,16 @@ pub fn classify(
 }
 
 /// The opaque evidence value a guard hands to `ValidatorOutcome::Classified`. The top-level keys
-/// are the ones the Python mirror carries too (`frameRef`, `verdict`, `spans`, `confidence`,
-/// `reason`, `classificationCid`); `classification` is the full record, with its CIDs spelled as
-/// strings (one encoding per meaning in governed JSON).
+/// are the ones the Python mirror carries too (`frameRef`, `ontologyRef`, `verdict`, `spans`,
+/// `confidence`, `reason`, `classificationCid`); `classification` is the full record, with its
+/// CIDs spelled as strings (one encoding per meaning in governed JSON). `ontologyRef` sits here,
+/// beside `classificationCid`, and not inside `FrameClassification`: the primitive in
+/// `elohim-epr` is unchanged, and the fold table's address rides in the carried evidence
+/// (ruling R-C14, review W2).
 pub fn evidence_value(
     classification: &FrameClassification,
     classification_cid: &Cid,
+    ontology_ref: &Cid,
     reason: &str,
 ) -> Value {
     let mut record = serde_json::to_value(classification).unwrap_or(Value::Null);
@@ -534,6 +690,7 @@ pub fn evidence_value(
     }
     json!({
         "frameRef": classification.frame_ref.to_string(),
+        "ontologyRef": ontology_ref.to_string(),
         "verdict": verdict_word(classification.verdict),
         "spans": classification.evidence.spans,
         "confidence": classification.confidence,
@@ -571,7 +728,9 @@ mod tests {
     }
 
     fn frame(validator: &str) -> (LoadedFrame, FrameOntology) {
-        frame_for(&repo_root(), validator).expect("the live atoms load")
+        let (loaded, (ontology, _)) =
+            frame_for(&repo_root(), validator).expect("the live atoms load");
+        (loaded, ontology)
     }
 
     fn write(prior: Option<&str>, content: &str) -> GovernanceWrite {
@@ -848,6 +1007,132 @@ mod tests {
             GOLDEN_CLASSIFICATION_CID,
             "golden classification CID drift — actual = {cid}"
         );
+    }
+
+    /// A fixture repo root carrying the live atoms with the sovereignty atom rewritten by `edit`.
+    fn fixture_with_sovereignty_atom(edit: impl FnOnce(&mut Value)) -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let frames = dir.path().join(FRAMES_DIR);
+        fs::create_dir_all(&frames).unwrap();
+        for name in [
+            ONTOLOGY_FILE,
+            "frame-sovereignty-apex.json",
+            "frame-ownership-inalienable.json",
+        ] {
+            fs::copy(repo_root().join(FRAMES_DIR).join(name), frames.join(name)).unwrap();
+        }
+        let path = frames.join("frame-sovereignty-apex.json");
+        let mut raw = read_json(&path).unwrap();
+        edit(&mut raw);
+        fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+        dir
+    }
+
+    /// Review M1 (ruling R-C12): an empty phrase used to reach `scan`, where
+    /// `match_indices("")` matches at offset 0 with length 0 and `at + 0 - 1` underflowed —
+    /// a panic in the decision authority. The loader now refuses an atom that breaks its own
+    /// schema (`minLength: 1`), so the guard is `Unavailable` (clamped to the declared class),
+    /// never a panic and never a pass.
+    #[test]
+    fn m1_empty_phrase_is_refused_as_invalid_atom() {
+        let dir = fixture_with_sovereignty_atom(|raw| {
+            raw["recall_signal"]["phrases"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!(""));
+        });
+        match load_frames(dir.path()) {
+            Err(FrameError::Invalid { message, .. }) => {
+                assert!(message.contains("phrase"), "{message}")
+            }
+            other => panic!("an empty phrase must refuse the atom, got {other:?}"),
+        }
+        for content in ["We are self-sovereign.", "Plain stewardship prose."] {
+            assert!(matches!(
+                outcome(dir.path(), SOVEREIGNTY, content),
+                ValidatorOutcome::Unavailable
+            ));
+        }
+        // An empty marker is refused the same way (it would match at every offset).
+        let dir = fixture_with_sovereignty_atom(|raw| {
+            raw["recall_signal"]["markers"] = json!([""]);
+        });
+        assert!(matches!(
+            load_frames(dir.path()),
+            Err(FrameError::Invalid { .. })
+        ));
+        // Defense in depth: a hand-built atom that never passed the loader still cannot panic.
+        let ((mut atom, cid), ontology) = frame(SOVEREIGNTY);
+        atom.recall_signal.phrases.push(String::new());
+        atom.recall_signal.markers.push(String::new());
+        let classified = classify(
+            &write(None, "We are self-sovereign."),
+            &(atom, cid),
+            &ontology,
+        )
+        .expect("the real phrase still fires");
+        assert_eq!(classified.0.evidence.spans.len(), 1);
+    }
+
+    /// Review M1 (ruling R-C12): phrases are matched against the LOWERCASED shadow, so an
+    /// uppercase phrase can never match — a silently dead guard. The schema says `^[^A-Z]+$`;
+    /// the loader refuses what the schema refuses. Markers follow `^[a-z][a-z-]*:$`, and the
+    /// other `minLength` / `minimum` constraints refuse the same way.
+    #[test]
+    fn m1_uppercase_phrase_is_refused() {
+        let dir = fixture_with_sovereignty_atom(|raw| {
+            raw["recall_signal"]["phrases"][0] = json!("Self-Sovereign");
+        });
+        assert!(matches!(
+            load_frames(dir.path()),
+            Err(FrameError::Invalid { .. })
+        ));
+        assert!(matches!(
+            outcome(dir.path(), SOVEREIGNTY, "We are self-sovereign."),
+            ValidatorOutcome::Unavailable
+        ));
+        for edit in [
+            (|raw: &mut Value| raw["recall_signal"]["markers"] = json!(["Sovereignty-frame:"]))
+                as fn(&mut Value),
+            |raw| raw["recall_signal"]["markers"] = json!(["sovereignty-frame"]),
+            |raw| raw["recall_signal"]["phrases"] = json!([]),
+            |raw| raw["recall_signal"]["phrases"] = json!(["fully sovereign", "fully sovereign"]),
+            |raw| raw["recall_signal"]["min_net_new"] = json!(0),
+            |raw| raw["recall_signal"]["scan_cap_bytes"] = json!(0),
+            |raw| raw["recall_signal"]["cosine_floor_permille"] = json!(1001),
+            |raw| raw["reason_clause"] = json!(""),
+            |raw| raw["family"] = json!("supporter"),
+            |raw| raw["rubric"]["apex_answer"] = json!("summit"),
+            |raw| raw["rubric"]["legitimate_frames"] = json!([]),
+            |raw| raw["id"] = json!("Frame-X"),
+        ] {
+            let dir = fixture_with_sovereignty_atom(edit);
+            assert!(
+                matches!(load_frames(dir.path()), Err(FrameError::Invalid { .. })),
+                "a schema-violating atom must refuse"
+            );
+        }
+        // The live atoms satisfy their schema.
+        load_frames(&repo_root()).expect("the live atoms are schema-valid");
+    }
+
+    /// Review W2 (ruling R-C14): the fold table (NFKC + confusables) decides what a phrase hit
+    /// is, so the carried evidence names it by content address, beside `classificationCid`.
+    #[test]
+    fn w2_evidence_carries_ontology_ref() {
+        let root = repo_root();
+        let raw = read_json(&root.join(FRAMES_DIR).join(ONTOLOGY_FILE)).unwrap();
+        let recipe = atom_cid(&raw).unwrap();
+        let (_, loaded) = load_ontology(&root).unwrap();
+        assert_eq!(loaded, recipe);
+        println!("frame-ontology.json ontologyRef = {recipe}");
+        let ValidatorOutcome::Classified { evidence, .. } =
+            outcome(&root, SOVEREIGNTY, "We are self-sovereign.")
+        else {
+            panic!("the guard classifies");
+        };
+        assert_eq!(evidence["ontologyRef"], json!(recipe.to_string()));
+        assert!(evidence["classificationCid"].is_string());
     }
 
     #[test]

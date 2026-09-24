@@ -437,6 +437,7 @@ fn frame_guard(request: &ValidatorRequest<'_>) -> ValidatorOutcome {
     let Ok((frame, ontology)) = frames::frame_for(request.repo_root, request.reference) else {
         return ValidatorOutcome::Unavailable;
     };
+    let (ontology, ontology_ref) = ontology;
     let Some((classification, cid)) = frames::classify(request.write, &frame, &ontology) else {
         return ValidatorOutcome::Pass;
     };
@@ -449,7 +450,7 @@ fn frame_guard(request: &ValidatorRequest<'_>) -> ValidatorOutcome {
         &cid.to_string(),
         frames::verdict_word(classification.verdict),
     );
-    let evidence = frames::evidence_value(&classification, &cid, &reason);
+    let evidence = frames::evidence_value(&classification, &cid, &ontology_ref, &reason);
     ValidatorOutcome::Classified { reason, evidence }
 }
 

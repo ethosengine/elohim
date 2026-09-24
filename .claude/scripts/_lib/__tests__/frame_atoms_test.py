@@ -311,6 +311,103 @@ finally:
     else:
         os.environ["CLAUDE_PROJECT_DIR"] = _saved
 
+# ── Review M1 (ruling R-C12): a malformed atom refuses; it never hangs the host ─────────────
+import subprocess  # noqa: E402
+
+
+def _fixture_with(edit) -> Path:
+    """A temp repo root carrying the live atoms, with the sovereignty atom rewritten by `edit`."""
+    root = Path(tempfile.mkdtemp(prefix="frame-m1-"))
+    shutil.copytree(FRAMES, root / frame_atoms.FRAMES_REL)
+    path = root / frame_atoms.FRAMES_REL / "frame-sovereignty-apex.json"
+    atom = json.loads(path.read_text())
+    edit(atom)
+    path.write_text(json.dumps(atom))
+    return root
+
+
+def _refuses(root: Path) -> bool:
+    try:
+        frame_atoms.load_frames(root)
+    except frame_atoms.FrameAtomError:
+        return True
+    return False
+
+
+# The host-level proof runs in a CHILD with a timeout: before the fix, `str.find("")` returned
+# the same offset forever and the Python host hung (the review reproduced it: `timeout 5` → 124).
+_GUARD_CHILD = """
+import sys
+sys.path.insert(0, sys.argv[1])
+from _lib import epr_meta
+v = epr_meta._sovereignty_ontology_guard(
+    {"path": "x.md", "content": "We are self-sovereign.\\n", "is_new": True})
+print(v.refer_reason if v is not None else "none")
+"""
+
+
+def _guard_outcome(root: Path) -> tuple[int | None, str]:
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root))
+    try:
+        done = subprocess.run([sys.executable, "-c", _GUARD_CHILD, str(REPO / ".claude/scripts")],
+                              capture_output=True, text=True, timeout=20, env=env)
+    except subprocess.TimeoutExpired:
+        return None, "timed out — the host hung"
+    return done.returncode, done.stdout.strip() + done.stderr.strip()[-300:]
+
+
+print("m1_empty_phrase_is_refused_as_invalid_atom")
+_root = _fixture_with(lambda a: a["recall_signal"]["phrases"].append(""))
+check("an empty phrase refuses the atom (FrameAtomError)", _refuses(_root))
+_rc, _out = _guard_outcome(_root)
+check("the guard degrades to unresolvable-validator — no hang, no pass",
+      _rc == 0 and _out == "unresolvable-validator", f"rc={_rc} out={_out}")
+shutil.rmtree(_root, ignore_errors=True)
+_root = _fixture_with(lambda a: a["recall_signal"].__setitem__("markers", [""]))
+check("an empty marker refuses the atom", _refuses(_root))
+_rc, _out = _guard_outcome(_root)
+check("…and the guard neither hangs nor passes on it",
+      _rc == 0 and _out == "unresolvable-validator", f"rc={_rc} out={_out}")
+shutil.rmtree(_root, ignore_errors=True)
+
+print("m1_uppercase_phrase_is_refused")
+_root = _fixture_with(lambda a: a["recall_signal"]["phrases"].__setitem__(0, "Self-Sovereign"))
+check("an uppercase phrase refuses the atom (the shadow is lowercased; it could never match)",
+      _refuses(_root))
+shutil.rmtree(_root, ignore_errors=True)
+_SCHEMA_BREAKS = {
+    "uppercase marker": lambda a: a["recall_signal"].__setitem__("markers", ["Sovereignty-frame:"]),
+    "marker without colon": lambda a: a["recall_signal"].__setitem__("markers", ["sovereignty-frame"]),
+    "no phrases": lambda a: a["recall_signal"].__setitem__("phrases", []),
+    "duplicate phrase": lambda a: a["recall_signal"].__setitem__(
+        "phrases", ["fully sovereign", "fully sovereign"]),
+    "min_net_new 0": lambda a: a["recall_signal"].__setitem__("min_net_new", 0),
+    "scan_cap_bytes 0": lambda a: a["recall_signal"].__setitem__("scan_cap_bytes", 0),
+    "cosine floor over 1000": lambda a: a["recall_signal"].__setitem__("cosine_floor_permille", 1001),
+    "empty reason_clause": lambda a: a.__setitem__("reason_clause", ""),
+    "family not defeater": lambda a: a.__setitem__("family", "supporter"),
+    "apex_answer not apex": lambda a: a["rubric"].__setitem__("apex_answer", "summit"),
+    "no legitimate frames": lambda a: a["rubric"].__setitem__("legitimate_frames", []),
+    "id breaks its pattern": lambda a: a.__setitem__("id", "Frame-X"),
+    "phrase is not a string": lambda a: a["recall_signal"].__setitem__("phrases", [7]),
+}
+for _what, _edit in _SCHEMA_BREAKS.items():
+    _root = _fixture_with(_edit)
+    check(f"schema break refuses the atom (Rust `validate_atom` twin): {_what}", _refuses(_root))
+    shutil.rmtree(_root, ignore_errors=True)
+check("the live atoms satisfy their schema", not _refuses(REPO))
+
+# ── Review W2 (ruling R-C14): the evidence names the fold table by content address ──────────
+print("w2_evidence_carries_ontology_ref")
+# Pinned by `frames::tests::w2_evidence_carries_ontology_ref` (printed there).
+RUST_ONTOLOGY_REF = "bafyreicurg2k5fhyv2vgjbxmf7efm6myb2ms64aozzczj3phsdugul4bni"
+check("ontology_ref(root) == the Rust pin", frame_atoms.ontology_ref(REPO) == RUST_ONTOLOGY_REF,
+      f"got {frame_atoms.ontology_ref(REPO)}")
+_r = frame_atoms.classify({"content": "We are self-sovereign.\n", "is_new": True, "path": "x.md"},
+                          SOV, REPO)
+check("classify evidence carries ontologyRef beside classificationCid",
+      _r["ontologyRef"] == RUST_ONTOLOGY_REF and "classificationCid" in _r, f"got {_r}")
+
 print("reason_line_matches_rust_format")
 # The native reason for the golden fixture (frames::tests::golden_fixture_classification_cid),
 # built from the same format string with the Rust-minted classification CID.
