@@ -2910,6 +2910,14 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                 // during the investigation of its own outage.
                                 if (targetEnv == 'alpha') {
                                     sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' genesis/orchestrator/manifests/infra/alpha-doorway-podmonitor.yaml"
+                                    // The edgenode PodMonitor — scrapes every storage pod's
+                                    // /metrics AND, on conductor pods that expose the
+                                    // `hc-metrics` port (fork pin >= 0f26f6703 lineage), the
+                                    // conductor's own hc_* instruments. Same tolerant helper,
+                                    // same RBAC caveat. Until 2026-09-24 nothing applied it,
+                                    // which is why Prometheus held zero hc_* series and every
+                                    // post-restart window was read from Loki lines alone.
+                                    sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' genesis/orchestrator/manifests/infra/alpha-edgenode-podmonitor.yaml"
                                 }
 
                                 // Deploy each human in parallel — see deployHumansInParallel
