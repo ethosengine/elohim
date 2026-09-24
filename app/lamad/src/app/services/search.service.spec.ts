@@ -1,15 +1,18 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { SearchService } from './search.service';
-import { ContentIndex, DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from './data-loader.service';
 import { TrustBadgeService } from './trust-badge.service';
-import { SearchQuery } from '../models/search.model';
+import { ContentBackendService } from './content-backend.service';
 import { vi, Mock } from 'vitest';
+
+import type { ContentSearchView } from '../../generated/content-search-view';
 
 describe('SearchService', () => {
   let service: SearchService;
   let dataLoaderSpy: any;
   let trustBadgeSpy: any;
+  let backendSpy: any;
 
   const mockContentIndex = {
     nodes: [
@@ -94,6 +97,101 @@ describe('SearchService', () => {
     lastUpdated: '2025-01-06T00:00:00.000Z',
   };
 
+  /**
+   * A whole answer from the peer, in the peer's order. The service is its reader:
+   * whatever this fixture says is what the results must say.
+   */
+  function peerAnswer(overrides: Partial<ContentSearchView> = {}): ContentSearchView {
+    return {
+      query: 'governance',
+      rankingKnown: true,
+      recipe: {
+        name: 'rrf-v2',
+        cid: 'bafyreianswerrecipecid0000000000000000000000000000000000',
+        k: 60,
+        orderOnly: true,
+        producers: [{ id: 'lexical', method: 'bafyreimeasurecid000000000000' }],
+      },
+      lens: {
+        level: 'standard',
+        choiceCount: 20,
+        cid: 'bafyreilenstablecid000000000',
+        provenance: 'defaulted',
+      },
+      selection: 'showing 3 of 3 ranked under rrf-v2',
+      fold: {
+        state: 'present',
+        value: {
+          measure: 'bafyreimeasurecid000000000000',
+          state: 'complete',
+          attestationCid: 'bafyreiattestationcid00000000',
+          at: 1_790_000_000,
+        },
+      },
+      foldLag: {
+        state: 'present',
+        value: { behind: 0, limit: 200, unit: 'units', within: true },
+      },
+      candidates: [
+        {
+          contentId: 'content-5',
+          title: 'Protocol Implementation',
+          contentType: 'lesson',
+          reach: 'commons',
+          trust: 'notarized',
+          tags: ['protocol', 'governance'],
+          score: 0.032,
+          producer: 'lexical',
+          method: 'bafyreimeasurecid000000000000',
+          bestSection: { title: 'head', snippet: 'governance modules, step by step' },
+        },
+        {
+          contentId: 'content-1',
+          title: 'Governance Framework',
+          contentType: 'epic',
+          reach: 'commons',
+          trust: 'published',
+          tags: ['governance', 'principles'],
+          score: 0.016,
+          producer: 'lexical',
+          method: 'bafyreimeasurecid000000000000',
+          bestSection: { title: 'tags', snippet: 'governance' },
+        },
+        {
+          contentId: 'content-2',
+          title: 'Constitutional Design',
+          contentType: 'concept',
+          reach: 'community',
+          trust: 'unconfirmed',
+          tags: ['constitution'],
+          score: 0.008,
+          producer: 'lexical',
+          method: 'bafyreimeasurecid000000000000',
+          bestSection: null,
+        },
+      ],
+      facets: {
+        contentType: [
+          { value: 'lesson', count: 1 },
+          { value: 'epic', count: 1 },
+          { value: 'concept', count: 1 },
+        ],
+        reach: [
+          { value: 'commons', count: 2 },
+          { value: 'community', count: 1 },
+        ],
+        tags: [
+          { value: 'governance', count: 2 },
+          { value: 'protocol', count: 1 },
+        ],
+      },
+      omissions: ['1 row withheld: reach private, reader is not a holder'],
+      unresolved: [],
+      totalCount: 3,
+      ...overrides,
+    } as ContentSearchView;
+  }
+
   beforeEach(() => {
     const dataLoaderSpyObj = {
       getContentIndex: vi.fn(),
@@ -102,20 +200,28 @@ describe('SearchService', () => {
     const trustBadgeSpyObj = {
       getTrustBadges: vi.fn(),
     };
+    const backendSpyObj = {
+      searchContentView: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
         SearchService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
+        { provide: ContentBackendService, useValue: backendSpyObj },
       ],
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
     trustBadgeSpy = TestBed.inject(TrustBadgeService) as { [K in keyof TrustBadgeService]?: Mock };
+    backendSpy = TestBed.inject(ContentBackendService) as {
+      [K in keyof ContentBackendService]?: Mock;
+    };
 
     dataLoaderSpy.getContentIndex.mockReturnValue(of(mockContentIndex));
     dataLoaderSpy.getPathIndex.mockReturnValue(of(mockPathIndex));
+    backendSpy.searchContentView.mockReturnValue(of(peerAnswer()));
 
     service = TestBed.inject(SearchService);
   });
@@ -125,378 +231,219 @@ describe('SearchService', () => {
   });
 
   // =========================================================================
-  // Basic Search
+  // The route's client (plan Lane S, ruling R-S6)
   // =========================================================================
 
   describe('search', () => {
-    it('should return all results when no text query', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          // 5 content nodes + 1 path = 6 total
-          expect(results.totalCount).toBe(6);
-          expect(results.results.length).toBe(6);
-          done();
-        });
-      }));
-
-    it('should filter by text query', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance' }).subscribe(results => {
-          expect(results.totalCount).toBeGreaterThan(0);
-          // Should match title "Governance Framework" and tag "governance"
-          expect(results.results.some(r => r.title.includes('Governance'))).toBe(true);
-          done();
-        });
-      }));
-
-    it('should score title matches higher than description', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance' }).subscribe(results => {
-          // "Governance Framework" should be ranked higher than "Protocol Implementation"
-          // which only has governance in tags and description
-          const governanceIdx = results.results.findIndex(r => r.title === 'Governance Framework');
-          const protocolIdx = results.results.findIndex(r => r.title === 'Protocol Implementation');
-
-          if (governanceIdx >= 0 && protocolIdx >= 0) {
-            expect(governanceIdx).toBeLessThan(protocolIdx);
-          }
-          done();
-        });
-      }));
-
-    it('should include relevance score', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance' }).subscribe(results => {
-          for (const result of results.results) {
-            expect(result.relevanceScore).toBeDefined();
-            expect(result.relevanceScore).toBeGreaterThan(0);
-          }
-          done();
-        });
-      }));
-
-    it('should include matched fields', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance' }).subscribe(results => {
-          const governance = results.results.find(r => r.title === 'Governance Framework');
-          expect(governance?.matchedFields.some(f => f.field === 'title')).toBe(true);
-          done();
-        });
-      }));
-
-    it('should include highlights', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance' }).subscribe(results => {
-          const governance = results.results.find(r => r.title === 'Governance Framework');
-          expect(governance?.highlights.length).toBeGreaterThan(0);
-          done();
-        });
-      }));
-
-    it('should handle multi-word queries', () =>
-      new Promise<void>(done => {
-        service.search({ text: 'governance design' }).subscribe(results => {
-          // Should match content with both words
-          expect(
-            results.results.some(
-              r =>
-                r.title.toLowerCase().includes('governance') ||
-                r.title.toLowerCase().includes('design')
-            )
-          ).toBe(true);
-          done();
-        });
-      }));
-  });
-
-  // =========================================================================
-  // Filtering
-  // =========================================================================
-
-  describe('filtering', () => {
-    it('should filter by content type', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', contentTypes: ['epic', 'feature'] }).subscribe(results => {
-          for (const result of results.results) {
-            expect(['epic', 'feature']).toContain(result.contentType);
-          }
-          done();
-        });
-      }));
-
-    it('should filter by reach level', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', reachLevels: ['commons', 'regional'] }).subscribe(results => {
-          for (const result of results.results) {
-            expect(['commons', 'regional']).toContain(result.reach);
-          }
-          done();
-        });
-      }));
-
-    it('should filter by tags (OR logic)', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', tags: ['governance', 'trust'] }).subscribe(results => {
-          for (const result of results.results) {
-            const hasMatchingTag = result.tags.some(
-              t => t.toLowerCase() === 'governance' || t.toLowerCase() === 'trust'
-            );
-            expect(hasMatchingTag).toBe(true);
-          }
-          done();
-        });
-      }));
-
-    it('should filter by required tags (AND logic)', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', requiredTags: ['governance', 'design'] }).subscribe(results => {
-          for (const result of results.results) {
-            const tags = result.tags.map(t => t.toLowerCase());
-            expect(tags).toContain('governance');
-            expect(tags).toContain('design');
-          }
-          done();
-        });
-      }));
-
-    it('should filter by minimum trust score', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', minTrustScore: 0.8 }).subscribe(results => {
-          for (const result of results.results) {
-            expect(result.trustScore).toBeGreaterThanOrEqual(0.8);
-          }
-          done();
-        });
-      }));
-
-    it('should exclude flagged content', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', excludeFlagged: true }).subscribe(results => {
-          for (const result of results.results) {
-            expect(result.hasFlags).toBe(false);
-          }
-          done();
-        });
-      }));
-
-    it('should combine text search with filters', () =>
+    it('search_calls_backend_searchContentView_with_text_and_page', () =>
       new Promise<void>(done => {
         service
           .search({
             text: 'governance',
+            page: 3,
+            pageSize: 5,
             contentTypes: ['epic'],
+            reachLevels: ['commons'],
+            tags: ['protocol'],
           })
-          .subscribe(results => {
-            expect(results.totalCount).toBeGreaterThan(0);
-            for (const result of results.results) {
-              expect(result.contentType).toBe('epic');
-            }
+          .subscribe(() => {
+            expect(backendSpy.searchContentView).toHaveBeenCalledWith({
+              q: 'governance',
+              limit: 5,
+              offset: 10,
+              contentType: 'epic',
+              reach: 'commons',
+              tags: ['protocol'],
+            });
             done();
           });
       }));
-  });
 
-  // =========================================================================
-  // Sorting
-  // =========================================================================
-
-  describe('sorting', () => {
-    it('should sort by relevance (default)', () =>
+    it('search_maps_candidates_to_results_preserving_server_order', () =>
       new Promise<void>(done => {
         service.search({ text: 'governance' }).subscribe(results => {
-          // Results should be in descending relevance order
-          for (let i = 0; i < results.results.length - 1; i++) {
-            expect(results.results[i].relevanceScore).toBeGreaterThanOrEqual(
-              results.results[i + 1].relevanceScore
-            );
-          }
+          expect(results.results.map(r => r.id)).toEqual(['content-5', 'content-1', 'content-2']);
+          // the fused score is carried through as the relevance, never recomputed
+          expect(results.results[0].relevanceScore).toBe(0.032);
+          expect(results.results[0].title).toBe('Protocol Implementation');
+          expect(results.results[0].tags).toEqual(['protocol', 'governance']);
+          // the matched section is where the match landed, named by the peer
+          expect(results.results[0].matchedFields[0].field).toBe('title');
+          expect(results.results[1].matchedFields[0].field).toBe('tags');
+          expect(results.results[2].matchedFields).toEqual([]);
+          // trust is the peer's label, read into the client's ladder
+          expect(results.results[0].trustLevel).toBe('verified');
+          expect(results.results[0].trustScore).toBe(1);
+          expect(results.results[2].trustLevel).toBe('unverified');
           done();
         });
       }));
 
-    it('should sort by title ascending', () =>
+    it('search_does_not_reorder_a_lower_scoring_candidate_the_peer_ranked_first', () =>
       new Promise<void>(done => {
-        service.search({ text: '', sortBy: 'title', sortDirection: 'asc' }).subscribe(results => {
-          for (let i = 0; i < results.results.length - 1; i++) {
-            expect(
-              results.results[i].title.localeCompare(results.results[i + 1].title)
-            ).toBeLessThanOrEqual(0);
-          }
+        const answer = peerAnswer();
+        // The peer's order is authoritative even when the scores look "wrong" here:
+        // a fused reciprocal rank is comparable only inside one answer.
+        answer.candidates[0].score = 0.001;
+        backendSpy.searchContentView.mockReturnValue(of(answer));
+
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.results.map(r => r.id)).toEqual(['content-5', 'content-1', 'content-2']);
           done();
         });
       }));
 
-    it('should sort by trust score descending', () =>
+    it('search_uses_server_facets_and_totalCount', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance', contentTypes: ['epic'] }).subscribe(results => {
+          expect(results.totalCount).toBe(3);
+          expect(results.facets.byContentType).toEqual([
+            { value: 'lesson', count: 1, selected: false },
+            { value: 'epic', count: 1, selected: true },
+            { value: 'concept', count: 1, selected: false },
+          ]);
+          expect(results.facets.byReach.map(f => f.value)).toEqual(['commons', 'community']);
+          expect(results.facets.byTag).toEqual([
+            { value: 'governance', count: 2, selected: false },
+            { value: 'protocol', count: 1, selected: false },
+          ]);
+          // trust and flag facets have no server counterpart: counted over this page only
+          expect(results.facets.byTrustLevel.map(f => f.value).sort()).toEqual([
+            'trusted',
+            'unverified',
+            'verified',
+          ]);
+          expect(results.facets.byFlagStatus).toEqual({ flagged: 0, unflagged: 3 });
+          done();
+        });
+      }));
+
+    it('search_surfaces_provenance_recipe_and_rankingKnown', () =>
+      new Promise<void>(done => {
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.provenance.recipeCid).toBe(
+            'bafyreianswerrecipecid0000000000000000000000000000000000'
+          );
+          expect(results.provenance.rankingKnown).toBe(true);
+          expect(results.provenance.foldState).toBe('present');
+          expect(results.provenance.unresolved).toEqual([]);
+          done();
+        });
+      }));
+
+    it('search_carries_the_peers_unresolved_lines_into_provenance', () =>
+      new Promise<void>(done => {
+        backendSpy.searchContentView.mockReturnValue(
+          of(peerAnswer({ unresolved: ['recipe pin names rrf-v1; this peer ranked under rrf-v2'] }))
+        );
+
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.provenance.unresolved).toContain(
+            'recipe pin names rrf-v1; this peer ranked under rrf-v2'
+          );
+          done();
+        });
+      }));
+
+    it('search_names_a_filter_the_route_cannot_carry_rather_than_dropping_it', () =>
       new Promise<void>(done => {
         service
-          .search({ text: '', sortBy: 'trustScore', sortDirection: 'desc' })
+          .search({ text: 'governance', minTrustScore: 0.8, sortBy: 'title' })
           .subscribe(results => {
-            for (let i = 0; i < results.results.length - 1; i++) {
-              expect(results.results[i].trustScore).toBeGreaterThanOrEqual(
-                results.results[i + 1].trustScore
-              );
-            }
+            expect(results.provenance.unresolved.some(u => u.includes('minTrustScore'))).toBe(true);
+            expect(results.provenance.unresolved.some(u => u.includes('sortBy'))).toBe(true);
             done();
           });
       }));
 
-    it('should sort by newest', () =>
+    it('search_reports_an_unfolded_peer_as_absent_with_no_candidates', () =>
       new Promise<void>(done => {
-        service.search({ text: '', sortBy: 'newest', sortDirection: 'desc' }).subscribe(results => {
-          for (let i = 0; i < results.results.length - 1; i++) {
-            expect(results.results[i].createdAt! >= results.results[i + 1].createdAt!).toBe(true);
-          }
+        backendSpy.searchContentView.mockReturnValue(
+          of(
+            peerAnswer({
+              rankingKnown: false,
+              candidates: [],
+              totalCount: 0,
+              fold: { state: 'absent', reason: 'observed_absent' },
+              foldLag: { state: 'absent', reason: 'observed_absent' },
+              facets: { contentType: [], reach: [], tags: [] },
+            })
+          )
+        );
+
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.results).toEqual([]);
+          expect(results.totalCount).toBe(0);
+          expect(results.provenance.rankingKnown).toBe(false);
+          expect(results.provenance.foldState).toBe('absent');
           done();
         });
       }));
-  });
 
-  // =========================================================================
-  // Pagination
-  // =========================================================================
-
-  describe('pagination', () => {
-    it('should return first page by default', () =>
+    it('search_on_transport_error_returns_empty_with_foldState_unreachable', () =>
       new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          expect(results.page).toBe(1);
+        backendSpy.searchContentView.mockReturnValue(
+          throwError(() => new Error('HTTP 502 - bad gateway'))
+        );
+
+        service.search({ text: 'governance' }).subscribe(results => {
+          expect(results.results).toEqual([]);
+          expect(results.totalCount).toBe(0);
+          expect(results.provenance.foldState).toBe('unreachable');
+          expect(results.provenance.rankingKnown).toBe(false);
+          expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
           done();
         });
       }));
 
-    it('should paginate results', () =>
+    it('search_paginates_from_the_answers_totalCount', () =>
       new Promise<void>(done => {
-        service.search({ text: '', pageSize: 2, page: 1 }).subscribe(results => {
-          expect(results.results.length).toBe(2);
-          expect(results.pageSize).toBe(2);
+        backendSpy.searchContentView.mockReturnValue(of(peerAnswer({ totalCount: 7 })));
+
+        service.search({ text: 'governance', page: 2, pageSize: 3 }).subscribe(results => {
+          expect(results.page).toBe(2);
+          expect(results.pageSize).toBe(3);
+          expect(results.totalPages).toBe(3);
           expect(results.hasMore).toBe(true);
           done();
         });
       }));
 
-    it('should return correct page', () =>
+    it('search_never_reads_the_local_content_index', () =>
       new Promise<void>(done => {
-        service.search({ text: '', pageSize: 2, page: 2 }).subscribe(results => {
-          expect(results.page).toBe(2);
-          expect(results.results.length).toBeLessThanOrEqual(2);
+        service.search({ text: 'governance' }).subscribe(() => {
+          expect(dataLoaderSpy.getContentIndex).not.toHaveBeenCalled();
+          expect(dataLoaderSpy.getPathIndex).not.toHaveBeenCalled();
           done();
         });
       }));
 
-    it('should calculate total pages correctly', () =>
+    it('should include execution time in results', () =>
       new Promise<void>(done => {
-        service.search({ text: '', pageSize: 2 }).subscribe(results => {
-          expect(results.totalPages).toBe(3); // 5 items / 2 per page = 3 pages
-          done();
-        });
-      }));
-
-    it('should set hasMore correctly on last page', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', pageSize: 2, page: 3 }).subscribe(results => {
-          expect(results.hasMore).toBe(false);
+        service.search({ text: '' }).subscribe(results => {
+          expect(results.executionTimeMs).toBeDefined();
+          expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
           done();
         });
       }));
   });
 
   // =========================================================================
-  // Facets
-  // =========================================================================
-
-  describe('facets', () => {
-    it('should return facets with results', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          expect(results.facets).toBeDefined();
-          expect(results.facets.byContentType.length).toBeGreaterThan(0);
-          expect(results.facets.byReach.length).toBeGreaterThan(0);
-          expect(results.facets.byTag.length).toBeGreaterThan(0);
-          done();
-        });
-      }));
-
-    it('should count content types correctly', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          const epicCount = results.facets.byContentType.find(f => f.value === 'epic');
-          expect(epicCount?.count).toBe(1);
-          done();
-        });
-      }));
-
-    it('should count tags correctly', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          const governanceTag = results.facets.byTag.find(f => f.value === 'governance');
-          // 3 content items + 1 path have governance tag = 4 total
-          expect(governanceTag?.count).toBe(4);
-          done();
-        });
-      }));
-
-    it('should count flag status', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          expect(results.facets.byFlagStatus.flagged).toBe(1);
-          // 4 content items + 1 path are unflagged = 5 total
-          expect(results.facets.byFlagStatus.unflagged).toBe(5);
-          done();
-        });
-      }));
-
-    it('computeFacets_yields_non_empty_byTag_when_backend_rows_carry_tags', () =>
-      new Promise<void>(done => {
-        // Rows as /db/content now serves them (tags per row), after the
-        // content-index projection; no paths, so every tag count is content-borne.
-        dataLoaderSpy.getContentIndex.mockReturnValue(
-          of({
-            nodes: [
-              {
-                id: 'r1',
-                title: 'Soil',
-                description: '',
-                contentType: 'concept',
-                tags: ['a', 'b'],
-                reach: 'commons',
-                trustScore: 1,
-              },
-              {
-                id: 'r2',
-                title: 'Seed',
-                description: '',
-                contentType: 'concept',
-                tags: ['b'],
-                reach: 'commons',
-                trustScore: 0.5,
-              },
-            ],
-          })
-        );
-        dataLoaderSpy.getPathIndex.mockReturnValue(of({ paths: [] }));
-
-        service.search({ text: '' }).subscribe(results => {
-          const byTag = Object.fromEntries(results.facets.byTag.map(f => [f.value, f.count]));
-          expect(byTag).toEqual({ a: 1, b: 2 });
-          done();
-        });
-      }));
-
-    it('should mark selected facet values', () =>
-      new Promise<void>(done => {
-        service.search({ text: '', contentTypes: ['epic'] }).subscribe(results => {
-          const epicFacet = results.facets.byContentType.find(f => f.value === 'epic');
-          expect(epicFacet?.selected).toBe(true);
-          done();
-        });
-      }));
-  });
-
-  // =========================================================================
-  // Suggestions
+  // Suggestions — still local (captured by R-S6)
   // =========================================================================
 
   describe('suggest', () => {
+    it('suggest_still_reads_local_content_index', () =>
+      new Promise<void>(done => {
+        service.suggest('gov').subscribe(suggestions => {
+          expect(dataLoaderSpy.getContentIndex).toHaveBeenCalled();
+          expect(dataLoaderSpy.getPathIndex).toHaveBeenCalled();
+          expect(backendSpy.searchContentView).not.toHaveBeenCalled();
+          expect(suggestions.suggestions.length).toBeGreaterThan(0);
+          done();
+        });
+      }));
+
     it('should return empty for short queries', () =>
       new Promise<void>(done => {
         service.suggest('g').subscribe(suggestions => {
@@ -590,102 +537,6 @@ describe('SearchService', () => {
         service.getTagCloud().subscribe(cloud => {
           expect(cloud[0].tag).toBe('governance');
           expect(cloud[0].count).toBe(3);
-          done();
-        });
-      }));
-  });
-
-  // =========================================================================
-  // Error Handling
-  // =========================================================================
-
-  describe('error handling', () => {
-    it('should handle data loader errors gracefully', () =>
-      new Promise<void>(done => {
-        dataLoaderSpy.getContentIndex.mockReturnValue(throwError(() => new Error('Network error')));
-
-        service.search({ text: 'test' }).subscribe(results => {
-          expect(results.totalCount).toBe(0);
-          expect(results.results.length).toBe(0);
-          done();
-        });
-      }));
-
-    it('should include execution time in results', () =>
-      new Promise<void>(done => {
-        service.search({ text: '' }).subscribe(results => {
-          expect(results.executionTimeMs).toBeDefined();
-          expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
-          done();
-        });
-      }));
-
-    it('should handle empty content index', () =>
-      new Promise<void>(done => {
-        dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
-
-        service.search({ text: 'test' }).subscribe(results => {
-          expect(results.totalCount).toBe(0);
-          expect(results.results.length).toBe(0);
-          done();
-        });
-      }));
-
-    it('should handle undefined nodes', () =>
-      new Promise<void>(done => {
-        dataLoaderSpy.getContentIndex.mockReturnValue(of({} as ContentIndex));
-        dataLoaderSpy.getPathIndex.mockReturnValue(
-          of({ paths: [], totalCount: 0, lastUpdated: '' })
-        );
-
-        service.search({ text: '' }).subscribe(results => {
-          expect(results.totalCount).toBe(0);
-          done();
-        });
-      }));
-  });
-
-  // =========================================================================
-  // Match Types
-  // =========================================================================
-
-  describe('match scoring', () => {
-    it('should score exact matches higher than contains', () =>
-      new Promise<void>(done => {
-        // Add a node with exact word "trust" and one with "trustworthy"
-        const indexWithMatches = {
-          nodes: [
-            {
-              id: 'exact',
-              title: 'Building Trust',
-              description: 'About trust',
-              contentType: 'concept',
-              tags: [],
-              reach: 'commons',
-              trustScore: 1,
-              flags: [],
-            },
-            {
-              id: 'contains',
-              title: 'Trustworthy Systems',
-              description: 'About trustworthiness',
-              contentType: 'concept',
-              tags: [],
-              reach: 'commons',
-              trustScore: 1,
-              flags: [],
-            },
-          ],
-        };
-        dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithMatches));
-
-        service.search({ text: 'trust' }).subscribe(results => {
-          const exactMatch = results.results.find(r => r.id === 'exact');
-          const containsMatch = results.results.find(r => r.id === 'contains');
-
-          if (exactMatch && containsMatch) {
-            expect(exactMatch.relevanceScore).toBeGreaterThanOrEqual(containsMatch.relevanceScore);
-          }
           done();
         });
       }));

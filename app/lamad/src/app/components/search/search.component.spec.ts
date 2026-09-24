@@ -30,6 +30,14 @@ describe('SearchComponent', () => {
     },
   ] as SearchResult[];
 
+  /** The provenance line the peer's answer carries (plan Lane S, ruling R-S6). */
+  const mockProvenance = {
+    recipeCid: 'bafyreianswerrecipecid0000000000000000000000000000000000',
+    rankingKnown: true,
+    foldState: 'present' as const,
+    unresolved: [],
+  };
+
   beforeEach(async () => {
     queryParamsSubject = new Subject();
 
@@ -54,7 +62,9 @@ describe('SearchComponent', () => {
     searchServiceSpy = TestBed.inject(SearchService) as { [K in keyof SearchService]?: Mock };
 
     // Default spy return - use 'as any' to avoid full interface implementation in test
-    searchServiceSpy.search.mockReturnValue(of({ results: mockSearchResults } as any));
+    searchServiceSpy.search.mockReturnValue(
+      of({ results: mockSearchResults, provenance: mockProvenance } as any)
+    );
 
     fixture = TestBed.createComponent(SearchComponent);
     component = fixture.componentInstance;
@@ -261,6 +271,44 @@ describe('SearchComponent', () => {
 
       const tags = fixture.nativeElement.querySelectorAll('.tag');
       expect(tags.length).toBeGreaterThan(0);
+    }));
+
+    it('renders_search_provenance_testid_after_a_search', fakeAsync(() => {
+      component.query = 'governance';
+      component.performSearch();
+      fixture.detectChanges();
+      tick();
+
+      const line = fixture.nativeElement.querySelector('[data-testid="search-provenance"]');
+      expect(line).toBeTruthy();
+      const text = line.textContent.replaceAll(/\s+/g, ' ').trim();
+      expect(text).toContain('recipe bafyreianswer');
+      expect(text).toContain('ranking known');
+      expect(text).toContain('fold present');
+    }));
+
+    it('provenance_says_unknown_when_rankingKnown_false', fakeAsync(() => {
+      searchServiceSpy.search.mockReturnValue(
+        of({
+          results: [],
+          provenance: {
+            recipeCid: 'bafyreianswerrecipecid0000000000000000000000000000000000',
+            rankingKnown: false,
+            foldState: 'absent',
+            unresolved: [],
+          },
+        } as any)
+      );
+      component.query = 'governance';
+      component.performSearch();
+      fixture.detectChanges();
+      tick();
+
+      const line = fixture.nativeElement.querySelector('[data-testid="search-provenance"]');
+      expect(line).toBeTruthy();
+      const text = line.textContent.replaceAll(/\s+/g, ' ').trim();
+      expect(text).toContain('ranking unknown');
+      expect(text).toContain('fold absent');
     }));
   });
 });

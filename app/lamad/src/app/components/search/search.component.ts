@@ -7,7 +7,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { eprToUniversalHref } from '@elohim/service';
 
-import { SearchResult } from '../../models/search.model';
+import { SearchProvenance, SearchResult } from '../../models/search.model';
 import { SearchService } from '../../services/search.service';
 
 @Component({
@@ -33,6 +33,10 @@ import { SearchService } from '../../services/search.service';
 
       <div class="results-section" *ngIf="hasSearched">
         <h2>Results ({{ results.length }})</h2>
+        <p class="search-provenance" *ngIf="provenance" data-testid="search-provenance">
+          recipe {{ shortCid(provenance.recipeCid) }} · ranking
+          {{ provenance.rankingKnown ? 'known' : 'unknown' }} · fold {{ provenance.foldState }}
+        </p>
         <div class="results-list" *ngIf="results.length > 0">
           <ng-template #cardBody let-result="result">
             <div class="result-type">
@@ -109,6 +113,13 @@ import { SearchService } from '../../services/search.service';
         color: #94a3b8;
         margin-bottom: 1.5rem;
       }
+      .search-provenance {
+        margin: -0.75rem 0 1.5rem;
+        font-size: 0.8125rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--lamad-text-secondary, #64748b);
+        letter-spacing: 0.01em;
+      }
       .results-list {
         display: flex;
         flex-direction: column;
@@ -166,6 +177,12 @@ import { SearchService } from '../../services/search.service';
 export class SearchComponent implements OnInit {
   query = '';
   results: SearchResult[] = [];
+  /**
+   * What the answering peer said about its own ranking (plan Lane S, ruling R-S6): the recipe it
+   * ranked under, whether that ranking is known at all, and the state of the fold it read. The
+   * page prints it verbatim — a result list with no provenance is a claim with no author.
+   */
+  provenance: SearchProvenance | null = null;
   hasSearched = false;
   isLoading = false;
 
@@ -189,13 +206,21 @@ export class SearchComponent implements OnInit {
     this.searchService.search({ text: this.query }).subscribe({
       next: searchResults => {
         this.results = searchResults.results;
+        this.provenance = searchResults.provenance ?? null;
         this.isLoading = false;
       },
       error: () => {
         this.results = [];
+        this.provenance = null;
         this.isLoading = false;
       },
     });
+  }
+
+  /** A content address is long; the line shows enough of it to recognise and to look up. */
+  shortCid(cid: string): string {
+    if (!cid) return '—';
+    return cid.length <= 16 ? cid : `${cid.slice(0, 16)}…`;
   }
 
   /** In-bundle commands for path results; null for cross-bundle content (§12.3). */

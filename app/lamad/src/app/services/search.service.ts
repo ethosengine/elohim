@@ -6,9 +6,10 @@ import { map, catchError } from 'rxjs/operators';
 
 import { Observable, of, forkJoin } from 'rxjs';
 
-import { TrustLevel, calculateTrustLevel } from '../models/trust-badge.model';
+import { TrustLevel } from '../models/trust-badge.model';
 import { DataLoaderService } from './data-loader.service';
 import { TrustBadgeService } from './trust-badge.service';
+import { ContentBackendService } from './content-backend.service';
 
 import { ContentType, ContentReach } from '../models/content-node.model';
 import { PathIndexEntry } from '../models/learning-path.model';
@@ -17,50 +18,72 @@ import {
   SearchResult,
   SearchResults,
   SearchFacets,
+  SearchProvenance,
   FacetCount,
   SearchHighlight,
   MatchedField,
   SearchSuggestion,
   SearchSuggestions,
-  SEARCH_FIELD_WEIGHTS,
-  SEARCH_MATCH_BONUSES,
   DEFAULT_SEARCH_CONFIG,
   createEmptyResults,
-  extractSnippet,
 } from '../models/search.model';
 
 import { ContentIndexEntry } from './content.service';
 
-import type { ContentAttestationType } from '../models/content-attestation.model';
+import type { ContentSearchQuery } from '@elohim/service';
+import type {
+  ContentSearchView,
+  ContentSearchCandidateView,
+  FacetCountView,
+} from '../../generated/content-search-view';
 
 /**
- * SearchService - Enhanced content search with relevance scoring and facets.
+ * The peer's trust legibility label, read into the client's trust ladder and score.
+ * The server never invents a number (R-S5); this is the client's reading of the label,
+ * and it is the only place the reading happens.
+ */
+const TRUST_LABEL_LEVEL: ReadonlyMap<string, TrustLevel> = new Map<string, TrustLevel>([
+  ['notarized', 'verified'],
+  ['published', 'trusted'],
+  ['unconfirmed', 'unverified'],
+]);
+
+const TRUST_LABEL_SCORE: ReadonlyMap<string, number> = new Map([
+  ['notarized', 1],
+  ['published', 0.5],
+  ['unconfirmed', 0],
+]);
+
+/**
+ * SearchService - the lamad client of the peer's content search.
  *
- * Features:
- * - Relevance-scored results (title > tags > description)
- * - Highlighted match snippets
- * - Faceted filtering (type, reach, trust, tags)
- * - Pagination
- * - Autocomplete suggestions
+ * `search()` asks `GET /db/content/search` and reads the answer. The peer folded the content,
+ * declared the recipe, ranked, gated by reach and counted the facets; this service publishes what
+ * it said and the provenance it said it under. It never re-scores and never re-sorts (plan Lane S,
+ * ruling R-S6; backend authoritative, X5).
+ *
+ * `suggest()` and `getTagCloud()` stay local: autocomplete over the content index the client
+ * already holds is a reading of what is in hand, not a claim about what the peer knows.
  *
  * Usage:
  * ```typescript
- * // Basic search
+ * // Ask the peer
  * this.searchService.search({ text: 'governance' }).subscribe(results => {
- *   console.log(results.results); // Scored and highlighted results
- *   console.log(results.facets);  // Facet counts for filter UI
+ *   console.log(results.results);    // the peer's candidates, in the peer's order
+ *   console.log(results.facets);     // the peer's counts over the admitted set
+ *   console.log(results.provenance); // recipe CID, rankingKnown, fold state
  * });
  *
- * // Filtered search
+ * // Filtered — one content type and one reach ring reach the route; the rest is named
+ * // in provenance.unresolved rather than dropped
  * this.searchService.search({
  *   text: 'protocol',
- *   contentTypes: ['epic', 'feature'],
- *   minTrustScore: 0.5,
+ *   contentTypes: ['epic'],
  *   page: 1,
  *   pageSize: 10
  * }).subscribe(results => ...);
  *
- * // Autocomplete
+ * // Autocomplete (local)
  * this.searchService.suggest('gov').subscribe(suggestions => ...);
  * ```
  */
@@ -68,142 +91,209 @@ import type { ContentAttestationType } from '../models/content-attestation.model
 export class SearchService {
   private readonly dataLoader = inject(DataLoaderService);
   private readonly trustBadgeService = inject(TrustBadgeService);
+  private readonly backend = inject(ContentBackendService);
 
   /**
-   * Search content AND paths with relevance scoring, filtering, and facets.
+   * Ask the peer its content search and read the answer it gives (plan Lane S, ruling R-S6).
    *
-   * Searches both:
-   * - Content nodes (documents, articles, videos, etc.)
-   * - Learning paths (curated journeys)
+   * The ranking, the facets and the count are the peer's: it folded the content, it declared the
+   * recipe, it ran the reach gate. This service is that route's client. It does not re-score and
+   * it does not re-sort — a client that reordered the candidates would be publishing a ranking no
+   * peer ever made, under a recipe CID it then prints as provenance.
    *
-   * Results are merged and sorted by relevance.
+   * What it does do is read: the peer's `trust` label into the client's trust ladder, the matched
+   * section into the card's highlight, the recipe/rankingKnown/fold into `provenance` so the page
+   * can print where the answer came from. A transport failure is answered honestly — empty
+   * results with `foldState: 'unreachable'`, never an empty list dressed as "no matches".
    */
   search(query: SearchQuery): Observable<SearchResults> {
     const startTime = Date.now();
+    const page = query.page ?? 1;
+    const pageSize = Math.min(
+      query.pageSize ?? DEFAULT_SEARCH_CONFIG.pageSize,
+      DEFAULT_SEARCH_CONFIG.maxPageSize
+    );
 
-    // Search both content and paths in parallel
-    return forkJoin({
-      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
-      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
-    }).pipe(
-      map(({ contentIndex, pathIndex }) => {
-        const ci = contentIndex as { nodes?: ContentIndexEntry[] };
-        const pi = pathIndex as { paths?: PathIndexEntry[] };
-        const contentNodes = ci.nodes ?? [];
-        const paths = pi.paths ?? [];
-
-        // Score and filter content nodes
-        const scoredContentResults = this.scoreAndFilter(contentNodes, query);
-
-        // Score and filter paths (converted to search result format)
-        const scoredPathResults = this.scoreAndFilterPaths(paths, query);
-
-        // Merge results
-        const allResults = [...scoredContentResults, ...scoredPathResults];
-
-        // Compute facets from ALL matching results (before pagination)
-        const facets = this.computeFacets(allResults, query);
-
-        // Sort results
-        const sortedResults = this.sortResults(allResults, query);
-
-        // Paginate
-        const page = query.page ?? 1;
-        const pageSize = Math.min(
-          query.pageSize ?? DEFAULT_SEARCH_CONFIG.pageSize,
-          DEFAULT_SEARCH_CONFIG.maxPageSize
-        );
-        const startIndex = (page - 1) * pageSize;
-        const paginatedResults = sortedResults.slice(startIndex, startIndex + pageSize);
-
-        const totalPages = Math.ceil(sortedResults.length / pageSize);
-
-        return {
-          query,
-          results: paginatedResults,
-          totalCount: sortedResults.length,
-          page,
-          pageSize,
-          totalPages,
-          hasMore: page < totalPages,
-          facets,
+    return this.backend.searchContentView(this.askPeer(query, page, pageSize)).pipe(
+      map(view => this.readAnswer(view, query, page, pageSize, startTime)),
+      catchError(() =>
+        of({
+          ...createEmptyResults({ ...query, page, pageSize }),
           executionTimeMs: Date.now() - startTime,
-        };
-      }),
-      catchError(_err => {
-        return of({
-          ...createEmptyResults(query),
-          executionTimeMs: Date.now() - startTime,
-        });
-      })
+        })
+      )
     );
   }
 
   /**
-   * Score and filter paths, converting them to SearchResult format.
+   * The question, in the route's own vocabulary.
+   *
+   * The route takes one content type and one reach ring; the client's query type allows several.
+   * Whatever cannot be carried is named in `provenance.unresolved` rather than silently dropped.
    */
-  private scoreAndFilterPaths(paths: PathIndexEntry[], query: SearchQuery): SearchResult[] {
-    const results: SearchResult[] = [];
-    const searchText = (query.text ?? '').toLowerCase().trim();
-    const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
+  private askPeer(query: SearchQuery, page: number, pageSize: number): ContentSearchQuery {
+    const ask: ContentSearchQuery = {
+      q: query.text ?? '',
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    };
 
-    // If filtering by content type and 'path' is not included, skip paths
-    if (
-      query.contentTypes &&
-      query.contentTypes.length > 0 &&
-      !query.contentTypes.includes('path')
-    ) {
-      return [];
+    if (query.contentTypes?.length) ask.contentType = query.contentTypes[0];
+    if (query.reachLevels?.length) ask.reach = query.reachLevels[0];
+    if (query.tags?.length) ask.tags = [...query.tags];
+
+    return ask;
+  }
+
+  /** One line per query parameter this route cannot carry — the client's own unresolved. */
+  private unhonoured(query: SearchQuery): string[] {
+    const lines: string[] = [];
+
+    const types = query.contentTypes ?? [];
+    const rings = query.reachLevels ?? [];
+
+    if (types.length > 1) {
+      lines.push(
+        `contentTypes: the route filters one type; asked for ${types.length}, sent ${types[0]}`
+      );
+    }
+    if (rings.length > 1) {
+      lines.push(
+        `reachLevels: the route filters one reach ring; asked for ${rings.length}, sent ${rings[0]}`
+      );
+    }
+    if (query.requiredTags?.length) {
+      lines.push('requiredTags: the route matches any tag, never all of them');
+    }
+    if (query.trustLevels?.length) {
+      lines.push('trustLevels: the peer does not filter by trust');
+    }
+    if (query.minTrustScore !== undefined) {
+      lines.push('minTrustScore: the peer serves a trust label, never a number to threshold');
+    }
+    if (query.excludeFlagged) {
+      lines.push('excludeFlagged: the answer carries no flag state');
+    }
+    if (query.sortBy && query.sortBy !== 'relevance') {
+      lines.push(`sortBy ${query.sortBy}: the peer's recipe owns the order`);
     }
 
-    for (const path of paths) {
-      // Runtime paths may carry createdAt/updatedAt even though PathIndexEntry doesn't declare them
-      const pathRecord = path as unknown as Record<string, unknown>;
-      // Convert path to a node-like format for filtering
-      const pathAsNode = {
-        id: path.id,
-        title: path.title,
-        description: path.description ?? '',
-        contentType: 'path' as ContentType,
-        tags: path.tags ?? [],
-        reach: 'commons' as ContentReach, // Paths are typically commons
-        trustScore: 1,
-        createdAt: pathRecord['createdAt'] as string | undefined,
-        updatedAt: pathRecord['updatedAt'] as string | undefined,
-      };
+    return lines;
+  }
 
-      // Apply filters (reuse existing filter logic)
-      if (!this.passesFilters(pathAsNode, query)) {
-        continue;
-      }
+  /** Read the peer's whole answer into the page's shape, in the peer's order. */
+  private readAnswer(
+    view: ContentSearchView,
+    query: SearchQuery,
+    page: number,
+    pageSize: number,
+    startTime: number
+  ): SearchResults {
+    const results = view.candidates.map(candidate => this.readCandidate(candidate));
+    const totalPages = Math.ceil(view.totalCount / pageSize);
 
-      // Score the path
-      const { score, matchedFields, highlights } = this.scoreNode(pathAsNode, searchWords);
+    const provenance: SearchProvenance = {
+      recipeCid: view.recipe.cid,
+      rankingKnown: view.rankingKnown,
+      foldState: view.fold.state,
+      unresolved: [...view.unresolved, ...this.unhonoured(query)],
+    };
 
-      // If there's search text, require a minimum score
-      if (searchText && score === 0) {
-        continue;
-      }
+    return {
+      query,
+      results,
+      totalCount: view.totalCount,
+      page,
+      pageSize,
+      totalPages,
+      hasMore: page < totalPages,
+      facets: this.readFacets(view, results, query),
+      provenance,
+      executionTimeMs: Date.now() - startTime,
+    };
+  }
 
-      results.push({
-        id: path.id,
-        title: path.title,
-        description: path.description ?? '',
-        contentType: 'path',
-        tags: path.tags ?? [],
-        reach: 'commons',
-        trustScore: 1,
-        trustLevel: 'trusted' as TrustLevel,
-        hasFlags: false,
-        relevanceScore: score,
-        matchedFields,
-        highlights,
-        createdAt: pathRecord['createdAt'] as string | undefined,
-        updatedAt: pathRecord['updatedAt'] as string | undefined,
-      });
+  /**
+   * One candidate, as the peer ranked it.
+   *
+   * `score` is the fused reciprocal rank: carried through for display, never compared across
+   * answers and never used to reorder. The matched section is the peer's own account of where the
+   * match landed, so it becomes both the card's description and its single highlight.
+   */
+  private readCandidate(candidate: ContentSearchCandidateView): SearchResult {
+    const section = candidate.bestSection;
+    const field = this.sectionField(section?.title);
+
+    const matchedFields: MatchedField[] = section
+      ? [{ field, weight: candidate.score, matchedText: section.snippet }]
+      : [];
+    const highlights: SearchHighlight[] = section
+      ? [{ field, snippet: section.snippet, matchRanges: [] }]
+      : [];
+
+    return {
+      id: candidate.contentId,
+      title: candidate.title,
+      description: section?.snippet ?? '',
+      contentType: candidate.contentType as ContentType,
+      tags: candidate.tags,
+      // The wire's declared-visibility Reach and the client's LocalityLevel are two vocabularies
+      // that share their ends ('private', 'commons'); the card reads the ring as served.
+      reach: candidate.reach as unknown as ContentReach,
+      trustScore: TRUST_LABEL_SCORE.get(candidate.trust) ?? 0,
+      trustLevel: TRUST_LABEL_LEVEL.get(candidate.trust) ?? 'unverified',
+      // The answer carries no flag state; claiming 'unflagged' as a finding would be inventing one.
+      hasFlags: false,
+      relevanceScore: candidate.score,
+      matchedFields,
+      highlights,
+    };
+  }
+
+  /** The peer names its sections; the card's three fields are the client's reading of them. */
+  private sectionField(title: string | undefined): MatchedField['field'] {
+    if (title === 'tags') return 'tags';
+    if (title === 'head') return 'title';
+    return 'description';
+  }
+
+  /**
+   * Facets: the peer's counts over the admitted set, as served.
+   *
+   * Trust and flag facets have no server counterpart — the answer carries a trust label per
+   * candidate and no flags at all — so those two are counted over this page only, which is the
+   * most the client can honestly say.
+   */
+  private readFacets(
+    view: ContentSearchView,
+    results: SearchResult[],
+    query: SearchQuery
+  ): SearchFacets {
+    const byTrustLevel = new Map<TrustLevel, number>();
+    for (const result of results) {
+      byTrustLevel.set(result.trustLevel, (byTrustLevel.get(result.trustLevel) ?? 0) + 1);
     }
 
-    return results;
+    const read = <T extends string>(counts: FacetCountView[], selected?: T[]): FacetCount<T>[] =>
+      counts.map(count => ({
+        value: count.value as T,
+        count: count.count,
+        selected: selected?.includes(count.value as T) ?? false,
+      }));
+
+    return {
+      byContentType: read<ContentType>(view.facets.contentType, query.contentTypes),
+      byReach: read<ContentReach>(view.facets.reach, query.reachLevels),
+      byTrustLevel: Array.from(byTrustLevel.entries())
+        .map(([value, count]) => ({
+          value,
+          count,
+          selected: query.trustLevels?.includes(value) ?? false,
+        }))
+        .sort((a, b) => b.count - a.count),
+      byTag: read<string>(view.facets.tags, query.tags).slice(0, DEFAULT_SEARCH_CONFIG.maxFacetTags),
+      byFlagStatus: { flagged: 0, unflagged: results.length },
+    };
   }
 
   /**
@@ -377,381 +467,8 @@ export class SearchService {
   }
 
   // ===========================================================================
-  // Scoring and Filtering
-  // ===========================================================================
-
-  /**
-   * Score and filter nodes based on query.
-   */
-  private scoreAndFilter(nodes: ContentIndexEntry[], query: SearchQuery): SearchResult[] {
-    const results: SearchResult[] = [];
-    const searchText = (query.text ?? '').toLowerCase().trim();
-    const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
-
-    for (const node of nodes) {
-      // Apply filters first (cheaper than scoring)
-      if (!this.passesFilters(node, query)) {
-        continue;
-      }
-
-      // Score the node
-      const { score, matchedFields, highlights } = this.scoreNode(node, searchWords);
-
-      // If there's search text, require a minimum score
-      if (searchText && score === 0) {
-        continue;
-      }
-
-      // Compute trust level
-      const trustLevel = this.computeTrustLevel(node);
-
-      results.push({
-        id: node.id,
-        title: node.title,
-        description: node.description,
-        contentType: node.contentType,
-        tags: node.tags ?? [],
-        reach: node.reach ?? 'commons',
-        trustScore: node.trustScore ?? 1,
-        trustLevel,
-        hasFlags: (node.flags ?? []).length > 0,
-        relevanceScore: score,
-        matchedFields,
-        highlights,
-        createdAt: node.createdAt,
-        updatedAt: node.updatedAt,
-      });
-    }
-
-    return results;
-  }
-
-  /**
-   * Check if node passes all query filters.
-   */
-  private passesFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    return (
-      this.passesContentTypeFilter(node, query) &&
-      this.passesReachLevelFilter(node, query) &&
-      this.passesTrustLevelFilter(node, query) &&
-      this.passesTagFilters(node, query) &&
-      this.passesTrustScoreFilter(node, query) &&
-      this.passesFlaggedFilter(node, query)
-    );
-  }
-
-  private passesContentTypeFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
-    if (!query.contentTypes || query.contentTypes.length === 0) return true;
-    return query.contentTypes.includes(node.contentType);
-  }
-
-  private passesReachLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
-    if (!query.reachLevels || query.reachLevels.length === 0) return true;
-    const nodeReach = node.reach ?? 'commons';
-    return query.reachLevels.includes(nodeReach);
-  }
-
-  private passesTrustLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
-    if (!query.trustLevels || query.trustLevels.length === 0) return true;
-    return query.trustLevels.includes(this.computeTrustLevel(node));
-  }
-
-  private passesTagFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    const nodeTags = new Set((node.tags ?? []).map(t => t.toLowerCase()));
-
-    if (
-      query.tags &&
-      query.tags.length > 0 &&
-      !query.tags.some(t => nodeTags.has(t.toLowerCase()))
-    ) {
-      return false;
-    }
-
-    if (
-      query.requiredTags &&
-      query.requiredTags.length > 0 &&
-      !query.requiredTags.every(t => nodeTags.has(t.toLowerCase()))
-    ) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private passesTrustScoreFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
-    if (query.minTrustScore === undefined) return true;
-    const trustScore = node.trustScore ?? 1;
-    return trustScore >= query.minTrustScore;
-  }
-
-  private passesFlaggedFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
-    if (!query.excludeFlagged) return true;
-    const flags = node.flags ?? [];
-    return flags.length === 0;
-  }
-
-  /**
-   * Score a node against search words.
-   */
-  private scoreNode(
-    node: ContentIndexEntry,
-    searchWords: string[]
-  ): { score: number; matchedFields: MatchedField[]; highlights: SearchHighlight[] } {
-    if (searchWords.length === 0) {
-      return { score: 50, matchedFields: [], highlights: [] };
-    }
-
-    const matchedFields: MatchedField[] = [];
-    const nodeText = {
-      title: node.title.toLowerCase(),
-      description: (node.description ?? '').toLowerCase(),
-      tags: (node.tags ?? []).map(t => t.toLowerCase()),
-    };
-
-    const totalScore = this.calculateFieldScores(searchWords, nodeText, matchedFields);
-    const normalizedScore = this.normalizeScore(totalScore, searchWords.length);
-    const highlights = this.generateHighlights(node, searchWords, matchedFields);
-
-    return { score: normalizedScore, matchedFields, highlights };
-  }
-
-  private calculateFieldScores(
-    searchWords: string[],
-    nodeText: { title: string; description: string; tags: string[] },
-    matchedFields: MatchedField[]
-  ): number {
-    let totalScore = 0;
-
-    for (const word of searchWords) {
-      totalScore += this.scoreFieldMatch('title', nodeText.title, word, matchedFields);
-      totalScore += this.scoreTagMatch(nodeText.tags, word, matchedFields);
-      totalScore += this.scoreFieldMatch('description', nodeText.description, word, matchedFields);
-    }
-
-    return totalScore;
-  }
-
-  private scoreFieldMatch(
-    field: 'title' | 'description',
-    text: string,
-    word: string,
-    matchedFields: MatchedField[]
-  ): number {
-    const matchType = this.getMatchType(text, word);
-    if (!matchType) return 0;
-
-    const score = SEARCH_FIELD_WEIGHTS[field] * SEARCH_MATCH_BONUSES[matchType];
-    matchedFields.push({ field, weight: score, matchedText: word });
-    return score;
-  }
-
-  private scoreTagMatch(tags: string[], word: string, matchedFields: MatchedField[]): number {
-    for (const tag of tags) {
-      const matchType = this.getMatchType(tag, word);
-      if (matchType) {
-        const score = SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES[matchType];
-        matchedFields.push({ field: 'tags', weight: score, matchedText: word });
-        return score;
-      }
-    }
-    return 0;
-  }
-
-  private normalizeScore(totalScore: number, wordCount: number): number {
-    const maxPossibleScore =
-      wordCount *
-      (SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
-        SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
-        SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch);
-    return Math.round((totalScore / maxPossibleScore) * 100);
-  }
-
-  private generateHighlights(
-    node: ContentIndexEntry,
-    searchWords: string[],
-    matchedFields: MatchedField[]
-  ): SearchHighlight[] {
-    const highlights: SearchHighlight[] = [];
-    const queryText = searchWords.join(' ');
-
-    if (matchedFields.some(f => f.field === 'title')) {
-      highlights.push({ field: 'title', ...extractSnippet(node.title, queryText) });
-    }
-
-    if (matchedFields.some(f => f.field === 'description') && node.description) {
-      highlights.push({ field: 'description', ...extractSnippet(node.description, queryText) });
-    }
-
-    if (matchedFields.some(f => f.field === 'tags')) {
-      const matchingTags = (node.tags ?? []).filter(tag =>
-        searchWords.some(w => tag.toLowerCase().includes(w))
-      );
-      if (matchingTags.length > 0) {
-        highlights.push({ field: 'tags', snippet: matchingTags.join(', '), matchRanges: [] });
-      }
-    }
-
-    return highlights;
-  }
-
-  /**
-   * Determine match type for scoring.
-   */
-  private getMatchType(text: string, word: string): keyof typeof SEARCH_MATCH_BONUSES | null {
-    // Check for exact word match (word boundaries)
-    const exactRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}\b`, 'i');
-    if (exactRegex.test(text)) {
-      return 'exactMatch';
-    }
-
-    // Check for prefix match (word starts with search term)
-    const prefixRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}`, 'i');
-    if (prefixRegex.test(text)) {
-      return 'prefixMatch';
-    }
-
-    // Check for contains match
-    if (text.includes(word)) {
-      return 'containsMatch';
-    }
-
-    return null;
-  }
-
-  /**
-   * Escape special regex characters.
-   */
-  private escapeRegex(str: string): string {
-    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-  }
-
-  // ===========================================================================
-  // Sorting
-  // ===========================================================================
-
-  /**
-   * Sort results based on query sort options.
-   */
-  private sortResults(results: SearchResult[], query: SearchQuery): SearchResult[] {
-    const sortBy = query.sortBy ?? 'relevance';
-    const direction = query.sortDirection ?? 'desc';
-    const multiplier = direction === 'asc' ? 1 : -1;
-
-    return [...results].sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortBy) {
-        case 'relevance':
-          comparison = a.relevanceScore - b.relevanceScore;
-          break;
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case 'trustScore':
-          comparison = a.trustScore - b.trustScore;
-          break;
-        case 'reach':
-          comparison = this.reachToNumber(a.reach) - this.reachToNumber(b.reach);
-          break;
-        case 'newest':
-          comparison = (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
-          break;
-        case 'updated':
-          comparison = (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '');
-          break;
-      }
-
-      return comparison * multiplier;
-    });
-  }
-
-  /**
-   * Convert reach level to numeric for sorting.
-   */
-  private reachToNumber(reach: ContentReach): number {
-    const levels: ContentReach[] = [
-      'private',
-      'invited',
-      'local',
-      'neighborhood',
-      'municipal',
-      'bioregional',
-      'regional',
-      'commons',
-    ];
-    return levels.indexOf(reach);
-  }
-
-  // ===========================================================================
-  // Facets
-  // ===========================================================================
-
-  /**
-   * Compute facet counts from results.
-   */
-  private computeFacets(results: SearchResult[], query: SearchQuery): SearchFacets {
-    const byContentType = new Map<ContentType, number>();
-    const byReach = new Map<ContentReach, number>();
-    const byTrustLevel = new Map<TrustLevel, number>();
-    const byTag = new Map<string, number>();
-    let flagged = 0;
-    let unflagged = 0;
-
-    for (const result of results) {
-      // Content type
-      byContentType.set(result.contentType, (byContentType.get(result.contentType) ?? 0) + 1);
-
-      // Reach
-      byReach.set(result.reach, (byReach.get(result.reach) ?? 0) + 1);
-
-      // Trust level
-      byTrustLevel.set(result.trustLevel, (byTrustLevel.get(result.trustLevel) ?? 0) + 1);
-
-      // Tags
-      for (const tag of result.tags) {
-        byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
-      }
-
-      // Flag status
-      if (result.hasFlags) {
-        flagged++;
-      } else {
-        unflagged++;
-      }
-    }
-
-    // Convert maps to sorted arrays
-    const toFacetArray = <T>(map: Map<T, number>, selectedValues?: T[]): FacetCount<T>[] => {
-      return Array.from(map.entries())
-        .map(([value, count]) => ({
-          value,
-          count,
-          selected: selectedValues?.includes(value) ?? false,
-        }))
-        .sort((a, b) => b.count - a.count);
-    };
-
-    return {
-      byContentType: toFacetArray(byContentType, query.contentTypes),
-      byReach: toFacetArray(byReach, query.reachLevels),
-      byTrustLevel: toFacetArray(byTrustLevel, query.trustLevels),
-      byTag: toFacetArray(byTag, query.tags).slice(0, DEFAULT_SEARCH_CONFIG.maxFacetTags),
-      byFlagStatus: { flagged, unflagged },
-    };
-  }
-
-  // ===========================================================================
   // Helpers
   // ===========================================================================
-
-  /**
-   * Compute trust level for a node.
-   */
-  private computeTrustLevel(node: ContentIndexEntry): TrustLevel {
-    const attestationTypes = (node.attestationTypes ?? []) as ContentAttestationType[];
-    const hasFlags = (node.flags ?? []).length > 0;
-    return calculateTrustLevel(node.reach ?? 'commons', attestationTypes, hasFlags);
-  }
 
   /**
    * Highlight matching text in a string.

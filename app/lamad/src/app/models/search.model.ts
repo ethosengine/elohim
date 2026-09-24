@@ -150,6 +150,29 @@ export interface SearchHighlight {
 }
 
 /**
+ * SearchProvenance - what the peer said about its own answer.
+ *
+ * A ranking is a claim, and a claim is worth what its provenance is worth. The peer names the
+ * recipe it ranked under, whether that ranking is known at all (a fold that is absent or
+ * unreachable ranks nothing, and an empty list must never be dressed as a ranking), the state of
+ * the fold it read, and every parameter it could not honour as asked. The client prints this; it
+ * never fills it in. See plan Lane S, ruling R-S6.
+ */
+export interface SearchProvenance {
+  /** The content address of the fusion recipe the answer ranked under; empty when none was named. */
+  recipeCid: string;
+
+  /** True only when the candidates were ordered by that recipe over a fold that was present. */
+  rankingKnown: boolean;
+
+  /** The fold the ranking read: present, absent (observed), or unreachable (no answer). */
+  foldState: 'present' | 'absent' | 'unreachable';
+
+  /** One line per request parameter that could not be honoured as asked. Present even when empty. */
+  unresolved: string[];
+}
+
+/**
  * SearchResults - Paginated search response with facets.
  */
 export interface SearchResults {
@@ -176,6 +199,9 @@ export interface SearchResults {
 
   /** Facet counts for filtering UI */
   facets: SearchFacets;
+
+  /** What the answering peer said about its own ranking */
+  provenance: SearchProvenance;
 
   /** Search execution time (ms) */
   executionTimeMs: number;
@@ -323,6 +349,14 @@ export function createEmptyResults(query: SearchQuery): SearchResults {
       byTrustLevel: [],
       byTag: [],
       byFlagStatus: { flagged: 0, unflagged: 0 },
+    },
+    // No answer arrived, so nothing is established in either direction: an empty result set is
+    // not an observed absence of matches, and it is never a ranking.
+    provenance: {
+      recipeCid: '',
+      rankingKnown: false,
+      foldState: 'unreachable',
+      unresolved: [],
     },
     executionTimeMs: 0,
   };
