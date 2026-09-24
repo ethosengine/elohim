@@ -26,6 +26,7 @@ const PRIMARY_URL = 'http://127.0.0.1:8091'; // NOSONAR -- loopback fixture tran
 const EXTRA_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:8092'];
 const CANONICAL_SSR_BUNDLE_PATH = '/repo/app/elohim-app/dist/elohim-app/server/main.server.mjs';
 const CANONICAL_NODE_KEY_FILE = '/repo/genesis/local-dev/household-dowell/doorway-a-node.key';
+const CANONICAL_LISTEN = '0.0.0.0:8888';
 
 function fixtureAInput(): Parameters<typeof fixtureDoorwayLaunch>[1] {
   return {
@@ -48,7 +49,7 @@ const template: LaunchTemplate = {
   argv: [
     '/owned/doorway',
     '--listen',
-    '0.0.0.0:8888',
+    CANONICAL_LISTEN,
     '--conductor-url',
     'ws://127.0.0.1:4444',
     '--storage-url',
@@ -78,7 +79,7 @@ void test('fixture launch preserves the template and rewrites only identity-loca
   assert.equal(launch.argv[launch.argv.indexOf('--storage-urls') + 1], EXTRA_URLS.join(','));
   assert.equal(launch.env['DOORWAY_ID'], 'fixture-a');
   assert.equal(launch.env['MONGODB_DB'], 'fixture-a-db');
-  assert.equal(template.argv[2], '0.0.0.0:8888', 'canonical template stays immutable');
+  assert.equal(template.argv[2], CANONICAL_LISTEN, 'canonical template stays immutable');
 });
 
 void test('fixture launch never inherits the canonical dist as its SSR bundle path', () => {
@@ -263,7 +264,7 @@ void test('deregistration sends the Admin bearer the verb requires, and a refusa
 
 void test('the Admin token is minted on the canonical doorway the fixture was cloned from', async () => {
   assert.equal(
-    canonicalDoorwayUrl({ argv: ['doorway', '--listen', '0.0.0.0:8888'] }),
+    canonicalDoorwayUrl({ argv: ['doorway', '--listen', CANONICAL_LISTEN] }),
     'http://127.0.0.1:8888'
   );
   assert.equal(
@@ -278,7 +279,7 @@ void test('the Admin token is minted on the canonical doorway the fixture was cl
     return await Promise.resolve('admin-jwt');
   };
   const template = {
-    argv: ['doorway', '--listen', '0.0.0.0:8888'],
+    argv: ['doorway', '--listen', CANONICAL_LISTEN],
     env: { API_KEY_ADMIN: 'mesh-admin-dev-key' },
   };
   assert.equal(await fixtureAdminToken(template, mint), 'admin-jwt');
