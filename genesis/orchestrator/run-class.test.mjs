@@ -15,7 +15,7 @@
 
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,7 +38,9 @@ const orchestrator = read("genesis/orchestrator/Jenkinsfile");
 const edge = read("elohim/holochain/Jenkinsfile");
 const buildGraph = read("genesis/orchestrator/build-graph.groovy");
 const mirrorSchema = JSON.parse(read("genesis/orchestrator/manifest.schema.json"));
-const rakiaSchema = JSON.parse(read("elohim/rakia/schemas/v1/build-manifest.schema.json"));
+// The rakia submodule may be uninitialised (a fresh clone, a scratch worktree).
+const RAKIA_SCHEMA = resolve(ROOT, "elohim/rakia/schemas/v1/build-manifest.schema.json");
+const rakiaSchema = existsSync(RAKIA_SCHEMA) ? JSON.parse(readFileSync(RAKIA_SCHEMA, "utf8")) : null;
 
 function topLevelDef(text, name) {
   const start = text.search(new RegExp(`^def\\s+${name}\\s*\\(`, "m"));
@@ -198,8 +200,8 @@ describe("declared data — the manifests and both schemas", () => {
   });
 
   test("when the pinned rakia schema declares steps[].class, it is the same vocabulary", () => {
-    const cls = rakiaSchema.$defs.step.properties.class;
-    if (!cls) return; // pin predates B1 — consumers default to build meanwhile
+    const cls = rakiaSchema?.$defs.step.properties.class;
+    if (!cls) return; // submodule absent, or the pin predates B1 — consumers default to build meanwhile
     assert.deepEqual(cls.enum, RUN_CLASSES);
     assert.equal(cls.default, "build");
   });
