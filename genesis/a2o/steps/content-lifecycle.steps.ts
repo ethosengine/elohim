@@ -23,13 +23,29 @@ import { E2EWorld } from '../src/framework/world.js';
 // ---------------------------------------------------------------------------
 
 /**
+ * Options the run-unique / reach-bearing Given variants add to the base create.
+ *
+ * `unique` appends the scenario's own run tag to the TITLE (not only to the tag
+ * list), so a title-matching search — content-search.feature — can assert that
+ * the row it found is the row this run just wrote, never a leftover of an
+ * earlier run on the same household. `reach` declares how widely the row may
+ * travel; absent, the substrate's own default stands (no reach is invented
+ * here).
+ */
+interface CreateContentOptions {
+  unique?: boolean;
+  reach?: string;
+}
+
+/**
  * Shared create logic — used by both When and Given variants.
  */
 async function createContent(
   world: E2EWorld,
   humanName: string,
   title: string,
-  tagsCsv: string
+  tagsCsv: string,
+  options: CreateContentOptions = {}
 ): Promise<void> {
   const human = world.getHuman(humanName);
   const device = human.devices[0] as BrowserDevice;
@@ -41,25 +57,30 @@ async function createContent(
     .map(t => t.trim())
     .filter(Boolean);
 
+  const resolvedTitle = options.unique ? `${title} ${runTag}` : title;
+
   const contentId = `e2e-${randomUUID()}`;
   const content = await device.client.createContent({
     id: contentId,
     contentType: 'article',
-    title,
+    title: resolvedTitle,
     description: `E2E content created by ${humanName}`,
     contentBody: `Automated test content for lifecycle validation.`,
     contentFormat: 'text',
     tags: ['e2e', runTag, ...tags],
+    ...(options.reach ? { reach: options.reach } : {}),
   });
 
   const id = content.id as string;
   world.contentIds.set('lastContentId', id);
-  world.contentIds.set('lastContentTitle', title);
+  world.contentIds.set('lastContentTitle', resolvedTitle);
+  world.contentIds.set('lastContentAuthor', humanName);
   world.contentIds.set('lastContentRunTag', runTag);
+  if (options.reach) world.contentIds.set('lastContentReach', options.reach);
   // Store per-title for multi-content scenarios
-  world.contentIds.set(`content:${title}:id`, id);
-  world.contentIds.set(`content:${title}:runTag`, runTag);
-  world.contentIds.set(`content:${title}:tags`, JSON.stringify(['e2e', runTag, ...tags]));
+  world.contentIds.set(`content:${resolvedTitle}:id`, id);
+  world.contentIds.set(`content:${resolvedTitle}:runTag`, runTag);
+  world.contentIds.set(`content:${resolvedTitle}:tags`, JSON.stringify(['e2e', runTag, ...tags]));
 
   // Delete the e2e-<uuid> content when the scenario ends. Without this,
   // EVERY content-lifecycle scenario permanently leaks a content row on the
@@ -88,6 +109,30 @@ Given(
   '{word} has created content titled {string} with tags {string}',
   async function (this: E2EWorld, humanName: string, title: string, tagsCsv: string) {
     await createContent(this, humanName, title, tagsCsv);
+  }
+);
+
+// Run-unique variants — see CreateContentOptions. content-search.feature needs a
+// title no other run can have written, and one scenario needs the row to declare
+// a reach so a non-holder's search can be shown withholding it.
+
+Given(
+  '{word} has created content titled {string} made unique to this run, with tags {string}',
+  async function (this: E2EWorld, humanName: string, title: string, tagsCsv: string) {
+    await createContent(this, humanName, title, tagsCsv, { unique: true });
+  }
+);
+
+Given(
+  '{word} has created content titled {string} made unique to this run, with tags {string} and reach {string}',
+  async function (
+    this: E2EWorld,
+    humanName: string,
+    title: string,
+    tagsCsv: string,
+    reach: string
+  ) {
+    await createContent(this, humanName, title, tagsCsv, { unique: true, reach });
   }
 );
 
