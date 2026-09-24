@@ -24,8 +24,23 @@ rules:
       a CI tool negative-tested outside its runtime is itself an unverified claim — the same class
       it polices. If a build-only script (e.g. cargo-publish-*.sh) legitimately needs a richer
       toolchain, confirm it never runs on the deploy path before proceeding.
+  - id: long-wait-default-cites-its-price
+    class: inject
+    when: { write: "*.sh", contains-any: ["_SECS:-"] }
+    dedupe-of: "the habit that prices pipeline wall clock: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (bounds stage-wallclock-ceiling@1, delivery-cost-ceiling@1 in .claude/epr-meta/measures.yaml)"
+    why: >
+      A `*_SECS:-<n>` default over 900 s is pipeline wall clock someone pays on every run. Beside
+      it, in a comment, name the habit that prices it (push-delivers-within-budget, or the habit
+      whose measure the wait serves) and why the wait belongs in THIS pipeline. Evidence-ladder spec
+      §8 (genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md): a2d1d0975
+      set STAGE_CELL_READY_BUDGET_SECS=7200 in stage-spa-blob.sh, passed six reviews of the bash and
+      none of the placement, and app #1719–#1725 then spent ≈12 pipeline-hours waiting out the
+      fleet's post-roll window and delivered nothing. Prefer a precondition that refuses in seconds
+      over a wait. A default at or under 900 s needs nothing — this advisory fires on any default
+      because the gate matches substrings, not numbers.
 cites:
   - substrate-convergence-five-defect-arc
+  - evidence-ladder-push-left
 ---
 
 # scripts/ci — pipeline + deploy-container bash entrypoints
@@ -54,5 +69,20 @@ teaches: parse config with bash+coreutils, and TEST IN THE CONTAINER, not just o
 subtree also holds build-only scripts (e.g. `cargo-publish-*.sh`) that legitimately use a fuller
 toolchain because they never run on the deploy path — the rule is content-scoped to the python class
 so it does not toll them.
+
+## Long wait defaults are priced (edit-time advisory)
+
+A `*_SECS:-<n>` default above 900 s is paid on every run, so it must say which habit prices it —
+evidence-ladder spec §8 is the scar: `STAGE_CELL_READY_BUDGET_SECS=7200` (a2d1d0975) turned the
+App pipeline into a two-hour wait for the edge fleet's post-roll window, and app #1719–#1725
+spent ≈12 pipeline-hours delivering nothing while every review read the bash and none the
+placement. The `long-wait-default-cites-its-price` rule is an `inject` advisory on any `.sh`
+write carrying a `_SECS:-` default. The 900 s threshold is authoritative but NOT gate-expressible
+in v1 (`contains-any` matches substrings, not numbers), so the author judges it: under 900 s,
+ignore the advisory; over it, add a comment naming the habit (usually
+`push-delivers-within-budget`) and why the wait belongs in this pipeline rather than as a
+precondition that refuses in seconds. The cost itself is measured, not asserted:
+`stage-wallclock@1` and `delivery-cost@1`, folded by `ci-harvest.py` from
+`genesis/orchestrator/delivery-series.mjs --stages`.
 
 See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
