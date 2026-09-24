@@ -18,7 +18,8 @@ read) so the ledger and the gate can never disagree on what "apex" means. Net-ne
 delta (pre-edit reconstructed from old_string→new_string), so cleaning/maintenance is never logged.
 
 Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
-          {ts, path, tool, net_new, phrases, frame_ref, classification_cid, source, verdict}.
+          {ts, path, tool, net_new, phrases, frame_ref, classification_cid,
+           classification_scope, source, verdict, nonce}.
           `frame_ref` is the frame atom's CID (stdlib, `frame_atoms`). `classification_cid` is
           minted ONLY by the native evaluator (ruling R-C4: no second DAG-CBOR encoder in
           Python): `epr govern --new --content-stdin` over the landed bytes. `--new` because the
@@ -29,6 +30,14 @@ Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
           and a DETACHED child (`--classify`) rewrites that row: `source: native` with the CID,
           or `source: python-degraded` when the evaluator does not run. A reader treats
           `pending` like `python-degraded`.
+          `classification_scope` is always `"document"` (ruling R-C14, review W1): `net_new` and
+          `phrases` describe the EDIT's delta, but `classification_cid` classifies the WHOLE
+          landed document against an empty prior, so a reader must not read the CID as a
+          classification of the delta. (A prior-content channel for the native evaluator is
+          backlog: genesis/data/timeline/backlog/native-govern-prior-channel.md.)
+          `nonce` is 16 random hex digits minted per landing and handed to the classify child,
+          which rewrites the pending row BY NONCE (review W4): two landings of one path within
+          one second share `(path, ts)` and would otherwise fill each other's rows.
 Probe:    the Family-2 SHADOW PROBE (ruling R-C4 amended, plan task C9). A `.md` Write/Edit whose
           net-new bytes reach the atom's `probe_min_net_new_bytes`, that NO keyword matched, and
           that is not testimony (the ontology atom's `testimony_exempt`) spawns a detached child
@@ -37,7 +46,11 @@ Probe:    the Family-2 SHADOW PROBE (ruling R-C4 amended, plan task C9). A `.md`
           landed file's directory. A score on the landed file at/above `cosine_floor_permille /
           1000` is an ABSTAIN — a row carrying `probe{cosine, floor, verdict, producer, method,
           fold_lag}` and a fold on `frame-probe-abstain@1` — never an accusation, and never
-          printed: the author does not see it. The child gives up at 8 s.
+          printed: the author does not see it. The child gives up at 30 s (ruling R-C10: it
+          is detached, so the author never waits; the chain measured 11.3 s under load). The
+          recall session `frame-probe-<sid>` is opened once per hook session: when its
+          continuation (`.eprfs/status/recall/frame-probe-<sid>/continuation.json`, the state
+          `recall open` writes) is already on disk, the probe goes straight to the search.
 Drift:    ONE thing — a fold via `epr flow note --kind observation --measure
           sovereignty-landings@1`. The private JSON tally this hook kept under
           `.claude/memory-kit/` was deleted with the kit at station six round (b)
@@ -53,6 +66,7 @@ import fcntl
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -106,7 +120,9 @@ _ESCALATE_AT = 3  # landings before the message asks for a rule/corpus drift rev
 _SOV_REF = "epr:validator-sovereignty-ontology-guard"
 LEDGER_REL = ".claude/data/sovereignty-guard.jsonl"
 PENDING = "pending"
-PROBE_DEADLINE_S = 8.0          # the shadow probe's whole budget (fold + open + search)
+PROBE_DEADLINE_S = 30.0         # the shadow probe's whole budget (fold + open + search), R-C10
+RECALL_DIR_REL = ".eprfs/status/recall"  # `epr flow memory recall`'s private session records
+CLASSIFICATION_SCOPE = "document"  # the CID classifies the landed document, not the delta (R-C14)
 PROBE_MEASURE = "frame-probe-abstain@1"
 
 
@@ -153,10 +169,16 @@ def append_row(repo: Path, row: dict) -> None:
         pass
 
 
-def rewrite_pending_row(repo: Path, rel: str, ts: str, fill) -> dict | None:
-    """Rewrite the LAST `pending` row for (`rel`, `ts`) with `fill(row)`'s fields, in place and
-    under the ledger lock (a concurrent append waits, and is never lost to a replace). Returns
-    the row as it was, or None when there is no such row."""
+def _is_pending(row, rel: str, ts: str, nonce: str) -> bool:
+    """THE pending row a child was spawned for: its own nonce, not merely its (path, second)."""
+    return (isinstance(row, dict) and row.get("source") == PENDING and bool(nonce)
+            and row.get("nonce") == nonce and row.get("path") == rel and row.get("ts") == ts)
+
+
+def rewrite_pending_row(repo: Path, rel: str, ts: str, nonce: str, fill) -> dict | None:
+    """Rewrite the `pending` row carrying `nonce` (for `rel`, `ts`) with `fill(row)`'s fields, in
+    place and under the ledger lock (a concurrent append waits, and is never lost to a replace).
+    Returns the row as it was, or None when there is no such row."""
     led = repo / LEDGER_REL
     try:
         with led.open("r+", encoding="utf-8") as fh:
@@ -167,8 +189,7 @@ def rewrite_pending_row(repo: Path, rel: str, ts: str, fill) -> dict | None:
                     row = json.loads(lines[i])
                 except ValueError:
                     continue
-                if (isinstance(row, dict) and row.get("path") == rel and row.get("ts") == ts
-                        and row.get("source") == PENDING):
+                if _is_pending(row, rel, ts, nonce):
                     was = dict(row)
                     row.update(fill(was))
                     lines[i] = json.dumps(row) + "\n"
@@ -201,27 +222,33 @@ def spawn_child(repo: Path, args: list[str], content: str | None = None) -> None
 
 
 def classify_child(args: list[str], stdin) -> int:
-    """`--classify <rel> <session> <ts>`: mint the native classification for the row the parent
-    wrote as `pending`, over the landed bytes on stdin (ruling R-C8)."""
-    if len(args) < 3:
+    """`--classify <rel> <session> <ts> <nonce>`: mint the native classification for the row the
+    parent wrote as `pending` with that nonce, over the landed bytes on stdin (rulings R-C8,
+    R-C14). Without a nonce there is no row it may claim, so it does nothing."""
+    if len(args) < 4:
         return 0
-    rel, session, ts = args[0], args[1] or None, args[2]
+    rel, session, ts, nonce = args[0], args[1] or None, args[2], args[3]
     pd = os.environ.get("CLAUDE_PROJECT_DIR")
-    if not pd:
+    if not pd or not nonce:
         return 0
     repo = Path(pd).resolve()
     landed = stdin.read()
-    frame_ref = _pending_frame_ref(repo, rel, ts)
+    frame_ref = _pending_frame_ref(repo, rel, ts, nonce)
     if frame_ref is None:
         return 0
     cid, source = native_classification(repo, rel, landed, frame_ref, session)
-    rewrite_pending_row(repo, rel, ts, lambda _row: {"classification_cid": cid, "source": source})
+    rewrite_pending_row(repo, rel, ts, nonce,
+                        lambda _row: {"classification_cid": cid, "source": source})
     return 0
 
 
-def _pending_frame_ref(repo: Path, rel: str, ts: str) -> str | None:
+def _pending_frame_ref(repo: Path, rel: str, ts: str, nonce: str) -> str | None:
+    """The frame ref of the pending row carrying `nonce`, read under the ledger lock (shared), so
+    a concurrent append or rewrite is never read half-written (review W4)."""
     try:
-        lines = (repo / LEDGER_REL).read_text(encoding="utf-8").splitlines()
+        with (repo / LEDGER_REL).open("r", encoding="utf-8") as fh:
+            fcntl.flock(fh, fcntl.LOCK_SH)
+            lines = fh.read().splitlines()
     except OSError:
         return None
     for line in reversed(lines):
@@ -229,8 +256,7 @@ def _pending_frame_ref(repo: Path, rel: str, ts: str) -> str | None:
             row = json.loads(line)
         except ValueError:
             continue
-        if (isinstance(row, dict) and row.get("path") == rel and row.get("ts") == ts
-                and row.get("source") == PENDING):
+        if _is_pending(row, rel, ts, nonce):
             ref = row.get("frame_ref")
             return ref if isinstance(ref, str) else None
     return None
@@ -291,6 +317,16 @@ def _session_label(session: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", session or "none")[:64]
 
 
+def recall_session_open(repo: Path, label: str) -> bool:
+    """Whether `recall open` already hydrated this session: it writes the session's state to
+    `.eprfs/status/recall/<session>/continuation.json` (`Execution::open`), creating the directory
+    first — so an empty or absent continuation is an open that never completed, not a session."""
+    try:
+        return (repo / RECALL_DIR_REL / label / "continuation.json").stat().st_size > 0
+    except OSError:
+        return False
+
+
 def probe_child(args: list[str]) -> int:
     """`--probe <rel> <session> [<tool>]`: fold → open → ONE semantic search scoped to the landed
     file's directory; abstain when the landed file itself scores at/above the atom's floor."""
@@ -324,8 +360,11 @@ def probe_child(args: list[str]) -> int:
                        stdin=subprocess.DEVNULL, timeout=max(0.01, deadline.left()))
     except (OSError, subprocess.SubprocessError):
         pass
-    if _run_json(binary, repo, ["flow", "memory", "recall", "open", "--session", label,
-                                "--need", query, "--json"], deadline.left()) is None:
+    # One open per hook session (ruling R-C10, review M3): the open cost 4.3-5.9 s under load and
+    # a session's later probes reuse the continuation it wrote.
+    if not recall_session_open(repo, label) and _run_json(
+            binary, repo, ["flow", "memory", "recall", "open", "--session", label, "--need", query,
+                           "--json"], deadline.left()) is None:
         return 0
     answer = _run_json(binary, repo, ["flow", "memory", "recall", "search", "--provider",
                                       "semantic", "--query", query, "--search-scope", scope,
@@ -347,7 +386,8 @@ def probe_child(args: list[str]) -> int:
     append_row(repo, {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "path": rel, "tool": tool, "net_new": 0, "phrases": [], "frame_ref": frame_ref,
-        "classification_cid": None, "source": "semantic-probe", "verdict": "abstain",
+        "classification_cid": None, "classification_scope": CLASSIFICATION_SCOPE,
+        "source": "semantic-probe", "verdict": "abstain",
         "probe": {"cosine": float(best["score"]), "floor": floor, "verdict": "abstain",
                   "producer": best["producer"], "method": best["method"],
                   "fold_lag": lag if isinstance(lag, int) and not isinstance(lag, bool) else None},
@@ -428,12 +468,16 @@ def main(argv: list[str] | None = None) -> int:
 
     # 1) append the landing to the ledger as `pending`, then hand the native classification to a
     #    detached child that rewrites this row (ruling R-C8 — govern costs more than the budget).
+    #    The nonce names THIS row for its child (review W4); the scope says the CID the child
+    #    mints classifies the whole landed document, not this edit's delta (review W1).
+    nonce = secrets.token_hex(8)
     append_row(repo, {"ts": ts, "path": rel, "tool": tool,
                       "net_new": net_new, "phrases": phrases,
                       "frame_ref": frame_ref,
                       "classification_cid": None,
-                      "source": PENDING, "verdict": found["verdict"]})
-    spawn_child(repo, ["--classify", rel, session, ts], content=post)
+                      "classification_scope": CLASSIFICATION_SCOPE,
+                      "source": PENDING, "verdict": found["verdict"], "nonce": nonce})
+    spawn_child(repo, ["--classify", rel, session, ts, nonce], content=post)
 
     # 2) aggregate into the drift tally (the signal that flows back to the rule).
     # The bound lives in .claude/epr-meta (sovereignty-landings@1) and the fold is the ONLY

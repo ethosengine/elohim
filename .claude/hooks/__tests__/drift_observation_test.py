@@ -457,7 +457,10 @@ class DriftObservationCase(unittest.TestCase):
         self.assertEqual(len(rows), 1, rows)
         row = rows[0]
         self.assertEqual(set(row), {"ts", "path", "tool", "net_new", "phrases", "frame_ref",
-                                    "classification_cid", "source", "verdict"})
+                                    "classification_cid", "classification_scope", "source",
+                                    "verdict", "nonce"})
+        # R-C14: the CID classifies the whole landed document, not the edit's delta
+        self.assertEqual(row["classification_scope"], "document")
         self.assertTrue(row["frame_ref"].startswith("bafy"), row)
         self.assertEqual(row["frame_ref"], frame)
         self.assertEqual(row["classification_cid"], self._STUB_CLASSIFICATION)

@@ -17,7 +17,16 @@ hook's pattern) so the author never waits on either:
     frame-probe-<sid>` -> ONE `flow memory recall search --provider semantic` scoped to the landed
     file's directory, keeps only candidates whose path is the landed file, and on a score at or
     above `cosine_floor_permille / 1000` appends an abstain row and folds
-    `frame-probe-abstain@1`. It never prints; it gives up at 8 s.
+    `frame-probe-abstain@1`. It never prints; it gives up at 30 s (ruling R-C10: detached, so
+    the author never waits; measured under load the whole chain took 11.3 s). The session's
+    recall open is paid once: a later probe in the same hook session finds the session's
+    continuation on disk and goes straight to the search.
+
+The ledger row's `classification_cid` is a WHOLE-DOCUMENT classification (`--new` over the landed
+bytes) while `net_new`/`phrases` are the edit's delta, so the row says so:
+`classification_scope: "document"` (ruling R-C14, review W1). Every pending row carries a random
+`nonce` the classify child is handed, and the child rewrites the row by that nonce — two landings
+of one path in one second each get their own classification (review W4).
 
 Every leg runs a stub `epr` (EPR_BIN) on a temporary project dir; the frame atoms are read from
 this repository (the `_lib` loader's fallback).
@@ -62,7 +71,9 @@ CLASSIFICATION = "bafyreifhbla6a66gg7u34dbpodxcp4h6pcuqxtxv2jkvsynwfjgnicbpxi"
 #                                        $GOVERN_FRAME_REF / $GOVERN_CID after $GOVERN_SLEEP s;
 #                                        anything else exits 2 ("did not run").
 #   flow memory index fold               sleeps $FOLD_SLEEP.
-#   flow memory recall open              {"operation": "open"}.
+#   flow memory recall open              writes <root>/.eprfs/status/recall/<session>/
+#                                        continuation.json (as the real verb does), answers
+#                                        {"operation": "open"}.
 #   flow memory recall search            sleeps $SEARCH_SLEEP, answers $CANDIDATES under
 #                                        retrieval.candidates, each carrying fold_lag $LAG.
 #   flow / flow note --help              advertise `--measure` (the fold emitter's probe).
@@ -89,6 +100,13 @@ if argv[:4] == ["flow", "memory", "index", "fold"]:
     print("index fold (stub)")
     sys.exit(0)
 if argv[:4] == ["flow", "memory", "recall", "open"]:
+    # like the real verb: the session's state lives at .eprfs/status/recall/<session>/
+    root = argv[argv.index("--root") + 1]
+    session = argv[argv.index("--session") + 1]
+    state = os.path.join(root, ".eprfs", "status", "recall", session)
+    os.makedirs(state, exist_ok=True)
+    with open(os.path.join(state, "continuation.json"), "w") as fh:
+        fh.write(json.dumps({"session": session}))
     print(json.dumps({"operation": "open"}))
     sys.exit(0)
 if argv[:4] == ["flow", "memory", "recall", "search"]:
@@ -251,10 +269,13 @@ class FrameProbeCase(unittest.TestCase):
         led = self.project / LEDGER_REL
         other = {"ts": "2026-09-24T00:00:00+00:00", "path": "other.md", "tool": "Write",
                  "net_new": 1, "phrases": ["self-sovereign"], "frame_ref": FRAME_REF,
-                 "classification_cid": None, "source": "pending", "verdict": "abstain"}
-        mine = dict(other, ts="2026-09-24T00:00:01+00:00", path="note.md")
+                 "classification_cid": None, "classification_scope": "document",
+                 "source": "pending", "verdict": "abstain", "nonce": "0a0a0a0a0a0a0a0a"}
+        mine = dict(other, ts="2026-09-24T00:00:01+00:00", path="note.md",
+                    nonce="1b1b1b1b1b1b1b1b")
         led.write_text(json.dumps(other) + "\n" + json.dumps(mine) + "\n")
-        done, _ = self.run_child("--classify", "note.md", "sid-1", mine["ts"], stdin=text,
+        done, _ = self.run_child("--classify", "note.md", "sid-1", mine["ts"], mine["nonce"],
+                                 stdin=text,
                                  GOVERN_VERB="1", GOVERN_FRAME_REF=FRAME_REF,
                                  GOVERN_CID=CLASSIFICATION)
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -278,14 +299,15 @@ class FrameProbeCase(unittest.TestCase):
         led = self.project / LEDGER_REL
         mine = {"ts": "2026-09-24T00:00:01+00:00", "path": "note.md", "tool": "Write",
                 "net_new": 1, "phrases": ["self-sovereign"], "frame_ref": FRAME_REF,
-                "classification_cid": None, "source": "pending", "verdict": "abstain"}
+                "classification_cid": None, "classification_scope": "document",
+                "source": "pending", "verdict": "abstain", "nonce": "2c2c2c2c2c2c2c2c"}
         led.write_text(json.dumps(mine) + "\n")
         hook = load_hook()
         hook.epr_client.resolve_binary = lambda: None
         saved = dict(os.environ)
         os.environ.update(self.env())
         try:
-            hook.classify_child(["note.md", "sid-1", mine["ts"]],
+            hook.classify_child(["note.md", "sid-1", mine["ts"], mine["nonce"]],
                                 io.StringIO("The learner is self-sovereign here.\n"))
         finally:
             os.environ.clear()
@@ -399,16 +421,104 @@ class FrameProbeCase(unittest.TestCase):
                         (self.rows(), self.calls()))
         self.assertEqual(self.rows()[0]["probe"]["verdict"], "abstain")
 
-    def test_child_honours_8s_deadline(self) -> None:
+    def test_child_honours_30s_deadline(self) -> None:
+        # Ruling R-C10: 8 s was measured short under load (fold 0.9-3.1 s + open 4.3-5.9 s +
+        # search 2.3 s; 11.3 s end to end). The child is detached, so the author never waits.
+        self.assertEqual(load_hook().PROBE_DEADLINE_S, 30.0)
         self.write_doc("docs/note.md", silent_prose())
         found = [candidate("docs/note.md", 0.9)]
         done, elapsed = self.run_child("--probe", "docs/note.md", "sid-10", "Write",
-                                       CANDIDATES=json.dumps(found), SEARCH_SLEEP="30")
+                                       CANDIDATES=json.dumps(found), SEARCH_SLEEP="60")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertLess(elapsed, 9.5, "the probe gives up at its 8 s deadline")
-        self.assertGreater(elapsed, 7.0, "the search had the budget's remainder, not less")
+        self.assertLess(elapsed, 31.5, "the probe gives up at its 30 s deadline")
+        self.assertGreater(elapsed, 29.0, "the search had the budget's remainder, not less")
         self.assertEqual(self.rows(), [])
         self.assertEqual(self.notes(), [])
+
+
+    # ── review M3 (ruling R-C10): one recall open per hook session ─────────────────────────
+    def test_m3_second_probe_in_a_session_skips_open(self) -> None:
+        self.write_doc("docs/note.md", silent_prose())
+        found = json.dumps([candidate("docs/note.md", 0.1)])
+        self.run_child("--probe", "docs/note.md", "sid-m3", "Write", CANDIDATES=found)
+        state = self.project / ".eprfs/status/recall/frame-probe-sid-m3/continuation.json"
+        self.assertTrue(state.is_file(), "the first probe opened the session")
+        first = [c[:4] for c in self.recall_calls()]
+        self.assertEqual(first, [["flow", "memory", "index", "fold"],
+                                 ["flow", "memory", "recall", "open"],
+                                 ["flow", "memory", "recall", "search"]])
+        self.log.unlink()
+        self.run_child("--probe", "docs/note.md", "sid-m3", "Edit", CANDIDATES=found)
+        second = self.recall_calls()
+        self.assertEqual([c[:4] for c in second],
+                         [["flow", "memory", "index", "fold"],
+                          ["flow", "memory", "recall", "search"]],
+                         "the session's continuation is on disk: the open is not paid again")
+        search = second[-1]
+        self.assertEqual(search[search.index("--session") + 1], "frame-probe-sid-m3")
+        # A different hook session opens its own.
+        self.log.unlink()
+        self.run_child("--probe", "docs/note.md", "sid-other", "Write", CANDIDATES=found)
+        self.assertIn(["flow", "memory", "recall", "open"],
+                      [c[:4] for c in self.recall_calls()])
+        # A session directory with no continuation (an open that failed before hydrating) is
+        # not a session: the open is paid.
+        self.log.unlink()
+        broken = self.project / ".eprfs/status/recall/frame-probe-sid-broken"
+        broken.mkdir(parents=True)
+        (broken / "continuation.json").write_text("")
+        self.run_child("--probe", "docs/note.md", "sid-broken", "Write", CANDIDATES=found)
+        self.assertIn(["flow", "memory", "recall", "open"],
+                      [c[:4] for c in self.recall_calls()])
+
+    # ── review W1 (ruling R-C14): the row says its classification covers the document ─────────
+    def test_w1_row_declares_whole_document_classification_scope(self) -> None:
+        self.parent_inprocess("docs/note.md", "The learner is self-sovereign here.\n")
+        (row,) = self.rows()
+        self.assertEqual(row["classification_scope"], "document")
+        self.assertEqual(row["source"], "pending")
+
+    # ── review W4 (ruling R-C14): pending rows are rewritten by nonce ───────────────────────
+    def test_w4_two_landings_in_one_second_rewrite_their_own_rows(self) -> None:
+        # The parent hands the row's own nonce to its child.
+        spawned, _ = self.parent_inprocess("docs/note.md", "The learner is self-sovereign here.\n")
+        (row,) = self.rows()
+        self.assertRegex(row["nonce"], r"^[0-9a-f]{16}$")
+        self.assertEqual(spawned[0][0], "--classify")
+        self.assertEqual(spawned[0][-1], row["nonce"], spawned)
+        again, _ = self.parent_inprocess("docs/note.md", "The learner is self-sovereign here.\n")
+        self.assertNotEqual(self.rows()[1]["nonce"], row["nonce"], "a nonce per landing")
+
+        # Two landings of one path in the same second: (path, ts) cannot tell them apart. The
+        # children finish in the OPPOSITE order to the landings; each must still fill its own.
+        led = self.project / LEDGER_REL
+        base = {"ts": "2026-09-24T00:00:05+00:00", "path": "note.md", "tool": "Edit",
+                "net_new": 1, "phrases": ["self-sovereign"], "frame_ref": FRAME_REF,
+                "classification_cid": None, "classification_scope": "document",
+                "source": "pending", "verdict": "abstain"}
+        first = dict(base, nonce="aaaaaaaaaaaaaaaa")
+        second = dict(base, nonce="bbbbbbbbbbbbbbbb")
+        led.write_text(json.dumps(first) + "\n" + json.dumps(second) + "\n")
+        cid_first = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        cid_second = "bafyreibbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        for landing, cid in ((first, cid_first), (second, cid_second))[::-1]:
+            done, _ = self.run_child("--classify", "note.md", "sid-w4", landing["ts"],
+                                     landing["nonce"], stdin="The learner is self-sovereign.\n",
+                                     GOVERN_VERB="1", GOVERN_FRAME_REF=FRAME_REF, GOVERN_CID=cid)
+            self.assertEqual(done.returncode, 0, done.stderr)
+        one, two = self.rows()
+        self.assertEqual((one["nonce"], one["classification_cid"], one["source"]),
+                         (first["nonce"], cid_first, "native"))
+        self.assertEqual((two["nonce"], two["classification_cid"], two["source"]),
+                         (second["nonce"], cid_second, "native"))
+        # A child with no nonce, or one that names no row, rewrites nothing.
+        led.write_text(json.dumps(first) + "\n")
+        self.run_child("--classify", "note.md", "sid-w4", first["ts"], stdin="x\n",
+                       GOVERN_VERB="1", GOVERN_FRAME_REF=FRAME_REF, GOVERN_CID=cid_first)
+        self.run_child("--classify", "note.md", "sid-w4", first["ts"], "cccccccccccccccc",
+                       stdin="x\n", GOVERN_VERB="1", GOVERN_FRAME_REF=FRAME_REF,
+                       GOVERN_CID=cid_first)
+        self.assertEqual(self.rows(), [first])
 
 
 if __name__ == "__main__":
