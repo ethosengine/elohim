@@ -196,13 +196,13 @@ describe('admission', () => {
 describe('writer: one attestation per measured concern of a household run', () => {
   const parts = { a2o: 'tree:1', storage: 'tree:2' };
 
-  it('maps each concern to pass | fail | warn with a sut-keyed check and artifact', () => {
+  it('maps each concern to pass | fail | skip (never warn) with a sut-keyed check and artifact', () => {
     const moored = { session: 's', principal: 'root', recipient: { runtime: 'claude-code' } };
     const out = attestationsFromReport(householdReport(parts), 'r.json', moored);
     const byConcern = Object.fromEntries(out.map(a => [a.summary.concern, a]));
     assert.equal(byConcern[CONCERN].result, 'pass');
     assert.equal(byConcern['doorway-failover'].result, 'fail');
-    assert.equal(byConcern.mixed.result, 'warn');
+    assert.equal(byConcern.mixed.result, 'skip', 'passed + skipped is not proven');
     const sut = hashSutParts(parts);
     assert.equal(byConcern[CONCERN].check, `${CONCERN}/${sut}`);
     assert.equal(byConcern[CONCERN].artifact, cidToString(sutArtifactCidBytes(parts)));

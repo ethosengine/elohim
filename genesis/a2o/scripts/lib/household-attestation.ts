@@ -62,7 +62,8 @@ export interface ReceiptSummary {
 export interface ConcernAttestation {
   check: string;
   artifact: string;
-  result: 'pass' | 'fail' | 'warn' | 'skip';
+  /** Three-valued, as every verification outcome is: brit's `warn` is never emitted here. */
+  result: 'pass' | 'fail' | 'skip';
   summary: ReceiptSummary;
 }
 
@@ -138,11 +139,11 @@ interface ReportLike {
   };
 }
 
+/** failed if any station failed; passed only if every one passed; otherwise not proven (skip). */
 function resultFor(scenarios: ReceiptScenario[]): ConcernAttestation['result'] {
-  if (scenarios.length === 0) return 'skip';
   if (scenarios.some(s => s.status === 'failed')) return 'fail';
-  if (scenarios.every(s => s.status === 'passed')) return 'pass';
-  return 'warn';
+  if (scenarios.length > 0 && scenarios.every(s => s.status === 'passed')) return 'pass';
+  return 'skip';
 }
 
 /**
