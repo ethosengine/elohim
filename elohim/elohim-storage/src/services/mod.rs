@@ -107,6 +107,7 @@ pub mod membership_identity_reconcile; // membership-truth agent-key supersede +
 pub mod mishpat_commitment_facing;
 pub mod mishpat_mirror_backfill; // level-triggered heal: re-file/insert replicates-* mirrors into the canonical projection namespace
 pub mod mutuality_audit_service;
+pub mod observation_kinds; // manifest-declared observation kinds + payload validation (attention-witnessed-privately A1)
 pub mod operation_authorization; // Che op-gate Slice 1 §14 — core op-gate gate over mishpat_commitments
 pub mod operational_weave_facing;
 pub mod peer_capacity_service;

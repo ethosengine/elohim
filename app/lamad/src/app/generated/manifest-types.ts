@@ -125,7 +125,7 @@ export const LAMAD_OBSERVATION_KINDS: ObservationKindDeclaration[] = [
     ref_cid: 'Cid',
     dwell_ms: 'u64',
     scroll_depth_pct: 'u8',
-    session_id: 'Cid',
+    session_id: 'Cid?',
     },
     retention_class: 'contextual',
     reach: 'agent-private',
