@@ -38,6 +38,8 @@ use elohim_epr_rea::{
     SidecarFlowStore,
 };
 
+use super::discovery::identifier_words;
+use super::passage::word_start_matches;
 use super::*;
 
 /// The synthetic receiver every sampled journey's `FlowEvent` names — the recall executor's own
@@ -168,7 +170,7 @@ pub(super) fn sample(
                         .reached_when
                         .terms
                         .iter()
-                        .all(|term| excerpt.contains(&term.to_ascii_lowercase()));
+                        .all(|term| carries_term(&excerpt, term));
                 let metered_bytes = read_view["usage"]["source_bytes"].as_u64().unwrap_or(0);
 
                 // 3. finish — a focused journey closes on its inspected passage.
@@ -639,4 +641,59 @@ fn judge_inner(args: &Args, contract: &Contract) -> FlowResult<JudgeOutcome> {
     view["lens"] = resolved_lens.to_value();
 
     Ok(JudgeOutcome::Rendered(view, Box::new(resolved_lens)))
+}
+
+/// Whether a read passage carries one of a bank question's `reached_when.terms`, read the way
+/// discovery reads text — never a second predicate of its own. Both sides pass through
+/// discovery's own [`identifier_words`] (`_` and `-` are word breaks, whitespace collapses) after
+/// lowercasing, and the term's words must begin a word in the passage ([`word_start_matches`], the
+/// rule the passage scorer counts terms by): `_GATE_TARGET_BIN` carries `gate target`;
+/// `gatekeeper target` and `tailgate target` do not. An inflection still matches at the tail
+/// (`stamps` carries `stamp`), as it does for discovery.
+///
+/// No plain-substring fallback: every term a plain substring found at a word start is found
+/// here, and the only matches a plain substring adds are fragments inside another word
+/// (`tailgate` for `gate`), which discovery's counting refuses too. An empty term carries nothing.
+fn carries_term(passage: &str, term: &str) -> bool {
+    let needle = identifier_words(&term.to_lowercase());
+    word_start_matches(&identifier_words(&passage.to_lowercase()), &needle) > 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Coordinator ruling (station 4 integration): an identifier carries the words it is spelled
+    /// from — `_` and case are word breaks, exactly as discovery reads them — and a word that
+    /// merely begins with a term's first word is not that word.
+    #[test]
+    fn an_identifier_carries_the_words_it_is_spelled_from() {
+        let passage =
+            "    if os.path.isfile(_GATE_TARGET_BIN) and os.access(_GATE_TARGET_BIN, os.X_OK):";
+        assert!(carries_term(passage, "gate target"));
+        assert!(carries_term("GateTarget is not split", "gatetarget"));
+        assert!(!carries_term("the gatekeeper target", "gate target"));
+        assert!(!carries_term("a tailgate target", "gate target"));
+    }
+
+    /// Every term the live bank's six questions carry is still read where it was read before:
+    /// identifiers, dotted names, hyphenated words and plain words.
+    #[test]
+    fn the_terms_a_plain_passage_carried_are_still_carried() {
+        let passage = "def resolve_bin():\n    env = os.environ.get(\"EPR_BIN\")\n    \
+                       return shutil.which(\"epr\")  # PATH; stamp .last-mine, lock-blocked";
+        for term in [
+            "resolve_bin",
+            "EPR_BIN",
+            "shutil.which",
+            "PATH",
+            "last-mine",
+            "lock-blocked",
+            "epr",
+        ] {
+            assert!(carries_term(passage, term), "{term}");
+        }
+        assert!(!carries_term(passage, "resolve bins"));
+        assert!(!carries_term(passage, ""), "an empty term carries nothing");
+    }
 }

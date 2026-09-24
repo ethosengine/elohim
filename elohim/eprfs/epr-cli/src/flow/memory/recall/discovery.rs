@@ -40,7 +40,7 @@ pub fn discover(
 
 /// Lower-level text with `_` and `-` read as word breaks and runs of whitespace collapsed, so a
 /// phrase and an identifier spelling of the same words compare equal.
-fn identifier_words(text: &str) -> String {
+pub(super) fn identifier_words(text: &str) -> String {
     text.replace(['_', '-'], " ")
         .split_whitespace()
         .collect::<Vec<_>>()

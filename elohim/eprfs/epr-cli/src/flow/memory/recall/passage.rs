@@ -259,7 +259,7 @@ fn count(text: &str, (needle, stemmed): &(String, String)) -> usize {
 /// Occurrences of `needle` that begin a word: the character before it is not alphanumeric. An
 /// inflection still matches (`lives` for `live`, `recall-journey` for `journey`), a fragment inside
 /// another word does not (`delivery` never counts as `live`).
-fn word_start_matches(text: &str, needle: &str) -> usize {
+pub(super) fn word_start_matches(text: &str, needle: &str) -> usize {
     if needle.is_empty() {
         return 0;
     }
