@@ -81,6 +81,7 @@
           "elohim/Cargo.lock",
           "elohim/Cargo.toml",
           "elohim/elohim-storage/config/**",
+          "elohim/elohim-storage/.epr-meta/elohim/algorithms/observation-lifestream-recipe.json",
           "elohim/ark/core/**",
           "elohim/elohim-cache-core/**",
           "elohim/elohim-compute/**",

@@ -368,6 +368,9 @@ FROM check-deps AS check
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 COPY elohim/elohim-storage/benches ./benches
+# observation::recipe include_str!s the governed lifestream recipe from
+# $CARGO_MANIFEST_DIR/.epr-meta/elohim/algorithms/ — same path in the image.
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/observation-lifestream-recipe.json ./.epr-meta/elohim/algorithms/observation-lifestream-recipe.json
 # config/: cfg(test) include_str! targets (policy/config.rs reads
 # ../../config/peer-policy.example.toml) — test-only, so the release path
 # never needed it and edge #1137's first test-layer run failed compile on it.
@@ -447,6 +450,11 @@ ARG RUSTC_VERSION=unknown
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 COPY elohim/elohim-storage/benches ./benches
+# observation::recipe include_str!s the governed lifestream recipe from
+# $CARGO_MANIFEST_DIR/.epr-meta/elohim/algorithms/ (the recipe's CID is BLAKE3
+# over these bytes). Without this COPY the build fails with "couldn't read
+# …/observation-lifestream-recipe.json".
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/observation-lifestream-recipe.json ./.epr-meta/elohim/algorithms/observation-lifestream-recipe.json
 
 # bootstrap_manifests.rs uses include_str!("../../../sdk/schemas/v1/manifests/...")
 # which resolves to /sdk/... in this WORKDIR /app layout (../../.. from
