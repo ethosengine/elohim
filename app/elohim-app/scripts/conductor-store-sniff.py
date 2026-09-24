@@ -95,6 +95,18 @@ def entry_kind(blob):
     return "?"
 
 
+# Table/column names come from the database itself and are interpolated into SQL,
+# so only plain identifiers pass; anything else is skipped with a one-line warning.
+IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def safe_identifier(name, what):
+    if isinstance(name, str) and IDENTIFIER.match(name):
+        return True
+    print(f"warning: skipping {what} with a non-identifier name {name!r}", file=sys.stderr)
+    return False
+
+
 def sniff_dna(root, dna_file, passphrase, top):
     db = os.path.join(root, "databases", dna_file)
     out = {"dna": dna_file[4:-3], "main_mb": fsize(db) / MB, "wal_mb": fsize(db + "-wal") / MB,
@@ -105,10 +117,13 @@ def sniff_dna(root, dna_file, passphrase, top):
     out["page_count"] = c.execute("pragma page_count").fetchone()[0]
     rows = {}
     for t in tables:
+        if not safe_identifier(t, "table"):
+            continue
         n = c.execute(f'select count(*) from "{t}"').fetchone()[0]
         if n:
-            cols = [r[1] for r in c.execute(f'pragma table_info("{t}")')]
-            expr = "+".join(f'coalesce(length("{k}"),0)' for k in cols)
+            cols = [k for k in (r[1] for r in c.execute(f'pragma table_info("{t}")'))
+                    if safe_identifier(k, f"column of {t}")]
+            expr = "+".join(f'coalesce(length("{k}"),0)' for k in cols) or "0"
             rows[t] = {"rows": n, "payload_mb": c.execute(f"select coalesce(sum({expr}),0) from \"{t}\"").fetchone()[0] / MB}
     out["tables"] = rows
     if "Action" in rows:

@@ -302,7 +302,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::Link(OpLink::CreateLink { .. }) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::Link(OpLink::DeleteLink { .. }) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::Link(OpLink::DeleteLink { .. }) => Ok(ValidateCallbackResult::Valid), // Unconditionally Valid: any agent may delete any link, so every coordinator that deletes links MUST filter `link.author == me` (as `delete_own_doorway_links` does). Trailing on purpose: a new line would shift the panic/tracing line numbers baked into this integrity wasm and move the DNA hash.
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
