@@ -661,6 +661,55 @@ visible as its own node.
 4. **One push per batch,** never mid-build; a `[build:app]` during a known window is the Lane A
    live check, a `[run:verify]` (Lane B) the no-roll check; Lane K's roll is the operator's.
 
+## Rulings log — wave 1 (2026-09-24, controller)
+
+Wave 1 landed on dev (A b6f256b9a 5d44375b6 · B 58b6b5456 1d29b1128 + rakia `feat/step-class`
+b081e9b + `pin/lane-B` 9466cae71 · C be979acbc 5ec286ce3 · D f8512d40f 322c3d63a 66994b31d 308638344
+· E 6cb119bfa 8c5679f9d 4e5a6d3de · F1 brit `feat/reach-derived-cid-epr` 06f9f234a4 b9c27d5ba5 · K
+088ab0b6c + `pin/lane-K` 62ffcfb2f · H0/H1 553edab1f 89d7c7e86 7be4d4e37 97977b60b). Reviews: all
+approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes raised:
+
+- **A** all five recommendations stand: `storage-refused` is NOT READY (a write that cannot be
+  anchored does not start — and the fleet reads exactly that today, `serving_ok=false` ≈2.8 h after
+  a doorway start: a fleet red for K0 to read, not a gate defect); transport error = not ready;
+  exit 2 proceeds on the 300 s tail; sentinel-hash probe on CI, `READINESS_PROBE_HASH` on the
+  household; one junit `readiness` case. **A adopts one face vocabulary** shared with Lane C:
+  `cell-not-running | catching-up | storage-forward-timeout` for the plan's three faces, the rest
+  as they are, and the host printed as the origin URL.
+- **B** do not invent plan-named steps (`mesh-quiesce-measure`, `publish-app-delivery`, …) until
+  the Jenkinsfile can honour them; every class below `deploy` dispatches validate-only; `[run:*]`
+  selects every pipeline declaring a step at or below the class; cross-repo downstreams get
+  `RUN_CLASS` only once they declare it; genesis lints stay `build`. Pre-existing red
+  `validate-manifests.mjs` (mirror lacks `attested`) is fixed with B5.
+- **C** shed for stations 3–4, real restart for station 2; served page within 30 s; the
+  `features/dataplane/README.md` concern table gains `push-delivers-within-budget`.
+- **D** the `cost:` headline slot is Rust (`HEADLINE_ORDER` in `flow/report.rs`) → Lane G1;
+  `e22562ad0ec9` reopening on the next unsplit red is the honest signal; habits-status at ~6 s is
+  acceptable off the SessionStart path; the `spread()` NaN is fixed in wave 1.5.
+- **E** habit ids are declared concern addresses; `operator-surfaced-pain@1` gets its lens after
+  the first folded week (hard 0, headline slot with G1); last-fired is read from the persona's own
+  observation notes; the cloud routine is the controller's to create from the scratchpad spec.
+- **F1** `Unknown→private`, `Deployed→intimate` in every scope; `BritCid` stays the field type
+  (serde-transparent over the same `cid::Cid`); the engine keeps `BritCid::compute` under the
+  parity test; the rakia spec lines "CI passed = trusted" are superseded (a pipeline's identity
+  earns no reach; only verification of the running artifact does) — the amendment lands on its own
+  rakia branch in F2. The dirty `elohim/brit` gitlink (HEAD on the feature branch) is restored to
+  the pin by Lane 0b, branch kept.
+- **K** the pin-move target is **e0bfc6c7a** (25dd2d0be + the sargable-arc fix alone), never
+  7e553f9c3, which K0's bisect judges separately; the conductor manifest gains an `attested`
+  step reading the fork's `pr_tests` check (B/F follow-up); `capture-rollout-evidence.sh` gains a
+  read-only storage-pod log capture since the conductor's creation time (A3 agent).
+- **H** the deregister verb over stable fixture ids; the unauthenticated admin verb is accepted
+  now with admin-path auth for all `/admin/federation/*` routes decided together (backlog);
+  partitioned-but-alive siblings stay skipped until H2; the peer-cache echo is H2's first named
+  node.
+- **Valueflow rail** refused every `epr flow claim` because the hand-written gap-items are not
+  intents the sidecar knows; Lane 0b converts the lane items to checkbox tasks so `epr flow project`
+  mints real gap-items, then claims are recorded retroactively per lane.
+
+**Wave 1.5 (small fixes before Lane 0b):** B5 + mirror-schema `attested`/`class`; D
+`spread()` NaN; A/C one face vocabulary + origin-URL host.
+
 ## Complementary work captured (backlog, not this sprint)
 
 - rakia portal aesthetic pass (graphos) — input: Lane G data contract.
