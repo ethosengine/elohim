@@ -8,6 +8,7 @@ pub mod actor;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;
+pub mod device_key;
 pub mod doctor;
 pub mod error;
 pub mod explain;
