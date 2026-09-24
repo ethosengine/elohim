@@ -235,11 +235,13 @@ case " $PUSH_TARGETS " in *"refs/heads/dev"*)
 - Consumes: ledger entries with `.get("concern")` (Tasks 2-3); habits checks' `@concern:` tags.
 - Produces: headline suffix `· pain: N open @<concern>` when the TOP RED's concern has open findings; `--full` gains one `pain:` line per habit listing `N open (fp1, fp2, …≤3)`.
 
-- [ ] **Step 1: Failing test** — importlib-load `habits-status.py`, override a new module-level `LEDGERS` constant (added in Step 3; test sets `m.LEDGERS = [fixture_path]`) pointing at a fixture jsonl containing two entries: `{"fp":"abc123","class":"ci-no-measure","status":"open","concern":"notary-authority"}` and `{"fp":"def456","status":"open"}` (no concern — must not crash, must not count). Assert `headline(...)` contains `pain: 1 open` and `full(...)` contains `abc123`.
-- [ ] **Step 2: Run → FAIL.**
-- [ ] **Step 3: Implement** — `LEDGERS` constant (ci-findings + runtime-findings absolute paths derived the same way the existing `HABITS` constant derives the repo root); `def open_pain()` → dict concern→[fps] over lines where `status=="open"` and `.get("concern")`; join in `headline` (top-red's first `@concern:` tag extracted from its check string with an inline copy of the `@concern:` regex — habits-status stays import-free) and per-habit in `full`. Missing/unreadable ledgers → empty dict (never a crash at session start).
-- [ ] **Step 4: Run test + `python3 .claude/scripts/habits-status.py` (live smoke — must render; a real pain line is a pass, not a failure) → PASS.**
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Failing test** — importlib-load `habits-status.py`, override a new module-level `LEDGERS` constant (added in Step 3; test sets `m.LEDGERS = [fixture_path]`) pointing at a fixture jsonl containing two entries: `{"fp":"abc123","class":"ci-no-measure","status":"open","concern":"notary-authority"}` and `{"fp":"def456","status":"open"}` (no concern — must not crash, must not count). Assert `headline(...)` contains `pain: 1 open` and `full(...)` contains `abc123`.
+- [x] **Step 2: Run → FAIL.**
+- [x] **Step 3: Implement** — `LEDGERS` constant (ci-findings + runtime-findings absolute paths derived the same way the existing `HABITS` constant derives the repo root); `def open_pain()` → dict concern→[fps] over lines where `status=="open"` and `.get("concern")`; join in `headline` (top-red's first `@concern:` tag extracted from its check string with an inline copy of the `@concern:` regex — habits-status stays import-free) and per-habit in `full`. Missing/unreadable ledgers → empty dict (never a crash at session start).
+- [x] **Step 4: Run test + `python3 .claude/scripts/habits-status.py` (live smoke — must render; a real pain line is a pass, not a failure) → PASS.**
+- [x] **Step 5: Commit.**
+
+**Extended 2026-09-24 (native-delivery sprint Lane D4):** pain also joins on the habit's own id (findings addressed to the promise, e.g. STAGE_OVER_BUDGET → `push-delivers-within-budget`), and the top red's row — plus a second active red's own `also active:` row — carries `pain · last evidence · cost`, the cost read from the bounds whose `concern:` names the habit via `epr flow report --bound`. Test: `.claude/scripts/_lib/__tests__/habits_status_cost_test.py`.
 
 ---
 

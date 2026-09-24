@@ -34,6 +34,13 @@ tag-scoped or path-filtered run therefore cannot make missing coverage vanish �
 unexercised declared concerns still render NOT MEASURED. Absence of any report at all is
 itself NOT MEASURED, never green.
 
+PAIN · LAST EVIDENCE · COST (native-delivery sprint Lane D4, 2026-09-24). The top red's row
+carries three readings together: open findings addressed to the habit (by its id or any of its
+@concern tags), the date of its newest evidence, and the bounds that price it — every
+`measures.yaml` lens / `policies.yaml` ceiling whose `concern:` names the habit, read through
+`epr flow report --bound` (the native report is the only reader of folds; this script never
+parses the sidecar). An unreadable report is said, never rendered as health.
+
 Usage:
   habits-status.py --headline   one line for the SessionStart context block
   habits-status.py --full       table: every habit, status, checks, first moves
@@ -44,7 +51,10 @@ Deterministic, read-only, no network. Statuses are DECLARED in habits.yaml (cove
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -129,12 +139,155 @@ def open_pain() -> dict:
     return pain
 
 
+def _addresses(habit: dict) -> list:
+    """Every address a finding can carry for this habit: its @concern tags, then its own id.
+
+    A finding may threaten the promise itself rather than one tagged scenario (ci-harvest
+    routes STAGE_OVER_BUDGET / BUDGET_EXHAUSTED to the habit that prices them), and a habit
+    whose checks are not a2o scenarios declares no tag at all."""
+    out = _concerns(habit.get("checks"))
+    hid = habit.get("id")
+    if isinstance(hid, str) and hid and hid not in out:
+        out.append(hid)
+    return out
+
+
+def habit_pain(habit: dict, pain: dict) -> tuple:
+    """(fps, first address with pain) across every address of `habit`, deduped, in order."""
+    fps, first = [], None
+    for addr in _addresses(habit):
+        got = pain.get(addr) or []
+        if got and first is None:
+            first = addr
+        fps.extend(fp for fp in got if fp not in fps)
+    return fps, first
+
+
+# ------------------------------------------------------------------ COST (the bounds that price a habit)
+# The two declared bound homes the native report reads as one shape. A row prices a habit when
+# its `concern:` names the habit id (or one of its @concern tags). Tests override wholesale.
+COST_REGISTRIES = [
+    _ROOT / ".claude" / "epr-meta" / "measures.yaml",
+    _ROOT / ".claude" / "epr-meta" / "policies.yaml",
+]
+_GATE_TARGET_BIN = "/tmp/eprfs-gate-target/debug/epr"  # same resolution order as the hooks
+_BOUND_TIMEOUT = 15
+
+
+def cost_bounds() -> dict:
+    """concern -> [bound ids] over active, measure-consuming rows that declare a `concern:`."""
+    out: dict = {}
+    for path in COST_REGISTRIES:
+        try:
+            doc = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError, ValueError):
+            continue
+        rows = []
+        for key in ("lenses", "policies"):
+            got = doc.get(key) if isinstance(doc, dict) else None
+            rows.extend(r for r in (got or []) if isinstance(r, dict))
+        for row in rows:
+            concern, rid = row.get("concern"), row.get("id")
+            if not isinstance(concern, str) or not isinstance(rid, str):
+                continue
+            if row.get("status", "active") != "active" or not (row.get("consumes") or row.get("measure")):
+                continue
+            ids = out.setdefault(concern, [])
+            if rid not in ids:
+                ids.append(rid)
+    return out
+
+
+def _epr_bin():
+    env = os.environ.get("EPR_BIN")
+    if env and os.path.isfile(env) and os.access(env, os.X_OK):
+        return env
+    if os.path.isfile(_GATE_TARGET_BIN) and os.access(_GATE_TARGET_BIN, os.X_OK):
+        return _GATE_TARGET_BIN
+    return shutil.which("epr")
+
+
+def _read_bound_native(bound_id: str):
+    """One bound's outcome from `epr flow report --bound <id> --json`, or None (fail-open)."""
+    binary = _epr_bin()
+    if not binary:
+        return None
+    try:
+        r = subprocess.run([binary, "flow", "report", "--bound", bound_id, "--json", "--root", str(_ROOT)],
+                           capture_output=True, text=True, timeout=_BOUND_TIMEOUT, cwd=str(_ROOT))
+        if r.returncode != 0:
+            return None
+        payload = json.loads(r.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    for recipe in payload.get("recipes") or []:
+        if not recipe.get("primary", True):
+            continue
+        for outcome in recipe.get("outcomes") or []:
+            if str(outcome.get("bound", "")).split("@")[0] == bound_id:
+                return outcome
+    return None
+
+
+READ_BOUND = _read_bound_native  # tests substitute a pure reader
+
+
+def _num(v) -> str:
+    return f"{v:g}" if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v)
+
+
+def _cost_part(bound_id: str, outcome: dict) -> str:
+    name = bound_id[: -len("-ceiling")] if bound_id.endswith("-ceiling") else bound_id
+    status = outcome.get("outcome")
+    if status == "skipped" or outcome.get("observed") is None:
+        return f"{name} skipped ({outcome.get('summary') or 'no reading'})"
+    marks = outcome.get("watermarks") or {}
+    if marks.get("hard") is not None:
+        edge = f"hard {_num(marks['hard'])}"
+    else:
+        edge = f"soft {_num(marks.get('soft'))}"
+    warn = status == "failed" or str(outcome.get("summary", "")).startswith("warn:")
+    unit = f" {outcome['unit']}" if outcome.get("unit") else ""
+    return f"{name} {_num(outcome['observed'])}{unit} ({edge}) {'⚠' if warn else '✅'}"
+
+
+def habit_cost(habit: dict, bounds=None):
+    """`cost: …` for the bounds pricing `habit`, or None when no bound names it."""
+    bounds = cost_bounds() if bounds is None else bounds
+    ids = []
+    for addr in _addresses(habit):
+        ids.extend(b for b in bounds.get(addr, []) if b not in ids)
+    if not ids:
+        return None
+    try:
+        with ThreadPoolExecutor(max_workers=min(4, len(ids))) as ex:
+            outcomes = list(ex.map(READ_BOUND, ids))
+    except Exception:  # noqa: BLE001 — a reader failure is "not read", never a crash
+        outcomes = [None] * len(ids)
+    parts = [_cost_part(b, o) for b, o in zip(ids, outcomes) if isinstance(o, dict)]
+    if not parts:
+        return "cost: not read (epr flow report unavailable)"
+    return "cost: " + ", ".join(parts)
+
+
+_DELTA_DATE = re.compile(r"^\s*DELTA (20\d{2}-\d{2}-\d{2})", re.M)
+
+
+def last_evidence(habit: dict, row=None) -> str:
+    """The newest evidence behind the habit: a lane verdict when the a2o lane witnessed it,
+    else the newest dated DELTA in its atom's ledger — 'none recorded' when neither exists."""
+    if row and row.get("last_measured") is not None:
+        return f"{row['age']} (a2o lane)"
+    dates = _DELTA_DATE.findall(str(habit.get("evidence") or ""))
+    return f"delta {max(dates)}" if dates else "none recorded"
+
+
 def _concerns(checks) -> list:
     """EVERY @concern: tag across a habit's check strings, in order, deduped.
 
     Law I's denominator, read from the register and not from a run: a habit that
-    declares six concerns is measured only when all six are. `_first_concern` (the
-    findings-ledger pain join, which addresses one concern) reads the first of these.
+    declares six concerns is measured only when all six are. `_addresses` (the
+    findings-ledger pain join) reads all of these plus the habit's own id.
     """
     out = []
     for c in checks or []:
@@ -481,16 +634,34 @@ def headline(habits: dict) -> str:
     top = next((n for n in reds if n.get("active")), None) \
         or (reds[0] if reds else None) \
         or next((n for n in unwired if n.get("active")), None)
+    # Law I's view is computed ONCE: the honesty block and each red row's last evidence read it.
+    # Guarded: this must never break session start (a hostile report body, an unreadable reports
+    # dir); a failure degrades to no block and delta-dated evidence, never a false green.
+    try:
+        view = not_measured_view(habits)
+    except Exception:  # noqa: BLE001
+        view = None
+    rows = {r["id"]: r for r in (view["rows"] if view else [])}
+    pain = open_pain()
+
+    def readings(habit):
+        """Pain, its last evidence and its cost on ONE row (Lane D4): what a session acts on."""
+        fps, addr = habit_pain(habit, pain)
+        out = f" · pain: {len(fps)} open @{addr}" if fps else ""
+        out += f" · last evidence: {last_evidence(habit, rows.get(habit.get('id')))}"
+        cost = habit_cost(habit)
+        return out + (f" · {cost}" if cost else "")
+
+    also = []
     if top is None:
         nxt = "all green — pull the next habit from the covenant queue"
     elif top.get("status") == "red":
         check = (top.get("checks") or ["(check missing)"])[0]
-        nxt = f"top red: {top['id']} → {check}"
-        concern = _first_concern(top.get("checks"))
-        if concern:
-            fps = open_pain().get(concern) or []
-            if fps:
-                nxt += f" · pain: {len(fps)} open @{concern}"
+        nxt = f"top red: {top['id']} → {check}{readings(top)}"
+        # The WIP fence allows two active habits; the second active red's pain and cost are as
+        # live as the first's, so it gets its own row (no check string — the top red owns that).
+        also = [f"  also active: {n['id']}{readings(n)}"
+                for n in reds if n.get("active") and n is not top]
     else:
         nxt = f"top move: {top['id']} is unwired → write its red ({(top.get('first_move') or '').strip().split(':')[0]}…)"
 
@@ -498,18 +669,19 @@ def headline(habits: dict) -> str:
     fence = ",".join(n["id"] for n in active) or "none"
     # Law I: the honesty leg renders ABOVE the next-move line. A green habit whose lane
     # measured nothing invalidates the selection that line is about to make, so it cannot
-    # sit below it. Guarded: this must never break session start (a hostile report body,
-    # an unreadable reports dir), and a failure degrades to printing no block at all —
-    # which is the pre-2026-08-22 behaviour, not a false green.
+    # sit below it. A failure degrades to printing no block at all — the pre-2026-08-22
+    # behaviour, not a false green.
     try:
-        nm_lines = not_measured_lines(not_measured_view(habits))
+        nm_lines = not_measured_lines(view) if view else []
     except Exception:
         nm_lines = []
     body = ("\n".join(nm_lines) + "\n") if nm_lines else ""
+    also_body = ("\n".join(also) + "\n") if also else ""
     return (
         f"HABITS ({len(arts)} declared in .epr-meta)  {counts} · active: {fence}\n"
         f"{body}"
         f"  {nxt}\n"
+        f"{also_body}"
         f"  RULE: sessions serve the habits — move reds green (with evidence), file new reds runnable, "
         f"one-line delta. A plan citing no habit belongs in held/."
     )
@@ -519,6 +691,7 @@ def full(habits: dict) -> str:
     lines = [f"Delivery habits — resolved from .epr-meta habit atoms "
              f"(projection: {HABITS.relative_to(_ROOT)}; updated {habits.get('updated')})", ""]
     pain = open_pain()
+    bounds = cost_bounds()
     try:
         view = not_measured_view(habits)
     except Exception:
@@ -542,12 +715,15 @@ def full(habits: dict) -> str:
             lines.append(f"    first move: {' '.join(str(n['first_move']).split())}")
         if n.get("evidence"):
             lines.append(f"    evidence: {' '.join(str(n['evidence']).split())}")
-        concern = _first_concern(n.get("checks"))
-        fps = pain.get(concern) if concern else None
+        fps, _addr = habit_pain(n, pain)
         if fps:
             shown = ", ".join(fps[:3]) + ("…" if len(fps) > 3 else "")
             lines.append(f"    pain: {len(fps)} open ({shown})")
         row = observed.get(n.get("id"))
+        lines.append(f"    last evidence: {last_evidence(n, row)}")
+        cost = habit_cost(n, bounds)
+        if cost:
+            lines.append(f"    {cost}")
         if row:
             obs = (f"    observed_status: {row['observed']}"
                    f"  ·  last_measured: {row['age']}"
