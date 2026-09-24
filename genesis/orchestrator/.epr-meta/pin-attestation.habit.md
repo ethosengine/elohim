@@ -27,6 +27,7 @@ retire-when: >
   when attestations are read from the dataplane rather than a forge — rung 2 landing makes
   `github-checks` one provider among peers — and this habit describes a product, not a practice.
 ---
+DELTA 2026-09-24: two attested-component branches await their upstream checks before any pin moves — rakia feat/step-class b081e9b (steps[].class), brit feat/reach-derived-cid-epr b9c27d5ba5 (reach as a view over protocol Reach, CIDs via elohim_epr); the conductor manifest declares no attested step yet (K follow-up). NO status change.
 DELTA 2026-09-23 (oracle flipped; RED preserved until two pin-moving pushes hold): the shadow
 selection over the pin-moving commit 691b28cdf printed `[gate] oracle-diff: +elohim-storage
 +elohim-app` — exactly the depth-one consumers of the rakia and sophia pins (brit's consumer,

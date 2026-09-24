@@ -24,6 +24,7 @@ retire-when: >
   no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
   and its wall clock stops being the delivery path this habit watches.
 ---
+DELTA 2026-09-24b (RED preserved): Lane A landed the readiness precondition + timed phases (b6f256b9a 5d44375b6; faces abd014123), Lane B run classes (58b6b5456 + rakia feat/step-class b081e9b, pin bump on pin/lane-B), B5 advisory guard (ac1e3a6cd), Lane D priced the stage: delivery-series --stages reads publish+verify p90 131.9 min against bound 20, 16.5 pipeline-h for 0 delivered (f8512d40f, NaN fix 9040b0eda); app #1726 failed like #1725. Live reading owed on the first push.
 DELTA 2026-09-24: ACTIVE for the native-delivery sprint (plan genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md) — app #1719–#1725 ≈12 pipeline-h, 0 delivered; the 7200 s readiness wait (a2d1d0975) is the app's cost; Lanes A/B/D/K serve this habit. Status stays RED until delivery-series reads within bounds.
 
 RED written 2026-09-22 on a live reading. `delivery-series.mjs --window 10` delivered 1 of 10 work-bearing
