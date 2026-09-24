@@ -3,7 +3,8 @@
 # (spec ratchet-to-delivery-dataplane-sdk-lanes, lane D rung D2; evidence-ladder-push-left §3
 # "ascend-only": a dataplane change is pushed only after the household mesh has seen it).
 #
-# Serving changes require every deliverability station on the current source.
+# Serving changes require every station of the household story that witnesses them, on the
+# current source (a signed validation attestation, else a sprint-report file).
 # Other dataplane changes retain the advisory recency receipt unless --strict.
 #
 # usage: t2-receipt.sh --changed <file: one repo-relative path per line> [--reports <dir>] [--strict]
@@ -22,17 +23,26 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
 
 # The paths whose behaviour only the household mesh can witness (T2 in the ladder).
+# SERVING_RE paths are mandatory whatever T2_RECEIPT says. serving-receipt.mjs owns which household
+# story's receipt admits each: features/dataplane/app-delivery-refuses-fast.feature (the not-ready
+# window) for fleet-write-readiness.sh, scripts/ci/lib/ and release_adoption/; either it or
+# epr-app-deliverability.feature for stage-spa-blob.sh; deliverability for the rest. A signed
+# household ValidationAttestation (refs/notes/brit/validate/a2o-household/…) is preferred over a
+# report file; both must match the current source.
 DATAPLANE_RE='^(elohim/elohim-storage/src/(p2p|sync|reconcile|p2p_iroh)/|doorway/doorway-service/src/)'
-SERVING_RE='^(elohim/elohim-render/|app/scripts/lint-ssr-entry\.mjs|elohim/sdk/scripts/|scripts/ci/(stage-spa-blob|verify-served-shell|verify-projected-head|same-doorway-curl)|doorway/doorway-service/src/|elohim/elohim-storage/src/(services/content_service\.rs|services/head_adoption\.rs|db/content|routes/apps|http|ssr|app_deliverability|sync/|p2p/(projection_reconcile|blob|view|content)|p2p_iroh/|reconcile/)|genesis/a2o/(features/dataplane/(epr-app-deliverability|served-shell-boots)|steps/dataplane/epr-app-deliverability|scripts/(browser-shell|verify-served-shell|lib/sut)|src/framework/served-shell-boot))'
+SERVING_RE='^(elohim/elohim-render/|app/scripts/lint-ssr-entry\.mjs|elohim/sdk/scripts/|scripts/ci/(stage-spa-blob|verify-served-shell|verify-projected-head|same-doorway-curl|fleet-write-readiness\.sh|lib/)|doorway/doorway-service/src/|elohim/elohim-storage/src/(services/content_service\.rs|services/head_adoption\.rs|services/release_adoption/|db/content|routes/apps|http|ssr|app_deliverability|sync/|p2p/(projection_reconcile|blob|view|content)|p2p_iroh/|reconcile/)|genesis/a2o/(features/dataplane/(epr-app-deliverability|served-shell-boots)|steps/dataplane/epr-app-deliverability|scripts/(browser-shell|verify-served-shell|lib/sut)|src/framework/served-shell-boot))'
 touched=$(grep -E "$DATAPLANE_RE|$SERVING_RE" "$CHANGED_FILE" || true)
 [ -n "$touched" ] || exit 0
 serving_touched=$(grep -E "$SERVING_RE" "$CHANGED_FILE" || true)
 if [ -n "$serving_touched" ]; then
-  if node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR"; then
-    exit 0
-  fi
-  echo '[pre-push] NO-SERVING-RECEIPT (refused): every browser, SSR and recovery station must pass on the current source.' >&2
-  echo '[pre-push] Produce the receipt: just test mesh features/dataplane/epr-app-deliverability.feature' >&2
+  serving_list=$(mktemp)
+  printf '%s\n' "$serving_touched" > "$serving_list"
+  node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list"
+  receipt_rc=$?
+  rm -f "$serving_list"
+  [ "$receipt_rc" -eq 0 ] && exit 0
+  echo '[pre-push] NO-SERVING-RECEIPT (refused): every station of the story that witnesses these serving paths must pass on the current source.' >&2
+  echo "$serving_touched" | sed 's/^/[pre-push]     /' >&2
   exit 1
 fi
 
