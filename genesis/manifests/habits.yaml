@@ -3831,6 +3831,19 @@ habits:
       `/api/v1/attention/tending` is undeclared at the doorway: `build_manifest()` declares only the
       three session routes for observations and nothing for attention, so a browser-path tending write
       has no route through the doorway (Tauri-direct only).
+
+      DELTA 2026-09-24 (A1–A9 landed; status stays red, mesh run pending). The landed tasks are A0
+      `a29e9c64f`, A1 `033cbf0c8`, A2 `f46f3517c`, A3 `79996e877`, A4 `1c3adb869`, A5 `5a7ae8599`,
+      A6 `06444bfca`, A7 `064f720d3`, A8 `a2b1b3b9d`, A9 feature+steps `bdb6b1ac3` and backlog atoms
+      `6bae0fd12`. Check (3) was re-measured green: the grep on content-viewer.component.ts = 0.
+      Check (2) was re-measured green: `cargo test --lib -- gossip_gate` (CARGO_BUILD_JOBS=1, pool
+      target) ran `agent_private_kind_yields_no_announcement` ok and
+      `non_private_kind_yields_announcement` ok, 2 passed, EXIT=0. Check (1) is still red: the
+      feature exists, and its cucumber dry-run defines all 14 steps, but it has not yet run on the
+      household mesh (`just mesh start && just mesh prologue`, then `just test mesh-browser
+      '@concern:attention-witnessed-privately'`), and the habit stays red until that is green twice.
+      Found while writing the scenario: the view posts only on an in-app leave (backlog
+      `content-view-observation-lost-on-hard-leave`).
     refs:
       - "plan: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md (Lane A, rulings R-A0..R-A5, tasks A0..A10)"
       - "spec: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md (the observation layer this habit makes live; §4 gate answers, §8.2 summary graduation)"
