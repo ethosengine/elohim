@@ -76,3 +76,37 @@ async fn current_log_cid_uses_blake3_prefix() {
         cid
     );
 }
+
+/// Review W4 (ruling R-A10): the log keeps its hasher and offset, and at most
+/// a bounded tail of recent observations for `read_from` — never every
+/// observation ever appended. The SQL projection is where the history lives.
+#[tokio::test]
+async fn log_memory_does_not_grow_with_appends() {
+    use elohim_storage::observation::log::TAIL_CAPACITY;
+    let mut log = ObservationLog::new_in_memory("agent:test".into());
+    let appended = (TAIL_CAPACITY as u64) * 4;
+    for i in 0..appended {
+        log.append(fixture_obs(i)).await.unwrap();
+        assert!(log.retained_len() <= TAIL_CAPACITY, "after {i} appends");
+    }
+    assert_eq!(log.latest_offset(), appended, "the offset still counts every append");
+
+    // read_from serves the retained tail; earlier offsets are skipped, as for a resumed log.
+    let all = log.read_from(0).await.unwrap();
+    assert_eq!(all.len(), TAIL_CAPACITY);
+    assert_eq!(all[0].seq, appended - TAIL_CAPACITY as u64);
+    let last = log.read_from(appended - 1).await.unwrap();
+    assert_eq!(last.len(), 1);
+    assert_eq!(last[0].seq, appended - 1);
+
+    // A log that keeps no tail keeps nothing at all, and its root still advances.
+    let mut bare = ObservationLog::new_in_memory("agent:test".into()).with_tail_capacity(0);
+    let before = bare.current_log_cid();
+    for i in 0..100u64 {
+        bare.append(fixture_obs(i)).await.unwrap();
+    }
+    assert_eq!(bare.retained_len(), 0);
+    assert_eq!(bare.latest_offset(), 100);
+    assert_ne!(bare.current_log_cid(), before);
+    assert!(bare.read_from(0).await.unwrap().is_empty());
+}

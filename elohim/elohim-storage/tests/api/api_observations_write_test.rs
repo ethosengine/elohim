@@ -303,3 +303,98 @@ async fn seq_increments_per_observer() {
     assert_eq!(m1.log_offset, 0, "and so is his log");
     assert_eq!(j3.log_offset, 2);
 }
+
+// ---------------------------------------------------------------------------
+// Bounds (ruling R-A10): observedAt, body size, subjectCid == payload.ref_cid.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn observed_at_out_of_bounds_is_400() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    for bad in [json!(-1), json!(NOW + 301), json!(i64::MAX)] {
+        let mut body: serde_json::Value =
+            serde_json::from_slice(&content_viewed(3000, 50)).unwrap();
+        body["observedAt"] = bad.clone();
+        let err = accept_observation(
+            &manager(),
+            &mut conn,
+            Some("human-jessica"),
+            &serde_json::to_vec(&body).unwrap(),
+            NOW,
+        )
+        .await
+        .unwrap_err();
+        let message = err.to_string();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST, "{bad}");
+        assert!(message.contains("observedAt"), "{message}");
+    }
+    let count: i64 = observations::table.count().get_result(&mut conn).unwrap();
+    assert_eq!(count, 0, "a refused write leaves no row");
+
+    // The edges are inside the bound: the epoch and five minutes of clock skew.
+    for good in [0, NOW + 300] {
+        let mut body: serde_json::Value =
+            serde_json::from_slice(&content_viewed(3000, 50)).unwrap();
+        body["observedAt"] = json!(good);
+        accept_observation(
+            &manager(),
+            &mut conn,
+            Some("human-jessica"),
+            &serde_json::to_vec(&body).unwrap(),
+            NOW,
+        )
+        .await
+        .unwrap_or_else(|e| panic!("observedAt {good} is in bounds: {e}"));
+    }
+}
+
+#[tokio::test]
+async fn post_body_over_16_kib_is_400() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let mut body: serde_json::Value = serde_json::from_slice(&content_viewed(3000, 50)).unwrap();
+    // Unknown fields would be refused anyway; pad a known one so only the size speaks.
+    body["subjectKind"] = json!("x".repeat(elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES));
+    let bytes = serde_json::to_vec(&body).unwrap();
+    assert!(bytes.len() > 16 * 1024);
+    let err = accept_observation(&manager(), &mut conn, Some("human-jessica"), &bytes, NOW)
+        .await
+        .unwrap_err();
+    let message = err.to_string();
+    assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
+    assert!(message.contains("16384"), "{message}");
+    assert_eq!(elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES, 16 * 1024);
+}
+
+#[tokio::test]
+async fn subject_cid_must_equal_payload_ref_cid() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let payload = json!({ "ref_cid": "bafy-node-1", "dwell_ms": 10, "scroll_depth_pct": 5 }).to_string();
+
+    for subject in [Some("bafy-node-2"), None] {
+        let mut body = json!({
+            "observationKind": "lamad:content-viewed",
+            "subjectKind": "content",
+            "payloadJson": payload,
+        });
+        if let Some(s) = subject {
+            body["subjectCid"] = json!(s);
+        }
+        let err = accept_observation(
+            &manager(),
+            &mut conn,
+            Some("human-jessica"),
+            &serde_json::to_vec(&body).unwrap(),
+            NOW,
+        )
+        .await
+        .unwrap_err();
+        let message = err.to_string();
+        assert_eq!(status_of(err), StatusCode::BAD_REQUEST, "{subject:?}");
+        assert!(message.contains("ref_cid"), "{message}");
+    }
+    let count: i64 = observations::table.count().get_result(&mut conn).unwrap();
+    assert_eq!(count, 0);
+}

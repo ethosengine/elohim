@@ -421,3 +421,92 @@ fn response_validates_against_observation_stream_schema() {
     let empty = serde_json::to_value(stream(&mut conn, JAMES, "")).unwrap();
     validate_against_schema("views/observation-stream-view.schema.json", &empty);
 }
+
+/// Review W6 (ruling R-A10): the lifestream shows a title only for content the
+/// node holds at commons or public reach. A title held at any narrower reach
+/// (self, intimate, community, …) never rides into the view, even for the
+/// person's own observation of it.
+#[test]
+fn stream_title_lookup_never_reveals_private_titles() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    for (id, title, reach) in [
+        ("bafy-commons", "A commons title", "commons"),
+        ("bafy-public", "A public title", "public"),
+        ("bafy-self", "A private journal", "self"),
+        ("bafy-intimate", "A family letter", "intimate"),
+        ("bafy-community", "A council minute", "community"),
+    ] {
+        diesel::sql_query("INSERT INTO content (id, title, reach) VALUES (?, ?, ?)")
+            .bind::<diesel::sql_types::Text, _>(id)
+            .bind::<diesel::sql_types::Text, _>(title)
+            .bind::<diesel::sql_types::Text, _>(reach)
+            .execute(&mut conn)
+            .expect("seed content");
+    }
+    for (i, id) in [
+        "bafy-commons",
+        "bafy-public",
+        "bafy-self",
+        "bafy-intimate",
+        "bafy-community",
+    ]
+    .iter()
+    .enumerate()
+    {
+        viewed(&mut conn, JESSICA, i as i64, NOW - 60 + i as i64, id, 1_000, 10);
+    }
+
+    let view = stream(&mut conn, JESSICA, "");
+    let title_of = |id: &str| {
+        view.entries
+            .iter()
+            .find(|e| e.subject_cid.as_deref() == Some(id))
+            .unwrap_or_else(|| panic!("{id} is an entry"))
+            .title
+            .clone()
+    };
+    assert_eq!(title_of("bafy-commons").as_deref(), Some("A commons title"));
+    assert_eq!(title_of("bafy-public").as_deref(), Some("A public title"));
+    for id in ["bafy-self", "bafy-intimate", "bafy-community"] {
+        assert_eq!(title_of(id), None, "{id}: a narrower-reach title never renders");
+    }
+}
+
+/// Ruling R-A10: the window is pushed into SQL. The out-of-window rows are
+/// counted there, and the counts still match what the in-memory render said:
+/// `total_count` covers the lens before the window, the omission names the
+/// older rows, and a lens with a dwell floor counts only what it selects.
+#[test]
+fn window_pushed_into_sql_keeps_the_older_omission_count() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    viewed(&mut conn, JESSICA, 0, NOW - DAY, "bafy-in-long", 90_000, 10);
+    viewed(&mut conn, JESSICA, 1, NOW - 2 * DAY, "bafy-in-short", 1_000, 10);
+    viewed(&mut conn, JESSICA, 2, NOW - 8 * DAY, "bafy-old-long", 90_000, 10);
+    viewed(&mut conn, JESSICA, 3, NOW - 9 * DAY, "bafy-old-short", 1_000, 10);
+    viewed(&mut conn, JESSICA, 4, NOW - 30 * DAY, "bafy-old-short-2", 2_000, 10);
+    // An unreadable payload out of the window: zero dwell, so no dwell lens selects it.
+    seed(&mut conn, JESSICA, 5, NOW - 40 * DAY, "lamad:content-viewed", "bafy-old-broken", "{");
+    // Another observer's old rows never count.
+    viewed(&mut conn, JAMES, 0, NOW - 20 * DAY, "bafy-james-old", 90_000, 10);
+    // After asOf.
+    viewed(&mut conn, JESSICA, 6, NOW + DAY, "bafy-later", 90_000, 10);
+
+    let view = stream(&mut conn, JESSICA, "");
+    assert_eq!(subjects(&view), vec!["bafy-in-long", "bafy-in-short"]);
+    assert_eq!(view.total_count, 7, "two in, four older, one later");
+    let older = omission_named(&view, "window").expect("window omission");
+    assert!(older.contains("4 older observations"), "{:?}", view.omissions);
+    assert!(
+        view.omissions.iter().any(|l| l.contains("1 observation after asOf")),
+        "{:?}",
+        view.omissions
+    );
+
+    let view = stream(&mut conn, JESSICA, "lens=long-dwell");
+    assert_eq!(subjects(&view), vec!["bafy-in-long"]);
+    assert_eq!(view.total_count, 3, "in-long, old-long, later");
+    let older = omission_named(&view, "window").expect("window omission");
+    assert!(older.contains("1 older observation "), "{:?}", view.omissions);
+}

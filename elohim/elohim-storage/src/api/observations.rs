@@ -14,11 +14,15 @@
 //!     (401 without it; no `local_sessions` fallback). See
 //!     [`stream_observations`] and ruling R-A4.
 //!   - `GET /api/v1/observations/by-subject?subjectCid=X&kind=Y`
-//!     → `Vec<ObservationView>` (newest first)
+//!     → `Vec<ObservationView>` (newest first). Never an `agent-private` kind
+//!     (404); see [`observations_by_subject`] and ruling R-A9.
 //!   - `GET /api/v1/observations/by-observer?observerCid=X[&kind=Y]`
-//!     → `Vec<ObservationView>` (newest first)
+//!     → `Vec<ObservationView>` (newest first). The observer's own rows only:
+//!     the explicit `X-Agent-Cid` must equal `observerCid` (401 / 403); see
+//!     [`observations_by_observer`] and ruling R-A9.
 //!   - `GET /api/v1/observations/diversity?subjectCid=X&kind=Y`
-//!     → `Option<ObservationDiversitySummaryView>`
+//!     → `Option<ObservationDiversitySummaryView>`. Never counts an
+//!     `agent-private` kind (404); see [`observation_diversity`].
 //!
 //! Source of truth for `observations`: libp2p gossip plane (agent-authored,
 //! projected into SQLite by the observation manager). Category B.
@@ -40,8 +44,12 @@ use crate::db::diesel_schema::{content, observation_diversity_summary, observati
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
 use crate::observation::manager::ObservationManagerBackend;
-use crate::observation::stream::{render_stream, RecipeInUse, StreamParams, StreamRow};
+use crate::observation::recipe::LensSpec;
+use crate::observation::stream::{
+    render_stream_counted, resolve_frame, OutsideWindow, RecipeInUse, StreamParams, StreamRow,
+};
 use crate::observation::wire::Observation;
+use crate::services::observation_kinds::ObservationKindRegistry;
 use crate::services::response;
 use crate::views::{
     ObservationAcceptedView, ObservationDiversitySummaryView, ObservationIntentView,
@@ -53,10 +61,26 @@ use super::get_conn;
 
 /// `observerCidNamespace` on every ack: the observer is the caller's header
 /// identifier as asserted (browser: a session human id; desktop: an agent key).
+/// The payload's `ref_cid` is as-asserted too: today it carries the content's
+/// route slug (the id in `/lamad/resource/:id`), not a content address, and it
+/// is checked only as a string equal to the intent's `subjectCid`.
 pub const OBSERVER_CID_NAMESPACE_AS_ASSERTED: &str = "as-asserted";
 
 /// `signed` on every ack until the signing graduation: rows carry no signature.
 pub const SIGNATURE_ABSENT: &str = "absent";
+
+/// The largest `POST /api/v1/observations` body the node reads (16 KiB).
+pub const MAX_OBSERVATION_BODY_BYTES: usize = 16 * 1024;
+
+/// How far ahead of the node's clock a client-supplied `observedAt` may be
+/// (seconds): clock skew, not a future observation.
+pub const OBSERVED_AT_MAX_SKEW_SECS: i64 = 300;
+
+/// The content reaches whose title the lifestream may print: the reaches a
+/// node serves to anyone (`blob_reach::serves_anonymously`). Inlined as a
+/// `reach IN (…)` filter on the title query rather than calling the content
+/// route's reach helper, which is being reshaped alongside this change.
+const TITLE_READABLE_REACHES: [&str; 2] = ["commons", "public"];
 
 // ---------------------------------------------------------------------------
 // Query param structs
@@ -126,9 +150,9 @@ pub async fn handle(
     match (&method, path) {
         (&Method::POST, "") => handle_post(req, pool, manager).await,
         (&Method::GET, "stream") => handle_stream(req, pool),
-        (&Method::GET, "by-subject") => handle_by_subject(req, pool).await,
+        (&Method::GET, "by-subject") => handle_by_subject(req, pool, manager).await,
         (&Method::GET, "by-observer") => handle_by_observer(req, pool).await,
-        (&Method::GET, "diversity") => handle_diversity(req, pool).await,
+        (&Method::GET, "diversity") => handle_diversity(req, pool, manager).await,
         (_, "" | "stream" | "by-subject" | "by-observer" | "diversity") => {
             Ok(response::method_not_allowed())
         }
@@ -151,13 +175,18 @@ async fn handle_post(
     pool: &DbPool,
     manager: &ObservationManagerBackend,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    use http_body_util::BodyExt;
+    use http_body_util::{BodyExt, Limited};
     let header = super::account::extract_agent_cid_explicit(&req);
-    let body = req
-        .into_body()
+    // Read at most one byte past the cap, so `accept_observation` refuses an
+    // oversized body with its own message instead of the node buffering it all.
+    let body = Limited::new(req.into_body(), MAX_OBSERVATION_BODY_BYTES + 1)
         .collect()
         .await
-        .map_err(|e| StorageError::InvalidInput(format!("Failed to read body: {e}")))?
+        .map_err(|e| {
+            StorageError::InvalidInput(format!(
+                "observation intent: body unreadable or over {MAX_OBSERVATION_BODY_BYTES} bytes: {e}"
+            ))
+        })?
         .to_bytes();
     let mut conn = get_conn(pool)?;
     let now = chrono::Utc::now().timestamp();
@@ -174,16 +203,19 @@ async fn handle_post(
 ///
 /// In order:
 /// 1. no (or empty) header → `Auth` (401);
-/// 2. a body `observerCid` other than the header → `Forbidden` (403), checked
+/// 2. a body over [`MAX_OBSERVATION_BODY_BYTES`] → `InvalidInput` (400);
+/// 3. a body `observerCid` other than the header → `Forbidden` (403), checked
 ///    before anything else is read so a mismatched body learns nothing more;
-/// 3. the intent must parse (unknown fields refused) → `InvalidInput` (400);
-/// 4. the kind must be manifest-declared → 400 `unknown observation kind <k>`;
-/// 5. `payloadJson` must be JSON matching the kind's field map → 400 with the
+/// 4. the intent must parse (unknown fields refused) → `InvalidInput` (400);
+/// 5. a client-supplied `observedAt` must lie in `0 ..= now + 300` → 400;
+/// 6. the kind must be manifest-declared → 400 `unknown observation kind <k>`;
+/// 7. `payloadJson` must be JSON matching the kind's field map → 400 with the
 ///    registry's reason;
-/// 6. `seq` = the observer's `max(seq) + 1`; the row is appended through the
+/// 8. a payload carrying `ref_cid` must name the intent's `subjectCid` → 400;
+/// 9. `seq` = the observer's `max(seq) + 1`; the row is appended through the
 ///    manager (log head stamped and persisted with the row), with an empty
 ///    signature;
-/// 7. the gossip gate ([`crate::p2p::observation_gossip::announcement_for`])
+/// 10. the gossip gate ([`crate::p2p::observation_gossip::announcement_for`])
 ///    runs on the stamped row: an agent-private kind yields no announcement.
 ///
 /// `seq` is read before the manager's append lock is taken, so two writes by
@@ -207,6 +239,13 @@ pub async fn accept_observation(
         }
     };
 
+    if body.len() > MAX_OBSERVATION_BODY_BYTES {
+        return Err(StorageError::InvalidInput(format!(
+            "observation intent: body is {} bytes; the limit is {MAX_OBSERVATION_BODY_BYTES}",
+            body.len()
+        )));
+    }
+
     let raw: serde_json::Value = serde_json::from_slice(body).map_err(|e| {
         StorageError::InvalidInput(format!("observation intent: invalid JSON: {e}"))
     })?;
@@ -221,6 +260,15 @@ pub async fn accept_observation(
     }
     let intent: ObservationIntentView = serde_json::from_value(raw)
         .map_err(|e| StorageError::InvalidInput(format!("observation intent: {e}")))?;
+    if let Some(at) = intent.observed_at {
+        let latest = now.saturating_add(OBSERVED_AT_MAX_SKEW_SECS);
+        if !(0..=latest).contains(&at) {
+            return Err(StorageError::InvalidInput(format!(
+                "observation intent: observedAt {at} is outside 0..={latest} (unix seconds, at \
+                 most {OBSERVED_AT_MAX_SKEW_SECS}s ahead of the node's clock)"
+            )));
+        }
+    }
 
     let kind = intent.observation_kind.as_str();
     let decl = manager
@@ -236,6 +284,13 @@ pub async fn accept_observation(
         registry
             .validate_payload(kind, &payload)
             .map_err(StorageError::InvalidInput)?;
+    }
+    if let Some(ref_cid) = payload.get("ref_cid") {
+        if ref_cid.as_str() != intent.subject_cid.as_deref() {
+            return Err(StorageError::InvalidInput(format!(
+                "{kind}: payload ref_cid must equal subjectCid (an observation names one subject)"
+            )));
+        }
     }
 
     let last_seq: Option<i64> = observations::table
@@ -318,7 +373,8 @@ fn handle_stream(
 /// requester's rows are loaded; titles are looked up by `subject_cid` against
 /// `content.id` / `content.blob_cid` when the node holds the content, and a
 /// failed lookup renders without titles rather than failing the stream. The
-/// arrangement is [`render_stream`] through the compiled-in recipe; a window
+/// arrangement is [`render_stream_counted`] through the compiled-in recipe,
+/// with the window pushed into SQL (in-window rows loaded, the rest counted); a window
 /// or lens the recipe cannot render is `InvalidInput` (400).
 pub fn stream_observations(
     conn: &mut SqliteConnection,
@@ -339,10 +395,43 @@ pub fn stream_observations(
         StorageError::InvalidInput(format!("observations/stream: invalid query params: {e}"))
     })?;
 
-    let rows: Vec<crate::db::models::ObservationRow> = observations::table
-        .filter(observations::observer_cid.eq(requester))
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("observations query failed: {e}")))?;
+    let params = StreamParams {
+        requester,
+        as_of: q.as_of,
+        window: q.window.as_deref(),
+        lens: q.lens.as_deref(),
+        kind: q.kind.as_deref(),
+    };
+    let recipe = RecipeInUse::compiled();
+    let frame = resolve_frame(&recipe, &params, now)
+        .map_err(|e| StorageError::InvalidInput(format!("observations/stream: {e}")))?;
+
+    // The window is pushed into SQL: only in-window rows are loaded; the rows
+    // the lens selects outside it are counted there for `total_count` and the
+    // `window:` omissions.
+    let query_failed = |e: diesel::result::Error| {
+        StorageError::Internal(format!("observations query failed: {e}"))
+    };
+    let rows: Vec<crate::db::models::ObservationRow> =
+        lens_selected(requester, frame.lens, params.kind, false)
+            .filter(observations::observed_at.ge(frame.window_start))
+            .filter(observations::observed_at.le(frame.as_of))
+            .load(conn)
+            .map_err(query_failed)?;
+    let older: i64 = lens_selected(requester, frame.lens, params.kind, true)
+        .filter(observations::observed_at.lt(frame.window_start))
+        .count()
+        .get_result(conn)
+        .map_err(query_failed)?;
+    let later: i64 = lens_selected(requester, frame.lens, params.kind, true)
+        .filter(observations::observed_at.gt(frame.as_of))
+        .count()
+        .get_result(conn)
+        .map_err(query_failed)?;
+    let outside = OutsideWindow {
+        older: u64::try_from(older).unwrap_or(0),
+        later: u64::try_from(later).unwrap_or(0),
+    };
 
     let titles = subject_titles(conn, &rows);
     let rows: Vec<StreamRow> = rows
@@ -356,20 +445,60 @@ pub fn stream_observations(
         })
         .collect();
 
-    let params = StreamParams {
-        requester,
-        as_of: q.as_of,
-        window: q.window.as_deref(),
-        lens: q.lens.as_deref(),
-        kind: q.kind.as_deref(),
-    };
-    render_stream(&rows, &RecipeInUse::compiled(), &params, now)
+    render_stream_counted(&rows, outside, &recipe, &params, now)
         .map_err(|e| StorageError::InvalidInput(format!("observations/stream: {e}")))
 }
 
+/// The requester's rows the lens (and the request's `kind`) select, as a
+/// query the caller narrows by time.
+///
+/// `with_dwell_floor` adds the lens's `min_dwell_ms` as a SQL predicate. The
+/// counting queries need it (their rows are never loaded); the in-window load
+/// leaves the floor to [`render_stream_counted`], whose payload reading is the
+/// authority. The predicate mirrors that reading: a payload that is not a JSON
+/// object with non-negative integer `dwell_ms` / `scroll_depth_pct` (either
+/// may be absent or null) reads as zero dwell. The outer `CASE` keeps the
+/// `json_*` calls off malformed text, which SQLite would raise on.
+fn lens_selected<'a>(
+    requester: &'a str,
+    lens: &'a LensSpec,
+    kind: Option<&'a str>,
+    with_dwell_floor: bool,
+) -> observations::BoxedQuery<'a, diesel::sqlite::Sqlite> {
+    let mut q = observations::table
+        .filter(observations::observer_cid.eq(requester))
+        .into_boxed();
+    if let Some(k) = lens.kind.as_deref() {
+        q = q.filter(observations::observation_kind.eq(k));
+    }
+    if let Some(k) = kind {
+        q = q.filter(observations::observation_kind.eq(k));
+    }
+    match lens.min_dwell_ms {
+        // The floor is the compiled recipe's integer, never request input.
+        Some(min) if with_dwell_floor && min > 0 => {
+            q = q.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "(CASE WHEN json_valid(payload_json) AND json_type(payload_json) = 'object' THEN \
+                   (CASE WHEN json_type(payload_json, '$.dwell_ms') = 'integer' \
+                          AND json_extract(payload_json, '$.dwell_ms') >= {min} \
+                          AND (json_type(payload_json, '$.scroll_depth_pct') IS NULL \
+                               OR json_type(payload_json, '$.scroll_depth_pct') = 'null' \
+                               OR (json_type(payload_json, '$.scroll_depth_pct') = 'integer' \
+                                   AND json_extract(payload_json, '$.scroll_depth_pct') >= 0)) \
+                         THEN 1 ELSE 0 END) \
+                 ELSE 0 END) = 1"
+            )));
+        }
+        _ => {}
+    }
+    q
+}
+
 /// Titles of the subjects this node holds as content, keyed by the subject
-/// CID (matched against `content.id` or `content.blob_cid`). Optional by
-/// design: a failed lookup is logged and yields no titles.
+/// CID (matched against `content.id` or `content.blob_cid`). Only content at
+/// commons or public reach lends its title ([`TITLE_READABLE_REACHES`]): a
+/// narrower-reach title never rides into the view. Optional by design: a
+/// failed lookup is logged and yields no titles.
 fn subject_titles(
     conn: &mut SqliteConnection,
     rows: &[crate::db::models::ObservationRow],
@@ -387,6 +516,7 @@ fn subject_titles(
                     .eq_any(chunk)
                     .or(content::blob_cid.eq_any(chunk)),
             )
+            .filter(content::reach.eq_any(TITLE_READABLE_REACHES))
             .select((content::id, content::blob_cid, content::title))
             .load(conn);
         match found {
@@ -413,25 +543,39 @@ fn subject_titles(
 async fn handle_by_subject(
     req: Request<Incoming>,
     pool: &DbPool,
+    manager: &ObservationManagerBackend,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let q: BySubjectQuery =
-        serde_urlencoded::from_str(req.uri().query().unwrap_or("")).map_err(|e| {
-            StorageError::InvalidInput(format!(
-                "observations/by-subject: missing or invalid query params: {}",
-                e
-            ))
-        })?;
-
     let mut conn = get_conn(pool)?;
+    let views = observations_by_subject(
+        &mut conn,
+        manager.kind_registry().map(|r| r.as_ref()),
+        req.uri().query().unwrap_or(""),
+    )?;
+    Ok(response::ok(&views))
+}
+
+/// Every observer's rows of one kind about one subject, newest first.
+///
+/// A cross-observer read, so it never lists an `agent-private` kind (ruling
+/// R-A9): see [`refuse_agent_private`] for the 404 and why it is not `[]`.
+pub fn observations_by_subject(
+    conn: &mut SqliteConnection,
+    registry: Option<&ObservationKindRegistry>,
+    query: &str,
+) -> Result<Vec<ObservationView>, StorageError> {
+    let q: BySubjectQuery = serde_urlencoded::from_str(query).map_err(|e| {
+        StorageError::InvalidInput(format!(
+            "observations/by-subject: missing or invalid query params: {e}"
+        ))
+    })?;
+    refuse_agent_private("by-subject", registry, &q.kind)?;
     let rows: Vec<crate::db::models::ObservationRow> = observations::table
         .filter(observations::subject_cid.eq(&q.subject_cid))
         .filter(observations::observation_kind.eq(&q.kind))
         .order(observations::observed_at.desc())
-        .load(&mut conn)
-        .map_err(|e| StorageError::Internal(format!("observations query failed: {}", e)))?;
-
-    let views: Vec<ObservationView> = rows.into_iter().map(ObservationView::from).collect();
-    Ok(response::ok(&views))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("observations query failed: {e}")))?;
+    Ok(rows.into_iter().map(ObservationView::from).collect())
 }
 
 /// `GET /api/v1/observations/by-observer?observerCid=X[&kind=Y]`
@@ -439,59 +583,131 @@ async fn handle_by_observer(
     req: Request<Incoming>,
     pool: &DbPool,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let q: ByObserverQuery =
-        serde_urlencoded::from_str(req.uri().query().unwrap_or("")).map_err(|e| {
-            StorageError::InvalidInput(format!(
-                "observations/by-observer: missing or invalid query params: {}",
-                e
-            ))
-        })?;
-
+    let header = super::account::extract_agent_cid_explicit(&req);
     let mut conn = get_conn(pool)?;
+    let views =
+        observations_by_observer(&mut conn, header.as_deref(), req.uri().query().unwrap_or(""))?;
+    Ok(response::ok(&views))
+}
+
+/// One observer's rows (optionally of one kind), newest first — shown only to
+/// that observer (ruling R-A9).
+///
+/// `header_agent_cid` is the explicit `X-Agent-Cid` header, never the
+/// `local_sessions` fallback: no (or empty) header → `Auth` (401); a header
+/// other than `observerCid` → `Forbidden` (403), checked before any row is
+/// read. The observer sees every kind of their own, private ones included.
+pub fn observations_by_observer(
+    conn: &mut SqliteConnection,
+    header_agent_cid: Option<&str>,
+    query: &str,
+) -> Result<Vec<ObservationView>, StorageError> {
+    let requester = match header_agent_cid {
+        Some(h) if !h.is_empty() => h,
+        _ => {
+            return Err(StorageError::Auth(
+                "GET /api/v1/observations/by-observer requires the X-Agent-Cid header: an \
+                 observer's rows are shown only to that observer"
+                    .into(),
+            ))
+        }
+    };
+    let q: ByObserverQuery = serde_urlencoded::from_str(query).map_err(|e| {
+        StorageError::InvalidInput(format!(
+            "observations/by-observer: missing or invalid query params: {e}"
+        ))
+    })?;
+    if q.observer_cid != requester {
+        return Err(StorageError::Forbidden(
+            "observations/by-observer: observerCid names another observer; a person reads only \
+             their own observations"
+                .into(),
+        ));
+    }
 
     // Build a boxed query so we can optionally filter by kind.
     let base = observations::table
         .filter(observations::observer_cid.eq(&q.observer_cid))
         .order(observations::observed_at.desc())
         .into_boxed();
-
     let rows: Vec<crate::db::models::ObservationRow> = if let Some(kind) = &q.kind {
         base.filter(observations::observation_kind.eq(kind))
-            .load(&mut conn)
+            .load(conn)
     } else {
-        base.load(&mut conn)
+        base.load(conn)
     }
-    .map_err(|e| StorageError::Internal(format!("observations query failed: {}", e)))?;
-
-    let views: Vec<ObservationView> = rows.into_iter().map(ObservationView::from).collect();
-    Ok(response::ok(&views))
+    .map_err(|e| StorageError::Internal(format!("observations query failed: {e}")))?;
+    Ok(rows.into_iter().map(ObservationView::from).collect())
 }
 
 /// `GET /api/v1/observations/diversity?subjectCid=X&kind=Y`
 async fn handle_diversity(
     req: Request<Incoming>,
     pool: &DbPool,
+    manager: &ObservationManagerBackend,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let q: DiversityQuery =
-        serde_urlencoded::from_str(req.uri().query().unwrap_or("")).map_err(|e| {
-            StorageError::InvalidInput(format!(
-                "observations/diversity: missing or invalid query params: {}",
-                e
-            ))
-        })?;
-
     let mut conn = get_conn(pool)?;
+    let summary = observation_diversity(
+        &mut conn,
+        manager.kind_registry().map(|r| r.as_ref()),
+        req.uri().query().unwrap_or(""),
+    )?;
+    Ok(response::ok(&summary))
+}
+
+/// How many distinct observers witnessed one kind about one subject.
+///
+/// A cross-observer aggregate, so it never counts an `agent-private` kind
+/// (ruling R-A9; [`refuse_agent_private`]).
+pub fn observation_diversity(
+    conn: &mut SqliteConnection,
+    registry: Option<&ObservationKindRegistry>,
+    query: &str,
+) -> Result<Option<ObservationDiversitySummaryView>, StorageError> {
+    let q: DiversityQuery = serde_urlencoded::from_str(query).map_err(|e| {
+        StorageError::InvalidInput(format!(
+            "observations/diversity: missing or invalid query params: {e}"
+        ))
+    })?;
+    refuse_agent_private("diversity", registry, &q.kind)?;
     let row: Option<crate::db::models::ObservationDiversitySummaryRow> =
         observation_diversity_summary::table
             .filter(observation_diversity_summary::subject_cid.eq(&q.subject_cid))
             .filter(observation_diversity_summary::observation_kind.eq(&q.kind))
-            .first(&mut conn)
+            .first(conn)
             .optional()
             .map_err(|e| {
-                StorageError::Internal(format!("observation_diversity_summary query failed: {}", e))
+                StorageError::Internal(format!("observation_diversity_summary query failed: {e}"))
             })?;
+    Ok(row.map(ObservationDiversitySummaryView::from))
+}
 
-    Ok(response::ok(
-        &row.map(ObservationDiversitySummaryView::from),
-    ))
+/// The privacy gate on the cross-observer reads (`by-subject`, `diversity`):
+/// a kind the registry marks `agent-private` is never listed or counted
+/// across observers (ruling R-A9).
+///
+/// It answers `NotFound` (404) with the reason, the same whether or not rows
+/// exist, rather than an empty `[]` / `null`: both routes' wire shapes have no
+/// `omissions` to carry a reason, and an empty answer would read as "nobody
+/// observed this" — a false statement about the world. A node with no registry
+/// cannot tell private kinds apart, so it refuses every cross-observer read
+/// (fail closed) rather than guess.
+fn refuse_agent_private(
+    route: &str,
+    registry: Option<&ObservationKindRegistry>,
+    kind: &str,
+) -> Result<(), StorageError> {
+    let Some(registry) = registry else {
+        return Err(StorageError::NotFound(format!(
+            "observations/{route}: this node has no observation-kind registry, so it cannot tell \
+             which kinds are agent-private; nothing is listed across observers"
+        )));
+    };
+    if registry.get(kind).is_some_and(|d| d.is_agent_private()) {
+        return Err(StorageError::NotFound(format!(
+            "observations/{route}: {kind} is agent-private; it stays on each observer's node and \
+             is never listed or counted across observers"
+        )));
+    }
+    Ok(())
 }

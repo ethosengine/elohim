@@ -8,8 +8,16 @@
 //!
 //! See genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §5.1.
 
+use std::collections::VecDeque;
+
 use crate::observation::wire::Observation;
 use thiserror::Error;
+
+/// How many of the most recent observations a log keeps in memory for
+/// [`ObservationLog::read_from`] by default. The log's identity is its hasher
+/// and offset; the history lives in the SQL projection, so memory stays
+/// bounded however many observations are appended.
+pub const TAIL_CAPACITY: usize = 64;
 
 #[derive(Debug, Error)]
 pub enum ObservationLogError {
@@ -24,13 +32,15 @@ pub enum ObservationLogError {
 /// MessagePack encoding of each appended observation.
 ///
 /// A log is either fresh ([`ObservationLog::new_in_memory`], offset 0) or
-/// resumed from a persisted head ([`ObservationLog::resume`]). A resumed log
-/// holds only the observations appended since it resumed; `base_offset` is the
-/// number of observations that precede them.
+/// resumed from a persisted head ([`ObservationLog::resume`]). Either way it
+/// holds at most `tail_capacity` recent observations (a ring;
+/// [`TAIL_CAPACITY`] by default); `base_offset` is the number of observations
+/// that precede the held tail.
 pub struct ObservationLog {
     observer_cid: String,
     base_offset: u64,
-    entries: Vec<Observation>,
+    tail: VecDeque<Observation>,
+    tail_capacity: usize,
     rolling_hasher: blake3::Hasher,
     current_root: String,
 }
@@ -43,10 +53,22 @@ impl ObservationLog {
         Self {
             observer_cid,
             base_offset: 0,
-            entries: Vec::new(),
+            tail: VecDeque::new(),
+            tail_capacity: TAIL_CAPACITY,
             rolling_hasher: hasher,
             current_root: initial,
         }
+    }
+
+    /// Keep at most `capacity` recent observations for `read_from` (0 keeps
+    /// none: the log is then only its hasher and offset).
+    pub fn with_tail_capacity(mut self, capacity: usize) -> Self {
+        self.tail_capacity = capacity;
+        while self.tail.len() > capacity {
+            self.tail.pop_front();
+            self.base_offset += 1;
+        }
+        self
     }
 
     /// Resume a log from its persisted head (`observation_logs.latest_offset`,
@@ -66,14 +88,15 @@ impl ObservationLog {
     /// in-memory log and the chaining.
     ///
     /// The observations before `latest_offset` are not held in memory: the SQL
-    /// projection keeps them, and `read_from` serves only the resumed tail.
+    /// projection keeps them, and `read_from` serves only the held tail.
     pub fn resume(observer_cid: String, latest_offset: u64, latest_log_cid: String) -> Self {
         let mut hasher = blake3::Hasher::new();
         hasher.update(latest_log_cid.as_bytes());
         Self {
             observer_cid,
             base_offset: latest_offset,
-            entries: Vec::new(),
+            tail: VecDeque::new(),
+            tail_capacity: TAIL_CAPACITY,
             rolling_hasher: hasher,
             current_root: latest_log_cid,
         }
@@ -88,27 +111,41 @@ impl ObservationLog {
     }
 
     /// The next offset to be written (= the number of observations in the log,
-    /// including those before a resume).
+    /// including those before a resume and those no longer held).
     pub fn latest_offset(&self) -> u64 {
-        self.base_offset + self.entries.len() as u64
+        self.base_offset + self.tail.len() as u64
+    }
+
+    /// How many observations the log holds in memory (at most its tail capacity).
+    pub fn retained_len(&self) -> usize {
+        self.tail.len()
     }
 
     /// Append an observation. Hashes its MessagePack encoding into the rolling
-    /// root and stores the row in order.
+    /// root and keeps it in the bounded tail, letting the oldest held one go
+    /// when the tail is full.
     pub async fn append(&mut self, obs: Observation) -> Result<(), ObservationLogError> {
         let bytes =
             rmp_serde::to_vec(&obs).map_err(|e| ObservationLogError::Encoding(e.to_string()))?;
         self.rolling_hasher.update(&bytes);
         self.current_root = format!("blake3:{}", self.rolling_hasher.finalize().to_hex());
-        self.entries.push(obs);
+        if self.tail_capacity == 0 {
+            self.base_offset += 1;
+            return Ok(());
+        }
+        if self.tail.len() == self.tail_capacity {
+            self.tail.pop_front();
+            self.base_offset += 1;
+        }
+        self.tail.push_back(obs);
         Ok(())
     }
 
-    /// Read all observations held in memory at or after the given offset, in
-    /// append order. For a resumed log, offsets before the resume point are not
-    /// held and are skipped.
+    /// Read the held observations at or after the given offset, in append
+    /// order. Offsets before the held tail (before a resume, or aged out of
+    /// the ring) are skipped: the SQL projection is where they are read.
     pub async fn read_from(&self, offset: u64) -> Result<Vec<Observation>, ObservationLogError> {
         let skip = offset.saturating_sub(self.base_offset) as usize;
-        Ok(self.entries.iter().skip(skip).cloned().collect())
+        Ok(self.tail.iter().skip(skip).cloned().collect())
     }
 }

@@ -8,6 +8,7 @@
 //! `mod` declarations here, verbatim.
 
 mod acquisition_pins_http;
+mod api_observations_privacy_test;
 mod api_observations_stream_test;
 mod api_observations_test;
 mod api_observations_write_test;

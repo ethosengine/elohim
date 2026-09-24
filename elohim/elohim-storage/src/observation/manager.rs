@@ -99,6 +99,9 @@ impl ObservationManagerBackend {
         let mut logs = self.logs.write().await;
 
         if !logs.contains_key(&observer) {
+            // The manager never reads a log's entries back (the SQL
+            // projection is the read side), so its logs keep no tail: each is
+            // only a hasher and an offset.
             let log = match load_head(conn, &observer)? {
                 Some(head) => ObservationLog::resume(
                     observer.clone(),
@@ -106,7 +109,8 @@ impl ObservationManagerBackend {
                     head.latest_log_cid,
                 ),
                 None => ObservationLog::new_in_memory(observer.clone()),
-            };
+            }
+            .with_tail_capacity(0);
             logs.insert(observer.clone(), log);
         }
 

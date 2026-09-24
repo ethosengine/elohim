@@ -28,7 +28,7 @@ use std::fmt;
 
 use serde::Deserialize;
 
-use super::recipe::{self, LifestreamRecipe};
+use super::recipe::{self, LensSpec, LifestreamRecipe};
 use crate::db::models::ObservationRow;
 use crate::views::{ObservationStreamEntryView, ObservationStreamView, RecipeRefView};
 
@@ -154,14 +154,27 @@ fn plural(n: u64, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
 
-/// Render the requester's lifestream through `recipe`. Pure: no I/O, no clock
-/// (`now` is the default `asOf`).
-pub fn render_stream(
-    rows: &[StreamRow],
-    recipe: &RecipeInUse<'_>,
+/// The frame a request resolves to: the window it names (or the recipe's
+/// default), where that window starts and ends, and the lens it selects with.
+#[derive(Debug, Clone)]
+pub struct StreamFrame<'r> {
+    /// The window as named (`Nd` | `Nh`).
+    pub window: String,
+    /// Unix seconds; rows observed before this are "older".
+    pub window_start: i64,
+    /// Unix seconds; rows observed after this are "later".
+    pub as_of: i64,
+    pub lens_name: String,
+    pub lens: &'r LensSpec,
+}
+
+/// Resolve what `params` asks of `recipe` — the checks the render makes first,
+/// exposed so a loader can push the window into its query.
+pub fn resolve_frame<'r>(
+    recipe: &RecipeInUse<'r>,
     params: &StreamParams<'_>,
     now: i64,
-) -> Result<ObservationStreamView, StreamError> {
+) -> Result<StreamFrame<'r>, StreamError> {
     let window = params.window.unwrap_or(recipe.spec.window_default.as_str());
     let window_secs =
         parse_window(window).ok_or_else(|| StreamError::InvalidWindow(window.to_string()))?;
@@ -170,7 +183,6 @@ pub fn render_stream(
     if as_of < 0 {
         return Err(StreamError::InvalidAsOf(as_of));
     }
-    let window_start = as_of.saturating_sub(window_secs);
 
     let lens_name = params.lens.unwrap_or(DEFAULT_LENS);
     let lens = recipe
@@ -181,10 +193,57 @@ pub fn render_stream(
             lens: lens_name.to_string(),
             declared: recipe.spec.lenses.keys().cloned().collect(),
         })?;
+    Ok(StreamFrame {
+        window: window.to_string(),
+        window_start: as_of.saturating_sub(window_secs),
+        as_of,
+        lens_name: lens_name.to_string(),
+        lens,
+    })
+}
 
-    let mut total: u64 = 0;
-    let mut older: u64 = 0;
-    let mut later: u64 = 0;
+/// Rows the lens selected outside the window that the loader counted rather
+/// than loaded (ruling R-A10: the window is pushed into SQL).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OutsideWindow {
+    /// Observed before the window starts.
+    pub older: u64,
+    /// Observed after `asOf`.
+    pub later: u64,
+}
+
+/// Render the requester's lifestream through `recipe`. Pure: no I/O, no clock
+/// (`now` is the default `asOf`).
+pub fn render_stream(
+    rows: &[StreamRow],
+    recipe: &RecipeInUse<'_>,
+    params: &StreamParams<'_>,
+    now: i64,
+) -> Result<ObservationStreamView, StreamError> {
+    render_stream_counted(rows, OutsideWindow::default(), recipe, params, now)
+}
+
+/// [`render_stream`] for a loader that pushed the window into its query:
+/// `rows` may be only the in-window rows, and `outside` carries the counts of
+/// the lens-selected rows it left behind. They join the render's own counts
+/// in `total_count` and the `window:` omissions.
+pub fn render_stream_counted(
+    rows: &[StreamRow],
+    outside: OutsideWindow,
+    recipe: &RecipeInUse<'_>,
+    params: &StreamParams<'_>,
+    now: i64,
+) -> Result<ObservationStreamView, StreamError> {
+    let frame = resolve_frame(recipe, params, now)?;
+    let window = frame.window.as_str();
+    let window_start = frame.window_start;
+    let as_of = frame.as_of;
+    let lens_name = frame.lens_name.as_str();
+    let lens = frame.lens;
+
+    let mut total: u64 = outside.older + outside.later;
+    let mut older: u64 = outside.older;
+    let mut later: u64 = outside.later;
     let mut unreadable: u64 = 0;
     let mut unsigned = false;
     let mut ranked: Vec<(ObservationStreamEntryView, i64)> = Vec::new();
