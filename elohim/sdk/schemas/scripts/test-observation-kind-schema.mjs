@@ -34,4 +34,20 @@ if (validate(invalid_reach)) {
   process.exit(1);
 }
 
+// The field map names Rust types the payload validator knows, optionally
+// suffixed `?` (ruling R-A10): a typo like `Cid|null` or `u128` is caught at
+// the manifest, not at the first write that misses it.
+const optional_field = { ...minimal, schema: { doorway_id: 'Cid', session_id: 'Cid?' } };
+if (!validate(optional_field)) {
+  console.error(validate.errors);
+  process.exit(1);
+}
+
+for (const bad of ['Cid|null', 'u128', 'string', 'Cid??', 'Option<Cid>', '']) {
+  if (validate({ ...minimal, schema: { some_field: bad } })) {
+    console.error(`Expected field-map type ${JSON.stringify(bad)} to fail`);
+    process.exit(1);
+  }
+}
+
 console.log('observation-kind.schema.json validates');

@@ -19,7 +19,10 @@
     "schema": {
       "type": "object",
       "description": "Field map from name to Rust type (Cid, String, u8, u16, u32, u64, f32, bool). Used by codegen and validators. A trailing `?` marks the field optional (e.g. \"Cid?\"): a payload may omit it, but when present it must match the base type. Every other declared field is required, and a payload field the map does not declare is refused.",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(Cid|String|u8|u16|u32|u64|f32|bool)\\??$"
+      }
     },
     "retention_class": {
       "type": "string",

@@ -43,3 +43,20 @@ household mesh (`just mesh start && just mesh prologue`, then `just test mesh-br
 '@concern:attention-witnessed-privately'`), and the habit stays red until that is green twice.
 Found while writing the scenario: the view posts only on an in-app leave (backlog
 `content-view-observation-lost-on-hard-leave`).
+
+DELTA 2026-09-24 (independent review H1 closed; status stays red, mesh run still pending). The
+review found that un-shadowing the observation routes (A2, `f46f3517c`) brought three
+cross-observer GETs to life that break this habit's "never joined by an outside observer" clause:
+`by-observer?observerCid=<anyone>` served another person's agent-private rows with NO header at
+all, `by-subject` listed every observer of a subject, and `diversity` counted across observers.
+Closed under ruling R-A9 with negative tests first (red run recorded: 4 of the 5 new privacy
+tests failed on the old handlers): `by-observer` now takes the explicit `X-Agent-Cid` and serves
+only that observer (401 without it, 403 on mismatch, no `local_sessions` fallback), and
+`by-subject` / `diversity` refuse any kind the registry marks `reach: agent-private` — 404 with
+the reason whether or not rows exist, so the route is not an existence oracle, and a node with no
+registry refuses every cross-observer read rather than guess. `cargo test --test api --
+observations`: 35 passed, 0 failed, EXIT=0. Same wave (rulings R-A10/R-A11): `observedAt` bounded
+to `0..=now+300`, the POST body capped at 16 KiB, `subjectCid` required to equal the payload's
+`ref_cid`, the lifestream's title lookup filtered to commons/public reach, the stream window
+pushed into SQL with the out-of-window rows counted there, and the in-memory log reduced to its
+hasher, offset and a bounded tail. Check (1) is unchanged: the household mesh run is still owed.

@@ -12,10 +12,15 @@
  *   - the content viewer at `/resource/:id` (elohim-app shell) — it opens the
  *     witnessed view on load, tracks the window's deepest scroll, and POSTs
  *     `/api/v1/observations` when the viewer is destroyed or moves to another
- *     node. The POST happens on an IN-APP leave only: a hard navigation
- *     (page.goto, tab close) unloads the document before Angular destroys the
- *     viewer, so nothing is sent. The "moves on … without leaving the app"
- *     step therefore routes inside the shell and waits for the POST's answer.
+ *     node. This lane exercises the IN-APP leave: the "moves on … without
+ *     leaving the app" step routes inside the shell and waits for the POST's
+ *     answer, which is the leave whose ack a scenario can read. A HARD leave
+ *     (page.goto, tab close, cross-bundle navigation) is now witnessed too —
+ *     the emitter flushes every open view on `pagehide` with `sendBeacon` or a
+ *     keepalive fetch (ruling R-A8, covered by
+ *     `app/elohim-library/projects/elohim-rea-runtime/src/lib/observation-emitter.service.spec.ts`
+ *     "hard leave") — so the in-app step is kept for the readable ack, not
+ *     because it is the only path that witnesses.
  *   - `/lamad/me/stream` (the lamad bundle) — testids `stream-provenance`
  *     (recipe name + `<code>` CID), `stream-entry` (an `<a href="/epr/{id}">`,
  *     dwell as "3.4 s" / "1 min 5 s", depth as "N%").
@@ -317,7 +322,9 @@ When('{word} scrolls to the bottom of the page', async function (this: E2EWorld,
  * Leave the content node by an in-app route change to the shell's home page
  * (`/`). Angular's router follows a popstate to the current history entry, so
  * the viewer is destroyed inside the living document and its POST is sent.
- * A page.goto here would unload the document and send nothing.
+ * A page.goto would now also witness (the emitter's `pagehide` flush, R-A8),
+ * but its request outlives the document with no response this lane can await —
+ * the in-app leave is what gives the next step an ack to read.
  *
  * Example: And Jessica moves on from the page to the home page without leaving the app
  */
