@@ -104,22 +104,62 @@ for side in "$A" "$B"; do
     bad peer-store "PROBE-BROKEN — $side/db/p2p/conductor-diagnostics HTTP:$diag_code (plumbing, not store state; see backlog/probe-conductor-diagnostics-doorway-404)"
     continue
   fi
+  # DEGRADED-200 IS NOT A THIN STORE. Since 2026-09-22 the route answers 200
+  # with `agentsObservable:false` and NO `agents`/`agentCount` when the
+  # conductor's peer store could not be read (a cell that has not joined its
+  # network has no kitsune space, so `agent_info` answers K2SpaceNotFound).
+  # Defaulting the missing keys to 0 printed "total=0 addressed=0" and sent the
+  # operator down the bootstrap-diagnosis path in the trust-contract runbook —
+  # the same lossy-measure shape as the 2026-08-07 doorway 404.
   agents=$(printf '%s' "$diagnostics" | \
     python3 -c "
 import json,sys
 d=json.load(sys.stdin)
-withurl=sum(1 for a in d.get('agents',[]) if a.get('url'))
-print(f\"{d.get('agentCount',0)} {withurl}\")" 2>/dev/null || echo "PARSE-FAIL")
+if d.get('agentsObservable') is False or 'agents' not in d:
+    # The conductor's own words, VERBATIM (newlines folded so the shell reads
+    # one line). Truncating them is how a cause gets lost and then guessed.
+    err = str(d.get('agentsError', 'agentsObservable=false'))
+    print('UNOBSERVABLE ' + ' '.join(err.split()))
+else:
+    withurl=sum(1 for a in d.get('agents',[]) if a.get('url'))
+    print(f\"{d.get('agentCount',0)} {withurl}\")" 2>/dev/null || echo "PARSE-FAIL")
   if [ "$agents" = "PARSE-FAIL" ]; then
     bad peer-store "PROBE-BROKEN — $side conductor-diagnostics body unparseable"
     continue
   fi
-  total=${agents% *}; withurl=${agents#* }
-  if [ "${total:-0}" -ge 5 ] && [ "${withurl:-0}" -ge 5 ]; then
-    note peer-store "OK — $side conductor holds $total agent-infos ($withurl addressed)"
-  else
-    bad peer-store "$side conductor peer store thin (total=$total addressed=$withurl)"
-  fi
+  case "$agents" in
+    UNOBSERVABLE*)
+      # THE ERROR DECIDES THE SENTENCE. `agent_info` resolves each space's peer
+      # store through `space_if_exists`, so a MISSING KITSUNE SPACE really does
+      # mean the cells have not joined their network — but a closed socket
+      # ("Websocket closed: No connection"), an auth failure and a timeout all
+      # arrive on this same degraded-200 body. Printing the network-join
+      # explanation for every one of them sends an operator hunting a startup
+      # window during a socket outage: an unsupported cause, which is the
+      # failure class this seam exists to refuse.
+      unobservable_reason="${agents#UNOBSERVABLE }"
+      case "$unobservable_reason" in
+        *K2SpaceNotFound*|*[Ss]pace\ not\ found*)
+          bad peer-store "PROBE-DEGRADED — $side conductor peer store is NOT OBSERVABLE (HTTP 200, agentsObservable=false): ${unobservable_reason}. This is not an empty or thin store; that error names a MISSING KITSUNE SPACE, so the conductor's cells have not joined their network. Read the route's \`cells\` block (ListCellIds membership + per-role state) before touching bootstrap."
+          ;;
+        *)
+          bad peer-store "PROBE-DEGRADED — $side conductor peer store is UNREADABLE (HTTP 200, agentsObservable=false): ${unobservable_reason}. This is not an empty or thin store, and this error text does NOT establish why — in particular it does not establish that the cells have not joined their network. Read the route's \`cells\` block (ListCellIds membership + per-role state) and the conductor's own error above before choosing a cure."
+          ;;
+      esac
+      # Deliberately NOT a `continue`: the peer-URL legs below detect the same
+      # degraded body and print an explicit SKIP. A leg that simply vanishes
+      # from the output is the unalertable-absence shape this script exists to
+      # avoid — an operator must be able to read that they were not evaluated.
+      ;;
+    *)
+      total=${agents% *}; withurl=${agents#* }
+      if [ "${total:-0}" -ge 5 ] && [ "${withurl:-0}" -ge 5 ]; then
+        note peer-store "OK — $side conductor holds $total agent-infos ($withurl addressed)"
+      else
+        bad peer-store "$side conductor peer store thin (total=$total addressed=$withurl)"
+      fi
+      ;;
+  esac
 
   # Inspect ONLY conductor-diagnostics peer URLs. Healthy iroh relay-dial logs
   # legitimately contain wss:// and must never feed the lingering-tx5 verdict.
@@ -133,6 +173,14 @@ try:
 except Exception:
     print("FAIL\tunreadable conductor-diagnostics JSON")
     print("FAIL\tunreadable conductor-diagnostics JSON")
+    raise SystemExit(0)
+
+if document.get("agentsObservable") is False or "agents" not in document:
+    # Degraded 200: the peer store is unreadable, so there are no URLs to
+    # inspect and NOTHING is established about relay contamination. Naming that
+    # is honest; printing a contamination FAIL would be a fabricated verdict.
+    print("SKIP\tpeer store not observable (agentsObservable=false) — no peer URLs to inspect")
+    print("SKIP\tpeer store not observable (agentsObservable=false) — no peer URLs to inspect")
     raise SystemExit(0)
 
 urls = [entry.get("url") for entry in document.get("agents", [])
@@ -180,10 +228,15 @@ else:
   tx5_check=$(printf '%s\n' "$peer_url_checks" | sed -n '2p')
   case "$contamination_check" in
     OK$'\t'*) note n0-contamination "OK — $side ${contamination_check#*$'\t'}" ;;
+    # SKIP = nothing established (degraded 200). Neither a pass nor a red: the
+    # peer-store leg above already carries the PROBE-DEGRADED verdict, and a
+    # second red about relay hosts we never read would be a fabricated finding.
+    SKIP$'\t'*) note n0-contamination "SKIP — $side ${contamination_check#*$'\t'}" ;;
     *) bad n0-contamination "$side ${contamination_check#*$'\t'}" ;;
   esac
   case "$tx5_check" in
     OK$'\t'*) note no-lingering-tx5 "OK — $side ${tx5_check#*$'\t'}" ;;
+    SKIP$'\t'*) note no-lingering-tx5 "SKIP — $side ${tx5_check#*$'\t'}" ;;
     *) bad no-lingering-tx5 "$side ${tx5_check#*$'\t'}" ;;
   esac
 done

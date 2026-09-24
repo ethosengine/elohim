@@ -1,9 +1,9 @@
 @e2e @doorway @resilience @regression @requires:doorway
-Feature: Doorway peer-conductor connections back off and do not leak
+Feature: Doorways stay responsive and expose recovery evidence during failures
   As a household member whose doorway fronts a pool of peer conductors
-  I want the doorway to retreat politely when a conductor session is unstable
-  So that one flapping or auth-rejecting conductor never burns the doorway
-  in a tight reconnect loop, and a mass reconnect never staggers the fleet.
+  I want bounded retries and waits when conductors, rendering, or networking fail
+  So that failures do not consume the doorway's ability to serve my household
+  And an operator can distinguish working service from an incomplete recovery.
 
   # Engineering constraint (story-harvest, 2026-06-10 conductor reconnect storm):
   # the doorway's reconnect loops reset their delay on a *successful WebSocket
@@ -61,11 +61,36 @@ Feature: Doorway peer-conductor connections back off and do not leak
     And the doorway's task count stays flat across the cycles
 
   @act:i @requires:owned-substrate
-  Scenario: Conductor restart heals the worker pool without a doorway restart
+  Scenario: A restarted conductor accepts direct zome calls; separately, the doorway reports its pool sockets reconnected
     Given a peer conductor that restarts and invalidates previously issued app auth tokens
     When the doorway's pool workers reconnect with the stale token
     Then the doorway re-mints an app auth token from the conductor admin interface
-    And zome calls through that conductor pool succeed within the recovery window
+    And a read-only zome call reaches the restarted conductor and returns
+    And the doorway reports every conductor worker pool reconnected
+
+  # These are separate recovery stations, not proof of restored doorway service.
+  # The token action, direct signed call, and reported socket health help an
+  # operator locate the remaining failure. The @wip scenario below preserves
+  # the still-unproved finish line: a signed call through that doorway pool.
+  # WHAT THE ASSERTIONS ABOVE DO AND DO NOT ESTABLISH.
+  #
+  # The zome call reaches the conductor over a connection this node holds
+  # DIRECTLY, not through the doorway's worker pool. So it proves the conductor
+  # is serving signed calls again — it does not prove the doorway's pool
+  # re-authenticated. The pool leg proves only what the doorway measures: a
+  # worker pool reports itself healthy on `connected_workers > 0`, a socket
+  # count, which is not a signed call. And no doorway route lets a caller name
+  # WHICH conductor's pool should answer, so nothing here can establish that a
+  # signed call through the restarted conductor's own pool returns.
+  #
+  # Rather than let a weaker check stand in for that proof, the scenario below
+  # names the missing evidence and stays @wip until a doorway surface exists for
+  # it. Backlog: genesis/data/timeline/backlog/doorway-no-per-conductor-signed-probe.md
+  @act:i @requires:owned-substrate @wip
+  Scenario: A signed call through the restarted conductor's own doorway pool succeeds
+    Given a peer conductor that restarts and invalidates previously issued app auth tokens
+    When the doorway's pool workers reconnect with the stale token
+    Then a read-only zome call through the doorway pool bound to the conductor under test succeeds
 
   @act:i @requires:owned-substrate
   Scenario: Reconnect churn is visible to operators

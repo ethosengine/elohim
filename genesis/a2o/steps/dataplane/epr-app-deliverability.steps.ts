@@ -1864,22 +1864,38 @@ Then(
     const record = app(this);
     const bundle = requireBundle(this);
     assert.ok(record.browserDeclaredAt && record.blobHash);
-    const deadline = record.browserDeclaredAt + seconds * 1000;
+    const browserDeclaredAt = record.browserDeclaredAt;
+    const expectedBlobHash = record.blobHash;
+    const deadline = browserDeclaredAt + seconds * 1000;
     await Promise.all(
       DOORWAYS.map(async peer => {
+        const pointerTimeline: {
+          elapsedMs: number;
+          status: number;
+          blobHash: string | null;
+        }[] = [];
+        const rememberPointer = (status: number, blobHash: string | null): void => {
+          pointerTimeline.push({
+            elapsedMs: Math.max(0, Date.now() - browserDeclaredAt),
+            status,
+            blobHash,
+          });
+          if (pointerTimeline.length > 32) pointerTimeline.shift();
+        };
         const ready = await pollUntil(
           async () => {
             const base = resolvePeerUrl(peer);
             const row = await getRaw(`${base}/db/content/${record.slug}`, { timeoutMs: 5000 });
-            if (
-              row.status !== 200 ||
-              (JSON.parse(row.text) as { blobHash?: string }).blobHash !== record.blobHash
-            )
-              return false;
+            const observedBlobHash =
+              row.status === 200
+                ? ((JSON.parse(row.text) as { blobHash?: string }).blobHash ?? null)
+                : null;
+            rememberPointer(row.status, observedBlobHash);
+            if (row.status !== 200 || observedBlobHash !== expectedBlobHash) return false;
             const paths = ['index.html', bundle.entryScript, bundle.styleSheet, 'version.json'];
             const files = await Promise.all(
               paths.map(async path =>
-                getRaw(`${base}/apps/${record.blobHash}/${path}`, { timeoutMs: 5000 })
+                getRaw(`${base}/apps/${expectedBlobHash}/${path}`, { timeoutMs: 5000 })
               )
             );
             return (
@@ -1890,10 +1906,28 @@ Then(
           },
           Math.max(0, deadline - Date.now())
         );
+        const lastObserved = pointerTimeline.at(-1) ?? null;
+        this.attach(
+          JSON.stringify(
+            {
+              measure: 'next-browser-pointer-timeline',
+              peer,
+              expectedBlobHash,
+              deadlineMs: seconds * 1000,
+              readyElapsedMs: ready,
+              lastObserved,
+              observations: pointerTimeline,
+            },
+            null,
+            2
+          ),
+          'application/json'
+        );
         assert.notEqual(
           ready,
           null,
-          `${peer}: next browser declaration and immutable bytes did not converge within ${seconds}s`
+          `${peer}: next browser declaration and immutable bytes did not converge within ${seconds}s; ` +
+            `last observed pointer=${JSON.stringify(lastObserved)}`
         );
       })
     );

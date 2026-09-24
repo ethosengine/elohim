@@ -75,6 +75,29 @@ pub struct Args {
     #[arg(long, env = "LISTEN", default_value = "0.0.0.0:8080")]
     pub listen: SocketAddr,
 
+    /// Port for the optional TLS listener (story 5.2 — the doorway terminates
+    /// its own TLS alongside the plain listener, rather than requiring a
+    /// front-of-house terminator). All-or-none with `tls_cert_file` /
+    /// `tls_key_file`: declaring one without the other two fails
+    /// [`Args::validate`]. Unset (the default) leaves today's behavior
+    /// unchanged — plaintext HTTP only on `listen`. No cert issuance or
+    /// rotation lives here (that is story 5.3); this loads a file pair the
+    /// operator (or the household mesh's local CA script) already minted.
+    /// Bound on the same host as `listen`, with this port substituted.
+    #[arg(long, env = "DOORWAY_TLS_PORT")]
+    pub tls_port: Option<u16>,
+
+    /// PEM certificate chain file for the TLS listener. See `tls_port`.
+    #[arg(long, env = "DOORWAY_TLS_CERT_FILE")]
+    pub tls_cert_file: Option<std::path::PathBuf>,
+
+    /// PEM private key file for the TLS listener. See `tls_port`. A
+    /// present-but-unparseable file, or a key that does not match
+    /// `tls_cert_file`, aborts boot rather than silently falling back to
+    /// plaintext-only — see `tls::load_server_config`.
+    #[arg(long, env = "DOORWAY_TLS_KEY_FILE")]
+    pub tls_key_file: Option<std::path::PathBuf>,
+
     /// Holochain conductor admin WebSocket URL (default port 4444)
     /// Used for admin operations (list_apps, attach_app_interface, discovery)
     /// The app interface URL for zome calls is derived by replacing port with APP_PORT_MIN
@@ -609,10 +632,41 @@ impl Args {
         port >= self.app_port_min && port <= self.app_port_max
     }
 
+    /// How many of the three TLS listener knobs (`tls_port`, `tls_cert_file`,
+    /// `tls_key_file`) are set. `validate()` requires this to be 0 (feature
+    /// off, today's behavior) or 3 (feature on) — never a partial declaration
+    /// that would silently leave the listener half-configured.
+    fn tls_declared_count(&self) -> usize {
+        [
+            self.tls_port.is_some(),
+            self.tls_cert_file.is_some(),
+            self.tls_key_file.is_some(),
+        ]
+        .into_iter()
+        .filter(|&declared| declared)
+        .count()
+    }
+
+    /// True when the TLS listener is fully and validly declared (all three
+    /// knobs set). Callers that reach this after `validate()` has already
+    /// passed can treat it as "exactly 0 or 3" — this is the "3" case.
+    pub fn tls_enabled(&self) -> bool {
+        self.tls_declared_count() == 3
+    }
+
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
         if !self.dev_mode && self.jwt_secret.is_none() {
             return Err("JWT_SECRET is required in production mode".to_string());
+        }
+
+        let tls_declared = self.tls_declared_count();
+        if tls_declared != 0 && tls_declared != 3 {
+            return Err(format!(
+                "DOORWAY_TLS_PORT, DOORWAY_TLS_CERT_FILE and DOORWAY_TLS_KEY_FILE must be set \
+                 together or not at all (got {tls_declared} of 3) — a partial TLS declaration \
+                 would silently leave the listener unconfigured"
+            ));
         }
 
         if self.app_port_min > self.app_port_max {
@@ -742,5 +796,70 @@ mod conductor_url_convention_tests {
         assert_eq!(url_port("ws://localhost:4444/path"), Some(4444));
         assert_eq!(url_port("ws://localhost"), None);
         assert_eq!(url_port("localhost:4444"), None);
+    }
+}
+
+/// Story 5.2 — TLS listener config is all-or-none. These are the config-layer
+/// tests; `tls::load_server_config` tests cover the file-loading contract.
+#[cfg(test)]
+mod tls_config_tests {
+    use super::*;
+    use clap::Parser;
+
+    // --dev-mode so validate() reaches the TLS declaration check rather than
+    // short-circuiting on the pre-existing "JWT_SECRET is required in
+    // production mode" rule these tests aren't about.
+    fn args_with(argv: &[&str]) -> Args {
+        let mut full = vec!["doorway", "--listen", "127.0.0.1:0", "--dev-mode"];
+        full.extend_from_slice(argv);
+        Args::parse_from(full)
+    }
+
+    #[test]
+    fn none_declared_is_valid_and_disabled() {
+        let args = args_with(&[]);
+        assert_eq!(args.tls_declared_count(), 0);
+        assert!(!args.tls_enabled());
+        assert!(args.validate().is_ok());
+    }
+
+    #[test]
+    fn all_three_declared_is_valid_and_enabled() {
+        let args = args_with(&[
+            "--tls-port",
+            "8443",
+            "--tls-cert-file",
+            "/tmp/does-not-need-to-exist.pem",
+            "--tls-key-file",
+            "/tmp/does-not-need-to-exist-key.pem",
+        ]);
+        assert_eq!(args.tls_declared_count(), 3);
+        assert!(args.tls_enabled());
+        // validate() checks declaration shape only, not file existence —
+        // a present-but-invalid file is caught later by
+        // tls::load_server_config so boot can log a precise error.
+        assert!(args.validate().is_ok());
+    }
+
+    #[test]
+    fn port_only_is_a_partial_declaration_and_invalid() {
+        let args = args_with(&["--tls-port", "8443"]);
+        assert_eq!(args.tls_declared_count(), 1);
+        assert!(!args.tls_enabled());
+        let err = args.validate().unwrap_err();
+        assert!(err.contains("must be set together or not at all"));
+    }
+
+    #[test]
+    fn cert_and_key_without_port_is_a_partial_declaration_and_invalid() {
+        let args = args_with(&[
+            "--tls-cert-file",
+            "/tmp/cert.pem",
+            "--tls-key-file",
+            "/tmp/key.pem",
+        ]);
+        assert_eq!(args.tls_declared_count(), 2);
+        assert!(!args.tls_enabled());
+        assert!(args.validate().is_err());
     }
 }

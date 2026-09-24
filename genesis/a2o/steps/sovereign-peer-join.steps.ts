@@ -116,11 +116,26 @@ async function pollUntil<T>(
   throw new Error(`timed out after ${Math.round(budgetMs / MINUTE_MS)} min — ${describe()}`);
 }
 
-async function fetchDiagnostics(doorwayUrl: string): Promise<DiagnosticsAgent[]> {
+/**
+ * The live agent set, or `null` when it is NOT OBSERVABLE.
+ *
+ * `null` and `[]` are different facts and this function refuses to collapse
+ * them. Since 2026-09-22 the route answers 200 with `agentsObservable:false`
+ * when the conductor's peer store could not be read (a cell that has not joined
+ * its network has no kitsune space, so `agent_info` answers K2SpaceNotFound).
+ * Reading that as an empty list made a poll for "the doorway lists our agent"
+ * eventually time out diagnosing an ABSENT workspace agent, when the real
+ * finding is that the doorway's own conductor cannot be asked yet.
+ */
+async function fetchDiagnostics(doorwayUrl: string): Promise<DiagnosticsAgent[] | null> {
   const res = await fetch(`${doorwayUrl}/db/p2p/conductor-diagnostics`);
-  if (!res.ok) return [];
-  const body = (await res.json()) as { agents?: DiagnosticsAgent[] };
-  return (body.agents ?? []).filter(a => a.isTombstone !== true && a.isTombstone !== 'True');
+  if (!res.ok) return null;
+  const body = (await res.json()) as {
+    agents?: DiagnosticsAgent[];
+    agentsObservable?: boolean;
+  };
+  if (body.agentsObservable === false || !Array.isArray(body.agents)) return null;
+  return body.agents.filter(a => a.isTombstone !== true && a.isTombstone !== 'True');
 }
 
 function liveSpaces(agents: DiagnosticsAgent[]): Set<string> {
@@ -268,14 +283,21 @@ Then(
     await pollUntil(
       3 * MINUTE_MS,
       async () => {
-        remote = liveSpaces(await fetchDiagnostics(doorway));
+        const observed = await fetchDiagnostics(doorway);
+        // Not observable ≠ no spaces: keep polling and let the describe() below
+        // say which of the two the timeout was.
+        if (observed === null) {
+          remote = new Set<string>();
+          return undefined;
+        }
+        remote = liveSpaces(observed);
         if (remote.size === 0) return undefined;
         const missingLocally = [...remote].filter(s => !c.dnaCores.has(s));
         const extraLocally = [...c.dnaCores].filter(s => !remote.has(s));
         return missingLocally.length === 0 && extraLocally.length === 0 ? true : undefined;
       },
       () =>
-        `doorway ${doorwayId} spaces=${[...remote].join(',') || '(none reported)'} ` +
+        `doorway ${doorwayId} spaces=${[...remote].join(',') || '(none READ — the agent set was either empty or NOT OBSERVABLE; check agentsObservable on /db/p2p/conductor-diagnostics)'} ` +
         `workspace dna cores=${[...c.dnaCores].join(',')}`
     );
   }
@@ -318,11 +340,16 @@ Then(
       10 * MINUTE_MS,
       async () => {
         const agents = await fetchDiagnostics(doorway);
+        if (agents === null) return undefined;
         return agents.some(a => typeof a.agent === 'string' && a.agent === c.agentCore)
           ? true
           : undefined;
       },
-      () => `doorway ${doorwayId} conductor-diagnostics does not yet list ${c.agentCore}`
+      () =>
+        `doorway ${doorwayId} conductor-diagnostics does not yet list ${c.agentCore} — note that ` +
+        `an UNOBSERVABLE agent set (200 with agentsObservable:false, the doorway's own conductor ` +
+        `not yet joined) polls identically to an absent agent; check that field before concluding ` +
+        `the workspace peer never appeared`
     );
   }
 );
@@ -339,6 +366,12 @@ Given(
     const c = await connectWorkspaceConductor();
     const doorway = this.getDoorway('alpha').url.replace(/\/$/, '');
     const agents = await fetchDiagnostics(doorway);
+    assert.ok(
+      agents !== null,
+      `doorway alpha's /db/p2p/conductor-diagnostics cannot read its own conductor's peer store ` +
+        `(200 with agentsObservable:false) — the workspace join is not observable from here yet, ` +
+        `which is a different finding from the workspace peer being absent`
+    );
     const spaces = liveSpaces(agents);
     assert.ok(
       [...c.dnaCores].every(s => spaces.has(s)),
@@ -346,9 +379,14 @@ Given(
     );
     await pollUntil(
       3 * MINUTE_MS,
-      async () =>
-        (await fetchDiagnostics(doorway)).some(a => a.agent === c.agentCore) ? true : undefined,
-      () => `doorway alpha does not list the workspace agent ${c.agentCore} as live`
+      async () => {
+        const live = await fetchDiagnostics(doorway);
+        if (live === null) return undefined;
+        return live.some(a => a.agent === c.agentCore) ? true : undefined;
+      },
+      () =>
+        `doorway alpha does not list the workspace agent ${c.agentCore} as live (an unobservable ` +
+        `agent set polls the same way — check agentsObservable)`
     );
   }
 );

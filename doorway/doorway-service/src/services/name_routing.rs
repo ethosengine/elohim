@@ -840,6 +840,19 @@ pub struct NameRouteTable {
     /// take it when nothing has elapsed). Never read in production.
     #[cfg(test)]
     prune_write_passes: std::sync::atomic::AtomicU64,
+    /// Story 4.2 slice 1: wall-clock second (`now_secs`) of the last PER-HOLDER
+    /// install (`replace_holder` — the doorbell/refresh-verb pull path), keyed
+    /// by `doorway_id`. Deliberately NOT touched by `replace_all` (the 60s
+    /// poll's writer) — this is what lets [`Self::replace_all_at`] tell "a
+    /// doorbell installed this holder more recently than this poll round
+    /// started" and skip clobbering it with a now-stale batch (C2 monotonic,
+    /// slice-1 design §3.2).
+    holder_installed_at: RwLock<HashMap<String, u64>>,
+    /// The digest this table last installed for each holder — read by the
+    /// doorbell receiver's C6b idempotency check ([`Self::held_digest`]) and
+    /// kept in step by both [`Self::replace_holder`] and
+    /// [`Self::replace_all_at`].
+    held_digests: RwLock<HashMap<String, String>>,
 }
 
 /// Exact project-epr reference resolution. Unlike the ordinary holder fold,
@@ -889,11 +902,92 @@ impl NameRouteTable {
         contracts: Vec<HolderContract>,
         liveness: HashMap<String, HolderLiveness>,
     ) {
+        self.replace_all_at(contracts, liveness, HashMap::new(), now_secs());
+    }
+
+    /// [`Self::replace_all`], but for a poll round that STARTED at
+    /// `fetch_started` and carries each probed holder's manifest `digest`
+    /// (story 4.2 slice 1, design §3.2). Two things a per-holder install
+    /// ([`Self::replace_holder`] — the doorbell/refresh-verb pull path) can
+    /// beat this whole-batch fold to:
+    ///
+    /// - **C2 monotonic.** A holder this table installed via
+    ///   [`Self::replace_holder`] AFTER `fetch_started` is PROTECTED — this
+    ///   round's (now-stale) copy of that holder's contracts/liveness/digest
+    ///   is dropped, and the holder's CURRENT rows are kept exactly as
+    ///   `replace_holder` left them. A slower poll can never regress a
+    ///   doorbell-fresh install.
+    /// - **held_digests.** Every OTHER holder's digest is recorded, so
+    ///   [`Self::held_digest`] reflects the poll's view for a holder no
+    ///   doorbell has ever touched.
+    ///
+    /// Last-good preservation is unchanged from `replace_all`: a batch that is
+    /// empty AFTER protecting, with existing rows already held, leaves the
+    /// table as-is.
+    pub fn replace_all_at(
+        &self,
+        mut contracts: Vec<HolderContract>,
+        mut liveness: HashMap<String, HolderLiveness>,
+        digests: HashMap<String, String>,
+        fetch_started: u64,
+    ) {
+        let protected: std::collections::HashSet<String> = {
+            let installed = self
+                .holder_installed_at
+                .read()
+                .expect("name-route lock poisoned");
+            installed
+                .iter()
+                // `>=`, not `>`: both clocks are whole seconds, so an install
+                // that landed in the same second the poll STARTED cannot be
+                // proven older than the poll's fetch — and clobbering it
+                // re-opens the exact race this guard exists to close. Erring
+                // toward the doorbell-fresh row costs at most one 60s poll.
+                .filter(|(_, &at)| at >= fetch_started)
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        if !protected.is_empty() {
+            contracts.retain(|c| !protected.contains(&c.doorway_id));
+            liveness.retain(|id, _| !protected.contains(id));
+        }
+
         {
             let mut live = self.liveness.write().expect("name-route lock poisoned");
-            *live = liveness;
+            // Keep a protected holder's CURRENT liveness (set by
+            // `replace_holder`), then fold in this round's verdicts for
+            // everyone else.
+            let mut merged: HashMap<String, HolderLiveness> = protected
+                .iter()
+                .filter_map(|id| live.get(id).map(|lv| (id.clone(), *lv)))
+                .collect();
+            merged.extend(liveness);
+            *live = merged;
         }
+
+        if !digests.is_empty() {
+            let mut held = self.held_digests.write().expect("name-route lock poisoned");
+            for (id, digest) in digests {
+                if !protected.contains(&id) {
+                    held.insert(id, digest);
+                }
+            }
+        }
+
         let mut table = self.contracts.write().expect("name-route lock poisoned");
+        if !protected.is_empty() {
+            for existing in table.iter() {
+                if protected.contains(&existing.doorway_id) {
+                    contracts.push(existing.clone());
+                }
+            }
+            contracts.sort_by(|left, right| {
+                left.doorway_id
+                    .cmp(&right.doorway_id)
+                    .then_with(|| left.url_path.cmp(&right.url_path))
+                    .then_with(|| left.host.cmp(&right.host))
+            });
+        }
         if contracts.is_empty() && !table.is_empty() {
             debug!(
                 held = table.len(),
@@ -902,6 +996,60 @@ impl NameRouteTable {
             return;
         }
         *table = contracts;
+    }
+
+    /// Install ONE holder's contracts + liveness + digest, replacing only
+    /// that holder's rows (never the whole table). `installed_at` is stamped
+    /// so a later, slower [`Self::replace_all_at`] round that STARTED before
+    /// this install cannot clobber it (C2 monotonic) — see
+    /// `holder_installed_at`'s doc comment. Used by the doorbell receiver and
+    /// the admin refresh verb (`services::federation::install_holder_snapshot`).
+    pub fn replace_holder(
+        &self,
+        doorway_id: &str,
+        mut contracts: Vec<HolderContract>,
+        liveness: HolderLiveness,
+        digest: String,
+        installed_at: u64,
+    ) {
+        {
+            let mut live = self.liveness.write().expect("name-route lock poisoned");
+            live.insert(doorway_id.to_string(), liveness);
+        }
+        {
+            let mut table = self.contracts.write().expect("name-route lock poisoned");
+            table.retain(|c| c.doorway_id != doorway_id);
+            table.append(&mut contracts);
+            table.sort_by(|left, right| {
+                left.doorway_id
+                    .cmp(&right.doorway_id)
+                    .then_with(|| left.url_path.cmp(&right.url_path))
+                    .then_with(|| left.host.cmp(&right.host))
+            });
+        }
+        {
+            let mut installed = self
+                .holder_installed_at
+                .write()
+                .expect("name-route lock poisoned");
+            installed.insert(doorway_id.to_string(), installed_at);
+        }
+        {
+            let mut held = self.held_digests.write().expect("name-route lock poisoned");
+            held.insert(doorway_id.to_string(), digest);
+        }
+    }
+
+    /// The digest this table last installed for `doorway_id`, or `None` when
+    /// this doorway has never installed anything for that holder. Read by the
+    /// doorbell receiver's C6b idempotency check: a doorbell whose digest
+    /// already matches the held one is a no-op.
+    pub fn held_digest(&self, doorway_id: &str) -> Option<String> {
+        self.held_digests
+            .read()
+            .expect("name-route lock poisoned")
+            .get(doorway_id)
+            .cloned()
     }
 
     /// Candidate holders for a [`RouteKey`] (see [`fold_candidate_holders`]).
@@ -3352,5 +3500,212 @@ mod tests {
         })
         .await;
         assert!(matches!(outcome.verdict, RelayVerdict::Served { .. }));
+    }
+
+    // ── Story 4.2 slice 1: replace_holder / held_digest / replace_all_at ──────
+
+    #[test]
+    fn replace_holder_installs_rows_liveness_and_digest_for_that_holder_only() {
+        let table = NameRouteTable::new();
+        // alpha mounts at /lamad (NOT the universal root "/"), so it never
+        // covers /garden — keeps this test's holder count unambiguous.
+        table.replace_all(
+            vec![contract(
+                "alpha-elohim-host",
+                "https://alpha.example",
+                "/lamad",
+            )],
+            HashMap::from([("alpha-elohim-host".to_string(), HolderLiveness::Serving)]),
+        );
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden",
+            )],
+            HolderLiveness::Serving,
+            "bafy-garden".to_string(),
+            1_000,
+        );
+        assert_eq!(table.len(), 2, "alpha's row survives, gamma's is added");
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-garden")
+        );
+        assert_eq!(table.held_digest("alpha-elohim-host"), None);
+        let holders = table.holders_for(&RouteKey::path_only("/garden"), "self");
+        assert_eq!(holders.len(), 1);
+        assert_eq!(holders[0].doorway_id, "gamma-elohim-host");
+    }
+
+    #[test]
+    fn replace_holder_replaces_only_that_holders_prior_rows() {
+        let table = NameRouteTable::new();
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/old",
+            )],
+            HolderLiveness::Serving,
+            "bafy-old".to_string(),
+            1_000,
+        );
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/new",
+            )],
+            HolderLiveness::Serving,
+            "bafy-new".to_string(),
+            1_001,
+        );
+        assert_eq!(
+            table.len(),
+            1,
+            "the old row must not survive alongside the new one"
+        );
+        let holders = table.holders_for(&RouteKey::path_only("/new"), "self");
+        assert_eq!(holders.len(), 1);
+        assert!(table
+            .holders_for(&RouteKey::path_only("/old"), "self")
+            .is_empty());
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-new")
+        );
+    }
+
+    /// THE C2 MONOTONIC GUARD, PINNED: a poll round that STARTED before a
+    /// doorbell installed a fresher snapshot for a holder must not clobber it
+    /// — the doorbell-installed rows survive `replace_all_at`.
+    #[test]
+    fn a_slower_poll_round_cannot_overwrite_a_newer_doorbell_install() {
+        let table = NameRouteTable::new();
+        // The poll round STARTS at 1_000 (fetch_started), but by the time it
+        // finishes and calls replace_all_at, a doorbell has already installed
+        // gamma's fresher snapshot at 1_005.
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden",
+            )],
+            HolderLiveness::Serving,
+            "bafy-fresh".to_string(),
+            1_005,
+        );
+        table.replace_all_at(
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/stale-batch",
+            )],
+            HashMap::from([("gamma-elohim-host".to_string(), HolderLiveness::Uncertain)]),
+            HashMap::from([("gamma-elohim-host".to_string(), "bafy-stale".to_string())]),
+            1_000, // fetch_started — BEFORE the doorbell install at 1_005
+        );
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-fresh"),
+            "the poll's stale digest must not overwrite the doorbell-fresh one"
+        );
+        assert!(
+            table
+                .holders_for(&RouteKey::path_only("/garden"), "self")
+                .iter()
+                .any(|h| h.doorway_id == "gamma-elohim-host"),
+            "the doorbell-installed row must survive the slower poll round"
+        );
+        assert!(
+            table
+                .holders_for(&RouteKey::path_only("/stale-batch"), "self")
+                .is_empty(),
+            "the poll's stale row for the protected holder must never be installed"
+        );
+    }
+
+    /// A poll round that STARTS AFTER the doorbell install is free to replace
+    /// it — protection is time-scoped, not permanent.
+    #[test]
+    fn a_poll_round_started_after_the_doorbell_install_may_replace_it() {
+        let table = NameRouteTable::new();
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden",
+            )],
+            HolderLiveness::Serving,
+            "bafy-fresh".to_string(),
+            1_000,
+        );
+        table.replace_all_at(
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden-v2",
+            )],
+            HashMap::from([("gamma-elohim-host".to_string(), HolderLiveness::Serving)]),
+            HashMap::from([("gamma-elohim-host".to_string(), "bafy-newer".to_string())]),
+            1_005, // fetch_started — AFTER the doorbell install at 1_000
+        );
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-newer")
+        );
+        assert!(table
+            .holders_for(&RouteKey::path_only("/garden-v2"), "self")
+            .iter()
+            .any(|h| h.doorway_id == "gamma-elohim-host"));
+    }
+
+    /// Same-second collision: both clocks are whole seconds, so a doorbell
+    /// install stamped in the SAME second a poll round started is protected
+    /// — the guard errs toward the doorbell-fresh row, never the poll's.
+    #[test]
+    fn a_poll_round_started_in_the_same_second_as_the_doorbell_install_cannot_replace_it() {
+        let table = NameRouteTable::new();
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden",
+            )],
+            HolderLiveness::Serving,
+            "bafy-fresh".to_string(),
+            1_000,
+        );
+        table.replace_all_at(
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/stale-batch",
+            )],
+            HashMap::from([("gamma-elohim-host".to_string(), HolderLiveness::Uncertain)]),
+            HashMap::from([("gamma-elohim-host".to_string(), "bafy-stale".to_string())]),
+            1_000, // fetch_started — the SAME second as the doorbell install
+        );
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-fresh"),
+            "a same-second poll must not overwrite the doorbell-fresh digest"
+        );
+        assert!(table
+            .holders_for(&RouteKey::path_only("/stale-batch"), "self")
+            .is_empty());
+    }
+
+    #[test]
+    fn held_digest_is_none_for_a_holder_never_installed() {
+        let table = NameRouteTable::new();
+        assert_eq!(table.held_digest("never-seen"), None);
     }
 }

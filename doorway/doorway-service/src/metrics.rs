@@ -440,6 +440,24 @@ lazy_static! {
         "Name-route holders currently demoted by their own declared shed window.",
     )
     .unwrap();
+
+    // ── Doorbell (story 4.2 slice 1) ───────────────────────────────────────────
+    //
+    // One counter, two axes: `side` (ring = sender outbound, receive =
+    // receiver inbound) and `outcome` (the closed vocabulary in
+    // `services::federation_doorbell`). C8 observability from the slice-1
+    // design's concern canon.
+
+    /// Doorbell ring/receive events, by side and outcome. See
+    /// `services::federation_doorbell::{SIDE_RING, SIDE_RECEIVE, ALL_OUTCOMES}`.
+    pub static ref DOORWAY_FEDERATION_DOORBELL_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_federation_doorbell_total",
+            "Doorbell ring/receive events, by side (ring|receive) and outcome.",
+        ),
+        &["side", "outcome"],
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -767,6 +785,23 @@ pub fn register_all() {
         // A doorway with no live demotion must read as a MEASURED zero, not an
         // absent gauge — same discipline as every other pre-touched series.
         NAME_ROUTE_HOLDERS_DEMOTED.set(0);
+        let _ = REGISTRY.register(Box::new(DOORWAY_FEDERATION_DOORBELL_TOTAL.clone()));
+        // Pre-touch the full closed `outcome` vocabulary on both sides — same
+        // zero-with-a-series discipline as every label-bearing collector here.
+        // Some (side, outcome) pairs never legitimately co-occur (e.g. `ring`
+        // + `installed`); pre-touching them anyway is a handful of always-zero
+        // series, a far cheaper cost than the `doorway_conductor_close_code_
+        // total` absent-series trap this file has already paid for once.
+        for side in [
+            crate::services::federation_doorbell::SIDE_RING,
+            crate::services::federation_doorbell::SIDE_RECEIVE,
+        ] {
+            for outcome in crate::services::federation_doorbell::ALL_OUTCOMES {
+                DOORWAY_FEDERATION_DOORBELL_TOTAL
+                    .with_label_values(&[side, outcome])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(SSR_RENDER_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(SSR_RENDER_INFLIGHT.clone()));
         // Pre-touch the closed outcome vocabulary. A label-bearing collector
@@ -1054,6 +1089,15 @@ pub fn inc_holder_demoted(reason: &str) {
 /// own to hang a counter increment on.
 pub fn set_holders_demoted(n: i64) {
     NAME_ROUTE_HOLDERS_DEMOTED.set(n);
+}
+
+/// Story 4.2 slice 1: record one doorbell event. `side` is
+/// `services::federation_doorbell::{SIDE_RING, SIDE_RECEIVE}`; `outcome` is
+/// one of `services::federation_doorbell::ALL_OUTCOMES`.
+pub fn record_doorbell(side: &str, outcome: &str) {
+    DOORWAY_FEDERATION_DOORBELL_TOTAL
+        .with_label_values(&[side, outcome])
+        .inc();
 }
 
 #[cfg(test)]

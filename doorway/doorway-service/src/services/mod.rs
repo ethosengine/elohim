@@ -34,6 +34,7 @@ pub mod did_resolver;
 pub mod discovery;
 pub mod elohim_verifier;
 pub mod federation;
+pub mod federation_doorbell;
 pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;

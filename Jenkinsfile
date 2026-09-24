@@ -842,6 +842,8 @@ spec:
     }
 
     options {
+        // Own budget; the orchestrator sums it (genesis/orchestrator/pipeline-budget.test.mjs).
+        timeout(time: 180, unit: 'MINUTES')
         // Skip default checkout - it uses sparse checkout with 0% files
         // We do explicit full checkout in the Checkout stage
         skipDefaultCheckout(true)

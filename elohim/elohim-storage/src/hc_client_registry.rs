@@ -149,6 +149,260 @@ pub const CROSS_CELL_ROLES: [&str; 1] = [crate::hc_client::MISHPAT_ROLE];
 /// brace and holds even if this ever becomes more than one driver.
 pub const CROSS_CELL_DRIVER_ROLE: &str = "lamad";
 
+/// One tick's reading of a role: the classified state, the status evidence it
+/// was classified with, and the SUCCESS ORDER it was classified against.
+///
+/// The third field is what makes the decision revocable. A classification is a
+/// statement about a moment; between that moment and the action a zome call can
+/// return, and then the whole plan is about a world that no longer exists.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TickObservation {
+    pub state: crate::conductor_bridge_health::RoleCellState,
+    pub enable: crate::conductor_bridge_health::AppEnableEvidence,
+    pub classified_from_success_seq: u64,
+}
+
+/// What one supervisor tick does about a role observed NOT RUNNING.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotRunningAction {
+    /// Spend a ladder rung on BOTH: `enable_app` (unless this is a cross-cell
+    /// role, which has no app of its own), then the read-only cell probe.
+    SpendRungEnableAndProbe,
+    /// Spend a ladder rung on the PROBE ONLY. `enable_app` provably cannot act
+    /// (the app is already Enabled, or its status is one the conductor refuses
+    /// to enable) but membership has NOT proven the cell absent — so the probe
+    /// is still the only recovery evidence a quiet role has, and withholding it
+    /// would leave such a role red for the life of the process.
+    SpendRungProbeOnly,
+    /// The ladder window is shut. Nothing is asked this tick.
+    WaitForWindow,
+    /// Probe the cell NOW, off the ladder — membership says it is running, so
+    /// this is the moment the episode can actually be closed.
+    ProbeNow,
+    /// Keep observing and ask nothing: membership PROVES the cell absent (so a
+    /// probe would fail by construction) and the app-status evidence proves
+    /// `enable_app` cannot act.
+    ObserveOnly,
+}
+
+impl NotRunningAction {
+    /// Does this action consume a ladder rung?
+    pub fn spends_a_rung(self) -> bool {
+        matches!(
+            self,
+            NotRunningAction::SpendRungEnableAndProbe | NotRunningAction::SpendRungProbeOnly
+        )
+    }
+}
+
+/// The whole tick decision, as a pure function of three independent inputs.
+///
+/// Extracted so the policy is a unit test with no conductor, no websocket and
+/// no `HcClient`; [`execute_not_running_action`] is the executor, and its own
+/// tests drive it through an injected actuator so a corrupted production arm
+/// cannot stay green.
+///
+/// **The mutation is decided by `enable` ALONE, independently of membership.**
+/// That ordering is the fix for the case where `ping()` had just observed
+/// `Enabled` and the first membership read failed: folding the status into
+/// `MembershipUnknown` discarded the one piece of evidence that settles the
+/// question, and the tick spent a rung calling the fork's proven no-op.
+/// Membership only adds two refinements on top — probe NOW when it says the
+/// cell is running, and skip the probe when it PROVES the cell absent.
+pub fn decide_not_running_action(
+    state: crate::conductor_bridge_health::RoleCellState,
+    enable: crate::conductor_bridge_health::AppEnableEvidence,
+    ladder_window_open: bool,
+) -> NotRunningAction {
+    // Membership says the cell is in the running map: the probe is owed now,
+    // off the ladder, because this is the moment the episode can end.
+    if state.probe_is_owed_now() {
+        return NotRunningAction::ProbeNow;
+    }
+    // The MUTATION gate, decided by app-status evidence on its own.
+    if enable.enable_may_help() {
+        return if ladder_window_open {
+            NotRunningAction::SpendRungEnableAndProbe
+        } else {
+            NotRunningAction::WaitForWindow
+        };
+    }
+    // enable_app provably cannot act. Whether anything is still worth asking
+    // turns on whether membership PROVED the cell absent.
+    if state.membership_proves_absent() {
+        // A probe would fail by construction, so nothing is asked and NO rung
+        // is spent — the ladder stays clear for a relapse a rung can cure.
+        NotRunningAction::ObserveOnly
+    } else if ladder_window_open {
+        NotRunningAction::SpendRungProbeOnly
+    } else {
+        NotRunningAction::WaitForWindow
+    }
+}
+
+/// The two mutations a not-running tick can make, behind an interface.
+///
+/// Exists so [`execute_not_running_action`] is testable: the zero-rung
+/// assertion that matters is "production called neither `enable_app` nor the
+/// probe, and did not touch the ledger", and that is only assertable by
+/// executing the production branch against a recording double.
+#[async_trait::async_trait]
+pub(crate) trait NotRunningActuator: Send + Sync {
+    /// Ask the conductor to enable the app behind `role`, on ladder `attempt`.
+    async fn enable_app(&self, role: &str, attempt: u32);
+    /// Ask `role`'s own cell one read-only question.
+    async fn probe_cell(&self, role: &str);
+}
+
+/// What [`execute_not_running_action_at`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ActionOutcome {
+    /// The action ran (including the two that deliberately do nothing).
+    Executed,
+    /// ABORTED: a zome call RETURNED between the classification and the action,
+    /// so the decision was taken against a world that no longer exists.
+    Superseded { by_success_seq: u64 },
+}
+
+/// Execute one tick's decision. The ONLY place a rung is consumed or a
+/// conductor mutation is made on the not-running path.
+///
+/// `now` is the instant the rung is stamped at. Injected rather than read here
+/// because [`crate::services::enable_app_backoff::EnableLedger`] is keyed by
+/// `Instant`: a test that drives a synthetic clock through
+/// [`decide_not_running_action`] but let this function read the wall clock would
+/// be measuring the millisecond skew between the two, not the ladder policy.
+pub(crate) async fn execute_not_running_action_at(
+    action: NotRunningAction,
+    role: &str,
+    is_cross_cell: bool,
+    ledger: &crate::services::enable_app_backoff::EnableLedger,
+    actuator: &dyn NotRunningActuator,
+    now: std::time::Instant,
+    classified_from_success_seq: u64,
+) -> ActionOutcome {
+    // ONE GUARDED SECTION: RE-CHECK, THEN DEBIT.
+    //
+    // The decision above was taken from a snapshot. A zome call can RETURN
+    // between that snapshot and this line — and then the role is serving, the
+    // episode is over and the ladder has been cleared, while this task is still
+    // holding a plan to enable an app and probe a cell that already answered.
+    //
+    // The re-check and the rung debit are ONE acquisition of the publication
+    // guard, because two acquisitions leave a gap a success can land in: the
+    // check would pass, the success would clear the ladder, and the debit would
+    // then write a rung onto a role that is serving.
+    let observer = crate::conductor_bridge_health::role_bridge_health().for_role(role);
+    let spends_a_rung = action.spends_a_rung();
+    let debit = {
+        let _publishing = observer.publish_guard();
+        let current = observer.observe();
+        if current.last_success_seq > classified_from_success_seq {
+            crate::metrics::note_superseded_observation("tick-action");
+            tracing::debug!(
+                role,
+                action = ?action,
+                classified_from_success_seq,
+                now_success_seq = current.last_success_seq,
+                "not-running action ABORTED — a zome call returned after this tick classified; \
+                 the decision describes a world that has moved on"
+            );
+            return ActionOutcome::Superseded {
+                by_success_seq: current.last_success_seq,
+            };
+        }
+        if spends_a_rung {
+            let previous = ledger.record_for(role);
+            let token = ledger.note_attempt_at(role, now);
+            Some((token, previous))
+        } else {
+            None
+        }
+    };
+
+    match action {
+        NotRunningAction::ObserveOnly | NotRunningAction::WaitForWindow => {}
+        NotRunningAction::ProbeNow => actuator.probe_cell(role).await,
+        NotRunningAction::SpendRungEnableAndProbe | NotRunningAction::SpendRungProbeOnly => {
+            let (token, previous) = debit.expect("a rung-spending action debits in the guard");
+            let attempt = ledger.attempts(role);
+            // A cross-cell role (mishpat) is a CELL of the same installed app,
+            // so there is no app of its own to enable — the enable its siblings
+            // make is already the whole of that cure. Its rung buys the probe
+            // only, exactly as `SpendRungProbeOnly` does for a different reason.
+            if action == NotRunningAction::SpendRungEnableAndProbe && !is_cross_cell {
+                actuator.enable_app(role, attempt).await;
+            }
+
+            // THE RPC IS NOT CANCELLABLE, BUT THE RUNG IS RETRACTABLE.
+            //
+            // A zome call can land while the enable RPC is in flight — the one
+            // window the pre-dispatch re-check cannot close, because the RPC is
+            // an await and the guard is not held across it. The enable was then
+            // a no-op against an app that is serving, which costs nothing; but
+            // CHARGING THE LADDER for it would hand the next outage an
+            // inherited backoff window it did not earn. So the attempt is undone
+            // to exactly the record it replaced.
+            //
+            // Residual, stated precisely: ONE no-op enable RPC against an
+            // already-serving conductor, and NO rung. Closing that last RPC
+            // would mean holding the guard across a conductor round trip, which
+            // is the uncancellable-call trap this crate refuses everywhere else.
+            let after = {
+                let _publishing = observer.publish_guard();
+                let after = observer.observe();
+                if after.last_success_seq > classified_from_success_seq {
+                    // TOKEN-GATED: this removes THIS tick's attempt and nothing
+                    // else. If `record_role_success` cleared the ledger while
+                    // the RPC was in flight, the entry is gone, the token does
+                    // not match, and the recovery's reset STAYS — restoring the
+                    // pre-recovery history here is what handed a relapse a
+                    // seven-deep ladder and an hour-long window.
+                    ledger.retract_attempt(role, token, previous);
+                }
+                after
+            };
+            if after.last_success_seq > classified_from_success_seq {
+                crate::metrics::note_superseded_observation("tick-rung");
+                tracing::debug!(
+                    role,
+                    classified_from_success_seq,
+                    now_success_seq = after.last_success_seq,
+                    "enable RPC returned after a zome call LANDED — the rung is retracted so the \
+                     next outage does not inherit a backoff window this tick did not earn; the \
+                     RPC itself was a no-op against a serving app"
+                );
+                return ActionOutcome::Superseded {
+                    by_success_seq: after.last_success_seq,
+                };
+            }
+            actuator.probe_cell(role).await;
+        }
+    }
+    ActionOutcome::Executed
+}
+
+/// [`execute_not_running_action_at`] against the monotonic clock.
+pub(crate) async fn execute_not_running_action(
+    action: NotRunningAction,
+    role: &str,
+    is_cross_cell: bool,
+    ledger: &crate::services::enable_app_backoff::EnableLedger,
+    actuator: &dyn NotRunningActuator,
+    classified_from_success_seq: u64,
+) -> ActionOutcome {
+    execute_not_running_action_at(
+        action,
+        role,
+        is_cross_cell,
+        ledger,
+        actuator,
+        std::time::Instant::now(),
+        classified_from_success_seq,
+    )
+    .await
+}
+
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
 #[derive(Debug, Clone)]
@@ -464,11 +718,21 @@ impl HcClientRegistry {
     ///    which every neighbour warrants into a permanent cell block holochain
     ///    0.7 cannot lift. Checked FIRST, so a fenced role can never consume an
     ///    attempt slot or reach the admin socket.
-    /// 2. **The bounded ladder.** `enable_app` is an admin-plane write against
+    /// 2. **MEMBERSHIP — is `enable_app` even capable of helping?** (2026-09-22)
+    ///    `ListCellIds` names the conductor's running-cell map; joined with the
+    ///    app's persisted status it produces one
+    ///    [`crate::conductor_bridge_health::RoleCellState`]. Where that state is
+    ///    STRANDED (`installed-not-running-app-enabled`) the conductor's own
+    ///    source proves `enable_app` short-circuits without touching a cell, so
+    ///    NO rung is spent — the ladder is not "backed off", it is not entered.
+    ///    Where membership says the cell IS running, the probe is owed
+    ///    immediately instead. Every other state keeps the pre-existing cure
+    ///    byte-for-byte, because an absent observation is not a disproof.
+    /// 3. **The bounded ladder.** `enable_app` is an admin-plane write against
     ///    a conductor that is, by hypothesis, already unwell. One attempt per
     ///    [`crate::services::enable_app_backoff::enable_backoff`] window —
     ///    60s doubling to a 1h cap — never per 20s probe.
-    /// 3. **The conductor's own answer.** On refusal the error is logged
+    /// 4. **The conductor's own answer.** On refusal the error is logged
     ///    VERBATIM at WARN, because THAT error is the diagnosis of why the app
     ///    is disabled, which is the one fact the incident never produced.
     ///
@@ -514,24 +778,182 @@ impl HcClientRegistry {
             }
         }
 
+        // ASK THE CONDUCTOR WHICH CURE APPLIES, BEFORE SPENDING ONE.
+        //
+        // `ListCellIds` returns `running_cell_ids()` — the same map zome
+        // dispatch looks in — so it is the read that answers what `CellDisabled`
+        // actually asked. The app's persisted status decides the MUTATION on its
+        // own; membership refines whether and when the probe is owed.
+        let tick = Self::observe_and_publish_cell_state(role, hc).await;
         let ledger = crate::services::enable_app_backoff::enable_ledger();
-        if !ledger.should_attempt(role) {
-            return;
-        }
-        ledger.note_attempt(role);
-        let attempt = ledger.attempts(role);
+        let action =
+            decide_not_running_action(tick.state, tick.enable, ledger.should_attempt(role));
 
-        // A cross-cell role (mishpat) is a CELL of the same installed app, so
-        // there is no app of its own to enable — the enable its siblings make is
-        // already the whole of that cure. Its rung buys the probe only.
-        if !CROSS_CELL_ROLES.contains(&role) {
-            Self::ask_the_conductor_to_enable(inputs, role, hc, reason, attempt).await;
+        let actuator = SupervisorActuator { inputs, hc, reason };
+        execute_not_running_action(
+            action,
+            role,
+            CROSS_CELL_ROLES.contains(&role),
+            ledger,
+            &actuator,
+            tick.classified_from_success_seq,
+        )
+        .await;
+    }
+
+    /// Read membership, join it with the app-status evidence, PUBLISH the
+    /// resulting state, and hand both back so the caller can choose a cure.
+    ///
+    /// Called on EVERY supervisor tick for every role the client resolves, not
+    /// only inside a not-running verdict. That is the fix for the gauge that
+    /// stayed at `1` after a conductor restart: with publication gated on an
+    /// active `CellDisabled` episode, a role that went transport-dead and then
+    /// reconnected to an Enabled app whose cell was absent had nothing to
+    /// republish it, because no zome call had failed since the restart.
+    ///
+    /// The membership read is shared by
+    /// [`crate::services::cell_membership::MEMBERSHIP_REFRESH_INTERVAL`] and
+    /// single-flighted, so five supervisor tasks on a 20s tick still cost
+    /// roughly ONE admin round trip between them.
+    async fn observe_and_publish_cell_state(role: &str, hc: &Arc<HcClient>) -> TickObservation {
+        let admin = hc.admin_websocket();
+        Self::observe_and_publish_cell_state_from(
+            role,
+            &admin,
+            hc.cell_id_for_role(role),
+            crate::services::cell_membership::membership(),
+            crate::services::cell_membership::ObservedAt::now(),
+        )
+        .await
+    }
+
+    /// The whole of [`Self::observe_and_publish_cell_state`], with its three
+    /// conductor-bound dependencies passed in: the membership SOURCE, this
+    /// role's `CellId`, and the cache.
+    ///
+    /// Not a test shim — it is the function, and the wrapper above is four
+    /// lines of binding. The seam exists because the supervisor's publication
+    /// path (refresh → observation identity → contradiction gate → classify →
+    /// publish) was otherwise only reachable through a live conductor, so the
+    /// tests that claimed to cover it were driving the publisher by hand and
+    /// would have stayed green with the supervisor's call deleted.
+    ///
+    /// `at` carries BOTH clocks and is injected for the same reason the clock is
+    /// injected everywhere else in this pair of modules: a test that drove a
+    /// synthetic membership clock while this read the real one would be
+    /// measuring skew. Durations come off the monotonic half; the wall half only
+    /// renders.
+    pub(crate) async fn observe_and_publish_cell_state_from(
+        role: &str,
+        src: &dyn crate::services::cell_membership::RunningCellSource,
+        cell_id: Option<&holochain_client::CellId>,
+        cache: &crate::services::cell_membership::MembershipCache,
+        at: crate::services::cell_membership::ObservedAt,
+    ) -> TickObservation {
+        use crate::conductor_bridge_health as health;
+        cache.refresh_if_stale_at(src, at).await;
+
+        // THE OBSERVATION'S IDENTITY IS THE READING'S, NOT THIS MOMENT'S — and
+        // that identity is an ORDER, not a timestamp.
+        //
+        // A publication stamped `now` claims an observation it did not make.
+        // That substitution is how a CACHED absence, published a second after a
+        // zome call proved the cell alive, overwrote the recovery. Stamping it
+        // with the reading's epoch-ms fixed the ordinary case and left two:
+        // two observations inside one millisecond compare EQUAL (and the older
+        // one wins a strict `>`), and a backward clock step inverts the
+        // relation outright. So the answer carries a sequence from the one
+        // process-wide observation clock, and nothing here compares wall time.
+        let answer = match cell_id {
+            // A role whose `CellId` this client does not carry cannot be asked
+            // at all — `None`, which is `membership-unknown` and changes no
+            // mutation decision, because the mutation is the app status's call.
+            // It is still an observation made NOW, so it is stamped now.
+            None => crate::services::cell_membership::MembershipAnswer {
+                running: None,
+                at_ms: at.wall_ms,
+                seq: health::next_obs_seq(),
+            },
+            Some(cell_id) => cache.cell_running_observed_at(cell_id, at),
+        };
+
+        // ONE SNAPSHOT OF THE WHOLE RECORD, and classify from THAT.
+        //
+        // The previous cut read the evidence KIND and the evidence SEQUENCE
+        // with two separate loads. A success landing between them retired the
+        // status and restamped it, and the classifier then contradicted a
+        // membership reading with the pair `(EnableCanLift, <success seq>)` —
+        // a tuple no observation ever produced. `SeqCst` orders each load; it
+        // does not make two of them one read.
+        let observed = health::role_bridge_health().for_role(role).observe();
+        let mut enable = observed.enable;
+        let mut enable_seq = observed.enable_seq;
+        // A cross-cell role has no app of its own, so its app STATUS is the
+        // status of the app its driver role ALSO lives in. Reading the driver's
+        // evidence is not a guess: mishpat is a cell of that same installed app.
+        // Its snapshot is taken whole for the same reason.
+        if enable == health::AppEnableEvidence::Unknown && CROSS_CELL_ROLES.contains(&role) {
+            let driver = health::role_bridge_health()
+                .for_role(CROSS_CELL_DRIVER_ROLE)
+                .observe();
+            enable = driver.enable;
+            enable_seq = driver.enable_seq;
         }
 
-        // THEN one read-only question to the role's own cell, on this same rung.
-        // Awaited inline, so this task makes exactly one and cannot start a
-        // second before the first answers; the gate in `cell_probe` holds the
-        // same invariant against any other driver.
+        // NEWER STATUS EVIDENCE BEATS AN OLDER CACHED `true`.
+        //
+        // `disable_app` removes an app's cells and awaits their cleanup BEFORE
+        // it writes `Disabled`, so a not-Enabled status observed after a
+        // membership reading that said "running" proves that reading has
+        // stopped describing the conductor. Without this, the bounded case the
+        // review named stands: disable the app without closing its sockets, let
+        // every later `ListCellIds` fail, and the cached `true` answers
+        // `ProbeNow` — suppressing the enable until the authority window
+        // expires. The TTL bounds that; it does not cure it.
+        //
+        // Evidence older than a proven zome success cannot reach here: that
+        // success RETIRES it (`record_role_success` restamps the role
+        // `AlreadyEnabled` at the success's own sequence), so a role that is
+        // now `Live` can no longer be argued into `membership-unknown` by a
+        // `Disabled` answer the success has already outlived.
+        let membership = if health::status_contradicts_cached_membership(
+            answer.running,
+            answer.seq,
+            enable,
+            enable_seq,
+        ) {
+            info!(
+                role,
+                enable = enable.as_str(),
+                membership_seq = answer.seq,
+                enable_seq,
+                "a cached membership `running` was observed BEFORE an app status this conductor \
+                 reports as NOT enabled — a disable removes cells before it writes that status, \
+                 so the cached reading is no longer evidence. Treating membership as UNKNOWN \
+                 until a fresh ListCellIds lands, which keeps the enable ladder running."
+            );
+            None
+        } else {
+            answer.running
+        };
+
+        let state = health::classify_cell_state(membership, enable);
+        health::record_role_cell_state(role, state, membership, enable, answer.seq, answer.at_ms);
+        TickObservation {
+            state,
+            enable,
+            // The success order this classification was taken against. The
+            // executor compares it before spending anything, so a call that
+            // RETURNED between here and there aborts the action instead of
+            // enabling an app that is already serving.
+            classified_from_success_seq: observed.last_success_seq,
+        }
+    }
+
+    /// One read-only question to `role`'s own cell. Every bound on it lives in
+    /// [`crate::services::cell_probe`]; awaited inline, so this task makes
+    /// exactly one and cannot start a second before the first answers.
+    async fn probe_the_cell(role: &str, hc: &Arc<HcClient>) {
         let _ = crate::services::cell_probe::probe_cell(
             role,
             hc,
@@ -594,7 +1016,35 @@ impl HcClientRegistry {
             ),
         }
     }
+}
 
+/// The production [`NotRunningActuator`]: the real `enable_app` and the real
+/// cell probe, bound to one role's live client.
+struct SupervisorActuator<'a> {
+    inputs: &'a HcRegistryInputs,
+    hc: &'a Arc<HcClient>,
+    reason: &'a str,
+}
+
+#[async_trait::async_trait]
+impl NotRunningActuator for SupervisorActuator<'_> {
+    async fn enable_app(&self, role: &str, attempt: u32) {
+        HcClientRegistry::ask_the_conductor_to_enable(
+            self.inputs,
+            role,
+            self.hc,
+            self.reason,
+            attempt,
+        )
+        .await;
+    }
+
+    async fn probe_cell(&self, role: &str) {
+        HcClientRegistry::probe_the_cell(role, self.hc).await;
+    }
+}
+
+impl HcClientRegistry {
     pub fn spawn_bridge_supervisor(
         self: Arc<Self>,
         inputs: HcRegistryInputs,
@@ -622,6 +1072,20 @@ impl HcClientRegistry {
                         continue;
                     };
 
+                    // PUBLISH MEMBERSHIP EVERY TICK, whatever the verdict.
+                    //
+                    // Not gated on a not-running episode, and that is the point:
+                    // a role that went transport-dead and then reconnected to an
+                    // Enabled app whose cell is ABSENT produces no failing zome
+                    // call, so an episode-gated observer had nothing to lower the
+                    // gauge with and it stayed at the `1` a much earlier success
+                    // had published. The read is shared and single-flighted, so
+                    // publishing unconditionally costs no extra admin round trip.
+                    // The publish is the point; the verdict is re-derived below
+                    // with the FRESH app-status evidence `ping` is about to
+                    // produce, so nothing here is carried forward.
+                    let _tick = Self::observe_and_publish_cell_state(role, &hc).await;
+
                     // ADOPT THE ROLES WITH NO TASK OF THEIR OWN. `mishpat` is a
                     // cell of the same installed app reached through this
                     // client, so it has no slot and no supervisor loop — and
@@ -631,6 +1095,9 @@ impl HcClientRegistry {
                     // ladder rather than four tasks racing for the same rung.
                     if role == CROSS_CELL_DRIVER_ROLE {
                         for cross in CROSS_CELL_ROLES {
+                            // Same unconditional publish: a cross-cell role has
+                            // no task of its own, so this is its only tick.
+                            let _tick = Self::observe_and_publish_cell_state(cross, &hc).await;
                             if crate::conductor_bridge_health::role_is_not_running(cross) {
                                 Self::try_enable_disabled_app(
                                     &inputs,
@@ -701,6 +1168,14 @@ impl HcClientRegistry {
                     registry.set_client(role, None);
                     drop(hc);
                     crate::conductor_bridge_health::record_role_reconnect(role);
+                    // REVOKE the membership answer with the bridge that produced
+                    // it. The process on the far side may be a different one, and
+                    // a reading of the OLD conductor's running map decides nothing
+                    // about the new one's — believing it is how a stale `true`
+                    // could classify a genuinely-Disabled app as "membership
+                    // present" and suppress its enable ladder indefinitely.
+                    crate::services::cell_membership::membership()
+                        .invalidate(&format!("the {role} bridge died and is being re-minted"));
 
                     if let Some(fresh) =
                         Self::connect_role_forever(&inputs, role, reconnect_shutdown.subscribe())
@@ -897,5 +1372,954 @@ mod supervised_slot_tests {
         // test run — this test asserts the call succeeds without a
         // PolicyConfig, not the supervisor's steady-state probing behavior.
         let _ = shutdown_tx.send(());
+    }
+    // ---- the membership-informed tick decision (2026-09-22) ---------------
+
+    use crate::conductor_bridge_health::AppEnableEvidence;
+    use crate::services::enable_app_backoff::EnableLedger;
+
+    /// THE CURE, as its decision table.
+    ///
+    /// The MUTATION column is decided by the app-status evidence alone;
+    /// membership only adds probe-now (it says running) and observe-only (it
+    /// PROVES the cell absent, so a probe would fail by construction).
+    #[test]
+    fn the_tick_action_follows_the_status_evidence_and_membership_refines_it() {
+        use crate::conductor_bridge_health::RoleCellState::*;
+        use AppEnableEvidence::*;
+        use NotRunningAction::*;
+        let rows = [
+            // (state, enable evidence, ladder open) -> action
+            // Membership says RUNNING: probe now, whatever else is true.
+            (RunningRecoveryUnverified, AlreadyEnabled, false, ProbeNow),
+            (RunningRecoveryUnverified, EnableCanLift, true, ProbeNow),
+            (RunningRecoveryUnverified, Unknown, false, ProbeNow),
+            // enable CAN lift: the pre-existing ladder, unchanged.
+            (
+                InstalledNotRunningAppDisabled,
+                EnableCanLift,
+                true,
+                SpendRungEnableAndProbe,
+            ),
+            (
+                InstalledNotRunningAppDisabled,
+                EnableCanLift,
+                false,
+                WaitForWindow,
+            ),
+            (
+                MembershipUnknown,
+                EnableCanLift,
+                true,
+                SpendRungEnableAndProbe,
+            ),
+            (MembershipUnknown, EnableCanLift, false, WaitForWindow),
+            (MembershipUnknown, Unknown, true, SpendRungEnableAndProbe),
+            (
+                InstalledNotRunningStatusUnknown,
+                Unknown,
+                true,
+                SpendRungEnableAndProbe,
+            ),
+            // STRANDED: membership PROVES absent and enable is a no-op → nothing.
+            (
+                InstalledNotRunningAppEnabled,
+                AlreadyEnabled,
+                true,
+                ObserveOnly,
+            ),
+            (
+                InstalledNotRunningAppEnabled,
+                AlreadyEnabled,
+                false,
+                ObserveOnly,
+            ),
+            // enable REFUSED and membership proves absent → also nothing.
+            (
+                InstalledNotRunningAppDisabled,
+                EnableRefused,
+                true,
+                ObserveOnly,
+            ),
+            // enable cannot act but membership is NOT established: the probe is
+            // still the only recovery evidence a quiet role has, so it rides a
+            // rung rather than being withheld forever.
+            (MembershipUnknown, AlreadyEnabled, true, SpendRungProbeOnly),
+            (MembershipUnknown, EnableRefused, true, SpendRungProbeOnly),
+            (MembershipUnknown, AlreadyEnabled, false, WaitForWindow),
+        ];
+        for (state, enable, open, expected) in rows {
+            assert_eq!(
+                decide_not_running_action(state, enable, open),
+                expected,
+                "state={} enable={} ladder_open={open}",
+                state.as_str(),
+                enable.as_str()
+            );
+        }
+    }
+
+    /// F4's failing scenario, as its own test: `ping()` just observed `Enabled`
+    /// and the FIRST membership read failed. The status evidence must still
+    /// suppress the mutation — folding it into `membership-unknown` was how a
+    /// rung got spent on the fork's proven no-op.
+    #[test]
+    fn a_known_enabled_app_never_spends_a_rung_even_with_unknown_membership() {
+        use crate::conductor_bridge_health::RoleCellState;
+        let action = decide_not_running_action(
+            RoleCellState::MembershipUnknown,
+            AppEnableEvidence::AlreadyEnabled,
+            true,
+        );
+        assert_eq!(
+            action,
+            NotRunningAction::SpendRungProbeOnly,
+            "the rung buys the PROBE (the only recovery evidence a quiet role has) and \
+             emphatically not the enable"
+        );
+        assert!(action.spends_a_rung(), "a probe rung is still a rung");
+    }
+
+    /// And `AwaitingMemproofs` is the same story from the other side: not
+    /// Enabled, and still never enabled, because this pin rejects it outright.
+    #[test]
+    fn awaiting_memproofs_never_spends_an_enable() {
+        use crate::conductor_bridge_health::RoleCellState;
+        for state in [
+            RoleCellState::InstalledNotRunningAppDisabled,
+            RoleCellState::MembershipUnknown,
+        ] {
+            let action = decide_not_running_action(state, AppEnableEvidence::EnableRefused, true);
+            assert_ne!(
+                action,
+                NotRunningAction::SpendRungEnableAndProbe,
+                "{}: the conductor REFUSES to enable this status",
+                state.as_str()
+            );
+        }
+    }
+
+    /// The genuinely-disabled case's ladder is UNCHANGED by this cure: one
+    /// attempt then 60s → 120 → 240, exactly as `enable_app_backoff` pins it.
+    #[test]
+    fn a_genuinely_disabled_role_keeps_the_existing_ladder() {
+        use crate::conductor_bridge_health::RoleCellState;
+        let ledger = EnableLedger::new();
+        let mut now = std::time::Instant::now();
+
+        let mut windows = Vec::new();
+        for _ in 0..3 {
+            assert_eq!(
+                decide_not_running_action(
+                    RoleCellState::InstalledNotRunningAppDisabled,
+                    AppEnableEvidence::EnableCanLift,
+                    ledger.should_attempt_at("lamad", now),
+                ),
+                NotRunningAction::SpendRungEnableAndProbe,
+                "the window is open, so the rung is spent"
+            );
+            ledger.note_attempt_at("lamad", now);
+            let window =
+                crate::services::enable_app_backoff::enable_backoff(ledger.attempts("lamad"));
+            windows.push(window.as_secs());
+
+            // Every 20s probe inside the window is refused, as before.
+            let mut probe_at = now + BRIDGE_PROBE_INTERVAL;
+            while probe_at < now + window {
+                assert_eq!(
+                    decide_not_running_action(
+                        RoleCellState::InstalledNotRunningAppDisabled,
+                        AppEnableEvidence::EnableCanLift,
+                        ledger.should_attempt_at("lamad", probe_at),
+                    ),
+                    NotRunningAction::WaitForWindow
+                );
+                probe_at += BRIDGE_PROBE_INTERVAL;
+            }
+            now += window;
+        }
+        assert_eq!(
+            windows,
+            vec![60, 120, 240],
+            "the pre-existing ladder, untouched by the membership join"
+        );
+    }
+
+    // ---- F7: the EXECUTOR, driven through an injected actuator -------------
+
+    /// Records what production actually asked the conductor to do.
+    #[derive(Default)]
+    struct RecordingActuator {
+        enables: std::sync::Mutex<Vec<(String, u32)>>,
+        probes: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl RecordingActuator {
+        fn enable_calls(&self) -> Vec<(String, u32)> {
+            self.enables
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone()
+        }
+        fn probe_calls(&self) -> Vec<String> {
+            self.probes
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl NotRunningActuator for RecordingActuator {
+        async fn enable_app(&self, role: &str, attempt: u32) {
+            self.enables
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((role.to_string(), attempt));
+        }
+        async fn probe_cell(&self, role: &str) {
+            self.probes
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(role.to_string());
+        }
+    }
+
+    /// NEW-2's action half: a success landing between the classification and the
+    /// action ABORTS the action, rather than enabling an app that is serving.
+    ///
+    /// A decision is a statement about a moment. The tick classifies from a
+    /// snapshot, and between that snapshot and the actuator a zome call can
+    /// RETURN — at which point the role is serving, the episode is over and the
+    /// ladder has been cleared, while this task still holds a plan to enable and
+    /// probe. One coherent re-read under the record's lock settles it.
+    #[tokio::test]
+    async fn an_action_classified_before_a_success_is_aborted() {
+        use crate::conductor_bridge_health::{record_role_success, role_bridge_health};
+        const ROLE: &str = "test-action-aborted-by-later-success";
+        let ledger = EnableLedger::new();
+
+        // The tick classifies while nothing has succeeded…
+        let classified_from = role_bridge_health()
+            .for_role(ROLE)
+            .observe()
+            .last_success_seq;
+        // …and a zome call RETURNS before the action runs.
+        record_role_success(ROLE);
+
+        let actuator = RecordingActuator::default();
+        let outcome = execute_not_running_action_at(
+            NotRunningAction::SpendRungEnableAndProbe,
+            ROLE,
+            false,
+            &ledger,
+            &actuator,
+            std::time::Instant::now(),
+            classified_from,
+        )
+        .await;
+
+        assert!(
+            matches!(outcome, ActionOutcome::Superseded { .. }),
+            "the plan describes a world that has moved on: {outcome:?}"
+        );
+        assert_eq!(ledger.attempts(ROLE), 0, "no rung was spent");
+        assert!(
+            actuator.enable_calls().is_empty(),
+            "and the conductor was not asked to enable an app that is serving"
+        );
+        assert!(actuator.probe_calls().is_empty());
+
+        // The SAME action, classified from the current world, runs normally.
+        let now_seq = role_bridge_health()
+            .for_role(ROLE)
+            .observe()
+            .last_success_seq;
+        let outcome = execute_not_running_action_at(
+            NotRunningAction::SpendRungEnableAndProbe,
+            ROLE,
+            false,
+            &ledger,
+            &actuator,
+            std::time::Instant::now(),
+            now_seq,
+        )
+        .await;
+        assert_eq!(outcome, ActionOutcome::Executed);
+        assert_eq!(ledger.attempts(ROLE), 1);
+        assert_eq!(actuator.enable_calls().len(), 1);
+    }
+
+    /// ITEM 3: a success landing while the enable RPC is IN FLIGHT retracts the
+    /// rung.
+    ///
+    /// The pre-dispatch re-check cannot close this window — the RPC is an await
+    /// and the guard is not held across it. So the ledger entry is captured
+    /// under the guard before the attempt and restored after, and the residual
+    /// is stated exactly: one no-op enable RPC against an already-serving
+    /// conductor, and NO rung.
+    #[tokio::test]
+    async fn a_success_landing_during_the_enable_rpc_retracts_the_rung() {
+        use crate::conductor_bridge_health::record_role_success;
+        const ROLE: &str = "test-rung-retracted-when-success-lands-mid-rpc";
+        // Recovery and executor must use the SAME ledger, as production does.
+        // An empty local ledger hid resurrection of six pre-recovery attempts.
+        let ledger = crate::services::enable_app_backoff::enable_ledger();
+        let now = std::time::Instant::now();
+        for _ in 0..6 {
+            ledger.note_attempt_at(ROLE, now - std::time::Duration::from_secs(7_200));
+        }
+        const SIBLING: &str = "test-rung-retraction-unrelated-role";
+        ledger.note_attempt_at(SIBLING, now);
+        let sibling_record = ledger.record_for(SIBLING);
+
+        /// An actuator whose `enable_app` lands a zome-call success while the
+        /// RPC is still in flight — the schedule the re-check cannot see.
+        struct SuccessDuringRpc {
+            inner: RecordingActuator,
+        }
+        #[async_trait::async_trait]
+        impl NotRunningActuator for SuccessDuringRpc {
+            async fn enable_app(&self, role: &str, attempt: u32) {
+                self.inner.enable_app(role, attempt).await;
+                // …and the call returns while we are still awaiting.
+                record_role_success(role);
+            }
+            async fn probe_cell(&self, role: &str) {
+                self.inner.probe_cell(role).await;
+            }
+        }
+
+        let classified_from = crate::conductor_bridge_health::role_bridge_health()
+            .for_role(ROLE)
+            .observe()
+            .last_success_seq;
+        let actuator = SuccessDuringRpc {
+            inner: RecordingActuator::default(),
+        };
+        let outcome = execute_not_running_action_at(
+            NotRunningAction::SpendRungEnableAndProbe,
+            ROLE,
+            false,
+            ledger,
+            &actuator,
+            std::time::Instant::now(),
+            classified_from,
+        )
+        .await;
+
+        assert!(
+            matches!(outcome, ActionOutcome::Superseded { .. }),
+            "the tick is superseded by the call that landed: {outcome:?}"
+        );
+        assert_eq!(
+            ledger.attempts(ROLE),
+            0,
+            "THE RUNG IS RETRACTED — charging the ladder for a no-op enable would hand the next \
+             outage a backoff window this tick did not earn"
+        );
+        assert_eq!(ledger.record_for(SIBLING), sibling_record);
+        ledger.note_attempt_at(ROLE, now);
+        assert_eq!(ledger.attempts(ROLE), 1, "a relapse starts a fresh ladder");
+        assert!(ledger.should_attempt_at(ROLE, now + std::time::Duration::from_secs(60)));
+        ledger.note_running(ROLE);
+        ledger.note_running(SIBLING);
+        assert!(
+            ledger.should_attempt_at(ROLE, std::time::Instant::now()),
+            "and the ladder is CLEAR, not merely backed off"
+        );
+        // The stated residual: the RPC itself did happen, exactly once.
+        assert_eq!(
+            actuator.inner.enable_calls().len(),
+            1,
+            "one no-op enable RPC against a serving app is the residual, and it is bounded"
+        );
+        assert!(
+            actuator.inner.probe_calls().is_empty(),
+            "and nothing further was asked of a role that is already serving"
+        );
+    }
+
+    /// THE ZERO-RUNG ASSERTION, on the production branch.
+    ///
+    /// The earlier version of this test called only the pure decision function,
+    /// so corrupting the `ObserveOnly` arm to increment the ledger or call
+    /// `enable_app` could not have failed it. This drives the real executor.
+    #[tokio::test]
+    async fn observe_only_calls_nothing_and_touches_no_ledger() {
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        for tick in 0..30 {
+            execute_not_running_action(
+                NotRunningAction::ObserveOnly,
+                "lamad",
+                false,
+                &ledger,
+                &actuator,
+                u64::MAX,
+            )
+            .await;
+            assert_eq!(
+                ledger.attempts("lamad"),
+                0,
+                "tick {tick}: ObserveOnly must not advance the ladder"
+            );
+        }
+        assert!(
+            actuator.enable_calls().is_empty(),
+            "ObserveOnly called enable_app: {:?}",
+            actuator.enable_calls()
+        );
+        assert!(
+            actuator.probe_calls().is_empty(),
+            "ObserveOnly probed a cell membership PROVED absent: {:?}",
+            actuator.probe_calls()
+        );
+        assert!(
+            ledger.should_attempt_at("lamad", std::time::Instant::now()),
+            "and the ladder is CLEAR, not merely backed off"
+        );
+    }
+
+    /// `WaitForWindow` is the OTHER no-op, and it must be distinguishable: it
+    /// also asks nothing, but it means the ladder was entered and is backing off.
+    #[tokio::test]
+    async fn wait_for_window_calls_nothing_either() {
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        execute_not_running_action(
+            NotRunningAction::WaitForWindow,
+            "lamad",
+            false,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(ledger.attempts("lamad"), 0);
+        assert!(actuator.enable_calls().is_empty());
+        assert!(actuator.probe_calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn spend_rung_enable_and_probe_calls_both_and_advances_the_ladder() {
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        execute_not_running_action(
+            NotRunningAction::SpendRungEnableAndProbe,
+            "lamad",
+            false,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(ledger.attempts("lamad"), 1, "the rung was spent");
+        assert_eq!(actuator.enable_calls(), vec![("lamad".to_string(), 1)]);
+        assert_eq!(actuator.probe_calls(), vec!["lamad".to_string()]);
+
+        // A second rung carries the incremented attempt number.
+        execute_not_running_action(
+            NotRunningAction::SpendRungEnableAndProbe,
+            "lamad",
+            false,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(
+            actuator.enable_calls(),
+            vec![("lamad".to_string(), 1), ("lamad".to_string(), 2)]
+        );
+    }
+
+    /// A cross-cell role has no app of its own, so its rung buys the probe only
+    /// — asserted as a CALL, not as a comment.
+    #[tokio::test]
+    async fn a_cross_cell_rung_buys_the_probe_and_never_an_enable() {
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        execute_not_running_action(
+            NotRunningAction::SpendRungEnableAndProbe,
+            crate::hc_client::MISHPAT_ROLE,
+            true,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(ledger.attempts(crate::hc_client::MISHPAT_ROLE), 1);
+        assert!(
+            actuator.enable_calls().is_empty(),
+            "mishpat is a CELL of another app — there is no app of its own to enable"
+        );
+        assert_eq!(
+            actuator.probe_calls(),
+            vec![crate::hc_client::MISHPAT_ROLE.to_string()]
+        );
+    }
+
+    /// `SpendRungProbeOnly` spends a rung and calls the probe, and NEVER the
+    /// enable — that is the whole reason the variant exists.
+    #[tokio::test]
+    async fn spend_rung_probe_only_never_calls_enable() {
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        execute_not_running_action(
+            NotRunningAction::SpendRungProbeOnly,
+            "imagodei",
+            false,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(
+            ledger.attempts("imagodei"),
+            1,
+            "a probe rung is still a rung"
+        );
+        assert!(
+            actuator.enable_calls().is_empty(),
+            "the app is already Enabled (or refuses enabling) — enable_app is a proven no-op"
+        );
+        assert_eq!(actuator.probe_calls(), vec!["imagodei".to_string()]);
+    }
+
+    /// `ProbeNow` probes OFF the ladder: no rung, whatever the ladder has
+    /// climbed to. Making this wait for a rung is how a recovered quiet role sat
+    /// red for up to an hour at the cap.
+    #[tokio::test]
+    async fn probe_now_probes_off_the_ladder() {
+        let ledger = EnableLedger::new();
+        let t0 = std::time::Instant::now();
+        // Climb to the cap so the ladder is as shut as it ever gets.
+        for step in 0..8 {
+            ledger.note_attempt_at(
+                "imagodei",
+                t0 + std::time::Duration::from_secs(step * 4_000),
+            );
+        }
+        let last_attempt = t0 + std::time::Duration::from_secs(7 * 4_000);
+        let now = last_attempt + BRIDGE_PROBE_INTERVAL;
+        assert_eq!(
+            crate::services::enable_app_backoff::enable_backoff(ledger.attempts("imagodei")),
+            crate::services::enable_app_backoff::ENABLE_BACKOFF_CAP,
+            "precondition: eight attempts put the ladder at its 1h cap"
+        );
+        assert!(
+            !ledger.should_attempt_at("imagodei", now),
+            "precondition: 20s after the last attempt, the 1h window is shut"
+        );
+
+        let before = ledger.attempts("imagodei");
+        let actuator = RecordingActuator::default();
+        execute_not_running_action(
+            NotRunningAction::ProbeNow,
+            "imagodei",
+            false,
+            &ledger,
+            &actuator,
+            // No success can outrank this: the executor's supersession
+            // re-check is exercised by its own test, and these pin the ACTIONS.
+            u64::MAX,
+        )
+        .await;
+        assert_eq!(
+            ledger.attempts("imagodei"),
+            before,
+            "ProbeNow must not consume a rung"
+        );
+        assert!(actuator.enable_calls().is_empty());
+        assert_eq!(actuator.probe_calls(), vec!["imagodei".to_string()]);
+    }
+
+    // ---- F1 / the integration sequence: driven through the real cache -------
+
+    /// A cell id for a role under test.
+    fn registry_test_cell(seed: u8) -> holochain_client::CellId {
+        use holochain_types::prelude::{AgentPubKey, DnaHash};
+        holochain_client::CellId::new(
+            DnaHash::from_raw_32(vec![seed; 32]),
+            AgentPubKey::from_raw_32(vec![seed.wrapping_add(19); 32]),
+        )
+    }
+
+    /// F1's failing scenario, driven through the REAL cache: a successful
+    /// membership read, then a conductor restart that RE-MINTS the bridge (the
+    /// production `invalidate` call), then repeated `ListCellIds` failures.
+    ///
+    /// The ladder MUST still progress. Before the authority window a stale
+    /// `Some(true)` classified this as "membership present" and answered
+    /// `ProbeNow` forever without ever enabling. Nothing here hands the
+    /// classifier a literal `None`: every membership answer comes out of
+    /// `MembershipCache` after real revocation and real failed reads.
+    #[tokio::test]
+    async fn a_restart_with_a_disabled_app_and_unreadable_membership_still_ladders() {
+        use crate::conductor_bridge_health::{classify_cell_state, RoleCellState};
+        use crate::services::cell_membership::{
+            fake::FakeAdmin, MembershipCache, RefreshOutcome, MEMBERSHIP_AUTHORITY_TTL,
+        };
+        const ROLE: &str = "test-restart-disabled-unreadable-ladders";
+
+        let cell = registry_test_cell(61);
+        let cache = MembershipCache::new();
+        let admin = FakeAdmin::new(Ok(vec![cell.clone()]));
+        let base: u64 = 1_700_000_000_000;
+
+        // BEFORE the restart: a real read says the cell IS running.
+        assert_eq!(
+            cache.refresh_if_stale_at(&admin, base.into()).await,
+            RefreshOutcome::Read { running: 1 }
+        );
+        assert_eq!(cache.cell_running_at(&cell, base.into()), Some(true));
+
+        // The conductor restarts; the supervisor clears the handle and revokes
+        // the reading with the bridge that produced it.
+        cache.invalidate_at(
+            base + 1_000,
+            "the bridge died and is being re-minted (test)",
+        );
+        // The app comes back genuinely Disabled, so every later membership read
+        // fails against a conductor whose cells never joined.
+        admin.set_tail(Err("ListCellIds failed: K2SpaceNotFound".to_string()));
+
+        let ledger = EnableLedger::new();
+        let actuator = RecordingActuator::default();
+        let mut mono = std::time::Instant::now();
+        let mut wall = base + 1_000;
+        let mut windows = Vec::new();
+        // Nothing has ever succeeded on this role, so no success can outrank
+        // the classification; the supersession re-check has its own test.
+
+        for rung in 0..3 {
+            wall += 20_000;
+            let outcome = cache.refresh_if_stale_at(&admin, wall.into()).await;
+            assert!(
+                matches!(outcome, RefreshOutcome::Failed { .. }),
+                "rung {rung}: the membership read really is failing, got {outcome:?}"
+            );
+            let membership = cache.cell_running_at(&cell, wall.into());
+            assert_eq!(
+                membership, None,
+                "rung {rung}: a revoked reading decides nothing — this is where the stale true was"
+            );
+            let state = classify_cell_state(membership, AppEnableEvidence::EnableCanLift);
+            assert_eq!(state, RoleCellState::MembershipUnknown);
+
+            let action = decide_not_running_action(
+                state,
+                AppEnableEvidence::EnableCanLift,
+                ledger.should_attempt_at(ROLE, mono),
+            );
+            assert_eq!(
+                action,
+                NotRunningAction::SpendRungEnableAndProbe,
+                "rung {rung}: the app is Disabled and enable_app lifts it — an unreadable \
+                 membership must not disable the cure"
+            );
+            // Stamp the rung at the SAME synthetic instant the decision read.
+            execute_not_running_action_at(action, ROLE, false, &ledger, &actuator, mono, u64::MAX)
+                .await;
+            let window = crate::services::enable_app_backoff::enable_backoff(ledger.attempts(ROLE));
+            windows.push(window.as_secs());
+            mono += window;
+        }
+        assert_eq!(
+            windows,
+            vec![60, 120, 240],
+            "the ladder PROGRESSES rather than being pinned by a stale membership true"
+        );
+        assert_eq!(
+            actuator.enable_calls().len(),
+            3,
+            "three real enable_app attempts: {:?}",
+            actuator.enable_calls()
+        );
+
+        // The OTHER way authority is lost — plain expiry, no re-mint — reaches
+        // the same decision. A read succeeds, then nothing refreshes it.
+        let fresh = MembershipCache::new();
+        let quiet = FakeAdmin::new(Ok(vec![cell.clone()]));
+        fresh.refresh_if_stale_at(&quiet, base.into()).await;
+        let expired = base + MEMBERSHIP_AUTHORITY_TTL.as_millis() as u64;
+        assert_eq!(fresh.cell_running_at(&cell, expired.into()), None);
+        assert_eq!(
+            decide_not_running_action(
+                classify_cell_state(
+                    fresh.cell_running_at(&cell, expired.into()),
+                    AppEnableEvidence::EnableCanLift
+                ),
+                AppEnableEvidence::EnableCanLift,
+                true,
+            ),
+            NotRunningAction::SpendRungEnableAndProbe,
+            "an EXPIRED reading must not disable the cure either"
+        );
+    }
+
+    /// THE FLEET SEQUENCE, END TO END IN ONE PROCESS.
+    ///
+    /// successful membership → conductor restart (bridge re-mint invalidates the
+    /// reading) → persisted Disabled app → repeated `ListCellIds` failures →
+    /// real enable progression observed on the recording actuator → a zome call
+    /// that RETURNS → gauges correct → and the recovered, QUIET role keeps a
+    /// cleared state family on its next tick.
+    ///
+    /// ## EXACTLY WHAT THIS TEST DOES NOT COVER
+    ///
+    /// Stated as a list rather than a disclaimer, because "deleting those
+    /// production connections can leave this test green" is a true and useful
+    /// thing to know about it:
+    ///
+    /// 1. **Supervisor scheduling** — `spawn_bridge_supervisor`'s per-role
+    ///    `tokio::spawn` loop, its `select!` on `BRIDGE_PROBE_INTERVAL` vs
+    ///    shutdown, and the `role == CROSS_CELL_DRIVER_ROLE` adoption of
+    ///    `mishpat`. Here the ticks are a `for` loop.
+    /// 2. **`ping()` classification** — the three-way
+    ///    `Running` / `NotRunning` / `Err` triage that decides between the
+    ///    ladder, `enable_app` and a full bridge re-mint.
+    /// 3. **Reconnect / invalidation wiring** — `registry.set_client(role,
+    ///    None)`, `record_role_reconnect`, `membership().invalidate(...)` and
+    ///    `connect_role_forever`. This test calls the cache's `invalidate_at`
+    ///    directly; it does not prove the loop calls it.
+    /// 4. **`SupervisorActuator`** — the production actuator. This drives
+    ///    `RecordingActuator`, so the real `enable_app` RPC and the real
+    ///    `cell_probe::probe_cell` are not exercised.
+    /// 5. **A probe result reaching the success hook** — the probe's zome call
+    ///    returning and landing in `record_role_success`. Here
+    ///    `record_role_success` is called directly.
+    ///
+    /// Stated the other way round, as the r4 review put it: this test **cannot
+    /// detect** the deletion of supervisor scheduling, of `ping()`
+    /// classification, of the reconnect/invalidation wiring, of
+    /// `SupervisorActuator`'s real RPCs, or of probe-result delivery to the
+    /// success hook. The conductor transitions are SUPPLIED here (the fake's
+    /// answer is changed by the test) and the successful call is a direct hook
+    /// call — so neither this test nor the doorway scenario demonstrates actual
+    /// fleet recovery through the affected workers. What it does pin is the
+    /// decision spine between those points.
+    ///
+    /// ## Why the cheap seam was NOT taken
+    ///
+    /// Driving the loop in-process needs the registry to be able to HOLD a fake,
+    /// i.e. `Arc<dyn HcClientLike>` in the slots rather than `Arc<HcClient>`.
+    /// Measured on this tree: `Arc<HcClient>` appears **149 times across 38
+    /// files**, with **59** call sites on the registry's own accessors
+    /// (`lamad_client()`, `imagodei_client()`, `client(role)`), and every one of
+    /// them calls concrete inherent methods (`call_zome`, `cell_id`,
+    /// `dna_hash`, `mishpat_cell_id`). The loop also reaches
+    /// `cell_probe::probe_cell(role, &HcClient, gate)` and
+    /// `admin_websocket() -> holochain_client::AdminWebsocket`, so the trait
+    /// would need a second trait behind it for `enable_app`. That is an order of
+    /// magnitude past the ~150-line budget this was weighed against, and it
+    /// would be a refactor of the crate's conductor handle rather than a test
+    /// seam — so it is NOT done here, deliberately, and the five items above
+    /// stay a2o territory
+    /// (`features/doorway/peer-conductor-connection-resilience.feature`).
+    ///
+    /// EVERYTHING BETWEEN those points is production code driven here: the
+    /// membership cache, the publication path
+    /// (`observe_and_publish_cell_state_from`, which the loop calls directly),
+    /// the contradiction gate, the decision (`decide_not_running_action`), the
+    /// executor (`execute_not_running_action_at`) and the recovery fold
+    /// (`record_role_success`).
+    #[tokio::test]
+    async fn the_whole_restart_to_recovery_sequence_on_one_role() {
+        use crate::conductor_bridge_health::{
+            self as health, AppRunObservation, RoleCellState, ROLE_CELL_STATES,
+        };
+        use crate::services::cell_membership::{fake::FakeAdmin, MembershipCache};
+        const ROLE: &str = "test-integration-restart-to-recovery";
+
+        let cell = registry_test_cell(71);
+        let sibling = registry_test_cell(72);
+        let cache = MembershipCache::new();
+        let admin = FakeAdmin::new(Ok(vec![cell.clone(), sibling.clone()]));
+
+        let running = crate::metrics::CONDUCTOR_CELL_RUNNING.with_label_values(&[ROLE]);
+        let family = |state: RoleCellState| {
+            crate::metrics::CONDUCTOR_CELL_STATE.with_label_values(&[ROLE, state.as_str()])
+        };
+        let tick = |wall_ms: u64| {
+            let (cache, admin, cell) = (&cache, &admin, &cell);
+            async move {
+                HcClientRegistry::observe_and_publish_cell_state_from(
+                    ROLE,
+                    admin,
+                    Some(cell),
+                    cache,
+                    crate::services::cell_membership::ObservedAt::from(wall_ms),
+                )
+                .await
+            }
+        };
+
+        // ── (0) SERVING. A call has landed and membership agrees.
+        health::record_role_success(ROLE);
+        let t0 = health::now_ms() + 5_000;
+        assert_eq!(
+            tick(t0).await.state,
+            RoleCellState::RunningRecoveryUnverified
+        );
+        assert_eq!(running.get(), 1);
+        for state in ROLE_CELL_STATES {
+            assert_eq!(
+                family(state).get(),
+                0,
+                "a serving role's WHY-family stays cleared ({})",
+                state.as_str()
+            );
+        }
+
+        // ── (1) THE CONDUCTOR RESTARTS. The bridge dies, is re-minted, and the
+        // reading is revoked with it; every later ListCellIds fails.
+        health::record_role_reconnect(ROLE);
+        cache.invalidate_at(t0 + 1_000, "the bridge died and is being re-minted (test)");
+        admin.set_tail(Err(
+            "ListCellIds failed: Websocket closed: No connection".to_string()
+        ));
+
+        // ── (2) THE APP IS PERSISTED DISABLED, and a zome call says so.
+        health::observe_role_app_status(
+            ROLE,
+            &AppRunObservation::NotRunning {
+                reason: "disabled: by an operator through the admin interface".to_string(),
+                enable: AppEnableEvidence::EnableCanLift,
+            },
+        );
+        assert!(
+            health::role_is_not_running(ROLE),
+            "the episode is open — this is what the ladder is paced against"
+        );
+
+        // ── (3) REPEATED MEMBERSHIP-READ FAILURES, and the ladder progresses.
+        //
+        // The PROCESS-WIDE ledger, not a local one: `record_role_success` below
+        // resets the ladder through `enable_app_backoff::enable_ledger()`, which
+        // is the ledger the supervisor spends rungs against. A local ledger
+        // would be reset by nothing and the recovery assertion would be a
+        // fiction. Keyed by role, and ROLE is unique to this test.
+        let ledger = crate::services::enable_app_backoff::enable_ledger();
+        let actuator = RecordingActuator::default();
+        let mut mono = std::time::Instant::now();
+        let mut wall = t0 + 1_000;
+        let mut windows = Vec::new();
+        for rung in 0..3 {
+            wall += 20_000;
+            let observed = tick(wall).await;
+            let (state, enable) = (observed.state, observed.enable);
+            let tick_seq = observed.classified_from_success_seq;
+            assert_eq!(
+                state,
+                RoleCellState::MembershipUnknown,
+                "rung {rung}: the read failed, so membership is not established"
+            );
+            assert_eq!(
+                running.get(),
+                -1,
+                "rung {rung}: an unreadable membership publishes -1, NEVER a 0 that reads as a \
+                 diagnosis"
+            );
+            assert_eq!(family(RoleCellState::MembershipUnknown).get(), 1);
+            let action =
+                decide_not_running_action(state, enable, ledger.should_attempt_at(ROLE, mono));
+            assert_eq!(action, NotRunningAction::SpendRungEnableAndProbe);
+            execute_not_running_action_at(action, ROLE, false, ledger, &actuator, mono, tick_seq)
+                .await;
+            let window = crate::services::enable_app_backoff::enable_backoff(ledger.attempts(ROLE));
+            windows.push(window.as_secs());
+            mono += window;
+        }
+        assert_eq!(windows, vec![60, 120, 240]);
+        assert_eq!(
+            actuator.enable_calls(),
+            vec![
+                (ROLE.to_string(), 1),
+                (ROLE.to_string(), 2),
+                (ROLE.to_string(), 3)
+            ],
+            "three REAL enable_app attempts on the recording actuator"
+        );
+        assert_eq!(
+            actuator.probe_calls().len(),
+            3,
+            "each rung also bought a probe"
+        );
+
+        // ── (4) THE CONDUCTOR FINISHES STARTING. Membership reads again, the
+        // probe is owed OFF the ladder, and the probe's call returns.
+        admin.set_tail(Ok(vec![cell.clone(), sibling.clone()]));
+        wall += 20_000;
+        let observed = tick(wall).await;
+        let (state, enable) = (observed.state, observed.enable);
+        let tick_seq = observed.classified_from_success_seq;
+        assert_eq!(state, RoleCellState::RunningRecoveryUnverified);
+        assert_eq!(running.get(), 1, "membership says the cell joined the map");
+        let action = decide_not_running_action(state, enable, ledger.should_attempt_at(ROLE, mono));
+        assert_eq!(
+            action,
+            NotRunningAction::ProbeNow,
+            "this is the moment the episode can end, so the probe does not wait for a rung"
+        );
+        let rungs_before = ledger.attempts(ROLE);
+        execute_not_running_action_at(action, ROLE, false, ledger, &actuator, mono, tick_seq).await;
+        assert_eq!(
+            ledger.attempts(ROLE),
+            rungs_before,
+            "ProbeNow spends no rung"
+        );
+        assert_eq!(actuator.probe_calls().len(), 4);
+
+        // The probe's zome call RETURNS — the one transition this node accepts.
+        health::record_role_success(ROLE);
+        assert!(!health::role_is_not_running(ROLE));
+        assert_eq!(
+            ledger.attempts(ROLE),
+            0,
+            "proven recovery clears the ladder"
+        );
+        assert_eq!(running.get(), 1);
+        for state in ROLE_CELL_STATES {
+            assert_eq!(
+                family(state).get(),
+                0,
+                "recovery zeroes the whole WHY-family ({})",
+                state.as_str()
+            );
+        }
+
+        // ── (5) THE RECOVERED ROLE IS QUIET. Its next tick reads a fresh
+        // `Some(true)` and must NOT re-open the family recovery just cleared.
+        wall += 20_000;
+        assert_eq!(
+            tick(wall).await.state,
+            RoleCellState::RunningRecoveryUnverified
+        );
+        assert_eq!(running.get(), 1);
+        for state in ROLE_CELL_STATES {
+            assert_eq!(
+                family(state).get(),
+                0,
+                "{} was re-opened on a recovered, quiet role — with no episode open no probe \
+                 follows, so it would stand at 1 for the life of the process",
+                state.as_str()
+            );
+        }
+        assert!(
+            !health::role_bridge_health().for_role(ROLE).has_cell_state(),
+            "and nothing was latched, so no transition line promising a probe was written"
+        );
     }
 }

@@ -80,3 +80,19 @@ today's Git-SHA-driven pod-template change, raw-apply-word admission, fleet-wide
 parallel apply, and absent convergence admission without joining a default green
 suite. Design home:
 `genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md`.
+
+## 2026-09-22 — content-keyed restarts landed in-tree (unproven on the fleet; stays wip)
+
+Three of this atom's four standing reds turn green
+(`design-tests/staggered-conductor-fleet-restarts.red.mjs`: storage + adam provenance,
+apply-word admission); the parallel-storage-wave red stays red. Edge #1474 (Deploy Alpha
+75.0m) is the measured motive: the storage pod templates still carried
+`app.kubernetes.io/version` (removed; adam's hand-pinned `restartedAt` too), and object-label
+changes made apply say `configured`, so all seven storage peers restarted and every conductor
+counted as CHANGED (5 of 6 settle gates ran to deadline). Now restart/CHANGED = the live pod
+template (+ ConfigMap data for storage) before vs after apply
+(`scripts/ci/pod-inputs-fingerprint.sh`), and the storage image is HELD while
+`scripts/ci/storage-input-digest.sh` equals the `elohim.host/storage-inputs` recorded on the
+live object (`storage-workload-image.sh`; `[storage-roll]` forces). Proof owed: the first edge
+build after landing logs `⏭️` for unchanged peers, and Deploy Alpha on a doorway-only commit
+drops back toward the 08-25 7.8 m baseline.

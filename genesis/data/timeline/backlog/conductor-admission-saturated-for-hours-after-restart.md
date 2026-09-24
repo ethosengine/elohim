@@ -134,3 +134,40 @@ grants — plus a one-time prune on the genesis pair. If it is chain length: the
 bounded query, and stories 1.1 / 1.2 of the serving-edge campaign (fewer failing declares, no re-minted contests)
 already slow the growth. Raising CPU limits helps every peer and is free, but by the susan comparison it is not the fix.
 
+## 2026-09-22 — blob ingestion crosses the forwarding deadline before it can receipt bytes
+
+App #1719 reached staging after the fonts build completed, then reported
+`forwarded_to_storage=false` for `sha256-471b6a80e519727b81812026919119c4d0560d3518834aa589c700316412fcd6`
+(11,986,252 bytes), initially targeting matthew storage; the later apex re-offers target
+adam and report the same timeout face. This is an observed forwarding timeout,
+not proof that storage rejected or never stored the bytes.
+
+Source review pinned to `b65fa3350` identifies a separate budget mismatch. Doorway's
+`routes/seed.rs` allows `30 + ceil(MiB)` seconds per storage PUT by default: 42 seconds
+for this upload. Storage's `HttpServer::put_blob_bytes` awaits a
+`node_registry_coordinator/create_shard_assignment` call after storing each shard,
+before publishing the manifest or replying. The conductor websocket timeout is 60
+seconds, preceded by an unbounded per-cell chain-lock wait and up to five seconds of
+interactive admission. The chain-write gate's two-second retry budget bounds when a
+retry may start; it does not bound that first call or the lock wait. One slow call can
+therefore outlive the forwarding budget. Configured fleet overrides still need reading.
+
+Identical PUTs also repeat registry authoring: the local blob store returns an
+`already_existed` result, but this HTTP path still calls the coordinator, which creates
+an entry, updates its self-reference, and creates three links per shard. The existing
+repeated-PUT test in `tests/blob/put_blob_dual_write.rs` proves local inventory
+idempotence with no node-registry API attached; it does not prove DHT idempotence.
+Whether a timed-out HTTP handler continues its remaining work is unmeasured.
+
+- chain: app delivery
+- between: content-addressed upload -> affirmative storage receipt
+- missing node: the receiving peer completes blob ingestion and its synchronous
+  dependencies within the doorway's forwarding budget
+- probe: correlate this existing hash and upload interval with the targeted peer's `Registered
+  shard assignment with Node Registry`, `Failed to register shard assignment with Node
+  Registry`, and `Stored blob with manifest` log lines; read the method-specific
+  conductor duration, timeout, dropped-call, and admission metrics; if needed, GET the
+  exact blob directly from that storage peer and verify its hash, bypassing doorway cache
+- current state: budget mismatch and repeated authoring are code-proven; the actual
+  blocking phase of #1719 is unmeasured. Do not re-PUT just to diagnose it, and do not
+  treat the cell-membership observation cure as a fix for this ingestion contract.

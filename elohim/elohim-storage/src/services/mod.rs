@@ -36,6 +36,7 @@ pub mod bootstrap_manifests;
 pub mod bounds_validator;
 pub mod capacity_pledge_author; // Explicit Class-A commons-capacity pledge via Mishpat conductor + eager projections
 pub mod capacity_reporter; // Periodic local capacity reporter — measures + upserts custodian_metrics, sets the cluster-capacity gauges
+pub mod cell_membership; // ListCellIds — the conductor's running-cell map, the only truthful membership read
 pub mod cell_probe; // The one read-only cell probe that lets a QUIET role prove it recovered
 pub mod cluster_view;
 pub mod commitment_fetcher;
@@ -114,6 +115,7 @@ pub mod peer_liveness; // Live connected-peer view — the liveness the felt bad
 pub mod peer_selection;
 pub mod peer_status_fanout; // Cross-agent PeerStatus fan-in — breaks the self-only peer_statuses ceiling
 pub mod peer_topology_view;
+pub mod pointer_audit; // story 1.4d — heal a declared row's drifted blob pointer via pointer_heal_patch; never authors, declares, contests, or moves a head
 pub mod presence_service;
 pub mod private_replica; // Wave 5.1 Slice-0 — encrypt-then-erasure-code + DEK envelope PROOF
 pub mod projection_shade; // Operational (Path C) admin verb — hide one projection kind from this peer's read route without deleting it

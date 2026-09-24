@@ -1342,6 +1342,28 @@ pub struct Config {
     /// `CUSTODY_ROTATION_ENABLED`.
     #[serde(default = "default_true")]
     pub custody_rotation_enabled: bool,
+
+    /// Pointer-audit sweep (story 1.4d,
+    /// `services::pointer_audit::run_once`): heals an already-torn declared
+    /// row — one whose `blob_cid` no longer names the same blob as its own
+    /// declared head's notarized record — through the SAME guarded T7 path
+    /// (`pointer_heal_patch` + `stamp_declared_head_mode(..,
+    /// StampMode::HealCanonical, ..)`) `head_adoption::adopt_local` already
+    /// runs for a row some OTHER path selected. `classify_content_gap`
+    /// compares anchors, not bytes, so a torn row with an intact anchor
+    /// reads `InSync` forever without this sweep.
+    ///
+    /// Default **true**: reconciliation over bytes/pointers this node's own
+    /// conductor can already verify, not conscription — same posture as
+    /// [`Config::manifest_backfill_enabled`] and
+    /// [`Config::custody_rotation_enabled`]. It never authors, declares,
+    /// contests, or moves a head.
+    ///
+    /// To disable: set env `ELOHIM_POINTER_AUDIT` to `0`/`false`/`off` (or
+    /// `pointer_audit_enabled = false` in config.toml). Loaded from env
+    /// `ELOHIM_POINTER_AUDIT`.
+    #[serde(default = "default_true")]
+    pub pointer_audit_enabled: bool,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -1526,6 +1548,7 @@ impl Default for Config {
             demand_autopin_throttle_seconds: default_demand_autopin_throttle_seconds(),
             manifest_backfill_enabled: default_true(),
             custody_rotation_enabled: default_true(),
+            pointer_audit_enabled: default_true(),
         }
     }
 }
@@ -1695,6 +1718,16 @@ mod transport_backend_tests {
         // this ships ON. A default-OFF rotation would leave every custody pledge
         // stale after the first redeploy, silently.
         assert!(super::Config::default().custody_rotation_enabled);
+    }
+
+    #[test]
+    fn pointer_audit_defaults_on() {
+        // Refreshing a declared row's own drifted pointer against its own
+        // conductor's record is reconciliation, not conscription — same
+        // posture as `manifest_backfill_enabled` and
+        // `custody_rotation_enabled`. A default-OFF sweep would leave a torn
+        // row (story 1.4d) unhealed forever, silently.
+        assert!(super::Config::default().pointer_audit_enabled);
     }
 
     #[test]

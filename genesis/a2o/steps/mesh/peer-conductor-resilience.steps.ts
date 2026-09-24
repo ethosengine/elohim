@@ -65,10 +65,12 @@ import { fileURLToPath } from 'node:url';
 import { Given, When, Then } from '@cucumber/cucumber';
 
 import {
+  classifyHeadRecordAnswer,
   describeCatchUpRide,
   getRaw,
   getRawRidingCatchUp,
   getRawWithHeaders,
+  listHeadResolvableContentIds,
   parseLabeledPrometheusMetric,
   parsePrometheusMetrics,
   probeHealth,
@@ -81,6 +83,7 @@ import {
   loadHouseholdMeshFixture,
   requireFixtureDoorwayLogPath,
   requireFixtureDoorwayUrl,
+  storagePeerForOrigin,
   type HouseholdMeshFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
 import {
@@ -552,6 +555,88 @@ function zomeCallDeadlineMs(): number {
  */
 function conductorCallUrl(base: string): string {
   return `${base}/db/p2p/conductor-diagnostics`;
+}
+
+/**
+ * Content ids on this doorway worth asking `head-record` for — the discovery
+ * half of the zome-call assertion.
+ *
+ * ELIGIBILITY, NOT RECENCY. Only a row with a resolvable DECLARED head reaches
+ * the conductor; a row without one answers a pre-conductor 404 and establishes
+ * nothing. A fixed prefix of the newest rows is therefore not a candidate set —
+ * six headless rows at the top of the projection permanently hide an eligible
+ * row seven, and every poll then repeats the same six pre-conductor 404s before
+ * diagnosing a failed re-authentication. `listHeadResolvableContentIds` scans
+ * past ineligible rows within a bounded budget and prefers a known-eligible id.
+ */
+const HEAD_RECORD_WANT = 3;
+const HEAD_RECORD_SCAN_LIMIT = 50;
+/**
+ * Tried first: the landing content the seeder always gives a declared head, and
+ * the id the substrate-seam smoke already uses for head convergence. When it is
+ * eligible the scan short-circuits to one probe.
+ */
+const HEAD_RECORD_PREFERRED = ['elohim-host-landing'];
+
+async function headRecordCandidates(base: string): Promise<string[]> {
+  return listHeadResolvableContentIds(base, {
+    want: HEAD_RECORD_WANT,
+    scanLimit: HEAD_RECORD_SCAN_LIMIT,
+    preferred: HEAD_RECORD_PREFERRED,
+  });
+}
+
+/** Render {@link bindConductorUnderTest}'s answer for a failure message. */
+function describeBoundConductor(
+  bound: { conductorUrl: string; conductorId: string; peer?: string } | null
+): string {
+  if (!bound) return "the doorway's default conductor (registry binding unavailable)";
+  const named = `conductor ${bound.conductorId} at ${bound.conductorUrl}`;
+  return bound.peer ? `${named} (household peer "${bound.peer}")` : named;
+}
+
+/**
+ * WHICH CONDUCTOR is this recovery assertion about?
+ *
+ * The scenario says "that conductor pool", so the assertion has to name one.
+ * The doorway's conductor registry answers it: a hosted human's agent key maps
+ * to the conductor that hosts their cell (`GET /admin/agents/{key}/conductor`),
+ * and the household fixture maps that conductor's app-websocket origin back to
+ * a peer name. This is the same join `steps/ui/hosted-human.steps.ts` already
+ * uses to find a hosted human's steward.
+ *
+ * Returns `null` rather than failing: a lane without the admin surface, without
+ * a household fixture, or with no agent yet in the registry is a lane where the
+ * BINDING is unavailable — which is not the same finding as "recovery failed",
+ * and reporting it as one would be a false red. The zome-call assertion below
+ * stands on its own either way.
+ */
+async function bindConductorUnderTest(
+  world: E2EWorld,
+  base: string
+): Promise<{ conductorUrl: string; conductorId: string; peer?: string } | null> {
+  try {
+    const admin = await world.getAdminClient(base);
+    const me = await admin.me();
+    const placement = await admin.adminAgentConductor(me.agentPubKey);
+    let peer: string | undefined;
+    try {
+      peer = storagePeerForOrigin(loadHouseholdMeshFixture(), placement.conductorUrl)?.name;
+    } catch {
+      peer = undefined;
+    }
+    return {
+      conductorUrl: placement.conductorUrl,
+      conductorId: placement.conductorId,
+      peer,
+    };
+  } catch (error) {
+    console.warn(
+      `  ℹ️  conductor binding unavailable on ${base} (${String(error)}) — the zome-call ` +
+        'assertion below still runs; only the "which conductor" attribution is missing'
+    );
+    return null;
+  }
 }
 
 async function burst(url: string, count: number, timeoutMs: number): Promise<HttpSample[]> {
@@ -1040,23 +1125,137 @@ Then(
 );
 
 Then(
-  'zome calls through that conductor pool succeed within the recovery window',
+  'a read-only zome call reaches the restarted conductor and returns',
   { timeout: STEP_LONG_MS },
   async function (this: E2EWorld) {
-    const url = conductorCallUrl(doorwayUrl(this));
+    // WHAT THIS PROVES, AND WHAT IT DOES NOT.
+    //
+    // `GET /db/content/{id}/head-record` resolves the declared head from the
+    // projection and then calls `content_store::get_record_for_action` over the
+    // conductor's AUTHENTICATED APP WEBSOCKET — the very socket a restart's
+    // token invalidation kills. A 200, or the post-call `head-record-empty`
+    // 404, therefore proves that CONDUCTOR was invoked and answered.
+    //
+    // It rides STORAGE's own independently-authenticated `HcClient`, not the
+    // doorway's worker pool. So it proves the conductor is serving signed calls
+    // again; it does NOT prove the doorway's pool re-authenticated, and the step
+    // name says only the former. The missing proof has its own @wip scenario and
+    // a backlog entry:
+    // genesis/data/timeline/backlog/doorway-no-per-conductor-signed-probe.md
+    const base = doorwayUrl(this);
+    const bound = await bindConductorUnderTest(this, base);
+    const about = describeBoundConductor(bound);
+
+    // ATTRIBUTION IS ASSERTED, NOT NARRATED.
+    //
+    // The restart targets every conductor in the household fixture; this read
+    // targets `doorwayUrl(world)`. Nothing joined those two, so on a world whose
+    // doorway is NOT in the fixture the step would have proved a zome call
+    // against a conductor nobody restarted and reported it as recovery. The
+    // binding already resolves the conductor behind this doorway through the
+    // same `storagePeerForOrigin` path the fixture uses — so require that it
+    // lands on a fixture peer, and say plainly when it does not.
+    assert.ok(
+      bound?.peer,
+      `cannot attribute this recovery assertion to a restarted conductor: ${about}. The ` +
+        `conductor serving ${base} does not resolve to a peer in the household fixture ` +
+        `(E2E_HOUSEHOLD_FIXTURE_PATH), but the restart step only bounces fixture conductors — ` +
+        `so a passing zome call here would prove nothing about the conductor under test. Point ` +
+        `the scenario at a household doorway, or extend the restart to the peer that serves this one.`
+    );
+
+    const candidates = await headRecordCandidates(base);
+    assert.ok(
+      candidates.length > 0,
+      `no content row on ${base} has a resolvable declared head within the first ` +
+        `${HEAD_RECORD_SCAN_LIMIT} rows, so there is no zome-backed read on this peer to prove ` +
+        `recovery with. This scenario asserts that a zome call returns; it cannot be satisfied by ` +
+        `admin-plane evidence. Seed the mesh first (\`just mesh prologue\`).`
+    );
+
+    let lastDetail = '(never asked)';
     const ok = await pollUntil(
       async () => {
-        const sample = await timedGet(url, zomeCallDeadlineMs() + 5_000);
-        return sample.status === 200 ? sample : null;
+        for (const contentId of candidates) {
+          const sample = await timedGet(
+            `${base}/db/content/${encodeURIComponent(contentId)}/head-record`,
+            zomeCallDeadlineMs() + 5_000
+          );
+          const answer = classifyHeadRecordAnswer(sample.status, sample.text);
+          lastDetail = `${contentId}: ${answer.detail}`;
+          if (answer.zomeAnswered) return sample;
+        }
+        return null;
       },
       300_000,
       5_000
     );
     assert.ok(
       ok,
-      `${url} never returned 200 within the recovery window — the pool did not re-authenticate after the restart`
+      `no read-only zome call reached a conductor through ${base} within the recovery window ` +
+        `across ${candidates.length} head-resolvable candidate id(s), about ${about} — last ` +
+        `answer was ${lastDetail}. A 502 means the bridge is up and the zome call errored; a 503 ` +
+        `means no app websocket at all. Either way the conductor's app plane is not serving ` +
+        `signed calls again.`
     );
     ctx(this).conductorCalls.push(ok);
+  }
+);
+
+Then(
+  'a read-only zome call through the doorway pool bound to the conductor under test succeeds',
+  function (this: E2EWorld) {
+    // AN EXPLICIT PENDING DEFINITION, NOT AN ABSENT ONE.
+    //
+    // Cucumber 11 checks for a missing definition BEFORE it consults
+    // `isSkippingSteps()`, so an undefined step reports UNDEFINED — which fails
+    // the run outside dry-run, in any profile that does not filter `@wip`. The
+    // mesh profiles do filter it; the default, alpha, local and genesis ones do
+    // not. So the @wip scenario naming the missing doorway-pool proof gets a
+    // definition whose only job is to be honestly pending.
+    //
+    // It stays pending until a doorway surface exists to route a read-only call
+    // through a NAMED conductor's worker pool with failures propagated:
+    // genesis/data/timeline/backlog/doorway-no-per-conductor-signed-probe.md
+    return 'pending';
+  }
+);
+
+Then(
+  'the doorway reports every conductor worker pool reconnected',
+  { timeout: STEP_LONG_MS },
+  async function (this: E2EWorld) {
+    // A CONNECTIVITY FACT, NAMED AS ONE.
+    //
+    // `WorkerPool::is_healthy` is `connected_workers > 0`
+    // (doorway-service/src/worker/pool.rs) and `healthy_count` counts such
+    // pools. That establishes sockets — not signing credentials, not capability
+    // authorization, and not a returning zome call. A doorway whose workers are
+    // connected but whose signed calls fail passes this leg, which is exactly
+    // why the step promises only what `poolsHealthy` means.
+    const base = doorwayUrl(this);
+    const pooled = await pollUntil(
+      async () => {
+        const health = await readHealth(base);
+        const { pools_total: total, pools_healthy: healthy } = health.conductor;
+        if (!health.conductor.connected) return null;
+        if (total === 0) return health;
+        return healthy === total ? health : null;
+      },
+      300_000,
+      5_000
+    );
+    assert.ok(
+      pooled,
+      `${base} never reported every conductor worker pool connected again within the recovery ` +
+        `window — the pool did not re-establish its sockets after the restart`
+    );
+    if (pooled.conductor.pools_total === 0) {
+      console.warn(
+        `  ℹ️  ${base} reports poolsTotal=0 — no per-conductor pool has authenticated on this ` +
+          'lane, so only the default pool is observable here'
+      );
+    }
   }
 );
 

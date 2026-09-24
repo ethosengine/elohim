@@ -13,6 +13,8 @@ cites:
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
   - genesis/data/timeline/backlog/head-authority-carried-with-content-sync-unit.md
   - genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md
+  - "admission-receiver-granted-lanes-design | story 3.3's brainstorm starting frame: receiver-granted reserved lanes, shortest-expected-hold first, AIMD background after restart (TCP/Homa lessons from the 2026-09-23 publish storm) | sha256:54611915e41292b9 | path: genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md"
+  - genesis/data/timeline/backlog/arch-dataplane-borrows-backlog.md
   - genesis/data/timeline/backlog/projection-reconcile-actionable-sawtooth.md
   - genesis/data/timeline/backlog/ci-orchestrator-baseline-advance-despite-failure.md
   - genesis/data/timeline/backlog/ci-apex-doorway-cannot-reach-adam-storage-blob-forward.md
@@ -169,6 +171,18 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   acceptance, not 1.4a's** — the design pass named it for T-1 in error, and T-1 was never going to flip it. T-1's
   proof is its red-first unit test and the absence of a torn row on the converged pair; T-2 proceeds as its own
   commit on that basis.
+  *Scheduled 2026-09-22:* a bounded pointer-audit sweep (`services::pointer_audit`, new module) heals the class
+  1.4d names — a declared row whose blob pointer no longer names the same blob as its own declared head's own
+  conductor record. It walks declared+pointer-bearing rows on a round-robin keyset cursor
+  (`content_diesel::list_declared_blob_pointer_candidates`), probes this node's own conductor
+  (`AdmissionClass::Background`, never Interactive), and runs the SAME guarded T7 heal
+  (`pointer_heal_patch` + `stamp_declared_head_mode(.., StampMode::HealCanonical, ..)`) `adopt_local` already
+  applies to a row some other path selected — never authoring, declaring, contesting, or moving a head. Metric
+  `elohim_content_pointer_audit_total{outcome}`; spawned on the same late-connect guard as the re-anchor backfill,
+  gated by `ELOHIM_POINTER_AUDIT` (default on). The fleet's own torn row (edge #1474 seam-smoke,
+  `ADVISORY-SAME-HEAD-DIFFERENT-BYTES`) cannot be healed by this sweep until it heals independently of code: both
+  doorways answered `UNREADABLE-HEAD-RECORD reason=cell-disabled` in #1474, so this node's own conductor cannot
+  yet produce the record the sweep reads FROM — it is waiting on cell health, not on this landing.
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
@@ -225,6 +239,11 @@ them, then close the zero-lag head oracle, then make the pair comparable.
 - **3.3 Admission degrades as a curve.** The design question from backlog conductor-admission (reserved
   interactive capacity vs background ceiling vs cold-start pacing; heartbeat call sites classed `interactive`).
   **Gate: brainstorm**, then its own plan. Scheduled here, may be pulled forward by 1.3's reading.
+  *Design input 2026-09-23* (specs/2026-09-23-admission-receiver-granted-lanes-design.md): the 2026-09-23 alpha
+  publish storm, read through TCP and Homa. The recommended frame is a receiver-issued grant over reserved
+  lanes: an interactive floor that background work never takes, shortest-expected-hold first, AIMD background
+  concurrency after a restart, and a `Retry-After` derived from the measured hold. It protects person-facing
+  calls. It does not cure a conductor-internal storm; that is borrows-backlog row 17. The brainstorm starts here.
 
 ### Sprint 4 — doorways hear each other (habit: doorway-failover; D:192-194 "designed-for, not built")
 
@@ -304,6 +323,9 @@ household-only first story that can start once 1.4 lands; every fleet story wait
 ## Complementary work captured, not planned here
 
 - The conductor ceiling itself on matthew and adam (operator lever; backlog conductor-admission).
+- Flow control borrowed from TCP/Homa after the 2026-09-23 publish storm (backlog arch-dataplane-borrows rows
+  16–17): receiver-granted doorway→storage blob forwarding with no blind retry, and conductor publish
+  backpressure in the holochain/kitsune2 fork (telemetry first).
 - `delegated-sweettest.feature` returns `pending` without its fixture and fails strict validate-only runs.
 - No gate runs `scripts/ci/*.test.sh`.
 - An untracked `resource_limit_raise_test.py` (2026-09-13) fails any push touching `.claude/scripts/_lib`.

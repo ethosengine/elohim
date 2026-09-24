@@ -444,6 +444,14 @@ pub struct RemovePeerRequest {
 pub struct AdminMutationResponse {
     pub success: bool,
     pub message: String,
+    /// Holders this call actually PULLED a fresh coherence manifest for and
+    /// installed (story 4.2 slice 1, §3.3 — "the refresh verb becomes the
+    /// actuation twin"). `None` for the add/remove-peer mutations, which
+    /// never pull; `Some(n)` only from
+    /// `handle_admin_refresh_federation_peers`, so the verb's reply is
+    /// finally true rather than describing only the peer-cache refresh.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pulled: Option<usize>,
 }
 
 /// Handle GET /admin/federation/peers
@@ -513,6 +521,7 @@ pub async fn handle_admin_add_federation_peer(
         return json_response(&AdminMutationResponse {
             success: false,
             message: "Peer URL already configured".to_string(),
+            pulled: None,
         });
     }
 
@@ -527,6 +536,7 @@ pub async fn handle_admin_add_federation_peer(
     json_response(&AdminMutationResponse {
         success: true,
         message: format!("Peer added: {}", request.url),
+        pulled: None,
     })
 }
 
@@ -549,6 +559,7 @@ pub async fn handle_admin_remove_federation_peer(
         return json_response(&AdminMutationResponse {
             success: false,
             message: "Peer URL not found in configuration".to_string(),
+            pulled: None,
         });
     }
 
@@ -562,12 +573,19 @@ pub async fn handle_admin_remove_federation_peer(
     json_response(&AdminMutationResponse {
         success: true,
         message: format!("Peer removed: {}", request.url),
+        pulled: None,
     })
 }
 
 /// Handle POST /admin/federation/peers/refresh
 ///
-/// Force an immediate refresh of the peer cache from all configured peer URLs.
+/// Force an immediate refresh of the peer cache from all configured peer
+/// URLs, THEN pull every discovered peer's own coherence manifest and install
+/// it (story 4.2 slice 1, design §3.3 — "the refresh verb becomes the
+/// actuation twin"). This is the SAME code path the doorbell receiver runs
+/// (`services::federation::pull_and_install_holder`), triggered by the
+/// operator instead of by a holder's own ring — so the reply's `pulled` count
+/// is finally true, not just a peer-cache-size restatement.
 pub async fn handle_admin_refresh_federation_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let urls = federation::get_peer_urls(&state.peer_url_list).await;
 
@@ -576,13 +594,31 @@ pub async fn handle_admin_refresh_federation_peers(state: Arc<AppState>) -> Resp
 
     let cached = federation::get_cached_peers(&state.peer_cache).await;
 
+    let mut pulled = 0usize;
+    for peer in &cached {
+        if matches!(
+            federation::pull_and_install_holder(
+                &state.name_routes,
+                &peer.id,
+                &peer.url,
+                &state.doorbell_client,
+            )
+            .await,
+            federation::PullOutcome::Installed
+        ) {
+            pulled += 1;
+        }
+    }
+
     json_response(&AdminMutationResponse {
         success: true,
         message: format!(
-            "Refreshed {} peer URL(s), discovered {} doorway(s)",
+            "Refreshed {} peer URL(s), discovered {} doorway(s), pulled {}",
             urls.len(),
-            cached.len()
+            cached.len(),
+            pulled,
         ),
+        pulled: Some(pulled),
     })
 }
 

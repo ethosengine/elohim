@@ -1496,6 +1496,36 @@ lazy_static! {
     )
     .unwrap();
 
+    /// End-to-end age of a remotely-authored Automerge change when its local
+    /// serving projection has completed. This is origin-to-projected-apply
+    /// staleness, not notification transit time: it includes queueing, a
+    /// periodic round or eager announce, dependency pulls, apply, and reverse
+    /// projection. The source timestamp has one-second precision and comes from
+    /// the author's wall clock. label: plane = "libp2p" | "iroh".
+    pub static ref SYNC_PROJECTED_APPLY_STALENESS_SECONDS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_sync_projected_apply_staleness_seconds",
+            "Seconds from the author's Automerge commit timestamp to successful remote serving projection; end-to-end staleness, not transport latency.",
+        )
+        .buckets(vec![0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0]),
+        &["plane"],
+    )
+    .unwrap();
+
+    /// Changes excluded from the staleness histogram. `missing` includes an
+    /// absent/zero/negative advisory timestamp or undecodable change bytes;
+    /// `future` means author wall time is ahead of receiver wall time. Future
+    /// samples are never clamped to zero because that would manufacture a good
+    /// latency under clock skew. labels are bounded.
+    pub static ref SYNC_PROJECTED_APPLY_STALENESS_INVALID: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_projected_apply_staleness_invalid_total",
+            "Remote changes excluded from projected-apply staleness by plane and reason (missing|future).",
+        ),
+        &["plane", "reason"],
+    )
+    .unwrap();
+
     /// Event-driven head-ADOPTION TRIGGER outcomes
     /// ([`crate::services::head_adoption_trigger`]). label: outcome =
     ///
@@ -2015,6 +2045,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Pointer-audit sweep candidates (story 1.4d), by
+    /// [`PointerAuditOutcome`]. This sweep heals an already-torn declared
+    /// row — one whose blob pointer no longer names the same blob as its
+    /// own declared head's notarized record — via the SAME guarded T7 path
+    /// `head_adoption::adopt_local` already runs; it never authors,
+    /// declares, contests, or moves a head.
+    ///
+    /// The honesty meter for this sweep: `healed` climbing is the tear class
+    /// closing; a standing non-zero `not_canonical` or `unreadable` beside a
+    /// flat `healed` says the own conductor cannot yet answer for these ids
+    /// (e.g. `CellDisabled` — see `elohim/holochain/dna/**` health), not
+    /// that nothing needs healing.
+    pub static ref CONTENT_POINTER_AUDIT: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_pointer_audit_total",
+            "Pointer-audit sweep candidates by outcome (story 1.4d).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Divergent REA commitments the heal leg ADJUDICATED without paying for a
     /// `get_rea_commitment` round-trip, by the remembered [`ReaHealSkip`].
     ///
@@ -2392,6 +2443,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Advisory Node Registry shard-assignment registrations, off the
+    /// `PUT /blob/{hash}` request path (`crate::shard_registration`). label:
+    /// outcome = "enqueued" | "completed" | "failed" | "dropped". "dropped"
+    /// is the bounded-queue-full case — advisory work shed rather than piled
+    /// up in memory or held against the HTTP response it used to block.
+    pub static ref SHARD_REGISTRATION_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_shard_registration_outcomes_total",
+            "Background Node Registry shard-assignment registrations, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Milliseconds a chain WRITE spent queued behind another writer on the same
     /// source chain (`crate::chain_write_gate`).
     ///
@@ -2571,6 +2636,107 @@ lazy_static! {
         &["role"],
     )
     .unwrap();
+
+    /// Is this role's CELL in the conductor's running-cell map? `1` yes, `0`
+    /// registered-but-absent, `-1` the `ListCellIds` read itself failed.
+    ///
+    /// The instrument `elohim_conductor_app_enabled` could not be. That gauge
+    /// answers "has a call landed on this role", which conflates two states the
+    /// cure differs between; this one answers the conductor's own membership
+    /// question — the same map zome dispatch looks in. `-1` is a real value and
+    /// not a sentinel to be filtered: a node that cannot read membership must
+    /// not publish a `0` that reads as a diagnosis.
+    ///
+    /// Alert shape: `min_over_time(elohim_conductor_cell_running[15m]) == 0`
+    /// names a role whose cell has been absent for a quarter of an hour.
+    /// Cardinality is the observed role roster (5), fixed at compile time.
+    pub static ref CONDUCTOR_CELL_RUNNING: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_conductor_cell_running",
+            "1 when this role's cell is in the conductor's running-cell map (ListCellIds), 0 when it is registered but absent, -1 when the membership read failed.",
+        ),
+        &["role"],
+    )
+    .unwrap();
+
+    /// One-hot: which joined [`crate::conductor_bridge_health::RoleCellState`]
+    /// is this role in right now?
+    ///
+    /// `elohim_conductor_cell_running` says WHETHER; this says WHY, and
+    /// therefore which cure applies. The series an operator alerts on is
+    /// `elohim_conductor_cell_state{state="installed-not-running-app-enabled"}
+    /// == 1` — the STRANDED state, where `enable_app` provably cannot help and
+    /// the conductor needs attention.
+    ///
+    /// Cardinality is 5 roles × 5 states = 25, both fixed at compile time.
+    /// Observations rejected as superseded, by observation kind.
+    pub static ref CONDUCTOR_SUPERSEDED_OBSERVATIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_superseded_observations_total",
+            "Observations dropped because a newer one already held the field they would overwrite.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+
+    pub static ref CONDUCTOR_CELL_STATE: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_conductor_cell_state",
+            "1 for the role's CURRENT joined cell state (app status × running-cell membership), 0 for every other state.",
+        ),
+        &["role", "state"],
+    )
+    .unwrap();
+}
+
+/// Publish whether ROLE's CELL is in the conductor's running-cell map.
+///
+/// `None` publishes `-1`: the membership read failed, which is a third answer
+/// and must never be flattened into `0`.
+pub fn set_conductor_cell_running(role: &str, running: Option<bool>) {
+    CONDUCTOR_CELL_RUNNING
+        .with_label_values(&[role])
+        .set(match running {
+            Some(true) => 1,
+            Some(false) => 0,
+            None => -1,
+        });
+}
+
+/// Publish ROLE's current joined cell state as a one-hot family, so a query
+/// never has to guess which of the five the absent series meant.
+pub fn set_conductor_cell_state(role: &str, state: crate::conductor_bridge_health::RoleCellState) {
+    for candidate in crate::conductor_bridge_health::ROLE_CELL_STATES {
+        CONDUCTOR_CELL_STATE
+            .with_label_values(&[role, candidate.as_str()])
+            .set(i64::from(candidate == state));
+    }
+}
+
+/// Zero every state in ROLE's cell-state family.
+///
+/// The family answers "why is this role NOT serving"; a role that IS serving has
+/// no such reason, so every series drops to 0 rather than one of them staying at
+/// the last reason. Called from the ONE recovery transition.
+pub fn clear_conductor_cell_state(role: &str) {
+    for state in crate::conductor_bridge_health::ROLE_CELL_STATES {
+        CONDUCTOR_CELL_STATE
+            .with_label_values(&[role, state.as_str()])
+            .set(0);
+    }
+}
+
+/// Observations DROPPED because a newer one already held the field.
+///
+/// Not an error: rejecting a superseded write is the mechanism working. But a
+/// sustained stream of them means two supervisors are fighting over one role,
+/// and that cure is upstream of this module — so it has to be countable.
+/// Cardinality is the closed `Observation` variant set (6), fixed at compile
+/// time.
+pub fn note_superseded_observation(kind: &str) {
+    CONDUCTOR_SUPERSEDED_OBSERVATIONS
+        .with_label_values(&[kind])
+        .inc();
 }
 
 /// Publish whether ROLE's conductor app is running.
@@ -2627,6 +2793,24 @@ pub fn register_all() {
         // the 2026-09-18 incident was two days of exactly that.
         for role in crate::hc_client_registry::OBSERVED_ROLES {
             CONDUCTOR_APP_ENABLED.with_label_values(&[role]).set(1);
+        }
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CELL_RUNNING.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CELL_STATE.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_SUPERSEDED_OBSERVATIONS.clone()));
+        // Pre-touch the membership family at `-1` (NOT `0`, and NOT `1`): before
+        // the first `ListCellIds` lands this node genuinely does not know, and
+        // both other values would be a claim. Absence is unalertable; a
+        // fabricated answer is worse than unalertable.
+        for role in crate::hc_client_registry::OBSERVED_ROLES {
+            CONDUCTOR_CELL_RUNNING.with_label_values(&[role]).set(-1);
+            // Every role × every state at 0 — so the one-hot query
+            // `cell_state{state="installed-not-running-app-enabled"} == 1` is a
+            // measured absence on a healthy pod rather than no series at all.
+            for state in crate::conductor_bridge_health::ROLE_CELL_STATES {
+                CONDUCTOR_CELL_STATE
+                    .with_label_values(&[role, state.as_str()])
+                    .set(0);
+            }
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(APP_DELIVERABILITY_VERDICTS.clone()));
@@ -2766,6 +2950,18 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT.clone()));
+        // Pre-touch every outcome — a torn-row class this sweep never sees
+        // (e.g. `not_canonical` on a fully converged corpus) must read as a
+        // MEASURED zero, not an absent series.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in PointerAuditOutcome::ALL {
+                CONTENT_POINTER_AUDIT
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_REMINT_SUPPRESSED.clone()));
         let _ = REGISTRY.register(Box::new(REA_HEAL_REFUSED_SKIPPED.clone()));
         // Pre-touch both verdicts, same discipline as the evidence states below:
@@ -2980,6 +3176,15 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_BLOB_FETCHES.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_PROJECTED_APPLY_STALENESS_SECONDS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_PROJECTED_APPLY_STALENESS_INVALID.clone()));
+        for plane in ["libp2p", "iroh"] {
+            for reason in ["missing", "future"] {
+                SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                    .with_label_values(&[plane, reason])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(HEAD_ADOPTION_TRIGGER.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
@@ -3084,6 +3289,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        let _ = REGISTRY.register(Box::new(SHARD_REGISTRATION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DROPPED.clone()));
@@ -3453,6 +3659,14 @@ impl Drop for ConductorCallMetricsGuard<'_> {
 pub fn inc_admission_shed(class: &str, zome: &str) {
     CONDUCTOR_ADMISSION_SHED
         .with_label_values(&[class, zome])
+        .inc();
+}
+
+/// Record one background shard-registration outcome — see
+/// [`SHARD_REGISTRATION_OUTCOMES`] for the closed `outcome` vocabulary.
+pub fn inc_shard_registration(outcome: &str) {
+    SHARD_REGISTRATION_OUTCOMES
+        .with_label_values(&[outcome])
         .inc();
 }
 
@@ -3842,6 +4056,45 @@ pub fn inc_sync_round() {
 /// "sync_changes" | "announce_change").
 pub fn inc_sync_request(kind: &str) {
     SYNC_REQUESTS.with_label_values(&[kind]).inc();
+}
+
+/// Observe remote changes only after their serving projection succeeded.
+/// Invalid author clocks remain visible without contaminating the histogram.
+pub fn observe_sync_projected_apply_staleness(
+    plane: &str,
+    origin_timestamps: impl IntoIterator<Item = Option<i64>>,
+) {
+    observe_sync_projected_apply_staleness_at(
+        plane,
+        origin_timestamps,
+        chrono::Utc::now().timestamp_millis() as f64 / 1_000.0,
+    );
+}
+
+fn observe_sync_projected_apply_staleness_at(
+    plane: &str,
+    origin_timestamps: impl IntoIterator<Item = Option<i64>>,
+    receiver_now_seconds: f64,
+) {
+    debug_assert!(matches!(plane, "libp2p" | "iroh"));
+    for origin in origin_timestamps {
+        let Some(origin) = origin.filter(|value| *value > 0) else {
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                .with_label_values(&[plane, "missing"])
+                .inc();
+            continue;
+        };
+        let age = receiver_now_seconds - origin as f64;
+        if age < 0.0 {
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                .with_label_values(&[plane, "future"])
+                .inc();
+            continue;
+        }
+        SYNC_PROJECTED_APPLY_STALENESS_SECONDS
+            .with_label_values(&[plane])
+            .observe(age);
+    }
 }
 
 /// Record one event-driven head-adoption trigger outcome. See
@@ -4368,6 +4621,53 @@ impl seam_contracts::ReasonLabel for ReanchorSkip {
     }
 }
 
+/// Outcome of one pointer-audit sweep candidate (story 1.4d) — the label
+/// vocabulary of [`CONTENT_POINTER_AUDIT`], as a closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary — a skip must name its
+/// cause, never vanish into a missing count).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PointerAuditOutcome {
+    /// The row's declared head's own record named a different blob; the
+    /// pointer + size were refreshed via `StampMode::HealCanonical` — the
+    /// declared head and `dht_anchor_hash` did not move.
+    Healed,
+    /// Nothing to heal: the row already carries the record's pointer, OR the
+    /// row's declared head is not (or no longer) exactly the record's head —
+    /// a genuine head divergence, which stays with `head_adoption`'s other
+    /// paths and is never touched here.
+    InStep,
+    /// The own conductor's answer was a root-author FALLBACK, not an
+    /// authoritative record — never licenses a write.
+    NotCanonical,
+    /// The own conductor holds no head record for this id at all
+    /// (`resolve_content_head` returned `None`) — the same shape the
+    /// substrate-seam-smoke probe names `UNREADABLE-HEAD-RECORD`.
+    Unreadable,
+    /// The conductor call, or a local DB read the decision needed, failed.
+    Error,
+}
+
+impl seam_contracts::ReasonLabel for PointerAuditOutcome {
+    const ALL: &'static [Self] = &[
+        PointerAuditOutcome::Healed,
+        PointerAuditOutcome::InStep,
+        PointerAuditOutcome::NotCanonical,
+        PointerAuditOutcome::Unreadable,
+        PointerAuditOutcome::Error,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            PointerAuditOutcome::Healed => "healed",
+            PointerAuditOutcome::InStep => "in_step",
+            PointerAuditOutcome::NotCanonical => "not_canonical",
+            PointerAuditOutcome::Unreadable => "unreadable",
+            PointerAuditOutcome::Error => "error",
+        }
+    }
+}
+
 /// Which ADJUDICATED heal verdict the REA leg replayed instead of re-deriving it
 /// from the own conductor — the label vocabulary of [`REA_HEAL_REFUSED_SKIPPED`],
 /// as a closed type.
@@ -4617,6 +4917,14 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Record one pointer-audit sweep candidate's outcome (story 1.4d).
+pub fn inc_pointer_audit(outcome: PointerAuditOutcome) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_POINTER_AUDIT
+        .with_label_values(&[outcome.label()])
         .inc();
 }
 
@@ -6793,5 +7101,29 @@ mod tests {
         assert_eq!(success.get_sample_count(), success_before);
         assert_eq!(dropped.get(), dropped_before + 1);
         assert_eq!(timeouts.get(), timeouts_before);
+    }
+
+    #[test]
+    fn projected_apply_staleness_refuses_missing_and_future_origins() {
+        let histogram = SYNC_PROJECTED_APPLY_STALENESS_SECONDS.with_label_values(&["libp2p"]);
+        let missing =
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID.with_label_values(&["libp2p", "missing"]);
+        let future =
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID.with_label_values(&["libp2p", "future"]);
+        let histogram_before = histogram.get_sample_count();
+        let sum_before = histogram.get_sample_sum();
+        let missing_before = missing.get();
+        let future_before = future.get();
+
+        observe_sync_projected_apply_staleness_at(
+            "libp2p",
+            [Some(99), None, Some(0), Some(-1), Some(101)],
+            100.25,
+        );
+
+        assert_eq!(histogram.get_sample_count(), histogram_before + 1);
+        assert_eq!(missing.get(), missing_before + 3);
+        assert_eq!(future.get(), future_before + 1);
+        assert_eq!(histogram.get_sample_sum(), sum_before + 1.25);
     }
 }

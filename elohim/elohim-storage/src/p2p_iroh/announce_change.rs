@@ -9,28 +9,24 @@
 //! up to a full round (60s) to reach an iroh peer. This module is the sender;
 //! [`super::sync_backend`] is the receiver.
 //!
-//! ## Where the announce is wired (and where it deliberately is NOT)
+//! ## Where the announce is wired
 //!
 //! The content-projection producer takes an optional announce channel. In
-//! `main.rs` that producer is spawned in exactly two arms:
+//! `main.rs` that producer is spawned in exactly two arms, so each change is
+//! projected once:
 //!
-//! - the **libp2p arm** (`p2p_node.is_some()`), which passes the libp2p announce
-//!   channel — this covers `Dual` mode, where both stacks share ONE
-//!   `Arc<SyncManager>` (`sync.sled` takes an exclusive lock, so it is opened
-//!   once per process);
-//! - the **pure-iroh arm** (`p2p_node.is_none()`), which is where this bridge is
-//!   wired.
+//! - the **pure-iroh arm** (`p2p_node.is_none()`) passes this bridge's channel
+//!   with [`AnnounceScope::AllBookPeers`];
+//! - the **libp2p arm** (`p2p_node.is_some()`) covers `Dual` mode, where both
+//!   stacks share ONE `Arc<SyncManager>` (`sync.sled` takes an exclusive lock,
+//!   so it is opened once per process). Its forwarder rings libp2p and, in
+//!   Dual, also hands the change to this bridge with
+//!   [`AnnounceScope::IrohOnlyPeers`].
 //!
-//! So the dedup question ("in dual mode both planes announce — redundant?")
-//! answers itself STRUCTURALLY: in dual mode only the libp2p arm's producer
-//! exists, so only libp2p rings. There is no double-announce to bound, and no
-//! per-peer libp2p-route check to write. The cost is that in dual mode an
-//! iroh-only peer (one with no libp2p route) learns a fresh change from the iroh
-//! sync round rather than the doorbell — bounded by the round interval, which is
-//! exactly the guarantee that existed before this module. That is a deliberate
-//! trade of eager latency for zero redundant fan-out, not an oversight; the fix
-//! if it ever matters is to announce over iroh only to book peers whose entry
-//! carries no `libp2p_peer_id`, which the book already records.
+//! The scope is the dedup: a book entry carrying a `libp2p_peer_id` runs dual
+//! and is already rung on libp2p, so only peers without one get the iroh push.
+//! Before this, a dual node left iroh-only peers to the 60s round — measured on
+//! the household 2026-09-22 at 38.6s against ~0.9s on libp2p.
 //!
 //! ## Bounded and lossy, deliberately
 //!
@@ -46,7 +42,7 @@ use iroh::Endpoint;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info, warn};
 
-use super::peer_book::IrohPeerBook;
+use super::peer_book::{IrohPeerBook, IrohPeerEntry};
 use super::sync::IrohSyncClient;
 use crate::p2p::sync_protocol::SyncResponse;
 use crate::p2p::sync_round::{announce_request, bounded_announce_payload};
@@ -58,6 +54,25 @@ use crate::sync::SyncManager;
 /// changes queue behind it.
 const ANNOUNCE_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Which book peers an announce rings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnnounceScope {
+    /// Pure-iroh node: iroh is the only plane, ring everyone.
+    AllBookPeers,
+    /// Dual node: libp2p already rang every peer that runs it, so ring only
+    /// peers whose manifest carries no `libp2p_peer_id`.
+    IrohOnlyPeers,
+}
+
+impl AnnounceScope {
+    fn admits(self, entry: &IrohPeerEntry) -> bool {
+        match self {
+            AnnounceScope::AllBookPeers => true,
+            AnnounceScope::IrohOnlyPeers => entry.libp2p_peer_id.is_none(),
+        }
+    }
+}
+
 /// Everything the iroh doorbell needs to ring.
 pub struct IrohAnnounceInputs {
     pub endpoint: Endpoint,
@@ -67,6 +82,8 @@ pub struct IrohAnnounceInputs {
     /// Where the announced change's bytes are read from — the same manager the
     /// producer just wrote into.
     pub sync_manager: Arc<SyncManager>,
+    /// Which book peers to ring.
+    pub scope: AnnounceScope,
 }
 
 /// Spawn the announce bridge: translate each locally-authored change reported
@@ -92,6 +109,21 @@ pub async fn announce_local_change(
     doc_id: &str,
     change_hash: &str,
 ) -> usize {
+    // Scope first: a dual node's forwarder hands every change here, and in an
+    // all-dual household no book peer is iroh-only — so decide who to ring
+    // before paying a sync-store read for bytes nobody will receive.
+    let me = inputs.endpoint.node_id();
+    let peers: Vec<IrohPeerEntry> = inputs
+        .book
+        .snapshot(Some(&me))
+        .into_iter()
+        .filter(|entry| inputs.scope.admits(entry))
+        .collect();
+    if peers.is_empty() {
+        debug!(doc_id = %doc_id, scope = ?inputs.scope, "iroh announce: no book peers in scope, the round remains the propagation path");
+        return 0;
+    }
+
     // Carry THE announced change, addressed by the hash the producer already
     // names — never `get_changes_since(.., &[])`, which is every change since
     // genesis and overflows the bound on any mature doc (the libp2p plane's own
@@ -113,13 +145,6 @@ pub async fn announce_local_change(
         }
     };
     let eager_bytes = change_data.as_ref().map(|d| d.len()).unwrap_or(0);
-
-    let me = inputs.endpoint.node_id();
-    let peers = inputs.book.snapshot(Some(&me));
-    if peers.is_empty() {
-        debug!(doc_id = %doc_id, "iroh announce: no book peers, the round remains the propagation path");
-        return 0;
-    }
 
     let client = IrohSyncClient::new(&inputs.endpoint);
     let mut accepted = 0usize;
@@ -197,11 +222,31 @@ mod tests {
             endpoint: endpoint.clone(),
             book: IrohPeerBook::new(),
             sync_manager: sync_manager(dir.path()).await,
+            scope: AnnounceScope::AllBookPeers,
         };
         assert_eq!(
             announce_local_change(&inputs, "node:nobody", "deadbeef").await,
             0
         );
         endpoint.close().await;
+    }
+
+    /// Dual scope rings only peers with no libp2p leg; pure-iroh rings all.
+    #[test]
+    fn dual_scope_admits_only_iroh_only_peers() {
+        let node_id = iroh::SecretKey::from_bytes(&[7u8; 32]).public();
+        let entry = |libp2p: Option<&str>| IrohPeerEntry {
+            addr: iroh::NodeAddr::new(node_id),
+            agent_cid: None,
+            libp2p_peer_id: libp2p.map(str::to_string),
+            user_agent: None,
+            announced_at_ms: 0,
+        };
+        let dual = entry(Some("12D3KooWdual"));
+        let iroh_only = entry(None);
+        assert!(!AnnounceScope::IrohOnlyPeers.admits(&dual));
+        assert!(AnnounceScope::IrohOnlyPeers.admits(&iroh_only));
+        assert!(AnnounceScope::AllBookPeers.admits(&dual));
+        assert!(AnnounceScope::AllBookPeers.admits(&iroh_only));
     }
 }

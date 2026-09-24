@@ -106,6 +106,8 @@ import {
   getRaw,
   postRaw,
   probeConductorDiagnostics,
+  diagnosticsAgentsObservable,
+  diagnosticsUnobservableReason,
   probeDeclaredHead,
   probeP2PStatus,
   probeSyncDocHeads,
@@ -447,6 +449,17 @@ Given(
     const fixture = loadHouseholdMeshFixture();
     const storageUrl = requireFixtureStoragePeer(fixture, 'matthew').url;
     const { body } = await probeConductorDiagnostics(storageUrl);
+    // An unreadable peer store is NOT an empty one: the route omits `agents`
+    // with `agentsObservable: false`. Naming that here fails with the real
+    // precondition instead of "no agent holds DHT state", which would send a
+    // reader hunting the wrong defect. The CAUSE is only claimed where the
+    // conductor's own error establishes it — a missing kitsune space means the
+    // cells have not joined; a closed socket or a timeout means no such thing.
+    assert.ok(
+      diagnosticsAgentsObservable(body),
+      `matthew's /db/p2p/conductor-diagnostics cannot read the conductor's peer store, so no ` +
+        `agent set is observable yet: ${diagnosticsUnobservableReason(body)}`
+    );
     const live = liveAgentIds(body.agents ?? []);
     assert.ok(
       live.length > 0,
@@ -521,6 +534,12 @@ Then('the agent key and cells are unchanged', async function (this: E2EWorld) {
   const fixture = loadHouseholdMeshFixture();
   const storageUrl = requireFixtureStoragePeer(fixture, 'matthew').url;
   const { body } = await probeConductorDiagnostics(storageUrl);
+  assert.ok(
+    diagnosticsAgentsObservable(body),
+    `matthew's /db/p2p/conductor-diagnostics cannot read the conductor's peer store after the ` +
+      `restart, so the agent set is not observable — a different finding from "the agent set ` +
+      `changed": ${diagnosticsUnobservableReason(body)}`
+  );
   const after = liveAgentIds(body.agents ?? []);
   assert.deepStrictEqual(
     [...after].sort((a, b) => a.localeCompare(b)),

@@ -42,6 +42,13 @@ orchestrator Jenkinsfile" is `genesis/orchestrator/Jenkinsfile`.
    later levels. A selected long-running producer is awaited through a detached
    completion barrier when a selected consumer depends on it; otherwise it stays
    fire-and-forget.
+   Levels run one after another, so a coupled change pays each level's full
+   time in sequence. Every dispatchable pipeline owns its wall-clock budget in
+   its own Jenkinsfile `options { timeout }`, and the orchestrator's budget is
+   the **sum** along the longest dependency chain plus its own stages — never a
+   tuned number. `pipeline-budget.test.mjs` enforces both, so the orchestrator
+   is never the clock that stops a downstream. When a downstream budget grows,
+   the fix is to shrink that downstream, not to raise the sum.
 4. **Run Genesis.** On eligible dev branches, a selected pipeline with
    `triggersGenesis: true` adds Genesis unless `SKIP_GENESIS` is set. Genesis runs
    after every selected non-Genesis level returns a successful dispatch result.
@@ -347,6 +354,8 @@ dispatches edge, which fails. The DNA baseline moves to this commit and edge's
 stays where it was. The run ends `FAILURE`, so the global baseline goes back,
 and the next push re-dispatches both DNA and edge.
 
+**Watch-out — a pipeline is dispatched only when its OWN baseline is stale, never the frozen global one.** Per-pipeline baselines (`pipeline-baselines.json`) can advance past a frozen `__global__` diff base independently of each other, so the global changeset alone over-dispatches; and any `longRunning` producer that a surviving pipeline still depends on is always kept, regardless of that producer's own dispatch status. The already-built filter enforces this with a pure git+manifest read that groups pipelines by their own baseline, then re-runs the same Groovy manifest walk the plan stage uses per group, skipping a pipeline only when that walk excludes it and no survivor still needs it. Full three-phase mechanism, the floating-tag argument against trusting controller build history, and the measured incidents that motivated it (#1888, #1886, #1844): `genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md`.
+
 ### Genesis
 
 Its own changed inputs or `[build:genesis]` select Genesis, as does step 4 of
@@ -433,6 +442,12 @@ or trigger logic:
   effect only in Jenkins.
 - Jenkinsfile `groupByDependencyLevel` owns pipeline-level ordering of the final
   selected set; `triggerPipeline` owns dispatch and result classification.
+- `timer-dispatch.mjs` owns the `groups`/`decide` phases of the already-built
+  filter — git and manifest reads only, no glob matcher of its own.
+- `commit-tag-parser.mjs` is the single home for commit-message tag grammar
+  (`[build:…]`, `[conductor:…]`, skip/deploy-only/reseed/validate-only).
+- `reconcile-build-graph.mjs` compares `predicted-build-graph.json` against
+  `actual-build-graph.json` and marks the orchestrator UNSTABLE on drift.
 
 Key invariants that naive edits break: `levelFailed` must stop later levels;
 waited baselines advance only after confirmed success; standalone long-running

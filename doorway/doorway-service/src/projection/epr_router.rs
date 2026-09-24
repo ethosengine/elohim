@@ -361,6 +361,15 @@ pub struct EprRouter {
     /// diffs the previous value against the new one to arm the revocation
     /// shield for anything that dropped out.
     primary_sourced_ids: RwLock<HashSet<String>>,
+    /// Wakes once per `replace_all` that actually changed the router
+    /// (story 4.2 slice 1, `services::federation_doorbell::spawn_doorbell_ringer`).
+    /// `Notify` stores exactly one permit, so a burst of `replace_all` calls
+    /// between ringer wakeups coalesces to one wake — the bounded, lossy
+    /// channel the design calls for (§3.1). NOT gated on whether the
+    /// generation actually moved the DIGEST (a no-op refetch still bumps
+    /// `generation`); the ringer's own `last_rung` check is what skips a wake
+    /// that produced no real digest change.
+    changed: tokio::sync::Notify,
 }
 
 /// The post-validation truth of a `replace_all`: how many rows were actually
@@ -520,6 +529,9 @@ impl EprRouter {
         // Bump the generation last — readers (sitemap) compare against this to
         // decide whether their materialized projection is stale (spec §7.5).
         self.generation.fetch_add(1, Ordering::SeqCst);
+        // Wake the doorbell ringer (story 4.2 slice 1) — see `changed`'s doc
+        // comment for why this is unconditional (not gated on digest change).
+        self.changed.notify_one();
 
         ReplaceOutcome {
             installed,
@@ -856,6 +868,13 @@ impl EprRouter {
     /// decide whether to re-render (spec §7.5).
     pub fn generation(&self) -> u64 {
         self.generation.load(Ordering::SeqCst)
+    }
+
+    /// The doorbell ringer's wake source (story 4.2 slice 1). `notified()`
+    /// resolves once per `replace_all`, coalesced by `Notify`'s single-permit
+    /// semantics — see `changed`'s doc comment.
+    pub fn changed(&self) -> &tokio::sync::Notify {
+        &self.changed
     }
 
     /// Snapshot of the live mount url_paths (telemetry + sitemap projection).

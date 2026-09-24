@@ -115,15 +115,14 @@ spec:
       environment: ENV_PLACEHOLDER
   template:
     metadata:
-      annotations:
-        # Force a rolling restart on next apply so Adam's pod picks up the
-        # Phase A elohim-storage image published by edge #901. Holochain
-        # #1125 deployed Adam's peer-policy ConfigMap before edge finished
-        # publishing the new image, so the running pod has the ConfigMap
-        # mounted but no forwarder code to honor it. Bump this timestamp
-        # to force another rollout whenever the running image lags the
-        # latest dev-latest.
-        kubectl.kubernetes.io/restartedAt: "2026-04-21T07:30:00Z"
+      # POD-TEMPLATE STABILITY (2026-09-22): nothing that changes on an
+      # ordinary commit may live here — the deploy restarts storage only when
+      # the live pod template or its ConfigMaps move (podInputsFingerprint in
+      # elohim/holochain/Jenkinsfile). The hand-pinned
+      # `kubectl.kubernetes.io/restartedAt: "2026-04-21T07:30:00Z"` that sat
+      # here (a one-off edge #901 image catch-up) is gone: apply reverted every
+      # later `rollout restart` stamp to it, so it moved the template on the
+      # deploy after each restart. Force a roll with `[storage-roll]` instead.
       labels:
         app: elohim-edgenode
         elohim-human: adam-firstman
@@ -133,7 +132,9 @@ spec:
         elohim-workload: storage
         app.kubernetes.io/name: edgenode
         app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+        # No app.kubernetes.io/version here: a git-SHA label in the POD
+        # template restarted every storage peer on every commit (the
+        # staggered-restart root cause). It stays on OBJECT metadata above.
         app.kubernetes.io/component: data
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins

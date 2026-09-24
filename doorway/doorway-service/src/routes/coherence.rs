@@ -143,6 +143,89 @@ pub fn router_fingerprint(
     }
 }
 
+/// `{doorwayId, digest}` — story 4.2 slice 1. Evidence that the sender's own
+/// digest just changed. NOT a new authority: it carries no heads, so the
+/// receiver cannot install anything from the doorbell body itself (C5
+/// evidence≠authority) — it only triggers a pull of the sender's OWN
+/// `GET /api/v1/federation/coherence`, at the URL this doorway already holds
+/// in `peer_cache` (never a URL taken from the body). See
+/// `crate::services::federation_doorbell`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoherenceDoorbell {
+    pub doorway_id: String,
+    pub digest: String,
+}
+
+/// Body-size ceiling for `POST /api/v1/federation/doorbell`. The body is two
+/// short JSON fields (`{doorwayId, digest}`); 4 KiB mirrors
+/// `routes::admin_dev::MAX_FIXTURE_BODY_BYTES` — the route is reachable by
+/// any peer BEFORE the peer-cache check, so the read must be bounded.
+pub const MAX_DOORBELL_BODY_BYTES: usize = 4 * 1024;
+
+/// `POST /api/v1/federation/doorbell` — story 4.2 slice 1. A sibling that
+/// just changed its own digest rings this doorway so it learns within
+/// seconds, without waiting on the 60s discovery poll (see
+/// `crate::services::federation_doorbell::spawn_doorbell_ringer`).
+///
+/// - `202 {"pulled":false,"reason":"deaf"}` — the household "deaf" fixture is
+///   standing (`PUT /admin/dev/federation-deaf`); never real production
+///   behavior (it is scenario 3's counterfactual control).
+/// - `404 {"error":"unknown-doorway"}` — the `doorwayId` is not in
+///   `peer_cache` (C4 honest absence).
+/// - `202 {"pulled":false}` — the digest already matches the held one (C6b
+///   idempotent).
+/// - `202 {"pulled":true}` — a pull was spawned, or queued behind one already
+///   running for this holder (C6a bounded work). The sender is never held for
+///   the pull itself (C5).
+pub async fn handle_doorbell(state: Arc<AppState>, body: Bytes) -> Response<Full<Bytes>> {
+    use crate::services::federation_doorbell::{self, DoorbellReceipt};
+
+    if federation_doorbell::is_deaf(&state).await {
+        crate::metrics::record_doorbell(
+            federation_doorbell::SIDE_RECEIVE,
+            federation_doorbell::OUTCOME_DEAF,
+        );
+        return doorbell_json_response(
+            StatusCode::ACCEPTED,
+            &serde_json::json!({ "pulled": false, "reason": "deaf" }),
+        );
+    }
+
+    let doorbell: CoherenceDoorbell = match serde_json::from_slice(&body) {
+        Ok(d) => d,
+        Err(e) => {
+            return doorbell_json_response(
+                StatusCode::BAD_REQUEST,
+                &serde_json::json!({ "error": format!("invalid JSON: {e}") }),
+            )
+        }
+    };
+
+    match federation_doorbell::receive_doorbell(&state, doorbell).await {
+        DoorbellReceipt::UnknownDoorway => doorbell_json_response(
+            StatusCode::NOT_FOUND,
+            &serde_json::json!({ "error": "unknown-doorway" }),
+        ),
+        DoorbellReceipt::NoOp => doorbell_json_response(
+            StatusCode::ACCEPTED,
+            &serde_json::json!({ "pulled": false }),
+        ),
+        DoorbellReceipt::Pulling | DoorbellReceipt::Queued => {
+            doorbell_json_response(StatusCode::ACCEPTED, &serde_json::json!({ "pulled": true }))
+        }
+    }
+}
+
+fn doorbell_json_response(status: StatusCode, body: &serde_json::Value) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .header("Cache-Control", "no-store")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
 /// Per-peer divergence verdict (Cat-C, observability-only). `agrees` = the peer
 /// was reachable AND its `digest` matches ours. `divergent_paths` names the
 /// pillars whose heads differ (operator-actionable). This is NEVER reconciled —
