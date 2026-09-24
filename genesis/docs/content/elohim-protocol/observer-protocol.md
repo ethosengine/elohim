@@ -1,5 +1,8 @@
 ---
 id: observer-protocol
+cites:
+  - "elohim-protocol-manifesto | The vision this epic deepens; its Witnessed Humanity section (Part III) is the digital half of the Sybil answer whose physical half is written here: humanity witnessed by those who know you, attunement over filters, the sense that notices a counterfeit, the privacy line. | sha256:8ce1acd2670cf1f1 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "shefa-economic-infrastructure | The economic pillar where social attestation against Sybil rings was first written (§5): people who know you attest, staking their own standing; the Observer adds the physical witness to that same relational shape. | sha256:74323616b4696d99 | path: genesis/docs/content/elohim-protocol/shefa.md"
 ---
 
 # **The Elohim Observer: When Being Seen Becomes Sacred**
@@ -71,14 +74,17 @@ The technology already exists in Ring doorbells, Nest cameras, corporate surveil
 
 ### **The Sybil Attack Solution**
 
-One of blockchain's greatest challenges is the Sybil attack—one entity pretending to be many. The Observer network solves this through continuous humanity verification:
+One of every open network's oldest challenges is the Sybil attack—one entity pretending to be many. Every prior answer has been a filter: a document, a scan, a test that compares a person to a template of "human" and admits whoever matches. Filters fail the people the template never anticipated, and they are exactly what an adversarial agent learns to pass. The Elohim Protocol answers instead with witness: humanity attested by those who know you, staked on the witness's own standing, contestable, never inferred by the substrate and never reduced to a score. The manifesto's *Witnessed Humanity* section lays out the digital half of that answer, where the witness is an agent attuned to a person through what they state and reveal. The Observer is where that same answer gains a body.
 
-**Physical Presence**: Cameras verify actual humans, not bots
-**Behavioral Patterns**: Real humans have consistent patterns
-**Biometric Hashing**: Privacy-preserving identity verification
-**Social Verification**: Network of relationships confirms identity
+**Physical Presence**: Hardware the household itself controls, under a mechanical privacy switch, witnesses that a person was here, breathing and moving in a real place. It writes a story of presence and then forgets the frames. It does not verify against a template of what a human looks like; it witnesses that this person lived here.
 
-This happens continuously, invisibly. Your humanity is proven by your witnessed life, not government IDs or corporate verification.
+**Consistency With Yourself**: Real people are consistent with themselves over time, in their own shape, which may be nothing like anyone else's. The Observer's patterns are attunement to the person it has actually seen, not a population profile. A neurodivergent life has a shape, and the Observer that knows it recognises it.
+
+**Correlation, Not Biometrics**: No biometric identity is produced or stored. What the Observer contributes is correlation: the person the household's agents are attuned to in the digital record and the person its own eyes have witnessed in the kitchen are, over a witnessed life, one person. A counterfeit that can fake a stream of text cannot fake having lived somewhere.
+
+**Social Verification**: The people who share the space attest to who you are, and each attestation carries the attester's own standing. A ring of invented identities that only vouch for one another has no one outside the ring, and no kitchen, to vouch for it.
+
+This happens continuously, and only where a person has chosen to be seen. Your humanity is proven by your witnessed life, not government IDs or corporate verification, first in the digital record and then, on your own terms, in the physical one.
 
 ### **The Mental Load Liberation**
 
