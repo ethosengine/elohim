@@ -12,8 +12,8 @@ flag→aggregate→surface loop the skill marks reserved in the engine (override
 built natively as a companion signal instead of faked against an unwired key. The protocol exercising
 its own governance over the bytes of this repo.
 
-Detection reuses the SHARED detector in _lib.epr_meta (_sov_apex_count / _SOV_APEX_PHRASES) so the
-ledger and the gate can never disagree on what "apex" means. Net-new only: an Edit is scored on the
+Detection reuses the SHARED classifier in _lib.frame_atoms (the frame atom both governance hosts
+read) so the ledger and the gate can never disagree on what "apex" means. Net-new only: an Edit is scored on the
 delta (pre-edit reconstructed from old_string→new_string), so cleaning/maintenance is never logged.
 
 Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
@@ -40,7 +40,7 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
-from _lib import epr_meta as em  # noqa: E402  (shared detector — single source of truth)
+from _lib import frame_atoms  # noqa: E402  (shared classifier — the frame atom is the source of truth)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _observation as _obs  # noqa: E402  (structured-observation emitter; JSON fallback while absent)
 
@@ -76,11 +76,7 @@ def active_rule_version(repo: Path, rule_id: str) -> str:
         return f"{rule_id}@1"
 
 _ESCALATE_AT = 3  # landings before the message asks for a rule/corpus drift review
-
-
-def _matched_phrases(pre: str, post: str) -> list[str]:
-    lp, lpost = pre.lower(), post.lower()
-    return sorted({p for p in em._SOV_APEX_PHRASES if lpost.count(p) > lp.count(p)})
+_SOV_REF = "epr:validator-sovereignty-ontology-guard"
 
 
 def main() -> int:
@@ -104,21 +100,24 @@ def main() -> int:
         post = doc.read_text(errors="replace")
     except OSError:
         return 0
-    if em._SOV_FRAME_MARKER in post.lower():
-        return 0  # frame adjudicated for this surface — consistent with the gate
-
     # Reconstruct the pre-edit content so we score NET-NEW apex framing (introduction, not maintenance).
     if tool == "Edit":
         old, new = ti.get("old_string", ""), ti.get("new_string", "")
         pre = post.replace(new, old) if ti.get("replace_all") else post.replace(new, old, 1)
     else:  # Write — no reliable prior state post-hoc; score the whole file as introduced (conservative)
         pre = ""
-    net_new = em._sov_apex_count(post) - em._sov_apex_count(pre)
-    if net_new <= 0:
-        return 0
+    try:
+        found = frame_atoms.classify(
+            {"content": post, "prior_content": pre, "is_new": False, "path": rel}, _SOV_REF)
+    except frame_atoms.FrameAtomError:
+        return 0  # telemetry degrades, it never blocks
+    if found is None or found["verdict"] == "legitimate":
+        return 0  # nothing net-new, or a frame adjudicated for this surface — consistent with the gate
+    net_new = found["netNew"]
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    phrases = _matched_phrases(pre, post)
+    phrases = [p for p in found["matchedRecallSignal"]
+               if not p.endswith(":") and p != frame_atoms.UNSCANNED_TAIL]
 
     # 1) append the landing to the ledger
     try:

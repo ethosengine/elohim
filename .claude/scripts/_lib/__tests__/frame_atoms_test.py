@@ -229,6 +229,120 @@ if rm_sov:
 if rm_own:
     check("Rust ownership_guard markers == pinned", rm_own == PINNED_OWN_MARKERS, f"got {rm_own}")
 
+# ── The Python mirror (`_lib/frame_atoms.py`) of the native classifier (`frames.rs`) ─────────
+import os  # noqa: E402
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+
+from _lib import frame_atoms  # noqa: E402
+
+# Pinned by the native classifier (`frames::tests::atom_cid_matches_registry_row_recipe` and
+# `golden_fixture_classification_cid`); the same literals, so either host drifting reds both.
+RUST_ATOM_CIDS = {
+    "epr:validator-sovereignty-ontology-guard":
+        "bafyreif2vuz6tnzwtvkgogulw25u2h65edipkbyxw5guf2yyezy5i5zo4e",
+    "epr:validator-ownership-ontology-guard":
+        "bafyreif2f3eve4kg5skanqi4exvigznllxuqsy6r6w6t4pgibp2cybx2xe",
+}
+RUST_GOLDEN_CLASSIFICATION_CID = "bafyreifb4rgfeqi74y2ulv2hnijbu6n3fjrgap2y6fhmrqnpnazg6lmenm"
+SOV = "epr:validator-sovereignty-ontology-guard"
+
+print("atom_cid_equals_rust_pin")
+_frames = frame_atoms.load_frames(REPO)
+for ref, pin in RUST_ATOM_CIDS.items():
+    check(f"{ref} frameRef == the Rust pin", _frames[ref][1] == pin, f"got {_frames[ref][1]}")
+    check(f"{ref} frameRef is sha256 over policy_content_hash's canonical bytes",
+          frame_atoms.frame_ref(_frames[ref][0]) == pin)
+
+print("spans_index_original_bytes_after_fold")
+_content = "We are self\u2011s\u043evereign now."
+_r = frame_atoms.classify({"content": _content, "is_new": True, "path": "x.md"}, SOV, REPO)
+_raw = _content.encode("utf-8")
+_start, _end = _raw.index(b"self"), _raw.index(b" now")
+check("Cyrillic + non-breaking-hyphen homoglyph classifies abstain",
+      _r is not None and _r["verdict"] == "abstain")
+check("span offsets index the ORIGINAL UTF-8 bytes",
+      _r["spans"] == [{"start": _start, "end": _end}], f"got {_r['spans']}")
+check("the span slices the homoglyph phrase out of the original bytes",
+      _raw[_start:_end].decode("utf-8") == "self\u2011s\u043evereign")
+_wide = "\uff33\uff45\uff4c\uff46-sovereign."
+_r = frame_atoms.classify({"content": _wide, "is_new": True, "path": "x.md"}, SOV, REPO)
+check("NFKC folds fullwidth letters; the span still indexes original bytes",
+      _r is not None and _r["spans"] == [{"start": 0, "end": _wide.encode().index(b".")}])
+_atom, _cid = _frames[SOV]
+with tempfile.TemporaryDirectory() as _td:
+    _root = Path(_td)
+    shutil.copytree(FRAMES, _root / frame_atoms.FRAMES_REL)
+    _atom_path = _root / frame_atoms.FRAMES_REL / "frame-sovereignty-apex.json"
+    _capped = json.loads(_atom_path.read_text())
+    _capped["recall_signal"]["scan_cap_bytes"] = 16
+    _atom_path.write_text(json.dumps(_capped))
+    _homo = "self\u2011s\u043evereign"
+    _doc = f"{_homo} one\nfully sovereign\n{_homo} two\n"
+    _r = frame_atoms.classify({"content": _doc, "is_new": True, "path": "x.md"}, SOV, _root)
+    _beyond = _doc.encode().index(b"fully")
+    check("scan cap: head folded, tail substring-only (Rust parity)",
+          _r["spans"] == [{"start": 0, "end": len(_homo.encode())},
+                          {"start": _beyond, "end": _beyond + len("fully sovereign")}],
+          f"got {_r['spans']}")
+    check("scan cap: unscanned-tail recorded last",
+          _r["matchedRecallSignal"][-1] == frame_atoms.UNSCANNED_TAIL)
+
+print("loader_falls_back_to_lib_repo_root")
+_saved = os.environ.get("CLAUDE_PROJECT_DIR")
+try:
+    with tempfile.TemporaryDirectory() as _td:
+        os.environ["CLAUDE_PROJECT_DIR"] = _td  # a hook-test project dir: no atoms
+        check("without atoms under CLAUDE_PROJECT_DIR the loader falls back to the _lib repo",
+              frame_atoms.repo_root() == REPO.resolve())
+        check("…and the fallback loads both atoms at their pinned CIDs",
+              {r: c for r, (_, c) in frame_atoms.load_frames().items()} == RUST_ATOM_CIDS)
+        (Path(_td) / frame_atoms.FRAMES_REL).mkdir(parents=True)
+        check("a project dir that carries the frames dir is preferred",
+              frame_atoms.repo_root() == Path(_td))
+        try:
+            frame_atoms.load_frames()
+            check("an empty frames dir refuses rather than passing", False)
+        except frame_atoms.FrameAtomError:
+            check("an empty frames dir refuses rather than passing", True)
+finally:
+    if _saved is None:
+        os.environ.pop("CLAUDE_PROJECT_DIR", None)
+    else:
+        os.environ["CLAUDE_PROJECT_DIR"] = _saved
+
+print("reason_line_matches_rust_format")
+# The native reason for the golden fixture (frames::tests::golden_fixture_classification_cid),
+# built from the same format string with the Rust-minted classification CID.
+_golden_reason = ("net-new apex-sovereignty framing needs an explicit bounded frame · "
+                  "frame bafyreif…zo4e · classification bafyreif…menm · abstain")
+check("reason_line with the native classification CID is byte-identical to Rust's",
+      frame_atoms.reason_line(_atom, _cid, RUST_GOLDEN_CLASSIFICATION_CID, "abstain")
+      == _golden_reason)
+_golden = frame_atoms.classify(
+    {"content": "# Golden frame fixture\n\nThe protocol names self-sovereign identity its apex.\n",
+     "is_new": True, "path": "genesis/docs/content/elohim-protocol/golden-frame.md"}, SOV, REPO)
+_g_bytes = "# Golden frame fixture\n\nThe protocol names self-sovereign identity its apex.\n".encode()
+_s1 = _g_bytes.index(b"self-sovereign")
+_s2 = _g_bytes.index(b"sovereign identity")
+check("golden fixture: abstain at confidence 2/3 with both spans (Rust parity)",
+      _golden["verdict"] == "abstain" and _golden["confidence"] == 2 / 3
+      and _golden["spans"] == [{"start": _s1, "end": _s1 + 14}, {"start": _s2, "end": _s2 + 18}],
+      f"got {_golden}")
+check("golden fixture: Python mints no classification CID (R-C4 amended)",
+      _golden["classificationCid"] is None)
+check("golden fixture: Python's reason differs from Rust's ONLY in the unminted classification",
+      _golden["reason"] == _golden_reason.replace("bafyreif…menm", frame_atoms.UNMINTED))
+check("ownership leads with its own clause, same format",
+      frame_atoms.reason_line(_frames["epr:validator-ownership-ontology-guard"][0],
+                              RUST_ATOM_CIDS["epr:validator-ownership-ontology-guard"], None,
+                              "drift")
+      == "net-new apex-ownership framing needs an explicit custody/stewardship frame · "
+         "frame bafyreif…x2xe · classification unminted · drift")
+check("no CBOR encoder in the mirror (R-C4 amended)",
+      "cbor" not in (REPO / ".claude/scripts/_lib/frame_atoms.py").read_text().lower().replace(
+          "dag-cbor", ""))
+
 print()
 if _failures:
     print(f"  {_passed} passed, {len(_failures)} FAILED ❌")

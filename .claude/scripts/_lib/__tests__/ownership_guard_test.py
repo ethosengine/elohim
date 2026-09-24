@@ -2,11 +2,12 @@
 """Harness for the ownership-ontology guard (`epr:validator-ownership-ontology-guard`).
 
 Locks the two decisions that are easy to silently regress:
-  1. the PROPERTY-vs-RESPONSIBILITY precision line in `_OWN_APEX_PHRASES` — English overloads
+  1. the PROPERTY-vs-RESPONSIBILITY precision line in the ownership frame atom's phrases — English overloads
      "ownership", and the accountability idiom ("take full ownership of this bug", "the full
      ownership matrix") must never fire an enclosure guard; and
   2. the contract mirrored from `_sovereignty_ontology_guard` — net-new-only, frame-marker escape
-     (either marker), `is_new` handling, fail-toward-surfacing on an unreadable prior file.
+     (either marker), `is_new` handling, fail-toward-surfacing on an unreadable prior file; the vocabulary is the frame atom
+     `frame-ownership-inalienable` (read through `_lib/frame_atoms.py`).
 
 Run: python3 .claude/scripts/_lib/__tests__/ownership_guard_test.py   (no pytest in this repo)
 """
@@ -29,8 +30,12 @@ def check(name, got, expected):
         failures.append(f"{name}: got {got!r}, expected {expected!r}")
 
 
-def fires(content, *, is_new=True, path="does-not-exist.md"):
+def verdict(content, *, is_new=True, path="does-not-exist.md"):
     return GUARD({"content": content, "is_new": is_new, "path": path})
+
+
+def fires(content, **kw):
+    return verdict(content, **kw) is not None
 
 
 # ── 1. Apex framing fires on a new file ────────────────────────────────────────────────────────
@@ -70,6 +75,19 @@ with tempfile.TemporaryDirectory() as td:
 # ── 5. Unreadable prior state fails toward surfacing (it is only an `ask`) ──────────────────────
 check("unreadable prior surfaces",
       fires("true data ownership", is_new=False, path="/nonexistent/dir/missing.md"), True)
+
+# ── 5b. A fired verdict names its content-addressed frame; the classification CID is native-only ─
+_v = verdict("Members get true data ownership.")
+check("fired verdict carries evidence", isinstance(_v.evidence, dict), True)
+check("evidence frameRef is a CID", str(_v.evidence.get("frameRef", "")).startswith("bafy"), True)
+check("evidence classificationCid is None (Python mints none)", _v.evidence["classificationCid"], None)
+check("verdict carries no class of its own (inherits the rule's)", _v.cls, None)
+check("evidence verdict is abstain (hits, no marker)", _v.evidence["verdict"], "abstain")
+check("reason leads with the ownership clause",
+      _v.reason.startswith("net-new apex-ownership framing needs an explicit custody/stewardship "
+                           "frame · frame bafyrei"), True)
+check("apex marker is drift", verdict("stewardship-frame: apex\nOwn your data.").evidence["verdict"],
+      "drift")
 
 # ── 6. Registry wiring + policy binding ────────────────────────────────────────────────────────
 check("validator registered", "epr:validator-ownership-ontology-guard" in em.REFERENCE_VALIDATORS, True)

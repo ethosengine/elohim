@@ -437,6 +437,12 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
                                 f"evaluated. {why}", rid, "unresolvable-validator")
         result = REFERENCE_VALIDATORS[ref](write)
         if isinstance(result, Verdict):
+            if result.cls is None:
+                # The twin of native `ValidatorOutcome::Classified`: a validator never sees its
+                # rule, so a classification carries no class of its own. It takes the rule's
+                # DECLARED class and the native reason format; its evidence rides through.
+                return Verdict(cls, f"validator `{ref}` flagged this write: {result.reason}. {why}",
+                               rid, result.refer_reason, result.evidence)
             # `evidence` rides through: a validator that MINTS algedonic evidence must not
             # have it dropped by the re-wrap that only exists to stamp the rule id.
             return Verdict(result.cls, result.reason, rid, result.refer_reason, result.evidence)
@@ -612,98 +618,42 @@ def _brand_vocabulary_boundary(write: dict) -> bool:
     return True
 
 
-# ── Sovereignty ontology guard (a validator-EPR). Fires an `ask` when a write NEWLY INTRODUCES
-# apex-assertion sovereignty framing — "self-sovereign" as the top identity/agency tier, "true/full
-# data sovereignty" celebrated as a goal — the crypto ontology the protocol rejects. It is a GUARD,
-# not a ban (`ask`, one-keystroke override); the `why:` teaches the fix and names the three LEGITIMATE
-# frames it deliberately does NOT fire on. Canon: genesis/docs/architecture/stewardship-over-sovereignty.md
-# ("we do not consider sovereignty itself to be the right framing") + values-forward.md Stance II.4
-# ("sovereignty is not forbidden — it is made mechanically expensive").
-#   Legitimate (guard stays silent): (1) ADVERSARY frame — what's resisted / external actors
-#   ("nation-states near-sovereign yet subject to the protocol"); (2) BOUNDED frame — "sovereign within
-#   higher bounds", the collective human floor sovereign over the machine; (3) BRIDGE-LEGIBILITY frame —
-#   a self-sovereign wallet making a participant legible to EXTERNAL sovereigns (a credit union/mutual),
-#   authority/head/ceiling still flowing from the commons governance pool.
-#   Drift (guard fires): self-sovereign as the protocol's OWN apex identity value; "true data
-#   sovereignty" as an implementation goal.
-# The guard fires only on NET-NEW apex framing (post-edit count > pre-edit count), so editing a file to
-# CLEAN sovereignty — or any maintenance edit to a surface already carrying it — is never trapped.
-_SOV_APEX_PHRASES = (
-    "self-sovereign", "self sovereign", "self-sovereignty", "self sovereignty",
-    "true data sovereignty", "full data sovereignty", "sovereign identity",
-    "digital sovereignty", "fully sovereign",
-)
-# A co-located frame declaration suppresses the guard where the frame is already adjudicated (the wallet
-# bridge crate declares this once, in-content or via a nearest-wins `.epr-meta` override on the rule id).
-_SOV_FRAME_MARKER = "sovereignty-frame:"
+# ── Sovereignty and ownership ontology guards (validator-EPRs). Their vocabulary is no longer code:
+# the phrases, frame markers and reason clause live in content-addressed frame atoms under
+# elohim/sdk/schemas/v1/frames/ (frame-sovereignty-apex, frame-ownership-inalienable), read by both
+# hosts, and `_lib/frame_atoms.py` mirrors the native classifier (epr-cli `frames.rs`). Canon:
+# genesis/docs/architecture/stewardship-over-sovereignty.md + values-forward.md Stance II.4
+# ("sovereignty is not forbidden — it is made mechanically expensive"); ownership is the
+# enclosure-flavoured sibling the protocol subordinates to stewardship and custody (ValueFlows
+# `primaryAccountable` vs `custodianScope`), with the property-vs-responsibility precision line
+# ("take full ownership of this bug" is not a member) held in the atom's phrase list.
+#   Net-new only: the write fires when its added lines carry more apex phrases than its removed
+#   ones, so cleaning or maintaining existing framing never fires. A declared legitimate frame
+#   (`sovereignty-frame: adversary`, `stewardship-frame: bounded`, …) stays silent; a declared
+#   `apex` is drift; hits with no marker are abstain. Rows are `class: dispatch` (advisory).
+#   The verdict carries no class of its own — `_eval_rule` gives it the rule's declared class, the
+#   twin of native `ValidatorOutcome::Classified` — and its evidence is the classification mirror
+#   (`frameRef`, `verdict`, `spans`, `reason`, `classificationCid: None`: only the native host mints
+#   the classification CID). An unreadable atom never passes: it surfaces as a flag.
+def _frame_guard(write: dict, ref: str) -> Verdict | None:
+    from _lib import frame_atoms  # lazy: frame_atoms computes frame refs through this module
 
-
-def _sov_apex_count(text: str) -> int:
-    t = text.lower()
-    return sum(t.count(p) for p in _SOV_APEX_PHRASES)
-
-
-# ── Ownership ontology guard. The sibling drift to sovereignty, and the same shape: OWNERSHIP is
-# the enclosure-flavoured apex the protocol subordinates to STEWARDSHIP/CUSTODY. ValueFlows already
-# splits the two — `primaryAccountable` (who holds the rights) vs `custodianScope` (who physically
-# stewards), with distinct `transferCustody` / `transferAllRights` actions — and collapsing them is
-# precisely the enclosure failure the Georgist common-inheritance framing exists to prevent: a holon
-# that "owns" the commons it stewards has enclosed it. Phrases are narrow on purpose (the bare words
-# "own"/"owner" are far too common to gate); these are the ones that assert ownership as the RIGHT
-# relationship to a resource. Escape hatch mirrors sovereignty's: declare `stewardship-frame:`.
-# PRECISION NOTE (audit 2026-08-05): the discriminator is PROPERTY vs RESPONSIBILITY. English uses
-# "ownership" for both — "take full ownership of this bug", "the full ownership matrix" (already in
-# 5 files here: timeline/CONVENTIONS.md + the deliver skill and its 3 projections), "without sole
-# ownership burden". Those are accountability idioms, not enclosure claims, so `full ownership` and
-# `sole ownership` were REMOVED after a corpus grep proved the collision. What remains is
-# property-flavoured only.
-_OWN_APEX_PHRASES = (
-    "data ownership", "own your data", "owns their data", "owns your data",
-    "true ownership", "outright ownership",
-    "ownership rights", "ownership of the commons", "owns the commons",
-)
-_OWN_FRAME_MARKER = "stewardship-frame:"
-
-
-def _own_apex_count(text: str) -> int:
-    t = text.lower()
-    return sum(t.count(p) for p in _OWN_APEX_PHRASES)
-
-
-def _sovereignty_ontology_guard(write: dict) -> bool:
-    post = write.get("content") or ""
-    if _SOV_FRAME_MARKER in post.lower():
-        return False  # frame explicitly declared/adjudicated for this surface
-    post_n = _sov_apex_count(post)
-    if post_n == 0:
-        return False
-    if write.get("is_new"):
-        return True  # brand-new file: all apex framing is net-new
     try:
-        pre = Path(write["path"]).read_text(errors="replace")
-    except OSError:
-        return True  # can't read prior state — fail toward surfacing (it's only an `ask`)
-    return post_n > _sov_apex_count(pre)  # net-new only; cleaning/maintenance never fires
+        result = frame_atoms.classify(write, ref)
+    except frame_atoms.FrameAtomError as exc:
+        return Verdict(None, f"frame atom unreadable — the guard cannot classify ({exc})",
+                       None, "unresolvable-validator")
+    if result is None or result["verdict"] == "legitimate":
+        return None
+    return Verdict(None, result["reason"], None, None, result)
 
 
-def _ownership_ontology_guard(write: dict) -> bool:
-    """Fires on NET-NEW apex-ownership framing. Same contract as the sovereignty guard: an
-    affirmation prompt, never a ban — confirm the frame is legitimate (adversary / bounded /
-    external-legibility) or reframe toward custody+stewardship."""
-    post = write.get("content") or ""
-    low = post.lower()
-    if _OWN_FRAME_MARKER in low or _SOV_FRAME_MARKER in low:
-        return False  # frame explicitly declared/adjudicated for this surface
-    post_n = _own_apex_count(post)
-    if post_n == 0:
-        return False
-    if write.get("is_new"):
-        return True
-    try:
-        pre = Path(write["path"]).read_text(errors="replace")
-    except OSError:
-        return True  # can't read prior state — fail toward surfacing (it's only an `ask`)
-    return post_n > _own_apex_count(pre)  # net-new only
+def _sovereignty_ontology_guard(write: dict) -> Verdict | None:
+    return _frame_guard(write, "epr:validator-sovereignty-ontology-guard")
+
+
+def _ownership_ontology_guard(write: dict) -> Verdict | None:
+    return _frame_guard(write, "epr:validator-ownership-ontology-guard")
 
 
 # ── Archetype resource alignment (a validator-EPR). Fires an `ask` when deployments.json carries

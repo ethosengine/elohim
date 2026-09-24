@@ -132,6 +132,37 @@ for _blocking in ("ask", "deny"):
     check(f"{_blocking} rule w/ unregistered validator STILL routes to review (S5 law)",
           _v is not None and _v.cls in ("ask", "deny"))
 
+# ── A validator that returns `Verdict(None, reason, None, None, evidence)` is the Python twin of
+# native `ValidatorOutcome::Classified`: it cannot see its rule, so the passthrough gives it the
+# rule's DECLARED class and the native reason format, and carries the evidence untouched. A
+# validator that names its own class keeps it (unchanged behaviour).
+_STUB = "epr:validator-stub-classifier"
+_stub_evidence = {"frameRef": "bafystub", "verdict": "abstain", "classificationCid": None}
+epr_meta.REFERENCE_VALIDATORS[_STUB] = lambda write: epr_meta.Verdict(
+    None, "stub classification", None, None, _stub_evidence)
+try:
+    for _declared in ("dispatch", "inject", "ask"):
+        _r = {"id": f"classified-{_declared}", "class": _declared, "validator": _STUB,
+              "when": {"write": "*.md"}, "why": "why text"}
+        # `evaluate`, not `combine`: `combine` projects only blocking/advisory classes, and the
+        # guard rows this serves are `dispatch`.
+        _vs = epr_meta.evaluate(_merged([_r]), {"path": "a.md", "content": "x"})
+        _v = _vs[0] if len(_vs) == 1 else None
+        check(f"cls=None classified verdict inherits the declared class ({_declared})",
+              _v is not None and _v.cls == _declared and _v.rule_id == f"classified-{_declared}")
+        check(f"cls=None classified verdict renders the native reason ({_declared})",
+              _v.reason == f"validator `{_STUB}` flagged this write: stub classification. why text")
+        check(f"cls=None classified verdict carries evidence untouched ({_declared})",
+              _v.evidence == _stub_evidence)
+    epr_meta.REFERENCE_VALIDATORS[_STUB] = lambda write: epr_meta.Verdict(
+        "ask", "own class", None, "resource-limit-raise-unattenuated", {"stock": 1})
+    _r = {"id": "own-class", "class": "inject", "validator": _STUB, "when": {"write": "*.md"}}
+    _v = epr_meta.combine(epr_meta.evaluate(_merged([_r]), {"path": "a.md", "content": "x"}))
+    check("a validator naming its own class keeps it and its reason",
+          _v.cls == "ask" and _v.reason == "own class" and _v.evidence == {"stock": 1})
+finally:
+    epr_meta.REFERENCE_VALIDATORS.pop(_STUB, None)
+
 # ── witness(): `actor` is present only when the caller supplies one (the actor plane's
 # absence must read as "not consulted", never as "unclaimed" — that value lives inside the
 # dict itself). Mirrors the `evaluator`-field precedent but with the opposite default.
