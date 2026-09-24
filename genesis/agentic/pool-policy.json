@@ -93,9 +93,6 @@
     "memory-ceremony": {
       "CARGO_BUILD_JOBS": "1",
       "RUST_TEST_THREADS": "1"
-    },
-    "elohim-storage": {
-      "CARGO_BUILD_JOBS": "1"
     }
   },
   "berth": {

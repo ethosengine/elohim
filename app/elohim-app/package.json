@@ -73,7 +73,7 @@
     "elohim-qahal": "workspace:*",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
-    "maplibre-gl": "^5.20.2",
+    "maplibre-gl": "^6.4.1",
     "marked": "^17.0.1",
     "marked-highlight": "^2.2.3",
     "multiformats": "^13.4.2",
@@ -95,7 +95,7 @@
     "@eslint/js": "^9.39.2",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
     "@typescript-eslint/parser": "^8.50.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -116,6 +116,6 @@
     "typescript-eslint": "^8.50.1",
     "vite": "^7.3.1",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   }
 }

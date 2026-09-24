@@ -284,3 +284,36 @@ describe('CLI .ci-ignore filtering', () => {
       `expected at least one project for the real source change; got ${JSON.stringify(result.projects)}`);
   });
 });
+
+// ── projectsFromStale ────────────────────────────────────────────
+
+import { projectsFromStale } from './graph-walker.mjs';
+
+describe('projectsFromStale — an external oracle can supply the stale set', () => {
+  it('maps stale steps to gate projects and keeps gate-only input matches', () => {
+    const manifests = [
+      makeManifest('comp', { ci: makeStep(['elohim/comp', 'elohim/comp/**']) }, {
+        projects: { comp: { dir: 'elohim/comp', steps: ['ci'], run: { kind: 'attested', attestation: { provider: 'github-checks', repo: 'o/comp', check: 'ci' } } } },
+      }),
+      makeManifest('app', { build: makeStep(['app/**'], ['comp:ci']) }, {
+        projects: {
+          app: { dir: 'app', steps: ['build'], run: { kind: 'just', recipe: 'gate' } },
+          schema: { dir: '.', inputs: { sources: ['elohim/comp'], buildProcess: [] }, run: { kind: 'root-just', recipe: '_gate-schema' } },
+        },
+      }),
+    ];
+    const stale = new Map([
+      ['comp:ci', ['source: elohim/comp']],
+      ['app:build', ['upstream: comp:ci']],
+    ]);
+    const projects = projectsFromStale(manifests, stale, ['elohim/comp']);
+    assert.deepEqual(projects.map(p => p.name), ['comp', 'app', 'schema']);
+    assert.deepEqual(projects.find(p => p.name === 'app').reasons, ['upstream: comp:ci']);
+    assert.deepEqual(projects.find(p => p.name === 'schema').reasons, ['source: elohim/comp']);
+  });
+
+  it('walkGraph is projectsFromStale over its own path-only stale set', () => {
+    const manifests = [makeManifest('x', { s: makeStep(['x/**']) }, { projects: { x: { dir: 'x', steps: ['s'], run: { kind: 'just', recipe: 'gate' } } } })];
+    assert.deepEqual(walkGraph(manifests, ['x/a.ts']).projects, projectsFromStale(manifests, new Map([['x:s', ['source: x/a.ts']]]), ['x/a.ts']));
+  });
+});

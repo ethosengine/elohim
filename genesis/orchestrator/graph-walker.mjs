@@ -87,6 +87,48 @@ function matchInputs(inputs, changedFiles) {
  *   `pipelines` = pipelines with stale steps (what Jenkins dispatches). These
  *   are NOT the same set — see Phase 5.
  */
+/**
+ * Phase 4 as a function: map a stale-step set (qualified name → reasons) to the
+ * gate projects that own those steps, plus gate-only projects whose `inputs`
+ * match the changed files. Ordered by topological position of the earliest
+ * stale step. `stale` may come from the path-only walk (walkGraph) or from
+ * an external oracle (gate-oracle.mjs).
+ */
+export function projectsFromStale(manifests, stale, changedFiles) {
+  const stepIndex = new Map();
+  for (const { content } of manifests) {
+    for (const [name, step] of Object.entries(content.steps)) {
+      stepIndex.set(`${content.pipeline}:${name}`, { step, pipeline: content.pipeline, manifest: content });
+    }
+  }
+  const order = topoSort(stepIndex);
+  const projectMap = new Map();
+
+  for (const { content } of manifests) {
+    if (!content.gate?.projects) continue;
+    for (const [projectName, config] of Object.entries(content.gate.projects)) {
+      const triggerSteps = config.steps || (config.inputs ? [] : Object.keys(content.steps));
+      const reasons = matchInputs(config.inputs, changedFiles);
+      let minOrder = Infinity;
+      for (const stepName of triggerSteps) {
+        const qualified = `${content.pipeline}:${stepName}`;
+        if (stale.has(qualified)) {
+          reasons.push(...stale.get(qualified));
+          const idx = order.indexOf(qualified);
+          if (idx >= 0 && idx < minOrder) minOrder = idx;
+        }
+      }
+      if (reasons.length > 0) {
+        projectMap.set(projectName, { dir: config.dir, reasons: [...new Set(reasons)], minOrder });
+      }
+    }
+  }
+
+  return [...projectMap.entries()]
+    .sort((a, b) => a[1].minOrder - b[1].minOrder)
+    .map(([name, { dir, reasons }]) => ({ name, dir, reasons }));
+}
+
 export function walkGraph(manifests, changedFiles) {
   if (manifests.length === 0) return { projects: [], pipelines: [] };
 
@@ -110,42 +152,11 @@ export function walkGraph(manifests, changedFiles) {
     }
   }
 
-  // Phase 3: Topo-sort for output ordering (dependencies before dependents)
-  // Note: we do NOT propagate staleness through dependencies. The hook's job
-  // is "did files in this project change?" — propagation is a Jenkins concern.
-  // Source/buildProcess matching is sufficient for quality gate detection.
-  const order = topoSort(stepIndex);
-
-  // Phase 4: Map stale steps to gate projects
-  const projectMap = new Map();
-
-  for (const { content } of manifests) {
-    if (!content.gate?.projects) continue;
-
-    for (const [projectName, config] of Object.entries(content.gate.projects)) {
-      const triggerSteps = config.steps || (config.inputs ? [] : Object.keys(content.steps));
-      const reasons = matchInputs(config.inputs, changedFiles);
-      let minOrder = Infinity;
-
-      for (const stepName of triggerSteps) {
-        const qualified = `${content.pipeline}:${stepName}`;
-        if (stale.has(qualified)) {
-          reasons.push(...stale.get(qualified));
-          const idx = order.indexOf(qualified);
-          if (idx >= 0 && idx < minOrder) minOrder = idx;
-        }
-      }
-
-      if (reasons.length > 0) {
-        projectMap.set(projectName, { dir: config.dir, reasons, minOrder });
-      }
-    }
-  }
-
-  // Sort by dependency order (lowest topo-sort index first)
-  const projects = [...projectMap.entries()]
-    .sort((a, b) => a[1].minOrder - b[1].minOrder)
-    .map(([name, { dir, reasons }]) => ({ name, dir, reasons }));
+  // Phase 3+4: the path-only walk does NOT propagate staleness through
+  // dependencies — "did files in this project change?" is its whole question.
+  // Propagation (one hop, locally) comes from the rakia oracle in gate-oracle.mjs,
+  // which hands projectsFromStale an externally computed stale set.
+  const projects = projectsFromStale(manifests, stale, changedFiles);
 
   // Phase 5: Map stale steps to PIPELINES.
   //

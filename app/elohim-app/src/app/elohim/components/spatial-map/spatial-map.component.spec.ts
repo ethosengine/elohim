@@ -28,11 +28,10 @@ vi.mock('maplibre-gl', () => {
     flyTo: vi.fn(),
     remove: vi.fn(),
   };
+  // maplibre-gl 6 is ESM-only with named exports (no default export).
   return {
-    default: {
-      Map: vi.fn(() => mockMap),
-      NavigationControl: vi.fn(() => ({})),
-    },
+    Map: vi.fn(() => mockMap),
+    NavigationControl: vi.fn(() => ({})),
   };
 });
 
