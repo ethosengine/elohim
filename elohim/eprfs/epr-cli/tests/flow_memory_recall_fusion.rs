@@ -256,7 +256,8 @@ fn contract_v20_says_the_first_screens_semantic_call_is_part_of_the_screen() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 20);
+    // v20 introduced this line; later versions keep it (each byte change bumps — 4.6 made v21).
+    assert!(value["version"].as_u64() >= Some(20));
     let method_lines = value["method"].to_string();
     assert!(
         method_lines.contains("does not consume the packet's explicit search"),

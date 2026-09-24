@@ -625,6 +625,45 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
+  # ── the semantic fold (governed-discovery station 4, task 4.6, 2026-09-24) ──
+  # The fold's lag replaces the manual mine gate on the SessionStart headline: the number is the
+  # fold's own reading (its manifest against the declared source, through its size+mtime stat
+  # cache), derived natively by index-fold-lag-ceiling@1's `derive: fold-lag` — no producer script.
+  - id: index-fold-lag
+    version: 1
+    family: index
+    unit: files
+    procedure: "epr flow report — derived natively by index-fold-lag-ceiling@1's `derive: fold-lag`, which reads `epr flow memory index status` (read-only) for the pinned embedder: files new, changed or removed since their fold; no pinned store is skipped, never zero"
+    provenance: ".epr-meta/elohim/algorithms/recall-semantic-index.json foldLag (the measure's own declared ceiling, 25 files)"
+    default-authority: observation
+    status: active
+    established_by: governed-discovery-station-4-2026-09-24
+
+  # The per-run cap has ONE home, the recall contract; this row names the question and cites it,
+  # carrying no number of its own (a second copy here is how the two would drift apart).
+  - id: index-fold-files-per-run
+    version: 1
+    family: index
+    unit: files
+    procedure: "epr flow memory index fold — files folded per run when --max-files is not given; the surfacing hook's detached fold passes the same declaration"
+    provenance: ".epr-meta/elohim/algorithms/recall-contract.json limits.fold_files_per_run (declared in station 4 task 4.3; the contract carries the number)"
+    default-authority: observation
+    status: active
+    established_by: governed-discovery-station-4-2026-09-24
+
+  # Fitness evidence on the model artifact: the fraction of the deterministic question bank the
+  # recall journey reaches, folded per model so a model swap is a different reading, not a
+  # correction of the old one. Task 4.7 writes the first fold.
+  - id: recall-bank-reach
+    version: 1
+    family: recall
+    unit: ratio
+    procedure: "epr flow memory recall sample --question <id> over every question in .epr-meta/elohim/algorithms/recall-questions.json; reached / total, folded with `env model=<model cid>`"
+    provenance: ".epr-meta/elohim/algorithms/recall-questions.json (the bank; its recipe pins the contract CID)"
+    default-authority: observation
+    status: active
+    established_by: governed-discovery-station-4-2026-09-24
+
   # The context-coverage ratchet's baseline, keyed by DIMENSION rather than by nine separate rows:
   # a fold is addressed `subject × measure@version × env`, so one measure with the dimension name as
   # its subject carries all nine. It replaces a private JSON file only `context-ratchet.py` could
@@ -1355,6 +1394,11 @@ lenses:
     consumes: [mempalace-surfaces-changed@1]
     context: session-headline
     hard: 1
+    # OFF THE HEADLINE since 2026-09-24 (governed-discovery station 4, task 4.6). The palace is the
+    # declared VISITOR, not the index: its mine is optional maintenance, and the headline's second
+    # slot is now `index:` (index-fold-lag-ceiling@1 below). The row stays declared and evaluated so
+    # `epr flow report --bound mempalace-surfaces-changed-ceiling` still answers by name, the way the
+    # retired `memkit` slot's row does.
     # DERIVED FROM THE TREE, not from a fold. `mempalace-currency.py` hid this walk as module
     # constants (SURFACE, GRACE_SECONDS, the marker path) that only that script could read; the
     # walk is declared here instead, so the number is re-derivable by anyone and the producer
@@ -1375,6 +1419,24 @@ lenses:
     grace-seconds: 120              # the value mine-grace-seconds@1 declares
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
+
+  # The headline's second slot (task 4.6): the semantic fold's lag against the measure's own
+  # declared foldLag ceiling. A ceiling whose watermark is the last acceptable value (`above`): 25
+  # behind is within, 26 is past — the reading the IndexMeasure's foldLag limit and the surfacing
+  # hook's DEGRADED banner also take, so the three cannot disagree at the boundary. No pinned store
+  # is `skipped — no fold`, never zero. The hook's detached `index fold` is what converges it.
+  - id: index-fold-lag-ceiling
+    version: 1
+    headline: index
+    compare: above
+    binding: binding-local
+    class: inject
+    derive: fold-lag
+    consumes: [index-fold-lag@1]
+    context: session-headline
+    hard: 25
+    status: active
+    established_by: governed-discovery-station-4-2026-09-24
 
   - id: scope-pending-moves-ceiling
     version: 1

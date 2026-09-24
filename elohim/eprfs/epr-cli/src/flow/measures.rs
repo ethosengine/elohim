@@ -280,6 +280,17 @@ pub enum Derive {
     /// or two journeys is noise wearing a number — the same three-valued discipline the other
     /// derives hold, moved from "no reset yet" to "not enough population yet".
     RateOverWindow,
+    /// The semantic fold's LAG: how many files are new, changed or removed since their fold,
+    /// read from the fold's own read-only status (`epr flow memory index status`) for the pinned
+    /// embedder.
+    ///
+    /// Governed-discovery station 4, task 4.6: the replacement for the manual MemPalace mine
+    /// gate. The fold already keeps a manifest of what it has seen with a size+mtime stat cache,
+    /// so the lag is a reading the fold owns — no second walk and no producer script. **No pinned
+    /// store is `skipped` ("no fold"), never zero**: nothing has been folded, so nothing is behind
+    /// or current. It reads neither the fold plane nor a declared surface walk, which is why it is
+    /// routed by [`Derive::reads_fold_store`] rather than [`Derive::reads_tree`].
+    FoldLag,
 }
 
 impl Derive {
@@ -289,6 +300,7 @@ impl Derive {
             "distinct-subjects-since-reset" => Some(Derive::DistinctSubjectsSinceReset),
             "files-newer-than" => Some(Derive::FilesNewerThan),
             "rate-over-window" => Some(Derive::RateOverWindow),
+            "fold-lag" => Some(Derive::FoldLag),
             other => {
                 // Fix round 1, F5: an unknown `derive:` string must NOT fall through to being
                 // read as a plain measurement — a row that declares `derive:` has committed to
@@ -312,6 +324,7 @@ impl Derive {
             Derive::DistinctSubjectsSinceReset => "distinct-subjects-since-reset",
             Derive::FilesNewerThan => "files-newer-than",
             Derive::RateOverWindow => "rate-over-window",
+            Derive::FoldLag => "fold-lag",
         }
     }
 
@@ -328,6 +341,13 @@ impl Derive {
     /// window-reading evaluator instead of the reset-reading one, and it has no `reset:` measure.
     pub fn reads_window(self) -> bool {
         matches!(self, Derive::RateOverWindow)
+    }
+
+    /// Whether this derive reads the semantic fold's own store (its lag) rather than the fold
+    /// plane or a declared surface walk. Routed by `evaluate` like the other two; it has no
+    /// `reset:` measure and declares no `surfaces:` — the fold's measure owns its surface.
+    pub fn reads_fold_store(self) -> bool {
+        matches!(self, Derive::FoldLag)
     }
 }
 

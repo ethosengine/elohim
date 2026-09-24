@@ -3033,11 +3033,11 @@ fn a_contract_with_no_process_spec_or_bounds_key_falls_back_to_composition_and_l
     let bounds = contract.bounds().unwrap();
     assert_eq!(
         bounds.len(),
-        23,
+        24,
         "one Bound per declared limits.* entry, unit-for-unit \
          (18 + resume_commits, station S2 of the 2026-09-22 recall-Codex-trail sprint; \
          + fold_procedure_bytes, fold_procedure_seconds, fold_batch_texts, station 4 task 4.2; \
-         + fold_files_per_run, station 4 task 4.3)"
+         + fold_files_per_run, station 4 task 4.3; + fold_listing_bytes, station 4 task 4.6)"
     );
     let body = bounds
         .iter()

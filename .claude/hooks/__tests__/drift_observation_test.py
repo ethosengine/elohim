@@ -535,12 +535,13 @@ class GoldenReportCase(unittest.TestCase):
     def test_all_five_headline_slots_render_without_any_bridged_fold(self):
         """No observation is appended at all, and five slots still render.
 
-        This is what retired the producer bridge: `cleanup` and `scope` derive, `mempalace`
-        walks the tree, and `recall` (the retired `memkit` slot's successor, 2026-09-11) reads the
-        latest recall-journey fold. A slot that needed a kit reading would report `skipped` here.
+        This is what retired the producer bridge: `cleanup` and `scope` derive, `index` (the
+        retired `mempalace` slot's successor, 2026-09-24) reads the semantic fold's own status, and
+        `recall` (the retired `memkit` slot's successor, 2026-09-11) reads the latest
+        recall-journey fold. A slot that needed a kit reading would report `skipped` here.
         """
         out = self.headline()
-        for label in ("recall", "mempalace", "cleanup", "scope", "memory-budget"):
+        for label in ("recall", "index", "cleanup", "scope", "memory-budget"):
             self.assertTrue(
                 any(l.strip().startswith(f"{label}:") for l in out.splitlines()),
                 f"no `{label}:` line in:\n{out}")

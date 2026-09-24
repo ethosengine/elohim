@@ -820,3 +820,56 @@ fn the_attestation_names_the_sessions_claimed_participant() {
     );
     assert_eq!(other.attestation.attested_by.0, UNCLAIMED);
 }
+
+/// Contract v20's method CID — the recipe before task 4.6 declared the fold's listing budget.
+const V20_METHOD_CID: &str = "bafkreie3ckteeb3p66smgm4t7ykv3s56dtjwa6tnumaixtm4bf6u4fitky";
+
+/// Task 4.6 (the listing budget 4.3 deferred): the fold's `git ls-files` read is charged to its
+/// OWN declared limit, `limits.fold_listing_bytes`, not the discovery traversal's `scan_bytes` —
+/// a listing over the fold's budget attests `failed` naming the listing, and a discovery budget
+/// too small for the listing no longer touches the fold.
+#[test]
+fn the_listing_charges_fold_listing_bytes_not_the_discovery_scan_budget() {
+    let dir = tree();
+    let root = dir.path();
+    git_commit_all(root);
+
+    let mut contract = live(CONTRACT_REL);
+    contract["limits"]["fold_listing_bytes"] = json!(8);
+    contract["limits"]["scan_bytes"] = json!(1_073_741_824);
+    put_json(root, CONTRACT_REL, &contract);
+    let starved = fold(root);
+    match &starved.attestation.state {
+        FoldState::Failed { why } => assert!(why.contains("git ls-files"), "{why}"),
+        other => panic!("a listing over fold_listing_bytes fails the fold: {other:?}"),
+    }
+
+    contract["limits"]["fold_listing_bytes"] = json!(4_194_304);
+    contract["limits"]["scan_bytes"] = json!(8);
+    put_json(root, CONTRACT_REL, &contract);
+    let fed = fold(root);
+    assert_eq!(
+        fed.attestation.state,
+        FoldState::Complete,
+        "the discovery scan budget no longer bounds the fold's listing"
+    );
+}
+
+/// Contract v21 declares the fold's listing budget (`limits.fold_listing_bytes: 4194304`) and the
+/// bank is re-pinned to the new recipe.
+#[test]
+fn contract_v21_declares_the_fold_listing_budget_and_repins_the_bank() {
+    let root = common::repo_root();
+    let contract = elohim_epr_cli::flow::memory::recall::Contract::load(&root.join(CONTRACT_REL))
+        .expect("live contract loads");
+    let value = common::live_contract();
+    assert!(value["version"].as_u64() >= Some(21));
+    assert_eq!(value["limits"]["fold_listing_bytes"], 4_194_304);
+    let method = contract.method_cid();
+    assert_ne!(method, V20_METHOD_CID, "the contract's bytes moved");
+    let bank = live(value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v21 recipe");
+}

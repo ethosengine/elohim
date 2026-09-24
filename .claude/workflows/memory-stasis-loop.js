@@ -35,7 +35,7 @@ const MEASURE = {
     dumps: { type: 'number' },             // anti-dump: NO-EXIT + DRIFT-DEAD + DUMP + archive files + shifts past the ~14d budget
     path_drift: { type: 'number' },        // architecture seeds changed since MAP.md update (headline `path:`)
     roadmap_stale: { type: 'boolean' },    // roadmap artifact stale vs the gap-ledger x cluster-state (headline `roadmap:`)
-    mempalace_stale: { type: 'boolean' },  // MemPalace semantic index behind the cleaned surface (headline `mempalace:`)
+    fold_behind: { type: 'boolean' },  // the native semantic fold is behind the tree (headline `index:`)
     cites_legacy: { type: 'number' },      // legacy doc path-cites to migrate to content-addressed envelopes (audit CITE-FORMAT-CANDIDATE)
     index_unloaded: { type: 'number' },    // MEMORY.md index rows past the harness load cap — entries no session can ever read (memory-index-drift.json)
     open_gaps: { type: 'number' },
@@ -45,7 +45,7 @@ const MEASURE = {
     at_stasis: { type: 'boolean' },        // compaction context-coverage within band
     dominant: { type: 'string', enum: ['needs-triage', 'mem-unlinked', 'superseded', 'claimed', 'regression', 'none'] },
   },
-  required: ['pressure_total', 'uncaptured', 'decompose_due', 'dumps', 'path_drift', 'roadmap_stale', 'mempalace_stale', 'cites_legacy', 'index_unloaded', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
+  required: ['pressure_total', 'uncaptured', 'decompose_due', 'dumps', 'path_drift', 'roadmap_stale', 'fold_behind', 'cites_legacy', 'index_unloaded', 'pressure_dirs_empty', 'stasis_score', 'at_stasis', 'dominant'],
 }
 
 // who drains what — equipped agents, BROAD goal, never step-by-step
@@ -62,7 +62,7 @@ const DISPATCH = {
   'roadmap-stale': { agentType: 'cartographer', goal: 'The roadmap is stale vs the gap-ledger x cluster-state x vision (headline `roadmap:`). Regenerate genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md: re-rank by vision x readiness from the live gap-item states + cluster-state availability + the household-living-core gospel; refresh the single highest-leverage next move. The roadmap is a maintained readout, never a snapshot.' },
   cites: { agentType: 'librarian', goal: 'Un-sealed cite debt remains — docs authored this sprint whose cites are still plain paths (audit CITE-FORMAT-CANDIDATE; headline `cites:`). Run the deterministic born-linked sweep: `epr flow cites seal --all` (assigns id: slugs + converts legacy doc-cites to `<slug> | desc | fingerprint` envelopes + verifies, idempotent, ~0.1s when clean). Content-addressed cites survive file moves — this is what makes relocations free (held/ moves never break a link). If the sweep reports `✍ N cite(s) on the title-default desc`, author the relationship hints — dispatch the corpus-describe workflow or run `epr flow cites describe <doc> --slug <ref> --desc \'<hint>\'` per doc — that is the progressive-discovery payload. Lower `cites_legacy` toward 0.' },
   head: { agentType: 'storyteller', goal: 'MEMORY.md index rows sit past the harness load cap (the `unloadedRows` of `epr flow memory project --index --json`) — entries that cost tokens to write and that NO session can ever read. This is the HEAD-COMPACTION lane of /memory-ceremony Phase 1c and it is yours: triage the lowest-value index rows with your three verbs. Memorialize a project note whose incident an umbrella already carries, a history doc, or a spec into that umbrella as an `index: false` member; graduate a row whose lesson a canonical story can carry to genesis/data/stories/; hold what is not ready. Feedback notes stay unless a surviving entry duplicates them. Then re-project: `epr flow memory project --index --budget memory-index-bytes@1 --out .claude/memory/MEMORY.md`. Per-entry description trimming is necessary and NOT sufficient — real relief is population work. Lower `index_unloaded` to 0.' },
-  mempalace: { agentType: 'librarian', goal: 'The MemPalace semantic index is behind the cleaned surface (headline `mempalace:`) — the front-link would recall a stale view. Sync (prune deleted/moved drawers), mine the cleaned durable surface (canonical seeds + curated history + working memory + stories), then stamp `.mempalace/.last-mine` so the bound clears. The kit wrapper was deleted at station six round (b); the surfaces, the marker and the grace window are DECLARED on `mempalace-surfaces-changed-ceiling@1` in .claude/epr-meta/measures.yaml, so read the bound with `epr flow report --headline` and use the `mempalace` MCP tools (sync / add-drawer / delete-drawer) to do the work. NEVER mine the transient pile / raw code / junk drawer — index only the clean surface. Restore index freshness.' },
+  fold: { agentType: 'librarian', goal: 'The native semantic fold is behind the tree (headline `index:` — `index-fold-lag-ceiling@1`, derive fold-lag) — the semantic route would answer from a stale view. Read `epr flow memory index status` for the lag, then run `epr flow memory index fold` (it folds at most `limits.fold_files_per_run` files a run; repeat until the lag is 0 and the attestation reads `complete`). The fold is flock-guarded, so a `busy` reply means another fold already holds the store — wait and re-read, never force. MemPalace is the optional visitor, no longer a headline gate: re-mining the palace is not part of this drain. Restore index freshness.' },
 }
 
 phase('Loop')
@@ -79,7 +79,7 @@ while (round < ROUND_CAP) {
     `Run, from /projects/elohim, and return the numbers as the schema. Edit NOTHING.\n` +
     `  ${AUDIT} --ledger --json   -> pressure_total = sum of rows whose state is one of NEEDS-TRIAGE, MEM-UNLINKED, CLAIMED-ONLY, REGRESSED, SUPERSEDED, UNKNOWN-STATUS; dominant = the largest of those classes ('none' if pressure_total is 0); open_gaps/claimed_gaps from "DECOMPOSED GAPS".\n` +
     `  ${AUDIT} --coverage --json -> uncaptured.\n` +
-    `  ${HEADLINE}                -> mempalace_stale = true unless the \`mempalace:\` line ends \`✅\`. There is no \`memkit:\` dimension any more: the report tier it bounded was removed 2026-09-11 and its bound is \`status: superseded\`, so the headline prints \`memkit: retired\` and nothing reads it.\n` +
+    `  ${HEADLINE}                -> fold_behind = true unless the \`index:\` line ends \`✅\` (\`index: skipped — no fold\` is NOT behind — nothing has been folded; it is a first-fold decision for the operator, not a drain). There is no \`mempalace:\` dimension any more: the palace is the declared visitor and its mine left the headline 2026-09-24. There is no \`memkit:\` dimension any more: the report tier it bounded was removed 2026-09-11 and its bound is \`status: superseded\`, so the headline prints \`memkit: retired\` and nothing reads it.\n` +
     `  ${AUDIT} --ledger --json   -> decompose_due = the count of rows whose state is SUPERSEDED or REGRESSED in an ACTIVE home (the \`decompose:\` number); roadmap_stale / path_drift come from the same payload's \`gaps\` and the map-currency bound (\`${EPR} flow report --bound map-currency-drift-ceiling --json\` -> contributingFolds).\n` +
     `  ${AUDIT} --stasis           -> STRUCTURAL EQUILIBRIUM section: dumps = NO-EXIT + DRIFT-DEAD + DUMP + archive(_retired) file count; pressure_dirs_empty = true iff every pressure dir shows 0 docs.\n` +
     `  epr flow cites stamp --all 2>/dev/null | grep -oE "stamped: [0-9]+" ; python3 .epr-meta/elohim/lenses/memory/memory-coherence-audit.py 2>/dev/null | grep -oE "format-candidate \\(cites_legacy\\): [0-9]+"  -> cites_legacy = the format-candidate count (legacy doc-cites to migrate to envelopes).\n` +
@@ -90,14 +90,14 @@ while (round < ROUND_CAP) {
     { label: `measure:r${round}`, phase: 'Loop', schema: MEASURE, model: 'haiku' },
   )
 
-  const remaining = m.pressure_total + m.uncaptured + m.decompose_due + m.dumps + m.path_drift + m.index_unloaded + (m.roadmap_stale ? 1 : 0) + (m.mempalace_stale ? 1 : 0)
-  history.push({ round, remaining, stasis_score: m.stasis_score, uncaptured: m.uncaptured, pressure: m.pressure_total, decompose_due: m.decompose_due, dumps: m.dumps, path_drift: m.path_drift, roadmap_stale: m.roadmap_stale, mempalace_stale: m.mempalace_stale, index_unloaded: m.index_unloaded })
-  log(`round ${round}: coverage=${(m.stasis_score * 100).toFixed(1)}% · pressure=${m.pressure_total} · uncaptured=${m.uncaptured} · decompose-due=${m.decompose_due} · dumps=${m.dumps} · path-drift=${m.path_drift} · roadmap-stale=${m.roadmap_stale} · mempalace-stale=${m.mempalace_stale} · index-unloaded=${m.index_unloaded}`)
+  const remaining = m.pressure_total + m.uncaptured + m.decompose_due + m.dumps + m.path_drift + m.index_unloaded + (m.roadmap_stale ? 1 : 0) + (m.fold_behind ? 1 : 0)
+  history.push({ round, remaining, stasis_score: m.stasis_score, uncaptured: m.uncaptured, pressure: m.pressure_total, decompose_due: m.decompose_due, dumps: m.dumps, path_drift: m.path_drift, roadmap_stale: m.roadmap_stale, fold_behind: m.fold_behind, index_unloaded: m.index_unloaded })
+  log(`round ${round}: coverage=${(m.stasis_score * 100).toFixed(1)}% · pressure=${m.pressure_total} · uncaptured=${m.uncaptured} · decompose-due=${m.decompose_due} · dumps=${m.dumps} · path-drift=${m.path_drift} · roadmap-stale=${m.roadmap_stale} · fold-behind=${m.fold_behind} · index-unloaded=${m.index_unloaded}`)
 
   // 2. STASIS? "done" = EVERY discipline at equilibrium: compaction in band + captured + no dumps +
   //    decompose-due drained + MAP current + roadmap current + index fresh
   //    + the MEMORY.md head inside the harness load cap (no index row is unreadable).
-  if (m.at_stasis && m.uncaptured === 0 && m.decompose_due === 0 && m.dumps === 0 && m.path_drift === 0 && !m.roadmap_stale && !m.mempalace_stale && m.index_unloaded === 0) {
+  if (m.at_stasis && m.uncaptured === 0 && m.decompose_due === 0 && m.dumps === 0 && m.path_drift === 0 && !m.roadmap_stale && !m.fold_behind && m.index_unloaded === 0) {
     log(`STASIS reached at round ${round}: all disciplines at equilibrium (compaction ${(m.stasis_score * 100).toFixed(1)}%, no dumps, MAP + roadmap current, capture complete).`)
     break
   }
@@ -122,7 +122,7 @@ while (round < ROUND_CAP) {
     (m.pressure_total > 0 && m.dominant !== 'none') ? m.dominant :
     m.path_drift > 0 ? 'map-drift' :
     m.roadmap_stale ? 'roadmap-stale' :
-    m.mempalace_stale ? 'mempalace' :
+    m.fold_behind ? 'fold' :
     m.index_unloaded > 0 ? 'head' :
     m.cites_legacy > 0 ? 'cites' :
     'claimed'
@@ -143,11 +143,11 @@ while (round < ROUND_CAP) {
 // final measurement so the return reflects reality after the last drain
 const finalCov = await agent(
   `Run from /projects/elohim: ${AUDIT} --stasis --json, ${AUDIT} --coverage --json, ${AUDIT} --ledger --json and ${HEADLINE}. Return the MEASURE schema ` +
-  `(pressure_total, uncaptured, decompose_due, dumps, path_drift, roadmap_stale, mempalace_stale, open_gaps, claimed_gaps, pressure_dirs_empty, stasis_score, at_stasis, dominant), plus index_unloaded = the length of \`unloadedRows\` from \`epr flow memory project --index --json\`. Edit nothing.`,
+  `(pressure_total, uncaptured, decompose_due, dumps, path_drift, roadmap_stale, fold_behind, open_gaps, claimed_gaps, pressure_dirs_empty, stasis_score, at_stasis, dominant), plus index_unloaded = the length of \`unloadedRows\` from \`epr flow memory project --index --json\`. Edit nothing.`,
   { label: 'measure:final', phase: 'Loop', schema: MEASURE, model: 'haiku' },
 )
 
-const reached = finalCov.at_stasis && finalCov.uncaptured === 0 && finalCov.decompose_due === 0 && finalCov.dumps === 0 && finalCov.path_drift === 0 && !finalCov.roadmap_stale && !finalCov.mempalace_stale && finalCov.index_unloaded === 0
+const reached = finalCov.at_stasis && finalCov.uncaptured === 0 && finalCov.decompose_due === 0 && finalCov.dumps === 0 && finalCov.path_drift === 0 && !finalCov.roadmap_stale && !finalCov.fold_behind && finalCov.index_unloaded === 0
 
 return {
   rounds: round,

@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 20,
+  "version": 21,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -24,6 +24,7 @@
     "fold_procedure_seconds": 120,
     "fold_batch_texts": 32,
     "fold_files_per_run": 40,
+    "fold_listing_bytes": 4194304,
     "native_raw_bytes": 262144,
     "session_bytes": 1048576,
     "habit_register_bytes": 1048576,
@@ -59,7 +60,7 @@
   "freshness": [
     "Fingerprint each source using the existing canonical body convention.",
     "Check the verified CLI named in the usage source before a current-evidence query.",
-    "Check index currency: the native semantic provider labels every answer with its fold lag (fold N files behind); a stale fold may suggest a source but cannot establish current behavior. MemPalace, the declared visitor, discloses no freshness; treat its currency as unknown.",
+    "Check index currency: the native semantic provider labels every answer with its fold lag (fold N files behind); a stale fold may suggest a source but cannot establish current behavior. The session headline's index: line reads the same lag against index-fold-lag-ceiling@1, and the fold's git listing is charged to limits.fold_listing_bytes, never the discovery scan budget. MemPalace, the declared visitor, discloses no freshness; treat its currency as unknown.",
     "No unconditional search, taxonomy load or diary writes. Mutation needs explicit maintenance authority."
   ],
   "evaluation": {

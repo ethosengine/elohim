@@ -13,7 +13,9 @@
 //! setting.
 //!
 //! **The candidates are the declared source.** On a git checkout they are `git ls-files -z`
-//! (bounded by the contract's traversal budget, `scan_bytes`/`scan_seconds`): ignored and
+//! (bounded by the fold's own listing budget, `fold_listing_bytes`, and `scan_seconds` — task
+//! 4.6 moved the listing off the discovery traversal's `scan_bytes`, which a growing tree's
+//! listing would otherwise exhaust, attesting the fold `failed`): ignored and
 //! untracked derived state is not source. Elsewhere, a walk. Either way a candidate that exists
 //! but cannot be read, and a directory that cannot be listed, is HELD — counted, its prior rows
 //! kept current, never demoted as if it were gone.
@@ -184,6 +186,11 @@ pub fn list(root: &Path, contract: &Contract, surface: &Surface) -> Result<Listi
 }
 
 fn git_tracked(root: &Path, contract: &Contract, surface: &Surface) -> Result<Listing, String> {
+    // A missing or non-positive budget is a named refusal, never a zero-byte listing that would
+    // read as "the source is empty".
+    let listing_bytes = contract
+        .positive_limit("fold_listing_bytes")
+        .map_err(|error| error.to_string())? as usize;
     let args = vec![
         "-C".to_string(),
         root.to_string_lossy().into_owned(),
@@ -193,7 +200,7 @@ fn git_tracked(root: &Path, contract: &Contract, surface: &Surface) -> Result<Li
     let outcome = bounded_process(
         "git",
         &args,
-        contract.limit_usize("scan_bytes"),
+        listing_bytes,
         contract.limit_secs("scan_seconds"),
         None,
     )

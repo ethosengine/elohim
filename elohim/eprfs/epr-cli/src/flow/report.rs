@@ -67,7 +67,13 @@ const OBSERVATION_TAG: &str = "run:observation";
 /// Slot 0 was `memkit` until 2026-09-11: the kit it measured was deleted, and the question that
 /// slot answered — "is the memory layer paying for itself?" — is now asked of the governed recall
 /// journey, whose honesty reading is the first thing a session should see.
-const HEADLINE_ORDER: [&str; 5] = ["recall", "mempalace", "cleanup", "scope", "budget"];
+///
+/// Slot 1 was `mempalace` until 2026-09-24 (governed-discovery station 4, task 4.6): a manual
+/// re-mine gate over the visitor's palace. The semantic route is now the native fold, whose
+/// freshness is its own lag (`index-fold-lag-ceiling@1`, `derive: fold-lag`), so `index` takes the
+/// position; the palace's mine is the visitor's optional maintenance, still declared and still
+/// answerable by name.
+const HEADLINE_ORDER: [&str; 5] = ["recall", "index", "cleanup", "scope", "budget"];
 
 /// The line prefix each slot prints under.
 fn slot_prefix(slot: &str) -> &'static str {
@@ -77,7 +83,10 @@ fn slot_prefix(slot: &str) -> &'static str {
         // still declares that slot, and a reader asking for it by name must get its own word back
         // rather than the fallback's.
         "memkit" => "memkit",
+        // `mempalace` left HEADLINE_ORDER on 2026-09-24 the same way: its bound stays declared (the
+        // visitor's maintenance), so a reader asking by name still gets its own word back.
         "mempalace" => "mempalace",
+        "index" => "index",
         "cleanup" => "cleanup",
         "scope" => "scope",
         _ => "memory-budget",
@@ -104,6 +113,7 @@ fn headline_slot(bound: &Bound) -> Option<&'static str> {
             // the stderr "unknown slot" path without putting them back in the headline.
             "memkit" => Some("memkit"),
             "mempalace" => Some("mempalace"),
+            "index" => Some("index"),
             "cleanup" => Some("cleanup"),
             "scope" => Some("scope"),
             "budget" | "memory-budget" => Some("budget"),
@@ -133,6 +143,8 @@ fn derived_slot(measure: &MeasureRef) -> Option<&'static str> {
         Some("memkit")
     } else if id.starts_with("mempalace") {
         Some("mempalace")
+    } else if id.starts_with("index-fold-lag") {
+        Some("index")
     } else if id.starts_with("cleanup") {
         Some("cleanup")
     } else if id.starts_with("scope") {
@@ -842,6 +854,9 @@ fn evaluate(
         if derive.reads_window() {
             return evaluate_rate_over_window(bound, derive, folds, recipe, watermarks, now);
         }
+        if derive.reads_fold_store() {
+            return evaluate_fold_lag(root, bound, derive, recipe, watermarks);
+        }
         return evaluate_derived(bound, derive, folds, recipe, watermarks);
     }
     let latest = folds
@@ -885,44 +900,11 @@ fn evaluate(
         .map(|u| format!(" {u}"))
         .unwrap_or_default();
     let observed = fold.value;
-    // The comparator is the ROW's, not this function's. Under the default `above` a watermark is
-    // the last acceptable value (24,000 is within a 24,000 bound; 24,001 is not); under
-    // `at-or-above` the watermark itself is the breach, which is what a trigger count declared as
-    // "fires at N" actually means. Both watermarks use the same comparator: a row that fires AT its
-    // hard number would be lying if its soft number quietly needed exceeding.
-    let compare = bound.compare;
-    let crossed = compare.crossed_phrase();
-    let (outcome, summary) = match (bound.soft, bound.hard) {
-        (_, Some(hard)) if compare.crossed(observed, hard) => (
-            OutcomeStatus::Failed,
-            format!(
-                "{}{unit_suffix} {crossed} the hard watermark {}",
-                trim_number(observed),
-                trim_number(hard)
-            ),
-        ),
-        (Some(soft), _) if compare.crossed(observed, soft) => (
-            OutcomeStatus::Passed,
-            format!(
-                "warn: {}{unit_suffix} {crossed} the soft watermark {}{}",
-                trim_number(observed),
-                trim_number(soft),
-                bound
-                    .hard
-                    .map(|h| format!(" (hard {})", trim_number(h)))
-                    .unwrap_or_default()
-            ),
-        ),
-        _ => (
-            OutcomeStatus::Passed,
-            format!(
-                "{}{unit_suffix} {} {}",
-                trim_number(observed),
-                compare.within_phrase(),
-                describe_watermarks(bound)
-            ),
-        ),
-    };
+    let (outcome, summary) = judge_reading(
+        bound,
+        observed,
+        &format!("{}{unit_suffix}", trim_number(observed)),
+    );
 
     BoundOutcome {
         bound: bound.id.clone(),
@@ -1093,6 +1075,122 @@ fn evaluate_surface_walk(
         contributing_folds: Some(walked),
         recipe: recipe.clone(),
     }
+}
+
+/// Judge a READING — a magnitude whose sentence is the number itself (`"12 files"`), not a
+/// measurement's own clause — against the bound's watermarks.
+///
+/// The comparator is the ROW's, not this function's. Under the default `above` a watermark is the
+/// last acceptable value (24,000 is within a 24,000 bound; 24,001 is not); under `at-or-above` the
+/// watermark itself is the breach, which is what a trigger count declared as "fires at N" actually
+/// means. Both watermarks use the same comparator: a row that fires AT its hard number would be
+/// lying if its soft number quietly needed exceeding.
+fn judge_reading(bound: &Bound, observed: f64, reading: &str) -> (OutcomeStatus, String) {
+    let compare = bound.compare;
+    let crossed = compare.crossed_phrase();
+    match (bound.soft, bound.hard) {
+        (_, Some(hard)) if compare.crossed(observed, hard) => (
+            OutcomeStatus::Failed,
+            format!(
+                "{reading} {crossed} the hard watermark {}",
+                trim_number(hard)
+            ),
+        ),
+        (Some(soft), _) if compare.crossed(observed, soft) => (
+            OutcomeStatus::Passed,
+            format!(
+                "warn: {reading} {crossed} the soft watermark {}{}",
+                trim_number(soft),
+                bound
+                    .hard
+                    .map(|h| format!(" (hard {})", trim_number(h)))
+                    .unwrap_or_default()
+            ),
+        ),
+        _ => (
+            OutcomeStatus::Passed,
+            format!(
+                "{reading} {} {}",
+                compare.within_phrase(),
+                describe_watermarks(bound)
+            ),
+        ),
+    }
+}
+
+/// Evaluate a bound whose value is the semantic fold's LAG (`derive: fold-lag`).
+///
+/// The replacement for the manual MemPalace mine gate (governed-discovery station 4, task 4.6). The
+/// number is the fold's own: [`index::status`] opens the pinned store read-only and diffs the
+/// declared source against its manifest through the size+mtime stat cache, so this reads what the
+/// fold already knows rather than walking the tree a second time. Two refusals:
+///
+/// - **No pinned store → `skipped` ("no fold …"), never zero.** Nothing has been folded, so nothing
+///   is behind or current; the headline renders it `index: skipped — no fold`.
+/// - **A status that cannot be read** (no contract, no measure, an unlistable source) → `skipped`,
+///   naming why. A lag nobody could compute is not a lag of zero.
+///
+/// [`index::status`]: super::memory::recall::index::status
+fn evaluate_fold_lag(
+    root: &Path,
+    bound: &Bound,
+    derive: Derive,
+    recipe: &RecipeRef,
+    watermarks: Watermarks,
+) -> BoundOutcome {
+    use super::memory::recall::index::{status, EmbedderChoice};
+
+    let subject = bound
+        .subject
+        .as_deref()
+        .map(|s| normalize_subject(s).to_string())
+        .unwrap_or_else(|| REPO_SUBJECT.to_string());
+    let outcome = |outcome: OutcomeStatus, summary: String, observed: Option<f64>| BoundOutcome {
+        bound: bound.id.clone(),
+        measure: bound.measure.to_string(),
+        subject: subject.clone(),
+        outcome,
+        summary,
+        observed,
+        unit: observed.and(bound.unit.clone()),
+        watermarks,
+        fold_cid: None,
+        source: bound.source.as_str().to_string(),
+        binding: bound.binding.clone(),
+        compare: bound.compare.as_str().to_string(),
+        derive: Some(derive.as_str().to_string()),
+        reset_measure: None,
+        reset_fold_cid: None,
+        contributing_folds: None,
+        recipe: recipe.clone(),
+    };
+    let view = match status(root, EmbedderChoice::Pinned) {
+        Ok(view) => view,
+        Err(error) => {
+            return outcome(
+                OutcomeStatus::Skipped,
+                format!("fold status unreadable — {error}"),
+                None,
+            )
+        }
+    };
+    let Some(lag) = view["lag"].as_u64() else {
+        return outcome(
+            OutcomeStatus::Skipped,
+            format!(
+                "no fold for {} — no readable pinned store for the semantic index measure",
+                bound.measure
+            ),
+            None,
+        );
+    };
+    let mut reading = format!("{lag} files behind the fold");
+    if let Some(unreadable) = view["unreadable"].as_u64().filter(|n| *n > 0) {
+        reading.push_str(&format!(" ({unreadable} unreadable)"));
+    }
+    let observed = lag as f64;
+    let (status, summary) = judge_reading(bound, observed, &reading);
+    outcome(status, summary, Some(observed))
 }
 
 /// Compare an observed magnitude against a bound's watermarks, in the vocabulary every other
@@ -1309,6 +1407,9 @@ fn evaluate_derived(
         // `evaluate_rate_over_window` before this function is entered — the `reads_window` guard's
         // sibling promise to `reads_tree`'s above.
         Derive::RateOverWindow => 0.0,
+        // Unreachable by construction too: `evaluate` routes the fold-store derive to
+        // `evaluate_fold_lag` (the `reads_fold_store` guard).
+        Derive::FoldLag => 0.0,
     };
 
     // The LENS's unit, not a contributing fold's: an accumulation over `documents` and `seeds` and
@@ -1801,6 +1902,11 @@ impl ReportPayload {
             {
                 format!("{prefix}: skipped — no journey fold")
             }
+            // The index slot's absence likewise has one meaning: no pinned fold exists yet. The
+            // outcome's summary names the measure; the session reader is told what is missing.
+            OutcomeStatus::Skipped if slot == "index" && outcome.summary.starts_with("no fold") => {
+                format!("{prefix}: skipped — no fold")
+            }
             OutcomeStatus::Skipped => format!("{prefix}: skipped ({})", outcome.summary),
             OutcomeStatus::Failed => format!("{prefix}: ⚠ failed — {}", outcome.summary),
             OutcomeStatus::Passed if outcome.summary.starts_with("warn: ") => {
@@ -1873,6 +1979,8 @@ fn slot_of_measure(id: &str) -> Option<&'static str> {
         Some("memkit")
     } else if id.starts_with("mempalace") {
         Some("mempalace")
+    } else if id.starts_with("index-fold-lag") {
+        Some("index")
     } else if id.starts_with("cleanup") {
         Some("cleanup")
     } else if id.starts_with("scope") {
@@ -1913,9 +2021,12 @@ mod tests {
     fn the_headline_order_is_the_gospel_declared_order() {
         assert_eq!(
             HEADLINE_ORDER,
-            ["recall", "mempalace", "cleanup", "scope", "budget"]
+            ["recall", "index", "cleanup", "scope", "budget"]
         );
         assert_eq!(slot_prefix("recall"), "recall");
+        assert_eq!(slot_prefix("index"), "index");
+        // Retired from the order, kept in the vocabulary.
+        assert_eq!(slot_prefix("mempalace"), "mempalace");
         assert_eq!(slot_prefix("cleanup"), "cleanup");
         assert_eq!(slot_prefix("scope"), "scope");
         assert_eq!(slot_prefix("budget"), "memory-budget");
@@ -1935,6 +2046,12 @@ mod tests {
         assert_eq!(derive("recall-screens-to-shape"), None);
         assert_eq!(derive("memkit-report-tier-mb"), Some("memkit"));
         assert_eq!(derive("mempalace-currency-days"), Some("mempalace"));
+        assert_eq!(derive("index-fold-lag"), Some("index"));
+        assert_eq!(
+            derive("index-fold-files-per-run"),
+            None,
+            "only the lag owns the index slot"
+        );
         assert_eq!(derive("cleanup-pressure"), Some("cleanup"));
         assert_eq!(derive("scope-drift"), Some("scope"));
         assert_eq!(derive("memory-index-bytes"), Some("budget"));

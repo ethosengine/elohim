@@ -44,8 +44,8 @@ their own recent journeys revealed, and whether its table came from the contract
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `bb671091157ae855cd07ccb2a094f1de0fedf3e89901df266733b97a820d464f` |
-| Whole open | `whole_open_is_byte_identical` | `0d4f656893bf89a27c580dde0a12ff15b2b2ce5a0882e963c4c74e05dbb4a939` |
+| Focused open | `focused_open_is_byte_identical` | `dd29eba64596a30b99ba105aa3c9040d58f940155fe90201e12fd2d19860e68a` |
+| Whole open | `whole_open_is_byte_identical` | `6ed2f87ca8b1cc2f2c392bc1a53c4364df52815436500255067346c227e9fe5f` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged: a refusal exits before render()'s lens/floor preamble runs) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -175,3 +175,7 @@ Focused open re-baselined for the fixture contract CID alone (bafkreid…nxm4 �
 ## 2026-09-24 — contract v20 (Task 4.5 fix round 1: the fused first screen's own semantic call is part of the screen, not the packet's search)
 
 Focused open re-baselined for the fixture contract CID alone (bafkreig…2kqm → bafkreie…3il4); substituting the previous CID back reproduces `7a43faae…`. Whole open moved for the CID and because an absent route is now charged nothing: the `Usage:` line drops `provider_seconds 0`, `semantic_chunks_scanned 0` and `semantic_query_ms`, and `search_queries` reverts 2 → 1. Reverting exactly those reproduces `469d909e…`. The omission line and the floor's `omissions: 6` are unchanged. The refusal digest is unchanged.
+
+## 2026-09-24 — contract v21 (station 4, Task 4.6: `limits.fold_listing_bytes` — the fold's git listing is charged to its own budget, not the discovery `scan_bytes`)
+
+Focused and whole open re-baselined for the fixture contract CID alone (bafkreie…3il4 → bafkreic…jbrm); substituting the previous CID back into each new rendering reproduces `bb671091…` and `0d4f6566…` byte for byte. The refusal digest is unchanged.
