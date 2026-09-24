@@ -9,6 +9,11 @@
 #   brit-helper.sh verify
 #   brit-helper.sh plan --since refs/notes/brit/build-baselines/__global__
 #   brit-helper.sh build-ref build put --step <name> --inputs-hash <hash> ...
+#   brit-helper.sh attest <actual-build-graph.json>
+#       one signed build attestation per pipeline the orchestrator run awaited, as a
+#       git note under refs/notes/brit/build/<pipeline> (scripts/brit-attest.mjs holds
+#       the field mapping). BRIT_NOTES_REMOTE=<remote> fetches and pushes those notes.
+#       Never fails the build.
 
 set -e
 
@@ -31,8 +36,11 @@ elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit" ]; th
     BRIT_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit"
 fi
 
-BRIT_BUILD_REF_BIN=""
-if command -v brit-build-ref >/dev/null 2>&1; then
+# BRIT_BUILD_REF_BIN set by the caller wins (a local build in a private CARGO_TARGET_DIR).
+BRIT_BUILD_REF_BIN="${BRIT_BUILD_REF_BIN:-}"
+if [ -n "$BRIT_BUILD_REF_BIN" ]; then
+    [ -x "$BRIT_BUILD_REF_BIN" ] || BRIT_BUILD_REF_BIN=""
+elif command -v brit-build-ref >/dev/null 2>&1; then
     BRIT_BUILD_REF_BIN=brit-build-ref
 elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit-build-ref" ]; then
     BRIT_BUILD_REF_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit-build-ref"
@@ -80,8 +88,24 @@ case "${1:-}" in
             exit 0
         }
         ;;
+    attest)
+        shift
+        if [ -z "$BRIT_BUILD_REF_BIN" ]; then
+            echo "[brit-helper] WARN: brit-build-ref not installed; build attestations skipped (Stage 1a)" >&2
+            exit 0
+        fi
+        if ! command -v node >/dev/null 2>&1; then
+            echo "[brit-helper] WARN: node not on PATH; build attestations skipped" >&2
+            exit 0
+        fi
+        echo "[brit-helper] attesting builds from ${1:-(no graph)} with $BRIT_BUILD_REF_BIN" >&2
+        BRIT_BUILD_REF_BIN="$BRIT_BUILD_REF_BIN" REPO_ROOT="${REPO_ROOT:-$(pwd)}" \
+            node "$(dirname "$0")/brit-attest.mjs" "$@" || \
+            echo "[brit-helper] WARN: brit-attest exited $? — advisory only, not failing the build" >&2
+        exit 0
+        ;;
     *)
-        echo "[brit-helper] usage: $0 {verify|plan|build-ref} [args...]" >&2
+        echo "[brit-helper] usage: $0 {verify|plan|build-ref|attest} [args...]" >&2
         exit 64
         ;;
 esac

@@ -256,3 +256,119 @@ test('a stage absent from a build is no sample: p50/p90 over present samples onl
   const allUnsplit = summarizeStages([unsplit, deliveredRun(1)], { window: 10 });
   assert.deepEqual(allUnsplit.phases.readiness, { n: 0, p50Min: null, p90Min: null });
 });
+
+// ── --from attestations: the series read from brit build notes, not the Jenkins API ─────────
+
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { attestationRuns, readBuildAttestations } from './delivery-series.mjs';
+
+const at = (step, commit, success, minutes, endIso) => ({
+  step,
+  commit,
+  success,
+  durationMs: minutes * 60_000,
+  builtAt: endIso,
+});
+
+test('attestations group by commit into the orchestrator series shape, newest first', () => {
+  const runs = attestationRuns([
+    at('elohim-edge', 'aaaa1111aaaa1111', true, 30, '2026-09-24T10:30:00Z'),
+    at('elohim', 'aaaa1111aaaa1111', true, 20, '2026-09-24T10:55:00Z'),
+    at('elohim-edge', 'bbbb2222bbbb2222', true, 30, '2026-09-24T12:30:00Z'),
+    at('elohim', 'bbbb2222bbbb2222', false, 120, '2026-09-24T14:40:00Z'),
+  ]);
+  assert.equal(runs.length, 2);
+  const [newest, older] = runs;
+  assert.equal(newest.commit, 'bbbb2222bbbb2222');
+  assert.equal(newest.number, 'bbbb2222bbbb');
+  assert.deepEqual(newest.planned, ['elohim-edge', 'elohim']);
+  assert.deepEqual(newest.outcome, { 'elohim-edge': 'SUCCESS', elohim: 'FAILURE' });
+  assert.equal(newest.delivered, false);
+  assert.equal(newest.result, 'FAILURE');
+  // Wall clock = first start (12:00) to last end (14:40), not the sum of the builds.
+  assert.equal(newest.minutes, 160);
+  assert.equal(older.delivered, true);
+  assert.equal(older.minutes, 55);
+  // A build note says nothing about a timeout: unknown, never "no timeout".
+  assert.equal(newest.timedOut, null);
+  const s = summarize(runs, { window: 10 });
+  assert.equal(s.delivered, 1);
+  assert.equal(s.timedOut, null);
+  assert.equal(s.lastDelivered, 'aaaa1111aaaa');
+});
+
+function repoWithNotes() {
+  const dir = mkdtempSync(join(tmpdir(), 'delivery-attest-'));
+  const git = (...args) => execFileSync('git', args, { cwd: dir }).toString().trim();
+  git('init', '-q', '.');
+  const commit = () => {
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'c');
+    return git('rev-parse', 'HEAD');
+  };
+  const note = (step, sha, body) =>
+    git('-c', 'user.name=brit', '-c', 'user.email=b@b', 'notes', '--ref', `refs/notes/brit/build/${step}`, 'add', '-f', '-m', JSON.stringify(body), sha);
+  // The payload brit-build-ref writes: the whole BuildAttestationContentNode, camelCase, with
+  // each CID serialized as its bytes.
+  const cid = [1, 85, 18, 32, ...Array(32).fill(0)];
+  const node = (step, success, ms, builtAt) => ({
+    manifestCid: cid,
+    stepName: step,
+    inputsHash: 'tree',
+    outputCid: cid,
+    agentId: '00',
+    hardwareProfile: {},
+    buildDurationMs: ms,
+    builtAt,
+    success,
+    signature: '',
+  });
+  const c1 = commit();
+  note('elohim', c1, node('elohim', true, 600_000, '2026-09-24T10:10:00+00:00'));
+  const c2 = commit();
+  note('elohim', c2, node('elohim', false, 1_200_000, '2026-09-24T11:20:00+00:00'));
+  note('elohim-edge', c2, node('elohim-edge', true, 600_000, '2026-09-24T11:00:00+00:00'));
+  return { dir, c1, c2 };
+}
+
+test('readBuildAttestations reads every refs/notes/brit/build/* note', () => {
+  const { dir, c1, c2 } = repoWithNotes();
+  const got = readBuildAttestations(dir).sort((a, b) => a.builtAt.localeCompare(b.builtAt));
+  assert.deepEqual(
+    got.map(a => [a.step, a.commit, a.success, a.durationMs]),
+    [
+      ['elohim', c1, true, 600_000],
+      ['elohim-edge', c2, true, 600_000],
+      ['elohim', c2, false, 1_200_000],
+    ]
+  );
+  assert.deepEqual(readBuildAttestations(mkdtempSync(join(tmpdir(), 'no-git-'))), []);
+});
+
+test('--from attestations prints the same JSON shape as the Jenkins series, sourced from notes', () => {
+  const { dir, c2 } = repoWithNotes();
+  const cli = join(import.meta.dirname, 'delivery-series.mjs');
+  const r = spawnSync('node', [cli, '--from', 'attestations', '--repo', dir, '--json', '--window', '2'], { encoding: 'utf8' });
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.source, 'attestations');
+  assert.equal(out.considered, 2);
+  assert.equal(out.delivered, 1);
+  assert.equal(out.runs[0].commit, c2);
+  assert.deepEqual(out.runs[0].outcome, { 'elohim-edge': 'SUCCESS', elohim: 'FAILURE' });
+  for (const key of ['window', 'considered', 'delivered', 'rate', 'timedOut', 'p50DeliveredMin', 'p90DeliveredMin', 'lastDelivered', 'runs', 'bounds', 'exit']) {
+    assert.ok(key in out, `shape keeps ${key}`);
+  }
+  // 1 of 2 delivered is outside the 80% bound.
+  assert.equal(out.exit, 1);
+  assert.equal(r.status, 1);
+});
+
+test('--stages is not in a build note: refused as not measured, never guessed', () => {
+  const { dir } = repoWithNotes();
+  const cli = join(import.meta.dirname, 'delivery-series.mjs');
+  const r = spawnSync('node', [cli, '--stages', '--from', 'attestations', '--repo', dir], { encoding: 'utf8' });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /NOT MEASURED/);
+});

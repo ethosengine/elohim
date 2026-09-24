@@ -23,8 +23,16 @@
 // never guessed. #1719–#1725 spent ≈12 pipeline-hours and delivered nothing; that is the
 // number this mode puts in front of a reader.
 //
+// --from attestations (Lane F3) reads the same series from brit build attestations — the git
+// notes `brit-helper.sh attest` writes under refs/notes/brit/build/<pipeline>, one signed
+// BuildAttestationContentNode per pipeline per commit — instead of the Jenkins API. One run is
+// one commit; its minutes are the wall clock from the first build's start to the last build's
+// end. A note carries no timeout reason, so `timedOut` reads unknown (null), never 0. With no
+// notes in the repository it says so on stderr and reads Jenkins. Fetch the notes first:
+//   git fetch origin '+refs/notes/brit/build/*:refs/notes/brit/build/*'
+//
 // CLI:  node genesis/orchestrator/delivery-series.mjs [--window 10] [--min-rate 0.8]
-//         [--max-p90-min 240] [--json]
+//         [--max-p90-min 240] [--json] [--from jenkins|attestations] [--repo <path>]
 //       node genesis/orchestrator/delivery-series.mjs --stages [--pipelines elohim]
 //         [--window 10] [--max-publish-verify-p90-min 20] [--max-cost-hours 1] [--json]
 // Exit: 0 within the declared bounds · 1 outside them · 2 not enough evidence
@@ -32,6 +40,7 @@
 // The --stages defaults mirror the bounds declared in .claude/epr-meta/measures.yaml
 // (stage-wallclock-ceiling@1, delivery-cost-ceiling@1); the test pins the two together.
 
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const JENKINS = 'https://jenkins.ethosengine.com';
@@ -89,12 +98,106 @@ export function summarize(runs, { window = 10 } = {}) {
     considered: recent.length,
     delivered: delivered.length,
     rate: recent.length ? delivered.length / recent.length : null,
-    timedOut: recent.filter(r => r.timedOut).length,
+    // A source that cannot see timeouts (build notes) makes the count unknown, not zero.
+    timedOut: recent.some(r => r.timedOut == null) ? null : recent.filter(r => r.timedOut).length,
     p50DeliveredMin: percentile(minutes, 50),
     p90DeliveredMin: percentile(minutes, 90),
     lastDelivered: delivered[0]?.number ?? null,
     runs: recent,
   };
+}
+
+// ── --from attestations: brit build notes instead of the Jenkins API ──────────────────────
+
+const BUILD_NOTES = 'refs/notes/brit/build/';
+
+/**
+ * Every build attestation note in `repo` → [{step, commit, success, durationMs, builtAt}].
+ * An unreadable repository or a malformed note reads as absent, never as a build.
+ */
+export function readBuildAttestations(repo) {
+  const git = (args, input) =>
+    execFileSync('git', args, { cwd: repo, input, stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 256 * 2 ** 20 }).toString();
+  let refs;
+  try {
+    refs = git(['for-each-ref', '--format=%(refname)', BUILD_NOTES]).split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+  const notes = [];
+  for (const ref of refs) {
+    for (const line of git(['notes', '--ref', ref, 'list']).split('\n').filter(Boolean)) {
+      const [blob, commit] = line.split(' ');
+      notes.push({ blob, commit });
+    }
+  }
+  if (notes.length === 0) return [];
+  // One `cat-file --batch` for every note body: "<sha> blob <size>\n<body>\n" per object.
+  const out = execFileSync('git', ['cat-file', '--batch'], {
+    cwd: repo,
+    input: notes.map(n => n.blob).join('\n') + '\n',
+    stdio: ['pipe', 'pipe', 'ignore'],
+    maxBuffer: 256 * 2 ** 20,
+  });
+  const attestations = [];
+  let at = 0;
+  for (const n of notes) {
+    const eol = out.indexOf(0x0a, at);
+    const [, type, size] = out.subarray(at, eol).toString().split(' ');
+    const body = out.subarray(eol + 1, eol + 1 + Number(size)).toString();
+    at = eol + 1 + Number(size) + 1;
+    if (type !== 'blob') continue;
+    try {
+      // brit serializes BuildAttestationContentNode camelCase (stepName, buildDurationMs, builtAt).
+      const node = JSON.parse(body);
+      if (typeof node.stepName !== 'string' || typeof node.success !== 'boolean') continue;
+      attestations.push({
+        step: node.stepName,
+        commit: n.commit,
+        success: node.success,
+        durationMs: Number(node.buildDurationMs) || 0,
+        builtAt: node.builtAt,
+      });
+    } catch {
+      // Not an attestation body; skip it.
+    }
+  }
+  return attestations;
+}
+
+/**
+ * Build attestations → the classifyRun shape, one run per commit, newest first. `number` is
+ * the short commit (a note knows no orchestrator build number); `minutes` is the wall clock
+ * from the first build's start (built_at − duration) to the last build's end.
+ */
+export function attestationRuns(attestations) {
+  const byCommit = new Map();
+  for (const a of attestations) {
+    const end = Date.parse(a.builtAt);
+    if (!Number.isFinite(end)) continue;
+    if (!byCommit.has(a.commit)) byCommit.set(a.commit, []);
+    byCommit.get(a.commit).push({ ...a, end, start: end - a.durationMs });
+  }
+  const runs = [...byCommit].map(([commit, builds]) => {
+    builds.sort((x, y) => x.start - y.start);
+    const planned = builds.map(b => b.step);
+    const outcome = Object.fromEntries(builds.map(b => [b.step, b.success ? 'SUCCESS' : 'FAILURE']));
+    const delivered = builds.every(b => b.success);
+    const first = Math.min(...builds.map(b => b.start));
+    const last = Math.max(...builds.map(b => b.end));
+    return {
+      number: commit.slice(0, 12),
+      commit,
+      result: delivered ? 'SUCCESS' : 'FAILURE',
+      minutes: Math.round((last - first) / 6000) / 10,
+      planned,
+      outcome,
+      delivered,
+      timedOut: null,
+      endedAt: last,
+    };
+  });
+  return runs.sort((x, y) => y.endedAt - x.endedAt).map(({ endedAt, ...r }) => r);
 }
 
 /** 0 within bounds · 1 outside · 2 insufficient evidence. */
@@ -363,22 +466,47 @@ function arg(argv, flag, fallback) {
   return i >= 0 && argv[i + 1] !== undefined ? Number(argv[i + 1]) : fallback;
 }
 
+function strArg(argv, flag, fallback) {
+  const i = argv.indexOf(flag);
+  return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback;
+}
+
 async function main(argv) {
-  if (argv.includes('--stages')) return stagesMain(argv);
+  const from = strArg(argv, '--from', 'jenkins');
+  if (from !== 'jenkins' && from !== 'attestations') {
+    console.error(`delivery-series: --from ${from} — expected jenkins or attestations. NOT MEASURED.`);
+    return 2;
+  }
+  if (argv.includes('--stages')) {
+    if (from === 'attestations') {
+      console.error('delivery-series --stages: stage and phase times are not in a build attestation. NOT MEASURED.');
+      return 2;
+    }
+    return stagesMain(argv);
+  }
   const window = arg(argv, '--window', 10);
   const minRate = arg(argv, '--min-rate', 0.8);
   const maxP90Min = arg(argv, '--max-p90-min', 240);
   let runs;
-  try {
-    runs = await fetchRuns(window * 4);
-  } catch (e) {
-    console.error(`delivery-series: Jenkins unreadable — ${e.message}. NOT MEASURED.`);
-    return 2;
+  let source = 'jenkins';
+  if (from === 'attestations') {
+    const repo = strArg(argv, '--repo', process.cwd());
+    runs = attestationRuns(readBuildAttestations(repo));
+    if (runs.length > 0) source = 'attestations';
+    else console.error(`delivery-series: no brit build attestations under ${BUILD_NOTES} in ${repo}; reading Jenkins.`);
+  }
+  if (source === 'jenkins') {
+    try {
+      runs = await fetchRuns(window * 4);
+    } catch (e) {
+      console.error(`delivery-series: Jenkins unreadable — ${e.message}. NOT MEASURED.`);
+      return 2;
+    }
   }
   const summary = summarize(runs, { window });
   const code = verdict(summary, { minRate, maxP90Min });
   if (argv.includes('--json')) {
-    console.log(JSON.stringify({ ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
+    console.log(JSON.stringify({ source, ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
     return code;
   }
   for (const r of summary.runs) {
@@ -388,9 +516,10 @@ async function main(argv) {
   const pct = summary.rate == null ? 'n/a' : `${Math.round(summary.rate * 100)}%`;
   console.log(
     `delivered ${summary.delivered}/${summary.considered} (${pct}, bound ≥${Math.round(minRate * 100)}%) · ` +
-      `timeouts ${summary.timedOut} · p50 ${summary.p50DeliveredMin ?? '—'}m p90 ${summary.p90DeliveredMin ?? '—'}m ` +
+      `timeouts ${summary.timedOut ?? '—'} · p50 ${summary.p50DeliveredMin ?? '—'}m p90 ${summary.p90DeliveredMin ?? '—'}m ` +
       `(bound ≤${maxP90Min}m) · last delivered #${summary.lastDelivered ?? '—'} → ` +
-      ['WITHIN BOUNDS', 'OUTSIDE BOUNDS', 'NOT ENOUGH EVIDENCE'][code]
+      ['WITHIN BOUNDS', 'OUTSIDE BOUNDS', 'NOT ENOUGH EVIDENCE'][code] +
+      ` (source: ${source})`
   );
   return code;
 }
