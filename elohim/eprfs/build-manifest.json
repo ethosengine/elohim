@@ -17,6 +17,9 @@
           "elohim/epr/**",
           "elohim/epr-rea/**",
           "elohim/Cargo.toml",
+          "bridges/did/Cargo.toml",
+          "bridges/did/did-bridge/**",
+          "bridges/did/did-types/**",
           "scripts/ci/cargo-publish-eprfs.sh"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]
