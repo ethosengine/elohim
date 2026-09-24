@@ -1,0 +1,371 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md",
+ "slug": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-24 (landing task) from the plan's four lanes: P0-P6, C0-C10, S0-S10, A0-A10, one item per task, each citing its plan line. The plan has no checkbox stations, so epr flow project mints none. P0, C0 and A0 are executed in the landing commit series; every item is OPEN at capture and advances through claim/fulfill.",
+ "count": 40,
+ "items": [
+  {
+   "text": "P0: Lane P — spec amendment: witness leg (R-P9) in the actor-plane spec §2 ParticipantClaim and station-2 wording; re-seal cites",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L143",
+   "class": "provisional",
+   "note": "serves acts-attributed-to-participants"
+  },
+  {
+   "text": "P1: Lane P — epr-cli device_key.rs: XDG device key path (R-P3), hardened load-or-generate, did:key via did-bridge path dep, sign/verify via elohim_epr::proof",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L144",
+   "class": "provisional",
+   "note": "serves acts-attributed-to-participants"
+  },
+  {
+   "text": "P2: Lane P — epr-rea ActorRecord::Signed + ActorRecord::Witness, participants.rs roster (Genesis/Binding/Contest), standing_human; agent-claim CIDs unchanged",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L145",
+   "class": "provisional",
+   "note": "serves acts-attributed-to-participants"
+  },
+  {
+   "text": "P3: Lane P — epr actor witness/claim --as human:/contest/device enroll|authorize|bind; resolve_session reads CLAUDE_CODE_SESSION_ID; standing-human attribution arm (source: claim-signed)",
+   "line": 146,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L146",
+   "class": "provisional",
+   "note": "serves acts-attributed-to-participants; needs P1, P2"
+  },
+  {
+   "text": "P4: Lane P — SessionStart participant-standing.py (prints, never witnesses); human tier above every model tier in the tier gate and policies.yaml; participants/ gitignore rung",
+   "line": 147,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L147",
+   "class": "provisional",
+   "note": "serves acts-attributed-to-participants; needs P3"
+  },
+  {
+   "text": "P5: Lane P — station 5 migration: gitAuthor→gitName, steward: slot names the collective, 250 contribution files rewritten by one signed attributed act",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L148",
+   "class": "provisional",
+   "note": "flips habit check 2; needs P4 + P6"
+  },
+  {
+   "text": "P6: Lane P — the witness act: the orchestrator witnesses human:matthew on this workspace; genesis row of the roster; observation note on the station-2 commitment",
+   "line": 149,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L149",
+   "class": "provisional",
+   "note": "Fable's act, not delegated; needs P3"
+  },
+  {
+   "text": "C0: Lane C — declare .epr-meta/guards-sense-frames.habit.md (red, active: false, checks a-c, retire-when per R-C0)",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#8",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L185",
+   "class": "provisional",
+   "note": "serves guards-sense-frames"
+  },
+  {
+   "text": "C1: Lane C — raise the registry byte cap to 1 MiB in eprfs-meta and epr_meta.py load_policies (manifests keep 64 KB); rebuild the pool epr",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#9",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L186",
+   "class": "provisional",
+   "note": "prerequisite for C6; policies.yaml near the 65,536-byte cap at capture"
+  },
+  {
+   "text": "C2: Lane C — frame atoms under elohim/sdk/schemas/v1/frames/ (schema, sovereignty-apex, ownership-inalienable, ontology with NFKC/confusable table and testimony exemption)",
+   "line": 187,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#10",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L187",
+   "class": "provisional",
+   "note": "serves guards-sense-frames"
+  },
+  {
+   "text": "C3: Lane C — opaque evidence channel: GovernanceVerdict.evidence + ValidatorOutcome::Classified in eprfs-meta, no validator literal",
+   "line": 188,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#11",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L188",
+   "class": "provisional",
+   "note": "serves guards-sense-frames"
+  },
+  {
+   "text": "C4: Lane C — native frames.rs classifier producing FrameClassification; sovereignty/ownership guards rebound, PHRASES consts deleted",
+   "line": 189,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#12",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L189",
+   "class": "provisional",
+   "note": "needs C2, C3; unicode-normalization new to the eprfs lockfile"
+  },
+  {
+   "text": "C5: Lane C — Python mirror frame_atoms.py (no CBOR); epr_meta.py phrase constants deleted; sovereignty-guard-signal import swapped",
+   "line": 190,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#13",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L190",
+   "class": "provisional",
+   "note": "needs C4"
+  },
+  {
+   "text": "C6: Lane C — policy rows @4 (class: dispatch kept, frame: + frame-ref:), @3 superseded, re-pin, +2 parity vectors, canon-lift regenerated",
+   "line": 191,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#14",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L191",
+   "class": "provisional",
+   "note": "needs C1, C4, C5"
+  },
+  {
+   "text": "C7: Lane C — [frame] advisory line on epr-meta-resolver and the git gate (exit unchanged), classification witnessed",
+   "line": 192,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#15",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L192",
+   "class": "provisional",
+   "note": "needs C4"
+  },
+  {
+   "text": "C8: Lane C — sovereignty-guard.jsonl rows gain frame_ref + classification_cid (epr govern), python-degraded when the binary is absent",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#16",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L193",
+   "class": "provisional",
+   "note": "needs C5"
+  },
+  {
+   "text": "C9: Lane C — Family-2 shadow probe as a detached child: fold, open, one scoped semantic search, abstain-only, 8 s deadline; frame-probe-abstain@1 measure",
+   "line": 194,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#17",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L194",
+   "class": "provisional",
+   "note": "needs C8"
+  },
+  {
+   "text": "C10: Lane C — frame_classifier_parity_test.py (native vs Python verdict/spans/reason/frameRef); habit re-measured, delta, gap items G1/G2 advanced",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#18",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L195",
+   "class": "provisional",
+   "note": "closes the lane; needs C6, C7"
+  },
+  {
+   "text": "S0: Lane S — ContentView.tags on /db/content (schema + Rust in one commit); lamad maps the trust label to trustScore",
+   "line": 223,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#19",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L223",
+   "class": "provisional",
+   "note": "serves recall-reaches-authority"
+  },
+  {
+   "text": "S1: Lane S — FTS5 runtime probe in elohim-storage tests/search (diesel and rusqlite on the same libsqlite3; bm25)",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#20",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L224",
+   "class": "provisional",
+   "note": "first; blocks S5; stop the lane if the diesel probe fails"
+  },
+  {
+   "text": "S2: Lane S — new leaf crate elohim-epr-index; pure recall parts moved byte-for-byte; recall golden digests must not move",
+   "line": 225,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#21",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L225",
+   "class": "provisional",
+   "note": "serves recall-reaches-authority"
+  },
+  {
+   "text": "S3: Lane S — fold store moved into epr-index keyed by unit_id (schema v3); epr-cli wraps it; existing stores rebuild",
+   "line": 226,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#22",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L226",
+   "class": "provisional",
+   "note": "needs S2"
+  },
+  {
+   "text": "S4: Lane S — content-search-view.schema.json + ContentSearchView Rust structs + TS codegen",
+   "line": 227,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#23",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L227",
+   "class": "provisional",
+   "note": "needs S0"
+  },
+  {
+   "text": "S5: Lane S — storage content-lexical-index measure + content-search-recipe declarations, fold loop under storage_dir/index/<measure-cid>",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#24",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L228",
+   "class": "provisional",
+   "note": "needs S1, S3"
+  },
+  {
+   "text": "S6: Lane S — GET /db/content/search dispatched before content/{id}; reach_admits extracted; honest fold: absent answer",
+   "line": 229,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#25",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L229",
+   "class": "provisional",
+   "note": "needs S5, S4"
+  },
+  {
+   "text": "S7: Lane S — ElohimClient.searchContent with failover; ContentBackendService.searchContentView; Tauri refuses honestly",
+   "line": 230,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#26",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L230",
+   "class": "provisional",
+   "note": "needs S4"
+  },
+  {
+   "text": "S8: Lane S — lamad SearchService.search becomes the route's client; search-provenance line on the page",
+   "line": 231,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#27",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L231",
+   "class": "provisional",
+   "note": "needs S7; eyes-first review"
+  },
+  {
+   "text": "S9: Lane S — a2o content-search.feature @concern:recall-reaches-authority + steps + blind-reader; habit check line added",
+   "line": 232,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#28",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L232",
+   "class": "provisional",
+   "note": "closes the lane on the household mesh"
+  },
+  {
+   "text": "S10: Lane S — optional fold-disabled boot switch and an unfolded mesh peer for the @requires:unfolded-peer scenario",
+   "line": 233,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#29",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L233",
+   "class": "provisional",
+   "note": "operator's call"
+  },
+  {
+   "text": "A0: Lane A — declare elohim/elohim-storage/.epr-meta/attention-witnessed-privately.habit.md (red, active: false, checks 1-3 per R-A0)",
+   "line": 262,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#30",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L262",
+   "class": "provisional",
+   "note": "serves attention-witnessed-privately"
+  },
+  {
+   "text": "A1: Lane A — observation-kinds manifest drift (session_id Cid?) + ObservationKindRegistry loader with payload validation",
+   "line": 263,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#31",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L263",
+   "class": "provisional",
+   "note": "serves attention-witnessed-privately"
+  },
+  {
+   "text": "A2: Lane A — un-shadow /api/v1/observations at http.rs:2531, start a multi-observer manager, persist log heads with resume",
+   "line": 264,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#32",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L264",
+   "class": "provisional",
+   "note": "serves attention-witnessed-privately"
+  },
+  {
+   "text": "A3: Lane A — POST /api/v1/observations (self-rows only, signed: absent), agent-private gossip gate with counters, build_manifest routes",
+   "line": 265,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#33",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L265",
+   "class": "provisional",
+   "note": "needs A1, A2"
+  },
+  {
+   "text": "A4: Lane A — observation-lifestream recipe + ObservationStreamView schema/Rust/codegen",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#34",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L266",
+   "class": "provisional",
+   "note": "needs A0"
+  },
+  {
+   "text": "A5: Lane A — GET /api/v1/observations/stream over the requester's own rows, recipe CID printed, omissions named",
+   "line": 267,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#35",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L267",
+   "class": "provisional",
+   "note": "needs A3, A4"
+  },
+  {
+   "text": "A6: Lane A — ObservationEmitterService in elohim-rea-runtime (dwell pauses when hidden, monotonic clamped scroll depth)",
+   "line": 268,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#36",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L268",
+   "class": "provisional",
+   "note": "serves attention-witnessed-privately"
+  },
+  {
+   "text": "A7: Lane A — content viewer emits lamad:content-viewed instead of AttentionTending; R-A0 grep reaches 0",
+   "line": 269,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#37",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L269",
+   "class": "provisional",
+   "note": "needs A6"
+  },
+  {
+   "text": "A8: Lane A — /me/stream page with stream-provenance, stream-entry, stream-omission, stream-lens",
+   "line": 270,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#38",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L270",
+   "class": "provisional",
+   "note": "needs A5, A7; eyes-first review"
+  },
+  {
+   "text": "A9: Lane A — a2o attention-witnessed-privately.feature + steps + blind-reader; attention-analytics superseded; five backlog atoms",
+   "line": 271,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#39",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L271",
+   "class": "provisional",
+   "note": "household mesh-browser lane"
+  },
+  {
+   "text": "A10: Lane A — close: gates, codegen diff clean, mesh scenario green twice, habit DELTA with the receipt id",
+   "line": 272,
+   "state": "OPEN",
+   "id": "plans__2026-09-25-post-station-4-participant-classifier-search-attention-sprint#40",
+   "cites": "genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md#L272",
+   "class": "provisional",
+   "note": "closes the lane"
+  }
+ ]
+}
