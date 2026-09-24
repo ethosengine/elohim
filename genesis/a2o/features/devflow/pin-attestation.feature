@@ -1,4 +1,4 @@
-# A submodule pin move is gated by the pinned commit's own attestation and re-gates
+# A submodule pin move is gated by the pinned commit's own attestation and re-selects
 # its direct consumers. Driven the way `steps/devflow/run-plane.steps.ts` drives the
 # `epr` CLI: every scenario mints its OWN scratch superproject (one gitlink, two
 # manifests, a fake `gh` on GH_BIN) and runs the real gate-runner against it with
@@ -61,6 +61,14 @@ Feature: A submodule pin is gated by its own attestation
     Then the gate exits 1
     And the gate printed "has no run at"
     And one pin-attestation observation was recorded with tier "witnessed" and conclusion "absent"
+
+  @concern:pin-attestation
+  Scenario: A still-running upstream check refuses the pin until it concludes
+    Given the upstream check at the pinned commit is still running
+    When the gate runs for project "comp"
+    Then the gate exits 1
+    And the gate printed "not yet concluded"
+    And one pin-attestation observation was recorded with tier "witnessed" and conclusion "pending"
 
   @concern:pin-attestation
   Scenario: An unreachable read passes on the floor and says so

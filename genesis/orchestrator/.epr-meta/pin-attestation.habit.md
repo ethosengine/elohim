@@ -9,7 +9,7 @@ invariant: >
 status: red
 active: false
 checks:
-  - "a2o @concern:pin-attestation (genesis/a2o/features/devflow/pin-attestation.feature — five scenarios over a scratch superproject with one gitlink and a fake `gh`: green passes, red refuses, absent refuses, unreachable passes as claimed, and a pin move selects the one-hop consumer and nothing deeper; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:pin-attestation')"
+  - "a2o @concern:pin-attestation (genesis/a2o/features/devflow/pin-attestation.feature — six scenarios over a scratch superproject with one gitlink and a fake `gh`: green passes, red refuses, absent refuses, still-running refuses, unreachable passes as claimed, and a pin move selects the one-hop consumer and nothing deeper; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:pin-attestation')"
   - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
   - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
 guard: >
@@ -27,5 +27,15 @@ retire-when: >
   when attestations are read from the dataplane rather than a forge — rung 2 landing makes
   `github-checks` one provider among peers — and this habit describes a product, not a practice.
 ---
+DELTA 2026-09-23 (rung 3 landed in shadow mode; RED preserved): schema lifted and widened
+(rakia 2b2cedb), brit/rakia/sophia declare attested gates with the pin as the step input
+(brit 92f5faf, rakia d3329b2, sophia 631f7f4 — all three upstream checks concluded success at
+those pins), consumer edges on cargo-build-storage and build-edge-image, gate-runner asks
+`rakia affected` in shadow mode (GATE_ORACLE=shadow default) and dispatches attested projects
+to gate-attest.mjs. Evidence: node --test gate-attest/gate-oracle/gate-runner + orchestrator
+suite 301/301 EXIT=0; a2o @concern:pin-attestation 6/6 (46 steps) on the default profile, two
+blind-reader passes READY; live: `gate-runner --target rakia` read `test success`,
+`--target sophia` read `build success`; a sophia pin path prints `[gate] oracle-diff:
++elohim-app` in shadow mode. Not yet: the oracle flip (commit 4) and a real pin-moving push.
 DELTA 2026-09-23 (born RED): spec and plan authored; the codegen gate was found red at the
 pinned rakia schema and the two oracles disagree on a bare gitlink path. No landing yet.
