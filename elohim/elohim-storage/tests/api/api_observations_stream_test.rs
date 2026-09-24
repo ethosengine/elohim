@@ -454,7 +454,15 @@ fn stream_title_lookup_never_reveals_private_titles() {
     .iter()
     .enumerate()
     {
-        viewed(&mut conn, JESSICA, i as i64, NOW - 60 + i as i64, id, 1_000, 10);
+        viewed(
+            &mut conn,
+            JESSICA,
+            i as i64,
+            NOW - 60 + i as i64,
+            id,
+            1_000,
+            10,
+        );
     }
 
     let view = stream(&mut conn, JESSICA, "");
@@ -469,7 +477,11 @@ fn stream_title_lookup_never_reveals_private_titles() {
     assert_eq!(title_of("bafy-commons").as_deref(), Some("A commons title"));
     assert_eq!(title_of("bafy-public").as_deref(), Some("A public title"));
     for id in ["bafy-self", "bafy-intimate", "bafy-community"] {
-        assert_eq!(title_of(id), None, "{id}: a narrower-reach title never renders");
+        assert_eq!(
+            title_of(id),
+            None,
+            "{id}: a narrower-reach title never renders"
+        );
     }
 }
 
@@ -482,14 +494,62 @@ fn window_pushed_into_sql_keeps_the_older_omission_count() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
     viewed(&mut conn, JESSICA, 0, NOW - DAY, "bafy-in-long", 90_000, 10);
-    viewed(&mut conn, JESSICA, 1, NOW - 2 * DAY, "bafy-in-short", 1_000, 10);
-    viewed(&mut conn, JESSICA, 2, NOW - 8 * DAY, "bafy-old-long", 90_000, 10);
-    viewed(&mut conn, JESSICA, 3, NOW - 9 * DAY, "bafy-old-short", 1_000, 10);
-    viewed(&mut conn, JESSICA, 4, NOW - 30 * DAY, "bafy-old-short-2", 2_000, 10);
+    viewed(
+        &mut conn,
+        JESSICA,
+        1,
+        NOW - 2 * DAY,
+        "bafy-in-short",
+        1_000,
+        10,
+    );
+    viewed(
+        &mut conn,
+        JESSICA,
+        2,
+        NOW - 8 * DAY,
+        "bafy-old-long",
+        90_000,
+        10,
+    );
+    viewed(
+        &mut conn,
+        JESSICA,
+        3,
+        NOW - 9 * DAY,
+        "bafy-old-short",
+        1_000,
+        10,
+    );
+    viewed(
+        &mut conn,
+        JESSICA,
+        4,
+        NOW - 30 * DAY,
+        "bafy-old-short-2",
+        2_000,
+        10,
+    );
     // An unreadable payload out of the window: zero dwell, so no dwell lens selects it.
-    seed(&mut conn, JESSICA, 5, NOW - 40 * DAY, "lamad:content-viewed", "bafy-old-broken", "{");
+    seed(
+        &mut conn,
+        JESSICA,
+        5,
+        NOW - 40 * DAY,
+        "lamad:content-viewed",
+        "bafy-old-broken",
+        "{",
+    );
     // Another observer's old rows never count.
-    viewed(&mut conn, JAMES, 0, NOW - 20 * DAY, "bafy-james-old", 90_000, 10);
+    viewed(
+        &mut conn,
+        JAMES,
+        0,
+        NOW - 20 * DAY,
+        "bafy-james-old",
+        90_000,
+        10,
+    );
     // After asOf.
     viewed(&mut conn, JESSICA, 6, NOW + DAY, "bafy-later", 90_000, 10);
 
@@ -497,9 +557,15 @@ fn window_pushed_into_sql_keeps_the_older_omission_count() {
     assert_eq!(subjects(&view), vec!["bafy-in-long", "bafy-in-short"]);
     assert_eq!(view.total_count, 7, "two in, four older, one later");
     let older = omission_named(&view, "window").expect("window omission");
-    assert!(older.contains("4 older observations"), "{:?}", view.omissions);
     assert!(
-        view.omissions.iter().any(|l| l.contains("1 observation after asOf")),
+        older.contains("4 older observations"),
+        "{:?}",
+        view.omissions
+    );
+    assert!(
+        view.omissions
+            .iter()
+            .any(|l| l.contains("1 observation after asOf")),
         "{:?}",
         view.omissions
     );
@@ -508,5 +574,9 @@ fn window_pushed_into_sql_keeps_the_older_omission_count() {
     assert_eq!(subjects(&view), vec!["bafy-in-long"]);
     assert_eq!(view.total_count, 3, "in-long, old-long, later");
     let older = omission_named(&view, "window").expect("window omission");
-    assert!(older.contains("1 older observation "), "{:?}", view.omissions);
+    assert!(
+        older.contains("1 older observation "),
+        "{:?}",
+        view.omissions
+    );
 }

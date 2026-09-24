@@ -355,7 +355,8 @@ async fn post_body_over_16_kib_is_400() {
     let mut conn = pool.get().unwrap();
     let mut body: serde_json::Value = serde_json::from_slice(&content_viewed(3000, 50)).unwrap();
     // Unknown fields would be refused anyway; pad a known one so only the size speaks.
-    body["subjectKind"] = json!("x".repeat(elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES));
+    body["subjectKind"] =
+        json!("x".repeat(elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES));
     let bytes = serde_json::to_vec(&body).unwrap();
     assert!(bytes.len() > 16 * 1024);
     let err = accept_observation(&manager(), &mut conn, Some("human-jessica"), &bytes, NOW)
@@ -364,14 +365,18 @@ async fn post_body_over_16_kib_is_400() {
     let message = err.to_string();
     assert_eq!(status_of(err), StatusCode::BAD_REQUEST);
     assert!(message.contains("16384"), "{message}");
-    assert_eq!(elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES, 16 * 1024);
+    assert_eq!(
+        elohim_storage::api::observations::MAX_OBSERVATION_BODY_BYTES,
+        16 * 1024
+    );
 }
 
 #[tokio::test]
 async fn subject_cid_must_equal_payload_ref_cid() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-    let payload = json!({ "ref_cid": "bafy-node-1", "dwell_ms": 10, "scroll_depth_pct": 5 }).to_string();
+    let payload =
+        json!({ "ref_cid": "bafy-node-1", "dwell_ms": 10, "scroll_depth_pct": 5 }).to_string();
 
     for subject in [Some("bafy-node-2"), None] {
         let mut body = json!({

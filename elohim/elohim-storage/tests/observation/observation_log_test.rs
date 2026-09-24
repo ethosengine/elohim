@@ -89,7 +89,11 @@ async fn log_memory_does_not_grow_with_appends() {
         log.append(fixture_obs(i)).await.unwrap();
         assert!(log.retained_len() <= TAIL_CAPACITY, "after {i} appends");
     }
-    assert_eq!(log.latest_offset(), appended, "the offset still counts every append");
+    assert_eq!(
+        log.latest_offset(),
+        appended,
+        "the offset still counts every append"
+    );
 
     // read_from serves the retained tail; earlier offsets are skipped, as for a resumed log.
     let all = log.read_from(0).await.unwrap();

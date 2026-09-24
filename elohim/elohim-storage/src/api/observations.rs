@@ -585,8 +585,11 @@ async fn handle_by_observer(
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let header = super::account::extract_agent_cid_explicit(&req);
     let mut conn = get_conn(pool)?;
-    let views =
-        observations_by_observer(&mut conn, header.as_deref(), req.uri().query().unwrap_or(""))?;
+    let views = observations_by_observer(
+        &mut conn,
+        header.as_deref(),
+        req.uri().query().unwrap_or(""),
+    )?;
     Ok(response::ok(&views))
 }
 
