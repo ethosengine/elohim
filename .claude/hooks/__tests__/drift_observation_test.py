@@ -427,6 +427,18 @@ class DriftObservationCase(unittest.TestCase):
             return []
         return [json.loads(line) for line in led.read_text().splitlines() if line.strip()]
 
+    def _settled_sov_rows(self, seconds: float = 10.0) -> list[dict]:
+        """The ledger once the detached `--classify` child has rewritten every `pending` row
+        (ruling R-C8: the native classification runs off the hook's critical path)."""
+        import time
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            rows = self._sov_rows()
+            if rows and all(r["source"] != "pending" for r in rows):
+                return rows
+            time.sleep(0.05)
+        return self._sov_rows()
+
     def _sov_write(self, text: str, **envextra) -> subprocess.CompletedProcess:
         doc = self.project / "note.md"
         doc.write_text(text)
@@ -439,7 +451,9 @@ class DriftObservationCase(unittest.TestCase):
         frame = self._sov_frame_ref()
         r = self._sov_write("The learner is self-sovereign here.\n", GOVERN_VERB="1",
                             GOVERN_FRAME_REF=frame, GOVERN_CID=self._STUB_CLASSIFICATION)
-        rows = self._sov_rows()
+        # The hook writes the row as `pending` and returns; the detached child mints the CID
+        # (the pending→native timing is pinned in frame_probe_test.py).
+        rows = self._settled_sov_rows()
         self.assertEqual(len(rows), 1, rows)
         row = rows[0]
         self.assertEqual(set(row), {"ts", "path", "tool", "net_new", "phrases", "frame_ref",
@@ -455,18 +469,19 @@ class DriftObservationCase(unittest.TestCase):
         self.assertEqual(govern[0][govern[0].index("--path") + 1], "note.md")
         self.assertEqual(govern[0][govern[0].index("--session") + 1], "sov-sid")
         self.assertIn(f"frame {frame[:8]}", r.stdout)
-        self.assertIn(f"classification {self._STUB_CLASSIFICATION[:8]}", r.stdout)
+        # the author's line is written before the CID exists — it says so
+        self.assertIn("classification pending", r.stdout)
         notes = [c for c in self.stub_calls() if c[:2] == ["flow", "note"] and "--help" not in c]
         self.assertEqual(len(notes), 1, self.stub_calls())
 
     def test_sovereignty_row_degrades_to_python_when_govern_does_not_run(self):
         r = self._sov_write("The learner is self-sovereign here.\n")
-        rows = self._sov_rows()
+        rows = self._settled_sov_rows()
         self.assertEqual(len(rows), 1, rows)
         self.assertTrue(rows[0]["frame_ref"].startswith("bafy"), rows)
         self.assertIsNone(rows[0]["classification_cid"])
         self.assertEqual(rows[0]["source"], "python-degraded")
-        self.assertIn("classification unminted", r.stdout)
+        self.assertIn("classification pending", r.stdout)
 
     def test_marker_declared_stays_silent_via_atom_markers(self):
         r = self._sov_write("sovereignty-frame: bounded\nThe learner is self-sovereign here.\n",

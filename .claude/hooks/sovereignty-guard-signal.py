@@ -23,8 +23,21 @@ Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
           minted ONLY by the native evaluator (ruling R-C4: no second DAG-CBOR encoder in
           Python): `epr govern --new --content-stdin` over the landed bytes. `--new` because the
           native host reads the prior from disk, which post-landing IS the landed file, so the
-          classification is of the landed document against an empty prior. When the binary does
-          not run: `classification_cid: null`, `source: python-degraded`.
+          classification is of the landed document against an empty prior.
+          OFF THE CRITICAL PATH (ruling R-C8): the hook's budget is 2 s and `epr govern` costs
+          ~1.3 s, so the parent writes the row with `classification_cid: null, source: pending`
+          and a DETACHED child (`--classify`) rewrites that row: `source: native` with the CID,
+          or `source: python-degraded` when the evaluator does not run. A reader treats
+          `pending` like `python-degraded`.
+Probe:    the Family-2 SHADOW PROBE (ruling R-C4 amended, plan task C9). A `.md` Write/Edit whose
+          net-new bytes reach the atom's `probe_min_net_new_bytes`, that NO keyword matched, and
+          that is not testimony (the ontology atom's `testimony_exempt`) spawns a detached child
+          (`--probe`): `flow memory index fold --max-files 1 --scope <rel>` → `recall open` → ONE
+          `flow memory recall search --provider semantic` for the atom's phrases, scoped to the
+          landed file's directory. A score on the landed file at/above `cosine_floor_permille /
+          1000` is an ABSTAIN — a row carrying `probe{cosine, floor, verdict, producer, method,
+          fold_lag}` and a fold on `frame-probe-abstain@1` — never an accusation, and never
+          printed: the author does not see it. The child gives up at 8 s.
 Drift:    ONE thing — a fold via `epr flow note --kind observation --measure
           sovereignty-landings@1`. The private JSON tally this hook kept under
           `.claude/memory-kit/` was deleted with the kit at station six round (b)
@@ -36,9 +49,14 @@ Hook Type: PostToolUse   Matcher: Edit|Write
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import re
+import subprocess
 import sys
+import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -86,6 +104,20 @@ def active_rule_version(repo: Path, rule_id: str) -> str:
 
 _ESCALATE_AT = 3  # landings before the message asks for a rule/corpus drift review
 _SOV_REF = "epr:validator-sovereignty-ontology-guard"
+LEDGER_REL = ".claude/data/sovereignty-guard.jsonl"
+PENDING = "pending"
+PROBE_DEADLINE_S = 8.0          # the shadow probe's whole budget (fold + open + search)
+PROBE_MEASURE = "frame-probe-abstain@1"
+
+
+class Deadline:
+    """One budget for a child, so its bounded calls cannot sum past it."""
+
+    def __init__(self, seconds: float) -> None:
+        self.end = time.monotonic() + seconds
+
+    def left(self) -> float:
+        return max(0.0, self.end - time.monotonic())
 
 
 def native_classification(repo: Path, rel: str, landed: str, frame_ref: str,
@@ -109,7 +141,246 @@ def native_classification(repo: Path, rel: str, landed: str, frame_ref: str,
     return None, "native"
 
 
-def main() -> int:
+# ── the ledger (append under a lock; the classify child rewrites one row in place) ───────────
+def append_row(repo: Path, row: dict) -> None:
+    try:
+        led = repo / LEDGER_REL
+        led.parent.mkdir(parents=True, exist_ok=True)
+        with led.open("a", encoding="utf-8") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            fh.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+
+
+def rewrite_pending_row(repo: Path, rel: str, ts: str, fill) -> dict | None:
+    """Rewrite the LAST `pending` row for (`rel`, `ts`) with `fill(row)`'s fields, in place and
+    under the ledger lock (a concurrent append waits, and is never lost to a replace). Returns
+    the row as it was, or None when there is no such row."""
+    led = repo / LEDGER_REL
+    try:
+        with led.open("r+", encoding="utf-8") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            lines = fh.read().splitlines(keepends=True)
+            for i in range(len(lines) - 1, -1, -1):
+                try:
+                    row = json.loads(lines[i])
+                except ValueError:
+                    continue
+                if (isinstance(row, dict) and row.get("path") == rel and row.get("ts") == ts
+                        and row.get("source") == PENDING):
+                    was = dict(row)
+                    row.update(fill(was))
+                    lines[i] = json.dumps(row) + "\n"
+                    fh.seek(0)
+                    fh.write("".join(lines))
+                    fh.truncate()
+                    return was
+    except OSError:
+        pass
+    return None
+
+
+# ── detached children ───────────────────────────────────────────────────────────────────────
+def spawn_child(repo: Path, args: list[str], content: str | None = None) -> None:
+    """ONE detached child of this hook: its own session, no inherited stdout/stderr (the harness
+    reads the hook's stdout to EOF, so an inherited pipe would make the author wait), the landed
+    bytes on stdin from an unlinked temp file. Never waited on."""
+    try:
+        with tempfile.TemporaryFile() as feed:
+            if content is not None:
+                feed.write(content.encode("utf-8"))
+                feed.seek(0)
+            subprocess.Popen(
+                [sys.executable, str(Path(__file__).resolve()), *args],
+                cwd=str(repo), stdin=feed, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True,
+            )
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+
+
+def classify_child(args: list[str], stdin) -> int:
+    """`--classify <rel> <session> <ts>`: mint the native classification for the row the parent
+    wrote as `pending`, over the landed bytes on stdin (ruling R-C8)."""
+    if len(args) < 3:
+        return 0
+    rel, session, ts = args[0], args[1] or None, args[2]
+    pd = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not pd:
+        return 0
+    repo = Path(pd).resolve()
+    landed = stdin.read()
+    frame_ref = _pending_frame_ref(repo, rel, ts)
+    if frame_ref is None:
+        return 0
+    cid, source = native_classification(repo, rel, landed, frame_ref, session)
+    rewrite_pending_row(repo, rel, ts, lambda _row: {"classification_cid": cid, "source": source})
+    return 0
+
+
+def _pending_frame_ref(repo: Path, rel: str, ts: str) -> str | None:
+    try:
+        lines = (repo / LEDGER_REL).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(row, dict) and row.get("path") == rel and row.get("ts") == ts
+                and row.get("source") == PENDING):
+            ref = row.get("frame_ref")
+            return ref if isinstance(ref, str) else None
+    return None
+
+
+# ── the Family-2 shadow probe ───────────────────────────────────────────────────────────────
+def net_new_bytes(pre: str, post: str) -> int:
+    """Bytes of the lines this write introduced — the classifier's own net-new (line-delta)
+    notion, so re-ordering or cleaning existing prose never counts."""
+    remaining: dict[str, int] = {}
+    for line in pre.split("\n"):
+        remaining[line] = remaining.get(line, 0) + 1
+    total = 0
+    for line in post.split("\n"):
+        if remaining.get(line):
+            remaining[line] -= 1
+        else:
+            total += len(line.encode("utf-8")) + 1
+    return total
+
+
+_FRONTMATTER = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.S)
+
+
+def is_testimony(rel: str, post: str, ontology: dict) -> bool:
+    """The ontology atom's `testimony_exempt`: a path prefix, or `<frontmatter_key>: true`."""
+    exempt = ontology.get("testimony_exempt") or {}
+    if any(rel.startswith(prefix) for prefix in exempt.get("path_prefixes") or []):
+        return True
+    key = exempt.get("frontmatter_key")
+    match = _FRONTMATTER.match(post)
+    if not key or not match:
+        return False
+    for line in match.group(1).splitlines():
+        name, sep, value = line.partition(":")
+        if sep and name.strip() == key:
+            return value.split("#", 1)[0].strip().strip("\"'").lower() == "true"
+    return False
+
+
+def _run_json(binary: str, repo: Path, args: list[str], timeout: float) -> dict | None:
+    """One bounded `epr` call whose stdout is a JSON object, or None (a timeout kills it)."""
+    if timeout <= 0:
+        return None
+    try:
+        done = subprocess.run([binary, *args, "--root", str(repo)], capture_output=True,
+                              text=True, timeout=timeout, cwd=str(repo),
+                              stdin=subprocess.DEVNULL)
+        if done.returncode != 0:
+            return None
+        value = json.loads(done.stdout)
+        return value if isinstance(value, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _session_label(session: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", session or "none")[:64]
+
+
+def probe_child(args: list[str]) -> int:
+    """`--probe <rel> <session> [<tool>]`: fold → open → ONE semantic search scoped to the landed
+    file's directory; abstain when the landed file itself scores at/above the atom's floor."""
+    if len(args) < 2:
+        return 0
+    rel, session = args[0], args[1]
+    tool = args[2] if len(args) > 2 else ""
+    deadline = Deadline(PROBE_DEADLINE_S)
+    pd = os.environ.get("CLAUDE_PROJECT_DIR")
+    binary = epr_client.resolve_binary()
+    if not pd or not binary:
+        return 0
+    repo = Path(pd).resolve()
+    try:
+        atom, frame_ref = frame_atoms.load_frames()[_SOV_REF]
+    except (frame_atoms.FrameAtomError, KeyError):
+        return 0
+    signal = atom["recall_signal"]
+    floor = signal["cosine_floor_permille"] / 1000
+    query = " / ".join(signal["phrases"])
+    scope = str(Path(rel).parent) or "."
+    label = f"frame-probe-{_session_label(session)}"
+
+    # The fold first, scoped to the landed file itself (`--scope` matches the exact path), so the
+    # bytes the search reads are the bytes that landed: an unscoped `--max-files 1` folds the
+    # first file the plan lists as behind, which is almost never this one. Its answer does not
+    # matter (a busy fold is another session's fold, and the search reports its own lag).
+    try:
+        subprocess.run([binary, "flow", "memory", "index", "fold", "--max-files", "1",
+                        "--scope", rel, "--root", str(repo)], capture_output=True, cwd=str(repo),
+                       stdin=subprocess.DEVNULL, timeout=max(0.01, deadline.left()))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if _run_json(binary, repo, ["flow", "memory", "recall", "open", "--session", label,
+                                "--need", query, "--json"], deadline.left()) is None:
+        return 0
+    answer = _run_json(binary, repo, ["flow", "memory", "recall", "search", "--provider",
+                                      "semantic", "--query", query, "--search-scope", scope,
+                                      "--session", label, "--json"], deadline.left())
+    best = None
+    for cand in ((answer or {}).get("retrieval") or {}).get("candidates") or []:
+        if not isinstance(cand, dict) or cand.get("path") != rel:
+            continue
+        score, producer, method = cand.get("score"), cand.get("producer"), cand.get("method")
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
+            continue
+        if not isinstance(producer, str) or not producer or not isinstance(method, str) or not method:
+            continue  # a candidate that cannot say who produced it under which method is not evidence
+        if best is None or score > best["score"]:
+            best = cand
+    if best is None or float(best["score"]) < floor or deadline.left() <= 0:
+        return 0
+    lag = best.get("fold_lag")
+    append_row(repo, {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "path": rel, "tool": tool, "net_new": 0, "phrases": [], "frame_ref": frame_ref,
+        "classification_cid": None, "source": "semantic-probe", "verdict": "abstain",
+        "probe": {"cosine": float(best["score"]), "floor": floor, "verdict": "abstain",
+                  "producer": best["producer"], "method": best["method"],
+                  "fold_lag": lag if isinstance(lag, int) and not isinstance(lag, bool) else None},
+    })
+    _obs.emit(PROBE_MEASURE, rel, 1,
+              reason="frame probe: keyword-silent write resembles the apex-sovereignty frame — abstain",
+              env={"frame": frame_ref, "cosine": f"{float(best['score']):.3f}"}, root=str(repo))
+    return 0
+
+
+def maybe_probe(repo: Path, rel: str, tool: str, pre: str, post: str, session: str) -> None:
+    """Spawn the shadow probe for a keyword-silent `.md` Write/Edit past the byte floor that is
+    not testimony. Any unreadable atom means no probe — telemetry degrades, it never blocks."""
+    if tool not in ("Write", "Edit"):
+        return
+    try:
+        atom, _ref = frame_atoms.load_frames()[_SOV_REF]
+        ontology = frame_atoms.load_ontology()
+    except (frame_atoms.FrameAtomError, KeyError):
+        return
+    if net_new_bytes(pre, post) < atom["recall_signal"]["probe_min_net_new_bytes"]:
+        return
+    if is_testimony(rel, post, ontology):
+        return
+    spawn_child(repo, ["--probe", rel, session, tool])
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--classify"]:
+        return classify_child(argv[1:], sys.stdin)
+    if argv[:1] == ["--probe"]:
+        return probe_child(argv[1:])
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
@@ -136,34 +407,33 @@ def main() -> int:
         pre = post.replace(new, old) if ti.get("replace_all") else post.replace(new, old, 1)
     else:  # Write — no reliable prior state post-hoc; score the whole file as introduced (conservative)
         pre = ""
+    session = str(data.get("session_id") or "")
     try:
         found = frame_atoms.classify(
             {"content": post, "prior_content": pre, "is_new": False, "path": rel}, _SOV_REF)
     except frame_atoms.FrameAtomError:
         return 0  # telemetry degrades, it never blocks
-    if found is None or found["verdict"] == "legitimate":
-        return 0  # nothing net-new, or a frame adjudicated for this surface — consistent with the gate
+    if found is None:
+        # Keyword-silent: the only road left is the shadow probe, detached and never printed.
+        maybe_probe(repo, rel, tool, pre, post, session)
+        return 0
+    if found["verdict"] == "legitimate":
+        return 0  # a frame adjudicated for this surface — consistent with the gate
     net_new = found["netNew"]
     frame_ref = found["frameRef"]
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     phrases = [p for p in found["matchedRecallSignal"]
                if not p.endswith(":") and p != frame_atoms.UNSCANNED_TAIL]
-    classification_cid, source = native_classification(repo, rel, post, frame_ref,
-                                                       data.get("session_id"))
 
-    # 1) append the landing to the ledger
-    try:
-        led = repo / ".claude" / "data" / "sovereignty-guard.jsonl"
-        led.parent.mkdir(parents=True, exist_ok=True)
-        with led.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": ts, "path": rel, "tool": tool,
-                                 "net_new": net_new, "phrases": phrases,
-                                 "frame_ref": frame_ref,
-                                 "classification_cid": classification_cid,
-                                 "source": source, "verdict": found["verdict"]}) + "\n")
-    except OSError:
-        pass
+    # 1) append the landing to the ledger as `pending`, then hand the native classification to a
+    #    detached child that rewrites this row (ruling R-C8 — govern costs more than the budget).
+    append_row(repo, {"ts": ts, "path": rel, "tool": tool,
+                      "net_new": net_new, "phrases": phrases,
+                      "frame_ref": frame_ref,
+                      "classification_cid": None,
+                      "source": PENDING, "verdict": found["verdict"]})
+    spawn_child(repo, ["--classify", rel, session, ts], content=post)
 
     # 2) aggregate into the drift tally (the signal that flows back to the rule).
     # The bound lives in .claude/epr-meta (sovereignty-landings@1) and the fold is the ONLY
@@ -184,8 +454,7 @@ def main() -> int:
 
     # 3) surface it. Below threshold: a light note the landing was recorded. At/over: ask for review.
     ph = ", ".join(phrases) or "apex-sovereignty framing"
-    cites = (f"frame {frame_atoms.short_cid(frame_ref)} · classification "
-             f"{frame_atoms.short_cid(classification_cid) if classification_cid else frame_atoms.UNMINTED}")
+    cites = f"frame {frame_atoms.short_cid(frame_ref)} · classification {PENDING}"
     if total >= _ESCALATE_AT:
         msg = (f"[sovereignty-guard] apex-sovereignty framing landed in {rel} ({ph}). "
                f"{total} landing(s) now aggregated across {rel!s} and peers "

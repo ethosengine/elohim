@@ -623,6 +623,16 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
+  - id: frame-probe-abstain
+    version: 1
+    family: sovereignty-guard
+    unit: abstentions
+    procedure: ".claude/hooks/sovereignty-guard-signal.py --probe — the Family-2 shadow probe: a keyword-silent .md write whose landed file scores at/above the frame atom's cosine_floor_permille/1000 on ONE semantic recall search for the atom's phrases, scoped to its directory; an abstain, never an accusation, never shown to the author"
+    provenance: "plan 2026-09-25 post-station-4 Lane C task C9; rulings R-C4 (amended), R-C6, R-C8; the floor and byte threshold live in elohim/sdk/schemas/v1/frames/frame-sovereignty-apex.json"
+    default-authority: observation
+    status: active
+    established_by: lane-c-c9-2026-09-24
+
   # Two bounds the SessionStart headline reports that no kit CONSTANT names — the value is the
   # line's own count. Added with the producer bridge so the native headline can carry them.
   - id: mempalace-surfaces-changed
