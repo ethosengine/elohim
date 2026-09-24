@@ -6,12 +6,86 @@
 #
 # Usage:
 #   capture-rollout-evidence.sh <kind> <name> <namespace> [output-root]
+#   capture-rollout-evidence.sh --since-conductor <storage-statefulset> <namespace> [output-root]
 #
 # The collector is diagnostic and best-effort: every failed read is recorded in
 # its artifact, but the script exits zero so it can never replace the rollout's
 # original failure with an observability failure.
+#
+# --since-conductor (read-only; native-delivery sprint Lane K follow-up) is the
+# SUCCESSFUL-roll mode. The default mode keeps logs only for non-Ready pods (the
+# last 200 lines), so after a clean roll scripts/ci/conductor-recovery-receipt.sh
+# finds no storage log and prints UNMEASURED for every pod. This mode captures
+# statefulset/<name>-conductor and statefulset/<name> exactly as the default
+# mode does, then, for every storage pod <name>-<n>, reads each container's log
+# SINCE its conductor pod <name>-conductor-<n>'s metadata.creationTimestamp (the
+# restart the receipt measures from) and keeps the `conductor app is …` lines
+# (NOT RUNNING / RUNNING again) as <pod>--<container>--since-conductor.log — the
+# layout the receipt reads. Filtered, so a six-hour window is lines, not
+# megabytes. Same verbs as the default mode (kubectl get / logs); nothing mutates.
 
 set -u
+
+if [ "${1:-}" = "--since-conductor" ]; then
+  shift
+  STORAGE="${1:?usage: capture-rollout-evidence.sh --since-conductor <storage-statefulset> <namespace> [output-root]}"
+  NAMESPACE="${2:?usage: capture-rollout-evidence.sh --since-conductor <storage-statefulset> <namespace> [output-root]}"
+  OUTPUT_ROOT="${3:-rollout-evidence}"
+  self="${BASH_SOURCE[0]}"
+  bash "${self}" statefulset "${STORAGE}-conductor" "${NAMESPACE}" "${OUTPUT_ROOT}" || true
+  bash "${self}" statefulset "${STORAGE}" "${NAMESPACE}" "${OUTPUT_ROOT}" || true
+
+  storage_dir="${OUTPUT_ROOT}/${NAMESPACE}--statefulset--${STORAGE}"
+  mkdir -p "${storage_dir}"
+  since_meta="${storage_dir}/since-conductor.txt"
+  : > "${since_meta}"
+  storage_selector="$(kubectl get "statefulset/${STORAGE}" -n "${NAMESPACE}" \
+    -o go-template='{{range $key, $value := .spec.selector.matchLabels}}{{printf "%s=%s," $key $value}}{{end}}' \
+    2>> "${since_meta}")"
+  storage_selector="${storage_selector%,}"
+  if [ -z "${storage_selector}" ]; then
+    printf 'since-conductor: statefulset/%s selector unresolved — no storage log captured\n' "${STORAGE}" \
+      | tee -a "${since_meta}"
+    exit 0
+  fi
+  storage_pods="$(kubectl get pods -n "${NAMESPACE}" -l "${storage_selector}" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>> "${since_meta}")"
+
+  captured=0
+  while IFS= read -r spod; do
+    [ -n "${spod}" ] || continue
+    cpod="${STORAGE}-conductor-${spod##*-}"
+    since="$(kubectl get pod "${cpod}" -n "${NAMESPACE}" \
+      -o jsonpath='{.metadata.creationTimestamp}' 2>> "${since_meta}")"
+    if [ -z "${since}" ]; then
+      printf '%s: no creationTimestamp for %s — not captured\n' "${spod}" "${cpod}" >> "${since_meta}"
+      continue
+    fi
+    printf '%s: since %s (%s creationTimestamp)\n' "${spod}" "${since}" "${cpod}" >> "${since_meta}"
+    containers="$(kubectl get pod "${spod}" -n "${NAMESPACE}" \
+      -o jsonpath='{range .spec.containers[*]}{.name}{"\n"}{end}' 2>> "${since_meta}")"
+    while IFS= read -r container; do
+      [ -n "${container}" ] || continue
+      out="${storage_dir}/${spod}--${container}--since-conductor.log"
+      raw="$(mktemp)"
+      kubectl logs "${spod}" -n "${NAMESPACE}" -c "${container}" --since-time="${since}" \
+        > "${raw}" 2>> "${since_meta}"
+      logs_status=$?
+      {
+        printf '$ kubectl logs %q -n %q -c %q --since-time=%q  (conductor-app lines only)\n' \
+          "${spod}" "${NAMESPACE}" "${container}" "${since}"
+        grep -F 'conductor app is ' "${raw}"
+        printf '\n[exit=%s scanned=%s]\n' "${logs_status}" "$(wc -l < "${raw}")"
+      } > "${out}"
+      rm -f "${raw}"
+      captured=$((captured + 1))
+    done <<< "${containers}"
+  done <<< "${storage_pods}"
+
+  printf 'since-conductor: %s storage container log(s) captured for statefulset/%s in %s\n' \
+    "${captured}" "${STORAGE}" "${NAMESPACE}" | tee -a "${since_meta}"
+  exit 0
+fi
 
 KIND="${1:?usage: capture-rollout-evidence.sh <kind> <name> <namespace> [output-root]}"
 NAME="${2:?usage: capture-rollout-evidence.sh <kind> <name> <namespace> [output-root]}"

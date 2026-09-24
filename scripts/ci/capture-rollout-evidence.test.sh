@@ -110,4 +110,76 @@ if grep -Eq 'kubectl (apply|delete|patch|replace|rollout|scale)' "${SCRIPT}"; th
   exit 1
 fi
 
+# --- --since-conductor: a SUCCESSFUL roll still yields a measured receipt row ---
+# Every pod is Ready, so the default mode keeps no log at all; the mode reads
+# each storage container's log since its conductor pod's creationTimestamp and
+# keeps the conductor-app lines, and conductor-recovery-receipt.sh measures it.
+SINCE_ROOT="${TEST_ROOT}/since"
+SINCE_CALLS="${TEST_ROOT}/since.calls"
+kubectl() {
+  printf '%s\n' "$*" >> "${FAKE_KUBECTL_CALLS}"
+  local args="$*" s='elohim-matthew-alpha' ns='elohim-alpha'
+  case "${args}" in
+    "get statefulset/${s}-conductor -n ${ns} -o yaml"|"get statefulset/${s} -n ${ns} -o yaml")
+      printf 'kind: StatefulSet\n' ;;
+    *"get statefulset/${s}-conductor -n ${ns} -o go-template="*) printf 'app=conductor,' ;;
+    *"get statefulset/${s} -n ${ns} -o go-template="*) printf 'app=storage,' ;;
+    'get nodes -o custom-columns='*) printf 'NAME\nnode-a\n' ;;
+    "get pods -n ${ns} -l app=conductor -o wide"|"get pods -n ${ns} -l app=storage -o wide")
+      printf 'NAME READY\n' ;;
+    "get pods -n ${ns} -l app=conductor -o yaml")
+      printf 'apiVersion: v1\nitems:\n- apiVersion: v1\n  kind: Pod\n  metadata:\n    creationTimestamp: "2026-09-25T10:00:00Z"\n    name: %s-conductor-0\n  spec:\n    containers:\n    - name: conductor\nkind: List\n' "${s}" ;;
+    "get pods -n ${ns} -l app=storage -o yaml") printf 'kind: List\nitems: []\n' ;;
+    *"get pods -n ${ns} -l app=conductor -o jsonpath="*) printf '%s-conductor-0\n' "${s}" ;;
+    *"get pods -n ${ns} -l app=storage -o jsonpath="*) printf '%s-0\n' "${s}" ;;
+    *"get pod ${s}-conductor-0 -n ${ns} -o jsonpath={.metadata.creationTimestamp}") printf '2026-09-25T10:00:00Z' ;;
+    *"get pod ${s}-conductor-0 -n ${ns} -o jsonpath="*'.metadata.name'*)
+      printf '%s-conductor-0|Running|True||node-a|conductor=true/;\n' "${s}" ;;
+    *"get pod ${s}-0 -n ${ns} -o jsonpath="*'.metadata.name'*)
+      printf '%s-0|Running|True||node-a|elohim-node=true/;\n' "${s}" ;;
+    *"get pod ${s}-0 -n ${ns} -o jsonpath={range .spec.containers[*]}"*) printf 'elohim-node\n' ;;
+    "logs ${s}-0 -n ${ns} -c elohim-node --since-time=2026-09-25T10:00:00Z")
+      printf '%s\n' \
+        '{"timestamp":"2026-09-25T10:00:05.000000Z","level":"INFO","fields":{"message":"sync sweep tick"},"target":"elohim_storage::sync"}' \
+        '{"timestamp":"2026-09-25T10:01:00.000000Z","level":"WARN","fields":{"message":"conductor app is NOT RUNNING (CellDisabled)","role":"lamad"},"target":"elohim_storage::conductor_bridge_health"}' \
+        '{"timestamp":"2026-09-25T10:07:12.000000Z","level":"INFO","fields":{"message":"conductor app is RUNNING again — a zome call on this role SUCCEEDED","role":"lamad"},"target":"elohim_storage::conductor_bridge_health"}' ;;
+    *)
+      printf 'unexpected kubectl invocation: %s\n' "${args}" >&2
+      return 97 ;;
+  esac
+}
+export -f kubectl
+
+FAKE_KUBECTL_CALLS="${SINCE_CALLS}" bash "${SCRIPT}" --since-conductor \
+  elohim-matthew-alpha elohim-alpha "${SINCE_ROOT}" > "${TEST_ROOT}/since.out"
+
+SINCE_LOG="${SINCE_ROOT}/elohim-alpha--statefulset--elohim-matthew-alpha/elohim-matthew-alpha-0--elohim-node--since-conductor.log"
+[ -f "${SINCE_LOG}" ] || { echo "--since-conductor wrote no ${SINCE_LOG}" >&2; exit 1; }
+grep -Fq 'conductor app is RUNNING again' "${SINCE_LOG}"
+grep -Fq 'conductor app is NOT RUNNING' "${SINCE_LOG}"
+if grep -Fq 'sync sweep tick' "${SINCE_LOG}"; then
+  echo '--since-conductor kept a line that is not a conductor-app line' >&2
+  exit 1
+fi
+grep -Fq '[exit=0 scanned=3]' "${SINCE_LOG}"
+grep -Fq '1 storage container log(s) captured' "${TEST_ROOT}/since.out"
+[ -f "${SINCE_ROOT}/elohim-alpha--statefulset--elohim-matthew-alpha-conductor/pods.yaml" ]
+if grep -Fq 'unexpected kubectl invocation' "${SINCE_ROOT}"/*/*.stderr 2>/dev/null; then
+  echo '--since-conductor made a kubectl call the fake does not model' >&2
+  exit 1
+fi
+if grep -Eq '^(describe|delete|apply|patch|rollout|scale) ' "${SINCE_CALLS}"; then
+  echo '--since-conductor on an all-Ready roll described or mutated something' >&2
+  exit 1
+fi
+
+receipt_out="$(bash "${REPO_ROOT}/scripts/ci/conductor-recovery-receipt.sh" --was 'pre-fix' "${SINCE_ROOT}")" || {
+  echo "conductor-recovery-receipt did not measure the --since-conductor tree: ${receipt_out}" >&2
+  exit 1
+}
+case "${receipt_out}" in
+  *'elohim-matthew-alpha'*'7m12s'*'lamad'*) ;;
+  *) echo "receipt row wrong: ${receipt_out}" >&2; exit 1 ;;
+esac
+
 echo 'capture-rollout-evidence: mocked capture and Jenkins wiring passed'
