@@ -48,6 +48,10 @@ pub const LEXICAL_PRODUCER: &str = "lexical";
 /// underscore documentation) is addressed elsewhere or not at all.
 pub const RECIPE_ADDRESSED_KEYS: [&str; 4] = ["recipe", "k", "order_only", "producers"];
 
+/// The candidate cap's headroom when the recipe declares none: `(offset + limit)` times this,
+/// floored at the lens level's `choice_count`.
+pub const DEFAULT_CANDIDATE_HEADROOM: u32 = 4;
+
 /// One level of the recipe's lens table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LensLevel {
@@ -67,6 +71,10 @@ pub struct Declared {
     pub lens_levels: BTreeMap<String, LensLevel>,
     /// `atom_cid` of the declared `lens_table` object.
     pub lens_cid: String,
+    /// The recipe's `candidate_headroom`: how many pages deep the fused set may be walked before
+    /// the cut (see [`Declared::candidate_cap`]). Un-addressed, like the lens table — it bounds
+    /// this peer's WORK, never the order it ranks in.
+    pub candidate_headroom: u32,
 }
 
 fn refused(what: impl std::fmt::Display) -> String {
@@ -140,6 +148,17 @@ impl Declared {
         }
         let lens_cid = atom_cid(table).map_err(refused)?.to_string();
 
+        let candidate_headroom = match recipe_raw.get("candidate_headroom") {
+            None => DEFAULT_CANDIDATE_HEADROOM,
+            Some(value) => value
+                .as_u64()
+                .and_then(|n| u32::try_from(n).ok())
+                .filter(|n| *n >= 1)
+                .ok_or_else(|| {
+                    refused("candidate_headroom is a whole number of pages, 1 or more")
+                })?,
+        };
+
         Ok(Self {
             measure,
             measure_cid,
@@ -148,12 +167,29 @@ impl Declared {
             lens_default,
             lens_levels,
             lens_cid,
+            candidate_headroom,
         })
     }
 
     /// The fold-lag bound as whole units (declarations carry no floats; the protocol type does).
     pub fn fold_lag_limit(&self) -> u64 {
         self.measure.fold_lag.limit.max(0.0) as u64
+    }
+
+    /// The most ranked candidates one answer may examine: the reader's own page (`offset +
+    /// limit`) times the declared [`Self::candidate_headroom`], never below the lens level's
+    /// `choices` — the answer's own cut would otherwise be the wider of the two.
+    ///
+    /// This bounds the WORK, not the ranking: everything past the cap is behind the head of an
+    /// order the reader is already paging, and the cut is named in the answer's `omissions`
+    /// (ruling R-S11, delta review W1). Without it, a `limit=1` question walked the whole corpus,
+    /// joining and reach-authorizing every matched row.
+    pub fn candidate_cap(&self, offset: usize, limit: usize, choices: usize) -> usize {
+        offset
+            .saturating_add(limit)
+            .saturating_mul(self.candidate_headroom as usize)
+            .max(choices)
+            .max(1)
     }
 }
 

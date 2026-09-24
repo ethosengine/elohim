@@ -7,12 +7,15 @@
 //!    term under four characters is named in `omissions`, never silently searched or dropped) and
 //!    their FTS5 expression ([`match_expression`]);
 //! 2. the fold's bm25 order, best chunk per unit ([`BestPerUnit`]), fused for ORDER by the
-//!    declared `rrf-v2` recipe ([`fuse`]) — one producer, `lexical`, under the measure's CID;
+//!    declared `rrf-v2` recipe ([`fuse`]) — one producer, `lexical`, under the measure's CID —
+//!    then cut to the declared candidate cap ([`Declared::candidate_cap`]), so the work an
+//!    answer costs is bounded by the reader's page, not by the corpus;
 //! 3. each ranked unit joined to its content row at the serving trust floor
 //!    ([`MinTrust::Amber`], the same floor `GET /db/content` reads at), then the reader's own
 //!    filters (`contentType`, `reach`, `tags`);
-//! 4. the reach gate, per candidate, AFTER ranking and BEFORE any snippet is read — a withheld
-//!    row contributes nothing to the answer but one counted line in `omissions`;
+//! 4. the reach gate — prepared once per request, consulted per candidate, AFTER ranking and
+//!    BEFORE any snippet is read — a withheld row contributes nothing to the answer but one
+//!    count-free line in `omissions` (a number there would enumerate a private ring, R-S11 S3);
 //! 5. facets over the admitted set only; the lens level's `choice_count` cut, then the page
 //!    (`offset`, `limit` clamped to `1..=100`); a snippet (≤ [`SNIPPET_CHARS`]) for the page only.
 //!
@@ -39,7 +42,7 @@ use serde_json::json;
 
 use super::fold::SearchIndex;
 use super::measure::{Declared, LEXICAL_PRODUCER};
-use super::reader::{Reader, ANONYMOUS_TIER};
+use super::reader::Reader;
 use crate::db::content_diesel::{get_content_with_tags, MinTrust};
 use crate::db::AppContext;
 use crate::views::ContentView;
@@ -398,8 +401,28 @@ pub fn answer(
     let hits = best.ranked();
     let chunk_of: HashMap<String, i64> = hits.iter().map(|h| (h.unit_id.clone(), h.id)).collect();
     let order = hits.iter().map(|h| json!({ "path": h.unit_id })).collect();
-    let fused = fuse(&[(LEXICAL_PRODUCER.to_string(), order)], declared.recipe.k);
+    let mut fused = fuse(&[(LEXICAL_PRODUCER.to_string(), order)], declared.recipe.k);
     view.ranking_known = true;
+
+    // The candidate cap, BEFORE the join and the reach gate (ruling R-S11, delta review W1).
+    // Without it a `limit=1` question bought a corpus-sized walk: one row read and one reach
+    // authorization per matched unit, whatever the reader could ever be shown. The cap is the
+    // reader's own page times the recipe's declared `candidate_headroom`, never below the lens
+    // level's choices — so what is cut is always behind the head of an order the reader is
+    // already paging — and what was not examined is named, never silently dropped.
+    let cap = declared.candidate_cap(
+        query.offset() as usize,
+        query.limit() as usize,
+        view.lens.choice_count as usize,
+    );
+    if fused.len() > cap {
+        let past = fused.len() - cap;
+        view.omissions.push(format!(
+            "{} past the cap were not examined",
+            plural(past, "ranked candidate", "ranked candidates")
+        ));
+        fused.truncate(cap);
+    }
 
     // Join, filter, then the reach gate — before any snippet is read.
     let ctx = AppContext::default_lamad();
@@ -426,15 +449,21 @@ pub fn answer(
         admitted.push((candidate.score, row));
     }
     if refused > 0 {
-        let who = match (&reader.agent_cid, reader.tier.as_str()) {
-            (None, _) => "an anonymous reader",
-            (Some(_), ANONYMOUS_TIER) => "a reader this peer could not resolve",
-            (Some(_), _) => "this reader",
-        };
-        view.omissions.push(format!(
-            "{} withheld by the reach gate for {who}",
-            plural(refused, "ranked candidate", "ranked candidates")
-        ));
+        // NO count, and no reader description (ruling R-S11, S3). A number here is a cardinality
+        // channel into rings the reader may not see: ask a question, read "3 withheld", narrow
+        // the terms, and the private corpus is enumerated without a single row leaving. The line
+        // stays because a refusal must be visible — an answer that silently drops matches is a
+        // ranking that lies — but what it says is only THAT something was withheld.
+        view.omissions
+            .push("some matches were withheld by reach".to_string());
+        // The count is the node operator's own diagnostic, never the reader's: it stays in this
+        // peer's log, where whoever runs the peer may already read the rows themselves.
+        tracing::debug!(
+            refused,
+            agent = reader.agent_cid.as_deref().unwrap_or("-"),
+            tier = reader.tier.as_str(),
+            "content search: candidates withheld by the reach gate"
+        );
     }
     if not_served > 0 {
         view.omissions.push(format!(

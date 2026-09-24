@@ -481,6 +481,10 @@ pub struct HttpServer {
     /// The content search fold (Lane S, ruling R-S4): `GET /db/content/search` ranks over it.
     /// `None` when this peer runs no fold; the route then answers `fold: unreachable`.
     search_index: Option<Arc<crate::search::SearchIndex>>,
+    /// How many [`PreparedReachGate`]s this server's reach-gated routes have built (ruling
+    /// R-S11, S1). One per request is the invariant; a test reads it before and after a request
+    /// to prove the gate did not come back per row.
+    reach_gates_prepared: Arc<std::sync::atomic::AtomicUsize>,
     /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Write-admission limiter (mutating requests): prevents OOM under burst
@@ -1241,6 +1245,7 @@ impl HttpServer {
             )),
             memo_store: None,
             search_index: None,
+            reach_gates_prepared: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             read_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_READS)),
@@ -7560,6 +7565,22 @@ impl HttpServer {
             .await
     }
 
+    /// One [`PreparedReachGate`] for the request about to be answered — the ONLY construction
+    /// site inside a handler, so "once per request" is a property of this method's call sites
+    /// rather than a rule to remember (ruling R-S11, S1).
+    fn prepare_reach_gate(&self) -> PreparedReachGate {
+        self.reach_gates_prepared
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        PreparedReachGate::new(&self.memo_store)
+    }
+
+    /// How many reach gates this server's handlers have prepared. A reach-gated request adds
+    /// exactly one; a test reads the delta across a request.
+    pub fn reach_gates_prepared(&self) -> usize {
+        self.reach_gates_prepared
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// `GET /db/content` — the external, trust-gated and reach-enforced listing.
     ///
     /// `requester_idv` is the EXPLICIT `X-Agent-Cid` header value only (never
@@ -7614,6 +7635,7 @@ impl HttpServer {
                 // ANONYMOUS request as the node's human and serve that
                 // human's reach. See `extract_agent_cid_explicit`.
                 let requester = resolve_requester(&mut conn, requester_idv.as_deref());
+                let gate = self.prepare_reach_gate();
                 let mut refused: usize = 0;
                 let views: Vec<ContentView> = items
                     .into_iter()
@@ -7623,7 +7645,7 @@ impl HttpServer {
                             &mut conn,
                             &app_ctx,
                             requester.as_ref(),
-                            &self.memo_store,
+                            &gate,
                             &v.reach,
                             &v.id,
                         );
@@ -7703,9 +7725,9 @@ impl HttpServer {
             requester_idv.as_deref(),
             requester.as_ref().map(|human| human.id.as_str()),
         );
-        let memo = self.memo_store.clone();
+        let prepared = self.prepare_reach_gate();
         let mut gate = |conn: &mut diesel::SqliteConnection, reach: &str, id: &str| {
-            reach_admits(conn, &app_ctx, requester.as_ref(), &memo, reach, id)
+            reach_admits(conn, &app_ctx, requester.as_ref(), &prepared, reach, id)
         };
         let view = crate::search::query::answer(index, &mut conn, &reader, &query, &mut gate);
         Ok(response::ok(&view))
@@ -18281,6 +18303,32 @@ pub fn resolve_requester(
         })
 }
 
+/// The reach authorizer, built ONCE for a request and consulted per row (ruling R-S11, S1).
+///
+/// It carries an [`crate::epr_service::EprService`] and that service's `PeerTrustCache`. Built
+/// per row — as `reach_admits` did until this ruling — every candidate paid for a fresh
+/// authorizer and a cache that could never hold anything, so a listing or a search over N
+/// restricted rows constructed N of them. Prepared once, the cache is warm for the rest of the
+/// page and the construction cost is paid a single time.
+pub struct PreparedReachGate {
+    service: crate::epr_service::EprService,
+}
+
+impl PreparedReachGate {
+    /// One gate for one request, carrying the process-lifetime verification-memo store.
+    pub fn new(memo: &Option<Arc<dyn crate::trust::VerificationMemoStore>>) -> Self {
+        Self {
+            service: crate::epr_service::EprService::new(
+                None,
+                None,
+                None,
+                crate::p2p::trust_cache::PeerTrustCache::new(),
+            )
+            .with_memo_store(memo.clone()),
+        }
+    }
+}
+
 /// The one per-row reach gate `GET /db/content` and `GET /db/content/search` share: may
 /// `requester` (already resolved from the EXPLICIT `X-Agent-Cid`, never the ambient session) see
 /// the row `id` at `reach`?
@@ -18289,14 +18337,14 @@ pub fn resolve_requester(
 /// every restricted tier needs a RESOLVED requester (deny-by-default — the fail-closed half that
 /// header presence once skipped); community is admitted for any resolved identity (mirroring the
 /// single-item route, which authorizes only above community); above community the requester is
-/// authorized per row by the reach authorizer, carrying the process-lifetime verification-memo
-/// store `memo`. An unrecognized ring sorts as the most restricted, so it reaches the authorizer
-/// and is refused there.
+/// authorized per row by `gate`'s reach authorizer, which carries the process-lifetime
+/// verification-memo store. An unrecognized ring sorts as the most restricted, so it reaches the
+/// authorizer and is refused there.
 pub fn reach_admits(
     conn: &mut diesel::SqliteConnection,
     ctx: &AppContext,
     requester: Option<&crate::db::models::Human>,
-    memo: &Option<Arc<dyn crate::trust::VerificationMemoStore>>,
+    gate: &PreparedReachGate,
     reach: &str,
     id: &str,
 ) -> bool {
@@ -18310,15 +18358,9 @@ pub fn reach_admits(
     if idx <= crate::epr_service::reach_level_index("community") {
         return true;
     }
-    crate::epr_service::EprService::new(
-        None,
-        None,
-        None,
-        crate::p2p::trust_cache::PeerTrustCache::new(),
-    )
-    .with_memo_store(memo.clone())
-    .authorize_reach_for_human_with_own_trust(conn, ctx, reach, human, id)
-    .is_ok()
+    gate.service
+        .authorize_reach_for_human_with_own_trust(conn, ctx, reach, human, id)
+        .is_ok()
 }
 
 /// Simple response container for integration test assertions.

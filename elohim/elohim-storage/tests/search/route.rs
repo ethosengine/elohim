@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use elohim_storage::db::content_diesel::{create_content, CreateContentInput};
 use elohim_storage::db::humans::{create_human, CreateHumanInput};
 use elohim_storage::db::{init_pool_from_dir, AppContext, DbPool};
-use elohim_storage::http::{reach_admits, HttpServer};
+use elohim_storage::http::{reach_admits, HttpServer, PreparedReachGate};
 use elohim_storage::search::query::{ContentSearchQuery, DEFAULT_LIMIT, MAX_LIMIT};
 use elohim_storage::search::{Declared, SearchIndex};
 use serde_json::Value;
@@ -330,9 +330,15 @@ async fn reach_gated_row_absent_for_non_holder() {
             .filter(|line| line.contains("reach"))
             .collect();
         assert_eq!(refusals.len(), 1, "{who}: one refusal line: {view}");
+        // The refusal names NO count (ruling R-S11, S3): a number is a cardinality channel into
+        // a private ring — vary the question, read the count, learn what is kept there.
+        assert_eq!(
+            refusals[0], "some matches were withheld by reach",
+            "{who}: the refusal is honest and count-free"
+        );
         assert!(
-            refusals[0].starts_with("1 "),
-            "{who}: it counts one: {}",
+            !refusals[0].chars().any(|c| c.is_ascii_digit()),
+            "{who}: no digit leaves: {}",
             refusals[0]
         );
     }
@@ -638,14 +644,16 @@ async fn list_route_still_gates_reach_through_reach_admits() {
     let human = elohim_storage::db::humans::get_human_by_id(&mut conn, "susan")
         .unwrap()
         .unwrap();
+    // One gate, prepared once, consulted per row.
+    let gate = PreparedReachGate::new(&None);
     assert!(reach_admits(
-        &mut conn, &ctx, None, &None, "commons", "open-row"
+        &mut conn, &ctx, None, &gate, "commons", "open-row"
     ));
     assert!(!reach_admits(
         &mut conn,
         &ctx,
         None,
-        &None,
+        &gate,
         "community",
         "kin-row"
     ));
@@ -653,7 +661,7 @@ async fn list_route_still_gates_reach_through_reach_admits() {
         &mut conn,
         &ctx,
         Some(&human),
-        &None,
+        &gate,
         "community",
         "kin-row"
     ));
@@ -661,7 +669,7 @@ async fn list_route_still_gates_reach_through_reach_admits() {
         &mut conn,
         &ctx,
         Some(&human),
-        &None,
+        &gate,
         "intimate",
         "kept-row"
     ));
@@ -669,8 +677,137 @@ async fn list_route_still_gates_reach_through_reach_admits() {
         &mut conn,
         &ctx,
         None,
-        &None,
+        &gate,
         "no-such-ring",
         "open-row"
     ));
+}
+
+#[tokio::test]
+async fn candidate_set_is_capped_before_the_join() {
+    // A public question must not buy a corpus-sized walk: the fused set is cut to
+    // `(offset + limit) x candidate_headroom` (floored at the lens's choices) BEFORE the join and
+    // the reach gate, and the cut is named in `omissions` (ruling R-S11, delta review W1).
+    let peer = peer();
+    seed(
+        &peer,
+        "orchard-keeping",
+        "Orchard orchard orchard",
+        "commons",
+        "concept",
+        &[],
+        "Orchard orchard orchard orchard keeping.",
+    );
+    for n in 0..90 {
+        seed(
+            &peer,
+            &format!("orchard-{n:03}"),
+            &format!("Orchard note {n}"),
+            "commons",
+            "concept",
+            &[],
+            "Fruit trees.",
+        );
+    }
+    fold(&peer);
+
+    // The uncapped reading: the widest lens and the largest page cannot be cut.
+    let server = server(&peer).await;
+    let whole = search(&server, "q=orchard&lens=whole&limit=100", None).await;
+    assert!(
+        !whole.to_string().contains("past the cap were not examined"),
+        "the widest lens at the largest page is never cut: {whole}"
+    );
+    let top = ids(&whole)[0].clone();
+
+    // The default reading, driven through `answer` with a counting gate: 91 units rank, the cap
+    // is 20 x 4 = 80, so the join and the gate run 80 times, not 91.
+    let mut conn = peer.pool.get().unwrap();
+    let reader = elohim_storage::search::reader::reader_for(None, None);
+    let query = ContentSearchQuery::parse("q=orchard").unwrap();
+    let mut gated = 0usize;
+    let view = {
+        let mut gate = |_: &mut diesel::SqliteConnection, _: &str, _: &str| {
+            gated += 1;
+            true
+        };
+        elohim_storage::search::query::answer(&peer.index, &mut conn, &reader, &query, &mut gate)
+    };
+    assert_eq!(
+        gated,
+        80,
+        "the join and the gate run at most the cap: {}",
+        serde_json::to_string(&view).unwrap()
+    );
+    let view = serde_json::to_value(&view).unwrap();
+    let cut: Vec<&str> = view["omissions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|line| line.contains("past the cap were not examined"))
+        .collect();
+    assert_eq!(cut.len(), 1, "the cut is named once: {view}");
+    assert!(
+        cut[0].starts_with("11 "),
+        "it names what it did not examine: {}",
+        cut[0]
+    );
+    assert_eq!(
+        ids(&view)[0],
+        top,
+        "the cap bounds the walk, never the ranking's head: {view}"
+    );
+}
+
+#[tokio::test]
+async fn reach_gate_is_prepared_once_per_request() {
+    // The reach gate carries an `EprService` and its peer-trust cache. Built per row it was a
+    // fresh authorizer for every candidate; it is prepared ONCE per request (ruling R-S11, S1).
+    let peer = peer();
+    seed(
+        &peer,
+        "orchard-open",
+        "Orchard in the open",
+        "commons",
+        "concept",
+        &[],
+        "Open orchard.",
+    );
+    for n in 0..8 {
+        seed(
+            &peer,
+            &format!("orchard-kin-{n}"),
+            &format!("Orchard kin {n}"),
+            "community",
+            "concept",
+            &[],
+            "Orchard among kin.",
+        );
+    }
+    seed_human(&peer, "susan");
+    fold(&peer);
+    let server = server(&peer).await;
+
+    let before = server.reach_gates_prepared();
+    let view = search(&server, "q=orchard", Some("susan")).await;
+    assert_eq!(
+        ids(&view).len(),
+        9,
+        "every row is admitted for susan: {view}"
+    );
+    assert_eq!(
+        server.reach_gates_prepared() - before,
+        1,
+        "nine candidates, one prepared gate"
+    );
+
+    let before = server.reach_gates_prepared();
+    let listed = server.test_list_db_content("", Some("susan")).await;
+    assert_eq!(listed.status, 200);
+    assert_eq!(
+        server.reach_gates_prepared() - before,
+        1,
+        "the listing prepares one gate for the whole page"
+    );
 }
