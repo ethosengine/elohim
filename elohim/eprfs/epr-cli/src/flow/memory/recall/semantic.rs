@@ -73,9 +73,10 @@ pub(super) fn cosine(a: &[f32], b: &[f32]) -> f32 {
     }
 }
 
-/// A cosine at the 4 decimals every candidate prints.
-fn rounded(score: f32) -> f64 {
-    (f64::from(score) * 10_000.0).round() / 10_000.0
+/// A score at the 4 decimals every candidate prints (the lexical route prints its own at the same
+/// precision).
+pub(super) fn rounded(score: f64) -> f64 {
+    (score * 10_000.0).round() / 10_000.0
 }
 
 /// One file's best chunk.
@@ -83,19 +84,20 @@ fn rounded(score: f32) -> f64 {
 pub(super) struct Hit {
     pub path: String,
     pub id: i64,
-    pub score: f32,
+    pub score: f64,
 }
 
-/// Each file's best chunk, offered one chunk at a time. Within a file the higher cosine wins and
+/// Each file's best chunk, offered one chunk at a time. Within a file the higher score (a cosine
+/// here, a negated `bm25()` on the lexical route) wins and
 /// the earlier chunk (lower id) breaks a tie; across files [`BestPerFile::ranked`] orders by the
 /// printed (4-decimal) score, then by path, so two runs over one store print one order.
 #[derive(Default)]
 pub(super) struct BestPerFile {
-    best: BTreeMap<String, (f32, i64)>,
+    best: BTreeMap<String, (f64, i64)>,
 }
 
 impl BestPerFile {
-    pub(super) fn offer(&mut self, id: i64, path: &str, score: f32) {
+    pub(super) fn offer(&mut self, id: i64, path: &str, score: f64) {
         match self.best.get_mut(path) {
             Some((kept, kept_id)) => {
                 if score > *kept || (score == *kept && id < *kept_id) {
@@ -139,7 +141,7 @@ fn decode(blob: &[u8], dims: usize) -> Option<Vec<f32>> {
 }
 
 /// Whether `path` lies in the search scope (`.` or empty is the whole fold).
-fn in_scope(path: &str, scope: &str) -> bool {
+pub(super) fn in_scope(path: &str, scope: &str) -> bool {
     let scope = scope.trim_end_matches('/');
     scope.is_empty()
         || scope == "."
@@ -189,8 +191,8 @@ fn line_of(
 /// Where the winning chunk sits in the file: the outline heading of the same title (the range the
 /// first screen would offer; where a title repeats, the one whose range holds the chunk), else the
 /// chunk's own line range — a window's label, or where its text sits in the file. `None` when the
-/// file no longer reads.
-fn locate(
+/// file no longer reads. Shared with the lexical route, which locates its best chunk the same way.
+pub(super) fn locate(
     root: &Path,
     contract: &Contract,
     path: &str,
@@ -398,7 +400,7 @@ fn answer_into(
             }
             in_view += 1;
             match decode(blob, dims) {
-                Some(vector) => best.offer(id, path, cosine(&question, &vector)),
+                Some(vector) => best.offer(id, path, f64::from(cosine(&question, &vector))),
                 None => malformed += 1,
             }
         })
@@ -543,7 +545,7 @@ mod tests {
             (4, "c.md", [1.0, 1.0]),
             (5, "a.md", [1.0, 0.0]),
         ] {
-            best.offer(id, path, cosine(&question, &vector));
+            best.offer(id, path, f64::from(cosine(&question, &vector)));
         }
         let ranked = best.ranked();
         let order: Vec<(&str, i64)> = ranked.iter().map(|h| (h.path.as_str(), h.id)).collect();

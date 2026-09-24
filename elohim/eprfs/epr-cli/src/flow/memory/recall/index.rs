@@ -26,7 +26,9 @@ use super::embedder::{EmbedBudget, Embedder, Fixture, PinnedProcedure};
 use super::surface::{self, Listing, Surface};
 use super::*;
 use cid::Cid;
-use elohim_epr_rea::{atom_cid, AgentRef, FoldAttestation, FoldState, IndexMeasure, ShardManifest};
+use elohim_epr_rea::{
+    atom_cid, AgentRef, FoldAttestation, FoldState, IndexMeasure, RankingMethod, ShardManifest,
+};
 use rusqlite::{params, Connection, OpenFlags};
 use serde::Serialize;
 
@@ -998,7 +1000,7 @@ impl Run<'_> {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-// The query side — the fold the semantic provider ranks over (task 4.4)
+// The query side — the fold the semantic (task 4.4) and lexical (task 4.8) providers rank over
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /// Why a declared fold cannot answer a question: each an honest absence the semantic provider
@@ -1099,7 +1101,71 @@ impl SemanticFold {
     }
 }
 
+/// A lexical measure (station 4, task 4.8): an `IndexMeasure` ranking by BM25 over the FTS5 table
+/// of a semantic fold it SHARES. It folds nothing of its own, pins no model (`validate()` refuses a
+/// pin no ranking uses) and never runs an embedder; its method is its own CID, and the fold it
+/// reads is valid for it only when the two declarations cut and cover the same text.
+pub(super) struct LexicalMeasure {
+    declared: Declared,
+}
+
+impl LexicalMeasure {
+    /// The measure at `measure_rel` under `contract`; an error when the declaration does not load,
+    /// does not validate, or ranks by anything but `bm25`.
+    pub(super) fn declare(root: &Path, contract: Contract, measure_rel: &str) -> FlowResult<Self> {
+        let declared = Declared::from_contract(root, contract, measure_rel)?;
+        if declared.measure.ranking != RankingMethod::Bm25 {
+            return Err(index_refused(format!(
+                "{measure_rel}: a lexical measure ranks by bm25"
+            )));
+        }
+        Ok(Self { declared })
+    }
+
+    /// The method every lexical candidate prints: this measure's CID.
+    pub(super) fn cid(&self) -> String {
+        self.declared.cid.to_string()
+    }
+
+    /// Whether `fold` was cut and covered under this measure's own method: the chunk rule on disk
+    /// hashes to the declared one, and the chunk rule and surfaces equal the fold measure's.
+    pub(super) fn shares(&self, fold: &SemanticFold) -> bool {
+        self.declared.chunk_rule().is_ok()
+            && self.declared.measure.chunk_rule == fold.declared.measure.chunk_rule
+            && self.declared.measure.surfaces == fold.declared.measure.surfaces
+    }
+}
+
 impl FoldReader {
+    /// Visit every LIVE chunk the FTS5 `expression` matches, with its `bm25()` (lower is a better
+    /// match); returns how many matched. The FTS table holds live chunks only (a demotion deletes
+    /// its row), and the join to `chunks` keeps a demoted row out even if one ever lingered.
+    pub(super) fn lexical(
+        &self,
+        expression: &str,
+        mut visit: impl FnMut(i64, &str, f64),
+    ) -> FlowResult<u64> {
+        let mut statement = self
+            .store
+            .conn
+            .prepare(
+                "SELECT chunks.id, chunks.path, bm25(chunks_fts) FROM chunks_fts \
+                 JOIN chunks ON chunks.id = chunks_fts.rowid \
+                 WHERE chunks_fts MATCH ?1 AND chunks.demoted_at IS NULL",
+            )
+            .map_err(db)?;
+        let mut rows = statement.query(params![expression]).map_err(db)?;
+        let mut matched = 0u64;
+        while let Some(row) = rows.next().map_err(db)? {
+            let id: i64 = row.get(0).map_err(db)?;
+            let path: String = row.get(1).map_err(db)?;
+            let rank: f64 = row.get(2).map_err(db)?;
+            visit(id, &path, rank);
+            matched += 1;
+        }
+        Ok(matched)
+    }
+
     /// The embedder label the store was folded under (`fixture`, or `procedure <cid> on model
     /// <cid>`): a query embedded by anything else would be compared against foreign vectors.
     pub(super) fn built_by(&self) -> &str {

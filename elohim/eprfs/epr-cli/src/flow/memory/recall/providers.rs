@@ -3,7 +3,8 @@
 //! [`discovery::discover_scored`]) and `mempalace` (an optional external process, bounded by
 //! bytes and seconds, honest about what it cannot claim). `providers_for` reads the pinned
 //! contract's own `ceremony.providers` and returns them in the recipe's declared order. The third
-//! declared kind, `semantic` (station 4, task 4.4), implements the same trait in `semantic.rs`.
+//! declared kind, `semantic` (station 4, task 4.4), implements the same trait in `semantic.rs`, and
+//! the fourth, `lexical` (FTS5/BM25 over the fold `semantic` keeps, task 4.8), in `lexical.rs`.
 //!
 //! Moved out of `mod.rs` (governed-discovery station zero, task 0.4): `ProcessOutcome`,
 //! `bounded_process` and `process_result` are the same bytes as before, just relocated next to
@@ -24,6 +25,7 @@
 //! station 4, task 4.5), which asks each non-local producer the recipe names ONCE, deliberately,
 //! to fuse its order with the screen's own (never probe-then-redo).
 use super::discovery::discover_scored;
+use super::lexical::Lexical;
 use super::semantic::Semantic;
 use super::*;
 
@@ -324,12 +326,15 @@ impl Provider for MemPalace {
     }
 }
 
-/// The providers this executor knows how to speak to, in the pinned recipe's own
-/// `ceremony.providers` order (an object, so — absent `preserve_order` — alphabetical; `local` <
-/// `mempalace` < `semantic` either way): `local` whenever declared with kind `local` (contract
-/// validation requires at least one provider, and every pinned recipe has always named this one),
-/// `mempalace` whenever declared with kind `mempalace`, `semantic` whenever declared with kind
-/// `semantic` (named by its declaration key, which it reads its measure and embedder from). A declared `fixture` provider (test interchange only,
+/// The providers this executor knows how to speak to: `local` FIRST — it is the declared default a
+/// bare `search` names, by rule rather than by spelling — then the rest in the pinned recipe's own
+/// `ceremony.providers` order (an object, so — absent `preserve_order` — alphabetical, which is
+/// exactly why `local` cannot rely on it: `lexical` < `local`). `local` whenever declared with kind
+/// `local` (contract validation requires at least one provider, and every pinned recipe has always
+/// named this one), `mempalace` whenever declared with kind `mempalace`, `semantic` whenever
+/// declared with kind `semantic` and `lexical` whenever declared with kind `lexical` (each named by
+/// its declaration key, which it reads its measure, fold and embedder from). A declared `fixture`
+/// provider (test interchange only,
 /// never live-fit) is not a `Provider` and is not returned here; `retrieve()` still answers it
 /// directly by name.
 ///
@@ -355,9 +360,12 @@ pub(super) fn providers_for(contract: &Contract) -> Vec<Box<dyn Provider>> {
                 palace: PathBuf::from(".mempalace/palace"),
             })),
             Some("semantic") => providers.push(Box::new(Semantic { key: key.clone() })),
+            Some("lexical") => providers.push(Box::new(Lexical { key: key.clone() })),
             _ => {}
         }
     }
+    // Stable: the others keep the recipe's order behind the default.
+    providers.sort_by_key(|provider| provider.id() != "local");
     providers
 }
 
@@ -397,6 +405,23 @@ mod tests {
             Some("local"),
             "the declared default stays first"
         );
+    }
+
+    /// `lexical` sorts before `local` as a map key; the default a bare `search` names stays `local`.
+    #[test]
+    fn a_declared_lexical_provider_never_displaces_the_local_default() {
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        value["ceremony"]["providers"]["lexical"] = json!({
+            "kind": "lexical",
+            "measure": ".epr-meta/elohim/algorithms/recall-lexical-index.json",
+            "fold": ".epr-meta/elohim/algorithms/recall-semantic-index.json",
+            "optional": true,
+        });
+        let contract = Contract::from_value(value).unwrap();
+        let ids: Vec<ProviderId> = providers_for(&contract).iter().map(|p| p.id()).collect();
+        assert_eq!(ids.first().map(String::as_str), Some("local"), "{ids:?}");
+        assert!(ids.contains(&"lexical".to_string()), "{ids:?}");
+        assert!(ids.contains(&"semantic".to_string()), "{ids:?}");
     }
 
     #[test]

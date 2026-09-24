@@ -90,6 +90,10 @@ mod surface;
 // measure CID on every candidate.
 mod semantic;
 
+// The FTS5/BM25 lexical candidate route (station 4, task 4.8): bm25() over the fold it shares
+// with the semantic route, its own measure CID on every candidate, never an embedder.
+mod lexical;
+
 // Reciprocal-rank fusion for ORDER on the focused first screen (station 4, task 4.5): the
 // declared recipe, its CID, and the pure `fuse`.
 mod fusion;
@@ -779,6 +783,14 @@ pub fn retrieve(
         "local" => discover_scored(root, contract, scope, query, &[], tags, "directory", names)?,
         // Cosine over the fold the declaration names; every absence answers, never errs.
         "semantic" => semantic::search(root, contract, &declaration, query, scope),
+        // BM25 over the shared fold's FTS5 table, matched by the question's own terms.
+        "lexical" => lexical::search(
+            root,
+            contract,
+            &declaration,
+            &discovery::question_terms(contract, query),
+            scope,
+        ),
         "mempalace" => {
             let palace = root.join(".mempalace/palace");
             let args = vec![

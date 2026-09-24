@@ -10,8 +10,8 @@
 //! (rank 1-based, in each producer's own order); ties break by path. Nothing a candidate carries
 //! — no producer's raw score, no term count, no standing, no human signal — is read by [`fuse`]:
 //! it sees each producer's ORDER and the path, and nothing else. Every fused candidate keeps its
-//! producer ranks (`ranks: {local: n|null, semantic: n|null}`) so the reader sees exactly what
-//! was fused.
+//! producer ranks (`ranks: {local: n|null, semantic: n|null}`, one key per recipe producer — a
+//! recipe may also name `lexical`, task 4.8) so the reader sees exactly what was fused.
 //!
 //! **When it runs.** Only on a focused open whose `--need` was typed (the first screen does not
 //! exist otherwise, so `open --purpose bootstrap` never asks the semantic route anything), over
@@ -388,12 +388,17 @@ fn charge_screen_call(usage: &mut Value, producer: &str, answer: &ProviderResult
     add_usage(usage, &charged);
 }
 
+/// One omission line on the screen; a line already there is not repeated (two producers reading
+/// one stale fold each report the same lag — the screen says it once).
 fn push_omission(screen: &mut Value, line: String) {
     if !screen["omissions"].is_array() {
         screen["omissions"] = json!([]);
     }
     if let Some(omissions) = screen["omissions"].as_array_mut() {
-        omissions.push(json!(line));
+        let line = json!(line);
+        if !omissions.contains(&line) {
+            omissions.push(line);
+        }
     }
 }
 
@@ -546,6 +551,18 @@ mod tests {
         assert_eq!(order(&fused), vec!["a.md", "b.md"]);
         assert_eq!(fused[1].ranks[0], ("local".to_string(), Some(2)));
         assert_eq!(fused[1].ranks[1], ("semantic".to_string(), None));
+    }
+
+    /// Two producers reading one stale fold each report its lag; the screen says it once.
+    #[test]
+    fn an_identical_omission_line_is_printed_once() {
+        let mut screen = json!({"omissions": ["fold 3 files behind"]});
+        push_omission(&mut screen, "fold 3 files behind".to_string());
+        push_omission(&mut screen, "lexical: no fold".to_string());
+        assert_eq!(
+            screen["omissions"],
+            json!(["fold 3 files behind", "lexical: no fold"])
+        );
     }
 
     #[test]
