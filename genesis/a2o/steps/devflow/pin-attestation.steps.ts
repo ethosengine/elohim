@@ -106,6 +106,7 @@ Given(
         '  unreachable) echo "gh: could not resolve host" >&2; exit 1 ;;',
         '  absent) echo \'{"check_runs":[]}\' ;;',
         '  pending) echo \'{"check_runs":[{"name":"ci","status":"in_progress","conclusion":null,"started_at":"2026-09-23T00:00:00Z"}]}\' ;;',
+        '  unpushed) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;',
         '  *) printf \'{"check_runs":[{"name":"ci","status":"completed","conclusion":"%s","started_at":"2026-09-23T00:00:00Z"}]}\' "$FAKE_GH_CONCLUSION" ;;',
         'esac',
         '',
@@ -184,6 +185,10 @@ Given('the upstream has no run of the check at the pinned commit', function () {
 Given('the upstream check at the pinned commit is still running', function () {
   assert.ok(fx);
   fx.conclusion = 'pending';
+});
+Given('the upstream has never seen the pinned commit', function () {
+  assert.ok(fx);
+  fx.conclusion = 'unpushed';
 });
 Given('the upstream cannot be read', function () {
   assert.ok(fx);

@@ -71,6 +71,14 @@ Feature: A submodule pin is gated by its own attestation
     And one pin-attestation observation was recorded with tier "witnessed" and conclusion "pending"
 
   @concern:pin-attestation
+  Scenario: A pin to a commit the upstream has never seen refuses, it is not an outage
+    Given the upstream has never seen the pinned commit
+    When the gate runs for project "comp"
+    Then the gate exits 1
+    And the gate printed "has no run at"
+    And one pin-attestation observation was recorded with tier "witnessed" and conclusion "absent"
+
+  @concern:pin-attestation
   Scenario: An unreachable read passes on the floor and says so
     Given the upstream cannot be read
     When the gate runs for project "comp"

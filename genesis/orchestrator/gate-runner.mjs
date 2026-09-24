@@ -19,10 +19,15 @@ const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
   : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** 'shadow' until the flip (spec §8 commit 4) — one line of evidence per differing push, no change in selection. */
+/**
+ * 'rakia' since 2026-09-23: the shadow run over the pin-moving commit 691b28cdf printed
+ * `[gate] oracle-diff: +elohim-storage +elohim-app` — exactly the depth-one consumers of the
+ * rakia and sophia pins — and over the full push range the two oracles agreed. The habit atom
+ * records the line. GATE_ORACLE=shadow|path remain available.
+ */
 export function oracleMode(env = process.env) {
   const declared = (env.GATE_ORACLE || '').trim();
-  return ['shadow', 'rakia', 'path'].includes(declared) ? declared : 'shadow';
+  return ['shadow', 'rakia', 'path'].includes(declared) ? declared : 'rakia';
 }
 
 function nameSet(projects) {
@@ -54,7 +59,9 @@ export function selectGateProjects(registry, target) {
 export function projectsForChanges(root, changedFiles, opts = {}) {
   const env = opts.env || process.env;
   const mode = opts.oracle || oracleMode(env);
-  const log = opts.log || (line => process.stdout.write(`${line}\n`));
+  // Diagnostics go to STDERR: the pre-push hook parses this command's stdout as
+  // project names (`--names`), so a line on stdout becomes a bogus gate target.
+  const log = opts.log || (line => process.stderr.write(`${line}\n`));
   const manifests = loadManifests(root);
   const registry = loadGateRegistry(root);
   const files = filterChanged(changedFiles);
@@ -66,7 +73,9 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
     const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env) }));
     const stale = ask();
     if (stale === null) {
-      if (mode === 'rakia') log('[gate] rakia unavailable — path-only selection');
+      // Said in both modes: in shadow mode an absent binary would otherwise mean the
+      // flip evidence silently never arrives.
+      log('[gate] rakia unavailable — path-only selection');
     } else {
       const byOracle = projectsFromStale(manifests, stale, files);
       if (mode === 'rakia') {
@@ -85,11 +94,11 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
   });
 }
 
-// The rakia-validated manifest schema does not yet accept `run.cargo.env` (the
-// SOURCE schema lives in the pinned elohim/rakia submodule, operator-owned) — so
-// a per-project cargo resource cap declares in genesis/agentic/pool-policy.json's
-// `cargo_env_overrides` instead. Read once per call; a missing/malformed file is
-// not fatal to the gate.
+// The rakia-validated manifest schema accepts `run.cargo.env` since rakia 2b2cedb
+// (2026-09-23); a project's cap declares on its own manifest (elohim-storage does).
+// genesis/agentic/pool-policy.json's `cargo_env_overrides` remains for projects that
+// have not moved theirs yet. Read once per call; a missing/malformed file is not
+// fatal to the gate.
 function loadPoolPolicy(root) {
   try {
     return JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8'));
@@ -216,7 +225,10 @@ if (isMain) {
 
   if (args.includes('--list')) {
     for (const project of registry.values()) {
-      process.stdout.write(`${project.name}\t${project.dir}\t${project.run.kind}:${project.run.recipe}\n`);
+      const how = project.run.kind === 'attested'
+        ? `attested:${project.run.attestation.repo}#${project.run.attestation.check}`
+        : `${project.run.kind}:${project.run.recipe}`;
+      process.stdout.write(`${project.name}\t${project.dir}\t${how}\n`);
     }
     process.exit(0);
   } else if (args.includes('--changed-file-list')) {

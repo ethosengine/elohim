@@ -9,6 +9,9 @@ import { accessSync, constants, statSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { delimiter, isAbsolute, join } from 'path';
 
+/** A stalled `rakia affected` degrades to path-only selection instead of blocking the push. */
+export const RAKIA_TIMEOUT_MS = 60_000;
+
 function isExecutable(candidate) {
   try {
     if (!statSync(candidate).isFile()) return false;
@@ -59,7 +62,8 @@ export function rakiaAffected(root, changedFiles, { rakiaBin, spawn = spawnSync 
   if (!rakiaBin) return null;
   const files = changedFiles.filter(Boolean);
   if (files.length === 0) return new Map();
-  const result = spawn(rakiaBin, ['affected', '--repo', root, '--files', files.join(',')], { encoding: 'utf8' });
+  // A hung planner must never block selection for every push: bounded, then fall back.
+  const result = spawn(rakiaBin, ['affected', '--repo', root, '--files', files.join(',')], { encoding: 'utf8', timeout: RAKIA_TIMEOUT_MS });
   if (!result || result.status !== 0) return null;
   let parsed;
   try {

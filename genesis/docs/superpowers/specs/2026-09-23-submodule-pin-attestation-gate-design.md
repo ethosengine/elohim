@@ -209,7 +209,7 @@ two-active fence holds).
 
 | layer | rail | cases |
 |---|---|---|
-| unit, orchestrator | the existing `*.test.mjs` beside `gate-runner.mjs` | gitlink path selects the attested project and its depth-one dependents; a two-hop dependent is not selected; absent `rakia` falls back and prints the line; shadow mode reports a diff without changing selection; `attestation` travels as `GATE_ATTESTATION`, never argv |
+| unit, orchestrator | the existing `*.test.mjs` beside `gate-runner.mjs` | gitlink path selects the attested project and its depth-one dependents; a two-hop dependent is not selected; absent `rakia` falls back and prints the line; shadow mode reports a diff without changing selection; diagnostics go to stderr so `--names` stdout is only names (the hook parses it) |
 | unit, gate script | a fake `gh` on PATH inside a throwaway git fixture with a gitlink | success passes; failure refuses; absent check refuses; unreachable read passes as `claimed`; dirty worktree line printed, outcome unchanged |
 | story | `genesis/a2o/features/devflow/pin-attestation.feature`, `@concern:pin-attestation`, default profile, fake `gh` | the four outcomes above plus one propagation scenario (a brit pin move selects the edge-image consumer and nothing deeper) |
 | schema | rakia-core's fixture runner (validates the real monorepo manifests when present); `rakia-codegen`, `rakia-validate` gates | codegen fresh; every manifest validates; an `attested` project without `attestation` is refused; a `just` project with `attestation` is refused |

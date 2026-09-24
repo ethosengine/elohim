@@ -25,6 +25,26 @@ describe('readCheck — the newest run of the named check', () => {
     const read = readCheck(attestation, SHA, { ghBin: 'gh', spawn: () => ({ status: 4, stdout: '', stderr: 'gh: not logged in' }) });
     assert.deepEqual(read, { read: 'failed', reason: 'gh: not logged in' });
   });
+  test('the forge answering "no such commit" (404/422) is a definitive absent, not an unreachable read', () => {
+    for (const code of [404, 422]) {
+      const read = readCheck(attestation, SHA, { ghBin: 'gh', spawn: () => ({ status: 1, stdout: '', stderr: `gh: Not Found (HTTP ${code})` }) });
+      assert.deepEqual(read, { read: 'ok', status: 'absent', conclusion: 'absent' }, `HTTP ${code}`);
+    }
+  });
+  test('auth, rate-limit, server and network failures stay unreachable reads', () => {
+    for (const stderr of ['gh: Forbidden (HTTP 403)', 'gh: rate limit exceeded (HTTP 429)', 'gh: Server Error (HTTP 502)', 'dial tcp: could not resolve host']) {
+      const read = readCheck(attestation, SHA, { ghBin: 'gh', spawn: () => ({ status: 1, stdout: '', stderr }) });
+      assert.equal(read.read, 'failed', stderr);
+    }
+  });
+  test('the read is bounded by a timeout, and a timed-out read is unreachable, naming the timeout', () => {
+    let opts;
+    const spawn = (bin, args, o) => { opts = o; return { status: null, stdout: '', stderr: '', error: Object.assign(new Error('spawnSync gh ETIMEDOUT'), { code: 'ETIMEDOUT' }) }; };
+    const read = readCheck(attestation, SHA, { ghBin: 'gh', spawn });
+    assert.ok(opts.timeout >= 30000, 'gh spawn carries a timeout');
+    assert.equal(read.read, 'failed');
+    assert.match(read.reason, /timed out/);
+  });
   test('no gh binary is read: failed', () => {
     assert.deepEqual(readCheck(attestation, SHA, { ghBin: null, spawn: () => { throw new Error('must not spawn'); } }), { read: 'failed', reason: 'gh not found' });
   });
@@ -71,19 +91,42 @@ describe('observationArgs', () => {
 
 describe('runAttested — reads the pin, not the checkout', () => {
   const project = { name: 'brit', dir: 'elohim/brit', run: { kind: 'attested', attestation } };
-  function fakeGit({ sha = SHA, dirty = false, gitlink = true } = {}) {
+  function fakeGit({ sha = SHA, dirty = false, gitlink = true, mode = '160000' } = {}) {
     return (bin, args) => {
       if (bin !== 'git') return null;
-      if (args.includes('rev-parse')) return gitlink ? { status: 0, stdout: `${sha}\n`, stderr: '' } : { status: 128, stdout: '', stderr: 'fatal: path not in tree' };
-      if (args.includes('status')) return { status: 0, stdout: dirty ? ' M Cargo.toml\n' : '', stderr: '' };
+      if (args.includes('ls-tree')) {
+        return gitlink
+          ? { status: 0, stdout: `${mode} ${mode === '160000' ? 'commit' : 'tree'} ${sha}\telohim/brit\n`, stderr: '' }
+          : { status: 0, stdout: '', stderr: '' };
+      }
+      if (args.includes('status')) return { status: 0, stdout: dirty ? ' M elohim/brit\n' : '', stderr: '' };
       return { status: 1, stdout: '', stderr: `unexpected git ${args.join(' ')}` };
     };
   }
   function harness(gh, git) {
-    const lines = []; const epr = [];
-    const spawn = (bin, args, o) => bin === 'git' ? git(bin, args, o) : gh(bin, args, o);
-    return { lines, epr, deps: { root: '/repo', env: { GH_BIN: process.execPath }, spawn, log: l => lines.push(l), runEpr: a => { epr.push(a); return 0; } } };
+    const lines = []; const epr = []; const gitCalls = [];
+    const spawn = (bin, args, o) => { if (bin === 'git') { gitCalls.push({ args, opts: o }); return git(bin, args, o); } return gh(bin, args, o); };
+    return { lines, epr, gitCalls, deps: { root: '/repo', env: { GH_BIN: process.execPath, GIT_DIR: '/repo/.git', GIT_INDEX_FILE: '/repo/.git/index' }, spawn, log: l => lines.push(l), runEpr: a => { epr.push(a); return 0; } } };
   }
+
+  test('the pin is read with ls-tree and must be a gitlink (mode 160000); a tree object is a manifest error', () => {
+    const h = harness(ghReturning([run('Tests pass', 'completed', 'success', '2026-09-02T00:00:00Z')]), fakeGit({ mode: '040000' }));
+    assert.equal(runAttested(project, h.deps), 2);
+    assert.match(h.lines[0], /not a gitlink/);
+    assert.equal(h.epr.length, 0);
+    assert.deepEqual(h.gitCalls[0].args, ['-C', '/repo', 'ls-tree', 'HEAD', '--', 'elohim/brit']);
+  });
+
+  test('dirtiness is the superproject’s view of the pin path, asked with the hook’s GIT_* pins scrubbed', () => {
+    const h = harness(ghReturning([run('Tests pass', 'completed', 'success', '2026-09-02T00:00:00Z')]), fakeGit());
+    assert.equal(runAttested(project, h.deps), 0);
+    const status = h.gitCalls.find(c => c.args.includes('status'));
+    assert.deepEqual(status.args, ['-C', '/repo', 'status', '--porcelain', '--', 'elohim/brit']);
+    for (const call of h.gitCalls) {
+      assert.equal(call.opts.env.GIT_DIR, undefined, 'GIT_DIR scrubbed');
+      assert.equal(call.opts.env.GIT_INDEX_FILE, undefined, 'GIT_INDEX_FILE scrubbed');
+    }
+  });
 
   test('green check → exit 0, one attested line, one witnessed observation', () => {
     const h = harness(ghReturning([run('Tests pass', 'completed', 'success', '2026-09-02T00:00:00Z')]), fakeGit());

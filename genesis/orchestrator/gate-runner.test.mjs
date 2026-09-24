@@ -6,7 +6,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { loadManifests } from './manifest-utils.mjs';
-import { gateChildEnv, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
+import { gateChildEnv, oracleMode, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -41,7 +41,7 @@ describe('manifest-driven local gate registry', () => {
   });
 
   test('a rakia pin move fires the two schema gates directly', () => {
-    const selected = projectsForChanges(ROOT, ['elohim/rakia']).map(p => p.name);
+    const selected = projectsForChanges(ROOT, ['elohim/rakia'], { oracle: 'path', log: () => {} }).map(p => p.name);
     assert.ok(selected.includes('rakia-validate'));
     assert.ok(selected.includes('rakia-codegen'));
     assert.ok(selected.includes('rakia'));
@@ -296,5 +296,43 @@ describe('attested dispatch', () => {
     assert.match(out.stdout, /attested, no local recipe/);
     assert.match(out.stdout, /attested: claimed — gh not found/);
     assert.doesNotMatch(out.stdout, /cargo target:/);
+  });
+});
+
+describe('the oracle flip', () => {
+  test('rakia is the default oracle once the shadow run has been read', () => {
+    assert.equal(oracleMode({}), 'rakia');
+    assert.equal(oracleMode({ GATE_ORACLE: 'shadow' }), 'shadow');
+    assert.equal(oracleMode({ GATE_ORACLE: 'path' }), 'path');
+  });
+});
+
+describe('the hook parses stdout as project names — diagnostics never ride on it', () => {
+  const cli = resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs');
+  test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr', () => {
+    const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
+      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'shadow' },
+    });
+    assert.equal(out.status, 0, out.stderr);
+    assert.equal(out.stdout.trim(), 'sophia');
+    assert.match(out.stderr, /\[gate\] oracle-diff: \+elohim-app/);
+  });
+  test('rakia mode without a binary: --names stdout is only names; the fallback line goes to stderr', () => {
+    const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
+      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'rakia', RAKIA_BIN: '/nonexistent/rakia' },
+    });
+    assert.equal(out.status, 0, out.stderr);
+    assert.equal(out.stdout.trim(), 'sophia');
+    assert.match(out.stderr, /\[gate\] rakia unavailable — path-only selection/);
+  });
+  test('shadow mode without a binary also says so, so the flip evidence cannot silently never arrive', () => {
+    const lines = [];
+    projectsForChanges(ROOT, ['sophia'], { oracle: 'shadow', rakia: () => null, log: l => lines.push(l) });
+    assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
+  });
+  test('--list names the attestation for attested projects instead of an undefined recipe', () => {
+    const out = spawnSync(process.execPath, [cli, '--list'], { cwd: ROOT, encoding: 'utf8' });
+    assert.match(out.stdout, /^brit\telohim\/brit\tattested:ethosengine\/brit#Tests pass$/m);
+    assert.doesNotMatch(out.stdout, /undefined/);
   });
 });

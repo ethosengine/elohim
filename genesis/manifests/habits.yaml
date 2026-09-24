@@ -4688,10 +4688,18 @@ habits:
     status: red
     active: false
     checks:
-      - "a2o @concern:pin-attestation (genesis/a2o/features/devflow/pin-attestation.feature — six scenarios over a scratch superproject with one gitlink and a fake `gh`: green passes, red refuses, absent refuses, still-running refuses, unreachable passes as claimed, and a pin move selects the one-hop consumer and nothing deeper; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:pin-attestation')"
+      - "a2o @concern:pin-attestation (genesis/a2o/features/devflow/pin-attestation.feature — seven scenarios over a scratch superproject with one gitlink and a fake `gh`: green passes, red refuses, absent refuses, still-running refuses, a commit the forge never saw refuses, unreachable passes as claimed, and a pin move selects the one-hop consumer and nothing deeper; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:pin-attestation')"
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
+      DELTA 2026-09-23 (oracle flipped; RED preserved until two pin-moving pushes hold): the shadow
+      selection over the pin-moving commit 691b28cdf printed `[gate] oracle-diff: +elohim-storage
+      +elohim-app` — exactly the depth-one consumers of the rakia and sophia pins (brit's consumer,
+      build-edge-image, has no gate project) — and over the full push range vs origin/dev the two
+      oracles agreed (no line). GATE_ORACLE now defaults to rakia. Evidence for the line was taken
+      by running the same selection the hook runs over that commit's file list before the push
+      (the push itself bypasses the hook on this host). The habit flips green when two further
+      pin-moving pushes select by the oracle with no override and every pin read is tier=witnessed.
       DELTA 2026-09-23 (rung 3 landed in shadow mode; RED preserved): schema lifted and widened
       (rakia 2b2cedb), brit/rakia/sophia declare attested gates with the pin as the step input
       (brit 92f5faf, rakia d3329b2, sophia 631f7f4 — all three upstream checks concluded success at

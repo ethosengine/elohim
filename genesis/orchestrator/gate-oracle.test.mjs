@@ -69,3 +69,12 @@ describe('resolveRakiaBin', () => {
     assert.equal(resolveRakiaBin({ RAKIA_BIN: '/nonexistent/rakia', PATH: '/nonexistent' }), null);
   });
 });
+
+describe('rakiaAffected — bounded by a timeout', () => {
+  test('the spawn carries a timeout and a timed-out oracle falls back', () => {
+    let opts;
+    const spawn = (bin, args, o) => { opts = o; return { status: null, stdout: '', stderr: '', error: Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }) }; };
+    assert.equal(rakiaAffected('/repo', ['sophia'], { rakiaBin: '/bin/rakia', spawn }), null);
+    assert.ok(opts.timeout >= 30000, 'rakia spawn carries a timeout');
+  });
+});
