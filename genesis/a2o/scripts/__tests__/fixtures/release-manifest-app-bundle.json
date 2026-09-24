@@ -44,25 +44,17 @@
   "appliesTo": {
     "apps": {
       "elohim-host-landing": {
-        "kinds": [
-          "browser",
-          "server"
-        ],
+        "kinds": ["browser", "server"],
         "mount": "/"
       },
       "lamad-spa": {
-        "kinds": [
-          "browser",
-          "server"
-        ],
+        "kinds": ["browser", "server"],
         "mount": "/lamad/"
       }
     }
   },
   "envelope": {
-    "wireEpochs": [
-      0
-    ],
+    "wireEpochs": [0],
     "lineageParentCid": null,
     "additiveOnly": true
   },
@@ -84,8 +76,6 @@
   "adoptionDiscipline": {
     "soakSecs": 60,
     "attestationThreshold": 1,
-    "canaryOrder": [
-      "alpha"
-    ]
+    "canaryOrder": ["alpha"]
   }
 }
