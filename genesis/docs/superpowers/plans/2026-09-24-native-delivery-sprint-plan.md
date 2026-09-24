@@ -452,7 +452,7 @@ notes-ref attestation `brit-build-ref validate list` shows; pre-push reads it as
 
 - [x] **F1 — reach and CID ruling: brit ReachLevel as a view over protocol Reach, attestation CIDs via elohim_epr** (serves pin-attestation) — brit feat/reach-derived-cid-epr 06f9f234a4 b9c27d5ba5 (branch; pin not moved)
 - [x] **F2 — household receipt becomes a signed validation attestation the pre-push T2 reader admits** (serves pin-attestation) — 14730ccdd bc8826323 bc84d1f9b (real brit-build-ref → reader smoke green in a scratch repo; a `just test mesh` attestation waits on the mesh and brit-build-ref on PATH)
-- [ ] **F3 — CI publishes brit build attestations per pipeline; delivery-series --from attestations** (serves pin-attestation, push-delivers-within-budget)
+- [x] **F3 — CI publishes brit build attestations per pipeline; delivery-series --from attestations** (serves pin-attestation, push-delivers-within-budget) — 2eb1c8511 6be44104c + brit `feat/build-put-success-value` 22ec935c12 (branch; pin not moved; CI emits once brit-build-ref is on ci-builder)
 - [ ] **F4 — decide the untracked rakia-executor; if kept its compute-receipt schema is the one receipt shape F2 emits** (serves pin-attestation)
 
 ---
