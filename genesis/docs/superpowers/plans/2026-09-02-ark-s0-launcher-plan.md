@@ -1,6 +1,7 @@
 ---
 id: ark-s0-launcher-plan
 status: landed
+verified_by: "a2o @concern:death-witness @station-1 household receipt re-read first-hand (1/1 scenario passed, 0 failed, 0 pending; measured commit da6968f44 is in dev) via genesis/a2o/scripts/receipt-check.py EXIT=0 2026-09-24 genesis/a2o/reports/sprint-report-household-20260902T205500Z-da6968f4.json"
 cites:
   - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
 ---

@@ -2,7 +2,7 @@
 id: limitarian-governor-v1-plan
 status: landed
 landed: 2026-06-10
-verify_evidence: "elohim-holochain dev #1321 SUCCESS (sweettests incl. mishpat wall validator); elohim dev #1523/#1524 build+unit stages green (deploy-side red = degraded-alpha substrate family, excluded); local: storage lib 1497/0, mishpat native 34/0, both wasm-checks"
+verified_by: "elohim-holochain/dev #1321 result=SUCCESS at ba3c9526a (fix(governor) whole-arc review W1+W2; in dev), 2026-06-10T02:20Z — read first-hand via read-only Jenkins MCP 2026-09-24: all DNAs incl. mishpat packed, manifest hygiene 9/9 and every sweettest shard summary passed (9+9+10+12, 0 failed). Original claims carried over unre-verified: elohim dev #1523/#1524 build+unit stages green (overall result FAILURE, deploy-side red = degraded-alpha substrate family, excluded); local: storage lib 1497/0, mishpat native 34/0, both wasm-checks"
 ---
 # Per-Substrate Limitarian Governor v1 Implementation Plan
 

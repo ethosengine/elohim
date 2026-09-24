@@ -1,6 +1,7 @@
 ---
 id: ark-s1-station2-custody-plan
 status: landed
+verified_by: "a2o @concern:death-witness @station-2 household receipt re-read first-hand (1/1 scenario passed, 0 failed, 0 pending; measured commit 6f6210688 is in dev) via genesis/a2o/scripts/receipt-check.py EXIT=0 2026-09-24 genesis/a2o/reports/sprint-report-household-20260903T035920Z-6f621068.json"
 cites:
   - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "ark-s0-launcher-plan | 2026-09-02-ark-s0-launcher-plan | sha256:e73607fce1c4c94a | path: genesis/docs/superpowers/plans/2026-09-02-ark-s0-launcher-plan.md"

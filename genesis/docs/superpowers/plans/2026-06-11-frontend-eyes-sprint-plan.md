@@ -2,6 +2,7 @@
 id: frontend-eyes-sprint
 status: landed
 landed: 2026-06-11
+verified_by: "all 14 cited fix-wave SHAs (ffd4ff75d 23d0f1e5a 251a3f1cc 2d610207f 3fca9d94e 5df7de7d0 68f0b35d4 6c89109d7 812afcdac 843d90b9d a092195fa c52ce734f cc3ac5de5 da706b090) in dev; render proofs genesis/a2o/reports/look/fontfix-local (brand webfonts) vs fontfix-deployed (fallback) re-read; fresh pnpm look of the deployed Storybook hub-aggregation-shift side-by-side EXIT=0 2026-09-24 renders Fraunces/DM Sans/Source Serif 4 matching fontfix-local, 0 page errors / failed requests / http errors — genesis/a2o/reports/look/fontfix-verify-20260924"
 ---
 
 # Frontend Eyes Sprint — render-verified design triage + fix waves (2026-06-11)

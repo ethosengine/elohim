@@ -2,6 +2,7 @@
 title: "elohim-facings crate extraction — behavior-preserving migration of the resiliency one-off into the pure lens crate"
 id: elohim-facings-crate-extraction-plan
 status: Landed
+verified_by: "cargo test --locked in elohim/elohim-facings (CARGO_BUILD_JOBS=1, RUSTFLAGS=\"\", pool slot family/dev/elohim__elohim-facings) EXIT=0 2026-09-24 at dev d3028c974: 90 passed / 0 failed, incl. boundary_tests::no_transitive_diesel_in_dep_tree and folds::resiliency::felt_status_tests; foundation commit c274d844c in dev. Storage-side household_resilience / schema_contract legs not re-run (heavy elohim-storage build)"
 domain: D5
 sprint: facings-framework-migration
 cites:

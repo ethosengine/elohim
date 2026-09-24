@@ -2,7 +2,8 @@
 title: "Resiliency Saga — executable eprfs valueflow driving the epic to live completion"
 id: resiliency-saga-valueflow
 tier: plan
-status: claimed-not-verified
+status: landed
+verified_by: "T1-T6 commits (839a2f9b8 b20a739f1 9b97db750 6eaaf4046 89eb92c64 a581fee74 35abe6f38) all in dev; saga-status.py --full EXIT=0 reads 11/11 chapters fulfilled (Produce events 2026-07-25..2026-08-22, no Dismiss); independent re-read of the newest household run exercising saga-01..saga-11: every chapter passed>0, failed=0, pending=0 at b407cad7f (in dev) via genesis/a2o/scripts/receipt-check.py EXIT=0 2026-09-24 genesis/a2o/reports/sprint-report-household-20260905T020013Z-b407cad7.json"
 triage_note: "was: Executed (CLAIMED — verify via CI dataplane runs + jenkins-sync)"
 triaged: 2026-09-24
 created: 2026-07-25

@@ -2,6 +2,7 @@
 title: EPR-app deliverability verdict — slice 1 (peer verdict, wire, stage gate) — Implementation Plan
 id: epr-app-deliverability-verdict-slice1-plan
 status: landed
+verified_by: "stage gate: bash scripts/ci/tests/deliverability-gate.test.sh EXIT=0 2026-09-24 (boots / broken rc=2 / not-judged advisory / strict rc=3 — ALL PASS); slice-1 commits b75362ac3..81812d1e7 all in dev; household epr-app-deliverability 5/5 scenarios incl. 'a bundle that cannot boot is refused', failed=0 pending=0 at c326b589b (in dev) via genesis/a2o/scripts/receipt-check.py EXIT=0 2026-09-24 genesis/a2o/reports/sprint-report-household-20260913T190958Z-c326b589.json"
 class: process-meta
 domain: peer-hoster dataplane (T2) app delivery × deploy definition-of-done
 sprint: delivery-verdict
