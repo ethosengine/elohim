@@ -1,7 +1,7 @@
 # Protocol Debug Surface — Reusable, Context-Routed, Native-Level
 
 **Date:** 2026-06-13
-**Status:** Design (supersedes the elohim-app-only handoff `genesis/docs/superpowers/plans/2026-06-13-self-healing-debug-view-handoff.md`, which it absorbs)
+**Status:** Design (supersedes and absorbs the elohim-app-only self-healing debug-view handoff; that body retired to git history)
 **Branch grounding:** `feat/frontend-eyes-sprint` HEAD (self-healing backend Plans A/B/C/D-core merged in via `db68a809a`; `/admin/self-healing` landed `82edc611e`).
 
 ## Problem & redirection

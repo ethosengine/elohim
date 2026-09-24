@@ -119,7 +119,9 @@ content from the mesh".
 `connectedPeers` floors tuned to the real alpha topology (M/J/J live mesh,
 hub-optional floor — one device must still function), adjacency both directions, and a
 peer-loss tolerance scenario: kill one storage pod mid-build, assert reads still serve
-from surviving peers (failover), pod returns and re-syncs.
+from surviving peers (failover), pod returns and re-syncs. Tune the floors per peer from
+the real topology the suite archives (`substrate-verify-mesh.json`
+`context.peers[].connectedPeerIds`), not from a guessed uniform minimum.
 
 **D. Free-storage / stewarded-commitment aggregates.** `/api/v1/network/posture`
 (`storagePressure`, `householdsReciprocating`) and the resilience snapshot read through
@@ -129,18 +131,28 @@ only in test_util — Epic B gap). Conductor seeding (post-netpol) is the design
 filler: verify PeerStatusRecorded → peer-statuses → posture lights up; then make the
 "free storage on this mesh / who stewards what" aggregates truthful and assert them in
 Verify Resilience Signals. p2p-design-gate before ANY new aggregate entity.
+Operator-confirmed precondition (2026-06-11): aggregates are quilt-shaped, not flat — run
+the gate against the tiered-quilt-stewardship seed (MAP D5) and dimension by tier (archive
+vs cache/draw) AND reach class; reconcile the reach-enum drift first (canonical = schema +
+`elohim/epr/src/reach.rs`); who authors shard manifests for bulk-seeded content is
+`genesis/data/timeline/backlog/resilience-unmeasured-vs-zero-honest-denominators.md`.
 
 **E. Projection durability.** Verify Projection Sync currently warns on null streams;
 finish: every pod's projector lag bounded post-seed, `projection_reconcile.caughtUp`
 true across the fleet, and the doorway EprRouter no longer needs the pod-delete crutch
 (restart-doorway-epr.sh exists because SSE projection.registered is flaky — root-cause
-or formally adopt; a concern either way).
+or formally adopt; a concern either way). Emitter-side, expose the pull state
+(`idle|active|caughtUp`) from the reconcile rollup so the CI tri-state can pass `idle`
+confidently instead of warning.
 
 **F. Doorway federation.** Verify Federation Layer asserts self-membership + bootstrap
 surface today. Finish: doorway serves content whose home peer is DOWN (failover through
 the pool / peer cache); cross-doorway content resolution scenarios
 (`features/federation/cross-doorway-content.feature`) — breadth legs @requires:shem,
-single-doorway failover legs run on household-nodes now.
+single-doorway failover legs run on household-nodes now. DESIGN-GATED first: the
+coherence audits disagreed on whether failover-retarget violates the doorway no-fan-out
+rule (`doorway/CLAUDE.md`) — adjudicate between replication-makes-single-target-sufficient,
+sequential re-target on 5xx from an operator pool, and failover living in storage P2P.
 
 ## Scenario slate (story-first — write/extend BEFORE implementing)
 

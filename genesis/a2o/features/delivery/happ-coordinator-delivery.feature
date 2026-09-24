@@ -29,7 +29,7 @@ Feature: hApp coordinator delivery — a shipped zome fix reaches running conduc
   # reinstall/migration path; coordinator-zome change → DNA hash does NOT
   # move → update_coordinators hot-swap path (no re-key, no DHT churn).
   # Fix: elohim-storage happ_manager::sync_coordinators.
-  # Plan: genesis/docs/superpowers/plans/2026-06-11-epr-durability-arc-workstreams-bcdef-pickup.md
+  # Plan: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
