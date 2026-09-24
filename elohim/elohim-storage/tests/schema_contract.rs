@@ -6729,7 +6729,11 @@ fn sample_content_search_view(
             cid: "bafyreilens".into(),
             provenance: "defaulted".into(),
         },
-        selection: format!("top {} of {} by rrf-v2 order", candidates.len(), candidates.len()),
+        selection: format!(
+            "top {} of {} by rrf-v2 order",
+            candidates.len(),
+            candidates.len()
+        ),
         fold,
         fold_lag,
         total_count: candidates.len() as u64,
@@ -6751,22 +6755,22 @@ fn content_search_accepts(instance: &Value) -> bool {
 fn content_search_view_matches_schema() {
     use elohim_views::{
         ContentSearchCandidateView, ContentSearchFoldAnswer, ContentSearchFoldLagAnswer,
-        ContentSearchFoldLagView, ContentSearchFoldView, ContentSearchSectionView,
-        FacetCountView,
+        ContentSearchFoldLagView, ContentSearchFoldView, ContentSearchSectionView, FacetCountView,
     };
     assert_source_of_truth_declared(&load_schema(CONTENT_SEARCH_SCHEMA), CONTENT_SEARCH_SCHEMA);
-    let candidate = |id: &str, section: Option<ContentSearchSectionView>| ContentSearchCandidateView {
-        content_id: id.into(),
-        title: "The commons and its stewards".into(),
-        content_type: "concept".into(),
-        reach: "commons".into(),
-        trust: "notarized".into(),
-        tags: vec!["stewardship".into()],
-        score: 1.0 / 61.0,
-        producer: "lexical".into(),
-        method: "bafyreimeasure".into(),
-        best_section: section,
-    };
+    let candidate =
+        |id: &str, section: Option<ContentSearchSectionView>| ContentSearchCandidateView {
+            content_id: id.into(),
+            title: "The commons and its stewards".into(),
+            content_type: "concept".into(),
+            reach: "commons".into(),
+            trust: "notarized".into(),
+            tags: vec!["stewardship".into()],
+            score: 1.0 / 61.0,
+            producer: "lexical".into(),
+            method: "bafyreimeasure".into(),
+            best_section: section,
+        };
     let mut view = sample_content_search_view(
         ContentSearchFoldAnswer::Present {
             value: ContentSearchFoldView {
@@ -6858,7 +6862,10 @@ fn content_search_view_absent_fold_matches_schema() {
     // An absent fold that smuggles a value, or claims a network reason, does not validate.
     let mut smuggled = serde_json::to_value(&view).unwrap();
     smuggled["fold"]["value"] = serde_json::json!({});
-    assert!(!content_search_accepts(&smuggled), "absent never carries a value");
+    assert!(
+        !content_search_accepts(&smuggled),
+        "absent never carries a value"
+    );
     let mut misreasoned = serde_json::to_value(&view).unwrap();
     misreasoned["fold"]["reason"] = serde_json::json!("timeout");
     assert!(
@@ -6884,17 +6891,40 @@ fn content_search_view_rejects_snake_case() {
     let json = serde_json::to_value(&view).unwrap();
     assert!(content_search_accepts(&json));
     let text = json.to_string();
-    for snake in ["ranking_known", "fold_lag", "total_count", "order_only", "choice_count"] {
-        assert!(!text.contains(snake), "snake_case leaked onto the wire: {snake}");
+    for snake in [
+        "ranking_known",
+        "fold_lag",
+        "total_count",
+        "order_only",
+        "choice_count",
+    ] {
+        assert!(
+            !text.contains(snake),
+            "snake_case leaked onto the wire: {snake}"
+        );
     }
 
     let mut snaked = json.clone();
-    let rk = snaked.as_object_mut().unwrap().remove("rankingKnown").unwrap();
+    let rk = snaked
+        .as_object_mut()
+        .unwrap()
+        .remove("rankingKnown")
+        .unwrap();
     snaked["ranking_known"] = rk;
-    assert!(!content_search_accepts(&snaked), "a snake_case top-level key is refused");
+    assert!(
+        !content_search_accepts(&snaked),
+        "a snake_case top-level key is refused"
+    );
 
     let mut nested = json;
-    let oo = nested["recipe"].as_object_mut().unwrap().remove("orderOnly").unwrap();
+    let oo = nested["recipe"]
+        .as_object_mut()
+        .unwrap()
+        .remove("orderOnly")
+        .unwrap();
     nested["recipe"]["order_only"] = oo;
-    assert!(!content_search_accepts(&nested), "a snake_case nested key is refused");
+    assert!(
+        !content_search_accepts(&nested),
+        "a snake_case nested key is refused"
+    );
 }
