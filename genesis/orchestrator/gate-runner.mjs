@@ -12,6 +12,7 @@ import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { recordCycle } from './gate-cycle.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
+import { runAttested } from './gate-attest.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -151,6 +152,18 @@ function runProject(project, printOnly, namesOnly) {
     const resolvedCargoEnv = resolvedEnv ? JSON.parse(resolvedEnv) : {};
     process.stdout.write(`${JSON.stringify({ name: project.name, dir: project.dir, run: project.run, resolvedCargoEnv, reasons: project.reasons || [] })}\n`);
     return 0;
+  }
+
+  if (project.run.kind === 'attested') {
+    // No local recipe: the pinned commit's own upstream attestation is the gate.
+    // Never reaches run-local-gate.sh (which keeps refusing unknown kinds).
+    process.stdout.write(`\n[gate] ${project.name} (${project.dir}) — attested, no local recipe\n`);
+    return runAttested(project, {
+      root: ROOT,
+      env: process.env,
+      log: line => process.stdout.write(`${line}\n`),
+      runEpr: eprArgs => spawnSync(process.env.EPR_BIN || 'epr', eprArgs, { cwd: ROOT, stdio: 'ignore', timeout: 30000 }).status,
+    });
   }
 
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);

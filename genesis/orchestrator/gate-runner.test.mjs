@@ -286,3 +286,15 @@ describe('selection oracle — shadow, rakia, path', () => {
     assert.equal(out.stdout.trim(), '', 'a2o has no build-manifest.json, so the registry is empty');
   });
 });
+
+describe('attested dispatch', () => {
+  test('an attested project never reaches run-local-gate.sh', () => {
+    const out = spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--target', 'brit'], {
+      cwd: ROOT, encoding: 'utf8', env: { ...process.env, GH_BIN: '/nonexistent/gh', EPR_BIN: '/nonexistent/epr' },
+    });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /attested, no local recipe/);
+    assert.match(out.stdout, /attested: claimed — gh not found/);
+    assert.doesNotMatch(out.stdout, /cargo target:/);
+  });
+});
