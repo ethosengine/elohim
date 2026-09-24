@@ -55,6 +55,9 @@ overrides:
   # webpack-dev-server's express chain); 6.15.2 is confirmed fetchable on the mirror right now
   # (unlike almost everything else checked in this pass) and fixes the CVE with no API change.
   qs: ^6.15.2
+  # GHSA-23hp-3jrh-7fpw (Dependabot #715, critical): tar <=7.5.18 has an unbounded-input
+  # decompression DoS; it arrives transitively (build/install tooling), so force the patched line.
+  tar: ^7.5.19
 
 onlyBuiltDependencies:
   - '@parcel/watcher'

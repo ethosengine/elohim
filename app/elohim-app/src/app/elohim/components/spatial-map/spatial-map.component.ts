@@ -11,7 +11,7 @@ import {
   inject,
 } from '@angular/core';
 
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { Subject, takeUntil } from 'rxjs';
 
 import { PlacesApiService } from '../../services/places-api.service';
@@ -333,7 +333,11 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
         const point: GeoJSON.Point = { type: 'Point', coordinates: [longitude, latitude] };
 
         if (existing && 'setData' in existing) {
-          (existing as maplibregl.GeoJSONSource).setData(point);
+          (existing as maplibregl.GeoJSONSource)
+            .setData(point)
+            .catch(err =>
+              console.warn('[SpatialMapComponent] Location marker update failed:', err)
+            );
         } else {
           this.map.addSource(markerId, { type: 'geojson', data: point });
           this.map.addLayer({
