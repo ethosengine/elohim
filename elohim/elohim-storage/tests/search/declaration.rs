@@ -6,8 +6,9 @@ use elohim_epr_rea::{atom_cid, RankingMethod};
 use elohim_storage::search::measure::{addressed, Declared, MEASURE_JSON, RECIPE_JSON};
 use serde_json::Value;
 
-/// `IndexMeasure::cid()` of `content-lexical-index.json`.
-const MEASURE_CID: &str = "bafyreiftk3eirwka5lghmmirijrf5jbv6pmu7uatgq6aje5gqy7n7aueea";
+/// `IndexMeasure::cid()` of `content-lexical-index.json` — reach `{commons, ceiling}`, the widest
+/// ring the peer serves; per-reader gating is at the route (ruling R-S8).
+const MEASURE_CID: &str = "bafyreifa7afnbfcrvx4u3dilv77xdbnkaigl5lsakyo46xst7tqbdat6gi";
 /// `atom_cid` of the recipe's addressed keys (`recipe`, `k`, `order_only`, `producers`).
 const RECIPE_CID: &str = "bafyreiedggzebsgekiw26kdkcdot6rxqpwsvbozpozmdwmig2mhhba4x3q";
 /// The recall measures' `_chunk_rule` CID: one chunker, two folds.
@@ -27,6 +28,11 @@ fn measure_declaration_loads_validates_and_has_stable_cid() {
     );
     assert_eq!(declared.measure.chunk_rule.to_string(), RECALL_CHUNK_RULE);
     assert_eq!(declared.fold_lag_limit(), 200);
+    // The declared reach is the serving ceiling, not `self`: the fold covers every row, and the
+    // route gates each candidate per reader (R-S8). Read literally, a `self` ceiling would refuse
+    // the commons rows the index is built to serve.
+    assert!(declared.measure.admits(elohim_epr::reach::Reach::Commons));
+    assert!(declared.measure.admits(elohim_epr::reach::Reach::Private));
     assert_eq!(
         declared.measure_cid, MEASURE_CID,
         "the measure's method CID moved"
