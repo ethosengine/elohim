@@ -399,24 +399,38 @@ fn one(
     Ok(Outcome::Contributed(event))
 }
 
-/// The registered claim for `session` — the identity every imported contribution is authored by.
+/// The identity every imported contribution is authored by: the session's registered claim, or —
+/// when the session registered none — this device's standing human (ruling R-P6).
 ///
-/// A human's git identity cannot stand here: the collective validates `author` with
-/// `parse_agent_ref`, and minting `agent:<person>@human` to get past that parser would be the
-/// substrate asserting a persona nobody claimed. The human is recorded twice, honestly and
-/// elsewhere: as `Imported::git_author` on the bytes they wrote, and as the note's `steward:` slot.
+/// A human's git identity still cannot stand here: nothing is minted from an email, and
+/// `agent:<person>@human` stays a forgery. What CAN stand is a human the device verifiably speaks
+/// for — witnessed by a present agent or self-claimed, and signed by this device's key — which is
+/// the same standing arm `contribute`'s note resolves, so the author and the note's attribution
+/// cannot disagree. The git author is still recorded honestly elsewhere: as
+/// `Imported::git_author` on the bytes they wrote.
 fn acting_author(root: &Path, session: Option<&str>) -> FlowResult<String> {
+    acting_author_on(root, session, crate::actor::standing_here(root))
+}
+
+/// [`acting_author`] with this device's standing human already resolved.
+fn acting_author_on(
+    root: &Path,
+    session: Option<&str>,
+    standing: Option<crate::actor::Standing>,
+) -> FlowResult<String> {
     let session = session.ok_or_else(|| {
         refused("import writes contributions and needs a registered --session; identity remains a local claim")
     })?;
-    let claim = SidecarActorStore::open(root)?
-        .current_for(session)?
-        .ok_or_else(|| {
-            refused(format!(
-                "session `{session}` registered no actor claim — run `epr actor claim --as agent:<role>@<model> --session {session}` first"
-            ))
-        })?;
-    Ok(claim.1.claimed.0)
+    if let Some((_, claim)) = SidecarActorStore::open(root)?.current_for(session)? {
+        return Ok(claim.claimed.0);
+    }
+    if let Some(standing) = standing {
+        return Ok(standing.subject);
+    }
+    Err(refused(format!(
+        "session `{session}` registered no actor claim and this device stands for no witnessed \
+         human — run `epr actor claim --as agent:<role>@<model> --session {session}` first"
+    )))
 }
 
 /// `Name <email>` of the newest commit touching `rel`, or an honest absence.
@@ -514,6 +528,69 @@ mod tests {
         // A document ABOUT the private tier is still fruit.
         assert!(private_reason(Path::new(".claude/memory/recall-executions-design.md")).is_none());
         assert!(private_reason(Path::new(".claude/memory/project_scratchpad_rails.md")).is_none());
+    }
+
+    #[test]
+    fn import_acting_author_falls_back_to_standing_human() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("README.md"), "fixture").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "README.md"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let out = crate::process::build_command("git", &args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(out.status.success());
+        }
+        let keys = tempfile::tempdir().unwrap();
+        let key_file = keys.path().join("ed25519.seed");
+
+        // A bare device: an unclaimed session is refused, exactly as before.
+        let err = acting_author_on(
+            root,
+            Some("import-session"),
+            crate::actor::standing_on_device(root, &key_file),
+        )
+        .expect_err("no claim, no standing");
+        assert!(
+            err.to_string().contains("registered no actor claim"),
+            "{err}"
+        );
+
+        let key = crate::device_key::DeviceKey::load_or_generate(&key_file).unwrap();
+        crate::actor::witness(
+            root,
+            "human:matthew",
+            "agent:orchestrator@claude-fable-5-1",
+            "witness-session",
+            "operator of this stewarded device",
+            false,
+            &key,
+        )
+        .unwrap();
+        let standing = crate::actor::standing_on_device(root, &key_file);
+        assert!(standing.is_some());
+
+        // The session registered nothing: the device's standing human authors the import.
+        assert_eq!(
+            acting_author_on(root, Some("import-session"), standing.clone()).unwrap(),
+            "human:matthew"
+        );
+        // A session's own claim still wins over standing.
+        crate::actor::claim(root, "agent:implementer@opus-5.5", "import-session").unwrap();
+        assert_eq!(
+            acting_author_on(root, Some("import-session"), standing.clone()).unwrap(),
+            "agent:implementer@opus-5.5"
+        );
+        // And a session is still required.
+        assert!(acting_author_on(root, None, standing).is_err());
     }
 
     #[test]

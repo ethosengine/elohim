@@ -109,6 +109,11 @@ const VERDICT_CHANGES_REQUESTED: &str = "changes-requested";
 /// inserted anywhere earlier would renumber a vocabulary other legs already read.
 pub(crate) const STEWARD_SLOT_PREFIX: &str = "steward:";
 
+/// Prefix on the slot naming where an attribution came from, emitted on the standing-human arm
+/// alone (`source:claim-signed`) — just before `steward:`, which stays last. Every other arm emits
+/// no source slot, so their notes keep their content addresses.
+pub(crate) const SOURCE_SLOT_PREFIX: &str = "source:";
+
 /// Prefix on the slot naming the pinned measure a STRUCTURED observation was taken under.
 ///
 /// A structured observation is the one note kind that is read arithmetically rather than by a
@@ -823,9 +828,14 @@ fn note_with_options_guard(
                 "acceptance --as differs from session actor claim".into(),
             ));
         }
+        // The steward the resolver chose (the standing handle, or the author) is kept.
+        let steward = attribution
+            .steward
+            .clone()
+            .unwrap_or_else(|| author.clone());
         attribution = Attribution {
             claim_cid: Some(pin),
-            ..Attribution::claimed(identity, &author)
+            ..Attribution::claimed(identity, &steward)
         };
     }
 
@@ -997,8 +1007,12 @@ pub(crate) struct Attribution {
     claim_cid: Option<Cid>,
     /// The claimed identity the note is attributed to; `None` leaves it with the commit author.
     pub(crate) actor: Option<String>,
-    /// The git-signing human, carried on the agent arms only.
+    /// The human answerable for the tree, carried on the attributed arms only: this device's
+    /// standing human (`human:<handle>`) when there is one, the git-signing email otherwise.
     pub(crate) steward: Option<String>,
+    /// `Some("claim-signed")` on the standing-human arm alone. The other arms record no source
+    /// slot, so every note they mint keeps the content address it always had.
+    pub(crate) source: Option<&'static str>,
 }
 
 impl Attribution {
@@ -1006,6 +1020,9 @@ impl Attribution {
     pub(crate) fn append_slots(&self, slots: &mut Vec<String>) {
         if let Some(cid) = self.claim_cid {
             slots.push(format!("actor-claim:{cid}"));
+        }
+        if let Some(source) = self.source {
+            slots.push(format!("{SOURCE_SLOT_PREFIX}{source}"));
         }
         if let Some(steward) = &self.steward {
             slots.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
@@ -1024,6 +1041,7 @@ impl Attribution {
             claim_cid: None,
             actor: None,
             steward: None,
+            source: None,
         }
     }
 
@@ -1035,6 +1053,19 @@ impl Attribution {
             claim_cid: None,
             actor: Some(identity),
             steward: Some(author.to_string()),
+            source: None,
+        }
+    }
+
+    /// The standing-human arm (ruling R-P6): this device's standing human is the actor AND the
+    /// steward — the handle, never the email — and the standing record (the witness or the
+    /// human's own signed claim) is the exact record consulted, pinned like a session claim.
+    fn standing(standing: crate::actor::Standing) -> Self {
+        Self {
+            claim_cid: standing.record(),
+            actor: Some(standing.subject.clone()),
+            steward: Some(standing.subject),
+            source: Some(crate::actor::CLAIM_SIGNED_SOURCE),
         }
     }
 }
@@ -1058,29 +1089,66 @@ pub(crate) fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>>
     }
 }
 
-/// The three arms, in priority order: a named identity, then a session's registered claim, then
-/// the commit author.
+/// The four arms, in priority order: a named identity, then a session's registered claim, then
+/// this device's standing human, then the commit author.
 ///
 /// Every failure on the session arm — no sidecar, no claim, an unreadable or tampered log — lands
-/// on the author arm with a notice on stderr rather than an error. The note is the durable thing
+/// on the next arm with a notice on stderr rather than an error. The note is the durable thing
 /// here; the attribution is an enrichment of it, and an enrichment that can veto its subject is a
 /// dependency in the wrong direction.
+///
+/// The standing arm (ruling R-P6) sits between the session claim and the git author: an agent's
+/// own claim for its session still wins, and a device whose human was witnessed (or signed their
+/// own claim) no longer falls through to an email. When a standing human exists, the `steward:`
+/// slot on EVERY attributed arm carries the handle (`human:<handle>`), never the email.
 pub(crate) fn resolve_attribution(
     root: &Path,
     named: Option<String>,
     session: Option<&str>,
     author: &str,
 ) -> Attribution {
+    resolve_attribution_on(
+        root,
+        named,
+        session,
+        author,
+        crate::actor::standing_here(root),
+    )
+}
+
+/// [`resolve_attribution`] with this device's standing human already resolved — the seam the
+/// tests drive with a temp device key instead of the process environment.
+pub(crate) fn resolve_attribution_on(
+    root: &Path,
+    named: Option<String>,
+    session: Option<&str>,
+    author: &str,
+    standing: Option<crate::actor::Standing>,
+) -> Attribution {
+    let steward = standing
+        .as_ref()
+        .map_or_else(|| author.to_string(), |s| s.subject.clone());
+    let fallback = |standing: Option<crate::actor::Standing>| match standing {
+        Some(standing) => {
+            eprintln!(
+                "note: this device's standing {} attributes it ({})",
+                standing.subject,
+                crate::actor::CLAIM_SIGNED_SOURCE
+            );
+            Attribution::standing(standing)
+        }
+        None => Attribution::authored(),
+    };
     match (named, session) {
-        (Some(identity), _) => Attribution::claimed(identity, author),
+        (Some(identity), _) => Attribution::claimed(identity, &steward),
         (None, Some(session)) => match claimed_for_session(root, session) {
             Some((cid, identity)) => Attribution {
                 claim_cid: Some(cid),
-                ..Attribution::claimed(identity, author)
+                ..Attribution::claimed(identity, &steward)
             },
-            None => Attribution::authored(),
+            None => fallback(standing),
         },
-        (None, None) => Attribution::authored(),
+        (None, None) => fallback(standing),
     }
 }
 
@@ -1488,6 +1556,119 @@ mod tests {
             "bafyreibzhpdchthmt3zlnhjjjsll6ji6p6fmhqlarcoymuhiprzof75jbq"
         );
     }
+    /// A committed tempdir repo whose HEAD author is an email, plus a temp device key that has
+    /// witnessed `human:matthew` there — never the real key, never the real sidecar.
+    fn witnessed_fixture() -> (tempfile::TempDir, tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "assertion.md"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let result = crate::process::build_command("git", &args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+        }
+        let keys = tempfile::tempdir().unwrap();
+        let key_file = keys.path().join("ed25519.seed");
+        let key = crate::device_key::DeviceKey::load_or_generate(&key_file).unwrap();
+        crate::actor::witness(
+            root,
+            "human:matthew",
+            "agent:orchestrator@claude-fable-5-1",
+            "witness-session",
+            "operator of this stewarded device",
+            false,
+            &key,
+        )
+        .unwrap();
+        (dir, keys, key_file)
+    }
+
+    #[test]
+    fn steward_slot_carries_handle_not_email_when_standing() {
+        let (dir, _keys, key_file) = witnessed_fixture();
+        let root = dir.path();
+        let standing = crate::actor::standing_on_device(root, &key_file);
+        assert_eq!(
+            standing.as_ref().map(|s| s.subject.as_str()),
+            Some("human:matthew")
+        );
+        crate::actor::claim(root, "agent:implementer@opus-5.5", "agent-session").unwrap();
+        let email = "fixture@example.test";
+
+        // Every attributed arm carries the handle as steward once the device stands for a human.
+        let arms = [
+            resolve_attribution_on(
+                root,
+                Some("agent:scribe@opus-5".into()),
+                None,
+                email,
+                standing.clone(),
+            ),
+            resolve_attribution_on(root, None, Some("agent-session"), email, standing.clone()),
+            resolve_attribution_on(root, None, None, email, standing.clone()),
+        ];
+        for attribution in &arms {
+            let mut slots = vec!["run:observation".to_string()];
+            attribution.append_slots(&mut slots);
+            assert_eq!(
+                slots.last().unwrap(),
+                "steward:human:matthew",
+                "the handle, never the email: {slots:?}"
+            );
+            assert!(!slots.iter().any(|s| s.contains(email)), "{slots:?}");
+        }
+        // The agent arms keep their agent as provider and record no source slot.
+        assert_eq!(arms[1].actor.as_deref(), Some("agent:implementer@opus-5.5"));
+        assert_eq!(arms[1].source, None);
+
+        // Without a standing human the agent arm still carries the email, exactly as before.
+        let bare = resolve_attribution_on(root, None, Some("agent-session"), email, None);
+        assert_eq!(bare.steward.as_deref(), Some(email));
+        assert_eq!(bare.source, None);
+    }
+
+    #[test]
+    fn the_standing_arm_sits_between_the_session_claim_and_the_author() {
+        let (dir, _keys, key_file) = witnessed_fixture();
+        let root = dir.path();
+        let standing = crate::actor::standing_on_device(root, &key_file).expect("stands");
+        let email = "fixture@example.test";
+
+        // An unclaimed session and a sessionless note both land on the standing human.
+        for session in [Some("never-claimed"), None] {
+            let attribution =
+                resolve_attribution_on(root, None, session, email, Some(standing.clone()));
+            assert_eq!(attribution.actor.as_deref(), Some("human:matthew"));
+            assert_eq!(attribution.provider(email), "human:matthew");
+            assert_eq!(attribution.source, Some("claim-signed"));
+            assert_eq!(attribution.claim_cid, standing.record());
+            let mut slots = Vec::new();
+            attribution.append_slots(&mut slots);
+            assert_eq!(
+                slots,
+                vec![
+                    format!("actor-claim:{}", standing.record_cid),
+                    "source:claim-signed".to_string(),
+                    "steward:human:matthew".to_string(),
+                ]
+            );
+        }
+        // No standing: the author arm, unchanged.
+        let authored = resolve_attribution_on(root, None, None, email, None);
+        assert_eq!(authored.actor, None);
+        assert_eq!(authored.steward, None);
+        assert_eq!(authored.source, None);
+    }
+
     #[test]
     fn guarded_note_emits_the_validated_actor_snapshot_after_session_switch() {
         let dir = tempfile::tempdir().unwrap();

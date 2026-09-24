@@ -1088,21 +1088,37 @@ fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowRes
     Ok(ExitCode::SUCCESS)
 }
 
-/// The session id a run is acting under: the explicit flag first, then `CLAUDE_SESSION_ID`, then
-/// `ELOHIM_SESSION_ID`.
+/// The environment variables a session id is read from, in order, after the explicit flag.
+///
+/// `CLAUDE_CODE_SESSION_ID` first: it is the variable this harness actually exports (the one the
+/// capability-tier gate reads), so a hook-emitted note that passes no `--session` still resolves
+/// the session it ran in. `CLAUDE_SESSION_ID` and `ELOHIM_SESSION_ID` follow, unchanged.
+const SESSION_ENV_KEYS: [&str; 3] = [
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "ELOHIM_SESSION_ID",
+];
+
+/// The session id a run is acting under: the explicit flag first, then [`SESSION_ENV_KEYS`] in
+/// order.
 ///
 /// A BLANK value at any position is absence, never a session named by the empty string. An
 /// exported-but-empty variable is exactly what an un-sessioned harness looks like, and taking it
 /// literally would send every such run asking the actor sidecar who claimed session `""` — a
 /// question that has one answer for everybody.
 fn resolve_session(explicit: Option<String>) -> Option<String> {
+    resolve_session_with(explicit, |key| std::env::var(key).ok())
+}
+
+/// [`resolve_session`] over an injected environment lookup, so the precedence is testable without
+/// mutating the process environment parallel tests share.
+fn resolve_session_with(
+    explicit: Option<String>,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Option<String> {
     explicit
         .into_iter()
-        .chain(
-            ["CLAUDE_SESSION_ID", "ELOHIM_SESSION_ID"]
-                .into_iter()
-                .filter_map(|key| std::env::var(key).ok()),
-        )
+        .chain(SESSION_ENV_KEYS.into_iter().filter_map(lookup))
         .map(|value| value.trim().to_string())
         .find(|value| !value.is_empty())
 }
@@ -1761,6 +1777,47 @@ pub fn short_cid(cid: &Cid) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_session_reads_claude_code_session_id_first() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |key: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == key)
+                    .map(|(_, v)| v.to_string())
+            }
+        };
+        let all = env(&[
+            ("CLAUDE_CODE_SESSION_ID", "code-session"),
+            ("CLAUDE_SESSION_ID", "claude-session"),
+            ("ELOHIM_SESSION_ID", "elohim-session"),
+        ]);
+        assert_eq!(
+            resolve_session_with(None, all).as_deref(),
+            Some("code-session"),
+            "the harness's real variable wins over the older names"
+        );
+        assert_eq!(
+            resolve_session_with(Some("flag".into()), all).as_deref(),
+            Some("flag"),
+            "the explicit flag still wins over every variable"
+        );
+        // A blank CLAUDE_CODE_SESSION_ID is absence: the next variable answers.
+        let blank = env(&[
+            ("CLAUDE_CODE_SESSION_ID", "  "),
+            ("CLAUDE_SESSION_ID", "claude-session"),
+        ]);
+        assert_eq!(
+            resolve_session_with(None, blank).as_deref(),
+            Some("claude-session")
+        );
+        assert_eq!(
+            resolve_session_with(None, env(&[("ELOHIM_SESSION_ID", "e")])).as_deref(),
+            Some("e")
+        );
+        assert_eq!(resolve_session_with(None, env(&[])), None);
+    }
 
     fn line(email: &str, ts: &str, trailers: &str) -> String {
         format!("{email}{FIELD_SEP}{ts}{FIELD_SEP}{trailers}")
