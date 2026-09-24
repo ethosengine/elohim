@@ -12,9 +12,9 @@ purpose: >
   ontological claim it is).
 rules:
   - id: sovereignty-ontology-guard
-    policy: sovereignty-ontology-guard@3
+    policy: sovereignty-ontology-guard@5
   - id: ownership-ontology-guard
-    policy: ownership-ontology-guard@3
+    policy: ownership-ontology-guard@5
   - id: manifesto-epic-blind-reader-review
     class: inject
     when: { write: "epic*.md" }
@@ -40,13 +40,13 @@ cites:
 # elohim-protocol/ — the protocol canon (governed)
 
 This directory is the vision. Its governance base is a **sibling pair of ontology guards** (bound from
-`.claude/epr-meta/policies.yaml`, both at `@3`): a write that NET-NEW introduces apex-assertion framing
+`.claude/epr-meta/policies.yaml`, both at `@5`): a write that NET-NEW introduces apex-assertion framing
 dispatches a bounded storyteller review against the legitimate uses and settled canon without stopping
 the active authoring pass.
 
-- **`sovereignty-ontology-guard@3`** — "self-sovereign" as the top identity tier, "true data
+- **`sovereignty-ontology-guard@5`** — "self-sovereign" as the top identity tier, "true data
   sovereignty" as a goal. Three frames: *adversary · bounded · bridge-legibility*.
-- **`ownership-ontology-guard@3`** — ownership as the right relationship to a resource. Four frames:
+- **`ownership-ontology-guard@5`** — ownership as the right relationship to a resource. Four frames:
   *adversary · bounded · external-legibility · **inalienable***.
 
 They are a **pair, not two rules**: ownership says *"mine, not yours"*, sovereignty says *"me, not
