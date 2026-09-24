@@ -291,10 +291,32 @@ fn a_missing_python_module_reports_unavailable() {
     );
 }
 
+/// The first of the procedure's three runtime modules (in `embed.py`'s own import order) that
+/// `interpreter` cannot import, or `Err` when the interpreter itself does not run. Probed at call
+/// time, never inferred from what a package list declares.
+fn missing_runtime_module(interpreter: &str) -> Result<Option<&'static str>, String> {
+    for module in ["numpy", "onnxruntime", "tokenizers"] {
+        let probe = std::process::Command::new(interpreter)
+            .args(["-c", &format!("import {module}")])
+            .output()
+            .map_err(|error| format!("{interpreter}: {error}"))?;
+        if !probe.status.success() {
+            return Ok(Some(module));
+        }
+    }
+    Ok(None)
+}
+
 /// The live model, wherever the manifest's `resolve` list finds it: a two-text batch returns two
-/// 384-vectors, each unit length, cosine(self) ≈ 1 and cosine(a, b) < 1. Where no model directory
-/// resolves this test does not skip — it asserts the honest `unavailable: <reason>` instead, so it
-/// runs everywhere and reports what it found.
+/// 384-vectors, each unit length, cosine(self) ≈ 1 and cosine(a, b) < 1. The precondition for the
+/// live leg is BOTH halves of the runtime — a model directory that resolves AND an interpreter
+/// that imports `numpy`, `onnxruntime` and `tokenizers` (probed first, never inferred). Otherwise
+/// this test does not skip and never panics: it asserts the specific honest `unavailable: <reason>`
+/// for what is absent — the model directory, the interpreter, or the first module missing.
+///
+/// Follow-up (station 4 final review, ruling I6): the native route should own its model directory
+/// through a provisioning recipe; the palace's cache (`~/.cache/chroma/...`) that the manifest's
+/// `resolve` list falls back to today is only today's fallback, not the route's home.
 #[test]
 fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
     let embedder = PinnedProcedure::declared(&common::repo_root()).expect("manifest loads");
@@ -304,11 +326,32 @@ fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
         "a household stewards its shared garden",
     ]);
     let answer = embedder.embed(&batch, budget);
-    match embedder.manifest.resolve_model_dir() {
-        Some(dir) => {
+    let Some(dir) = embedder.manifest.resolve_model_dir() else {
+        let reason = unavailable_reason(answer.expect_err("no model resolves"));
+        assert!(reason.contains("no model directory resolves"), "{reason}");
+        println!("live model absent on this machine: unavailable: {reason}");
+        return;
+    };
+    match missing_runtime_module(&embedder.interpreter) {
+        Err(why) => {
+            let reason = unavailable_reason(answer.expect_err("the interpreter does not run"));
+            assert!(reason.contains(&embedder.interpreter), "{reason} ({why})");
+            println!("live runtime absent on this machine: unavailable: {reason}");
+        }
+        Ok(Some(module)) => {
+            let reason = unavailable_reason(answer.expect_err("a runtime module is missing"));
+            assert_eq!(
+                reason,
+                format!("python module '{module}' is not importable"),
+                "the model resolves at {} but the runtime lacks {module}",
+                dir.display()
+            );
+            println!("live runtime absent on this machine: unavailable: {reason}");
+        }
+        Ok(None) => {
             let embedding = answer.unwrap_or_else(|e| {
                 panic!(
-                    "the model resolves at {} but did not embed: {e}",
+                    "the model resolves at {} and the runtime imports, but it did not embed: {e}",
                     dir.display()
                 )
             });
@@ -321,6 +364,30 @@ fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
             assert!((cosine(a, a) - 1.0).abs() < 1e-3);
             assert!(cosine(a, b) < 0.99, "distinct texts: {}", cosine(a, b));
             assert!(embedding.fitness.contains("recall-bank-reach@1"));
+            // Neither text is anywhere near the 256-token window: a procedure that counts says 0.
+            assert!(
+                embedding.truncated.is_none_or(|n| n == 0),
+                "{:?}",
+                embedding.truncated
+            );
+            // One text past the window (~600 tokens): a procedure that counts says exactly 1; one
+            // that does not count says nothing (unknown), never a guessed 0.
+            let long = "stewardship of the commons ".repeat(150);
+            let counted = embedder
+                .embed(&texts(&[&long, "a short text"]), budget)
+                .expect("a long text embeds from its head");
+            assert!(
+                counted.truncated.is_none_or(|n| n == 1),
+                "{:?}",
+                counted.truncated
+            );
+            println!(
+                "live procedure truncation count: {}",
+                counted.truncated.map_or(
+                    "unknown (the pinned procedure does not count)".to_string(),
+                    |n| n.to_string()
+                )
+            );
             // One question fits the query-time provider envelope (8192 bytes, 15 s): the reply
             // is ~4 KB of 6-significant-digit floats.
             let question = embedder
@@ -337,10 +404,44 @@ fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
                 cosine(a, b)
             );
         }
-        None => {
-            let reason = unavailable_reason(answer.expect_err("no model resolves"));
-            assert!(reason.contains("no model directory resolves"), "{reason}");
-            println!("live model absent on this machine: unavailable: {reason}");
-        }
+    }
+}
+
+/// Station 4 final review, ruling I5: truncation is COUNTED. A procedure that reports `truncated`
+/// (texts whose token count exceeded the model's window) carries it through `Embedding`; one that
+/// does not says nothing, which reads as unknown (`None`) — never a guessed zero. The fixture
+/// embedder never truncates.
+#[test]
+fn a_reply_carries_the_procedures_truncation_count_or_none() {
+    let budget = EmbedBudget::fold(&contract()).unwrap();
+    assert_eq!(
+        Fixture
+            .embed(&texts(&["a", "b"]), budget)
+            .unwrap()
+            .truncated,
+        Some(0)
+    );
+    let dir = tempfile::tempdir().unwrap();
+    for (reply, expected) in [
+        ("{\"dims\": 384, \"vectors\": v, \"truncated\": 1}", Some(1)),
+        ("{\"dims\": 384, \"vectors\": v}", None),
+    ] {
+        let stub = dir.path().join("stub.py");
+        let body = format!(
+            "import json, sys\nn = len(json.loads(sys.stdin.read())[\"texts\"])\n\
+             v = [[1.0] + [0.0] * 383 for _ in range(n)]\nprint(json.dumps({reply}))\n"
+        );
+        std::fs::write(&stub, &body).unwrap();
+        let mut manifest = manifest_resolving_to(dir.path());
+        manifest.procedure = Some(BlobCid::compute_raw(body.as_bytes()).to_string());
+        let embedder = PinnedProcedure {
+            manifest,
+            procedure: stub,
+            interpreter: "python3".to_string(),
+        };
+        let embedding = embedder
+            .embed(&texts(&["short", "long"]), budget)
+            .expect("the stub answers");
+        assert_eq!(embedding.truncated, expected, "{reply}");
     }
 }

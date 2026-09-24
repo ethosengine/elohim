@@ -3540,3 +3540,153 @@ fn staleness_is_never_inferred_without_a_declared_stale_days() {
         outcome.summary
     );
 }
+
+// ── rate-over-window: a deterministic `sample` journey counts once per (question, method) ───────
+//
+// Final whole-branch review of station 4, ruling I1 (2026-09-24): `recall sample` is
+// deterministic — the same bank question under the same method CID walks the same route — so
+// re-running it mints a new journey that is not new evidence about the quarter. A journey whose
+// folds carry `env:question` and `env:recipe` (the shape `sample` writes, and `judge` repeats)
+// counts at most once per (question, method CID) in the window, the LATEST such journey standing
+// for the pair. Every other journey is unchanged.
+
+fn sample_env(journey: &str, question: &str, method: &str) -> BTreeMap<String, String> {
+    let mut env = BTreeMap::new();
+    env.insert("journey".to_string(), journey.to_string());
+    env.insert("question".to_string(), question.to_string());
+    env.insert("recipe".to_string(), method.to_string());
+    env.insert("reader".to_string(), "agent:steward@fixture".to_string());
+    env
+}
+
+/// One sample journey as `sample` folds it: bytes 0 and not-reached 0/1, both carrying the env.
+fn sample_journey_at(root: &Path, when: &str, env: &BTreeMap<String, String>, missed: bool) {
+    fold_env_at(root, when, "recall-unmetered-bytes@1", ".", 0.0, env);
+    fold_env_at(
+        root,
+        when,
+        "recall-not-reached@1",
+        ".",
+        if missed { 1.0 } else { 0.0 },
+        env,
+    );
+}
+
+fn plain_journey_at(root: &Path, when: &str, journey: &str, value: f64) {
+    let mut env = BTreeMap::new();
+    env.insert("journey".to_string(), journey.to_string());
+    fold_env_at(root, when, "recall-mistaken-assertions@1", ".", value, &env);
+}
+
+#[test]
+fn three_sample_journeys_of_one_question_under_one_method_count_as_one() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    // The same question under the same method, sampled three times: two early misses, then a
+    // reach. The LATEST journey stands for the pair, so the pair reads clean.
+    sample_journey_at(
+        root,
+        &days_ago(6),
+        &sample_env("s-1", "q-a", "method-1"),
+        true,
+    );
+    sample_journey_at(
+        root,
+        &days_ago(5),
+        &sample_env("s-2", "q-a", "method-1"),
+        true,
+    );
+    sample_journey_at(
+        root,
+        &days_ago(4),
+        &sample_env("s-3", "q-a", "method-1"),
+        false,
+    );
+    // Two ordinary journeys, so the window holds three journeys after the collapse.
+    plain_journey_at(root, &days_ago(3), "free-1", 1.0);
+    plain_journey_at(root, &days_ago(2), "free-2", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert!(
+        outcome.summary.contains("1 of 3 journeys"),
+        "three samples of one (question, method) are ONE journey, the latest (a reach): {}",
+        outcome.summary
+    );
+    assert_eq!(outcome.observed, Some(1.0 / 3.0));
+    assert!(
+        outcome
+            .summary
+            .contains("2 repeated sample journeys collapsed"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn the_same_question_under_two_methods_counts_twice() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    sample_journey_at(
+        root,
+        &days_ago(6),
+        &sample_env("s-1", "q-a", "method-1"),
+        true,
+    );
+    sample_journey_at(
+        root,
+        &days_ago(5),
+        &sample_env("s-2", "q-a", "method-1"),
+        false,
+    );
+    sample_journey_at(
+        root,
+        &days_ago(4),
+        &sample_env("s-3", "q-a", "method-2"),
+        true,
+    );
+    plain_journey_at(root, &days_ago(3), "free-1", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert!(
+        outcome.summary.contains("1 of 3 journeys"),
+        "method-1's latest reached, method-2's missed, and the free journey is clean: {}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn a_journey_that_is_not_a_sample_is_never_collapsed() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    // Three free-form journeys that happen to carry a `question` slot but no method CID, and one
+    // hand-written fold with no slots at all: none of them is a sample, none collapses.
+    for (n, days) in [("free-1", 6_i64), ("free-2", 5), ("free-3", 4)] {
+        let mut env = BTreeMap::new();
+        env.insert("journey".to_string(), n.to_string());
+        env.insert("question".to_string(), "q-a".to_string());
+        fold_env_at(
+            root,
+            &days_ago(days),
+            "recall-mistaken-assertions@1",
+            ".",
+            1.0,
+            &env,
+        );
+    }
+    fold_at(root, &days_ago(3), "recall-unmetered-bytes@1", ".", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert!(
+        outcome.summary.contains("3 of 4 journeys (4 folds)"),
+        "{}",
+        outcome.summary
+    );
+    assert!(
+        !outcome.summary.contains("collapsed"),
+        "{}",
+        outcome.summary
+    );
+}

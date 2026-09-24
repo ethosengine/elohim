@@ -46,6 +46,9 @@ pub struct Embedding {
     pub dims: usize,
     pub vectors: Vec<Vec<f32>>,
     pub fitness: String,
+    /// How many texts of this reply were longer than the model's token window and embedded from
+    /// their head only; `None` when the procedure does not count (unknown — never a guessed 0).
+    pub truncated: Option<usize>,
 }
 
 /// The envelope one `embed` call runs under — resolved from the pinned contract by the caller.
@@ -227,6 +230,9 @@ impl PinnedProcedure {
         struct Reply {
             dims: usize,
             vectors: Vec<Vec<f32>>,
+            /// Texts past the model's `max_tokens` — absent from a procedure that does not count.
+            #[serde(default)]
+            truncated: Option<usize>,
         }
         let reply: Reply = serde_json::from_slice(stdout).map_err(|error| {
             unavailable(format!(
@@ -252,9 +258,15 @@ impl PinnedProcedure {
                 short.len()
             )));
         }
+        if let Some(n) = reply.truncated.filter(|n| *n > expected) {
+            return Err(unavailable(format!(
+                "embedding procedure replied {n} truncated of {expected} texts"
+            )));
+        }
         Ok(Embedding {
             dims,
             vectors: reply.vectors,
+            truncated: reply.truncated,
             fitness: format!(
                 "{} on model {}",
                 self.manifest.fitness, self.manifest.model_bytes
@@ -406,6 +418,8 @@ impl Embedder for Fixture {
             dims: FIXTURE_DIMS,
             vectors: texts.iter().map(|text| Fixture::vector(text)).collect(),
             fitness: FIXTURE_FITNESS.to_string(),
+            // A bag of words has no token window: nothing is ever cut.
+            truncated: Some(0),
         })
     }
 }

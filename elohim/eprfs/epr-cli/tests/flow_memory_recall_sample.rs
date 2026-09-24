@@ -574,3 +574,30 @@ fn judge_accepts_a_measured_miss_event() {
     assert_eq!(j["verdict"]["decision"], "permit");
     assert_eq!(j["verdict"]["subject"], cid);
 }
+
+/// Station 4 final review, ruling I2: the rule `sample` reads `reached` by is DECLARED in the
+/// contract (`evaluation.reached_rule`), so the method CID every receipt and fold pins moves when
+/// the ruler changes. `sample` reads nothing from the declaration — `carries_term` IS the rule —
+/// but the contract must say what it is, in the words the code keeps.
+#[test]
+fn the_contract_declares_the_rule_sample_reads_reached_by() {
+    let contract = Contract::load(&common::repo_root().join(recall::CONTRACT_REL))
+        .expect("the live contract loads");
+    let rule = &contract.value["evaluation"]["reached_rule"];
+    let terms = rule["terms"]
+        .as_str()
+        .unwrap_or_else(|| panic!("evaluation.reached_rule.terms is declared: {rule}"));
+    for clause in [
+        "underscore and hyphen",
+        "word-start",
+        "in order and adjacent",
+        "no plain-substring",
+    ] {
+        assert!(terms.contains(clause), "`{clause}` in {terms}");
+    }
+    assert_eq!(rule["since"], "v23", "{rule}");
+    assert!(
+        contract.value["version"].as_u64() >= Some(23),
+        "the declaration moved the contract to v23"
+    );
+}

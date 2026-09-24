@@ -774,6 +774,7 @@ fn status_without_a_fold_says_skipped() {
         "unreadable",
         "unusable",
         "last",
+        "truncated",
     ];
     expected.sort_unstable();
     assert_eq!(got, expected);
@@ -877,4 +878,137 @@ fn contract_v21_declares_the_fold_listing_budget_and_repins_the_bank() {
     contract
         .question_bank()
         .expect("every question is in scope of the v21 recipe");
+}
+
+// ── truncation is counted (station 4 final review, ruling I5) ─────────────────────────────────
+//
+// A chunk longer than the model's token window is embedded from its head only. The embedder says
+// how many texts of a reply it truncated (`Embedding::truncated`: `Some(n)`, or `None` when the
+// procedure does not count); the fold sums it into its report line (`truncated N chunks`) and into
+// the store's tally that `status --json` reads as `truncated`. A store any of whose chunks was
+// embedded by a procedure that does not count reads `null` — unknown, never a guessed zero.
+
+/// A stub fold procedure, pinned in `root`'s own model manifest (the model directory resolves to
+/// an empty directory the stub never reads): one unit vector per text, and — when `counts` — a
+/// `truncated` count of the texts carrying the word `LONG`, standing in for texts past the
+/// model's token window.
+fn pin_stub_procedure(root: &Path, counts: bool) {
+    use elohim_epr_cli::flow::memory::recall::embedder::{MODEL_MANIFEST_REL, PROCEDURE_REL};
+    let truncated = if counts {
+        ", \"truncated\": sum(1 for t in texts if \"LONG\" in t)"
+    } else {
+        ""
+    };
+    let body = format!(
+        "import json, sys\nrequest = json.loads(sys.stdin.read())\ntexts = request[\"texts\"]\n\
+         vectors = [[1.0] + [0.0] * 383 for _ in texts]\n\
+         print(json.dumps({{\"dims\": 384, \"vectors\": vectors{truncated}}}))\n"
+    );
+    common::write(root, PROCEDURE_REL, &body);
+    std::fs::create_dir_all(root.join("model")).unwrap();
+    let mut manifest = live(MODEL_MANIFEST_REL);
+    manifest["resolve"] = json!([root.join("model").to_string_lossy()]);
+    manifest["procedure"] = json!(eprfs_core::BlobCid::compute_raw(body.as_bytes()).to_string());
+    put_json(root, MODEL_MANIFEST_REL, &manifest);
+}
+
+fn pinned_fold(root: &Path) -> FoldReport {
+    fold_with(
+        root,
+        FoldOptions {
+            embedder: EmbedderChoice::Pinned,
+            ..FoldOptions::default()
+        },
+    )
+}
+
+fn pinned_status(root: &Path) -> Value {
+    index::status(root, EmbedderChoice::Pinned).expect("status reads")
+}
+
+#[test]
+fn the_fixture_fold_truncates_nothing_and_says_so() {
+    let dir = tree();
+    let root = dir.path();
+    let report = fold(root);
+    assert_eq!(report.truncated, Some(0));
+    assert_eq!(status(root)["truncated"], 0);
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args([
+            "flow",
+            "memory",
+            "index",
+            "fold",
+            "--embedder",
+            "fixture",
+            "--root",
+        ])
+        .arg(root)
+        .output()
+        .expect("epr runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("truncated   0 chunks"), "{stdout}");
+}
+
+#[test]
+fn a_counting_procedure_sums_its_truncation_into_status_and_the_report() {
+    let dir = tree();
+    let root = dir.path();
+    common::write(
+        root,
+        "genesis/long.md",
+        "# Long\nLONG text past the window.\n## Longer\nLONG again.\n",
+    );
+    pin_stub_procedure(root, true);
+    let report = pinned_fold(root);
+    assert_eq!(report.attestation.state, FoldState::Complete, "{report:?}");
+    assert_eq!(report.truncated, Some(2), "two chunks carry LONG");
+    assert_eq!(pinned_status(root)["truncated"], 2);
+
+    // A later fold adds its own count to the tally.
+    common::write(root, "genesis/beta.md", "# Beta\nLONG stewardship.\n");
+    let report = pinned_fold(root);
+    assert_eq!(report.truncated, Some(1));
+    assert_eq!(pinned_status(root)["truncated"], 3);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["flow", "memory", "index", "status", "--root"])
+        .arg(root)
+        .output()
+        .expect("epr runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("truncated   3 chunks"), "{stdout}");
+}
+
+#[test]
+fn a_store_embedded_by_a_procedure_that_does_not_count_reads_unknown() {
+    let dir = tree();
+    let root = dir.path();
+    pin_stub_procedure(root, false);
+    let report = pinned_fold(root);
+    assert_eq!(report.attestation.state, FoldState::Complete, "{report:?}");
+    assert_eq!(report.truncated, None, "the procedure did not count");
+    assert!(pinned_status(root)["truncated"].is_null());
+
+    // A store folded before its procedure counted — the live store's case — stays unknown under
+    // a counting fold: the chunks already folded were never counted, and the tally is no part of
+    // the store's identity (the store is reused, never rebuilt, for it).
+    let dir = tree();
+    let root = dir.path();
+    pin_stub_procedure(root, true);
+    assert_eq!(pinned_fold(root).truncated, Some(0));
+    let pinned = index::store_dir(root, &measure_cid(root), EmbedderChoice::Pinned);
+    rusqlite::Connection::open(pinned.join("fold.sqlite"))
+        .unwrap()
+        .execute("DELETE FROM meta WHERE key = 'truncated'", [])
+        .unwrap();
+    assert!(pinned_status(root)["truncated"].is_null());
+    common::write(root, "genesis/beta.md", "# Beta\nLONG stewardship.\n");
+    let report = pinned_fold(root);
+    assert_eq!(report.store, "reused");
+    assert_eq!(report.truncated, Some(1), "this run counted its own chunks");
+    assert!(
+        pinned_status(root)["truncated"].is_null(),
+        "the store's tally stays unknown"
+    );
 }

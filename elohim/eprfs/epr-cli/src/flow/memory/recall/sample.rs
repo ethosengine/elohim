@@ -281,8 +281,8 @@ pub(super) fn sample(
 
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     env.insert("reader".into(), reader_ref.clone());
-    env.insert("question".into(), question_id.clone());
-    env.insert("recipe".into(), method.to_string());
+    env.insert(note::SAMPLE_QUESTION_ENV_KEY.into(), question_id.clone());
+    env.insert(note::SAMPLE_METHOD_ENV_KEY.into(), method.to_string());
     env.insert("lens".into(), resolved_lens.cid.clone());
     // Fix round 1, F1 (controller ruling): the bound reads JOURNEYS, and this is what makes that
     // true rather than an approximation — every fold this journey writes names the journey's own

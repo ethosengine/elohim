@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 22,
+  "version": 23,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -46,8 +46,8 @@
   "method": [
     "Try declared source routes first; verify locators and current bytes.",
     "Read the packet sources before querying the semantic index.",
-    "If routes are absent or insufficient, make at most one semantic search per packet (search --provider semantic, limits.search_results; the fused first screen's own semantic call is part of the screen and does not consume the packet's explicit search): the native semantic provider ranks by cosine over the declared fold and prints its method CID and fold lag on every candidate; verify returned sources within that packet’s remaining file/byte budget. MemPalace is the declared visitor, a second opinion whose ranking, version and freshness are unknown, never the index. The lexical provider (FTS5 bm25 over the same fold) is declared and reachable by search --provider lexical, but is not yet in the first screen's fusion recipe, pending bank evidence.",
-    "Treat service ranking as candidate discovery, not authority; it may combine semantic and lexical scores. Record query, source locators and unknown ranking/version details.",
+    "If routes are absent or insufficient, make at most one semantic search per packet (search --provider semantic, limits.search_results; the fused first screen's own semantic call is part of the screen and does not consume the packet's explicit search): the native semantic provider ranks by cosine over the declared fold and prints its method CID and fold lag on every candidate; verify returned sources within that packet’s remaining file/byte budget. MemPalace is the declared visitor, a second opinion whose ranking, version and freshness are unknown, never the index. The lexical provider (FTS5 bm25 over the same fold) is declared and reachable by search --provider lexical; the first screen's fusion recipe does not include it.",
+    "Treat service ranking as candidate discovery, not authority; ranks from several producers fuse for order only, under the declared fusion recipe, and no scores are combined. Record query, source locators and unknown ranking/version details.",
     "If useful evidence does not fit this packet, report its unresolved frontier. Autonomously open another focused packet with an explicit evidence question when expected value justifies it; carry cumulative cost forward and do not reset accounting to conceal repeated fruitless searches.",
     "An open with no --intent adopts the caller's own --need as the session intent: the question the agent actually carried is what every later operation, receipt and finish is accounted against. An explicit --intent still wins.",
     "Use native scoped reconciliation for current evidence; never infer acceptance from a test, date, similarity score or checkbox.",
@@ -79,7 +79,11 @@
       "tokens if actually metered; otherwise unknown",
       "subsequent implementation rework if observed; otherwise unknown"
     ],
-    "acceptance": "Independent reader judges answer fitness. Budget compliance alone is not semantic correctness or stasis."
+    "acceptance": "Independent reader judges answer fitness. Budget compliance alone is not semantic correctness or stasis.",
+    "reached_rule": {
+      "terms": "A bank question is reached when the passage read at its first located candidate's linked lines carries every one of its reached_when.terms, read as identifier words: both sides lower-cased, underscore and hyphen read as word breaks, whitespace collapsed (case folds, camelCase is not split); each term must begin a word in the passage (word-start match: the character before it is not alphanumeric, an inflection still matches at the tail); a multi-word term matches in order and adjacent; no plain-substring fallback, so a fragment inside another word never counts.",
+      "since": "v23"
+    }
   },
   "cases": {
     "native-reconciliation": {

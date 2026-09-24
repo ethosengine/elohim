@@ -333,6 +333,18 @@ struct Store {
     conn: Connection,
 }
 
+/// The store's running count of chunks embedded from a truncated head (past the model's token
+/// window), in `meta` beside the identity rows but no part of the identity. Present only while
+/// every chunk the store ever embedded was counted: a fold by a procedure that does not count
+/// removes it, and nothing puts it back short of a new store (station 4 final review, ruling I5).
+const TRUNCATED_META_KEY: &str = "truncated";
+
+/// A store's meta rows without the truncation tally — what identity comparisons read.
+fn identity(mut meta: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    meta.remove(TRUNCATED_META_KEY);
+    meta
+}
+
 /// The identity a store was built under; any difference is a different fold.
 fn meta_rows(declared: &Declared, embedder: &str) -> BTreeMap<String, String> {
     [
@@ -420,7 +432,7 @@ impl Store {
         let wanted = meta_rows(declared, embedder);
         let why = match Self::open_existing(path, declared, false) {
             Ok(None) => None,
-            Ok(Some(store)) => match store.meta() {
+            Ok(Some(store)) => match store.meta().map(identity) {
                 Ok(meta) if meta == wanted => return Ok((store, "reused".into())),
                 Ok(_) => Some("store was folded under another procedure".to_string()),
                 Err(error) => Some(error.to_string()),
@@ -443,7 +455,9 @@ impl Store {
         conn.busy_timeout(BUSY_TIMEOUT).map_err(db)?;
         let tx = conn.transaction().map_err(db)?;
         tx.execute_batch(SCHEMA).map_err(db)?;
-        for (key, value) in &wanted {
+        // A new store has embedded nothing yet: its tally starts known, at zero.
+        let tally = (TRUNCATED_META_KEY.to_string(), "0".to_string());
+        for (key, value) in wanted.iter().chain([(&tally.0, &tally.1)]) {
             tx.execute(
                 "INSERT INTO meta (key, value) VALUES (?1, ?2)",
                 params![key, value],
@@ -578,6 +592,9 @@ pub struct FoldReport {
     pub unreadable: usize,
     /// Chunks past `max_chunks_per_file`, dropped and counted.
     pub dropped_chunks: usize,
+    /// Chunks this run embedded from a truncated head (longer than the model's token window);
+    /// `None` when the embedding procedure does not count.
+    pub truncated: Option<usize>,
     /// Files still behind after this run; `None` when the fold failed before measuring.
     pub lag: Option<usize>,
     pub attestation: FoldAttestation,
@@ -721,6 +738,7 @@ pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldRun> {
         embedder: String::new(),
         folded: Vec::new(),
         embedded_chunks: 0,
+        truncated: Some(0),
         demoted: Vec::new(),
         skipped: Vec::new(),
         unreadable: 0,
@@ -894,6 +912,8 @@ impl Run<'_> {
         let dims = declared.dims();
         let embedded = EmbedBudget::fold(&declared.contract).and_then(|budget| {
             let mut vectors = Vec::with_capacity(pending.len());
+            // Known only while every batch counted.
+            let mut truncated = Some(0usize);
             let texts: Vec<String> = pending.iter().map(|p| p.text.clone()).collect();
             for batch in texts.chunks(budget.texts) {
                 let reply = embedder.embed(batch, budget)?;
@@ -903,12 +923,16 @@ impl Run<'_> {
                         reply.dims
                     )));
                 }
+                truncated = truncated.zip(reply.truncated).map(|(sum, n)| sum + n);
                 vectors.extend(reply.vectors);
             }
-            Ok(vectors)
+            Ok((vectors, truncated))
         });
         let vectors = match embedded {
-            Ok(vectors) => vectors,
+            Ok((vectors, truncated)) => {
+                report.truncated = truncated;
+                vectors
+            }
             Err(error) => {
                 report.lag = Some(plan.lag());
                 let why = error.to_string();
@@ -970,6 +994,22 @@ impl Run<'_> {
             )
             .map_err(db)?;
         }
+        // The store's tally: this run's count added while every chunk so far was counted; an
+        // uncounted run makes it unknown for good.
+        match report.truncated {
+            Some(n) => tx
+                .execute(
+                    "UPDATE meta SET value = CAST(value AS INTEGER) + ?2 WHERE key = ?1",
+                    params![TRUNCATED_META_KEY, n as i64],
+                )
+                .map_err(db)?,
+            None => tx
+                .execute(
+                    "DELETE FROM meta WHERE key = ?1",
+                    params![TRUNCATED_META_KEY],
+                )
+                .map_err(db)?,
+        };
         for (path, size, mtime_ns) in &plan.restat {
             tx.execute(
                 "UPDATE files SET size = ?2, mtime_ns = ?3 WHERE path = ?1",
@@ -1069,9 +1109,11 @@ impl SemanticFold {
             Ok(None) => return Err(Absent::NoFold),
             Err(why) => return Err(Absent::Unreadable(why)),
         };
-        let mut meta = store
-            .meta()
-            .map_err(|error| Absent::Unreadable(error.to_string()))?;
+        let mut meta = identity(
+            store
+                .meta()
+                .map_err(|error| Absent::Unreadable(error.to_string()))?,
+        );
         let built_by = meta.remove("embedder").unwrap_or_default();
         let mut wanted = meta_rows(&self.declared, "");
         wanted.remove("embedder");
@@ -1242,6 +1284,7 @@ pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
         "unreadable": Value::Null,
         "unusable": Value::Null,
         "last": last.unwrap_or(Value::Null),
+        "truncated": Value::Null,
     });
     let store = match Store::open_existing(&dir.join(STORE_FILE), &declared, true) {
         Ok(store) => store,
@@ -1263,6 +1306,10 @@ pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
             .map_err(|why| FlowError::Unavailable(format!("fold source: {why}")))?;
         view["lag"] = json!(plan.lag());
         view["unreadable"] = json!(plan.unreadable);
+        view["truncated"] = json!(store
+            .meta()?
+            .get(TRUNCATED_META_KEY)
+            .and_then(|n| n.parse::<u64>().ok()));
     }
     Ok(view)
 }
@@ -1287,10 +1334,18 @@ fn render_status(view: &Value, declared_lag: &str) -> String {
             None => "skipped — no fold".to_string(),
         },
     };
+    let truncated = match view["truncated"].as_u64() {
+        Some(n) => format!("truncated   {n} chunks past the model's token window\n"),
+        None if view["lag"].is_u64() => {
+            "truncated   unknown — a procedure that does not count folded part of this store\n"
+                .to_string()
+        }
+        None => String::new(),
+    };
     format!(
         "index status\nmeasure     {}\nembedder    {} ({} source)\nmodel       {}\n\
-         chunk rule  {}\nfold        {} chunks, {} demoted, {} bytes\nlag         {lag}\n\
-         last        {last}\n",
+         chunk rule  {}\nfold        {} chunks, {} demoted, {} bytes\n{truncated}\
+         lag         {lag}\nlast        {last}\n",
         view["measure"].as_str().unwrap_or_default(),
         view["embedder"].as_str().unwrap_or_default(),
         view["source"].as_str().unwrap_or_default(),
@@ -1342,6 +1397,10 @@ fn render_fold(report: &FoldReport, declared_lag: &str) -> FlowResult<String> {
             out += &format!("{label:<11} {count} {what}\n");
         }
     }
+    out += &match report.truncated {
+        Some(n) => format!("truncated   {n} chunks past the model's token window\n"),
+        None => "truncated   unknown — the embedding procedure does not count\n".to_string(),
+    };
     if let Some(lag) = report.lag {
         out += &format!("lag         {lag} files behind ({declared_lag})\n");
     }

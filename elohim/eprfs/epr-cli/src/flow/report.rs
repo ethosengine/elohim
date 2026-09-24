@@ -37,7 +37,7 @@
 //! stays distinct because `skipped` has no honest spelling in a five-valued gate enum, and
 //! collapsing it onto `info` is precisely the "unmeasured reads as fine" failure.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -50,7 +50,7 @@ use super::measures::{
 };
 use super::note::{
     normalize_subject, ENV_SLOT_PREFIX, JOURNEY_ENV_KEY, MEASURE_SLOT_PREFIX, REPO_SUBJECT,
-    UNIT_SLOT_PREFIX, VALUE_SLOT_PREFIX,
+    SAMPLE_METHOD_ENV_KEY, SAMPLE_QUESTION_ENV_KEY, UNIT_SLOT_PREFIX, VALUE_SLOT_PREFIX,
 };
 use super::{short_cid, FlowError, FlowResult};
 use crate::report::{Finding, FindingStatus};
@@ -1618,6 +1618,25 @@ fn evaluate_rate_over_window(
             .unwrap_or(fold.cid.as_str());
         journeys.entry(key).or_default().push(fold);
     }
+    let collapsed = collapse_repeated_samples(&mut journeys);
+    // The folds of a collapsed journey leave the count with it.
+    let kept: BTreeSet<&str> = journeys
+        .values()
+        .flatten()
+        .map(|fold| fold.cid.as_str())
+        .collect();
+    let windowed: Vec<&Fold> = windowed
+        .into_iter()
+        .filter(|fold| kept.contains(fold.cid.as_str()))
+        .collect();
+    let collapsed_note = if collapsed > 0 {
+        format!(
+            " ({collapsed} repeated sample journey{} collapsed)",
+            if collapsed == 1 { "" } else { "s" }
+        )
+    } else {
+        String::new()
+    };
 
     if journeys.len() < 3 {
         return BoundOutcome {
@@ -1626,7 +1645,7 @@ fn evaluate_rate_over_window(
             subject,
             outcome: OutcomeStatus::Skipped,
             summary: format!(
-                "fewer than 3 journeys in window — {} journeys ({} folds) in the last {} days{fallback_note}{}",
+                "fewer than 3 journeys in window — {} journeys ({} folds) in the last {} days{collapsed_note}{fallback_note}{}",
                 journeys.len(),
                 windowed.len(),
                 trim_number(window_days),
@@ -1656,7 +1675,7 @@ fn evaluate_rate_over_window(
     let observed = positive as f64 / journeys.len() as f64;
 
     let basis = format!(
-        "{positive} of {} journeys ({} folds) in the last {} days{fallback_note}",
+        "{positive} of {} journeys ({} folds) in the last {} days{collapsed_note}{fallback_note}",
         journeys.len(),
         windowed.len(),
         trim_number(window_days)
@@ -1692,6 +1711,49 @@ fn evaluate_rate_over_window(
         contributing_folds: Some(windowed.len()),
         recipe: recipe.clone(),
     }
+}
+
+/// Station 4 final review, ruling I1: a `recall sample` journey is DETERMINISTIC — the same bank
+/// question under the same method CID walks the same route — so re-running it mints a new journey
+/// that is not new evidence about the window. A journey whose folds carry the journey slot, the
+/// question id and the method CID (`note::SAMPLE_QUESTION_ENV_KEY`, `note::SAMPLE_METHOD_ENV_KEY`
+/// — what `sample` writes) counts at most once per (question, method): the LATEST such journey
+/// (its newest fold by `(occurred_at, seq)`) stands for the pair and the older ones leave the
+/// population. Any other journey — free-form, hand-written, or missing either slot — is never
+/// collapsed. Returns how many journeys were removed.
+fn collapse_repeated_samples(journeys: &mut BTreeMap<&str, Vec<&Fold>>) -> usize {
+    let sample_of = |group: &[&Fold]| -> Option<(String, String)> {
+        group.iter().find_map(|fold| {
+            fold.env.get(JOURNEY_ENV_KEY)?;
+            Some((
+                fold.env.get(SAMPLE_QUESTION_ENV_KEY)?.clone(),
+                fold.env.get(SAMPLE_METHOD_ENV_KEY)?.clone(),
+            ))
+        })
+    };
+    let newest = |group: &[&Fold]| -> Option<(String, usize)> {
+        group
+            .iter()
+            .map(|fold| (fold.occurred_at.clone(), fold.seq))
+            .max()
+    };
+    // (question, method) → the journey key standing for it and that journey's newest fold.
+    let mut standing: BTreeMap<(String, String), (String, (String, usize))> = BTreeMap::new();
+    for (key, group) in journeys.iter() {
+        let (Some(pair), Some(at)) = (sample_of(group), newest(group)) else {
+            continue;
+        };
+        let later = standing.get(&pair).is_none_or(|(_, held)| at > *held);
+        if later {
+            standing.insert(pair, (key.to_string(), at));
+        }
+    }
+    let before = journeys.len();
+    journeys.retain(|key, group| match sample_of(group) {
+        Some(pair) => standing.get(&pair).is_some_and(|(kept, _)| kept == key),
+        None => true,
+    });
+    before - journeys.len()
 }
 
 /// Whether a fold's `occurred_at` falls on or after `cutoff` — an unparseable timestamp is

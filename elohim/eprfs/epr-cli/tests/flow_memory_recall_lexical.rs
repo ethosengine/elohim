@@ -712,9 +712,12 @@ fn a_three_producer_recipe_fuses_the_lexical_order() {
     fold(root);
     let need = "orbit launch daemon";
     let lexical = ask_in(root, need, "genesis");
+    // Ruling I4 (final review): the provider itself withholds the register, before any fusion.
     assert!(
-        paths(&lexical["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string()),
-        "precondition: the lexical route ranks the register: {lexical}"
+        !paths(&lexical["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string())
+            && lines(&lexical["omissions"])
+                .contains(&"1 non-authority hit(s) withheld".to_string()),
+        "precondition: the lexical route found the register and withheld it: {lexical}"
     );
 
     let mut value = contract(root).value;
@@ -815,10 +818,14 @@ fn contract_v22_declares_lexical_outside_the_fusion_recipe() {
         json!(["local", "semantic"]),
         "lexical is declared, not fused"
     );
+    // v23 (final review): the prose is state-free — it says what the recipe holds, and that ranks
+    // fuse for order only with no score combined.
     let method_lines = value["method"].to_string();
     assert!(
         method_lines.contains("search --provider lexical")
-            && method_lines.contains("not yet in the first screen's fusion recipe"),
+            && method_lines.contains("the first screen's fusion recipe does not include it")
+            && method_lines.contains("no scores are combined")
+            && !method_lines.contains("may combine semantic and lexical scores"),
         "{method_lines}"
     );
     let method = contract.method_cid();
@@ -880,4 +887,86 @@ fn search_provider_lexical_answers_under_the_live_declaration() {
     let first = &retrieval["candidates"][0];
     assert_eq!(first["producer"], "lexical", "{first}");
     assert_eq!(first["method"], json!(cid_of(root, LEXICAL_REL)), "{first}");
+}
+
+/// Station 4 final review, ruling I4: a lexical hit on the question bank never appears in
+/// `search --provider lexical` — the same first-screen offer rule, applied inside the provider —
+/// and is counted in one omission line. A contract copy naming another bank offers this file (the
+/// precondition that it would rank at all).
+#[test]
+fn search_provider_lexical_never_offers_the_question_bank() {
+    let dir = tree();
+    let root = dir.path();
+    let bank = contract(root).value["question_bank"]
+        .as_str()
+        .expect("the live contract names its bank")
+        .to_string();
+    let mut surface: Vec<Value> = SURFACE.iter().map(|p| json!(p)).collect();
+    surface.push(json!(bank));
+    for rel in [FOLD_REL, LEXICAL_REL] {
+        let mut measure = live(rel);
+        measure["surfaces"]["paths"] = json!(surface);
+        put_json(root, rel, &measure);
+    }
+    common::write(
+        root,
+        &bank,
+        "{\"question\": \"which quasar nebula pulsar is it\"}\n",
+    );
+    commit(root);
+    fold(root);
+
+    let mut elsewhere = contract(root).value;
+    elsewhere["question_bank"] = json!("genesis/exam.json");
+    let elsewhere = Contract::from_value(elsewhere).expect("a valid contract copy");
+    let offered = retrieve(
+        root,
+        &elsewhere,
+        "lexical",
+        "quasar nebula pulsar",
+        ".",
+        &[],
+        &[],
+    )
+    .expect("an honest answer");
+    assert!(
+        paths(&offered["candidates"]).contains(&bank),
+        "precondition: the lexical route ranks the bank when it is not the bank: {offered}"
+    );
+
+    let (code, stdout, stderr) = cli_with(
+        root,
+        CONTRACT_REL,
+        "bank",
+        &["open", "--intent", "Find the sky notes"],
+        &[],
+    );
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    let (code, stdout, stderr) = cli_with(
+        root,
+        CONTRACT_REL,
+        "bank",
+        &[
+            "search",
+            "--provider",
+            "lexical",
+            "--query",
+            "quasar nebula pulsar",
+            "--search-scope",
+            ".",
+            "--json",
+        ],
+        &[],
+    );
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    let view: Value = serde_json::from_str(&stdout).expect("json");
+    let retrieval = &view["retrieval"];
+    assert_eq!(retrieval["ranking_known"], true, "{view}");
+    let found = paths(&retrieval["candidates"]);
+    assert!(found.contains(&"genesis/sky.md".to_string()), "{view}");
+    assert!(!found.contains(&bank), "{view}");
+    assert!(
+        lines(&retrieval["omissions"]).contains(&"1 non-authority hit(s) withheld".to_string()),
+        "{view}"
+    );
 }

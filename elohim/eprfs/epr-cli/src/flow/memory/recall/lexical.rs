@@ -34,7 +34,7 @@
 //! false` — through `retrieve()` and the `Provider` seam alike. A stale fold answers and says how
 //! stale (`fold N files behind`). This route never spawns an embedding process: BM25 reads the
 //! chunk text, which is the same whichever embedder folded it.
-use super::discovery::{question_terms, stem};
+use super::discovery::{offered_on_first_screen, question_terms, stem};
 use super::embedder::FIXTURE_FITNESS;
 use super::index::{Absent, EmbedderChoice, FoldReader, LexicalMeasure, SemanticFold};
 use super::providers::{lines, scope_string, Provider, ProviderId, ProviderResult};
@@ -236,12 +236,18 @@ fn answer_into(
     let limit = contract.limit_usize("search_results").max(1);
     let roots = contract.source_roots();
     let mut candidates: Vec<Value> = Vec::new();
-    let mut outside = 0usize;
+    let (mut outside, mut withheld) = (0usize, 0usize);
     let ranked = best.ranked();
     answer["usage"]["lexical_query_ms"] = json!(query_began.elapsed().as_millis() as u64);
     for hit in ranked {
         if candidates.len() >= limit {
             break;
+        }
+        // The question bank and the generated register are never an answer, on any screen a
+        // provider feeds (the first-screen offer rule, one predicate for every route).
+        if !offered_on_first_screen(contract, &hit.path) {
+            withheld += 1;
+            continue;
         }
         if !root.join(&hit.path).is_file() {
             omissions.push(format!("{}: folded file no longer present", hit.path));
@@ -279,6 +285,9 @@ fn answer_into(
             "{outside} ranked file(s) lie outside the recipe's declared source roots and were \
              passed over"
         ));
+    }
+    if withheld > 0 {
+        omissions.push(format!("{withheld} non-authority hit(s) withheld"));
     }
     answer["candidates"] = json!(candidates);
     answer["omissions"] = json!(omissions);

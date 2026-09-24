@@ -16,7 +16,9 @@
 //!    search;
 //! 4. each candidate prints `producer`, the measure CID as `method`, the `model`, the fold's lag at
 //!    answer time and a `best_section` in the first screen's shape, so its linked `read` lands on
-//!    the passage.
+//!    the passage; the answer names the embedding `procedure` (the CID the model manifest pins)
+//!    and the label the store was folded under (`built_by`), so a candidate list names the exact
+//!    procedure behind its vectors.
 //!
 //! The vector scan reads a DERIVED store: it is reported in `usage` (`semantic_chunks_scanned`,
 //! `semantic_query_ms`, `provider_seconds`, and `embedding_processes` when an embedding process
@@ -30,8 +32,8 @@
 //! sees an absent route, never a known empty ranking. A stale fold answers
 //! and says how stale (`fold N files behind`). The private chain never reaches this file: the
 //! fold excluded it, and this route reads nothing but the store and the outline of a candidate.
-use super::discovery::question_terms;
-use super::embedder::{EmbedBudget, FIXTURE_FITNESS};
+use super::discovery::{offered_on_first_screen, question_terms};
+use super::embedder::{EmbedBudget, ModelManifest, FIXTURE_FITNESS, MODEL_MANIFEST_REL};
 use super::index::{Absent, EmbedderChoice, FoldReader, SemanticFold};
 use super::passage::{outline_at, section_link};
 use super::providers::lines;
@@ -277,6 +279,8 @@ pub(super) fn search(
         "method": Value::Null,
         "model": Value::Null,
         "embedder": Value::Null,
+        "procedure": Value::Null,
+        "built_by": Value::Null,
         "fold_lag": Value::Null,
         "scope": scope,
         "selection": SELECTION,
@@ -328,7 +332,14 @@ fn answer_into(
     let choice = choice?;
     answer["embedder"] = json!(choice.name());
     let model = match choice {
-        EmbedderChoice::Pinned => json!(fold.model()),
+        EmbedderChoice::Pinned => {
+            // The exact embedding procedure the ranking rests on: the CID the model manifest pins
+            // (a manifest that does not load names none; the embedder then answers why).
+            answer["procedure"] = json!(ModelManifest::load(&root.join(MODEL_MANIFEST_REL))
+                .ok()
+                .and_then(|manifest| manifest.procedure));
+            json!(fold.model())
+        }
         EmbedderChoice::Fixture => {
             answer["fitness"] = json!(FIXTURE_FITNESS);
             Value::Null
@@ -336,6 +347,7 @@ fn answer_into(
     };
     answer["model"] = model.clone();
     let reader: FoldReader = fold.open(root).map_err(absent)?;
+    answer["built_by"] = json!(reader.built_by());
     if query.trim().is_empty() {
         return Err("semantic: no question text to embed; name --query or --need".into());
     }
@@ -423,13 +435,19 @@ fn answer_into(
     let terms = question_terms(contract, query);
     let roots = contract.source_roots();
     let mut candidates: Vec<Value> = Vec::new();
-    let (mut outside, mut unranked) = (0usize, 0usize);
+    let (mut outside, mut unranked, mut withheld) = (0usize, 0usize, 0usize);
     for hit in best.ranked() {
         if candidates.len() >= limit {
             break;
         }
         if hit.score <= 0.0 {
             unranked += 1;
+            continue;
+        }
+        // The question bank and the generated register are never an answer, on any screen a
+        // provider feeds (the first-screen offer rule, one predicate for every route).
+        if !offered_on_first_screen(contract, &hit.path) {
+            withheld += 1;
             continue;
         }
         if !root.join(&hit.path).is_file() {
@@ -469,6 +487,9 @@ fn answer_into(
             "{outside} ranked file(s) lie outside the recipe's declared source roots and were \
              passed over"
         ));
+    }
+    if withheld > 0 {
+        omissions.push(format!("{withheld} non-authority hit(s) withheld"));
     }
     if unranked > 0 {
         omissions.push(format!(

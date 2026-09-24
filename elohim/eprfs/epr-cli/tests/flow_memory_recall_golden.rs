@@ -100,8 +100,8 @@ fn digest(s: &str) -> String {
 // `recipe` CID (`Contract::method_cid()` over the WHOLE contract's bytes), so any contract edit
 // moves GOLDEN_FOCUSED and GOLDEN_WHOLE. GOLDEN_REFUSAL has never moved: a refusal never reaches
 // `render()`'s orientation/lens/floor preamble, so it never prints a `recipe` line.
-const GOLDEN_FOCUSED: &str = "f4b05a76057fdeb31ea5fd8df1c428ff6df7ff45b0520ee8917efcfa09292124";
-const GOLDEN_WHOLE: &str = "431796e6858934c0691ce6fcaa2cde82947af0bb7addb8967a6ea060340bd34d";
+const GOLDEN_FOCUSED: &str = "a906ece4cc9deefe2d6d225bb87fd2fa8af07469703bdc5b2a9ead0e9143addb";
+const GOLDEN_WHOLE: &str = "c699e6c51116998f4fa43b2f0037e707132cae6c3c55c1fbaabbcbcce1b5c8e5";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

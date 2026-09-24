@@ -551,6 +551,10 @@ _gate-memory-ceremony:
     # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
     # out-of-process artefacts); the Python suite and its scripts are gone.
     cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test flow_memory_recall_golden --test flow_memory_recall_lens --test flow_memory_recall_sample --test flow_report --test flow_report_fold_lag
+    # Governed-discovery station 4 (final review, ruling I3): the native semantic provider's own
+    # suites — the fold, the semantic and lexical routes, first-screen fusion, the pinned embedder
+    # and the index declarations — run in the gate that covers the station.
+    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall_fold --test flow_memory_recall_semantic --test flow_memory_recall_fusion --test flow_memory_recall_lexical --test flow_memory_recall_embedder --test flow_memory_recall_index
     # Station four (2026-09-10): the memory-index projection router and the relocated memory
     # lenses. Station six round (b) (2026-09-11) removed the kit leg from every hook, so these
     # now pin the INVERTED contract: a drift signal is a fold and only a fold, and the index

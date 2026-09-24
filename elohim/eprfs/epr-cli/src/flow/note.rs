@@ -139,6 +139,14 @@ pub(crate) const ENV_SLOT_PREFIX: &str = "env:";
 /// key two ways.
 pub(crate) const JOURNEY_ENV_KEY: &str = "journey";
 
+/// The `env:` keys naming WHAT a `recall sample` journey sampled and UNDER WHICH METHOD: the bank
+/// question's id and the recall contract's method CID. `recall::sample` writes both on every fold
+/// of a journey (and `recall::judge` carries them onto its own); `report::evaluate_rate_over_window`
+/// reads them to count a deterministic sample journey at most once per (question, method) in its
+/// window (station 4 final review, ruling I1). One home, so the writer and the reader agree.
+pub(crate) const SAMPLE_QUESTION_ENV_KEY: &str = "question";
+pub(crate) const SAMPLE_METHOD_ENV_KEY: &str = "recipe";
+
 /// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
 /// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
 /// a repository that never had one has written a record of having looked.

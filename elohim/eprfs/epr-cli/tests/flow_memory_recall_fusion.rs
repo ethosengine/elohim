@@ -792,9 +792,12 @@ fn a_semantic_hit_on_the_habit_register_never_reaches_the_fused_screen() {
     fold(root);
     let semantic = retrieve(root, &contract(root), "semantic", NEED, "genesis", &[], &[])
         .expect("an honest answer");
+    // Ruling I4 (final review): the provider itself withholds the register, before any fusion.
     assert!(
-        paths(&semantic["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string()),
-        "precondition: the semantic route ranks the register: {semantic}"
+        !paths(&semantic["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string())
+            && lines(&semantic["omissions"])
+                .contains(&"1 non-authority hit(s) withheld".to_string()),
+        "precondition: the semantic route found the register and withheld it: {semantic}"
     );
     let view = focused(root, "register");
     let screen = &view["first_screen"];
@@ -912,10 +915,14 @@ fn the_question_bank_never_reaches_a_fused_screen() {
     );
     let semantic = retrieve(root, &contract(root), "semantic", NEED, scope, &[], &[])
         .expect("an honest answer");
+    // Ruling I4 (final review): the provider itself withholds the bank and offers the other.
     let ranked = paths(&semantic["candidates"]);
     assert!(
-        ranked.contains(&BANK_REL.to_string()) && ranked.contains(&exam.to_string()),
-        "precondition: the semantic route ranks both: {semantic}"
+        !ranked.contains(&BANK_REL.to_string())
+            && ranked.contains(&exam.to_string())
+            && lines(&semantic["omissions"])
+                .contains(&"1 non-authority hit(s) withheld".to_string()),
+        "precondition: the semantic route withholds the bank and ranks the other: {semantic}"
     );
 
     let view = open_json(root, "bank", &["--need", NEED, "--scope", scope]);

@@ -183,3 +183,7 @@ Focused and whole open re-baselined for the fixture contract CID alone (bafkreie
 ## 2026-09-24 — contract v22 (station 4 integration: `ceremony.providers.lexical` declared, not fused; the question bank never offered; a fused candidate's passage follows the ranking producer)
 
 Focused and whole open re-baselined for the fixture contract CID alone (bafkreic…jbrm → bafkreib…papm); substituting the previous CID back into each new rendering reproduces `dd29eba6…` and `6ed2f87c…` byte for byte. Neither fixture renders a fused candidate (the whole open's semantic route is absent), so the new `passage by <producer> #n` segment moves no pinned line. The refusal digest is unchanged.
+
+## 2026-09-24 — contract v23 (station 4 final review: `evaluation.reached_rule` declared; `method[2]`/`method[3]` reworded state-free)
+
+Focused and whole open re-baselined for the fixture contract CID alone (bafkreib…papm → bafkreia…vghu); substituting the previous CID back into each new rendering reproduces `f4b05a76…` and `431796e6…` byte for byte. The refusal digest is unchanged.

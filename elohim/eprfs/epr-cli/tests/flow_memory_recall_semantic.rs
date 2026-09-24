@@ -652,3 +652,95 @@ fn search_provider_semantic_answers_through_the_cli() {
     );
     assert!(view["usage"]["semantic_chunks_scanned"].as_u64().unwrap() > 0);
 }
+
+/// Station 4 final review, ruling I4: the question bank is the exam sheet, never an answer — on
+/// any screen a provider feeds, not only the fused first screen. A semantic hit on the file the
+/// contract's `question_bank` names never appears in `search --provider semantic`; it is counted in
+/// one omission line. The rule reads the contract: a copy whose `question_bank` names another file
+/// offers this one (the precondition that it would rank at all).
+#[test]
+fn search_provider_semantic_never_offers_the_question_bank() {
+    let dir = tree("fixture");
+    let root = dir.path();
+    let bank = contract(root).value["question_bank"]
+        .as_str()
+        .expect("the live contract names its bank")
+        .to_string();
+    let mut measure = live(MEASURE_REL);
+    let mut surface: Vec<Value> = SURFACE.iter().map(|p| json!(p)).collect();
+    surface.push(json!(bank));
+    measure["surfaces"]["paths"] = json!(surface);
+    put_json(root, MEASURE_REL, &measure);
+    common::write(root, &bank, "{\"question\": \"who can fix a bug now\"}\n");
+    fold(root);
+    common::git(root, &["init", "-q"]);
+    common::git(root, &["add", "-A"]);
+    common::git(root, &["commit", "-qm", "fixture"]);
+
+    let mut elsewhere = contract(root).value;
+    elsewhere["question_bank"] = json!("genesis/exam.json");
+    let elsewhere = Contract::from_value(elsewhere).expect("a valid contract copy");
+    let offered = retrieve(root, &elsewhere, "semantic", SHORT_WORDED, ".", &[], &[])
+        .expect("an honest answer");
+    assert!(
+        paths(&offered).contains(&bank),
+        "precondition: the semantic route ranks the bank when it is not the bank: {offered}"
+    );
+
+    let (code, opened) = cli(root, &["open", "--intent", "Find who fixes bugs"]);
+    assert_eq!(code, Some(0), "{opened}");
+    let (code, stdout) = cli(
+        root,
+        &[
+            "search",
+            "--provider",
+            "semantic",
+            "--query",
+            SHORT_WORDED,
+            "--search-scope",
+            ".",
+        ],
+    );
+    assert_eq!(code, Some(0), "{stdout}");
+    let view: Value = serde_json::from_str(&stdout).expect("json");
+    let retrieval = &view["retrieval"];
+    assert_eq!(retrieval["ranking_known"], true, "{view}");
+    assert!(!paths(retrieval).contains(&bank), "{view}");
+    assert!(
+        !stdout.contains(&format!("--path {bank}")) && !stdout.contains(&format!("\"{bank}\"")),
+        "the bank is named nowhere in the answer: {stdout}"
+    );
+    assert!(
+        omissions(retrieval).contains(&"1 non-authority hit(s) withheld".to_string()),
+        "{view}"
+    );
+}
+
+/// Station 4 final review, minor m1: the answer names the exact embedding procedure its ranking
+/// rests on — `procedure` (the CID the model manifest pins) and `built_by` (the label the store
+/// was folded under) — so a candidate list, and a `recall-bank-reach@1` fold that cites it, can
+/// say which procedure produced the vectors. The fixture names no procedure.
+#[test]
+fn the_answer_names_its_embedding_procedure() {
+    use elohim_epr_cli::flow::memory::recall::embedder::{MODEL_MANIFEST_REL, PROCEDURE_REL};
+    let dir = tree("fixture");
+    let root = dir.path();
+    fold(root);
+    let answer = ask(root, SHORT_WORDED);
+    assert_eq!(answer["ranking_known"], true, "{answer}");
+    assert_eq!(answer["built_by"], "fixture", "{answer}");
+    assert_eq!(answer["procedure"], Value::Null, "{answer}");
+
+    let dir = tree("pinned");
+    let root = dir.path();
+    fold(root);
+    pinned_store_from_fixture(root, Some(&pinned_label()));
+    let procedure = root.join(PROCEDURE_REL);
+    std::fs::create_dir_all(procedure.parent().unwrap()).unwrap();
+    std::fs::copy(common::repo_root().join(PROCEDURE_REL), &procedure).unwrap();
+    let answer = ask(root, SHORT_WORDED);
+    let pinned = live(MODEL_MANIFEST_REL)["procedure"].clone();
+    assert!(pinned.is_string(), "the live manifest pins a procedure");
+    assert_eq!(answer["procedure"], pinned, "{answer}");
+    assert_eq!(answer["built_by"], json!(pinned_label()), "{answer}");
+}
