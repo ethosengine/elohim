@@ -1,0 +1,92 @@
+{
+  "$id": "epr:schema:view:observation-stream",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObservationStreamView",
+  "description": "Source of truth: the requester's own agent-private observations on their node (the observations projection of their append-only log, Private, Category B); this view is rendered per request from those rows and never persisted (Operational, Category C). Response to GET /api/v1/observations/stream?asOf&window&lens&kind — the person's own lifestream, arranged by the observation-lifestream recipe (audience self: only rows whose observer is the requester). recipe names the recipe and its content address so the page prints its provenance. omissions are named lines for what the view could not show or vouch for: the absent signature, rows outside the window, payloads that did not parse.",
+  "type": "object",
+  "required": ["asOf", "window", "recipe", "lens", "entries", "omissions", "totalCount"],
+  "additionalProperties": false,
+  "properties": {
+    "asOf": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix epoch seconds the window ends at."
+    },
+    "window": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*[dh]$",
+      "description": "How far back from asOf the view reaches: N days (Nd) or N hours (Nh)."
+    },
+    "recipe": { "$ref": "#/$defs/recipeRef" },
+    "lens": {
+      "type": "string",
+      "description": "The recipe lens applied — a key of the recipe's lens table (all, content, long-dwell)."
+    },
+    "entries": {
+      "type": "array",
+      "description": "The requester's own observations inside the window, ranked by the recipe: newest first, then longest dwell.",
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "omissions": {
+      "type": "array",
+      "description": "One named line per omission, e.g. 'signature: absent — …'. Present even when empty.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "totalCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many of the requester's observations the lens selected before the window; entries never exceed it."
+    }
+  },
+  "$defs": {
+    "recipeRef": {
+      "title": "RecipeRefView",
+      "type": "object",
+      "description": "The recipe the view was rendered through.",
+      "required": ["name", "cid"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "The recipe id, e.g. observation-lifestream." },
+        "cid": {
+          "type": "string",
+          "pattern": "^blake3:[0-9a-f]{64}$",
+          "description": "BLAKE3 over the recipe's governed bytes."
+        }
+      }
+    },
+    "entry": {
+      "title": "ObservationStreamEntryView",
+      "type": "object",
+      "description": "One observation in the stream.",
+      "required": ["observedAt", "kind", "subjectCid", "dwellMs", "scrollDepthPct"],
+      "additionalProperties": false,
+      "properties": {
+        "observedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unix epoch seconds on the observer's clock."
+        },
+        "kind": { "type": "string", "description": "The manifest-declared observation kind." },
+        "subjectCid": {
+          "type": ["string", "null"],
+          "description": "What was observed. Null only when the observation named no subject (a single provenance)."
+        },
+        "title": {
+          "type": "string",
+          "description": "The subject's title when known; omitted otherwise, never null."
+        },
+        "dwellMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time the person spent with the subject, in milliseconds (0 when the payload did not parse, named in omissions)."
+        },
+        "scrollDepthPct": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "The deepest point reached, as a percentage of the page."
+        }
+      }
+    }
+  }
+}

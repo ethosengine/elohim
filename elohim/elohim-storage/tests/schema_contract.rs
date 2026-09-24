@@ -6594,3 +6594,101 @@ fn observation_accepted_view_conforms() {
     extra["signatureB64"] = serde_json::json!("");
     assert!(!observation_schema_accepts(schema_path, &extra));
 }
+
+// ── Observation lifestream view (attention-witnessed-privately, plan task A4) ──
+
+fn sample_observation_stream_view(
+    entries: Vec<elohim_views::ObservationStreamEntryView>,
+) -> elohim_views::ObservationStreamView {
+    elohim_views::ObservationStreamView {
+        as_of: 1_790_000_000,
+        window: "7d".into(),
+        recipe: elohim_views::RecipeRefView {
+            name: "observation-lifestream".into(),
+            cid: format!("blake3:{}", "cd".repeat(32)),
+        },
+        lens: "all".into(),
+        total_count: entries.len() as u64,
+        entries,
+        omissions: vec![
+            "signature: absent — observations are unsigned until the signing graduation".into(),
+        ],
+    }
+}
+
+#[test]
+fn observation_stream_view_minimal_validates() {
+    let schema_path = "views/observation-stream-view.schema.json";
+    assert_source_of_truth_declared(&load_schema(schema_path), schema_path);
+    let json = serde_json::to_value(sample_observation_stream_view(vec![])).unwrap();
+    validate_against_schema(schema_path, &json);
+}
+
+#[test]
+fn observation_stream_view_full_validates() {
+    use elohim_views::ObservationStreamEntryView;
+    let entries = vec![
+        ObservationStreamEntryView {
+            observed_at: 1_789_999_000,
+            kind: "lamad:content-viewed".into(),
+            subject_cid: Some("bafy-node-1".into()),
+            title: Some("The commons and its stewards".into()),
+            dwell_ms: 64_000,
+            scroll_depth_pct: 100,
+        },
+        ObservationStreamEntryView {
+            observed_at: 1_789_998_000,
+            kind: "lamad:content-viewed".into(),
+            subject_cid: None,
+            title: None,
+            dwell_ms: 0,
+            scroll_depth_pct: 0,
+        },
+    ];
+    let mut view = sample_observation_stream_view(entries);
+    view.lens = "long-dwell".into();
+    view.omissions
+        .push("window: 3 older observations are outside 7d".into());
+    view.total_count = 5;
+    let json = serde_json::to_value(&view).unwrap();
+    // An absent title is omitted, never null.
+    assert!(json["entries"][1].get("title").is_none(), "{json}");
+    validate_against_schema("views/observation-stream-view.schema.json", &json);
+}
+
+#[test]
+fn observation_stream_view_rejects_extra_field() {
+    let schema_path = "views/observation-stream-view.schema.json";
+    let mut json = serde_json::to_value(sample_observation_stream_view(vec![])).unwrap();
+    json["observerCid"] = serde_json::json!("human-james");
+    assert!(!observation_schema_accepts(schema_path, &json));
+
+    let mut entry_extra = serde_json::to_value(sample_observation_stream_view(vec![
+        elohim_views::ObservationStreamEntryView {
+            observed_at: 1,
+            kind: "lamad:content-viewed".into(),
+            subject_cid: None,
+            title: None,
+            dwell_ms: 1,
+            scroll_depth_pct: 1,
+        },
+    ]))
+    .unwrap();
+    entry_extra["entries"][0]["payloadJson"] = serde_json::json!("{}");
+    assert!(!observation_schema_accepts(schema_path, &entry_extra));
+}
+
+#[test]
+fn observation_stream_view_rejects_missing_recipe_cid() {
+    let schema_path = "views/observation-stream-view.schema.json";
+    let mut json = serde_json::to_value(sample_observation_stream_view(vec![])).unwrap();
+    json["recipe"]
+        .as_object_mut()
+        .unwrap()
+        .remove("cid")
+        .expect("the sample carries a recipe cid");
+    assert!(
+        !observation_schema_accepts(schema_path, &json),
+        "a stream that cannot name its recipe must not validate"
+    );
+}

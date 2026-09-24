@@ -144,6 +144,7 @@ export * from './views/navigation-context-view';
 export * from './views/network-posture-view';
 export * from './views/node-shape-view';
 export * from './views/observation-accepted-view';
+export * from './views/observation-stream-view';
 export * from './views/p2p-status-view';
 export * from './views/peer-capacity-view';
 export * from './views/peer-household-edge';

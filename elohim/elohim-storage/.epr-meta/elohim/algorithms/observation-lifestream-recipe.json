@@ -1,0 +1,18 @@
+{
+  "id": "observation-lifestream",
+  "version": 1,
+  "purpose": "A person's own stream of attention: what they looked at, newest first, recomposed from the agent-private observations on their own node. This recipe is the whole of the ranking, and its CID prints on every page it renders.",
+  "audience": "self",
+  "ranking": ["recency", "dwell_ms"],
+  "window_default": "7d",
+  "lenses": {
+    "all": {},
+    "content": { "kind": "lamad:content-viewed" },
+    "long-dwell": { "kind": "lamad:content-viewed", "min_dwell_ms": 60000 }
+  },
+  "omissions_policy": {
+    "signature": "Every observation is unsigned until the signing graduation; the view carries one omission line saying so.",
+    "window": "Observations older than the window are not rendered; the view names how many were left out.",
+    "payload": "An observation whose payload does not parse renders with zero dwell and depth, and the view names it."
+  }
+}

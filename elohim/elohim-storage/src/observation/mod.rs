@@ -7,4 +7,5 @@
 pub mod log;
 pub mod manager;
 pub mod projector;
+pub mod recipe;
 pub mod wire;

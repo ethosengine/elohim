@@ -209,6 +209,9 @@ const INTERFACE_FILES = [
   // POST /api/v1/observations body and ack (Category B observer-private log).
   { src: 'inputs/observation-intent.ts', dest: 'observation-intent.ts' },
   { src: 'views/observation-accepted-view.ts', dest: 'observation-accepted-view.ts' },
+  // attention-witnessed-privately (plan task A4): the lifestream view — the
+  // requester's own rows through the observation-lifestream recipe (Category C).
+  { src: 'views/observation-stream-view.ts', dest: 'observation-stream-view.ts' },
 ];
 
 /**

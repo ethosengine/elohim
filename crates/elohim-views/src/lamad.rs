@@ -559,3 +559,66 @@ pub struct ContentEngagementStatsView {
     /// ISO-8601 timestamp when this projection was last computed.
     pub computed_at: String,
 }
+
+/// The recipe a view was rendered through, named and content-addressed.
+///
+/// Wire format: nested in `observation-stream-view.schema.json`. `cid` is
+/// `blake3:<hex>` over the recipe's governed bytes; the page prints it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct RecipeRefView {
+    pub name: String,
+    pub cid: String,
+}
+
+/// One entry in a person's lifestream: a content view they witnessed.
+///
+/// Wire format: nested in `observation-stream-view.schema.json`. `subject_cid`
+/// is `None` only when the observation named no subject (one provenance).
+/// `title` is omitted when no title is known for the subject — never null.
+/// `dwell_ms` and `scroll_depth_pct` come from the observation's payload; a
+/// payload that does not parse renders as zeros and the view names it in
+/// `omissions`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct ObservationStreamEntryView {
+    /// Unix epoch seconds on the observer's clock.
+    #[ts(type = "number")]
+    pub observed_at: i64,
+    pub kind: String,
+    pub subject_cid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    #[ts(type = "number")]
+    pub dwell_ms: u64,
+    pub scroll_depth_pct: u8,
+}
+
+/// `GET /api/v1/observations/stream` — a person's own lifestream, rendered
+/// through the observation-lifestream recipe.
+///
+/// Wire format: `observation-stream-view.schema.json` (Category C — rendered
+/// per request from the requester's own `observations` rows; never persisted).
+/// `recipe` names the recipe and its CID so the page can print its provenance;
+/// `omissions` are named lines for everything the view could not show or
+/// vouch for (the absent signature, rows outside the window, unreadable
+/// payloads). `total_count` is how many of the requester's rows the lens
+/// selected before the window; `entries.len()` never exceeds it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct ObservationStreamView {
+    /// Unix epoch seconds the window ends at.
+    #[ts(type = "number")]
+    pub as_of: i64,
+    pub window: String,
+    pub recipe: RecipeRefView,
+    pub lens: String,
+    pub entries: Vec<ObservationStreamEntryView>,
+    pub omissions: Vec<String>,
+    #[ts(type = "number")]
+    pub total_count: u64,
+}
