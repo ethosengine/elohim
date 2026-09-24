@@ -1,4 +1,5 @@
 ---
+id: gitoxide-upstream-alignment-design
 status: approved
 triage_note: "status read from the body line (Approved, amended same-day with the gix-brit playground reframe); frontmatter added so the ledger reads it"
 triaged: 2026-09-24
