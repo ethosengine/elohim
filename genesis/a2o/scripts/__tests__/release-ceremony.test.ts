@@ -29,7 +29,10 @@ import { describe, it } from 'node:test';
 import {
   ADOPTION_PATH,
   assertAdmissibleOverEarnedHead,
+  doorwayPublishRefusal,
+  mergeReleaseBinding,
   readAdoptedRelease,
+  RELEASE_CHANNEL_KEY,
   type Flags,
   type PeerConfig,
 } from '../release-ceremony.js';
@@ -298,5 +301,70 @@ describe('assertAdmissibleOverEarnedHead — D-A: runsTarget counts as adopted',
         );
       }
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice 2 (native-delivery Lane N) — channel bind and the doorway transport
+// ---------------------------------------------------------------------------
+
+describe('channel bind — the slug elects itself by its release channel', () => {
+  const CHANNEL = 'runtime:app-bundle:alpha:dev';
+
+  it('sets the binding and carries every other key unchanged', () => {
+    const merged = JSON.parse(
+      mergeReleaseBinding(JSON.stringify({ serverBlobHash: 'sha256-s', title: 'x' }), CHANNEL)
+    );
+    assert.deepEqual(merged, {
+      serverBlobHash: 'sha256-s',
+      title: 'x',
+      [RELEASE_CHANNEL_KEY]: CHANNEL,
+    });
+  });
+
+  it('unbind removes only the binding', () => {
+    const merged = JSON.parse(
+      mergeReleaseBinding(
+        JSON.stringify({ serverBlobHash: 'sha256-s', releaseChannel: CHANNEL }),
+        null
+      )
+    );
+    assert.deepEqual(merged, { serverBlobHash: 'sha256-s' });
+  });
+
+  it('binds an empty metadata, and refuses a non-channel id or non-object metadata', () => {
+    assert.deepEqual(JSON.parse(mergeReleaseBinding(null, CHANNEL)), { releaseChannel: CHANNEL });
+    assert.throws(() => mergeReleaseBinding('{}', 'app-bundle-dev'));
+    assert.throws(() => mergeReleaseBinding('[1,2]', CHANNEL));
+  });
+});
+
+describe('publish --transport doorway — the lineage pre-flight', () => {
+  const HEAD = 'uhCkkCurrentHead';
+  it('admits a first release, and a candidate naming the current head or staged candidate', () => {
+    assert.equal(doorwayPublishRefusal(null, { envelope: { lineageParentCid: null } }), '');
+    assert.equal(
+      doorwayPublishRefusal({ headActionHash: HEAD }, { envelope: { lineageParentCid: null } }),
+      ''
+    );
+    assert.equal(
+      doorwayPublishRefusal({ headActionHash: HEAD }, { envelope: { lineageParentCid: HEAD } }),
+      ''
+    );
+    assert.equal(
+      doorwayPublishRefusal(
+        { headActionHash: HEAD, stagingCandidate: 'uhCkkStaged' },
+        { envelope: { lineageParentCid: 'uhCkkStaged' } }
+      ),
+      ''
+    );
+  });
+
+  it('refuses a candidate that builds on a release the channel no longer stands on', () => {
+    const refusal = doorwayPublishRefusal(
+      { headActionHash: HEAD },
+      { envelope: { lineageParentCid: 'uhCkkSomethingElse' } }
+    );
+    assert.ok(refusal.startsWith('lineage_parent_mismatch'), refusal);
   });
 });

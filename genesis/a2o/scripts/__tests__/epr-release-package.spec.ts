@@ -37,9 +37,13 @@ const AjvCtor: new (opts: AjvOptions) => AjvNs.default =
   (AjvNs as unknown as { default: new (opts: AjvOptions) => AjvNs.default }).default ??
   (AjvNs as unknown as new (opts: AjvOptions) => AjvNs.default);
 
-const SCHEMA_PATH = fileURLToPath(
-  new URL('../../../../elohim/rakia/schemas/v1/release-manifest.schema.json', import.meta.url)
-);
+// `ELOHIM_RAKIA_ROOT` measures a rakia schema branch before its pin moves —
+// the same override the packager and the Rust mirror test honour.
+const SCHEMA_PATH = process.env['ELOHIM_RAKIA_ROOT']
+  ? path.join(process.env['ELOHIM_RAKIA_ROOT'], 'schemas/v1/release-manifest.schema.json')
+  : fileURLToPath(
+      new URL('../../../../elohim/rakia/schemas/v1/release-manifest.schema.json', import.meta.url)
+    );
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const TSX_BIN = path.join(REPO_ROOT, 'node_modules/.bin/tsx');
 const PACKAGER_SCRIPT = path.join(REPO_ROOT, 'genesis/a2o/scripts/epr-release-package.ts');
@@ -742,5 +746,165 @@ void describe('epr-release-package.ts CLI — --applies-to-from lineage-aware de
     // The peer's other roles still package — one unreadable role does not
     // refuse the whole derivation.
     assert.equal('node_registry' in roles, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part 4 — the app-bundle class (slice 2 of the elected-content spec, §12.8)
+// ---------------------------------------------------------------------------
+
+const APP_CHANNEL_ID = 'runtime:app-bundle:alpha:dev';
+const APP_BUNDLE = 'app-bundle';
+const LANDING = 'elohim-host-landing';
+const ZIP_MIME = 'application/zip';
+const BROWSER_ZIP = 'browser.zip';
+const FLAG_APP_ARTIFACT = '--app-artifact';
+
+/** Whether the schema under test already carries the app-bundle class (the rakia pin bump). */
+function schemaKnowsAppBundle(): boolean {
+  const schema = loadSchema() as {
+    properties?: { artifactClass?: { enum?: string[] } };
+  };
+  return schema.properties?.artifactClass?.enum?.includes(APP_BUNDLE) ?? false;
+}
+
+function tempZip(name: string, body: string): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'epr-release-package-app-'));
+  const file = path.join(dir, name);
+  writeFileSync(file, body);
+  return file;
+}
+
+function appBundleArgs(extra: string[] = []): string[] {
+  return [
+    FLAG_ARTIFACT_CLASS,
+    APP_BUNDLE,
+    '--channel-id',
+    APP_CHANNEL_ID,
+    FLAG_APP_ARTIFACT,
+    `${LANDING}:browser:${tempZip(BROWSER_ZIP, 'landing browser')}`,
+    FLAG_APP_ARTIFACT,
+    `${LANDING}:server:${tempZip('server.zip', 'landing server')}`,
+    FLAG_APP_ARTIFACT,
+    `lamad-spa:browser:${tempZip(BROWSER_ZIP, 'lamad browser')}`,
+    FLAG_APP_ARTIFACT,
+    `lamad-spa:server:${tempZip('server.zip', 'lamad server')}`,
+    '--app-mount',
+    'lamad-spa=/lamad/',
+    FLAG_SOAK_SECS,
+    '60',
+    FLAG_ATTESTATION_THRESHOLD,
+    '1',
+    '--first-release',
+    '--no-put',
+    '--compact',
+    ...extra,
+  ];
+}
+
+void describe('release-manifest schema — app-bundle artifactClass', () => {
+  void it('the committed app-bundle fixture validates exactly when the schema carries the class', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('./fixtures/release-manifest-app-bundle.json', import.meta.url)),
+        'utf8'
+      )
+    ) as JsonObject;
+    const result = validateManifest(fixture);
+    assert.equal(
+      result.ok,
+      schemaKnowsAppBundle(),
+      `schema at ${SCHEMA_PATH}: ${result.errors.join('; ')}`
+    );
+  });
+
+  void it('an app-bundle manifest without appliesTo.apps is invalid once the class exists', () => {
+    if (!schemaKnowsAppBundle()) return;
+    const m = baseManifest({ artifactClass: APP_BUNDLE, appliesTo: { roles: {} } });
+    assert.equal(validateManifest(m).ok, false);
+  });
+});
+
+void describe('epr-release-package.ts CLI — app-bundle', () => {
+  void it('derives appliesTo.apps from the halves and names each blob for its pair', () => {
+    if (!schemaKnowsAppBundle()) {
+      // The pinned schema predates the class: the packager must refuse to
+      // emit what the schema cannot validate (exit 2), never emit it anyway.
+      assertUsageFailure(() => runPackager(appBundleArgs()), 2);
+      return;
+    }
+    const manifest = JSON.parse(runPackager(appBundleArgs(['--strict']))) as JsonObject;
+    assert.equal(manifest['artifactClass'], APP_BUNDLE);
+    assert.equal(manifest['channelId'], APP_CHANNEL_ID);
+    assert.deepEqual((manifest['appliesTo'] as JsonObject)['apps'], {
+      [LANDING]: { kinds: ['browser', 'server'] },
+      'lamad-spa': { kinds: ['browser', 'server'], mount: '/lamad/' },
+    });
+    assert.equal((manifest['appliesTo'] as JsonObject)['roles'], undefined);
+    const artifacts = manifest['artifacts'] as JsonObject[];
+    assert.deepEqual(
+      artifacts.map(a => [a['app'], a['kind'], a['filename'], a['mimeType']]),
+      [
+        [LANDING, 'browser', `${LANDING}-browser.zip`, ZIP_MIME],
+        [LANDING, 'server', `${LANDING}-server.zip`, ZIP_MIME],
+        ['lamad-spa', 'browser', 'lamad-spa-browser.zip', ZIP_MIME],
+        ['lamad-spa', 'server', 'lamad-spa-server.zip', ZIP_MIME],
+      ]
+    );
+    assert.deepEqual(manifest['adoptionDiscipline'], {
+      soakSecs: 60,
+      attestationThreshold: 1,
+      canaryOrder: [],
+    });
+  });
+
+  void it('refuses an app bundle fed through --artifact', () => {
+    assertUsageFailure(() => runPackager([...appBundleArgs(), FLAG_ARTIFACT, tempArtifact()]), 64);
+  });
+
+  void it('refuses the same (app, kind) twice', () => {
+    assertUsageFailure(
+      () =>
+        runPackager([
+          ...appBundleArgs(),
+          FLAG_APP_ARTIFACT,
+          `lamad-spa:browser:${tempZip(BROWSER_ZIP, 'again')}`,
+        ]),
+      64
+    );
+  });
+
+  void it('refuses a kind that is neither browser nor server', () => {
+    assertUsageFailure(
+      () =>
+        runPackager([
+          ...appBundleArgs(),
+          FLAG_APP_ARTIFACT,
+          `lamad-spa:wasm:${tempZip('x.zip', 'x')}`,
+        ]),
+      64
+    );
+  });
+
+  void it('refuses --app-artifact on any other class, and --applies-to on an app bundle', () => {
+    assertUsageFailure(
+      () =>
+        runPackager([
+          FLAG_ARTIFACT,
+          tempArtifact(),
+          FLAG_ARTIFACT_CLASS,
+          ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+          FLAG_APPLIES_TO,
+          appliesToLiteral(),
+          FLAG_APP_ARTIFACT,
+          `lamad-spa:browser:${tempZip(BROWSER_ZIP, 'x')}`,
+          '--no-put',
+        ]),
+      64
+    );
+    assertUsageFailure(
+      () => runPackager([...appBundleArgs(), FLAG_APPLIES_TO, appliesToLiteral()]),
+      64
+    );
   });
 });

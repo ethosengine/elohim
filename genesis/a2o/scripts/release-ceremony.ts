@@ -96,7 +96,10 @@
  *   cd genesis/a2o && pnpm exec tsx scripts/release-ceremony.ts <verb> ...
  *
  *   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
+ *   channel bind <slug> <channelId>
+ *   channel unbind <slug>
  *   publish <manifest.json> [--adoption-url <storage base url>]
+ *   publish <manifest.json> --transport doorway --doorway <url>
  *   promote <channelId> <releaseCid> [--delegation <file>]
  *   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
  *   status <channelId>
@@ -171,7 +174,18 @@ const USAGE = `Usage: release-ceremony.ts <verb> ... [options]
 
 Verbs:
   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
+  channel bind <slug> <channelId>
+                        elect an app slug by its release channel instead of its own head:
+                        a merged-metadata update_content ({releaseChannel}), no blob change,
+                        declared the slug's head (earned where this peer holds the authority,
+                        else staging)
+  channel unbind <slug> the same act removing the binding — the slug is its own head again
   publish <manifest.json> [--adoption-url <storage base url>]
+  publish <manifest.json> --transport doorway --doorway <url>
+                        the CI transport: PATCH /db/content/<channelId> (the manifest rides
+                        metadata; reach rides along so the storage peer re-notarizes through its
+                        conductor) then POST /db/content/<channelId>/canonical-head (staging).
+                        X-API-Key from STORAGE_API_KEY_ADMIN. The household default stays admin-WS
   promote <channelId> <releaseCid> [--delegation <file>]
   revert <channelId> <priorReleaseCid | manifest.json> [--delegation <file>]
   status <channelId>
@@ -252,7 +266,7 @@ function resolveActingPeer(flags: Flags, peers: PeerConfig[]): PeerConfig {
   return peer;
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms);
     p.then(
@@ -315,7 +329,7 @@ async function conductor(name: string, adminPort: number, appPort: number, timeo
     timeoutMs,
     `app connect ${name}:${appPort}`
   );
-  const call = (fn_name: string, payload: any) =>
+  const call = async (fn_name: string, payload: any) =>
     appWs.callZome({ cell_id: lamad, zome_name: ZOME, fn_name, payload });
   return { name, admin, appWs, call, agent: encodeHashToBase64(lamad[1]) };
 }
@@ -802,6 +816,243 @@ async function authorVersionFromManifest(
   return { conn, channelId, releaseCid, actingPeer };
 }
 
+// =============================================================================
+// Slice 2 — an app slug elected by its release channel
+// =============================================================================
+
+/** The `metadata_json` key a slug names its release channel under
+ * (`elohim-storage/src/services/head_adoption.rs` `RELEASE_CHANNEL_KEY`). */
+export const RELEASE_CHANNEL_KEY = 'releaseChannel';
+
+const CHANNEL_ID_RE = /^runtime:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * The slug's metadata with its binding set (`channelId`) or removed (`null`).
+ * Every other key is carried unchanged — a bind never moves the slug's bytes
+ * or anything else it declares. Metadata that is not a JSON object is
+ * refused rather than replaced: binding must never be how a slug loses the
+ * rest of what it said about itself.
+ */
+export function mergeReleaseBinding(metadataJson: string | null, channelId: string | null): string {
+  let current: Record<string, unknown> = {};
+  if (metadataJson && metadataJson.trim().length > 0) {
+    const parsed: unknown = JSON.parse(metadataJson);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('the slug metadata is not a JSON object — refusing to rewrite it');
+    }
+    current = parsed as Record<string, unknown>;
+  }
+  if (channelId === null) {
+    return JSON.stringify(
+      Object.fromEntries(Object.entries(current).filter(([key]) => key !== RELEASE_CHANNEL_KEY))
+    );
+  }
+  if (!CHANNEL_ID_RE.test(channelId)) {
+    throw new Error(
+      `'${channelId}' is not a release channel id (runtime:<class>:<network>:<name>)`
+    );
+  }
+  return JSON.stringify({ ...current, [RELEASE_CHANNEL_KEY]: channelId });
+}
+
+async function cmdChannelBind(
+  slug: string,
+  channelId: string | null,
+  flags: Flags,
+  peers: PeerConfig[],
+  timeoutMs: number
+) {
+  const verb = channelId === null ? 'channel unbind' : 'channel bind';
+  const actingPeer = resolveActingPeer(flags, peers);
+  const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
+  const existing: any = await conn.call('get_content_by_id', { id: slug });
+  if (!existing?.content) {
+    throw new Error(`${verb}: no content '${slug}' on ${actingPeer.name}`);
+  }
+  const metadataJson = mergeReleaseBinding(existing.content.metadata_json ?? null, channelId);
+  const updated: any = await conn.call('update_content', { id: slug, metadata_json: metadataJson });
+  const headActionHash = toB64(updated.action_hash);
+
+  // The bound version must BECOME the slug's head, or no peer ever projects
+  // the binding (a heal preserves the head it already obeys). Earned where
+  // this peer holds the authority; otherwise staging, and say so.
+  const declarePayload = {
+    id: slug,
+    head_action_hash: headActionHash,
+    carried_record: null,
+    adopt_before_author: false,
+    delegation: loadDelegation(flags.delegation),
+  };
+  let tier = 'earned';
+  let declared: any;
+  try {
+    declared = await conn.call('declare_earned_canonical_head', declarePayload);
+  } catch (e) {
+    console.error(
+      `${verb}: ${actingPeer.name} cannot declare '${slug}' earned (${String(e).slice(0, 200)}) — ` +
+        'declaring staging; the binding reaches peers once that head is promoted'
+    );
+    tier = 'staging';
+    declared = await conn.call('declare_canonical_content_head', {
+      ...declarePayload,
+      delegation: null,
+    });
+  }
+  console.log(
+    JSON.stringify(
+      {
+        verb,
+        slug,
+        channelId,
+        actingPeer: actingPeer.name,
+        headActionHash,
+        tier,
+        canonical: declared?.canonical,
+      },
+      null,
+      2
+    )
+  );
+  process.exit(0);
+}
+
+// =============================================================================
+// publish --transport doorway — the CI transport (native-delivery Lane N5)
+// =============================================================================
+
+/** The subset of a storage content-head view (`GET /db/content/{id}/head`) the
+ * doorway transport reads. */
+export interface ContentHeadLite {
+  headActionHash?: string;
+  stagingCandidate?: string | null;
+}
+
+/**
+ * The doorway transport's adopt-before-author pre-flight. The head view names
+ * the channel's current head but not its tier, so this checks the half a CI
+ * runner can check: a candidate that declares a lineage parent must name the
+ * channel's CURRENT head (or the candidate already staged beneath it) as the
+ * release it builds on. The admin-WS transport additionally asks the acting
+ * peer's adoption receipt; the zome's own earned-head guard is the floor for
+ * both. Returns the refusal sentence, or the empty string when admitted.
+ */
+export function doorwayPublishRefusal(
+  head: ContentHeadLite | null,
+  manifest: { envelope?: { lineageParentCid?: string | null } } | null
+): string {
+  const declared = manifest?.envelope?.lineageParentCid ?? null;
+  const current = head?.headActionHash ?? null;
+  const admitted =
+    declared === null ||
+    current === null ||
+    declared === current ||
+    declared === head?.stagingCandidate;
+  const refusal =
+    `lineage_parent_mismatch: the channel's head is ${current} but the manifest ` +
+    `names ${declared} as the release it builds on`;
+  return admitted ? '' : refusal;
+}
+
+async function doorwayRequest(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<{ status: number; body: any }> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': process.env.STORAGE_API_KEY_ADMIN ?? '',
+      ...((init.headers as Record<string, string>) ?? {}),
+    },
+    signal: AbortSignal.timeout(Math.max(timeoutMs, 15_000)),
+  });
+  const text = await response.text();
+  let body: any = text;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    /* keep the text */
+  }
+  return { status: response.status, body };
+}
+
+async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutMs: number) {
+  const doorway = (flags.doorway ?? process.env.RELEASE_DOORWAY_URL ?? '').replace(/\/$/, '');
+  if (!doorway) throw new Error('publish --transport doorway needs --doorway <url>');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const channelId: string | undefined = manifest.channelId;
+  if (!channelId) throw new Error(`publish: manifest at ${manifestPath} has no channelId`);
+  const base = `${doorway}/db/content/${encodeURIComponent(channelId)}`;
+
+  const channel = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
+  if (channel.status === 404) {
+    throw new Error(
+      `publish: channel '${channelId}' does not exist behind ${doorway} — a steward runs ` +
+        `'channel create ${channelId}' once before CI can publish on it`
+    );
+  }
+  if (channel.status >= 300) {
+    throw new Error(`publish: GET ${base} returned ${channel.status}`);
+  }
+  const reach = typeof channel.body?.reach === 'string' ? channel.body.reach : 'commons';
+
+  const head = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const refusal = doorwayPublishRefusal(head.status < 300 ? head.body : null, manifest);
+  if (refusal) throw new Error(`publish refused — ${refusal}`);
+
+  // `reach` rides along on purpose: a metadata-only PATCH is a diesel-direct
+  // write on the storage peer, and a release must be a NOTARIZED version. A
+  // reach-carrying PATCH is re-authored through the peer's conductor
+  // (`patch_needs_conductor`), which is what mints the release version.
+  const patch = await doorwayRequest(
+    base,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        reach,
+        metadata: { kind: 'release-manifest', publishedAt: new Date().toISOString(), manifest },
+      }),
+    },
+    timeoutMs
+  );
+  if (patch.status >= 300) {
+    throw new Error(
+      `publish: PATCH ${base} returned ${patch.status}: ${JSON.stringify(patch.body)}`
+    );
+  }
+  const authored = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const releaseCid: string | undefined = authored.body?.headActionHash;
+  if (!releaseCid) {
+    throw new Error(`publish: GET ${base}/head named no headActionHash after the PATCH`);
+  }
+  const declare = await doorwayRequest(
+    `${base}/canonical-head`,
+    { method: 'POST', body: JSON.stringify({ headActionHash: releaseCid }) },
+    timeoutMs
+  );
+  if (declare.status >= 300) {
+    throw new Error(
+      `publish: POST ${base}/canonical-head returned ${declare.status}: ${JSON.stringify(declare.body)}`
+    );
+  }
+  console.log(
+    JSON.stringify(
+      {
+        verb: 'publish',
+        transport: 'doorway',
+        doorway,
+        channelId,
+        releaseCid,
+        tier: 'staging',
+      },
+      null,
+      2
+    )
+  );
+  process.exit(0);
+}
+
 async function cmdPublish(
   manifestPath: string,
   flags: Flags,
@@ -1161,7 +1412,9 @@ async function cmdAttestations(
 }
 
 async function cmdStatus(channelId: string, _flags: Flags, peers: PeerConfig[], timeoutMs: number) {
-  const rows = await Promise.all(peers.map(p => resolveElectionOnPeer(p, channelId, timeoutMs)));
+  const rows = await Promise.all(
+    peers.map(async p => resolveElectionOnPeer(p, channelId, timeoutMs))
+  );
   const report = {
     channelId,
     checkedAt: new Date().toISOString(),
@@ -1203,10 +1456,24 @@ async function main() {
         'usage: channel create <channelId> [--reach <tier>] [--discipline <json|path>]'
       );
     await cmdChannelCreate(channelId, flags, peers, timeoutMs);
+  } else if (verb === 'channel' && subverb === 'bind') {
+    const [slug, channelId] = positionals;
+    if (!slug || !channelId) throw new Error('usage: channel bind <slug> <channelId>');
+    await cmdChannelBind(slug, channelId, flags, peers, timeoutMs);
+  } else if (verb === 'channel' && subverb === 'unbind') {
+    const [slug] = positionals;
+    if (!slug) throw new Error('usage: channel unbind <slug>');
+    await cmdChannelBind(slug, null, flags, peers, timeoutMs);
   } else if (verb === 'publish') {
     const [manifestPath] = positionals;
     if (!manifestPath) throw new Error('usage: publish <manifest.json>');
-    await cmdPublish(manifestPath, flags, peers, timeoutMs);
+    if (flags.transport === 'doorway') {
+      await cmdPublishViaDoorway(manifestPath, flags, timeoutMs);
+    } else if (flags.transport && flags.transport !== 'admin-ws') {
+      throw new Error(`publish --transport expects admin-ws or doorway, got ${flags.transport}`);
+    } else {
+      await cmdPublish(manifestPath, flags, peers, timeoutMs);
+    }
   } else if (verb === 'promote') {
     const [channelId, releaseCid] = positionals;
     if (!channelId || !releaseCid) throw new Error('usage: promote <channelId> <releaseCid>');

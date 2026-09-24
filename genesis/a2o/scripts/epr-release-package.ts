@@ -53,7 +53,13 @@ const AjvCtor: new (opts: AjvOptions) => AjvNs.default =
   (AjvNs as unknown as new (opts: AjvOptions) => AjvNs.default);
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
-const SCHEMA_PATH = path.join(REPO_ROOT, 'elohim/rakia/schemas/v1/release-manifest.schema.json');
+// `ELOHIM_RAKIA_ROOT` measures another rakia tree (a schema branch not yet
+// pinned) — the attested pin gate forbids moving the pin to find out.
+const RAKIA_ROOT_OVERRIDE = process.env['ELOHIM_RAKIA_ROOT']?.trim() ?? '';
+const SCHEMA_PATH = path.join(
+  RAKIA_ROOT_OVERRIDE.length > 0 ? RAKIA_ROOT_OVERRIDE : path.join(REPO_ROOT, 'elohim/rakia'),
+  'schemas/v1/release-manifest.schema.json'
+);
 
 const DEFAULT_PEER = 'http://localhost:8090';
 const DEFAULT_NETWORK = 'elohim';
@@ -69,14 +75,28 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const GIT_BIN = process.env['GIT_BIN'] ?? '/usr/bin/git';
 const RUSTC_BIN = process.env['RUSTC_BIN'] ?? '/opt/rust/cargo/bin/rustc';
 
+const APP_BUNDLE_CLASS = 'app-bundle';
+
 const ARTIFACT_CLASSES = [
   'coordinator-bundle',
   'config-epr',
   'storage-binary',
   'happ-bundle',
   'happ-lineage',
+  APP_BUNDLE_CLASS,
 ] as const;
 type ArtifactClass = (typeof ARTIFACT_CLASSES)[number];
+
+/** Which half of an app an app-bundle artifact is. */
+const APP_ARTIFACT_KINDS = ['browser', 'server'] as const;
+type AppArtifactKind = (typeof APP_ARTIFACT_KINDS)[number];
+
+/** One `--app-artifact <slug>:<kind>:<path>`. */
+interface AppArtifactArg {
+  app: string;
+  kind: AppArtifactKind;
+  file: string;
+}
 
 /**
  * Channel-id segment each artifact class conventionally publishes under
@@ -90,6 +110,7 @@ const CLASS_CHANNEL_SEGMENT: Record<ArtifactClass, string> = {
   'storage-binary': 'storage-binary',
   'happ-bundle': 'happ',
   'happ-lineage': 'happ',
+  [APP_BUNDLE_CLASS]: APP_BUNDLE_CLASS,
 };
 
 const USAGE = `Usage: epr-release-package.ts --artifact <path> --artifact-class <class> [options]
@@ -98,6 +119,18 @@ const USAGE = `Usage: epr-release-package.ts --artifact <path> --artifact-class 
 Artifact:
   --artifact <path>             file to package; repeat for a multi-blob release
   --artifact-class <class>      ${ARTIFACT_CLASSES.join(' | ')}
+
+app-bundle (slice 2 of the elected-content spec, §12.8):
+  --app-artifact <slug>:<kind>:<path>
+                                one half of one app — kind is browser | server; repeat once per
+                                (app, kind). appliesTo.apps is DERIVED from these (no --applies-to*),
+                                and each blob is named <slug>-<kind>.zip so two apps' halves never
+                                stage over each other
+  --app-mount <slug>=<path>     the URL mount an app is served under (e.g. lamad-spa=/lamad/);
+                                recorded on the receipt, never used to address bytes
+  --put-via <storage|doorway>   storage (default): PUT /blob/sha256-<hex> on --peer. doorway: PUT
+                                /admin/seed/blob with X-Blob-Hash and X-API-Key from
+                                STORAGE_API_KEY_ADMIN — the one admin route a CI doorway exposes
 
 Channel and reach:
   --channel-id <id>             full runtime:<class>:<network>:<name> id
@@ -241,6 +274,12 @@ interface Options {
   help: boolean;
   validate: string[];
   artifacts: string[];
+  /** app-bundle only: each (app, kind) half, in command-line order. */
+  appArtifacts: AppArtifactArg[];
+  /** app-bundle only: slug -> the URL mount it is served under. */
+  appMounts: Record<string, string>;
+  /** Where the blob PUT goes: a storage peer's /blob, or a doorway's admin seed route. */
+  putVia: 'storage' | 'doorway';
   artifactClass: ArtifactClass | null;
   channelId: string | null;
   network: string;
@@ -359,6 +398,44 @@ function parseRoleEquals(raw: string, flag: string): [string, string] {
   return [role, value];
 }
 
+/** `<slug>:<kind>:<path>` — the path may itself carry colons, so split twice only. */
+function parseAppArtifact(raw: string): AppArtifactArg {
+  const first = raw.indexOf(':');
+  const second = first < 0 ? -1 : raw.indexOf(':', first + 1);
+  const app = first < 0 ? '' : raw.slice(0, first);
+  const kind = second < 0 ? '' : raw.slice(first + 1, second);
+  const file = second < 0 ? '' : raw.slice(second + 1);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(app) || !file) {
+    throw new UsageError(`--app-artifact expects <slug>:<kind>:<path>, got: ${raw}`);
+  }
+  const found = APP_ARTIFACT_KINDS.find(candidate => candidate === kind);
+  if (!found) {
+    throw new UsageError(
+      `--app-artifact kind must be one of ${APP_ARTIFACT_KINDS.join(' | ')}, got: ${kind}`
+    );
+  }
+  return { app, kind: found, file: path.resolve(file) };
+}
+
+function parseAppBundleFlag(options: Options, flag: string, value: string): void {
+  if (flag === '--app-artifact') {
+    options.appArtifacts.push(parseAppArtifact(value));
+    return;
+  }
+  if (flag === '--app-mount') {
+    const [slug, mount] = parseRoleEquals(value, flag);
+    if (!mount.startsWith('/')) {
+      throw new UsageError(`--app-mount expects <slug>=/<path>, got: ${value}`);
+    }
+    options.appMounts[slug] = mount;
+    return;
+  }
+  if (value !== 'storage' && value !== 'doorway') {
+    throw new UsageError(`--put-via expects storage or doorway, got: ${value}`);
+  }
+  options.putVia = value;
+}
+
 function parseArtifactClass(value: string): ArtifactClass {
   const found = ARTIFACT_CLASSES.find(candidate => candidate === value);
   if (!found) {
@@ -374,6 +451,9 @@ function parseArgs(argv: string[]): Options {
     help: false,
     validate: [],
     artifacts: [],
+    appArtifacts: [],
+    appMounts: {},
+    putVia: 'storage',
     artifactClass: null,
     channelId: null,
     network: DEFAULT_NETWORK,
@@ -415,6 +495,13 @@ function parseArgs(argv: string[]): Options {
     const arg = argv[index];
     if (arg === '--first-release') {
       options.firstRelease = true;
+      continue;
+    }
+    // The three app-bundle flags are parsed before the switch, like
+    // --first-release, to keep the switch under the lint's case ceiling.
+    if (arg === '--app-artifact' || arg === '--app-mount' || arg === '--put-via') {
+      parseAppBundleFlag(options, arg, requiredValue(argv, index, arg));
+      index++;
       continue;
     }
     switch (arg) {
@@ -573,8 +660,15 @@ function parseArgs(argv: string[]): Options {
   }
 
   if (options.help || options.validate.length > 0) return options;
-  if (options.artifacts.length === 0) throw new UsageError('--artifact is required');
   if (!options.artifactClass) throw new UsageError('--artifact-class is required');
+  if (options.artifactClass === APP_BUNDLE_CLASS) {
+    validateAppBundleArgs(options);
+  } else {
+    if (options.appArtifacts.length > 0) {
+      throw new UsageError('--app-artifact is only meaningful with --artifact-class app-bundle');
+    }
+    if (options.artifacts.length === 0) throw new UsageError('--artifact is required');
+  }
   if (options.artifactClass === 'happ-lineage' && !options.pathCommitment) {
     throw new UsageError(
       '--path-commitment <cid> is required when --artifact-class is happ-lineage — a lineage ' +
@@ -583,6 +677,40 @@ function parseArgs(argv: string[]): Options {
   }
   if (options.wireEpochs.length === 0) options.wireEpochs.push(0);
   return options;
+}
+
+/**
+ * An app bundle's halves come ONLY from `--app-artifact`, one per (app, kind),
+ * and its `appliesTo.apps` is derived from them — so an app release can never
+ * declare a half it does not carry, or carry a half it does not declare.
+ */
+function validateAppBundleArgs(options: Options): void {
+  if (options.artifacts.length > 0) {
+    throw new UsageError(
+      '--artifact-class app-bundle takes its bytes from --app-artifact <slug>:<kind>:<path>, not --artifact'
+    );
+  }
+  if (options.appArtifacts.length === 0) {
+    throw new UsageError('--artifact-class app-bundle requires at least one --app-artifact');
+  }
+  if (options.appliesToLiteral || options.appliesToFrom || options.appliesToFromAdoption) {
+    throw new UsageError(
+      'an app-bundle appliesTo is derived from --app-artifact; --applies-to* does not apply'
+    );
+  }
+  const seen = new Set<string>();
+  for (const half of options.appArtifacts) {
+    const key = `${half.app}:${half.kind}`;
+    if (seen.has(key)) {
+      throw new UsageError(`--app-artifact names (${half.app}, ${half.kind}) twice`);
+    }
+    seen.add(key);
+  }
+  for (const slug of Object.keys(options.appMounts)) {
+    if (!options.appArtifacts.some(half => half.app === slug)) {
+      throw new UsageError(`--app-mount names ${slug}, which no --app-artifact carries`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -595,6 +723,22 @@ interface ArtifactEntry {
   sha256: string;
   filename: string;
   mimeType?: string;
+  /** app-bundle only: the app slug this artifact is one half of. */
+  app?: string;
+  /** app-bundle only: which half. */
+  kind?: AppArtifactKind;
+}
+
+/** app-bundle only: what the release carries for one app. */
+interface AppBinding {
+  kinds: AppArtifactKind[];
+  mount?: string;
+}
+
+/** `roles` for every class that binds a conductor cell; `apps` for app-bundle. */
+interface AppliesTo {
+  roles?: Record<string, RoleBinding>;
+  apps?: Record<string, AppBinding>;
 }
 
 interface RoleBinding {
@@ -620,7 +764,7 @@ interface ReleaseManifest {
   channelId: string;
   artifactClass: ArtifactClass;
   artifacts: ArtifactEntry[];
-  appliesTo: { roles: Record<string, RoleBinding> };
+  appliesTo: AppliesTo;
   envelope: { wireEpochs: number[]; lineageParentCid: string | null; additiveOnly: boolean };
   provenance: {
     builderAgent: string;
@@ -1015,6 +1159,7 @@ interface BlobResult {
 
 function mimeFor(file: string, artifactClass: ArtifactClass): string {
   if (artifactClass === 'config-epr' || file.endsWith('.json')) return 'application/json';
+  if (file.endsWith('.zip')) return 'application/zip';
   return 'application/octet-stream';
 }
 
@@ -1024,13 +1169,24 @@ async function putAndVerify(
   entry: ArtifactEntry,
   options: Options
 ): Promise<BlobResult> {
-  const putPath = `${options.peer}/blob/sha256-${entry.sha256}`;
+  // A storage peer takes the blob at its own address; a CI doorway exposes the
+  // admin seed route instead (the one route stage-spa-blob.sh has always used),
+  // which forwards to the storage peer behind it and checks X-Blob-Hash.
+  const viaDoorway = options.putVia === 'doorway';
+  const putPath = viaDoorway
+    ? `${options.peer}/admin/seed/blob`
+    : `${options.peer}/blob/sha256-${entry.sha256}`;
+  const headers: Record<string, string> = {
+    'content-type': entry.mimeType ?? 'application/octet-stream',
+    'x-agent-id': options.agentId,
+  };
+  if (viaDoorway) {
+    headers['x-blob-hash'] = `sha256-${entry.sha256}`;
+    headers['x-api-key'] = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
+  }
   const putResponse = await reach(putPath, {
     method: 'PUT',
-    headers: {
-      'content-type': entry.mimeType ?? 'application/octet-stream',
-      'x-agent-id': options.agentId,
-    },
+    headers,
     body: new Uint8Array(bytes),
     signal: AbortSignal.timeout(options.requestTimeoutMs),
   });
@@ -1069,7 +1225,8 @@ async function putAndVerify(
 async function packageArtifact(
   file: string,
   options: Options,
-  artifactClass: ArtifactClass
+  artifactClass: ArtifactClass,
+  half: AppArtifactArg | null = null
 ): Promise<BlobResult> {
   const stats = statSync(file);
   if (!stats.isFile()) throw new UsageError(`--artifact is not a file: ${file}`);
@@ -1078,8 +1235,11 @@ async function packageArtifact(
     blobCid: blobCid(bytes),
     bytes: bytes.length,
     sha256: sha256Hex(bytes),
-    filename: path.basename(file),
+    // Both apps' browser halves are `browser.zip` on disk; the adopting peer
+    // stages artifacts by filename, so an app half is named for its pair.
+    filename: half ? `${half.app}-${half.kind}${path.extname(file)}` : path.basename(file),
     mimeType: mimeFor(file, artifactClass),
+    ...(half ? { app: half.app, kind: half.kind } : {}),
   };
   if (!options.put) {
     return { entry, putStatus: null, storedAs: null, roundTripBytes: null };
@@ -1103,6 +1263,28 @@ function resolveChannelId(options: Options, artifactClass: ArtifactClass): strin
     return options.channelId;
   }
   return `runtime:${CLASS_CHANNEL_SEGMENT[artifactClass]}:${options.network}:${options.channel}`;
+}
+
+/**
+ * `appliesTo.apps` for an app bundle, derived from its `--app-artifact`
+ * halves: each slug with the kinds it carries (browser before server), and
+ * its `--app-mount` when given.
+ */
+export function appsFromHalves(
+  halves: { app: string; kind: AppArtifactKind }[],
+  mounts: Record<string, string>
+): Record<string, AppBinding> {
+  const apps: Record<string, AppBinding> = {};
+  for (const half of halves) {
+    const binding = (apps[half.app] ??= { kinds: [] });
+    if (!binding.kinds.includes(half.kind)) binding.kinds.push(half.kind);
+  }
+  for (const [slug, binding] of Object.entries(apps)) {
+    binding.kinds.sort((a, b) => APP_ARTIFACT_KINDS.indexOf(a) - APP_ARTIFACT_KINDS.indexOf(b));
+    const mount = mounts[slug];
+    if (mount) binding.mount = mount;
+  }
+  return apps;
 }
 
 async function resolveAppliesTo(options: Options): Promise<{ roles: Record<string, RoleBinding> }> {
@@ -1523,9 +1705,18 @@ async function assembleManifest(options: Options): Promise<{
   for (const file of options.artifacts) {
     blobs.push(await packageArtifact(file, options, artifactClass));
   }
+  for (const half of options.appArtifacts) {
+    blobs.push(await packageArtifact(half.file, options, artifactClass, half));
+  }
 
-  const appliesTo = applyLineageBindings(await resolveAppliesTo(options), options);
-  guardCoordinatorBundleScope(artifactClass, appliesTo, options);
+  let appliesTo: AppliesTo;
+  if (artifactClass === APP_BUNDLE_CLASS) {
+    appliesTo = { apps: appsFromHalves(options.appArtifacts, options.appMounts) };
+  } else {
+    const roles = applyLineageBindings(await resolveAppliesTo(options), options);
+    guardCoordinatorBundleScope(artifactClass, roles, options);
+    appliesTo = roles;
+  }
   const buildInfo = await resolveBuildInfo(options);
   const gitCommit = options.gitCommit ?? git(['rev-parse', 'HEAD']);
   if (!gitCommit) {
@@ -1635,7 +1826,10 @@ async function runPackage(options: Options): Promise<void> {
   }
   console.error(
     `PASS ${manifest.artifactClass} release for ${manifest.channelId}: ` +
-      `${manifest.artifacts.length} blob(s), ${Object.keys(manifest.appliesTo.roles).length} role(s), ` +
+      `${manifest.artifacts.length} blob(s), ` +
+      (manifest.appliesTo.apps
+        ? `${Object.keys(manifest.appliesTo.apps).length} app(s), `
+        : `${Object.keys(manifest.appliesTo.roles ?? {}).length} role(s), `) +
       `reach ${manifest.declaredReach}` +
       (options.out ? `; manifest at ${path.relative(REPO_ROOT, options.out)}` : '')
   );
