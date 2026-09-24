@@ -312,7 +312,7 @@ pre-push on a stage-spa-blob.sh change prints the receipt line, not `NO-T2-RECEI
 **Tasks**
 
 - [x] **C1 — app-delivery-refuses-fast.feature: four household stations for the not-ready window** (serves push-delivers-within-budget) — be979acbc 5ec286ce3
-- [ ] **C2 — T2 receipt contract: t2-receipt.sh SERVING_RE and serving-receipt.mjs admit this feature as the receipt, strict** (serves push-delivers-within-budget)
+- [x] **C2 — T2 receipt contract: t2-receipt.sh SERVING_RE and serving-receipt.mjs admit this feature as the receipt, strict** (serves push-delivers-within-budget) — bc84d1f9b (receipt line proven in a fixture repo; the live receipt waits on a household run)
 
 ---
 
@@ -451,7 +451,7 @@ notes-ref attestation `brit-build-ref validate list` shows; pre-push reads it as
 **Tasks**
 
 - [x] **F1 — reach and CID ruling: brit ReachLevel as a view over protocol Reach, attestation CIDs via elohim_epr** (serves pin-attestation) — brit feat/reach-derived-cid-epr 06f9f234a4 b9c27d5ba5 (branch; pin not moved)
-- [ ] **F2 — household receipt becomes a signed validation attestation the pre-push T2 reader admits** (serves pin-attestation)
+- [x] **F2 — household receipt becomes a signed validation attestation the pre-push T2 reader admits** (serves pin-attestation) — 14730ccdd bc8826323 bc84d1f9b (real brit-build-ref → reader smoke green in a scratch repo; a `just test mesh` attestation waits on the mesh and brit-build-ref on PATH)
 - [ ] **F3 — CI publishes brit build attestations per pipeline; delivery-series --from attestations** (serves pin-attestation, push-delivers-within-budget)
 - [ ] **F4 — decide the untracked rakia-executor; if kept its compute-receipt schema is the one receipt shape F2 emits** (serves pin-attestation)
 
