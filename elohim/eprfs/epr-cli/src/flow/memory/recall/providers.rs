@@ -20,10 +20,9 @@
 //! `Provider::candidates` to "check" a provider first — that would run `discover_scored` a
 //! second time (once to check, once inside `retrieve()` to actually answer) and double-charge
 //! `view["usage"]` for one `search` (2026-09-11 review finding on this task). `Provider::candidates`
-//! and [`ProviderResult`] therefore have no production caller yet — only this file's own unit
-//! tests — until a richer caller (task 0.5's `journey.rs`) needs to compare more than one
-//! provider's actual answer, at which point calling it once, deliberately, to compare (not to
-//! probe-then-redo) is the right shape.
+//! and [`ProviderResult`] have one production caller: the first screen's fusion (`fusion.rs`,
+//! station 4, task 4.5), which asks each non-local producer the recipe names ONCE, deliberately,
+//! to fuse its order with the screen's own (never probe-then-redo).
 use super::discovery::discover_scored;
 use super::semantic::Semantic;
 use super::*;
@@ -36,12 +35,7 @@ pub(super) type ProviderId = String;
 
 /// One provider's answer to one question: what it ranked (or merely returned), whether the
 /// ranking is a known method or an honestly unknown one, the method pinned to it (if any), and
-/// what asking it cost.
-///
-/// No production code constructs or reads this yet (see the module doc — `providers_for` names a
-/// provider without asking it anything); it is exercised by this file's own unit tests, ahead of
-/// a caller (task 0.5's `journey.rs`) that actually needs one provider's real answer.
-#[allow(dead_code)]
+/// what asking it cost. Read by the first screen's fusion (`fusion.rs`).
 pub(super) struct ProviderResult {
     pub ranked: Vec<Value>,
     /// True only when the provider actually ranked under a known method. A provider that could
@@ -73,10 +67,8 @@ pub(super) fn lines(value: &Value) -> Vec<String> {
 /// `session_root`.
 pub(super) trait Provider {
     fn id(&self) -> ProviderId;
-    // See the module doc: exercised by this file's unit tests, not yet by production code.
     /// `query` is the question's own text, `terms` the lexical route's shape of it; each provider
     /// reads the one its method is defined over (the semantic route embeds the text).
-    #[allow(dead_code)]
     fn candidates(
         &self,
         query: &str,
@@ -92,9 +84,7 @@ pub(super) trait Provider {
 /// names `session_root` itself, otherwise the path beneath it. A `scope` that is already relative
 /// (the CLI's own `--search-scope`) passes through unchanged.
 ///
-/// A `LocalLexical::candidates` helper — dead in production today for the same reason
-/// `Provider::candidates` is (see the module doc).
-#[allow(dead_code)]
+/// A `LocalLexical::candidates`/`Semantic::candidates` helper.
 pub(super) fn scope_string(scope: &Path, session_root: &Path) -> String {
     let relative = if scope.is_absolute() {
         scope.strip_prefix(session_root).unwrap_or(scope)
@@ -285,9 +275,8 @@ pub(super) fn process_result(program: &str, args: &[String], contract: &Contract
 ///
 /// `palace` is the recipe-declared location, relative to `session_root` unless it is already
 /// absolute (the shape a test double supplies to point at a fixed, possibly nonexistent, path).
-/// Read only inside `candidates` (see the module doc — not yet called by production code).
+/// Read only inside `candidates`.
 pub(super) struct MemPalace {
-    #[allow(dead_code)]
     pub palace: PathBuf,
 }
 

@@ -90,6 +90,10 @@ mod surface;
 // measure CID on every candidate.
 mod semantic;
 
+// Reciprocal-rank fusion for ORDER on the focused first screen (station 4, task 4.5): the
+// declared recipe, its CID, and the pure `fuse`.
+mod fusion;
+
 mod journey;
 use journey::execute;
 

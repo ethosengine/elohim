@@ -37,6 +37,10 @@ const V15_METHOD_CID: &str = "bafkreiauhzxlr2ex6vd6lwu66la2f6dzkp6pj2ogfdjfxaemu
 const V16_METHOD_CID: &str = "bafkreigcpetnffhhr7fdtcna3gd27rmni6fkkcoffednsjhnntvr2v7n6m";
 const V17_METHOD_CID: &str = "bafkreifrln4kyfld72xyd6nqrvzokj77gczalf6q3azdhibiestnrf7pha";
 
+/// The v18 contract's method CID (task 4.4). Task 4.5 declared the first screen's fusion recipe,
+/// so the contract's bytes — and its address — moved off this one.
+const V18_METHOD_CID: &str = "bafkreifo5g3r6ymjtpbopdappjnc32426f3qhplza2cninotofelfdrt3e";
+
 /// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
 /// proved the string spelling of its CIDs left this address where the byte-array spelling had it
 /// (`bafyreic5…ycma` both ways); the pin moved once for the self-consistent chunk rule and the
@@ -387,7 +391,7 @@ fn contract_v18_declares_the_semantic_store_and_names_the_native_route() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 18);
+    assert!(value["version"].as_u64() >= Some(18));
     let semantic = &value["ceremony"]["providers"]["semantic"];
     assert_eq!(semantic["kind"], "semantic");
     assert_eq!(semantic["embedder"], "pinned");
@@ -406,6 +410,7 @@ fn contract_v18_declares_the_semantic_store_and_names_the_native_route() {
         .is_some_and(|line| line.contains("visitor")));
     let method = contract.method_cid();
     assert_ne!(method, V17_METHOD_CID, "the contract's bytes moved");
+    assert_ne!(method, V18_METHOD_CID, "and moved again at v19");
     let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
     assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
     contract

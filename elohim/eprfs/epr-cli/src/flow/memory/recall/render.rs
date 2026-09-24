@@ -246,10 +246,41 @@ fn render_floor_line(
     let receipts = receipts_count(view);
     let [recipe_label, lens_label, selection_label, omissions_label, receipts_label] =
         floor.always_printed;
+    // Station 4 (task 4.5): a fused first screen names its fusion recipe and that recipe's own
+    // method CID; an unfused one prints exactly the line it always did.
+    let fusion = &view["first_screen"]["fusion"];
+    let fused = match (fusion["recipe"].as_str(), fusion["cid"].as_str()) {
+        (Some(name), Some(cid)) => format!(" · fusion {name} {}", short(cid)),
+        _ => String::new(),
+    };
     format!(
         "{recipe_label} {recipe} · {lens_label} {lens_cid} · {selection_label}: {selection} · \
-         {omissions_label}: {omissions} · {receipts_label}: {receipts}\n"
+         {omissions_label}: {omissions} · {receipts_label}: {receipts}{fused}\n"
     )
+}
+
+/// A fused candidate's producer ranks and the method handle of each producer that returned it —
+/// `local #2 · semantic #1 · by local bafkrei…abcd, semantic bafkrei…wxyz`, `—` for a producer
+/// that did not return it — in the recipe's producer order. `None` for an unfused candidate.
+fn render_ranks(screen: &Value, candidate: &Value) -> Option<String> {
+    let ranks = candidate["ranks"].as_object()?;
+    let producers = screen["fusion"]["producers"].as_array()?;
+    let mut shown: Vec<String> = Vec::new();
+    let mut methods: Vec<String> = Vec::new();
+    for producer in producers {
+        let id = producer["id"].as_str().unwrap_or_default();
+        match ranks.get(id).and_then(Value::as_u64) {
+            Some(rank) => {
+                shown.push(format!("{id} #{rank}"));
+                methods.push(format!(
+                    "{id} {}",
+                    short(producer["method"].as_str().unwrap_or_default())
+                ));
+            }
+            None => shown.push(format!("{id} —")),
+        }
+    }
+    Some(format!("{} · by {}", shown.join(" · "), methods.join(", ")))
 }
 
 /// Governed-discovery station 2.1: `open --purpose bootstrap` names its top red right after the
@@ -456,8 +487,15 @@ fn render_candidate_block(shown: &[(&Value, bool)], lens: &LensView) -> String {
     let mut dropped_by_density = 0usize;
     for (candidate, is_floor) in shown {
         let marker = if *is_floor { " [floor]" } else { "" };
+        // One collapsed tag for a fused order at `minimal`/`simple`; the ranks print at
+        // `standard`+.
+        let fused = if candidate["ranks"].is_object() {
+            " [fused]"
+        } else {
+            ""
+        };
         let line = format!(
-            "  {}. {} — {}{marker}\n",
+            "  {}. {} — {}{fused}{marker}\n",
             printed + 1,
             candidate["path"].as_str().unwrap_or_default(),
             clip(candidate["title"].as_str().unwrap_or_default(), 100),
@@ -673,6 +711,9 @@ fn render_first_screen(screen: &Value) -> String {
                     "       § {title} ({lines}) {}\n",
                     render_hits(&candidate["best_section"]["hits"])
                 ));
+            }
+            if let Some(ranks) = render_ranks(screen, candidate) {
+                out.push_str(&format!("       {ranks}\n"));
             }
         }
     }

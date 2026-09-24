@@ -31,7 +31,10 @@ fn run_text(root: &Path, args: &[&str]) -> String {
         .expect("epr runs");
     let raw = String::from_utf8(out.stdout).expect("utf8");
     let text = raw.replace(&*root.to_string_lossy(), "<FIXTURE_ROOT>");
-    redact_accounting_elapsed(&redact_elapsed_seconds(&text))
+    redact_accounting_elapsed(&redact_measured(
+        &redact_measured(&text, "elapsed_seconds "),
+        "semantic_query_ms ",
+    ))
 }
 
 /// Replaces the rounded wall-clock segment of the `Accounting:` line (`… native bytes · 0.1s ·
@@ -67,15 +70,16 @@ fn redact_accounting_elapsed(text: &str) -> String {
         .collect()
 }
 
-/// Replaces the numeric value following every `elapsed_seconds ` occurrence with a fixed
-/// placeholder — a measured wall-clock duration, not part of the pinned rendering.
-fn redact_elapsed_seconds(text: &str) -> String {
-    const NEEDLE: &str = "elapsed_seconds ";
+/// Replaces the numeric value following every `needle` occurrence with a fixed placeholder — a
+/// measured wall-clock duration, not part of the pinned rendering: `elapsed_seconds`, and (task
+/// 4.5) `semantic_query_ms`, the first screen's semantic call, which a loaded machine moves off
+/// zero even when the route is absent.
+fn redact_measured(text: &str, needle: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(pos) = rest.find(NEEDLE) {
-        out.push_str(&rest[..pos + NEEDLE.len()]);
-        rest = &rest[pos + NEEDLE.len()..];
+    while let Some(pos) = rest.find(needle) {
+        out.push_str(&rest[..pos + needle.len()]);
+        rest = &rest[pos + needle.len()..];
         let end = rest
             .find(|c: char| !(c.is_ascii_digit() || c == '.'))
             .unwrap_or(rest.len());
@@ -97,8 +101,8 @@ fn digest(s: &str) -> String {
 // `recipe` CID (`Contract::method_cid()` over the WHOLE contract's bytes), so any contract edit
 // moves GOLDEN_FOCUSED and GOLDEN_WHOLE. GOLDEN_REFUSAL has never moved: a refusal never reaches
 // `render()`'s orientation/lens/floor preamble, so it never prints a `recipe` line.
-const GOLDEN_FOCUSED: &str = "784cb3473ab005cb21585c0b76cdd3afb178060f687bca0fb904f0e0c617e130";
-const GOLDEN_WHOLE: &str = "cc285a5423a094a1c22310d2adeec54f6d66f1df5b3fcaedf91a15d5a8028928";
+const GOLDEN_FOCUSED: &str = "7a43faae1d28c8d87df44ef2d974ca2a28600e44e9e590e282c59716b850b2ca";
+const GOLDEN_WHOLE: &str = "469d909e5878a8ab3b7e7f5d9a9677549d3af12012d6041d796a894723c9a3b6";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

@@ -49,7 +49,11 @@ rules:
       semantic candidate route, `search --provider semantic` — the `Semantic` provider, cosine and
       best-chunk-per-file ranking over the declared fold, the measure CID and fold lag on every
       candidate, and each honest absence as one unresolved line (it is its own file because
-      `providers.rs` would cross 600 lines). LENS (`lens.rs`, station 1): the `role@model ->
+      `providers.rs` would cross 600 lines). FUSION (`fusion.rs`, station 4): the first screen's
+      reciprocal-rank fusion for ORDER — the recipe declared at `discovery.first_screen_fusion`
+      and its `atom_cid`, the pure `fuse` (ranks only; no score, no standing) and `fuse_screen`,
+      which asks each non-local producer once through the `Provider` seam and turns an absent route
+      into one omission line. LENS (`lens.rs`, station 1): the `role@model ->
       LensLevel` table and lens resolution — not yet split out; a function shaping that table
       belongs there once it exists. RENDER (`render.rs`): turning a view into the human screen —
       `render`, `render_first_screen`, `render_outline`, `render_hits`. PASSAGE (`passage.rs`): where inside an already-named candidate the question's terms land — `outline`, `best_section`, and the term-density window for unsectioned structured files. REFUSAL (`refusal.rs`): the

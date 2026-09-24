@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 18,
+  "version": 19,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -190,6 +190,8 @@
     "group_scope": "returned candidate window",
     "first_screen_globs": ["*.md", "*.py", "*.json", "*.yaml", "*.yml", "*.rs", "*.ts", "*.feature", "*.sh"],
     "first_screen_globs_rule": "S1 (2026-09-22): the focused first screen (`first_screen`) discovers across EVERY declared glob in one shared traversal, charged to the SAME body-scan budget a single-glob call always used — never a second read, never a wider window. An older contract that does not declare this key falls back to `[\"*.md\"]`, today's only glob, so this key is additive and never silently widens an unaware caller.",
+    "first_screen_fusion": {"recipe": "rrf-v1", "k": 60, "producers": ["local", "semantic"], "order_only": true},
+    "first_screen_fusion_rule": "Station 4 (task 4.5): when --need was typed, the focused first screen (a located area's candidates, or the whole-tree authority set) also asks the semantic provider, over the focused area else the session scope, and fuses the two producer orders by reciprocal rank for ORDER only: a path scores the sum of 1/(k + rank) over the producers that returned it, ties by path. No producer's raw score and no standing or human signal enters the order; every fused candidate keeps its producer ranks and prints them, and the recipe's method is this object's CID (atom_cid, canonical dag-cbor), printed on the honesty floor. An absent, unavailable or other-method route is one omission line and the screen stays the lexical screen; a stale fold fuses and says how far behind. The lens cut and the content floor apply after fusion. open --purpose bootstrap has no first screen and asks the semantic route nothing.",
     "short_terms": ["red", "top", "cid", "dna", "hdk", "epr", "ci", "wasm", "pr", "api"],
     "short_terms_rule": "S1 (2026-09-22): `question_terms` drops every token under four characters UNLESS it is declared here — undeclared short tokens stay noise (a bare 'ci' or 'pr' in ordinary prose would otherwise flood matching). Two adjacent declared-short terms in the question text (e.g. `top red`) also mint the two-word PHRASE as an additional term, matched as a phrase rather than as two independent hits.",
     "stemming": "suffix-strip-v1",

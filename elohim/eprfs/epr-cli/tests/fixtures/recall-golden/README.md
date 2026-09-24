@@ -44,8 +44,8 @@ their own recent journeys revealed, and whether its table came from the contract
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `784cb3473ab005cb21585c0b76cdd3afb178060f687bca0fb904f0e0c617e130` |
-| Whole open | `whole_open_is_byte_identical` | `cc285a5423a094a1c22310d2adeec54f6d66f1df5b3fcaedf91a15d5a8028928` |
+| Focused open | `focused_open_is_byte_identical` | `7a43faae1d28c8d87df44ef2d974ca2a28600e44e9e590e282c59716b850b2ca` |
+| Whole open | `whole_open_is_byte_identical` | `469d909e5878a8ab3b7e7f5d9a9677549d3af12012d6041d796a894723c9a3b6` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged: a refusal exits before render()'s lens/floor preamble runs) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -167,3 +167,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract CID mov
 ## 2026-09-23 — a third ambient field normalized (Task 4.4 fix round 1)
 
 The `Accounting:` line's rounded wall-clock segment (`· 0.0s ·`) is the same measured duration as `elapsed_seconds`, rounded to a tenth; under load it rendered `0.1s` and the focused digest flaked. `run_text()` now replaces it with `<FIXTURE_ELAPSED>s`. Focused and whole open re-baselined for that ONE reason. Proof: putting `0.0s` back into each new rendering reproduces the previous pins (`81344107…`, `aab7b527…`) byte for byte. The refusal digest is unchanged.
+
+## 2026-09-24 — contract v19 (station 4, Task 4.5: `discovery.first_screen_fusion` declares the first screen's reciprocal-rank fusion)
+
+Focused open re-baselined for the fixture contract CID alone (bafkreid…nxm4 → bafkreig…2kqm); substituting the previous CID back reproduces `784cb347…` byte for byte. Whole open (a typed `--need`, so its `docs` area screen now asks the semantic route) moved for the CID and for the absent route's honest trace: one omission line (`semantic: the declared measure does not load: …` — the fixture carries no measure), the floor's `omissions` 5 → 6, and the semantic call's usage on the `Usage:` line (`provider_seconds 0`, `search_queries` 1 → 2, `semantic_chunks_scanned 0`, `semantic_query_ms`); reverting exactly those reproduces `cc285a54…`. `semantic_query_ms` is a measured wall-clock, so `run_text()` now normalizes it like `elapsed_seconds`. No fused tag or ranks appear: the route is absent, so the screen is the lexical screen. The refusal digest is unchanged.

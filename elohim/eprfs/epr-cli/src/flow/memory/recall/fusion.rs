@@ -1,0 +1,558 @@
+//! FUSION — reciprocal-rank fusion for ORDER on the focused first screen (governed-discovery
+//! station 4, task 4.5).
+//!
+//! The recipe is a declaration, not a constant: `discovery.first_screen_fusion` in the pinned
+//! contract (`{"recipe": "rrf-v1", "k": 60, "producers": ["local", "semantic"], "order_only":
+//! true}`), and its method CID is `atom_cid` of that object — the canonical dag-cbor address the
+//! honesty floor prints beside the recipe's own.
+//!
+//! **Order only.** A path's fused score is Σ 1/(k + rank) over the producers that returned it
+//! (rank 1-based, in each producer's own order); ties break by path. Nothing a candidate carries
+//! — no producer's raw score, no term count, no standing, no human signal — is read by [`fuse`]:
+//! it sees each producer's ORDER and the path, and nothing else. Every fused candidate keeps its
+//! producer ranks (`ranks: {local: n|null, semantic: n|null}`) so the reader sees exactly what
+//! was fused.
+//!
+//! **When it runs.** Only on a focused open whose `--need` was typed (the first screen does not
+//! exist otherwise, so `open --purpose bootstrap` never asks the semantic route anything), over
+//! the focused area if one resolved, else the session scope. An absent, unavailable or
+//! other-method route is ONE omission line naming why, and the screen stays the lexical screen —
+//! never an exit 2 for the whole screen. A stale fold fuses, and its `fold N files behind` line
+//! rides into the screen's omissions. The lens cut and the content floor apply after fusion, in
+//! `render.rs`: fusion orders; the lens chooses how many.
+use elohim_epr_rea::atom_cid;
+
+use super::discovery::{frontmatter_header, trim_to_character_boundary};
+use super::providers::{providers_for, ProviderResult};
+use super::*;
+
+/// Where the pinned contract declares the first screen's fusion recipe.
+pub(super) const RECIPE_POINTER: &str = "/discovery/first_screen_fusion";
+
+/// The one fusion recipe this executor runs.
+pub(super) const RRF_V1: &str = "rrf-v1";
+
+/// The producer whose order is the first screen's own lexical order.
+pub(super) const LOCAL: &str = "local";
+
+/// The declared fusion recipe, read and checked.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Recipe {
+    pub name: String,
+    pub k: u64,
+    pub producers: Vec<String>,
+    /// `atom_cid` of the declared object — the method every fused screen names.
+    pub cid: String,
+}
+
+impl Recipe {
+    /// `None` when the contract declares no fusion (the screen is the lexical screen, as before
+    /// this task); `Some(Err(reason))` when it declares one this executor does not run.
+    pub(super) fn declared(contract: &Contract) -> Option<Result<Self, String>> {
+        let object = contract.value.pointer(RECIPE_POINTER)?;
+        Some(Self::from_declared(object))
+    }
+
+    fn from_declared(object: &Value) -> Result<Self, String> {
+        let name = object["recipe"].as_str().unwrap_or_default();
+        if name != RRF_V1 {
+            return Err(format!(
+                "fusion: the recipe declares `{name}`; this executor runs {RRF_V1} only"
+            ));
+        }
+        if object["order_only"].as_bool() != Some(true) {
+            return Err(
+                "fusion: the recipe is not order_only; fusion here orders, it never sums a \
+                 producer's score"
+                    .to_string(),
+            );
+        }
+        let k = object["k"]
+            .as_u64()
+            .filter(|k| *k > 0)
+            .ok_or("fusion: the recipe's k must be a positive integer")?;
+        let producers: Vec<String> = object["producers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect();
+        if producers.first().map(String::as_str) != Some(LOCAL) || producers.len() < 2 {
+            return Err(format!(
+                "fusion: the recipe's producers must begin with `{LOCAL}` (the screen's own \
+                 order) and name another"
+            ));
+        }
+        let cid = atom_cid(object)
+            .map_err(|error| format!("fusion: the recipe has no canonical address: {error}"))?;
+        Ok(Self {
+            name: name.to_string(),
+            k,
+            producers,
+            cid: cid.to_string(),
+        })
+    }
+}
+
+/// One fused candidate: its path, its reciprocal-rank score, and its rank in each producer's
+/// order (`None` where that producer did not return it), in the recipe's producer order.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Fused {
+    pub path: String,
+    pub score: f64,
+    pub ranks: Vec<(String, Option<usize>)>,
+    /// The candidate as its first returning producer (in recipe order) shaped it, with `ranks`
+    /// and, for every later producer that also returned it, that producer's own fields under
+    /// `native.<producer>`.
+    pub candidate: Value,
+}
+
+/// Reciprocal-rank fusion of `producers` (each an id and its candidates in its own order), for
+/// order only: a path's score is Σ 1/(k + rank) over the producers that returned it, rank
+/// 1-based among that producer's distinct paths; higher first, ties by path. Only each
+/// candidate's `path` and its position are read — no field a candidate carries can move it.
+pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
+    struct Entry {
+        score: f64,
+        ranks: Vec<Option<usize>>,
+        candidate: Option<Value>,
+        native: Map<String, Value>,
+    }
+    let mut entries: BTreeMap<String, Entry> = BTreeMap::new();
+    for (index, (producer, candidates)) in producers.iter().enumerate() {
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        for candidate in candidates {
+            let Some(path) = candidate["path"].as_str() else {
+                continue;
+            };
+            if !seen.insert(path) {
+                continue;
+            }
+            let rank = seen.len();
+            let entry = entries.entry(path.to_string()).or_insert_with(|| Entry {
+                score: 0.0,
+                ranks: vec![None; producers.len()],
+                candidate: None,
+                native: Map::new(),
+            });
+            entry.score += 1.0 / (k as f64 + rank as f64);
+            entry.ranks[index] = Some(rank);
+            match entry.candidate {
+                None => entry.candidate = Some(candidate.clone()),
+                Some(_) => {
+                    let mut own = candidate.clone();
+                    if let Some(fields) = own.as_object_mut() {
+                        fields.remove("path");
+                    }
+                    entry.native.insert(producer.clone(), own);
+                }
+            }
+        }
+    }
+    let mut fused: Vec<Fused> = entries
+        .into_iter()
+        .map(|(path, entry)| {
+            let ranks: Vec<(String, Option<usize>)> = producers
+                .iter()
+                .map(|(producer, _)| producer.clone())
+                .zip(entry.ranks)
+                .collect();
+            let mut candidate = entry.candidate.unwrap_or_else(|| json!({"path": path}));
+            candidate["ranks"] = Value::Object(
+                ranks
+                    .iter()
+                    .map(|(producer, rank)| (producer.clone(), json!(rank)))
+                    .collect(),
+            );
+            if !entry.native.is_empty() {
+                candidate["native"] = Value::Object(entry.native);
+            }
+            Fused {
+                path,
+                score: entry.score,
+                ranks,
+                candidate,
+            }
+        })
+        .collect();
+    fused.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    fused
+}
+
+/// Fuse `screen`'s lexical candidates with the recipe's other producers, in place, asking each
+/// over `scope` with the typed question. Nothing happens when the contract declares no fusion.
+/// A producer that could not rank (absent, unavailable, undeclared) adds ONE omission line and
+/// the screen stays the lexical screen; a known ranking's own omissions (a stale fold's
+/// `fold N files behind`) ride into the screen's. Every producer's usage is charged to `usage`.
+pub(super) fn fuse_screen(
+    args: &Args,
+    contract: &Contract,
+    screen: &mut Value,
+    scope: &str,
+    terms: &[String],
+    usage: &mut Value,
+) {
+    let recipe = match Recipe::declared(contract) {
+        None => return,
+        Some(Ok(recipe)) => recipe,
+        Some(Err(reason)) => {
+            push_omission(screen, reason);
+            return;
+        }
+    };
+    let local: Vec<Value> = screen["candidates"].as_array().cloned().unwrap_or_default();
+    let mut orders: Vec<(String, Vec<Value>)> = vec![(LOCAL.to_string(), local)];
+    let mut methods: Vec<Value> = vec![json!({"id": LOCAL, "method": contract.method_cid()})];
+    let declared = providers_for(contract);
+    let mut absent = false;
+    for producer in recipe.producers.iter().skip(1) {
+        let Some(provider) = declared.iter().find(|p| p.id() == *producer) else {
+            push_omission(
+                screen,
+                format!("{producer}: not declared by the recipe's ceremony.providers"),
+            );
+            absent = true;
+            continue;
+        };
+        let answer = provider.candidates(
+            args.need.trim(),
+            terms,
+            Path::new(scope),
+            contract,
+            &args.root,
+        );
+        let answer: ProviderResult = match answer {
+            Ok(answer) => answer,
+            Err(error) => {
+                push_omission(screen, format!("{producer}: unavailable: {error}"));
+                absent = true;
+                continue;
+            }
+        };
+        add_usage(usage, &answer.usage);
+        if !answer.ranking_known {
+            // Exactly one line naming why — the route's own reason when it gave one.
+            let why = if answer.unresolved.is_empty() {
+                format!("{producer}: ranking unknown; not fused")
+            } else {
+                answer.unresolved.join("; ")
+            };
+            push_omission(screen, why);
+            absent = true;
+            continue;
+        }
+        for line in answer.omissions {
+            push_omission(screen, line);
+        }
+        methods.push(json!({"id": producer, "method": answer.method}));
+        orders.push((producer.clone(), answer.ranked));
+    }
+    if absent {
+        return;
+    }
+    let fused = fuse(&orders, recipe.k);
+    let candidates: Vec<Value> = fused
+        .into_iter()
+        .map(|fused| {
+            let mut candidate = fused.candidate;
+            if candidate["ranks"][LOCAL].is_null() {
+                // A candidate only another producer returned was never read for its frontmatter:
+                // its declared title and content class are read now, so the content floor keeps
+                // a correction past the lens cut whichever producer found it.
+                let (title, class) =
+                    declared_fields(&args.root, contract, &fused.path, &mut *usage);
+                if let Some(title) = title {
+                    candidate["title"] = json!(title);
+                }
+                candidate["content_class"] = json!(class);
+            }
+            if candidate["title"].as_str().is_none_or(str::is_empty) {
+                // A producer that reads no frontmatter names no title; the file's name stands in,
+                // as the authority set's own candidates do.
+                candidate["title"] = json!(Path::new(&fused.path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or(fused.path));
+            }
+            candidate
+        })
+        .collect();
+    let lexical = screen["ranking"]
+        .as_str()
+        .unwrap_or("the screen's own order")
+        .to_string();
+    screen["candidates"] = json!(candidates);
+    screen["provider"] = json!(recipe.producers.join(" + "));
+    screen["ranking"] = json!(format!(
+        "{} reciprocal-rank order over {} (k {}; order only — no producer score, no standing); \
+         local: {lexical}",
+        recipe.name,
+        recipe.producers.join(" + "),
+        recipe.k
+    ));
+    screen["fusion"] = json!({
+        "recipe": recipe.name,
+        "cid": recipe.cid,
+        "k": recipe.k,
+        "order_only": true,
+        "producers": methods,
+    });
+}
+
+/// A candidate's declared `title` and `content_class`, read from at most `limits.metadata_bytes`
+/// of its own frontmatter and charged to the scan counters (discovery, never evidence). For a
+/// candidate that a producer reading no frontmatter (the semantic route) put on the first screen,
+/// so the content floor holds for it exactly as for a lexical candidate (station 4, task 4.5).
+/// Each field is `None` when the file declares none or the read cannot prove its header.
+fn declared_fields(
+    root: &Path,
+    contract: &Contract,
+    path: &str,
+    usage: &mut Value,
+) -> (Option<String>, Option<String>) {
+    let limit = contract.limit_usize("metadata_bytes");
+    let mut data = Vec::new();
+    let Ok(file) = File::open(root.join(path)) else {
+        return (None, None);
+    };
+    let file_bytes = file.metadata().map_or(0, |m| m.len() as usize);
+    if file.take(limit as u64).read_to_end(&mut data).is_err() {
+        return (None, None);
+    }
+    add_usage(
+        usage,
+        &json!({"scan_bytes": data.len(), "scanned_files": 1}),
+    );
+    let Some(text) = trim_to_character_boundary(&data) else {
+        return (None, None);
+    };
+    let Some(header) = frontmatter_header(&text, data.len(), file_bytes) else {
+        return (None, None);
+    };
+    let Ok(value) = serde_yaml::from_str::<serde_yaml::Value>(&header[4..]) else {
+        return (None, None);
+    };
+    let field = |key: &str| {
+        value
+            .as_mapping()
+            .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some(key)))
+            .and_then(|(_, v)| v.as_str().map(str::to_string))
+    };
+    (field("title"), field("content_class"))
+}
+
+fn push_omission(screen: &mut Value, line: String) {
+    if !screen["omissions"].is_array() {
+        screen["omissions"] = json!([]);
+    }
+    if let Some(omissions) = screen["omissions"].as_array_mut() {
+        omissions.push(json!(line));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn candidate(path: &str) -> Value {
+        json!({"path": path})
+    }
+
+    fn order(fused: &[Fused]) -> Vec<&str> {
+        fused.iter().map(|f| f.path.as_str()).collect()
+    }
+
+    /// RRF with k = 60: Σ 1/(60 + rank) over the producers that returned a path.
+    fn rrf(ranks: &[usize]) -> f64 {
+        ranks.iter().map(|r| 1.0 / (60.0 + *r as f64)).sum()
+    }
+
+    #[test]
+    fn the_fused_order_is_reciprocal_rank_over_the_producer_orders() {
+        let local = vec![candidate("a.md"), candidate("b.md"), candidate("c.md")];
+        let semantic = vec![candidate("c.md"), candidate("d.md"), candidate("a.md")];
+        let fused = fuse(
+            &[("local".into(), local), ("semantic".into(), semantic)],
+            60,
+        );
+        // a: 1/61 + 1/63; c: 1/63 + 1/61 — equal, path decides; b: 1/62; d: 1/62 — path decides.
+        assert_eq!(order(&fused), vec!["a.md", "c.md", "b.md", "d.md"]);
+        assert!((fused[0].score - rrf(&[1, 3])).abs() < 1e-12);
+        assert!((fused[2].score - rrf(&[2])).abs() < 1e-12);
+        assert_eq!(
+            fused[3].ranks,
+            vec![
+                ("local".to_string(), None),
+                ("semantic".to_string(), Some(2))
+            ]
+        );
+        assert_eq!(
+            fused[0].candidate["ranks"],
+            json!({"local": 1, "semantic": 3})
+        );
+        assert_eq!(
+            fused[3].candidate["ranks"],
+            json!({"local": null, "semantic": 2})
+        );
+    }
+
+    /// Ruling 3: no producer's raw score, no term count and no standing or human signal enters
+    /// the order — a candidate carrying a `standing` field, and one with a huge local `term_hits`,
+    /// fuse exactly as their ranks say.
+    #[test]
+    fn standing_and_raw_scores_never_enter_the_order() {
+        let local = vec![
+            json!({"path": "low.md", "term_hits": 1}),
+            json!({"path": "huge.md", "term_hits": 1_000_000, "score": 99.0}),
+        ];
+        let semantic = vec![
+            json!({"path": "stood.md", "standing": {"attested": 1000, "reach": "commons"},
+                   "score": 0.99}),
+            json!({"path": "low.md", "score": 0.01}),
+        ];
+        let fused = fuse(
+            &[("local".into(), local), ("semantic".into(), semantic)],
+            60,
+        );
+        // low: 1/61 + 1/62; huge: 1/62; stood: 1/61 — ranks alone.
+        assert_eq!(order(&fused), vec!["low.md", "stood.md", "huge.md"]);
+        let bare = fuse(
+            &[
+                (
+                    "local".into(),
+                    vec![candidate("low.md"), candidate("huge.md")],
+                ),
+                (
+                    "semantic".into(),
+                    vec![candidate("stood.md"), candidate("low.md")],
+                ),
+            ],
+            60,
+        );
+        assert_eq!(
+            order(&fused),
+            order(&bare),
+            "the fields never move the order"
+        );
+        let scores: Vec<f64> = fused.iter().map(|f| f.score).collect();
+        let bare_scores: Vec<f64> = bare.iter().map(|f| f.score).collect();
+        assert_eq!(scores, bare_scores);
+        // The signal is carried, never summed.
+        assert_eq!(fused[1].candidate["standing"]["attested"], 1000);
+    }
+
+    /// A semantic-only candidate enters with its own `best_section`; a local-only one keeps its
+    /// own; one both returned is shaped by the first producer and keeps the other's fields.
+    #[test]
+    fn each_candidate_keeps_its_producer_native_fields() {
+        let local = vec![
+            json!({"path": "both.md", "title": "Both", "best_section": {"lines": "1:2"}}),
+            json!({"path": "lex.json", "title": "lex.json", "best_section": {"lines": "3:4"}}),
+        ];
+        let semantic = vec![
+            json!({"path": "sem.md", "producer": "semantic", "method": "m",
+                   "best_section": {"lines": "5:9"}}),
+            json!({"path": "both.md", "producer": "semantic", "method": "m",
+                   "best_section": {"lines": "7:8"}}),
+        ];
+        let fused = fuse(
+            &[("local".into(), local), ("semantic".into(), semantic)],
+            60,
+        );
+        let by = |path: &str| {
+            fused
+                .iter()
+                .find(|f| f.path == path)
+                .unwrap_or_else(|| panic!("{path} fused"))
+                .candidate
+                .clone()
+        };
+        assert_eq!(by("sem.md")["best_section"]["lines"], "5:9");
+        assert_eq!(by("sem.md")["producer"], "semantic");
+        assert_eq!(by("lex.json")["best_section"]["lines"], "3:4");
+        let both = by("both.md");
+        assert_eq!(
+            both["best_section"]["lines"], "1:2",
+            "the first producer shapes it"
+        );
+        assert_eq!(both["title"], "Both");
+        assert_eq!(both["native"]["semantic"]["best_section"]["lines"], "7:8");
+        assert!(both["native"]["semantic"].get("path").is_none());
+        assert!(
+            both.get("producer").is_none(),
+            "never relabelled by a later producer"
+        );
+    }
+
+    #[test]
+    fn a_path_repeated_by_one_producer_is_ranked_once_and_an_empty_producer_fuses() {
+        let fused = fuse(
+            &[
+                (
+                    "local".into(),
+                    vec![candidate("a.md"), candidate("a.md"), candidate("b.md")],
+                ),
+                ("semantic".into(), Vec::new()),
+            ],
+            60,
+        );
+        assert_eq!(order(&fused), vec!["a.md", "b.md"]);
+        assert_eq!(fused[1].ranks[0], ("local".to_string(), Some(2)));
+        assert_eq!(fused[1].ranks[1], ("semantic".to_string(), None));
+    }
+
+    #[test]
+    fn the_recipe_is_declared_and_its_cid_is_the_objects_atom_cid() {
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        let object = json!({"recipe": "rrf-v1", "k": 60, "producers": ["local", "semantic"],
+                            "order_only": true});
+        value["discovery"]["first_screen_fusion"] = object.clone();
+        let contract = Contract::from_value(value.clone()).unwrap();
+        let recipe = Recipe::declared(&contract)
+            .expect("declared")
+            .expect("runs");
+        assert_eq!(recipe.name, RRF_V1);
+        assert_eq!(recipe.k, 60);
+        assert_eq!(recipe.producers, vec!["local", "semantic"]);
+        assert_eq!(recipe.cid, atom_cid(&object).unwrap().to_string());
+
+        for (bad, why) in [
+            (
+                json!({"recipe": "sum-v1", "k": 60, "producers": ["local", "semantic"],
+                    "order_only": true}),
+                "rrf-v1",
+            ),
+            (
+                json!({"recipe": "rrf-v1", "k": 60, "producers": ["local", "semantic"],
+                    "order_only": false}),
+                "order",
+            ),
+            (
+                json!({"recipe": "rrf-v1", "k": 0, "producers": ["local", "semantic"],
+                    "order_only": true}),
+                "k",
+            ),
+            (
+                json!({"recipe": "rrf-v1", "k": 60, "producers": ["semantic"],
+                    "order_only": true}),
+                "local",
+            ),
+        ] {
+            value["discovery"]["first_screen_fusion"] = bad;
+            let contract = Contract::from_value(value.clone()).unwrap();
+            let refused = Recipe::declared(&contract).expect("declared").unwrap_err();
+            assert!(refused.contains(why), "{refused}");
+        }
+        value["discovery"]
+            .as_object_mut()
+            .unwrap()
+            .remove("first_screen_fusion");
+        let contract = Contract::from_value(value).unwrap();
+        assert!(Recipe::declared(&contract).is_none());
+    }
+}

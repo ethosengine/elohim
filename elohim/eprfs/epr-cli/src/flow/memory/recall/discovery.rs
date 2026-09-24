@@ -7,6 +7,7 @@
 //! can wrap the traversal in the `Provider` trait without the two seams sharing one 3,700-line
 //! file. Behaviour is unchanged — only the location moved, plus two visibility widenings
 //! (`first_screen`, `outline`) so `mod.rs`'s `execute()` can still reach them.
+use super::fusion::fuse_screen;
 use super::passage::{best_section, section_link};
 use super::*;
 
@@ -1063,6 +1064,12 @@ pub(super) fn first_screen(
     if !continuation.is_null() {
         screen["continuation"] = continuation;
     }
+    // Station 4 (task 4.5): a located area's screen is fused with the recipe's other producers
+    // for ORDER, asked over the area itself; the lens cut and the content floor apply after, at
+    // render. An absent route is one omission line and this stays the lexical screen.
+    if let Some(area) = &area {
+        fuse_screen(args, contract, &mut screen, area, &terms, usage);
+    }
     Ok(Some(screen))
 }
 
@@ -1199,7 +1206,7 @@ fn root_authority_screen(
         ));
         candidates.truncate(result_limit);
     }
-    Ok(Some(json!({
+    let mut screen = json!({
         "area": ".",
         "terms": terms,
         "habits": habits,
@@ -1210,7 +1217,11 @@ fn root_authority_screen(
                       neither authority nor currency; read the passage.",
         "omissions": omissions,
         "unresolved": Vec::<String>::new(),
-    })))
+    });
+    // Station 4 (task 4.5): the whole-tree screen fuses too — the authority set is the local
+    // order, and the semantic route is asked over the session scope (`.`).
+    fuse_screen(args, contract, &mut screen, ".", terms, usage);
+    Ok(Some(screen))
 }
 
 /// The count each grouped directory reached inside a `discover_scored` view — used only to name
@@ -1702,7 +1713,7 @@ pub(super) fn bootstrap_projection(
 ///
 /// A byte budget ends wherever it ends, very often mid-character; that is a property of the reader,
 /// not a fault in the document. `None` means not even the first character survived.
-fn trim_to_character_boundary(data: &[u8]) -> Option<String> {
+pub(super) fn trim_to_character_boundary(data: &[u8]) -> Option<String> {
     match std::str::from_utf8(data) {
         Ok(text) => Some(text.to_string()),
         Err(error) => match error.valid_up_to() {
@@ -1718,7 +1729,11 @@ fn trim_to_character_boundary(data: &[u8]) -> Option<String> {
 /// trailing newline may be a `---` prefix the budget cut in half. When more file remains unread,
 /// that is not a proven document boundary, and treating it as one would let a truncated read
 /// establish category membership.
-fn frontmatter_header(text: &str, read_bytes: usize, file_bytes: usize) -> Option<String> {
+pub(super) fn frontmatter_header(
+    text: &str,
+    read_bytes: usize,
+    file_bytes: usize,
+) -> Option<String> {
     if !text.starts_with("---\n") {
         return None;
     }
