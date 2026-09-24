@@ -49,6 +49,9 @@ pub struct Options<'a> {
     pub budget: Option<&'a str>,
     /// Where to write the projected index. Absent means write nothing.
     pub out: Option<&'a str>,
+    /// `migrate-identity-reserve --basis` — one line the executor stands behind (on whose behalf
+    /// it runs), recorded verbatim in the act's reason. Refused by every other operation.
+    pub basis: Option<&'a str>,
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
@@ -76,7 +79,8 @@ pub fn usage() -> String {
          feedback      file governed feedback on a contribution\n  \
          graduate      rehearse local repository reach for a contribution\n  \
          import        adopt an authored directory of requests\n  \
-         migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n  \
+         migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n                    \
+                   (--session ID [--basis LINE] [--contributions DIR] [--dry-run])\n  \
          recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n  \
          index         the semantic fold \u{2014} `index fold|status`, `index --help` for its surface\n",
         OPERATIONS.join("|")
@@ -151,6 +155,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             "--contributions" => opts.contributions = Some(value.as_str()),
             "--budget" => opts.budget = Some(value.as_str()),
             "--out" => opts.out = Some(value.as_str()),
+            "--basis" => opts.basis = Some(value.as_str()),
             _ => return Err(refused(format!("unknown option {key}"))),
         }
         i += 2;
@@ -183,11 +188,14 @@ pub fn execute(
 
 /// Public for contract tests and local composition. Writes only existing flow observations.
 pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<Value> {
-    if operation == "import" {
-        return import::run(root, opts);
-    }
     if operation == "migrate-identity-reserve" {
         return import::migrate_identity_reserve(root, opts);
+    }
+    if opts.basis.is_some() {
+        return Err(refused("--basis belongs to migrate-identity-reserve alone"));
+    }
+    if operation == "import" {
+        return import::run(root, opts);
     }
     if operation == "project" && opts.index {
         return index::run(root, opts);

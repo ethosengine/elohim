@@ -43,9 +43,10 @@
 //! The substrate writes a human into fruit only as the handle they claimed or the name the commit
 //! already publishes, never an email or any cross-namespace key. Stores written before the rule
 //! carry `imported.gitAuthor: Name <email>`; [`migrate_identity_reserve`] rewrites exactly that
-//! one line of each to `imported.gitName: Name`, as ONE act attributed to this device's standing
-//! human, and pins a lineage (old request CID → new request CID) so each author's original
-//! contribution act keeps attributing the migrated bytes. Every other byte is untouched.
+//! one line of each to `imported.gitName: Name`, as ONE act attributed through the standard arm
+//! order (the executing session's claim, else this device's standing human), and pins a lineage
+//! (old request CID → new request CID) so each author's original contribution act keeps
+//! attributing the migrated bytes. Every other byte is untouched.
 //!
 //! ## Idempotence is by content, checked before the append
 //!
@@ -543,18 +544,25 @@ fn reserve(text: &str) -> Option<Result<String, String>> {
     })
 }
 
-/// `epr flow memory migrate-identity-reserve [--contributions DIR] --session ID [--dry-run]`.
+/// `epr flow memory migrate-identity-reserve [--contributions DIR] --session ID [--basis LINE]
+/// [--dry-run]`.
 ///
 /// Station 5 of the participant actor plane: every tracked contribution still carrying
 /// `imported.gitAuthor: Name <email>` is rewritten to `imported.gitName: Name`, and nothing else
 /// about it moves. The whole rewrite is ONE act — an observation note on the lineage manifest —
-/// attributed to this device's **standing human** through the standing arm (`source:
-/// claim-signed`): the email being withdrawn from fruit is theirs, and the act is theirs, whoever
-/// executes it. `--session` names the executing session in the act's reason; its own claim does
-/// not author the act. A device that stands for no human is refused before anything is written.
+/// attributed through the standard arm order ([`acting_author`]): the executing session's claim
+/// provides it, and only a session that registered none falls to this device's standing human.
+/// The standing human is the act's `steward:` slot either way. Forcing the human as provider
+/// would attribute to them an act they did not perform — the misattribution the participant plane
+/// exists to end (ruling R-P11). A session with no claim on a device standing for no one is
+/// refused before anything is written, because the note leg would otherwise fall back to the
+/// commit author — the email this act withdraws. `--basis` is one line the executor stands
+/// behind (on whose behalf it runs), recorded verbatim in the act's reason.
 ///
-/// Idempotent by construction: a store with nothing left to migrate writes no manifest, rewrites
-/// no file and appends no act.
+/// Idempotent by construction: a store with nothing left to migrate writes no manifest and
+/// rewrites no file. It appends an act only to CORRECT a prior migration act whose provider is not
+/// what the standard order resolves for the session that act names — a corrected act for the same
+/// lineage manifest, naming the act it corrects; once one stands, a re-run appends nothing.
 pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value> {
     let contributions_rel = normalized(opts.contributions.unwrap_or(DEFAULT_CONTRIBUTIONS_DIR))?;
     let session = opts.session.ok_or_else(|| {
@@ -562,6 +570,12 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
             "migrate-identity-reserve needs --session: the act names the session that executed it",
         )
     })?;
+    if opts
+        .basis
+        .is_some_and(|b| b.trim().is_empty() || b.contains('\n'))
+    {
+        return Err(refused("--basis is one non-empty line"));
+    }
     let root = std::fs::canonicalize(root)?;
     let dir = root.join(&contributions_rel);
 
@@ -619,18 +633,38 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
         "refused": refusals,
         "act": Value::Null,
     });
-    if moved.is_empty() || opts.dry_run {
+    if opts.dry_run {
+        return Ok(report);
+    }
+    if moved.is_empty() {
+        // Nothing moves. A prior act attributed outside the standard order is corrected here —
+        // the only act a settled store ever appends.
+        let mut corrections = Vec::new();
+        for prior in misattributed_migrations(&root)? {
+            let provider = acting_author(&root, Some(session))?;
+            let reason = migration_reason(&MigrationAct {
+                manifest_cid: &prior.manifest_cid,
+                count: prior.count,
+                directory: &rel_str(&contributions_rel),
+                session,
+                basis: opts.basis,
+                corrects: &prior.acts,
+            });
+            let act = attributed_act(&root, &prior.manifest_rel, &reason, session, &provider)?;
+            corrections.push(json!({
+                "lineage": prior.manifest_rel,
+                "corrects": prior.acts,
+                "act": serde_json::to_value(&act)?,
+            }));
+        }
+        if !corrections.is_empty() {
+            report["corrections"] = json!(corrections);
+        }
         return Ok(report);
     }
 
-    // The act is the standing human's; without one there is no one to attribute it to, and the
-    // note leg would fall back to the commit author — the email this act exists to withdraw.
-    let standing = crate::actor::standing_here(&root).ok_or_else(|| {
-        refused(
-            "migrate-identity-reserve is the act of this device's standing human, and this device \
-             stands for no witnessed human — `epr actor witness --subject human:<handle> …` first",
-        )
-    })?;
+    // Resolved BEFORE anything is written: the refusal must leave the store as it was.
+    let provider = acting_author(&root, Some(session))?;
 
     let lineage = Lineage {
         version: 1,
@@ -643,30 +677,15 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
     std::fs::create_dir_all(root.join(LINEAGE_DIR))?;
     std::fs::write(root.join(&manifest_rel), &manifest)?;
 
-    let reason = format!(
-        "{}{manifest_cid}: {} contributions under {} rewritten imported.{RETIRED_FIELD} → \
-         imported.{RESERVED_FIELD} (display name only; no email in fruit); every other byte \
-         unchanged and each author's contribution act carried forward by this lineage; executed \
-         in session {session}",
-        MIGRATION_REASON_PREFIX.trim_start_matches("reason:"),
-        lineage.moved.len(),
-        rel_str(&contributions_rel),
-    );
-    let act = crate::flow::note::note(
-        &root,
-        &manifest_rel,
-        "observation",
-        &reason,
-        None,
-        None,
-        &crate::flow::note::NoteActor::default(),
-    )?;
-    if act.actor.as_deref() != Some(standing.subject.as_str()) {
-        return Err(refused(format!(
-            "the migration act resolved to {:?}, not the standing {} — nothing was rewritten",
-            act.actor, standing.subject
-        )));
-    }
+    let reason = migration_reason(&MigrationAct {
+        manifest_cid: &manifest_cid,
+        count: lineage.moved.len(),
+        directory: &rel_str(&contributions_rel),
+        session,
+        basis: opts.basis,
+        corrects: &[],
+    });
+    let act = attributed_act(&root, &manifest_rel, &reason, session, &provider)?;
 
     for (path, migrated) in &writes {
         std::fs::write(path, migrated)?;
@@ -674,6 +693,149 @@ pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value
     report["act"] = serde_json::to_value(&act)?;
     report["lineage"] = json!(manifest_rel);
     Ok(report)
+}
+
+/// The words of a migration act's reason, spelled once for the first act and a correction alike.
+struct MigrationAct<'a> {
+    manifest_cid: &'a str,
+    count: usize,
+    directory: &'a str,
+    session: &'a str,
+    basis: Option<&'a str>,
+    /// Prior acts for the same lineage this one corrects; empty on a first migration.
+    corrects: &'a [String],
+}
+
+/// The marker [`executing_session`] reads back out of a reason slot.
+const EXECUTED_IN: &str = "executed in session ";
+
+fn migration_reason(act: &MigrationAct<'_>) -> String {
+    let mut reason = format!(
+        "{}{}: {} contributions under {} rewritten imported.{RETIRED_FIELD} → \
+         imported.{RESERVED_FIELD} (display name only; no email in fruit); every other byte \
+         unchanged and each author's contribution act carried forward by this lineage; \
+         {EXECUTED_IN}{}",
+        MIGRATION_REASON_PREFIX.trim_start_matches("reason:"),
+        act.manifest_cid,
+        act.count,
+        act.directory,
+        act.session,
+    );
+    if let Some(basis) = act.basis {
+        reason.push_str(&format!("; basis: {}", basis.trim()));
+    }
+    if !act.corrects.is_empty() {
+        reason.push_str(&format!(
+            "; corrects {}, whose provider was not the one the standard arm order resolves for \
+             its session",
+            act.corrects.join(", ")
+        ));
+    }
+    reason
+}
+
+/// The session a migration act's reason names as having executed it.
+fn executing_session(slot: &str) -> Option<&str> {
+    let (_, tail) = slot.split_once(EXECUTED_IN)?;
+    let session = tail.split(';').next()?.trim();
+    (!session.is_empty()).then_some(session)
+}
+
+/// Append the migration act under `session` and prove it resolved to `provider`, the identity
+/// [`acting_author`] resolved for the same session — the note leg and this module must agree on
+/// who acted, or nothing is claimed to have happened.
+fn attributed_act(
+    root: &Path,
+    manifest_rel: &str,
+    reason: &str,
+    session: &str,
+    provider: &str,
+) -> FlowResult<crate::flow::note::NoteOutcome> {
+    let act = crate::flow::note::note(
+        root,
+        manifest_rel,
+        "observation",
+        reason,
+        None,
+        None,
+        &crate::flow::note::NoteActor {
+            as_ref: None,
+            session: Some(session.to_string()),
+        },
+    )?;
+    if act.actor.as_deref() != Some(provider) {
+        return Err(refused(format!(
+            "the migration act resolved to {:?}, not {provider} — nothing was rewritten",
+            act.actor
+        )));
+    }
+    Ok(act)
+}
+
+/// A lineage whose every migration act names a provider other than the one the standard arm
+/// order resolves for that act's own executing session.
+struct Misattributed {
+    manifest_cid: String,
+    manifest_rel: String,
+    count: usize,
+    acts: Vec<String>,
+}
+
+fn misattributed_migrations(root: &Path) -> FlowResult<Vec<Misattributed>> {
+    use elohim_epr_rea::{FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
+    if !root.join(".eprfs/status/flows.jsonl").exists() {
+        return Ok(Vec::new());
+    }
+    // manifest cid → (count, misattributed act CIDs, any act correctly attributed)
+    let mut by_manifest: std::collections::BTreeMap<String, (usize, Vec<String>, bool)> =
+        std::collections::BTreeMap::new();
+    for (cid, record) in SidecarFlowStore::open(root)?.records()? {
+        let FlowRecord::Event(event) = record else {
+            continue;
+        };
+        if event.action != ReaVerb::Cite
+            || !event.classified_as.iter().any(|v| v == "run:observation")
+        {
+            continue;
+        }
+        let Some(slot) = event
+            .classified_as
+            .iter()
+            .find(|v| v.starts_with(MIGRATION_REASON_PREFIX))
+        else {
+            continue;
+        };
+        let Some(lineage) = lineage_for(root, slot, &event.resource.to_string()) else {
+            continue;
+        };
+        let Some(manifest_cid) = slot
+            .strip_prefix(MIGRATION_REASON_PREFIX)
+            .and_then(|s| s.split(':').next())
+            .map(|s| s.trim().to_string())
+        else {
+            continue;
+        };
+        let expected = executing_session(slot).and_then(|s| acting_author(root, Some(s)).ok());
+        let entry =
+            by_manifest
+                .entry(manifest_cid)
+                .or_insert((lineage.moved.len(), Vec::new(), false));
+        if expected.as_deref() == Some(event.provider.0.as_str()) {
+            entry.2 = true;
+        } else {
+            entry.1.push(cid.to_string());
+        }
+    }
+    Ok(by_manifest
+        .into_iter()
+        .filter(|(_, (_, acts, settled))| !settled && !acts.is_empty())
+        .map(|(manifest_cid, (count, acts, _))| Misattributed {
+            manifest_rel: format!("{LINEAGE_DIR}/{manifest_cid}.json"),
+            manifest_cid,
+            count,
+            acts,
+        })
+        .collect())
 }
 
 /// The identity every imported contribution is authored by: the session's registered claim, or —

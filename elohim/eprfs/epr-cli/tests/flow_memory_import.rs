@@ -1026,16 +1026,19 @@ fn migration_is_idempotent() {
     assert_eq!(contributions(root), settled);
 }
 
+/// A session with no claim, on a device standing for no one: nobody can be attributed the act, and
+/// the note leg would fall back to the commit author's email — so nothing is written.
 #[test]
-fn migration_refuses_without_a_standing_human() {
+fn migration_refuses_without_any_attributable_actor() {
     let dir = repo();
     let root = dir.path();
     plant_legacy(root);
     let keys = TempDir::new().expect("keys");
-    // A key, but no witness: this device stands for no one.
+    // A key, but no witness: this device stands for no one. And MIGRATION_SESSION claims nothing.
     let key_file = keys.path().join("ed25519.seed");
     elohim_epr_cli::device_key::DeviceKey::load_or_generate(&key_file).expect("key");
     let before = contributions(root);
+    let events_before = events(root);
     let out = epr(
         root,
         &key_file,
@@ -1048,12 +1051,131 @@ fn migration_refuses_without_a_standing_human() {
             "--json",
         ],
     );
-    assert!(!out.status.success(), "an unwitnessed device migrated");
+    assert!(!out.status.success(), "an unattributable migration ran");
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("standing"), "{stderr}");
+    assert!(
+        stderr.contains("registered no actor claim") && stderr.contains("witnessed"),
+        "the refusal names both missing arms: {stderr}"
+    );
     assert_eq!(
         contributions(root),
         before,
         "a refused migration wrote a file"
     );
+    assert_eq!(
+        events(root),
+        events_before,
+        "a refused migration wrote an act"
+    );
+    assert!(
+        !root.join(".eprfs/status/identity-reserve").exists(),
+        "a refused migration pinned a manifest"
+    );
+}
+
+/// Ruling R-P11: the executing session's claim provides the act; the standing human stewards it.
+#[test]
+fn migration_provider_is_the_session_claim_when_one_exists() {
+    const EXECUTOR: &str = "agent:implementer@fixture";
+    let dir = repo();
+    let root = dir.path();
+    let names = plant_legacy(root);
+    let keys = TempDir::new().expect("keys");
+    let key_file = witnessed(root, &keys);
+    actor::claim(root, EXECUTOR, MIGRATION_SESSION).expect("executor claim");
+
+    let out = epr(
+        root,
+        &key_file,
+        &[
+            "flow",
+            "memory",
+            "migrate-identity-reserve",
+            "--session",
+            MIGRATION_SESSION,
+            "--basis",
+            "run on the orchestrator's behalf",
+            "--json",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let outcome: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json");
+    assert_eq!(outcome["counts"]["migrated"], names.len());
+
+    let record = last_event(root);
+    assert_eq!(record["record"]["provider"], EXECUTOR, "{record}");
+    let slots: Vec<String> =
+        serde_json::from_value(record["record"]["classifiedAs"].clone()).expect("slots");
+    assert_eq!(slots.last().expect("steward"), &format!("steward:{HUMAN}"));
+    assert!(
+        slots.iter().any(|s| s.starts_with("actor-claim:")),
+        "the session claim is pinned: {slots:?}"
+    );
+    assert!(
+        !slots.contains(&"source:claim-signed".to_string()),
+        "the standing arm did not attribute it: {slots:?}"
+    );
+    assert!(
+        slots.iter().any(|s| s.contains(&format!(
+            "executed in session {MIGRATION_SESSION}; basis: run on the orchestrator's behalf"
+        ))),
+        "{slots:?}"
+    );
+    assert!(
+        !slots.iter().any(|s| s.contains("example.test")),
+        "no email anywhere in the act: {slots:?}"
+    );
+    // The lineage still carries every author's act forward.
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
+}
+
+/// A migration act attributed to the standing human although its executing session held a claim
+/// is corrected by a re-run: no byte moves, one corrected act names the one it corrects, and a
+/// further re-run appends nothing.
+#[test]
+fn a_misattributed_migration_act_is_corrected_by_a_re_run() {
+    const EXECUTOR: &str = "agent:implementer@fixture";
+    let dir = repo();
+    let root = dir.path();
+    plant_legacy(root);
+    let keys = TempDir::new().expect("keys");
+    let key_file = witnessed(root, &keys);
+    // The session held no claim when it migrated, so the standing human provided the act; once
+    // the session is shown to be the executor's, that act names the wrong provider.
+    migrate(root, &key_file);
+    let wrong = last_event(root);
+    assert_eq!(wrong["record"]["provider"], HUMAN);
+    actor::claim(root, EXECUTOR, MIGRATION_SESSION).expect("executor claim");
+    let settled = contributions(root);
+    let events_settled = events(root);
+
+    let corrected = migrate(root, &key_file);
+    assert_eq!(corrected["counts"]["migrated"], 0);
+    assert_eq!(contributions(root), settled, "a correction moved a byte");
+    assert_eq!(events(root), events_settled + 1, "one corrected act");
+    let record = last_event(root);
+    assert_eq!(record["record"]["provider"], EXECUTOR, "{record}");
+    let slots: Vec<String> =
+        serde_json::from_value(record["record"]["classifiedAs"].clone()).expect("slots");
+    assert_eq!(slots.last().expect("steward"), &format!("steward:{HUMAN}"));
+    let wrong_cid = wrong["cid"].as_str().expect("cid");
+    assert!(
+        slots
+            .iter()
+            .any(|s| s.contains(&format!("corrects {wrong_cid}"))),
+        "{slots:?}"
+    );
+    assert_eq!(corrected["corrections"][0]["corrects"][0], wrong_cid);
+
+    // Settled: a correctly attributed act stands for the lineage, so nothing more is appended.
+    let again = migrate(root, &key_file);
+    assert!(again.get("corrections").is_none(), "{again}");
+    assert_eq!(events(root), events_settled + 1);
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
 }
