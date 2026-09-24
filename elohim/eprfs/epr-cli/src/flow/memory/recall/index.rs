@@ -1070,7 +1070,9 @@ pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
     let store = match Store::open_existing(&dir.join(STORE_FILE), &declared, true) {
         Ok(store) => store,
         Err(why) => {
-            view["unusable"] = json!(why);
+            view["unusable"] = json!(format!(
+                "{why}; rebuild pending — run epr flow memory index fold"
+            ));
             None
         }
     };
@@ -1326,6 +1328,11 @@ mod tests {
         ))
         .unwrap();
         drop(v2);
+        // Until then, status names the store's state and its remedy, not a dead end.
+        assert_eq!(
+            status(root, EmbedderChoice::Fixture).unwrap()["unusable"],
+            "store was built under another schema; rebuild pending — run epr flow memory index fold"
+        );
 
         let opts = FoldOptions {
             embedder: EmbedderChoice::Fixture,
