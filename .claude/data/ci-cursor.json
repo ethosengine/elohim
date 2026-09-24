@@ -3,16 +3,16 @@
   "elohim": 1725,
   "elohim-edge": 1478,
   "elohim-genesis": 1577,
-  "elohim-holochain": 1454,
+  "elohim-holochain": 1455,
   "elohim-orchestrator": 1897,
   "elohim-sophia": 146,
   "elohim-steward": 1,
-  "elohim-storybook": 326
+  "elohim-storybook": 327
  },
  "green": {
-  "elohim-holochain": 1454,
+  "elohim-holochain": 1455,
   "elohim-sophia": 146,
-  "elohim-storybook": 326,
+  "elohim-storybook": 327,
   "elohim": 1697,
   "elohim-edge": 1478,
   "elohim-orchestrator": 1847
@@ -20,10 +20,10 @@
  "green_streak": {
   "elohim": 0,
   "elohim-edge": 2,
-  "elohim-storybook": 38,
+  "elohim-storybook": 39,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
-  "elohim-holochain": 14,
+  "elohim-holochain": 15,
   "elohim-sophia": 1
  },
  "recent": {
@@ -113,7 +113,7 @@
    "UNSTABLE"
   ],
   "elohim-holochain": [
-   "NOT_BUILT",
+   "SUCCESS",
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
