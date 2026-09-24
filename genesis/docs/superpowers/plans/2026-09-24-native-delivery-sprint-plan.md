@@ -615,11 +615,11 @@ scenario 2 still green with the crutch deleted.
 
 **Tasks**
 
-- [ ] **N1 — ArtifactClass::AppBundle and the release-manifest schema app-bundle class** (serves dataplane-convergence)
-- [ ] **N2 — verify.rs AppBundle shape, envelope skip and verify_app_bundle_boots** (serves dataplane-convergence)
-- [ ] **N3 — AppBundleVehicle writes every bound slug in one transaction, plus the head_adoption Held predicate** (serves dataplane-convergence)
-- [ ] **N4 — doorway candidate channel through storage handle_content_head for a bound slug** (serves dataplane-convergence)
-- [ ] **N5 — CI publish-app-release.sh and verify-app-adoption.sh; channels followed as a list** (serves dataplane-convergence, push-delivers-within-budget)
+- [x] **N1 — ArtifactClass::AppBundle and the release-manifest schema app-bundle class** (serves dataplane-convergence) — ee5f9e54a, packager 31c0bfac6; rakia feat/app-bundle-class 720c132, pin bump on pin/lane-N 1b1002c84 (branches; pin not moved on dev)
+- [x] **N2 — verify.rs AppBundle shape, envelope skip and verify_app_bundle_boots** (serves dataplane-convergence) — ee5f9e54a
+- [x] **N3 — AppBundleVehicle writes every bound slug in one transaction, plus the head_adoption Held predicate** (serves dataplane-convergence) — ee5f9e54a; channel bind 31c0bfac6
+- [x] **N4 — doorway candidate channel through storage handle_content_head for a bound slug** (serves dataplane-convergence) — ee5f9e54a
+- [x] **N5 — CI publish-app-release.sh and verify-app-adoption.sh; channels followed as a list** (serves dataplane-convergence, push-delivers-within-budget) — 2cb1b6b2a, doorway transport 31c0bfac6; app-bundle soak-probe arm owed
 - [ ] **N6 — household app-bundle-elected-delivery.feature, then fleet; retire prologue leg 4b and the app to edge dependsOn** (serves dataplane-convergence)
 
 ---
