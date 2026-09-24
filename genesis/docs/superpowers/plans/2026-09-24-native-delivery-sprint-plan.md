@@ -222,7 +222,7 @@ UNSTABLE in < 60 s, intent archived; one during a ready window delivers with pha
 
 - [x] **A1 — fleet-write-readiness.sh: single-shot readiness precondition per doorway, exit 0/3/2, never sleeps** (serves push-delivers-within-budget) — b6f256b9a; one face vocabulary abd014123
 - [x] **A2 — App delivery in concern-scoped timed phases; readiness refuses UNSTABLE in seconds with deploy-intent.json** (serves push-delivers-within-budget) — 5d44375b6; faces abd014123
-- [ ] **A3 — event-driven re-dispatch: hold the app baseline on a readiness UNSTABLE, pendingDeploy, deploy-pending timer pass** (serves push-delivers-within-budget)
+- [x] **A3 — event-driven re-dispatch: hold the app baseline on a readiness UNSTABLE, pendingDeploy, deploy-pending timer pass** (serves push-delivers-within-budget) — 7002b26ca; K follow-up capture-rollout-evidence --since-conductor 983efe6bb
 - [ ] **A4 — retire the DECLARE_ONLY fan-out from the App pipeline; verifyProjectedHeads stays as the measurement** (serves dataplane-convergence, push-delivers-within-budget)
 
 ---
@@ -414,7 +414,7 @@ Verify (E): package round-trips byte-identical (plant skill fidelity gate); the 
 - [x] **E1 — plant the algedonic-designer persona package and its projection** (serves push-delivers-within-budget) — 6cb119bfa; success measure operator-surfaced-pain@1 4e5a6d3de
 - [x] **E2 — cadence: /pain-sweep command, delivery-stasis pain-sweep station, daily surprise-auditor cloud routine** (serves push-delivers-within-budget) — 8c5679f9d; routine trig_01Pm5R6UBgRUNFQoPDUWPNAR
 - [ ] **E3 — first firing self-test: stage-wallclock@1 fires red on archived app #1719-#1725 and stays quiet on a second pass** (serves push-delivers-within-budget)
-- [ ] **E4 — delivery-stasis pain-sweep station merges origin pain/* branches into dev locally** (serves push-delivers-within-budget)
+- [x] **E4 — delivery-stasis pain-sweep station merges origin pain/* branches into dev locally** (serves push-delivers-within-budget) — 3d91ec75c
 
 ---
 
