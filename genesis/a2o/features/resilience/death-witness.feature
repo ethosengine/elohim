@@ -42,8 +42,9 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     network; it is ANCHORED later — committed to the distributed network
     through the peer's own conductor, so it survives the loss of that peer —
     which can only happen once a conductor is running again. The
-    envelope's last decision may be "none: the child was killed from
-    outside"; that is still a recorded decision.
+    envelope's last decision about a child killed from outside is its last
+    spawn or restart of that child, since the kill itself was nobody's
+    decision inside the envelope; that is still a recorded decision.
   - A CUSTODIAN is another household peer that has agreed, in a signed
     commitment, to keep copies of this peer's witnesses — a custodian KEEPS
     a copy, it never OWNS the record or the peer it came from. The
@@ -60,14 +61,17 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     and its custodians and refused to anyone else — refused, and told that
     a reach it does not have is required, never told the record does not
     exist at all.
-  - PRE-AUTHORIZATION is a receiving peer's own check, made before it keeps
-    a copy of a witness the replication plane hands it: does this peer have
-    standing for that witness's household (a live custody commitment, or
-    being the witness's own household)? A SKIPPED PRE-AUTHORIZATION is a
-    failed check — the peer declines to keep the copy at all, and counts
-    one. It is the replication plane's mirror of a stranger's HTTP refusal
-    (station 3b): the same "no standing, nothing kept" rule, applied where a
-    peer receives a copy instead of where a caller requests one.
+  - The REPLICATION PLANE is how peers copy records to each other: each peer
+    periodically asks the others what they hold and pulls what it lacks.
+    STANDING is what entitles a peer to a copy of a witness: being the
+    witness's own peer, or being one of its custodians.
+  - WITHHOLDING is a holding peer's refusal to hand a copy of a witness to a
+    peer without standing that asks for it over the replication plane. The
+    asking peer is not told the witness exists; the holding peer records
+    that it withheld it. It is the replication plane's mirror of a
+    stranger's HTTP refusal (station 3b): the same "no standing, nothing
+    handed over" rule, applied where a peer asks for copies instead of where
+    a caller fetches one.
   - The ATOM HOME is the page in the app that shows one record; a death
     witness is one kind of record it renders. It has a REACH CHIP (who may
     see this) and a FOCAL SLOT (the main area, which renders the record by
@@ -87,11 +91,13 @@ Feature: Death witness — a peer's runtime tells its household why a child died
   #
   # @requires:owned-substrate — this suite may kill processes only on a mesh it owns.
   # Every peer named here is a dedicated drill fixture on that mesh (see
-  # chaos-peer-churn.feature). Jessica, Matthew, and James are fixture household humans.
+  # chaos-peer-churn.feature). Jessica, Matthew, and James are fixture household humans;
+  # Daniel, Jessica's brother, is a fourth fixture household human who joins only in
+  # station 3b-ii, as a household member without custody standing.
   #
   # S0 landed 2026-09-02: the household mesh launches its conductors under the envelope
-  # (`MESH_CONDUCTOR_LAUNCH=ark`), so stations 1, 2 and 3b are live; 3a, 3b-ii and 4 stay
-  # @wip until S1 finishes rendering, the shard-plane custody gate and anchoring. Without
+  # (`MESH_CONDUCTOR_LAUNCH=ark`), so stations 1, 2 and 3b are live; 3a and 4 stay @wip
+  # until S1 finishes rendering and anchoring, and 3b-ii until it passes on the mesh. Without
   # the envelope every assertion below would be vacuous by construction — the Background
   # refuses to run then. Stations are decomposed so the finish line (station 4) is
   # untouched as earlier stations land.
@@ -150,8 +156,11 @@ Feature: Death witness — a peer's runtime tells its household why a child died
   # replication plane that carries it to a custodian in the first place (station 2).
   # A custodian earns the witness by counter-signing custody; a peer that never made
   # that promise must end up holding nothing, even though it joins the very mesh
-  # that carries the witness to Matthew and James. @wip until the mesh measures it —
-  # this is the custody-scoped read gate on the shard replication plane itself.
+  # that carries the witness to Matthew and James. The proof is on the holding side:
+  # the peers that have the witness refuse to hand it to Daniel. (A receiving peer
+  # also re-checks standing before keeping anything handed to it; an honest
+  # household never hands Daniel the witness, so that backstop is proven in the
+  # storage crate's own tests, not here.) @wip until this scenario passes on the mesh.
   @wip @station-3b-ii @requires:owned-substrate
   Scenario: Station 3b-ii — a peer without standing receives nothing over the replication plane
     Given Matthew and James have each already counter-signed a commitment to custody Jessica's witnesses
@@ -159,7 +168,7 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     When Jessica's conductor is killed with SIGKILL
     Then within 120 seconds Matthew and James each hold a copy of the witness with the same content hash
     And Daniel's peer holds no copy of the witness
-    And Daniel's peer counts one skipped pre-authorization for it
+    And a peer holding the witness withheld it from Daniel when he asked for copies
 
   @wip @station-4
   Scenario: Station 4 — the incident becomes a durable network record when the conductor returns
