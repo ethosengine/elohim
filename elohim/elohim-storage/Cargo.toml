@@ -400,6 +400,11 @@ ssr = ["dep:elohim-render", "reqwest/blocking"]
 
 [dev-dependencies]
 tempfile = "3"
+# FTS5 runtime probe (tests/search/fts5_probe.rs). NO FEATURES — load-bearing:
+# the graph already resolves rusqlite 0.37 / libsqlite3-sys 0.35 through lair's
+# bundled SQLCipher (built with -DSQLITE_ENABLE_FTS5). Adding `bundled` here
+# would compile a second SQLite into the same binary.
+rusqlite = "0.37"
 jsonschema = "0.28"
 wiremock = "0.6"
 # Adds `test-util` (paused/advanced virtual time, e.g. `#[tokio::test(start_paused = true)]`)

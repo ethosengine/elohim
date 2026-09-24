@@ -2608,6 +2608,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "rrule",
+ "rusqlite",
  "serde",
  "serde_bytes",
  "serde_ipld_dagcbor",
