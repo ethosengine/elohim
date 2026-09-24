@@ -1,0 +1,40 @@
+{
+  "$id": "epr:schema:view:observation-accepted",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObservationAcceptedView",
+  "description": "Source of truth: the observer's own append-only observation log on their node (Private, Category B); this ack is its head after the append (Operational, Category C — returned once per write, not persisted apart from the log head). Response to POST /api/v1/observations. It names what the row honestly is: observerCidNamespace 'as-asserted' says the observer is the caller's header identifier verbatim (the browser path sends a session human id, the desktop path an agent key; the two namespaces are named here, not reconciled), and signed 'absent' says the row carries no signature until the signing graduation. Both are single-valued today by design; the graduation widens them.",
+  "type": "object",
+  "required": ["observerCid", "observerCidNamespace", "logCid", "logOffset", "seq", "signed"],
+  "additionalProperties": false,
+  "properties": {
+    "observerCid": {
+      "type": "string",
+      "description": "The observer: the X-Agent-Cid header, verbatim."
+    },
+    "observerCidNamespace": {
+      "type": "string",
+      "const": "as-asserted",
+      "description": "How observerCid was established: as the caller asserted it."
+    },
+    "logCid": {
+      "type": "string",
+      "pattern": "^blake3:[0-9a-f]{64}$",
+      "description": "The observer's log root after this append."
+    },
+    "logOffset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "This observation's position in the observer's log (0-based)."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The observer's own sequence number for this observation (1-based)."
+    },
+    "signed": {
+      "type": "string",
+      "const": "absent",
+      "description": "Whether the row carries the observer's signature. Absent until the signing graduation."
+    }
+  }
+}

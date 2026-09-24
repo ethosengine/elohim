@@ -2547,6 +2547,51 @@ lazy_static! {
     .unwrap();
 }
 
+// Observation cursor gossip gate (`p2p::observation_gossip::announcement_for`).
+// A separate `lazy_static!` block for the same macro-recursion reason noted
+// above the Q3/Q4 block.
+lazy_static! {
+    /// Observation appends whose cursor was NOT announced because the kind's
+    /// manifest-declared reach is `agent-private` — the gate that keeps a
+    /// person's attention on their own node. label: kind (a manifest-declared
+    /// observation kind; the vocabulary is closed by the pillar manifests, so
+    /// the label set is bounded by it).
+    pub static ref OBSERVATION_CURSOR_SUPPRESSED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_observation_cursor_suppressed_total",
+            "Observation appends whose cursor announcement the agent-private gate suppressed, by kind.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+
+    /// Observation appends that produced a cursor announcement (a kind whose
+    /// reach is not `agent-private`). For an agent-private kind this stays 0 —
+    /// a non-zero value there is the invariant broken. label: kind.
+    pub static ref OBSERVATION_CURSOR_ANNOUNCED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_observation_cursor_announced_total",
+            "Observation appends that produced a cursor announcement, by kind.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+}
+
+/// Record one observation append whose cursor the agent-private gate suppressed.
+pub fn inc_observation_cursor_suppressed(kind: &str) {
+    OBSERVATION_CURSOR_SUPPRESSED
+        .with_label_values(&[kind])
+        .inc();
+}
+
+/// Record one observation append that produced a cursor announcement.
+pub fn inc_observation_cursor_announced(kind: &str) {
+    OBSERVATION_CURSOR_ANNOUNCED
+        .with_label_values(&[kind])
+        .inc();
+}
+
 // ── HTTP dispatch wrapper — the request-duration histogram this file was
 // missing entirely until 2026-08-21: the doorway's 2-failure breaker opened on
 // a ~60s storage stall under suite load while storage answered in 1.6ms a
@@ -2837,6 +2882,20 @@ pub fn register_all() {
         for reason in ["no_identity_header", "agent_cid_unresolved"] {
             ACCOUNT_CALLER_UNRESOLVED_TOTAL
                 .with_label_values(&[reason])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(OBSERVATION_CURSOR_SUPPRESSED.clone()));
+        let _ = REGISTRY.register(Box::new(OBSERVATION_CURSOR_ANNOUNCED.clone()));
+        // Pre-touch both counters for every compiled-in observation kind, so
+        // "nothing was announced" reads as a measured 0 rather than an absent
+        // series — the a2o scenario asserts `announced_total` is 0.
+        for decl in crate::services::observation_kinds::ObservationKindRegistry::embedded().kinds()
+        {
+            OBSERVATION_CURSOR_SUPPRESSED
+                .with_label_values(&[&decl.kind])
+                .inc_by(0);
+            OBSERVATION_CURSOR_ANNOUNCED
+                .with_label_values(&[&decl.kind])
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(SIGNAL_DECODE_MISS_TOTAL.clone()));

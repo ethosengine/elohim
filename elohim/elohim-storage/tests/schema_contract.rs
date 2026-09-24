@@ -6523,3 +6523,74 @@ fn content_view_carries_tags_and_conforms() {
     assert_eq!(untagged.get("tags"), Some(&serde_json::json!([])));
     validate_against_schema("views/content-view.schema.json", &untagged);
 }
+
+// ── Observation write path (attention-witnessed-privately, plan task A3) ──
+
+/// True when `instance` validates against the schema at `relative`.
+fn observation_schema_accepts(relative: &str, instance: &Value) -> bool {
+    let schema = load_schema(relative);
+    let validator = jsonschema::validator_for(&schema)
+        .unwrap_or_else(|e| panic!("Failed to compile schema {}: {}", relative, e));
+    validator.is_valid(instance)
+}
+
+#[test]
+fn observation_intent_input_conforms() {
+    use elohim_views::ObservationIntentView;
+    let schema_path = "inputs/observation-intent.schema.json";
+    assert_source_of_truth_declared(&load_schema(schema_path), schema_path);
+
+    // Minimal: the kind and the payload; the server stamps the rest.
+    let minimal: ObservationIntentView = serde_json::from_value(serde_json::json!({
+        "observationKind": "lamad:content-viewed",
+        "payloadJson": "{\"ref_cid\":\"bafy\",\"dwell_ms\":3000,\"scroll_depth_pct\":50}"
+    }))
+    .expect("minimal intent deserializes");
+    validate_against_schema(schema_path, &serde_json::to_value(&minimal).unwrap());
+
+    let full = ObservationIntentView {
+        observer_cid: Some("human-jessica".into()),
+        observation_kind: "lamad:content-viewed".into(),
+        subject_cid: Some("bafy-node".into()),
+        subject_kind: Some("content".into()),
+        observed_at: Some(1_790_000_000),
+        payload_json: "{}".into(),
+    };
+    validate_against_schema(schema_path, &serde_json::to_value(&full).unwrap());
+
+    // The schema and the Rust struct both refuse an undeclared field.
+    let extra = serde_json::json!({
+        "observationKind": "lamad:content-viewed",
+        "payloadJson": "{}",
+        "signature": "forged"
+    });
+    assert!(!observation_schema_accepts(schema_path, &extra));
+    assert!(serde_json::from_value::<ObservationIntentView>(extra).is_err());
+}
+
+#[test]
+fn observation_accepted_view_conforms() {
+    use elohim_views::ObservationAcceptedView;
+    let schema_path = "views/observation-accepted-view.schema.json";
+    assert_source_of_truth_declared(&load_schema(schema_path), schema_path);
+
+    let ack = ObservationAcceptedView {
+        observer_cid: "human-jessica".into(),
+        observer_cid_namespace: "as-asserted".into(),
+        log_cid: format!("blake3:{}", "ab".repeat(32)),
+        log_offset: 0,
+        seq: 1,
+        signed: "absent".into(),
+    };
+    let json = serde_json::to_value(&ack).unwrap();
+    validate_against_schema(schema_path, &json);
+
+    // The ack never claims a signature it does not carry.
+    let mut claimed = json.clone();
+    claimed["signed"] = serde_json::json!("present");
+    assert!(!observation_schema_accepts(schema_path, &claimed));
+
+    let mut extra = json;
+    extra["signatureB64"] = serde_json::json!("");
+    assert!(!observation_schema_accepts(schema_path, &extra));
+}

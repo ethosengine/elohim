@@ -2291,6 +2291,59 @@ pub struct ObservationView {
     pub signature_b64: String,
 }
 
+/// Body of `POST /api/v1/observations` — a person's node witnessing one of
+/// their own observations.
+///
+/// Wire format: `inputs/observation-intent.schema.json`. The observer is never
+/// the body's to choose: it is the explicit `X-Agent-Cid` header, verbatim.
+/// `observer_cid` exists only so a body that names an observer can be checked —
+/// equal to the header it is redundant, any other value is refused (403).
+/// `payload_json` is pre-stringified (the `Observation` wire convention) and is
+/// validated against the kind's manifest-declared field map. `observed_at`
+/// (unix seconds) is stamped by the server when absent.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct ObservationIntentView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub observer_cid: Option<String>,
+    pub observation_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub subject_cid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub subject_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "number")]
+    pub observed_at: Option<i64>,
+    pub payload_json: String,
+}
+
+/// Acknowledgement of an accepted `POST /api/v1/observations`.
+///
+/// Wire format: `views/observation-accepted-view.schema.json`. The ack names
+/// what the row honestly is today: `observer_cid_namespace` is `"as-asserted"`
+/// (the header's identifier, verbatim — the browser path sends the session's
+/// human id, the desktop path an agent key; the two namespaces are named, not
+/// reconciled) and `signed` is `"absent"` (the row carries an empty signature
+/// until the signing graduation). `log_offset` and `seq` are the observer's own
+/// log position and sequence.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct ObservationAcceptedView {
+    pub observer_cid: String,
+    pub observer_cid_namespace: String,
+    pub log_cid: String,
+    #[ts(type = "number")]
+    pub log_offset: u64,
+    #[ts(type = "number")]
+    pub seq: u64,
+    pub signed: String,
+}
+
 /// Cluster-scoped operational weave projection: placement/coverage/capacity/occupancy
 /// folded per-shard → per-node → per-cluster. Each lens field is OPTIONAL — a facing
 /// carries only the lenses it selected (the not-selected-field contract).

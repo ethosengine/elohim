@@ -9,6 +9,7 @@
 
 mod acquisition_pins_http;
 mod api_observations_test;
+mod api_observations_write_test;
 mod api_placement_gaps;
 mod db_content_list_tags;
 mod db_humans_http_route;

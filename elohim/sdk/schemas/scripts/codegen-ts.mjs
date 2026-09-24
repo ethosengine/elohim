@@ -205,6 +205,10 @@ const INTERFACE_FILES = [
   { src: 'views/exchange-session-response.ts', dest: 'exchange-session-response.ts' },
   { src: 'views/session-token-response.ts', dest: 'session-token-response.ts' },
   { src: 'views/account-response.ts', dest: 'account-response.ts' },
+  // attention-witnessed-privately (plan task A3): the observation write path —
+  // POST /api/v1/observations body and ack (Category B observer-private log).
+  { src: 'inputs/observation-intent.ts', dest: 'observation-intent.ts' },
+  { src: 'views/observation-accepted-view.ts', dest: 'observation-accepted-view.ts' },
 ];
 
 /**

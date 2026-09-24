@@ -112,6 +112,7 @@ pub async fn handle_api_request(
     elohim_capability: Option<crate::views::ElohimCapabilityProfile>,
     render_capability: Option<crate::views::RenderCapabilityProfile>,
     extensions: Option<crate::views::CapabilityExtensions>,
+    observation_manager: Arc<crate::observation::manager::ObservationManagerBackend>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -328,7 +329,15 @@ pub async fn handle_api_request(
         hazards::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("observations") {
         let resource_path = sub_path.strip_prefix("observations").unwrap_or("");
-        observations::handle(req, method, resource_path, &pool, &app_ctx).await
+        observations::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            &observation_manager,
+        )
+        .await
     } else if sub_path.starts_with("placement-gaps") {
         let resource_path = sub_path.strip_prefix("placement-gaps").unwrap_or("");
         placement_gaps::handle(req, method, resource_path, &pool, &app_ctx).await

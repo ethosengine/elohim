@@ -2649,6 +2649,7 @@ impl HttpServer {
                         self.elohim_capability.clone(),
                         self.render_capability.clone(),
                         self.extensions.clone(),
+                        self.observation_manager.clone(),
                     )
                     .await
                 } else {
@@ -17586,6 +17587,22 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .handler("observation_report")
                 .build(),
         )
+        // Observation layer (`api/observations.rs`): the caller's own rows only.
+        // The write witnesses one observation under a manifest-declared kind;
+        // the stream is the lifestream recipe over the caller's rows. Both need
+        // the verified caller, which the doorway forwards as `X-Agent-Cid`.
+        .route(
+            Route::post("/api/v1/observations")
+                .handler("observation_append")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/observations/stream")
+                .handler("observation_stream")
+                .auth_required()
+                .build(),
+        )
         // =====================================================================
         // /account -- Account Import/Export (seeding & recovery)
         // =====================================================================
@@ -19469,6 +19486,30 @@ mod auth_me_tests {
             "GET /api/v1/status/projector missing from build_manifest — doorway \
              cannot proxy projector lag/caughtUp to the stability surface"
         );
+    }
+
+    /// The observation write and the lifestream read are reachable through the
+    /// doorway only if the manifest declares them (the doorway routes from
+    /// this manifest; an undeclared path 404s there). Both answer for the
+    /// caller's own rows, so both require auth — the doorway then forwards the
+    /// verified caller as `X-Agent-Cid`.
+    #[test]
+    fn build_manifest_declares_observation_write_and_stream() {
+        let manifest = build_manifest();
+        for (method, path) in [
+            (doorway_client::HttpMethod::Post, "/api/v1/observations"),
+            (
+                doorway_client::HttpMethod::Get,
+                "/api/v1/observations/stream",
+            ),
+        ] {
+            let route = manifest
+                .routes
+                .iter()
+                .find(|r| r.method == method && r.path == path)
+                .unwrap_or_else(|| panic!("{path} missing from build_manifest"));
+            assert!(route.auth_required, "{path} must be auth_required");
+        }
     }
 }
 

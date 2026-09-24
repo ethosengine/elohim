@@ -1,5 +1,5 @@
 //! Observation-kind registry — the manifest-declared vocabulary of observations
-//! this node will accept, loaded from the pillar manifests on disk.
+//! this node will accept.
 //!
 //! Each pillar declares its observation kinds in `manifest.json` under
 //! `observation_kinds`, either inline (an array) or by `{"$ref": "./manifest/observation-kinds.json"}`
@@ -8,9 +8,15 @@
 //! is read from that file. The declaration shape is
 //! `elohim/sdk/schemas/v1/manifest/observation-kind.schema.json`.
 //!
-//! The directory follows the same resolution as the write-through layer-1 loader
-//! (`manifest_registry::load_pillar_manifest_layer1`): `ELOHIM_PILLAR_MANIFEST_DIR`,
-//! falling back to `elohim/sdk/domains` relative to the working directory.
+//! **The vocabulary is compiled into the binary** ([`ObservationKindRegistry::embedded`]).
+//! A deployed node sets no manifest directory and runs from a working directory
+//! that holds no `elohim/sdk`, so a registry read from disk there is empty and
+//! every observation would be an unknown kind. The embedded table lists the
+//! declaring pillars explicitly (no build script); a test pins it to the
+//! manifests on disk, so a pillar that starts declaring kinds fails the tests
+//! until it is added here. `ELOHIM_PILLAR_MANIFEST_DIR` stays as a development
+//! override: when it names a readable directory, the kinds read there REPLACE
+//! the embedded set (ruling R-A7, 2026-09-24).
 //!
 //! `validate_payload` checks an observation's payload against the kind's declared
 //! field map. Type map: `Cid` | `String` → JSON string; `u8`/`u16`/`u32`/`u64` →
@@ -25,11 +31,71 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
-/// Env var naming the pillar manifest root (shared with the write-through loader).
+/// Env var naming a pillar manifest root whose kinds replace the embedded set
+/// (development override; shared with the write-through loader).
 pub const PILLAR_MANIFEST_DIR_ENV: &str = "ELOHIM_PILLAR_MANIFEST_DIR";
 
-/// Default pillar manifest root, relative to the working directory.
-pub const DEFAULT_PILLAR_MANIFEST_DIR: &str = "elohim/sdk/domains";
+/// One pillar's manifest bytes, compiled in: its `manifest.json` and any file
+/// that manifest's `observation_kinds` `$ref` names (path as written there).
+struct EmbeddedPillar {
+    name: &'static str,
+    manifest: &'static str,
+    referenced: &'static [(&'static str, &'static str)],
+}
+
+macro_rules! pillar_file {
+    ($rel:literal) => {
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../sdk/domains/",
+            $rel
+        ))
+    };
+}
+
+/// Every pillar that declares observation kinds, in name order — the order
+/// [`ObservationKindRegistry::load`] reads a directory in, so "first declared
+/// wins" resolves identically from the binary and from disk.
+const EMBEDDED_PILLARS: &[EmbeddedPillar] = &[
+    EmbeddedPillar {
+        name: "elohim",
+        manifest: pillar_file!("elohim/manifest.json"),
+        referenced: &[],
+    },
+    EmbeddedPillar {
+        name: "imagodei",
+        manifest: pillar_file!("imagodei/manifest.json"),
+        referenced: &[],
+    },
+    EmbeddedPillar {
+        name: "infrastructure",
+        manifest: pillar_file!("infrastructure/manifest.json"),
+        referenced: &[],
+    },
+    EmbeddedPillar {
+        name: "lamad",
+        manifest: pillar_file!("lamad/manifest.json"),
+        referenced: &[(
+            "./manifest/observation-kinds.json",
+            pillar_file!("lamad/manifest/observation-kinds.json"),
+        )],
+    },
+    EmbeddedPillar {
+        name: "mishpat",
+        manifest: pillar_file!("mishpat/manifest.json"),
+        referenced: &[],
+    },
+    EmbeddedPillar {
+        name: "qahal",
+        manifest: pillar_file!("qahal/manifest.json"),
+        referenced: &[],
+    },
+    EmbeddedPillar {
+        name: "shefa",
+        manifest: pillar_file!("shefa/manifest.json"),
+        referenced: &[],
+    },
+];
 
 /// One manifest-declared observation kind (mirror of `observation-kind.schema.json`).
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -69,17 +135,47 @@ impl ObservationKindRegistry {
         Self::default()
     }
 
-    /// The pillar manifest root: `ELOHIM_PILLAR_MANIFEST_DIR`, else `elohim/sdk/domains`.
-    pub fn default_dir() -> PathBuf {
-        std::env::var(PILLAR_MANIFEST_DIR_ENV)
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from(DEFAULT_PILLAR_MANIFEST_DIR))
+    /// The development override directory, when `ELOHIM_PILLAR_MANIFEST_DIR` is set.
+    pub fn override_dir() -> Option<PathBuf> {
+        std::env::var_os(PILLAR_MANIFEST_DIR_ENV).map(PathBuf::from)
     }
 
-    /// Load from [`Self::default_dir`]. A missing directory yields an empty
-    /// registry (warned), the same degradation the write-through loader uses.
+    /// The node's registry: the kinds read under `ELOHIM_PILLAR_MANIFEST_DIR`
+    /// when it names a readable directory (development override, replaces the
+    /// embedded set), else the compiled-in kinds ([`Self::embedded`]).
     pub fn load_default() -> Self {
-        Self::load(&Self::default_dir())
+        if let Some(dir) = Self::override_dir() {
+            if dir.is_dir() {
+                return Self::load(&dir);
+            }
+            tracing::warn!(
+                target = "observation::kinds",
+                dir = ?dir,
+                "ELOHIM_PILLAR_MANIFEST_DIR is not a readable directory; using the compiled-in observation kinds"
+            );
+        }
+        Self::embedded()
+    }
+
+    /// The observation kinds compiled into this binary from the pillar manifests.
+    pub fn embedded() -> Self {
+        let mut registry = Self::empty();
+        for pillar in EMBEDDED_PILLARS {
+            let Some(manifest) = parse_json(pillar.name, pillar.manifest) else {
+                continue;
+            };
+            let fetch = |rel: &str| {
+                pillar
+                    .referenced
+                    .iter()
+                    .find(|(path, _)| normalize_rel(path) == normalize_rel(rel))
+                    .and_then(|(path, body)| parse_json(path, body))
+            };
+            for decl in resolve_pillar_kinds(pillar.name, Some(manifest), &fetch) {
+                registry.kinds.entry(decl.kind.clone()).or_insert(decl);
+            }
+        }
+        registry
     }
 
     /// Load every pillar's declared observation kinds under `dir`.
@@ -117,6 +213,11 @@ impl ObservationKindRegistry {
     /// The declaration for `kind`, if any pillar declares it.
     pub fn get(&self, kind: &str) -> Option<&ObservationKindDeclaration> {
         self.kinds.get(kind)
+    }
+
+    /// Every declared kind, in no particular order.
+    pub fn kinds(&self) -> impl Iterator<Item = &ObservationKindDeclaration> {
+        self.kinds.values()
     }
 
     /// Number of declared kinds.
@@ -198,33 +299,41 @@ fn check_type(
     }
 }
 
-/// Read one pillar's kinds: `manifest.json`'s `observation_kinds` (inline array
-/// or `$ref`), else `manifest/observation-kinds.json`.
+/// Read one pillar directory's kinds from disk.
 fn read_pillar_kinds(pillar: &Path) -> Vec<ObservationKindDeclaration> {
     let manifest_path = pillar.join("manifest.json");
-    let declared = match std::fs::read_to_string(&manifest_path) {
-        Ok(body) => match serde_json::from_str::<serde_json::Value>(&body) {
-            Ok(json) => json.get("observation_kinds").cloned(),
-            Err(e) => {
-                tracing::warn!(
-                    target = "observation::kinds",
-                    path = ?manifest_path,
-                    error = %e,
-                    "pillar manifest is not valid JSON; skipping its observation kinds"
-                );
-                return Vec::new();
-            }
+    let manifest = match std::fs::read_to_string(&manifest_path) {
+        Ok(body) => match parse_json(&manifest_path.display().to_string(), &body) {
+            Some(json) => Some(json),
+            // Malformed manifest: warned in `parse_json`; the pillar is skipped.
+            None => return Vec::new(),
         },
         Err(_) => None,
     };
+    let fetch = |rel: &str| {
+        let path = pillar.join(rel);
+        let body = std::fs::read_to_string(&path).ok()?;
+        parse_json(&path.display().to_string(), &body)
+    };
+    resolve_pillar_kinds(&pillar.display().to_string(), manifest, &fetch)
+}
 
+/// Resolve one pillar's kinds: `manifest.json`'s `observation_kinds` (inline
+/// array or `$ref`), else `manifest/observation-kinds.json`. `fetch` reads a
+/// path relative to the pillar — from disk or from the compiled-in table.
+fn resolve_pillar_kinds(
+    pillar: &str,
+    manifest: Option<serde_json::Value>,
+    fetch: &dyn Fn(&str) -> Option<serde_json::Value>,
+) -> Vec<ObservationKindDeclaration> {
+    let declared = manifest.and_then(|json| json.get("observation_kinds").cloned());
     let kinds_value = match declared {
         Some(serde_json::Value::Object(obj)) => match obj.get("$ref").and_then(|r| r.as_str()) {
-            Some(rel) => read_json(&pillar.join(rel)),
+            Some(rel) => fetch(rel),
             None => None,
         },
         Some(array @ serde_json::Value::Array(_)) => Some(array),
-        _ => read_json(&pillar.join("manifest").join("observation-kinds.json")),
+        _ => fetch("manifest/observation-kinds.json"),
     };
 
     let Some(value) = kinds_value else {
@@ -235,7 +344,7 @@ fn read_pillar_kinds(pillar: &Path) -> Vec<ObservationKindDeclaration> {
         Err(e) => {
             tracing::warn!(
                 target = "observation::kinds",
-                pillar = ?pillar,
+                pillar = pillar,
                 error = %e,
                 "observation_kinds does not match the declaration shape; skipping pillar"
             );
@@ -244,16 +353,20 @@ fn read_pillar_kinds(pillar: &Path) -> Vec<ObservationKindDeclaration> {
     }
 }
 
-fn read_json(path: &Path) -> Option<serde_json::Value> {
-    let body = std::fs::read_to_string(path).ok()?;
-    match serde_json::from_str(&body) {
+/// `./manifest/x.json` and `manifest/x.json` name the same file.
+fn normalize_rel(rel: &str) -> &str {
+    rel.trim_start_matches("./")
+}
+
+fn parse_json(label: &str, body: &str) -> Option<serde_json::Value> {
+    match serde_json::from_str(body) {
         Ok(v) => Some(v),
         Err(e) => {
             tracing::warn!(
                 target = "observation::kinds",
-                path = ?path,
+                path = label,
                 error = %e,
-                "observation-kinds file is not valid JSON; skipping"
+                "pillar manifest file is not valid JSON; skipping"
             );
             None
         }
@@ -336,6 +449,90 @@ mod tests {
             .validate_payload("lamad:content-viewed", &payload)
             .unwrap_err();
         assert!(err.contains("dwell_ms"), "{err}");
+    }
+
+    /// Env var that turns [`embedded_registry_child_probe`] from a no-op into
+    /// the real probe; only the parent test below sets it.
+    const CHILD_PROBE_ENV: &str = "OBSERVATION_KINDS_EMBEDDED_CHILD_PROBE";
+
+    /// R-A7: a deployed node sets no `ELOHIM_PILLAR_MANIFEST_DIR` and runs from
+    /// a working directory that holds no `elohim/sdk/domains`. The declared
+    /// kinds must still be there, because they are compiled in.
+    ///
+    /// The working directory is process-global and the test harness is
+    /// multi-threaded, so the probe runs in a CHILD process (this same test
+    /// binary, filtered to [`embedded_registry_child_probe`]) started in an
+    /// empty temp directory with the env var removed — never by mutating this
+    /// process's cwd under other tests.
+    #[test]
+    fn embedded_kinds_include_lamad_content_viewed_without_env_or_cwd() {
+        let cwd = tempfile::tempdir().expect("temp cwd");
+        let out = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "services::observation_kinds::tests::embedded_registry_child_probe",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .current_dir(cwd.path())
+            .env_remove(PILLAR_MANIFEST_DIR_ENV)
+            .env(CHILD_PROBE_ENV, "1")
+            .output()
+            .expect("spawn the child probe");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            out.status.success(),
+            "child probe failed:\n{stdout}\n{stderr}"
+        );
+        assert!(
+            stdout.contains("EMBEDDED-PROBE lamad:content-viewed agent-private"),
+            "the child probe did not run or did not find the kind:\n{stdout}\n{stderr}"
+        );
+    }
+
+    /// The child half of the test above; a no-op unless the parent started it.
+    #[test]
+    fn embedded_registry_child_probe() {
+        if std::env::var(CHILD_PROBE_ENV).is_err() {
+            return;
+        }
+        assert!(std::env::var(PILLAR_MANIFEST_DIR_ENV).is_err());
+        assert!(
+            !Path::new("elohim/sdk/domains").exists(),
+            "the child must run where no repo-relative manifest dir resolves"
+        );
+        for registry in [
+            ObservationKindRegistry::embedded(),
+            ObservationKindRegistry::load_default(),
+        ] {
+            let decl = registry
+                .get("lamad:content-viewed")
+                .expect("lamad:content-viewed is compiled into the binary");
+            println!("EMBEDDED-PROBE {} {}", decl.kind, decl.reach);
+        }
+    }
+
+    /// The embedded table lists the pillars explicitly (no build script), so a
+    /// pillar that starts declaring kinds must be added to it. This pins the
+    /// compiled-in vocabulary to the manifests on disk.
+    #[test]
+    fn embedded_set_matches_the_pillar_manifests_on_disk() {
+        let disk = repo_registry();
+        let embedded = ObservationKindRegistry::embedded();
+        let mut disk_kinds: Vec<_> = disk.kinds().map(|d| d.kind.clone()).collect();
+        let mut embedded_kinds: Vec<_> = embedded.kinds().map(|d| d.kind.clone()).collect();
+        disk_kinds.sort();
+        embedded_kinds.sort();
+        assert_eq!(embedded_kinds, disk_kinds);
+        for decl in disk.kinds() {
+            assert_eq!(
+                embedded.get(&decl.kind),
+                Some(decl),
+                "{} drifted",
+                decl.kind
+            );
+        }
     }
 
     #[test]
