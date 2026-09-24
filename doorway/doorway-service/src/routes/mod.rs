@@ -81,10 +81,10 @@ pub use dashboard_ws::handle_dashboard_ws;
 // `handle_db_request` re-export retired with the db module — see comment above.
 pub use debug_stream::{handle_debug_stream, DebugEvent, DebugHub};
 pub use federation::{
-    handle_admin_add_federation_peer, handle_admin_federation_peers,
-    handle_admin_refresh_federation_peers, handle_admin_remove_federation_peer,
-    handle_doorway_keys, handle_federation_doorways, handle_federation_hosted_binding,
-    handle_federation_p2p_peers,
+    handle_admin_add_federation_peer, handle_admin_federation_deregister,
+    handle_admin_federation_peers, handle_admin_refresh_federation_peers,
+    handle_admin_remove_federation_peer, handle_doorway_keys, handle_federation_doorways,
+    handle_federation_hosted_binding, handle_federation_p2p_peers,
 };
 pub use freshness::{FreshnessPantry, FreshnessStatus, StageProvenance};
 pub use health::{health_check, readiness_check, serving_check, startup_check, version_info};

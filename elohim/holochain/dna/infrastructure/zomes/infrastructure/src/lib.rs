@@ -652,6 +652,105 @@ pub fn get_all_doorways(_: ()) -> ExternResult<Vec<DoorwayOutput>> {
     Ok(results)
 }
 
+/// Deregister a doorway: take it out of the federation roster.
+///
+/// Deletes every index link that points at a registration for `id`: the
+/// `IdToDoorway` links on the `__all__` list-all anchor and on the doorway's
+/// own id anchor, and its `OperatorToDoorway` and `RegionToDoorway` links, so
+/// `get_all_doorways`, `get_doorway_by_id` and the operator/region reads stop
+/// returning it. Every boot re-registers and appends links, so all of them go.
+///
+/// Self-deregistration only, mirroring `register_doorway` / `update_doorway`:
+/// a link is deleted only when THIS agent authored it and the registration it
+/// targets is operated by this agent. The registration entries themselves stay
+/// on the source chain (append-only); only the index links move.
+///
+/// Why it exists: a2o scenario doorways registered on every run and were never
+/// removed, and every sibling's peer-health probe attested each one forever
+/// (conductor-store growth report 2026-09-24, §3 and §7.1). Coordinator-only:
+/// `DeleteLink` is already `Valid` in the integrity zome, so the DNA hash does
+/// not move. Idempotent; returns the number of links deleted.
+#[hdk_extern]
+pub fn deregister_doorway(id: String) -> ExternResult<u32> {
+    if id.is_empty() || id == "__all__" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "deregister_doorway needs a real doorway id".to_string()
+        )));
+    }
+    let me = agent_info()?.agent_initial_pubkey;
+    let mut regions: Vec<String> = Vec::new();
+    let mut deleted = 0;
+    for (anchor, link_type) in [
+        (
+            StringAnchor::new("doorway_id", "__all__"),
+            LinkTypes::IdToDoorway,
+        ),
+        (StringAnchor::new("doorway_id", &id), LinkTypes::IdToDoorway),
+        (
+            StringAnchor::new("doorway_operator", &me.to_string()),
+            LinkTypes::OperatorToDoorway,
+        ),
+    ] {
+        deleted += delete_own_doorway_links(anchor, link_type, &id, &me, &mut regions)?;
+    }
+    for region in regions {
+        deleted += delete_own_doorway_links(
+            StringAnchor::new("doorway_region", &region),
+            LinkTypes::RegionToDoorway,
+            &id,
+            &me,
+            &mut Vec::new(),
+        )?;
+    }
+    Ok(deleted)
+}
+
+/// Delete the links under `anchor` that `me` authored and that target a
+/// registration of doorway `id` operated by `me`. Records each matched
+/// registration's region in `regions` (deduplicated) for the region pass.
+fn delete_own_doorway_links(
+    anchor: StringAnchor,
+    link_type: LinkTypes,
+    id: &str,
+    me: &AgentPubKey,
+    regions: &mut Vec<String>,
+) -> ExternResult<u32> {
+    let base = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
+    let me_string = me.to_string();
+    let mut deleted: u32 = 0;
+    for link in links {
+        if &link.author != me {
+            continue;
+        }
+        let Some(action_hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(action_hash, GetOptions::default())? else {
+            continue;
+        };
+        let Some(doorway) = record
+            .entry()
+            .to_app_option::<DoorwayRegistration>()
+            .ok()
+            .flatten()
+        else {
+            continue;
+        };
+        if doorway.id != id || doorway.operator_agent != me_string {
+            continue;
+        }
+        if let Some(region) = doorway.region {
+            if !regions.contains(&region) {
+                regions.push(region);
+            }
+        }
+        delete_link(link.create_link_hash, GetOptions::default())?;
+        deleted += 1;
+    }
+    Ok(deleted)
+}
+
 /// Get all doorways in a region
 #[hdk_extern]
 pub fn get_doorways_by_region(region: String) -> ExternResult<Vec<DoorwayOutput>> {

@@ -207,6 +207,36 @@ pub async fn register_doorway_in_dht(
     }
 }
 
+/// Take THIS doorway out of the infrastructure DHT's federation roster.
+///
+/// Calls the coordinator's `deregister_doorway` with this doorway's own id —
+/// self-deregistration only, the mirror of [`register_doorway_in_dht`]; the
+/// zome deletes only index links this agent authored. Returns the number of
+/// links deleted (0 = nothing to remove; the verb is idempotent).
+///
+/// The registration verb had no inverse, so every a2o scenario doorway stayed
+/// on the roster forever and every sibling probed and attested it every
+/// round (conductor-store growth report 2026-09-24 §3, §7.1).
+pub async fn deregister_doorway_in_dht(
+    config: &FederationConfig,
+    zome_caller: &ZomeCaller,
+) -> Result<u32, String> {
+    let deleted: u32 = zome_caller
+        .call::<String, u32>(
+            &config.infrastructure_role,
+            &config.zome_name,
+            "deregister_doorway",
+            &config.doorway_id,
+        )
+        .await?;
+    info!(
+        doorway_id = %config.doorway_id,
+        links_deleted = deleted,
+        "Doorway deregistered from the infrastructure DHT roster"
+    );
+    Ok(deleted)
+}
+
 // =============================================================================
 // Registration retry (bounded)
 // =============================================================================

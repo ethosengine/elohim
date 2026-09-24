@@ -7,6 +7,7 @@
 //! - `POST /admin/federation/peers` — add a federation peer
 //! - `DELETE /admin/federation/peers` — remove a federation peer
 //! - `POST /admin/federation/peers/refresh` — force peer cache refresh
+//! - `POST /admin/federation/deregister` — take THIS doorway off the DHT roster
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -622,6 +623,45 @@ pub async fn handle_admin_refresh_federation_peers(state: Arc<AppState>) -> Resp
     })
 }
 
+/// Response for POST /admin/federation/deregister
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeregisterResponse {
+    pub doorway_id: String,
+    /// Index links the zome deleted; 0 when nothing was registered (idempotent).
+    pub links_deleted: u32,
+}
+
+/// Handle POST /admin/federation/deregister
+///
+/// Takes THIS doorway out of the infrastructure DHT's federation roster so
+/// siblings stop discovering, probing and attesting it. Self-only: the id is
+/// this doorway's configured `doorway_id`, never a request parameter. Called
+/// by the a2o `OwnedDoorwayPair` fixture on teardown, before its scenario
+/// doorways stop (conductor-store growth report 2026-09-24 §7.1).
+///
+/// - 200 `{doorwayId, linksDeleted}`
+/// - 503 — federation not configured or no conductor connection
+/// - 502 — the zome call failed
+pub async fn handle_admin_federation_deregister(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let Some(zome_caller) = state.zome_caller.as_ref() else {
+        return json_error_response(StatusCode::SERVICE_UNAVAILABLE, "no conductor connection");
+    };
+    let Some(config) = FederationConfig::from_args(&state.args) else {
+        return json_error_response(StatusCode::SERVICE_UNAVAILABLE, "federation not configured");
+    };
+    match federation::deregister_doorway_in_dht(&config, zome_caller).await {
+        Ok(links_deleted) => json_response(&DeregisterResponse {
+            doorway_id: config.doorway_id,
+            links_deleted,
+        }),
+        Err(e) => {
+            tracing::warn!(error = %e, "Doorway deregistration failed");
+            json_error_response(StatusCode::BAD_GATEWAY, "deregistration zome call failed")
+        }
+    }
+}
+
 /// Helper: serialize to JSON response
 fn json_response<T: Serialize>(data: &T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(data) {
@@ -744,6 +784,27 @@ fn hosted_binding_json(status: StatusCode, body: String) -> Response<Full<Bytes>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// With no conductor there is nothing to deregister from: the verb must say
+    /// so (503), never answer 200 — the a2o fixture records the outcome and a
+    /// silent success would hide a roster that keeps growing.
+    #[tokio::test]
+    async fn deregister_without_a_conductor_is_an_honest_503() {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--doorway-id",
+            "epr-deliverability-test-a",
+            "--doorway-url",
+            "http://127.0.0.1:1",
+        ]);
+        let state = Arc::new(AppState::new(args));
+        assert!(state.zome_caller.is_none());
+        let response = handle_admin_federation_deregister(state).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
 
     #[test]
     fn test_base64_url_encode() {

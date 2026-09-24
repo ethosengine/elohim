@@ -8346,6 +8346,9 @@ async fn handle_request(
         (Method::POST, "/admin/federation/peers/refresh") => {
             to_boxed(routes::handle_admin_refresh_federation_peers(Arc::clone(&state)).await)
         }
+        (Method::POST, "/admin/federation/deregister") => {
+            to_boxed(routes::handle_admin_federation_deregister(Arc::clone(&state)).await)
+        }
         (Method::POST, "/admin/federation/peers") => {
             let body = match req.collect().await {
                 Ok(collected) => collected.to_bytes(),

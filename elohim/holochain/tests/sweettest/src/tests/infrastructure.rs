@@ -14,6 +14,9 @@
 //! 4. `get_all_doorways_lists_every_registered_doorway` — federation peer
 //!    discovery: the list-all sentinel anchor surfaces every peer (not just
 //!    self) across conductors, with latest-wins dedup on re-registration.
+//! 5. `a_deregistered_doorway_leaves_the_roster` — `deregister_doorway` removes
+//!    every roster/id link of the caller's own registration (all boots), leaves
+//!    siblings alone, and is idempotent.
 
 use anyhow::Result;
 use elohim_sweettest::common::{
@@ -344,6 +347,68 @@ async fn get_all_doorways_lists_every_registered_doorway() -> Result<()> {
         alpha[0].doorway.url, "https://alpha-v2.example",
         "dedup must keep the NEWEST registration"
     );
+
+    Ok(())
+}
+
+/// A scenario doorway that is torn down must be able to leave the roster.
+/// Registered twice (two boots = two `__all__` links), then deregistered:
+/// `get_all_doorways` and `get_doorway_by_id` stop returning it, a sibling
+/// registered by the same operator is untouched, and a second call deletes
+/// nothing. (Conductor-store growth report 2026-09-24 §7.1: the a2o serving
+/// receipt registered two doorways per run and never removed them.)
+#[tokio::test(flavor = "multi_thread")]
+async fn a_deregistered_doorway_leaves_the_roster() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), None).await?;
+    let app = conductor
+        .setup_app_for_agent("infrastructure-app", agent, &[dna])
+        .await?;
+    let cell = app.cells().first().unwrap().clone();
+    let zome = cell.zome("infrastructure");
+
+    let mut scenario = alpha_doorway_input();
+    scenario.id = "epr-deliverability-test-a".to_string();
+    let _: DoorwayOutput = conductor
+        .call(&zome, "register_doorway", scenario.clone())
+        .await;
+    scenario.url = "https://scenario-reboot.example".to_string();
+    let _: DoorwayOutput = conductor.call(&zome, "register_doorway", scenario).await;
+    let _: DoorwayOutput = conductor
+        .call(&zome, "register_doorway", alpha_doorway_input())
+        .await;
+
+    let deleted: u32 = conductor
+        .call(
+            &zome,
+            "deregister_doorway",
+            "epr-deliverability-test-a".to_string(),
+        )
+        .await;
+    // Two boots x (list-all + id + operator + region) links.
+    assert_eq!(deleted, 8, "every index link of both boots is removed");
+
+    let all: Vec<DoorwayOutput> = conductor.call(&zome, "get_all_doorways", ()).await;
+    let ids: Vec<&str> = all.iter().map(|d| d.doorway.id.as_str()).collect();
+    assert_eq!(ids, vec!["alpha"], "only the sibling stays on the roster");
+
+    let gone: Option<DoorwayOutput> = conductor
+        .call(
+            &zome,
+            "get_doorway_by_id",
+            "epr-deliverability-test-a".to_string(),
+        )
+        .await;
+    assert!(gone.is_none(), "the id lookup is gone too");
+
+    let again: u32 = conductor
+        .call(
+            &zome,
+            "deregister_doorway",
+            "epr-deliverability-test-a".to_string(),
+        )
+        .await;
+    assert_eq!(again, 0, "deregistration is idempotent");
 
     Ok(())
 }
