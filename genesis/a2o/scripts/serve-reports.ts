@@ -8,6 +8,11 @@
  * the operator opens the Che route for the SAME artifacts — symmetric vision.
  *
  * Zero dependencies (node http/fs only). Usage: `pnpm reports:serve`
+ *
+ * /delivery (+ /delivery.json) is the native "build #" view (native-delivery sprint, Lane G2):
+ * the push-delivers-within-budget habit's tier and cost from `epr flow walk --json`, the last
+ * orchestrator runs, and the App pipeline's stage graph with the readiness case as its own node
+ * (scripts/lib/delivery-view.ts). Readings are cached for 60 s; `?fresh` retakes them.
  * Port override: REPORTS_PORT. Mutually exclusive with anything else on 4201
  * (the ui-playground port is a shared dev slot).
  */
@@ -17,8 +22,21 @@ import { readdir, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
+import { type DeliveryData, loadDeliveryData, renderDeliveryPage } from './lib/delivery-view.js';
+
 const ROOT = resolve(import.meta.dirname, '..', 'reports');
 const PORT = Number(process.env['REPORTS_PORT'] ?? 4201);
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const DELIVERY_TTL_MS = 60_000;
+
+let delivery: { at: number; data: Promise<DeliveryData> } | null = null;
+
+async function deliveryData(fresh: boolean): Promise<DeliveryData> {
+  if (fresh || !delivery || Date.now() - delivery.at > DELIVERY_TTL_MS) {
+    delivery = { at: Date.now(), data: loadDeliveryData(REPO_ROOT) };
+  }
+  return delivery.data;
+}
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -47,7 +65,18 @@ function htmlIndex(urlPath: string, entries: { name: string; dir: boolean }[]): 
 
 const server = createServer((req, res) => {
   void (async () => {
-    const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0]);
+    const [rawPath, query = ''] = (req.url ?? '/').split('?');
+    const urlPath = decodeURIComponent(rawPath);
+    if (urlPath === '/delivery' || urlPath === '/delivery.json') {
+      const data = await deliveryData(new URLSearchParams(query).has('fresh'));
+      const json = urlPath.endsWith('.json');
+      res.writeHead(200, {
+        'content-type': json ? MIME['.json'] : MIME['.html'],
+        'cache-control': 'no-store',
+      });
+      res.end(json ? JSON.stringify(data, null, 2) : renderDeliveryPage(data));
+      return;
+    }
     const fsPath = normalize(join(ROOT, urlPath));
     const inRoot = fsPath.startsWith(ROOT + sep) || fsPath === ROOT;
     if (!inRoot) {
