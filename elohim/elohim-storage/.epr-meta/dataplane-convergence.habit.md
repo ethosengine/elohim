@@ -72,6 +72,8 @@ retire-when: >
   converging is not a degraded version of this system, it is a different one — so this is
   watched permanently rather than until a milestone.
 ---
+DELTA 2026-09-24: app #1719–#1725 — six ~2h10 runs (≈12 pipeline-h), 0 bundles delivered; #1725 waited the full 7200 s readiness budget (a2d1d0975) against `catching-up cause=upstream` on BOTH doorways, 8 legs STALE. Priced in evidence-ladder spec §8: the App stage conflates byte-seed/author/verify with declare fan-out (this habit's concern) and fleet post-roll readiness (edge's), and the manifest `dependsOn: elohim-edge` dispatches it into the not-ready window every time. No status flip — the cure is a readiness precondition + stage split, then the channel-publish path this habit's federation-deploy check already names. NO status change.
+
 DELTA 2026-09-07 (T6 feedback-discovery cold-retire, sprint 2026-09-08 batch 2; NO status
 flip): the feedback projector's rotation now retires a subscription member after
 COLD_AFTER_CLEAN_SWEEPS = 3 sweeps that found nothing open or unapplied, and re-arms it

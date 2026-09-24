@@ -164,3 +164,91 @@ that same pattern on the development plane.
 - No semantic truth claims from fingerprints — a cite binds a sentence to exact
   bytes and expires it on change; that expiry, enforced at write/push/walk, is
   the whole (and sufficient) guarantee.
+
+## 8. The App-delivery stage, priced (2026-09-24) — the §4 sentinel that never landed
+
+**Measurement.** `elohim/dev` app builds #1719–#1725 (2026-09-22 → 09-23): six
+runs of 2h09–2h18 each, one aborted at 44m — ≈12 pipeline-hours, **zero bundles
+delivered**. #1725 (upstream orchestrator #1897) is the anatomy: it started the
+minute edge #1478 (2h45m) finished; 8 minutes in, both doorways answered
+`503 {"status":"catching-up","cause":"upstream","circuit":"closed"}`; the run
+then re-offered every leg (2 bundles × browser/server × 2 hosts = 8 legs) until
+each hit the 7200 s readiness deadline, every leg "host left STALE". The two
+hours are `STAGE_CELL_READY_BUDGET_SECS=7200` (a2d1d0975, 2026-09-21), the
+fleet's post-roll not-ready window measured **from inside the App pipeline**.
+The hard bound (7200 + 360 + 1500 s) is 2h31m — the "2.5 h" wall clock.
+
+**What the stage conflates** (five concerns, one `sh` ladder):
+
+| # | concern | owner | honest cost |
+|---|---|---|---|
+| 1 | byte-seed (content-addressed PUT per host) | app delivery | seconds |
+| 2 | author the head ONCE via a live bridge | app delivery | seconds–1 min |
+| 3 | declare fan-out / cross-peer propagation (`DECLARE_MAX_ATTEMPTS=24`, ~36 min) | dataplane-convergence | the peer's job, not CI's — `federation-deploy.feature` names this crutch retirable |
+| 4 | fleet readiness after a pod roll (7200 s wait) | edge / quiesce gate | **not an app concern at all** |
+| 5 | served-shell + browser boot verification | delivery | ~90 s per mount |
+
+Only 1, 2 and 5 belong in "Publish and Verify App Delivery". 3 is the habit's
+own red (`dataplane-convergence`), and 4 is a **precondition** the orchestrator
+must read before dispatch — the App manifest `dependsOn: elohim-edge`, so the
+app deploy is *always* scheduled into the freshest possible not-ready window and
+then waits it out. Waiting is measurement-by-blocking: the same anti-pattern as
+measurement-by-deploy (§1), with the sign flipped.
+
+**Why nothing screamed (the VSM miss, four layers each locally correct):**
+
+1. `ci-harvest.py` scrubs durations out of fingerprints by design (durations →
+   `#`), so cost is structurally invisible to the algedonic channel. A fix that
+   turns "red at 63 min" into "red at 130 min" reads as no change; into "green
+   at 130 min" reads as improvement.
+2. Fingerprint `e22562ad0ec9` ("red build, stage:Publish and Verify App
+   Delivery") has been open since 2026-09-09, seen 10× through #1725,
+   `UNCLASSIFIED`, with no `concern:` address (§6) — a pain signal with no
+   accountable node.
+3. §4 (cost accounting → redesign pressure) is increment 5 and never landed;
+   no habit's `checks:` prices pipeline cost, so no red exists for a session
+   to serve. The directive that opened this spec named the 2.5 h cycle as the
+   REA cost; the instrument that would have priced it was the one increment
+   with no habit binding.
+4. a2d1d0975 passed six second-model reviews of the *mechanism* (bounding bash)
+   and zero of the *placement* (should the App pipeline wait for the fleet at
+   all?). Its own message says the wait was "not provable before a roll" —
+   shipped at T4 with no T2 expression of the catching-up face (the household
+   prologue defaults the budget to 900 s, so local never exercised 7200). A
+   2 h budget is a limit raise wearing a fix costume.
+
+**Ranked moves (leverage × evidence; each on an existing rail):**
+
+1. **Split the stage by concern; make readiness a refuse-before-launch
+   precondition.** Probe `/health/serving` once per host; `catching-up` ⇒ typed
+   verdict `FLEET-NOT-READY`, exit in seconds, stage `UNSTABLE` with the
+   orchestrator re-dispatching when the edge quiesce gate passes. Budget drops
+   to minutes. Concern 3's declare fan-out moves behind `[edge:validate-only]`
+   / the dataplane lane where `federation-deploy` already measures it.
+2. **Run classes as declared data** — `build | deploy | verify | measure |
+   profile` on the manifest (the `.epr-meta ci-trigger:` leg of the 06-25
+   ci-detection spec + increment 2's push-time tag coherence). Telemetry and
+   convergence measures never ride a `deploy`-class run.
+3. **T2 expression of the post-roll window** (increment 4): household
+   `conductors-restart` then the same `stage-spa-blob.sh`, as an
+   `epr-app-deliverability` scenario — "delivery during a restart window refuses
+   fast". A T2 receipt becomes the admission ticket for the T4 stage
+   (`T2_RECEIPT=strict` for app delivery, the ascend-only rule).
+4. **Price it** (increments 5 + 6): ci-harvest keeps per-stage duration as a
+   field (not in the fingerprint); `e22562ad0ec9` gets `concern:
+   dataplane-convergence`; a `checks:` line on that habit (or a lightest-signal
+   `inject` rule in `scripts/ci/.epr-meta`: a budget default > 15 min must cite
+   the habit that prices it) — so the next 2 h wait is red *before* it ships.
+5. **Native path, in order:** app EPR bundles publish to a release channel and
+   are adopted by election (the `runtime-upgrade-propagation` mechanism, green
+   for coordinators, stations 1–9), replacing per-host PUT + fan-out; deploy
+   authority as an REA compute commitment (Z.D, 2026-05-25) with the berth
+   signing the household receipt as the `reach=trusted` attestation ("works
+   on my machine" becomes a content-addressed claim); reach elevation IS
+   promotion (rakia discovery 1). The 2 h window's root — binary changes roll
+   pods (cycle-time table: 2–4 h) — falls to the ark S2 admin socket, not to CI.
+6. **Visualization:** no rakia portal yet (§7 non-goal stands). The native
+   "build #" view is `epr flow walk` with the tier + cost columns (increment
+   3) over commitments/receipts + `ark witness ls`; `reports:serve` already
+   shows the artifacts. A portal before the columns is an instrument with no
+   reader.
