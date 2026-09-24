@@ -218,6 +218,13 @@ Verify (A): unit tests green; `node --test genesis/orchestrator/pipeline-budget.
 `[build:app]` push during a known not-ready window shows the `readiness` case in the junit, stage
 UNSTABLE in < 60 s, intent archived; one during a ready window delivers with phase timings > 0.
 
+**Tasks**
+
+- [x] **A1 — fleet-write-readiness.sh: single-shot readiness precondition per doorway, exit 0/3/2, never sleeps** (serves push-delivers-within-budget) — b6f256b9a; one face vocabulary abd014123
+- [x] **A2 — App delivery in concern-scoped timed phases; readiness refuses UNSTABLE in seconds with deploy-intent.json** (serves push-delivers-within-budget) — 5d44375b6; faces abd014123
+- [ ] **A3 — event-driven re-dispatch: hold the app baseline on a readiness UNSTABLE, pendingDeploy, deploy-pending timer pass** (serves push-delivers-within-budget)
+- [ ] **A4 — retire the DECLARE_ONLY fan-out from the App pipeline; verifyProjectedHeads stays as the measurement** (serves dataplane-convergence, push-delivers-within-budget)
+
 ---
 
 ## Lane B — Run classes as declared data (rakia schema, orchestrator)
@@ -260,6 +267,14 @@ becomes `every { stepClass(it) <= 'verify' }`.
 Verify (B): a push touching only `genesis/a2o/**` prints `RUN_CLASS=verify` for edge and app and
 rolls no pod; `[run:measure]` on an empty commit runs the mesh-quiesce measure alone.
 
+**Tasks**
+
+- [x] **B1 — rakia schema steps[].class enum + generated Step.class + orchestrator mirror** (serves push-delivers-within-budget, pin-attestation) — rakia feat/step-class b081e9b, pin bump on pin/lane-B 9466cae71 (branches; pin not moved on dev); mirror class in ac1e3a6cd
+- [x] **B2 — edge and app build manifests declare step run classes** (serves push-delivers-within-budget) — pin/lane-B 9466cae71 (branch, rides the rakia pin bump)
+- [x] **B3 — orchestrator derives the run class and sends RUN_CLASS to every downstream; [run:*] commit tag** (serves push-delivers-within-budget) — 58b6b5456 1d29b1128
+- [ ] **B4 — root and edge Jenkinsfiles gate stages by class (classAllows), shouldRunStep learns the class** (serves push-delivers-within-budget) — edge param declared in 58b6b5456; root App pipeline gating open
+- [x] **B5 — orchestrator Brit Plan (advisory) stage guarded by catchError so a launch flake cannot abort dispatch** (serves push-delivers-within-budget) — ac1e3a6cd
+
 ---
 
 ## Lane C — The not-ready window, expressed on the household (a2o, T2)
@@ -294,6 +309,11 @@ Serves `push-delivers-within-budget` (proof before paying) and the evidence-ladd
 Verify (C): `just test mesh features/dataplane/app-delivery-refuses-fast.feature` 4/4 twice;
 pre-push on a stage-spa-blob.sh change prints the receipt line, not `NO-T2-RECEIPT`.
 
+**Tasks**
+
+- [x] **C1 — app-delivery-refuses-fast.feature: four household stations for the not-ready window** (serves push-delivers-within-budget) — be979acbc 5ec286ce3
+- [ ] **C2 — T2 receipt contract: t2-receipt.sh SERVING_RE and serving-receipt.mjs admit this feature as the receipt, strict** (serves push-delivers-within-budget)
+
 ---
 
 ## Lane D — Price it (cost in the headline; compose with algedonic slice 1 + push-delivers-within-budget)
@@ -318,6 +338,13 @@ pre-push on a stage-spa-blob.sh change prints the receipt line, not `NO-T2-RECEI
 Verify (D): `node genesis/orchestrator/delivery-series.mjs --stages --json` on the last 10 runs
 prints the readiness/publish/verify split; `epr flow report --headline` shows a `cost:` line;
 `python3 .claude/scripts/_lib/__tests__/ci_harvest_stage_budget_test.py` passes.
+
+**Tasks**
+
+- [x] **D1 — delivery-series --stages: per-stage p50/p90 and cost per delivered bundle; stage-wallclock@1, delivery-cost@1 declared** (serves push-delivers-within-budget) — f8512d40f; NaN fix 9040b0eda
+- [x] **D2 — ci-harvest STAGE_OVER_BUDGET findings addressed to their habit, durationMillis a field only** (serves push-delivers-within-budget) — 322c3d63a
+- [x] **D3 — scripts/ci .epr-meta inject: a long *_SECS default names the habit that prices it** (serves push-delivers-within-budget) — 66994b31d
+- [x] **D4 — habits-status joins pain, last evidence and cost on one row per active red** (serves push-delivers-within-budget) — 308638344
 
 ---
 
@@ -382,6 +409,13 @@ Verify (E): package round-trips byte-identical (plant skill fidelity gate); the 
 `stage-wallclock@1` red on the archived runs; a second run over the same evidence emits nothing
 (hysteresis).
 
+**Tasks**
+
+- [x] **E1 — plant the algedonic-designer persona package and its projection** (serves push-delivers-within-budget) — 6cb119bfa; success measure operator-surfaced-pain@1 4e5a6d3de
+- [x] **E2 — cadence: /pain-sweep command, delivery-stasis pain-sweep station, daily surprise-auditor cloud routine** (serves push-delivers-within-budget) — 8c5679f9d; routine trig_01Pm5R6UBgRUNFQoPDUWPNAR
+- [ ] **E3 — first firing self-test: stage-wallclock@1 fires red on archived app #1719-#1725 and stays quiet on a second pass** (serves push-delivers-within-budget)
+- [ ] **E4 — delivery-stasis pain-sweep station merges origin pain/* branches into dev locally** (serves push-delivers-within-budget)
+
 ---
 
 ## Lane F — brit/rakia rails: "works on my machine" as a content-addressed claim
@@ -413,6 +447,13 @@ Serves `pin-attestation` and the rakia arc (reach IS promotion; attestation = go
 
 Verify (F): `cargo test -p brit-epr` byte-identity test green; a `just test mesh` run leaves a
 notes-ref attestation `brit-build-ref validate list` shows; pre-push reads it as the receipt.
+
+**Tasks**
+
+- [x] **F1 — reach and CID ruling: brit ReachLevel as a view over protocol Reach, attestation CIDs via elohim_epr** (serves pin-attestation) — brit feat/reach-derived-cid-epr 06f9f234a4 b9c27d5ba5 (branch; pin not moved)
+- [ ] **F2 — household receipt becomes a signed validation attestation the pre-push T2 reader admits** (serves pin-attestation)
+- [ ] **F3 — CI publishes brit build attestations per pipeline; delivery-series --from attestations** (serves pin-attestation, push-delivers-within-budget)
+- [ ] **F4 — decide the untracked rakia-executor; if kept its compute-receipt schema is the one receipt shape F2 emits** (serves pin-attestation)
 
 ---
 
@@ -454,6 +495,13 @@ clean, ~20× synthetic).
 Operator ruling 2026-09-24: **included, operator-gated** — agents prepare the fork PR, the pin
 move commit and the receipt script; the operator triggers the fork push, `[build:conductor]` and
 the roll. Everything in Lane A is correct either way; K is what makes the wait vanish for everyone.
+
+**Tasks**
+
+- [ ] **K0 — measure before moving: bisect the pin on the batch-C tree and measure the post-restart window for both pins** (serves push-delivers-within-budget)
+- [ ] **K1 — publish the fork: fast-forward elohim-0.7, push perf/k2-dht-model-sargable-arc, open its PR (operator pushes)** (serves push-delivers-within-budget)
+- [ ] **K2 — move the conductor gitlink to e0bfc6c7a and [build:conductor]** (serves push-delivers-within-budget) — prepared on pin/lane-K 62ffcfb2f (branch; dev holds 25dd2d0be)
+- [ ] **K3 — one staggered roll with a per-pod restart-to-RUNNING cycle-time row** (serves push-delivers-within-budget) — receipt script 088ab0b6c prepared; roll is the operator's
 
 ---
 
@@ -565,6 +613,15 @@ Verify (N): `cargo test -p elohim-storage release_adoption::` (shape/envelope/bo
 predicate); household feature 6/6 twice; fleet `verify-app-adoption.sh` green; `federation-deploy`
 scenario 2 still green with the crutch deleted.
 
+**Tasks**
+
+- [ ] **N1 — ArtifactClass::AppBundle and the release-manifest schema app-bundle class** (serves dataplane-convergence)
+- [ ] **N2 — verify.rs AppBundle shape, envelope skip and verify_app_bundle_boots** (serves dataplane-convergence)
+- [ ] **N3 — AppBundleVehicle writes every bound slug in one transaction, plus the head_adoption Held predicate** (serves dataplane-convergence)
+- [ ] **N4 — doorway candidate channel through storage handle_content_head for a bound slug** (serves dataplane-convergence)
+- [ ] **N5 — CI publish-app-release.sh and verify-app-adoption.sh; channels followed as a list** (serves dataplane-convergence, push-delivers-within-budget)
+- [ ] **N6 — household app-bundle-elected-delivery.feature, then fleet; retire prologue leg 4b and the app to edge dependsOn** (serves dataplane-convergence)
+
 ---
 
 ## Lane H — The store that grows (writer bounded at the writer; ruling 2026-09-24)
@@ -621,6 +678,14 @@ Verify (H): `cargo test -p doorway-service federation::` + the a2o receipt teard
 sniffer on a stopped household after one idle hour shows lamad actions/day within the ceiling
 and WAL/main ≤ 1 after H3; `idle-is-free` gains a dated delta with both readings.
 
+**Tasks**
+
+- [x] **H0 — conductor-store growth report and offline sniffer committed** (serves idle-is-free) — 553edab1f
+- [x] **H1 — stop the bleed: heartbeat probes only the live roster, self-deregistration verb, a2o receipt doorways deregister on teardown** (serves idle-is-free) — 89d7c7e86 7be4d4e37 97977b60b; review fixes 78a46bd01 fc441e497
+- [ ] **H2 — health samples leave the DHT: retention table, notarize only transitions, drop the type-index link** (serves idle-is-free)
+- [ ] **H3 — fork WAL checkpointing and O(1) storage_info on the Lane K branch** (serves idle-is-free)
+- [x] **H4 — store-growth sensors: dna-actions-per-day@1, wal-main-ratio@1, subject-anchor-links@1 with bounds** (serves idle-is-free) — 980ee25f6
+
 ---
 
 ## Lane G — The native "build #" view: walker columns + the portal's data contract
@@ -639,6 +704,11 @@ and WAL/main ≤ 1 after H3; `idle-is-free` gains a dated delta with both readin
 Verify (G): `epr flow walk genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
 --json` shows tier/cost; the page renders the last 10 orchestrator runs with the readiness case
 visible as its own node.
+
+**Tasks**
+
+- [ ] **G1 — epr flow walk/status --json gains tier and cost per commitment; the cost: headline slot** (serves push-delivers-within-budget)
+- [ ] **G2 — reports:serve page renders the pipeline graph with per-node tier and cost** (serves push-delivers-within-budget)
 
 ---
 
