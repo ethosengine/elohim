@@ -5,7 +5,8 @@
 //! storage peer folds its content projection under another. What they share lives here — the
 //! declared chunk rule ([`chunk`]), a question's terms and the FTS5 match expression ([`terms`]),
 //! ranking ([`rank`]), rank fusion ([`fuse`]), the embedding boundary ([`embedder`]), the fold
-//! attestation ([`attest`]) and the reader an answer is shaped for ([`reader`]).
+//! store keyed by an opaque unit id ([`store`]), the fold attestation ([`attest`]) and the reader
+//! an answer is shaped for ([`reader`]).
 //!
 //! What does NOT live here: walking a tree, reading git, deciding which units a fold covers,
 //! reading a recipe's contract, or any wire type. A unit is an opaque `unit_id` — a path to the
@@ -20,6 +21,7 @@ pub mod error;
 pub mod fuse;
 pub mod rank;
 pub mod reader;
+pub mod store;
 pub mod terms;
 
 pub use error::{IndexError, Result};

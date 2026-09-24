@@ -15,6 +15,7 @@ publish = ["elohim"]
 # `bundled` in a normal dependency would link a second SQLite into a binary that has one.
 # Only this crate's own tests pull `bundled` (below), so they have FTS5 to run against.
 [dependencies]
+cid.workspace = true
 elohim-epr = { path = "../epr" }
 elohim-epr-rea = { path = "../epr-rea", default-features = false }
 rusqlite = "0.37"

@@ -462,6 +462,7 @@ dependencies = [
 name = "elohim-epr-index"
 version = "0.1.0"
 dependencies = [
+ "cid",
  "elohim-epr",
  "elohim-epr-rea",
  "rusqlite",

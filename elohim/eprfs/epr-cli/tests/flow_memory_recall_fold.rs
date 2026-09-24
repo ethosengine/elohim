@@ -193,7 +193,7 @@ fn the_first_fold_attests_complete() {
     assert_eq!(report.attestation.shard.atoms, live_chunks as u64);
     let vector: Vec<u8> = conn
         .query_row(
-            "SELECT vector FROM chunks WHERE path = 'genesis/alpha.md' LIMIT 1",
+            "SELECT vector FROM chunks WHERE unit_id = 'genesis/alpha.md' LIMIT 1",
             [],
             |r| r.get(0),
         )
@@ -238,7 +238,7 @@ fn editing_one_file_refolds_exactly_that_file() {
     assert!(
         count(
             &conn,
-            "SELECT count(*) FROM chunks WHERE path = ?1 AND demoted_at IS NOT NULL",
+            "SELECT count(*) FROM chunks WHERE unit_id = ?1 AND demoted_at IS NOT NULL",
             "genesis/beta.md",
         ) > 0,
         "the superseded chunks are demoted, not deleted"
@@ -298,7 +298,7 @@ fn the_lexical_index_holds_live_chunks_only() {
     );
     assert!(conn
         .execute(
-            "UPDATE chunks SET text = 'rewritten' WHERE path = 'genesis/beta.md'",
+            "UPDATE chunks SET text = 'rewritten' WHERE unit_id = 'genesis/beta.md'",
             []
         )
         .is_err());
@@ -327,17 +327,17 @@ fn a_deleted_file_is_demoted_and_a_returning_one_is_refolded() {
     assert_eq!(second.attestation.state, FoldState::Complete);
     assert!(second.attestation.shard.atoms < first.attestation.shard.atoms);
     let conn = store(root);
-    let live = "SELECT count(*) FROM chunks WHERE path = ?1 AND demoted_at IS NULL";
+    let live = "SELECT count(*) FROM chunks WHERE unit_id = ?1 AND demoted_at IS NULL";
     assert_eq!(count(&conn, live, "genesis/alpha.md"), 0);
     assert!(
         count(
             &conn,
-            "SELECT count(*) FROM chunks WHERE path = ?1 AND demoted_at IS NOT NULL",
+            "SELECT count(*) FROM chunks WHERE unit_id = ?1 AND demoted_at IS NOT NULL",
             "genesis/alpha.md",
         ) > 0
     );
     assert!(conn.execute("DELETE FROM chunks", []).is_err());
-    assert!(conn.execute("DELETE FROM files", []).is_err());
+    assert!(conn.execute("DELETE FROM units", []).is_err());
     assert_eq!(
         status(root)["demoted"],
         scalar(
@@ -355,7 +355,7 @@ fn a_deleted_file_is_demoted_and_a_returning_one_is_refolded() {
     assert_eq!(
         count(
             &conn,
-            "SELECT count(*) FROM files WHERE path = ?1 AND demoted_at IS NULL",
+            "SELECT count(*) FROM units WHERE unit_id = ?1 AND demoted_at IS NULL",
             "genesis/alpha.md"
         ),
         1
@@ -532,8 +532,8 @@ fn the_private_recall_store_and_worktrees_are_never_folded() {
     let conn = store(root);
     let leaked = scalar(
         &conn,
-        "SELECT count(*) FROM files WHERE path LIKE '.eprfs/status/recall/%' \
-         OR path LIKE '%worktrees/%'",
+        "SELECT count(*) FROM units WHERE unit_id LIKE '.eprfs/status/recall/%' \
+         OR unit_id LIKE '%worktrees/%'",
     );
     assert_eq!(leaked, 0, "{:?}", report.folded);
     assert!(report.folded.contains(&".claude/notes.md".to_string()));
@@ -575,7 +575,7 @@ fn an_unreadable_file_is_held_not_demoted() {
     assert!(
         count(
             &conn,
-            "SELECT count(*) FROM chunks WHERE path = ?1 AND demoted_at IS NULL",
+            "SELECT count(*) FROM chunks WHERE unit_id = ?1 AND demoted_at IS NULL",
             "genesis/beta.md"
         ) > 0,
         "its rows stay current"

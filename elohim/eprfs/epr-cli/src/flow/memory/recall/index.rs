@@ -19,8 +19,11 @@
 //! fixture vectors and live ones never share a store or a log — derived and gitignored: a
 //! missing, corrupt or foreign store is rebuilt from scratch, never repaired by hand. One fold at a
 //! time holds `fold.lock`; a second exits reporting `busy`, writing nothing.
-use std::time::Duration;
-
+//!
+//! The store's tables, triggers and single-transaction write are `elohim_epr_index::store`'s
+//! (schema v3, rows keyed by an opaque `unit_id` — here the repository-relative path, with the
+//! plan's stat recorded as `"size:mtime_ns"`); a store of any earlier schema takes the rebuild
+//! path below (post-station-4 sprint, ruling R-S1).
 use super::chunk::ChunkRule;
 use super::embedder::{fold_budget, Embedder, Fixture, PinnedProcedure};
 use super::surface::{self, Listing, Surface};
@@ -28,11 +31,14 @@ use super::*;
 use cid::Cid;
 use elohim_epr_index::attest::{next_retry, record, LATEST_FILE};
 use elohim_epr_index::rank::encode as vector_blob;
+use elohim_epr_index::store::{
+    ChunkRow, LiveUnit, Root, Store as IndexStore, UnitChunks, SCHEMA_VERSION,
+};
 use elohim_epr_index::IndexError;
 use elohim_epr_rea::{
     atom_cid, AgentRef, FoldAttestation, FoldState, IndexMeasure, RankingMethod, ShardManifest,
 };
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::params;
 use serde::Serialize;
 
 /// Every semantic fold's store and attestations live under here, one directory per measure CID
@@ -49,71 +55,6 @@ const STORE_FILE: &str = "fold.sqlite";
 const LOCK_FILE: &str = "fold.lock";
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 const CHUNK_RULE_MISMATCH: &str = "chunk rule on disk does not hash to the measure";
-
-/// How long a reader waits on a fold's write transaction before reporting the store busy.
-const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// Bumped when the tables below change shape; a store of another version is rebuilt.
-const SCHEMA_VERSION: &str = "2";
-
-/// The whole store, in one place.
-///
-/// - `files` is the fold's manifest of what it has seen, with the stat taken when its bytes were
-///   read (a file whose size and mtime still match is not re-hashed). A file that yields no chunk
-///   — empty, or skipped as non-UTF-8 — is still seen, so it is not behind forever.
-/// - `chunks` holds each chunk's text and vector (little-endian `f32` × the pinned dims). A row's
-///   text, path and section are fixed once written; only `demoted_at` moves, and only once.
-/// - `chunks_fts` is external-content FTS5 over `text` holding LIVE chunks only: a demotion
-///   issues FTS5's `'delete'` for that row, so the lexical provider never ranks a demoted chunk.
-const SCHEMA: &str = "
-CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE files (
-  path TEXT PRIMARY KEY,
-  fingerprint TEXT NOT NULL,
-  size INTEGER NOT NULL,
-  mtime_ns INTEGER NOT NULL,
-  chunks INTEGER NOT NULL,
-  skipped TEXT,
-  folded_at INTEGER NOT NULL,
-  demoted_at INTEGER
-);
-CREATE TABLE chunks (
-  id INTEGER PRIMARY KEY,
-  path TEXT NOT NULL,
-  section TEXT NOT NULL,
-  ordinal INTEGER NOT NULL,
-  fingerprint TEXT NOT NULL,
-  text TEXT NOT NULL,
-  vector BLOB NOT NULL,
-  folded_at INTEGER NOT NULL,
-  demoted_at INTEGER
-);
-CREATE INDEX chunks_by_path ON chunks(path, demoted_at);
-CREATE VIRTUAL TABLE chunks_fts USING fts5(
-  text, path UNINDEXED, section UNINDEXED, content='chunks', content_rowid='id'
-);
-CREATE TRIGGER chunks_fts_insert AFTER INSERT ON chunks BEGIN
-  INSERT INTO chunks_fts(rowid, text, path, section) VALUES (new.id, new.text, new.path, new.section);
-END;
-CREATE TRIGGER chunks_fts_demote AFTER UPDATE OF demoted_at ON chunks
-WHEN old.demoted_at IS NULL AND new.demoted_at IS NOT NULL BEGIN
-  INSERT INTO chunks_fts(chunks_fts, rowid, text, path, section)
-    VALUES ('delete', old.id, old.text, old.path, old.section);
-END;
-CREATE TRIGGER chunks_demoted_once BEFORE UPDATE OF demoted_at ON chunks
-WHEN old.demoted_at IS NOT NULL BEGIN
-  SELECT RAISE(ABORT, 'a demoted chunk stays demoted; a returning file folds new rows');
-END;
-CREATE TRIGGER chunks_identity_fixed BEFORE UPDATE OF text, path, section ON chunks BEGIN
-  SELECT RAISE(ABORT, 'a chunk''s text, path and section are fixed; demote it and fold another');
-END;
-CREATE TRIGGER chunks_never_deleted BEFORE DELETE ON chunks BEGIN
-  SELECT RAISE(ABORT, 'demotion, never deletion');
-END;
-CREATE TRIGGER files_never_deleted BEFORE DELETE ON files BEGIN
-  SELECT RAISE(ABORT, 'demotion, never deletion');
-END;
-";
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // The crate boundary: `elohim_epr_index` errors are this executor's errors, one to one
@@ -298,11 +239,10 @@ fn fingerprint(bytes: &[u8]) -> String {
     BlobCid::compute_raw(bytes).to_string()
 }
 
-/// A stored file row, as the plan compares it.
-struct Row {
-    fingerprint: String,
-    size: u64,
-    mtime_ns: i64,
+/// The stat the plan compares and the store records: `"size:mtime_ns"` of the handle a file's
+/// bytes were read through.
+fn stat_text(size: u64, mtime_ns: i64) -> String {
+    format!("{size}:{mtime_ns}")
 }
 
 #[derive(Default)]
@@ -312,7 +252,7 @@ struct Plan {
     /// Live in the store, gone from the source.
     removed: Vec<String>,
     /// Unchanged bytes under a moved stat: the fold records the new stat, nothing else.
-    restat: Vec<(String, u64, i64)>,
+    restat: Vec<(String, String)>,
     /// Candidates that exist but could not be read, and listing errors — their rows stay current.
     unreadable: usize,
 }
@@ -341,15 +281,15 @@ fn plan(root: &Path, declared: &Declared, store: &Store) -> FlowResult<Result<Pl
             plan.behind.push(candidate.rel.clone());
             continue;
         };
-        if row.size == candidate.size && row.mtime_ns == candidate.mtime_ns {
+        if row.stat.as_deref() == Some(stat_text(candidate.size, candidate.mtime_ns).as_str()) {
             continue;
         }
         match std::fs::read(root.join(&candidate.rel)) {
             Err(_) => plan.unreadable += 1,
-            Ok(bytes) if fingerprint(&bytes) == row.fingerprint => {
-                plan.restat
-                    .push((candidate.rel.clone(), candidate.size, candidate.mtime_ns))
-            }
+            Ok(bytes) if fingerprint(&bytes) == row.fingerprint => plan.restat.push((
+                candidate.rel.clone(),
+                stat_text(candidate.size, candidate.mtime_ns),
+            )),
             Ok(_) => plan.behind.push(candidate.rel.clone()),
         }
     }
@@ -365,8 +305,10 @@ fn plan(root: &Path, declared: &Declared, store: &Store) -> FlowResult<Result<Pl
 // The store
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
+/// The executor's store: the crate's fold store, keyed by repository-relative path, with this
+/// executor's identity rows, rebuild policy and plan reads over it.
 struct Store {
-    conn: Connection,
+    inner: IndexStore,
 }
 
 /// The store's running count of chunks embedded from a truncated head (past the model's token
@@ -397,14 +339,7 @@ fn meta_rows(declared: &Declared, embedder: &str) -> BTreeMap<String, String> {
 
 impl Store {
     fn meta(&self) -> FlowResult<BTreeMap<String, String>> {
-        let mut statement = self
-            .conn
-            .prepare("SELECT key, value FROM meta")
-            .map_err(db)?;
-        let rows = statement
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(db)?;
-        rows.collect::<Result<_, _>>().map_err(db)
+        Ok(self.inner.meta()?)
     }
 
     /// A readable store of this measure: `Ok(None)` when there is no file, `Err(why)` when there
@@ -434,28 +369,7 @@ impl Store {
     /// fold's job (it rebuilds a store that fails it), and a corrupt store a query touches still
     /// surfaces as the SQLite error of the read that meets it.
     fn open_readable(path: &Path, read_only: bool, check: bool) -> Result<Option<Self>, String> {
-        if !path.is_file() {
-            return Ok(None);
-        }
-        let flags = if read_only {
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-        } else {
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-        };
-        let unreadable = |error: rusqlite::Error| format!("store unreadable: {error}");
-        let conn = Connection::open_with_flags(path, flags).map_err(unreadable)?;
-        conn.busy_timeout(BUSY_TIMEOUT).map_err(unreadable)?;
-        let store = Self { conn };
-        if check {
-            let verdict: String = store
-                .conn
-                .query_row("PRAGMA quick_check", [], |row| row.get(0))
-                .map_err(unreadable)?;
-            if verdict != "ok" {
-                return Err(format!("store fails its integrity check: {verdict}"));
-            }
-        }
-        Ok(Some(store))
+        Ok(IndexStore::open_readable(path, read_only, check)?.map(|inner| Self { inner }))
     }
 
     /// The store this fold writes to, and what happened to get it: `created`, `reused`, or
@@ -477,89 +391,27 @@ impl Store {
         };
         let outcome = match &why {
             Some(why) => {
-                for suffix in ["", "-journal", "-wal", "-shm"] {
-                    let stale = PathBuf::from(format!("{}{suffix}", path.display()));
-                    if stale.exists() {
-                        std::fs::remove_file(&stale)?;
-                    }
-                }
+                IndexStore::remove(path)?;
                 format!("rebuilt ({why})")
             }
             None => "created".to_string(),
         };
-        let mut conn = Connection::open(path).map_err(db)?;
-        conn.busy_timeout(BUSY_TIMEOUT).map_err(db)?;
-        let tx = conn.transaction().map_err(db)?;
-        tx.execute_batch(SCHEMA).map_err(db)?;
         // A new store has embedded nothing yet: its tally starts known, at zero.
-        let tally = (TRUNCATED_META_KEY.to_string(), "0".to_string());
-        for (key, value) in wanted.iter().chain([(&tally.0, &tally.1)]) {
-            tx.execute(
-                "INSERT INTO meta (key, value) VALUES (?1, ?2)",
-                params![key, value],
-            )
-            .map_err(db)?;
-        }
-        tx.commit().map_err(db)?;
-        Ok((Self { conn }, outcome))
+        let mut rows = wanted;
+        rows.insert(TRUNCATED_META_KEY.to_string(), "0".to_string());
+        let inner = IndexStore::create(path, &rows)?;
+        Ok((Self { inner }, outcome))
     }
 
     /// Every file the fold currently holds, with its fingerprint and recorded stat.
-    fn live_rows(&self) -> FlowResult<BTreeMap<String, Row>> {
-        let mut statement = self
-            .conn
-            .prepare("SELECT path, fingerprint, size, mtime_ns FROM files WHERE demoted_at IS NULL")
-            .map_err(db)?;
-        let rows = statement
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    Row {
-                        fingerprint: row.get(1)?,
-                        size: row.get::<_, i64>(2)?.max(0) as u64,
-                        mtime_ns: row.get(3)?,
-                    },
-                ))
-            })
-            .map_err(db)?;
-        rows.collect::<Result<_, _>>().map_err(db)
-    }
-
-    fn count(&self, sql: &str) -> FlowResult<u64> {
-        self.conn
-            .query_row(sql, [], |row| row.get::<_, i64>(0))
-            .map(|n| n.max(0) as u64)
-            .map_err(db)
+    fn live_rows(&self) -> FlowResult<BTreeMap<String, LiveUnit>> {
+        Ok(self.inner.live_units()?)
     }
 
     /// What the fold holds: live chunk count, their text bytes, and the CID of the sorted
     /// `(path, section, fingerprint)` manifest.
     fn shard(&self) -> FlowResult<ShardManifest> {
-        let mut statement = self
-            .conn
-            .prepare(
-                "SELECT path, section, fingerprint, length(CAST(text AS BLOB)) FROM chunks \
-                 WHERE demoted_at IS NULL",
-            )
-            .map_err(db)?;
-        let mut rows: Vec<(String, String, String)> = Vec::new();
-        let mut bytes = 0u64;
-        let mut query = statement.query([]).map_err(db)?;
-        while let Some(row) = query.next().map_err(db)? {
-            rows.push((
-                row.get(0).map_err(db)?,
-                row.get(1).map_err(db)?,
-                row.get(2).map_err(db)?,
-            ));
-            bytes += row.get::<_, i64>(3).map_err(db)?.max(0) as u64;
-        }
-        rows.sort();
-        Ok(ShardManifest {
-            arc: None,
-            atoms: rows.len() as u64,
-            bytes,
-            manifest: atom_cid(&rows)?,
-        })
+        Ok(self.inner.shard()?)
     }
 
     /// One `(root, head)` pair per declared include pattern (the surface's roots; a negation owns
@@ -567,20 +419,21 @@ impl Store {
     /// `(path, fingerprint)` list of the held files it matches — so a later fold can name which
     /// root moved.
     fn heads(&self, declared: &Declared) -> FlowResult<Vec<(Cid, Cid)>> {
-        let files = self.live_rows()?;
-        let mut heads = Vec::new();
-        for (text, pattern) in declared.surface.includes() {
-            let under: Vec<(&String, &String)> = files
-                .iter()
-                .filter(|(path, _)| Surface::include_matches(pattern, path))
-                .map(|(path, row)| (path, &row.fingerprint))
-                .collect();
-            heads.push((
-                *BlobCid::compute_raw(text.as_bytes()).as_cid(),
-                atom_cid(&under)?,
-            ));
-        }
-        Ok(heads)
+        type Matcher<'m> = Box<dyn Fn(&str) -> bool + 'm>;
+        let matchers: Vec<(Cid, Matcher<'_>)> = declared
+            .surface
+            .includes()
+            .map(|(text, pattern)| {
+                let matches: Matcher<'_> =
+                    Box::new(move |path: &str| Surface::include_matches(pattern, path));
+                (*BlobCid::compute_raw(text.as_bytes()).as_cid(), matches)
+            })
+            .collect();
+        let roots: Vec<Root<'_>> = matchers
+            .iter()
+            .map(|(root, matches)| (*root, matches.as_ref()))
+            .collect();
+        Ok(self.inner.heads(&roots)?)
     }
 }
 
@@ -792,12 +645,9 @@ pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldRun> {
     run.fold(report, label)
 }
 
-/// One chunk ready to write.
+/// One chunk ready to write; its file is the `FoldedFile` it follows, in order.
 struct Pending {
-    path: String,
     section: String,
-    ordinal: usize,
-    fingerprint: String,
     text: String,
 }
 
@@ -900,12 +750,9 @@ impl Run<'_> {
             report.dropped_chunks += chunked.dropped;
             file.chunks = chunked.chunks.len();
             files.push(file);
-            for (ordinal, chunk) in chunked.chunks.into_iter().enumerate() {
+            for chunk in chunked.chunks {
                 pending.push(Pending {
-                    path: path.clone(),
                     section: chunk.section,
-                    ordinal,
-                    fingerprint: fingerprint.clone(),
                     text: chunk.text,
                 });
             }
@@ -945,86 +792,52 @@ impl Run<'_> {
         };
 
         let at = now();
-        let tx = store.conn.transaction().map_err(db)?;
-        let demote = |tx: &rusqlite::Transaction, path: &str| -> FlowResult<()> {
-            tx.execute(
-                "UPDATE chunks SET demoted_at = ?2 WHERE path = ?1 AND demoted_at IS NULL",
-                params![path, at],
-            )
-            .map_err(db)?;
-            Ok(())
-        };
-        for file in &files {
-            demote(&tx, &file.path)?;
-            tx.execute(
-                "INSERT INTO files (path, fingerprint, size, mtime_ns, chunks, skipped, folded_at,
-                   demoted_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
-                 ON CONFLICT(path) DO UPDATE SET fingerprint = ?2, size = ?3, mtime_ns = ?4,
-                   chunks = ?5, skipped = ?6, folded_at = ?7, demoted_at = NULL",
-                params![
-                    file.path,
-                    file.fingerprint,
-                    file.size as i64,
-                    file.mtime_ns,
-                    file.chunks as i64,
-                    file.skipped,
-                    at
-                ],
-            )
-            .map_err(db)?;
-        }
-        for (chunk, vector) in pending.iter().zip(&vectors) {
-            tx.execute(
-                "INSERT INTO chunks (path, section, ordinal, fingerprint, text, vector, folded_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
-                    chunk.path,
-                    chunk.section,
-                    chunk.ordinal as i64,
-                    chunk.fingerprint,
-                    chunk.text,
-                    vector_blob(vector),
-                    at
-                ],
-            )
-            .map_err(db)?;
-        }
-        for path in &removed {
-            demote(&tx, path)?;
-            tx.execute(
-                "UPDATE files SET demoted_at = ?2 WHERE path = ?1 AND demoted_at IS NULL",
-                params![path, at],
-            )
-            .map_err(db)?;
-        }
-        // The store's tally: this run's count added while every chunk so far was counted; an
-        // uncounted run makes it unknown for good.
-        match report.truncated {
-            Some(n) => tx
-                .execute(
+        let embedded_chunks = pending.len();
+        // Each folded file's chunks, in the order they were chunked and embedded.
+        let mut chunks = pending.into_iter().zip(vectors);
+        let insert: Vec<UnitChunks> = files
+            .iter()
+            .map(|file| UnitChunks {
+                unit_id: file.path.clone(),
+                fingerprint: file.fingerprint.clone(),
+                stat: Some(stat_text(file.size, file.mtime_ns)),
+                skipped: file.skipped.map(str::to_string),
+                chunks: chunks
+                    .by_ref()
+                    .take(file.chunks)
+                    .map(|(chunk, vector)| ChunkRow {
+                        section: chunk.section,
+                        text: chunk.text,
+                        vector: Some(vector_blob(&vector)),
+                    })
+                    .collect(),
+            })
+            .collect();
+        let truncated = report.truncated;
+        store.inner.fold_txn(at, &removed, &insert, |tx| {
+            // The store's tally: this run's count added while every chunk so far was counted; an
+            // uncounted run makes it unknown for good.
+            match truncated {
+                Some(n) => tx.execute(
                     "UPDATE meta SET value = CAST(value AS INTEGER) + ?2 WHERE key = ?1",
                     params![TRUNCATED_META_KEY, n as i64],
-                )
-                .map_err(db)?,
-            None => tx
-                .execute(
+                )?,
+                None => tx.execute(
                     "DELETE FROM meta WHERE key = ?1",
                     params![TRUNCATED_META_KEY],
-                )
-                .map_err(db)?,
-        };
-        for (path, size, mtime_ns) in &plan.restat {
-            tx.execute(
-                "UPDATE files SET size = ?2, mtime_ns = ?3 WHERE path = ?1",
-                params![path, *size as i64, mtime_ns],
-            )
-            .map_err(db)?;
-        }
-        tx.commit().map_err(db)?;
+                )?,
+            };
+            for (path, stat) in &plan.restat {
+                tx.execute(
+                    "UPDATE units SET stat = ?2 WHERE unit_id = ?1",
+                    params![path, stat],
+                )?;
+            }
+            Ok(())
+        })?;
 
         report.folded = files.iter().map(|file| file.path.clone()).collect();
-        report.embedded_chunks = pending.len();
+        report.embedded_chunks = embedded_chunks;
         report.demoted = removed;
         // A file the run selected but could not read stays behind.
         let lag = plan.lag() - report.folded.len() - report.demoted.len();
@@ -1189,27 +1002,9 @@ impl FoldReader {
     pub(super) fn lexical(
         &self,
         expression: &str,
-        mut visit: impl FnMut(i64, &str, f64),
+        visit: impl FnMut(i64, &str, f64),
     ) -> FlowResult<u64> {
-        let mut statement = self
-            .store
-            .conn
-            .prepare(
-                "SELECT chunks.id, chunks.path, bm25(chunks_fts) FROM chunks_fts \
-                 JOIN chunks ON chunks.id = chunks_fts.rowid \
-                 WHERE chunks_fts MATCH ?1 AND chunks.demoted_at IS NULL",
-            )
-            .map_err(db)?;
-        let mut rows = statement.query(params![expression]).map_err(db)?;
-        let mut matched = 0u64;
-        while let Some(row) = rows.next().map_err(db)? {
-            let id: i64 = row.get(0).map_err(db)?;
-            let path: String = row.get(1).map_err(db)?;
-            let rank: f64 = row.get(2).map_err(db)?;
-            visit(id, &path, rank);
-            matched += 1;
-        }
-        Ok(matched)
+        Ok(self.store.inner.lexical(expression, visit)?)
     }
 
     /// The embedder label the store was folded under (`fixture`, or `procedure <cid> on model
@@ -1220,35 +1015,17 @@ impl FoldReader {
 
     /// Visit every live chunk's `(id, path, vector bytes)`; returns how many were visited.
     pub(super) fn scan(&self, mut visit: impl FnMut(i64, &str, &[u8])) -> FlowResult<u64> {
-        let mut statement = self
+        // Every chunk this executor folds carries a vector; a NULL one reads as no vector at all
+        // (zero wide), which the semantic route counts as malformed rather than ranks.
+        Ok(self
             .store
-            .conn
-            .prepare("SELECT id, path, vector FROM chunks WHERE demoted_at IS NULL")
-            .map_err(db)?;
-        let mut rows = statement.query([]).map_err(db)?;
-        let mut seen = 0u64;
-        while let Some(row) = rows.next().map_err(db)? {
-            let id: i64 = row.get(0).map_err(db)?;
-            let path: String = row.get(1).map_err(db)?;
-            let vector = row.get_ref(2).map_err(db)?.as_blob().map_err(|error| {
-                FlowError::Io(std::io::Error::other(format!("fold store: {error}")))
-            })?;
-            visit(id, &path, vector);
-            seen += 1;
-        }
-        Ok(seen)
+            .inner
+            .scan(|id, path, vector| visit(id, path, vector.unwrap_or_default()))?)
     }
 
     /// One chunk's `(section, text)`.
     pub(super) fn chunk(&self, id: i64) -> FlowResult<(String, String)> {
-        self.store
-            .conn
-            .query_row(
-                "SELECT section, text FROM chunks WHERE id = ?1",
-                params![id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .map_err(db)
+        Ok(self.store.inner.chunk(id)?)
     }
 }
 
@@ -1298,14 +1075,10 @@ pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
         }
     };
     if let Some(store) = store {
-        view["chunks"] =
-            json!(store.count("SELECT count(*) FROM chunks WHERE demoted_at IS NULL")?);
-        view["demoted"] =
-            json!(store.count("SELECT count(*) FROM chunks WHERE demoted_at IS NOT NULL")?);
-        view["bytes"] = json!(store.count(
-            "SELECT coalesce(sum(length(CAST(text AS BLOB))), 0) FROM chunks \
-             WHERE demoted_at IS NULL"
-        )?);
+        let tally = store.inner.tally()?;
+        view["chunks"] = json!(tally.chunks);
+        view["demoted"] = json!(tally.demoted);
+        view["bytes"] = json!(tally.bytes);
         let plan = plan(root, &declared, &store)?
             .map_err(|why| FlowError::Unavailable(format!("fold source: {why}")))?;
         view["lag"] = json!(plan.lag());
@@ -1505,4 +1278,99 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Schema v3 (post-station-4 sprint): a store folded under v2 — rows keyed by `path` in a
+    /// `files` table — is not migrated. The next fold takes the rebuild path and names why; the
+    /// fold after that reuses the v3 store it built.
+    #[test]
+    fn a_v2_store_is_rebuilt_under_schema_v3() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        value["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+        let measure = value["ceremony"]["providers"]["semantic"]["measure"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        for (rel, bytes) in [
+            (
+                CONTRACT_REL.to_string(),
+                serde_json::to_vec(&value).unwrap(),
+            ),
+            (measure.clone(), std::fs::read(repo.join(&measure)).unwrap()),
+            (
+                "note.md".to_string(),
+                b"# Stewardship\nThe commons is tended.\n".to_vec(),
+            ),
+        ] {
+            std::fs::create_dir_all(root.join(&rel).parent().unwrap()).unwrap();
+            std::fs::write(root.join(&rel), bytes).unwrap();
+        }
+        let cid = Declared::load(root).unwrap().cid.to_string();
+        let store = store_dir(root, &cid, EmbedderChoice::Fixture);
+        std::fs::create_dir_all(&store).unwrap();
+        let v2 = rusqlite::Connection::open(store.join(STORE_FILE)).unwrap();
+        v2.execute_batch(&format!(
+            "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE files (path TEXT PRIMARY KEY, fingerprint TEXT NOT NULL);
+             INSERT INTO meta VALUES ('schema', '2'), ('measure', '{cid}');"
+        ))
+        .unwrap();
+        drop(v2);
+
+        let opts = FoldOptions {
+            embedder: EmbedderChoice::Fixture,
+            ..FoldOptions::default()
+        };
+        let FoldRun::Done(first) = fold(root, &opts).unwrap() else {
+            panic!("the fold ran");
+        };
+        assert_eq!(
+            first.store,
+            "rebuilt (store was built under another schema)"
+        );
+        assert!(
+            first.folded.contains(&"note.md".to_string()),
+            "{:?}",
+            first.folded
+        );
+        let rebuilt = rusqlite::Connection::open(store.join(STORE_FILE)).unwrap();
+        let (schema, units): (String, i64) = rebuilt
+            .query_row(
+                "SELECT (SELECT value FROM meta WHERE key = 'schema'), \
+                 (SELECT count(*) FROM units WHERE unit_id = 'note.md')",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((schema.as_str(), units), ("3", 1));
+        let stat: String = rebuilt
+            .query_row(
+                "SELECT stat FROM units WHERE unit_id = 'note.md'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let (size, mtime_ns) = stat.split_once(':').expect("size:mtime_ns");
+        assert_eq!(size, "37");
+        assert!(mtime_ns.parse::<i64>().is_ok(), "{stat}");
+
+        let FoldRun::Done(second) = fold(root, &opts).unwrap() else {
+            panic!("the fold ran");
+        };
+        assert_eq!(second.store, "reused");
+        assert!(
+            second.folded.is_empty(),
+            "an unchanged stat is not re-hashed"
+        );
+    }
 }
