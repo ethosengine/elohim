@@ -124,6 +124,15 @@ def main(argv: list[str]) -> int:
                                          f"authority: {native.get('evaluator')}"])
             except Exception:  # noqa: BLE001 — witnessing must never break the gate
                 pass
+        # The frame line (advisory, never decisive): a values guard judged by a content-addressed
+        # frame names that frame and its native classification CID. Exit code is untouched.
+        for rv in native.get("verdicts") or []:
+            evidence = rv.get("evidence") if isinstance(rv, dict) else None
+            cid = evidence.get("classificationCid") if isinstance(evidence, dict) else None
+            if isinstance(cid, str) and cid:
+                frame_reason = str(evidence.get("reason") or rv.get("reason") or "").strip()
+                msgs.append(f"[frame] {frame_reason} (rule `{rv.get('ruleId')}`, path {path}, "
+                            f"classification {cid})")
         advisory_referral = (rs_decision == "refer" and native.get("winningClass") == "inject"
                              and native.get("referReason") == "stale-evidence")
         if rs_decision in _NATIVE_BLOCKS and not advisory_referral and not (rs_decision == "refer" and ack):

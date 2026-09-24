@@ -214,11 +214,34 @@ def _handle_measures(measures, merged, root: Path, fp_path: str) -> list[str]:
     return notes
 
 
-def _handle_dispatches(dispatches, merged, fp_path: str) -> list[str]:
+def _native_frames(native) -> dict[str, list[tuple[str, str]]]:
+    """Frame evidence from the native payload: `{rule_id: [(classificationCid, reason)]}` for
+    every verdict whose opaque `evidence` carries a `classificationCid` (a values guard judged
+    by a content-addressed frame). Surfacing only — the decision authority never reads it."""
+    frames: dict[str, list[tuple[str, str]]] = {}
+    for verdict in (native or {}).get("verdicts") or []:
+        evidence = verdict.get("evidence") if isinstance(verdict, dict) else None
+        cid = evidence.get("classificationCid") if isinstance(evidence, dict) else None
+        if isinstance(cid, str) and cid:
+            reason = evidence.get("reason") or verdict.get("reason") or ""
+            frames.setdefault(verdict.get("ruleId"), []).append((cid, str(reason).strip()))
+    return frames
+
+
+def _frame_checks(frames, rule_id) -> list[str]:
+    return [f"classification {cid}" for cid, _ in frames.get(rule_id, [])]
+
+
+def _frame_lines(frames, rule_id) -> list[str]:
+    return [f"[frame] {reason}" for _, reason in frames.get(rule_id, [])]
+
+
+def _handle_dispatches(dispatches, merged, fp_path: str, frames=None) -> list[str]:
     """The dispatch side-channel: build the sentinel-idiom directive text per fired dispatch
     verdict (deprecation-sentinel.py:487-509's dispatch-a-background-agent phrasing, verbatim
-    shape) from the rule's `parameters` (dispatch-agent / dispatch-prompt). Pure text assembly —
-    witnessing is the caller's job (main(), which has `root`)."""
+    shape) from the rule's `parameters` (dispatch-agent / dispatch-prompt). A rule judged by a
+    frame gains its advisory `[frame]` line. Pure text assembly — witnessing is the caller's job
+    (main(), which has `root`)."""
     notes: list[str] = []
     for v in dispatches:
         rule = merged["rules"].get(v.rule_id, {})
@@ -229,6 +252,7 @@ def _handle_dispatches(dispatches, merged, fp_path: str) -> list[str]:
             f"[epr-meta] dispatch rule `{v.rule_id}` fired — DISPATCH NOW (do not derail the "
             f"current task): launch the `{agent}` agent via the Agent tool with "
             f"run_in_background: true and the prompt: {prompt} (subject: {fp_path})")
+        notes += _frame_lines(frames or {}, v.rule_id)
     return notes
 
 
@@ -409,6 +433,9 @@ def main():
     # its decision, its reasons.
     global _EVALUATOR, _ACTOR
     native = epr_client.govern(root, fp, content, is_new, is_new_subdir, session=session_id)
+    # The frame line (advisory): a values guard's native verdict names the content-addressed frame
+    # that judged the write and its classification CID. Printed and witnessed; never decisive.
+    frames = _native_frames(native)
     if native is None:
         _EVALUATOR = epr_meta.evaluator_identity()
         # Announce the missing second opinion only where there was a DECISION to
@@ -469,9 +496,15 @@ def main():
             params = rule.get("parameters") if isinstance(rule.get("parameters"), dict) else {}
             _witness(root, subject=fp, decision="permit", cls="dispatch", rule_id=v.rule_id,
                      policy_ref=rule.get("policy-ref"),
-                     checks=[f"dispatch-agent={params.get('dispatch-agent', '?')}"])
+                     checks=[f"dispatch-agent={params.get('dispatch-agent', '?')}",
+                             *_frame_checks(frames, v.rule_id)])
         if result["decision"] == "permit":
-            advisories += _handle_dispatches(result["dispatches"], merged, fp)
+            advisories += _handle_dispatches(result["dispatches"], merged, fp, frames)
+    # A frame verdict whose rule is not a dispatch (a future inject/ask row) still prints its line.
+    _dispatched = {v.rule_id for v in result["dispatches"]}
+    for _rid in frames:
+        if _rid not in _dispatched:
+            advisories += _frame_lines(frames, _rid)
 
     decision = result["decision"]
     cls = result["cls"]
@@ -481,14 +514,14 @@ def main():
         _witness(root, subject=fp, decision="refuse", cls="deny", rule_id=result["rule_id"],
                  policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
                              if merged and result["rule_id"] else None),
-                 checks=[reason])
+                 checks=[reason, *_frame_checks(frames, result["rule_id"])])
         _emit_deny(reason)
 
     if decision == "refer":  # ask, OR an unresolvable-validator / malformed-manifest routing
         _witness(root, subject=fp, decision="refer", cls=cls, rule_id=result["rule_id"],
                  policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
                              if merged and result["rule_id"] else None),
-                 refer=result["refer"], checks=[reason])
+                 refer=result["refer"], checks=[reason, *_frame_checks(frames, result["rule_id"])])
         if cls == "inject" and (result.get("refer") or {}).get("reason") == "stale-evidence":
             _emit_advise(" ".join([reason, *advisories]))
         _emit_ask(reason)
@@ -498,7 +531,7 @@ def main():
         _witness(root, subject=fp, decision="permit", cls="inject", rule_id=result["rule_id"],
                  policy_ref=(merged["rules"].get(result["rule_id"], {}).get("policy-ref")
                              if merged and result["rule_id"] else None),
-                 checks=[reason])
+                 checks=[reason, *_frame_checks(frames, result["rule_id"])])
         _emit_advise(" ".join([reason, *advisories]))
 
     if advisories:

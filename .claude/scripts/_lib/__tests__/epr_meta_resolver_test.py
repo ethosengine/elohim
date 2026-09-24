@@ -282,4 +282,80 @@ check("mint keeps the original fp/rule/policy/path/detail/status shape",
 shutil.rmtree(root_with, ignore_errors=True)
 shutil.rmtree(root_without, ignore_errors=True)
 
+# ── C7: the native frame evidence reaches the PreToolUse surface and the witness ───────────
+# `epr govern` returns each verdict's opaque `evidence`; a frame verdict carries
+# `classificationCid`. The resolver surfaces an advisory `[frame] <reason>` line and witnesses
+# `classification <cid>`. Decision authority is unchanged (the stub agrees: permit/dispatch).
+_STUB_CID = "bafyreifhbla6a66gg7u34dbpodxcp4h6pcuqxtxv2jkvsynwfjgnicbpxi"
+_FRAME_REASON = ("net-new apex-sovereignty framing needs an explicit bounded frame · frame "
+                 "bafyreif…zo4e · classification bafyreif…bpxi · abstain")
+
+
+def _stub_epr(dirpath: Path, evidence) -> Path:
+    verdict = {"class": "dispatch", "ruleId": "sov-guard", "policyRef": None,
+               "reason": "validator flagged this write: " + _FRAME_REASON}
+    if evidence is not None:
+        verdict["evidence"] = evidence
+    payload = {"decision": "permit", "winningClass": "dispatch", "ruleId": "sov-guard",
+               "reason": verdict["reason"], "referReason": None, "diagnostics": [],
+               "verdicts": [verdict],
+               "evaluator": {"id": "stub-epr", "version": "0", "cid": "sha256:stub"}}
+    stub = dirpath / "epr-stub"
+    stub.write_text("#!/usr/bin/env python3\nimport sys\nsys.stdin.read()\n"
+                    f"print({json.dumps(json.dumps(payload))})\n")
+    stub.chmod(0o755)
+    return stub
+
+
+def _frame_case(evidence):
+    import os
+    td = Path(tempfile.mkdtemp())
+    (td / ".git").mkdir()
+    _wr(td / ".epr-meta", """
+        ---
+        epr-meta-version: 1
+        root: true
+        rules:
+          - id: sov-guard
+            class: dispatch
+            when: { write: "*.md" }
+            validator: epr:validator-sovereignty-ontology-guard
+            parameters: { dispatch-agent: storyteller, dispatch-prompt: "review the framing" }
+            why: test
+        ---
+    """)
+    env = {**os.environ, "EPR_BIN": str(_stub_epr(td, evidence))}
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    r = subprocess.run([sys.executable, str(HOOK)], capture_output=True, text=True, env=env,
+                       input=json.dumps({"tool_name": "Write", "session_id": "frame-test",
+                                         "tool_input": {"file_path": str(td / "w.md"),
+                                                        "content": "Members hold a self-sovereign identity.\n"}}))
+    ledger = td / ".claude/data/governance-findings.jsonl"
+    rows = [json.loads(ln) for ln in ledger.read_text().splitlines()] if ledger.is_file() else []
+    shutil.rmtree(td, ignore_errors=True)
+    return r, rows
+
+
+# native_frame_evidence_is_surfaced_and_witnessed
+_r, _rows = _frame_case({"classificationCid": _STUB_CID, "reason": _FRAME_REASON,
+                         "frameRef": "bafyreif2vuz6tnzwtvkgogulw25u2h65edipkbyxw5guf2yyezy5i5zo4e",
+                         "verdict": "abstain"})
+check("frame: hook exits 0 (dispatch never blocks)", _r.returncode == 0)
+_ctx = json.loads(_r.stdout)["hookSpecificOutput"].get("additionalContext", "") if _r.stdout.strip() else ""
+check("frame: decision authority unchanged — no permissionDecision on the dispatch permit",
+      _r.stdout.strip() and "permissionDecision" not in json.loads(_r.stdout)["hookSpecificOutput"])
+check("frame: the emitted context carries the advisory `[frame]` line with `frame bafy`",
+      "[frame] " in _ctx and "frame bafy" in _ctx)
+check("frame: the dispatch directive still rides along", "DISPATCH NOW" in _ctx)
+_disp = [row for row in _rows if row.get("class") == "dispatch" and row.get("ruleId") == "sov-guard"]
+check("frame: the dispatch witness row carries `classification <cid>`",
+      len(_disp) == 1 and f"classification {_STUB_CID}" in _disp[0]["witness"])
+
+# no_evidence_no_frame_line
+_r, _rows = _frame_case(None)
+_ctx = json.loads(_r.stdout)["hookSpecificOutput"].get("additionalContext", "") if _r.stdout.strip() else ""
+check("no evidence: no `[frame]` line", "[frame]" not in _ctx and "DISPATCH NOW" in _ctx)
+check("no evidence: no `classification` check witnessed",
+      not any(str(c).startswith("classification ") for row in _rows for c in row.get("witness", [])))
+
 print(f"\n  {_passed} assertions passed ✅")

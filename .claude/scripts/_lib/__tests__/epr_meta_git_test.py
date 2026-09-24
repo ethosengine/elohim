@@ -119,4 +119,64 @@ with tempfile.TemporaryDirectory() as _td:
           _v_other is not None and _v_other.cls == "ask"
           and _v_other.rule_id == "epr-meta:malformed")
 
+# ── frame_line_is_advisory_exit_zero (plan task C7) ──
+# A native verdict carrying `evidence.classificationCid` prints its `[frame]` line to stderr as an
+# advisory; the exit code is the decision's (dispatch → permit → 0), never the frame's.
+import contextlib  # noqa: E402
+import importlib.util  # noqa: E402
+import io  # noqa: E402
+import os  # noqa: E402
+import tempfile  # noqa: E402
+
+from _lib import epr_client, epr_meta  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("epr_meta_git_gate", REPO / ".claude/scripts/epr-meta-git-gate.py")
+_gate = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_gate)
+_CID = "bafyreifhbla6a66gg7u34dbpodxcp4h6pcuqxtxv2jkvsynwfjgnicbpxi"
+_REASON = ("net-new apex-sovereignty framing needs an explicit bounded frame · frame "
+           "bafyreif…zo4e · classification bafyreif…bpxi · abstain")
+
+
+def _native(evidence):
+    verdict = {"class": "dispatch", "ruleId": "sovereignty-ontology-guard", "reason": _REASON}
+    if evidence is not None:
+        verdict["evidence"] = evidence
+    return {"decision": "permit", "winningClass": "dispatch", "ruleId": "sovereignty-ontology-guard",
+            "reason": _REASON, "referReason": None, "verdicts": [verdict],
+            "evaluator": {"id": "stub", "version": "0", "cid": "sha256:stub"}}
+
+
+def _run_gate(native):
+    saved = (gg.changed_files, gg.content_of, gg.head_has_parent, gg.verdict_for,
+             epr_client.govern, epr_meta.witness)
+    gg.changed_files = lambda mode, rng: [("docs/w.md", "A")]
+    gg.content_of = lambda mode, rng, path: "Members hold a self-sovereign identity.\n"
+    gg.head_has_parent = lambda mode, rng, path: True
+    gg.verdict_for = lambda path, write: Verdict("dispatch", _REASON, "sovereignty-ontology-guard")
+    epr_client.govern = lambda *a, **k: native
+    epr_meta.witness = lambda *a, **k: None
+    cwd = os.getcwd()
+    err = io.StringIO()
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / ".git").mkdir()
+            os.chdir(td)
+            with contextlib.redirect_stderr(err):
+                code = _gate.main(["--staged"])
+    finally:
+        os.chdir(cwd)
+        (gg.changed_files, gg.content_of, gg.head_has_parent, gg.verdict_for,
+         epr_client.govern, epr_meta.witness) = saved
+    return code, err.getvalue()
+
+
+_code, _err = _run_gate(_native({"classificationCid": _CID, "reason": _REASON}))
+check("frame line: the git gate exits 0 on a frame-judged dispatch permit", _code == 0)
+check("frame line: stderr carries the advisory `[frame]` line naming `frame bafy`",
+      "[frame] " in _err and "frame bafy" in _err)
+check("frame line: stderr names the full classification CID", f"classification {_CID}" in _err)
+_code, _err = _run_gate(_native(None))
+check("no evidence: exit 0 and no `[frame]` line", _code == 0 and "[frame]" not in _err)
+
 print(f"\n{_passed} checks passed")
