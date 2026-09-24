@@ -4508,6 +4508,7 @@ async fn async_main(
                         "content search: fold store open"
                     );
                     services.attach_search_index(index.clone());
+                    http_server = http_server.with_search_index(index.clone());
                     tokio::spawn(
                         index.run_loop(pool.clone(), elohim_storage::search::fold::SWEEP_PERIOD),
                     );

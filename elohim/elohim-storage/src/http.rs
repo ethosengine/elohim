@@ -478,6 +478,9 @@ pub struct HttpServer {
     /// (process, not per-request). Not yet consulted for any decision;
     /// `TrustGradient::inert()` still passes `memo: None` (T9 wires reads).
     memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
+    /// The content search fold (Lane S, ruling R-S4): `GET /db/content/search` ranks over it.
+    /// `None` when this peer runs no fold; the route then answers `fold: unreachable`.
+    search_index: Option<Arc<crate::search::SearchIndex>>,
     /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Write-admission limiter (mutating requests): prevents OOM under burst
@@ -1237,6 +1240,7 @@ impl HttpServer {
                 std::collections::HashMap::new(),
             )),
             memo_store: None,
+            search_index: None,
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             read_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_READS)),
@@ -1690,6 +1694,13 @@ impl HttpServer {
     /// instance.
     pub fn with_memo_store(mut self, store: Arc<dyn crate::trust::VerificationMemoStore>) -> Self {
         self.memo_store = Some(store);
+        self
+    }
+
+    /// Wire the content search fold `GET /db/content/search` ranks over (Lane S, R-S4) — the same
+    /// `Arc` the content service wakes after each write.
+    pub fn with_search_index(mut self, index: Arc<crate::search::SearchIndex>) -> Self {
+        self.search_index = Some(index);
         self
     }
 
@@ -7136,6 +7147,12 @@ impl HttpServer {
             return self.handle_db_content_bulk(req, method).await;
         }
 
+        // Content search (Lane S, ruling R-S4). Must precede the `content/{id}`
+        // catch-all below, which would otherwise read `search` as a content id.
+        if resource_path == "content/search" {
+            return self.handle_db_content_search(req, method).await;
+        }
+
         // Entity-nested schedule routes: /db/content/{cid}/schedule
         if let Some(rest) = resource_path.strip_prefix("content/") {
             if let Some(cid) = rest.strip_suffix("/schedule") {
@@ -7596,55 +7613,24 @@ impl HttpServer {
                 // unverified caller, so the cascade form would resolve an
                 // ANONYMOUS request as the node's human and serve that
                 // human's reach. See `extract_agent_cid_explicit`.
-                let requester = requester_idv.and_then(|idv| {
-                    crate::db::humans::get_human_by_id(&mut conn, &idv)
-                        .ok()
-                        .flatten()
-                        .or_else(|| {
-                            crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
-                                .ok()
-                                .flatten()
-                        })
-                });
-                let community_idx = crate::epr_service::reach_level_index("community");
-                let reach_gate = crate::epr_service::EprService::new(
-                    None,
-                    None,
-                    None,
-                    crate::p2p::trust_cache::PeerTrustCache::new(),
-                )
-                .with_memo_store(self.memo_store.clone());
+                let requester = resolve_requester(&mut conn, requester_idv.as_deref());
                 let mut refused: usize = 0;
                 let views: Vec<ContentView> = items
                     .into_iter()
                     .map(Into::into)
                     .filter(|v: &ContentView| {
-                        let idx = crate::epr_service::reach_level_index(&v.reach);
-                        // commons/public: no identity needed.
-                        if idx == 0 {
-                            return true;
-                        }
-                        // Every restricted tier needs a RESOLVED requester.
-                        // Deny-by-default when the caller cannot be resolved —
-                        // this is the fail-closed half header-presence skipped.
-                        let Some(ref human) = requester else {
+                        let admitted = reach_admits(
+                            &mut conn,
+                            &app_ctx,
+                            requester.as_ref(),
+                            &self.memo_store,
+                            &v.reach,
+                            &v.id,
+                        );
+                        if !admitted {
                             refused += 1;
-                            return false;
-                        };
-                        // community: a resolved identity IS the gate (mirrors the
-                        // single-item route, which authorizes only above community).
-                        if idx <= community_idx {
-                            return true;
                         }
-                        match reach_gate.authorize_reach_for_human_with_own_trust(
-                            &mut conn, &app_ctx, &v.reach, human, &v.id,
-                        ) {
-                            Ok(()) => true,
-                            Err(_) => {
-                                refused += 1;
-                                false
-                            }
-                        }
+                        admitted
                     })
                     .collect();
                 if refused > 0 {
@@ -7664,6 +7650,65 @@ impl HttpServer {
             }
             Err(e) => Ok(response::error_response(e)),
         }
+    }
+
+    /// `GET /db/content/search` (Lane S, ruling R-S4) — a recipe-governed lexical search over the
+    /// content projection's fold, reach-gated per candidate. GET only.
+    async fn handle_db_content_search(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+        // EXPLICIT `X-Agent-Cid` only — the same rule `list_db_content_views` follows.
+        let requester_idv = crate::api::account::extract_agent_cid_explicit(&req);
+        let query_str = req.uri().query().unwrap_or("").to_string();
+        self.content_search_view(&query_str, requester_idv)
+    }
+
+    /// The body of `GET /db/content/search?{query_str}`, split out so an integration test drives
+    /// the production path without a hyper `Incoming` body. `requester_idv` is the explicit
+    /// `X-Agent-Cid` header value only.
+    fn content_search_view(
+        &self,
+        query_str: &str,
+        requester_idv: Option<String>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let query = match crate::search::query::ContentSearchQuery::parse(query_str) {
+            Ok(query) => query,
+            Err(why) => return Ok(response::bad_request(&why)),
+        };
+        let Some(index) = self.search_index.as_ref() else {
+            // No fold on this peer: still print the declared recipe, and say the fold is
+            // unreachable rather than answering an empty list as if it were a ranking.
+            return match crate::search::Declared::load() {
+                Ok(declared) => Ok(response::ok(&crate::search::query::answer_unlit(
+                    &declared, &query,
+                ))),
+                Err(why) => Err(StorageError::Internal(why)),
+            };
+        };
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+        let app_ctx = db::AppContext::default_lamad();
+        let requester = resolve_requester(&mut conn, requester_idv.as_deref());
+        let reader = crate::search::reader::reader_for(
+            requester_idv.as_deref(),
+            requester.as_ref().map(|human| human.id.as_str()),
+        );
+        let memo = self.memo_store.clone();
+        let mut gate = |conn: &mut diesel::SqliteConnection, reach: &str, id: &str| {
+            reach_admits(conn, &app_ctx, requester.as_ref(), &memo, reach, id)
+        };
+        let view = crate::search::query::answer(index, &mut conn, &reader, &query, &mut gate);
+        Ok(response::ok(&view))
     }
 
     /// GET /db/content - List content, POST /db/content - Create content
@@ -14907,6 +14952,30 @@ impl HttpServer {
         }
     }
 
+    /// Drive `GET /db/content/search?{query_str}` through the route's production path (the fold,
+    /// the trust floor and the per-candidate reach gate) without an HTTP server bind. `agent_cid`
+    /// stands in for the explicit `X-Agent-Cid` header.
+    pub async fn test_content_search(
+        &self,
+        query_str: &str,
+        agent_cid: Option<&str>,
+    ) -> HttpTestResponse {
+        match self.content_search_view(query_str, agent_cid.map(str::to_string)) {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
     /// Drive `handle_get_blob` directly without an HTTP server bind.
     pub async fn test_get_blob(&self, hash: &str) -> HttpTestResponse {
         match self.handle_get_blob(hash, None).await {
@@ -17193,6 +17262,14 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         .route(
+            // Lane S (R-S4). Declared before `/db/content/{id}`, and uncached: each answer is
+            // shaped for its reader by the per-candidate reach gate and moves with the fold.
+            Route::get("/db/content/search")
+                .handler("search_content")
+                .public_if_reach("commons")
+                .build(),
+        )
+        .route(
             Route::get("/db/content/{id}")
                 .handler("get_content")
                 .cache_ttl(300)
@@ -18185,6 +18262,63 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
+}
+
+/// Resolve an explicit `X-Agent-Cid` value to a human this peer knows — by `humans.id`, then by
+/// agent key. `None` when no header was sent or it names nobody here.
+pub fn resolve_requester(
+    conn: &mut diesel::SqliteConnection,
+    requester_idv: Option<&str>,
+) -> Option<crate::db::models::Human> {
+    let idv = requester_idv?;
+    crate::db::humans::get_human_by_id(conn, idv)
+        .ok()
+        .flatten()
+        .or_else(|| {
+            crate::db::humans::get_human_by_agent_key(conn, idv)
+                .ok()
+                .flatten()
+        })
+}
+
+/// The one per-row reach gate `GET /db/content` and `GET /db/content/search` share: may
+/// `requester` (already resolved from the EXPLICIT `X-Agent-Cid`, never the ambient session) see
+/// the row `id` at `reach`?
+///
+/// Authorization is UNCONDITIONAL at every posture (2026-08-20): commons/public need no identity;
+/// every restricted tier needs a RESOLVED requester (deny-by-default — the fail-closed half that
+/// header presence once skipped); community is admitted for any resolved identity (mirroring the
+/// single-item route, which authorizes only above community); above community the requester is
+/// authorized per row by the reach authorizer, carrying the process-lifetime verification-memo
+/// store `memo`. An unrecognized ring sorts as the most restricted, so it reaches the authorizer
+/// and is refused there.
+pub fn reach_admits(
+    conn: &mut diesel::SqliteConnection,
+    ctx: &AppContext,
+    requester: Option<&crate::db::models::Human>,
+    memo: &Option<Arc<dyn crate::trust::VerificationMemoStore>>,
+    reach: &str,
+    id: &str,
+) -> bool {
+    let idx = crate::epr_service::reach_level_index(reach);
+    if idx == 0 {
+        return true;
+    }
+    let Some(human) = requester else {
+        return false;
+    };
+    if idx <= crate::epr_service::reach_level_index("community") {
+        return true;
+    }
+    crate::epr_service::EprService::new(
+        None,
+        None,
+        None,
+        crate::p2p::trust_cache::PeerTrustCache::new(),
+    )
+    .with_memo_store(memo.clone())
+    .authorize_reach_for_human_with_own_trust(conn, ctx, reach, human, id)
+    .is_ok()
 }
 
 /// Simple response container for integration test assertions.

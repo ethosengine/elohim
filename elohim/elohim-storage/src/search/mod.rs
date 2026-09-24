@@ -9,9 +9,12 @@
 //! - [`fold`] — [`fold::SearchIndex`], the incremental bm25 fold of the content rows into
 //!   `<storage_dir>/index/<measure-cid>/fold.sqlite`, with its attestation beside it, run at
 //!   boot, on [`fold::SearchIndex::notify`] from the content service, and on a timer;
-//! - [`reader`] — who an answer is shaped for (the reach gate's input), never on the wire.
+//! - [`reader`] — who an answer is shaped for (the reach gate's input), never on the wire;
+//! - [`query`] — `GET /db/content/search`: the query, and [`query::answer`], one ranked,
+//!   reach-gated `ContentSearchView` over the fold.
 pub mod fold;
 pub mod measure;
+pub mod query;
 pub mod reader;
 
 pub use fold::{FoldReport, FoldSnapshot, SearchIndex};

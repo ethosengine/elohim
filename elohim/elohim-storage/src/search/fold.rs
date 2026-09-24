@@ -391,6 +391,21 @@ impl SearchIndex {
         read(&store)
     }
 
+    /// Content rows past the fold's watermark right now — what the fold has yet to read. A row
+    /// inside the settle window counts until the watermark passes it.
+    pub fn behind(&self, conn: &mut SqliteConnection) -> Result<u64, String> {
+        let meta = self.with_store(|store| store.meta().map_err(|e| e.to_string()))?;
+        let at = meta.get(META_WATERMARK_AT).cloned().unwrap_or_default();
+        let id = meta.get(META_WATERMARK_ID).cloned().unwrap_or_default();
+        Ok(diesel::sql_query(count_after_sql())
+            .bind::<Text, _>(&at)
+            .bind::<Text, _>(&id)
+            .get_result::<CountRow>(conn)
+            .map_err(fault("count behind"))?
+            .n
+            .max(0) as u64)
+    }
+
     /// Wake the loop: something in `content` changed. A wake that arrives while a run is under
     /// way is kept (one permit), so the next run starts as soon as this one ends.
     pub fn notify(&self) {

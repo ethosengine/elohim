@@ -7,3 +7,4 @@
 mod declaration;
 mod fold;
 mod fts5_probe;
+mod route;
