@@ -2,7 +2,7 @@
 title: "Freenet lift-and-shift — applying the peer-confrontation lessons"
 id: freenet-lift-and-shift
 tier: plan
-status: Open
+status: In-flight
 created: 2026-07-27
 maintainers: Matthew Dowell + Claude Opus 5
 requires_env: []

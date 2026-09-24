@@ -2,7 +2,10 @@
 title: Acceptance-aware native reconciliation
 id: acceptance-plan
 kind: plan
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: c51471be5  # flow/reconciliation.rs + tests/flow_reconciliation.rs
+verified_by: "habits.yaml dev-system-equilibrium DELTA 2026-09-09 — final eprfs, genesis-a2o and gherkin gates EXIT=0; independent technical verdict approved; appointed experiential verdict linked from acceptance-aware-reconciliation/task-4-report.md"
+concerns: "was: DONE_WITH_CONCERNS — the scoped readout keeps six acceptance-unestablished assertions; local appointment is not peer authority"
 written: 2026-09-09
 serves: dev-system-equilibrium
 cites:

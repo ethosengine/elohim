@@ -2,7 +2,9 @@
 title: "Vision-Gap Stub — O4: A Home / Covenant for AI (Substrate Definition)"
 id: vision-gap-home-for-ai-stub
 date: 2026-06-14
-status: SCOPING-MEMO / GREENLIGHT-TO-EXPAND
+status: proposal
+triage_note: "vision-gap stub (was: SCOPING-MEMO / GREENLIGHT-TO-EXPAND); awaiting an operator expand/decline"
+triaged: 2026-09-24
 owner: rust-architect (substrate)
 kind: vision-gap-stub
 objective: O4 — build a home and a covenant for AI

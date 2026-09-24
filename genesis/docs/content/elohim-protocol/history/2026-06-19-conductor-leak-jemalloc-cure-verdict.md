@@ -2,7 +2,7 @@
 title: "Conductor leak — CURED by the jemalloc allocator swap (verdict, 2026-06-19)"
 id: conductor-leak-jemalloc-cure-verdict
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-19
 topic: [conductor-leak, oom, jemalloc, glibc-arena, cure, alpha]

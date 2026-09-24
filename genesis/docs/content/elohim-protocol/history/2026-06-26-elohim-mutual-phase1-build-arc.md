@@ -1,13 +1,13 @@
 ---
 id: elohim-mutual-phase1-build-arc
-status: noted
+status: Accepted
 tier: history
 canonical: genesis/docs/content/elohim-protocol/autonomous_entity/mutual/epic-elohim-mutual.md
 derived_from:
   - genesis/docs/DEV-QUICK-START.md          # retired to git 2026-06-26 (Elohim Mutual dev quick-start, stub era)
   - genesis/docs/PHASE-1-BUILD-SUMMARY.md     # retired to git 2026-06-26 (Phase-1 build snapshot, 2025-12-22)
 cites:
-  - "elohim-mutual-epic | epic-elohim-mutual | sha256:81d79e525a4ee305 | status: dead — target no longer resolves | path: genesis/docs/content/elohim-protocol/autonomous_entity/mutual/epic-elohim-mutual.md"
+  - genesis/docs/content/elohim-protocol/autonomous_entity/mutual/epic-elohim-mutual.md
   - "shefa-economic-infrastructure | Shefa | sha256:d3eb56a79069a6cc | path: genesis/docs/content/elohim-protocol/shefa.md"
   - app/elohim-app/src/app/shefa/services/insurance-mutual.service.ts
 ---

@@ -1,3 +1,9 @@
+---
+status: approved
+triage_note: "status read from the body line (Approved, amended same-day with the gix-brit playground reframe); frontmatter added so the ledger reads it"
+triaged: 2026-09-24
+---
+
 # Gitoxide Upstream Alignment — Design
 
 **Date:** 2026-04-20

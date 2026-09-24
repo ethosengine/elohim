@@ -2,7 +2,7 @@
 title: "History: The community-compute founding vision arc (March 2026)"
 id: community-compute-founding-vision-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [community-compute, founding-vision, family-node, replication, stewardship, economics, explainability, design-arc]

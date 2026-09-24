@@ -2,7 +2,9 @@
 title: "Resiliency Saga — executable eprfs valueflow driving the epic to live completion"
 id: resiliency-saga-valueflow
 tier: plan
-status: Executed (CLAIMED — verify via CI dataplane runs + jenkins-sync)
+status: claimed-not-verified
+triage_note: "was: Executed (CLAIMED — verify via CI dataplane runs + jenkins-sync)"
+triaged: 2026-09-24
 created: 2026-07-25
 maintainers: Matthew Dowell + Claude Fable 5
 sprint: verify-track

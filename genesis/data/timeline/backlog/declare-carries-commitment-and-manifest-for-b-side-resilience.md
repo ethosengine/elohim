@@ -13,8 +13,8 @@ ci_status: blocked
 jobs: [elohim-edge]
 tags: [resiliency-saga, ch10, declare-carries, commitment, shard-locations, rea, mishpat, gossip-gap, full-arc, carried-record]
 cites:
-  - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
-  - security-declare-carries-record-carried-evidence-bounds | carried-record bounds | path: genesis/data/timeline/backlog/security-declare-carries-record-carried-evidence-bounds.md
+  - "resiliency-saga-valueflow | the saga plan whose sprint-3 objective (declare-carries-Record, b91168724) surfaced this ch10 gap | sha256:1ffcaefb3212d80b | path: genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md"
+  - genesis/data/timeline/backlog/security-declare-carries-record-carried-evidence-bounds.md
   - elohim/elohim-storage/src/services/household_resilience.rs
   - elohim/elohim-storage/src/db/rea_commitments.rs
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs

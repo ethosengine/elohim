@@ -2,7 +2,7 @@
 title: Substrate Readiness — Native Recursive Signal Aggregation at Global Commons-Compute Scale
 id: commons-compute-aggregation-readiness-assessment
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-21
 author: workflow:commons-aggregation-readiness

@@ -1,7 +1,10 @@
 ---
 id: plan-automerge-content-sync-plane-lighting
 title: Light the Automerge content-sync plane — pure-Rust two-node convergence spine
-status: Spine + stretch (G5 doorway, G6 frontend) + iroh-mode landed & verified (2026-06-27); follow-up = iroh sync-round driver
+status: landed
+landed_commit: 87c03f0cf
+verified_by: "2026-06-27 independent re-run of the G3 convergence proof (tests/p2p/sync_libp2p_convergence.rs doc_authored_on_a_converges_to_b) — see §Execution Outcome"
+landing_state: "Spine + stretch (G5 doorway, G6 frontend) + iroh-mode landed & verified (2026-06-27); follow-up = iroh sync-round driver"
 domain: D5
 sprint: dataplane-automerge-spine (D5 forward slice; not in roadmap 1-6 — operator-requested 2026-06-27)
 requires_env: [household-nodes]

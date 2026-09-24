@@ -2,7 +2,7 @@
 title: "RCA: Genesis seeding/verify stages Unstable + all-zeros resilience card"
 id: genesis-seed-stages-unstable-resilience-card-rca
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-18
 author: session (feat/frontend-eyes-sprint)

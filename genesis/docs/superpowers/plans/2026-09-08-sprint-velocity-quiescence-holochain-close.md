@@ -1,7 +1,9 @@
 ---
 id: sprint-velocity-quiescence-holochain-close
 title: Sprint 2026-09-08 → 09-14 — velocity, peer-driven quiescence, Holochain integration close
-status: IN_PROGRESS
+status: In-flight
+triage_note: "was: IN_PROGRESS; the 09-08→09-14 window closed with no sprint-result — its open tasks need a decompose pass (verify each against the tree, carry the rest to their habits/backlog)"
+triaged: 2026-09-24
 class: protocol-canonical
 actor: agent:orchestrator@fable-5.1
 habits: [dataplane-convergence, runtime-upgrade-propagation, operator-runtime-surface, runtime-death-witnessed, happ-lineage-migration]

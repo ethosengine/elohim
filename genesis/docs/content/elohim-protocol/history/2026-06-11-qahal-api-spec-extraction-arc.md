@@ -1,6 +1,6 @@
 ---
 id: qahal-api-spec-extraction-arc
-status: noted
+status: Accepted
 tier: history
 derived_from:
   - app/elohim-app/src/app/qahal/QAHAL_API_SPECIFICATION_v1.0.md   # retired to git 2026-06-11 (qahal island recompose)

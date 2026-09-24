@@ -2,7 +2,8 @@
 title: Alpha Test-Bench Compute Envelope — observed constraint to governed commitment
 id: alpha-test-bench-compute-envelope
 tier: architecture
-status: Ratification-pending operational governance contract
+status: Accepted — operational governance contract
+ratified: "2026-07-16 by the operator — typed at genesis/data/rakia/compute-capacity.json cluster.ratifications[0] (policy test-bench-aggregate-capacity); the prior status read ratification-pending after the typed record existed"
 created: 2026-07-16
 pillar coupling: rakia (capacity observation), shefa (bounded commitment), elohim (reach governance)
 informed-by:

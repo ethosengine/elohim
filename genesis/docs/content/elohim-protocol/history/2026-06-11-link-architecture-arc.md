@@ -2,7 +2,7 @@
 title: "History: The link-architecture arc — the Signal Rule won the canon while its cleanup phases stalled (Dec 2025 – Jun 2026)"
 id: link-architecture-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [holochain, dna, link-types, 256-cap, dht-as-notary, projection, multi-dna-split, deprecation, signal-rule]

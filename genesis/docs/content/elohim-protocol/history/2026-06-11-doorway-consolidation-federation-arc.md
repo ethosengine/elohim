@@ -2,7 +2,7 @@
 title: "History: The doorway consolidation + federation design arc (Dec 2025 – Apr 2026)"
 id: doorway-consolidation-federation-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [doorway, federation, consolidation, did, jwt, blob-fanout, design-arc]

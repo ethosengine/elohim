@@ -2,7 +2,7 @@
 title: The Five-Defect Convergence Arc — a museum record of stacked invisible failures
 id: substrate-convergence-five-defect-arc
 date: 2026-07-12
-status: history
+status: Accepted
 author: dht-unity arc close (Fable session, 2026-07-11/12)
 cites:
   - substrate-trust-contract-runbook | The Substrate Trust Contract | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md

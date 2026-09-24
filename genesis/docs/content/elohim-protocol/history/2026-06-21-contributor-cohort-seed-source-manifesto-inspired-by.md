@@ -2,7 +2,7 @@
 title: Contributor-cohort seed source — the manifesto "Inspired by" lists
 id: contributor-cohort-seed-source-manifesto-inspired-by
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-21
 author: operator (Matthew Dowell) LinkedIn post, 9mo prior; captured by session

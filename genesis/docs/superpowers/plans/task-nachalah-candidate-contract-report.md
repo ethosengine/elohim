@@ -1,7 +1,10 @@
 ---
 id: nachalah-candidate-contract-report
 title: Non-actuating candidate contract verified after prerequisite test repair
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: 7f95ac47f
+verified_by: "just gate elohim-ark EXIT=0 (126 tests) + independent review — runtime-upgrade-propagation habit DELTA 2026-09-06"
+concerns: "was: DONE_WITH_CONCERNS for #1a only — #1b grant proof, activation, rollback and household ceremonies stay open in the nachalah sprint handoff"
 class: protocol-canonical
 gap: nachalah-supervised-activation#1a
 actor: agent:implementer@gpt-6

@@ -1,6 +1,8 @@
 ---
 id: non-commons-provide-implementation-plan
-status: plan
+status: Draft
+triage_note: "unexecuted (was: plan): mishpat_integrity still enforces reach_ceiling == commons only for replicates-commons and carries no inlined reach ordinal — Stage B (the hash move) has not landed; the DNA reinstall stays an operator ceremony"
+triaged: 2026-09-24
 created: 2026-06-13
 class: substrate
 artifact_kind: plan

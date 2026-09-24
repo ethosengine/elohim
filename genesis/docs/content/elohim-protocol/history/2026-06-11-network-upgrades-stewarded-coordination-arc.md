@@ -2,7 +2,7 @@
 title: "History: The NETWORK_UPGRADES stewarded-coordination arc (Dec 2025 – Jun 2026)"
 id: network-upgrades-stewarded-coordination-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [holochain, dna, upgrades, lineage, network-seed, manifest-hygiene, rna, governance, design-arc]

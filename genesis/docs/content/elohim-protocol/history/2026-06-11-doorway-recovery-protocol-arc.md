@@ -2,7 +2,7 @@
 title: "History: The recovery-protocol design arc (Jan – Apr 2026)"
 id: doorway-recovery-protocol-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [recovery, shard-tracking, social-recovery, imagodei, node-registry, doorway, design-arc]

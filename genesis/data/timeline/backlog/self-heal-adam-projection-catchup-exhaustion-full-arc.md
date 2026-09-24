@@ -18,11 +18,11 @@ fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
 tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure]
 cites:
-  - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
+  - "resiliency-saga-valueflow | the saga plan whose sprint-3 delivery found this ch06 runtime blocker | sha256:1ffcaefb3212d80b | path: genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md"
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - genesis/orchestrator/manifests/humans/adam-firstman.yaml
-  - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
   - https://elohim.host/admin/self-healing
   - https://elohim.host/p2p/status
   - .claude/scripts/_lib/runtime_harvest.py

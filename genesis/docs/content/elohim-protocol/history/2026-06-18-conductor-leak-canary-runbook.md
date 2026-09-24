@@ -2,7 +2,7 @@
 title: "Conductor leak — canary runbook (2026-06-18)"
 id: conductor-leak-canary-runbook
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-18
 topic: [conductor-leak, oom, jemalloc, canary, glibc-arena, alpha]

@@ -1,7 +1,10 @@
 ---
 title: Quilt-Policy Schema Substrate — Implementation Plan
 id: quilt-policy-schema-substrate-plan
-status: Substrate LANDED (2026-06-04 — schema + ref-gates in both generators + 17 fixtures green; consumer TierController HELD; variances: prereq AJV-registration fix rode in 53290ea90; gate moved to single-owner model in 4085af4e4)
+status: landed
+landed_commit: 4085af4e4
+landing_state: "Substrate LANDED (2026-06-04 — schema + ref-gates in both generators + 17 fixtures green; consumer TierController HELD; variances: prereq AJV-registration fix rode in 53290ea90; gate moved to single-owner model in 4085af4e4)"
+verified_by: "2026-09-24 re-run: node elohim/sdk/schemas/scripts/test-manifest-quilt-policy.mjs 17 passed / 0 failed, after registering the closure enum (836855b3b) the harness had missed since 2026-07-24"
 class: protocol-canonical
 domain: D5
 topic: [quilt, tier, manifest, schema, storage-policy]

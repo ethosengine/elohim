@@ -2,7 +2,7 @@
 title: "jemalloc-PRODUCTION conductor change set — verified, ready-to-apply (2026-06-19)"
 id: conductor-leak-jemalloc-prod-changeset
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-19
 topic: [conductor-leak, jemalloc, production, changeset, edgenode]

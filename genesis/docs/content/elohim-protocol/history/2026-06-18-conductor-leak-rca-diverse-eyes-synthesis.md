@@ -2,7 +2,7 @@
 title: "Conductor leak — diverse-eyes RCA synthesis (2026-06-18)"
 id: conductor-leak-rca-diverse-eyes-synthesis
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-18
 topic: [conductor-leak, rca, glibc-arena, native-heap, allocator, alpha]

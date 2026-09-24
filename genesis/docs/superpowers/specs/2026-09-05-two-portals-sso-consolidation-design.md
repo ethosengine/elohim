@@ -1,7 +1,9 @@
 ---
 title: "Two portals, shared like SSO — the doorway portal is the primary sign-in for hosted humans; apps are relying parties"
 id: two-portals-sso-consolidation-design
-status: Decided
+status: approved
+triage_note: "design decided 2026-09-05 (was: Decided); implementation tracked by plans/2026-09-05-two-portals-sso-consolidation-plan.md"
+triaged: 2026-09-24
 class: protocol-canonical
 context-tier: disclosed
 steward: angular-architect

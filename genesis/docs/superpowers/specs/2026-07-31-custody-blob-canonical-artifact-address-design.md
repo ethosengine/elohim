@@ -1,7 +1,9 @@
 ---
 title: Custody Blob Canonical Artifact Address
 id: custody-blob-canonical-artifact-address-design
-status: implemented
+status: claimed-not-verified
+verification_note: "code landed (6103694f9); the elohim-storage gate was not re-run in the 2026-09-24 triage (host busy with another build)"
+landed_commit: 6103694f9
 class: substrate
 context-tier: disclosed
 steward: storage

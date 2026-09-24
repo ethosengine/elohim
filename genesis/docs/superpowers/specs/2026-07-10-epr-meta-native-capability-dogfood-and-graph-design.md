@@ -2,7 +2,9 @@
 title: "Dogfood .epr-meta Native Governance + Certify Claude→Elohim-Native Translation (+ eprfs Package Graph)"
 id: epr-meta-native-capability-dogfood-and-graph
 tier: spec
-status: Implemented
+status: claimed-not-verified
+verification_note: "landed (aefa1b2cf..8f322dfdf). 2026-09-24 package-projections.mjs verify: 2075 pass, 4 FAIL — stale runtime projections of CLAUDE.md and the hc-dev-orchestrator skill, both edited directly in 33b604518 instead of through their packages"
+landed_commit: 8f322dfdf  # range aefa1b2cf..8f322dfdf per §Implemented
 created: 2026-07-10
 maintainers: Matthew Dowell + Claude Opus 4.8
 class: process-meta

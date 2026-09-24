@@ -1,7 +1,7 @@
 ---
 title: "Che keyless peer-client — Slice 1: the delegates-compute op-gate governance spine (Wave-1.3 unblock)"
 id: che-keyless-peer-client-slice1-governance-spine-plan
-status: In-progress
+status: In-flight
 class: protocol-canonical
 landing_state: |
   Offline spine landed, live legs held (verified against the tree 2026-08-05 during the worktree

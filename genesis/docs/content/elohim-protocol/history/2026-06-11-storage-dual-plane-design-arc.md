@@ -2,7 +2,7 @@
 title: "History: The storage dual-plane design arc (April 2026)"
 id: storage-dual-plane-design-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [storage, p2p, dual-plane, reach, cache-core, doorway, design-arc]

@@ -2,7 +2,7 @@
 title: "History: The P2P dataplane + sync-engine design arc (March 2026)"
 id: p2p-dataplane-sync-engine-design-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [p2p, dataplane, sync, automerge, libp2p, iroh, sharding, design-arc]

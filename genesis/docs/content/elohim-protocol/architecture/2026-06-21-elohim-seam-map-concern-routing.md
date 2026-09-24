@@ -2,7 +2,7 @@
 title: The Elohim Seam Map — A Concern-Routing Atlas
 id: elohim-seam-map-concern-routing
 date: 2026-06-21
-status: reference
+status: Living reference
 author: workflow:elohim-seam-map-atlas
 cites:
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"

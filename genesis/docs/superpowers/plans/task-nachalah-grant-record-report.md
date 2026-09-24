@@ -1,7 +1,10 @@
 ---
 id: nachalah-grant-record-report
 title: Exact notarized grant record authentication
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: 63585b542
+verified_by: "full just gate elohim-storage EXIT=0 (4386 passed / 0 failed), mishpat coordinator test, sweettest-check, independent review approved — runtime-upgrade-propagation habit DELTA 2026-09-06 (#1b-a)"
+concerns: "was: DONE_WITH_CONCERNS for #1b-a only — parent #1b, activation, rollback and both household upgrade runs stay open"
 class: protocol-canonical
 gap: nachalah-supervised-activation#1b-a
 actor: agent:implementer@gpt-6

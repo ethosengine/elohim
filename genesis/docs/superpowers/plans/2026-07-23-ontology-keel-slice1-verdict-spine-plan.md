@@ -1,7 +1,9 @@
 ---
 title: "Ontology Keel Slice 1 — the verdict spine, the epistemic axis, and peer review as value flow"
 id: ontology-keel-slice1-verdict-spine-plan
-status: Ready
+status: claimed-not-verified
+verification_note: "landed (713562975; verdict.rs, epistemic.rs, decision schema, epistemic-standing.feature on disk); crate tests not re-run in the 2026-09-24 triage (host busy with another build)"
+landed_commit: 713562975
 class: protocol-canonical
 created: 2026-07-23
 domain: D2

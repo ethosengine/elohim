@@ -2,7 +2,7 @@
 title: "Overnight shakeout 2026-06-24 — eve cold-install timeout + alpha deploy-lag findings"
 id: eve-cold-install-timeout-overnight-shakeout
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-24
 author: autonomous overnight session

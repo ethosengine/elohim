@@ -2,7 +2,7 @@
 title: The Substrate Trust Contract — invariants, probes, and the per-seam runbook
 id: substrate-trust-contract-runbook
 date: 2026-07-12
-status: reference
+status: Living reference
 author: dht-unity arc close (Fable session, 2026-07-11/12)
 cites:
   - genesis-pair-dht-unity-plan | Genesis-Pair DHT Unity | path: genesis/docs/superpowers/plans/2026-07-11-genesis-pair-dht-unity-plan.md

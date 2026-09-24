@@ -1,7 +1,9 @@
 ---
 title: "Discipline 1 — .epr-meta governance speaks the verdict spine; agents drive within the ladder"
 id: epr-meta-discipline1-governance-spine-plan
-status: Ready
+status: claimed-not-verified
+verification_note: "landed (c67b8c2e3). 2026-09-24: Python legs green — test_governance_parity.py 52 assertions, test_escalation_ladder.py 6; the Rust parity leg (T2) was not re-run"
+landed_commit: c67b8c2e3
 class: protocol-canonical
 created: 2026-07-23
 domain: D2

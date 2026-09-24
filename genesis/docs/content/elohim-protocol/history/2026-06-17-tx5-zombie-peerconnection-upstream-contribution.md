@@ -2,7 +2,7 @@
 title: "Upstream comments — tx5/go-pion zombie-PeerConnection leak (2026-06-17)"
 id: tx5-zombie-peerconnection-upstream-contribution
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-17
 topic: [conductor-leak, tx5, upstream, contribution, ethosengine-bot]

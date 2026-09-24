@@ -1,7 +1,7 @@
 ---
 title: EPR Content Durability Arc — finish peer replication, healing, sync, aggregates, projection, and federation, proven by resiliency scenarios
 id: epr-durability-replication-arc-plan
-status: open
+status: In-flight
 class: substrate
 sprint: unranked — born 2026-06-10 from the genesis #1118 stabilization session (M1 → substrate-validation suite). Mixed plan — most gaps testable on household-nodes NOW; only cross-doorway breadth diverges (tagged @requires:shem inline). No doc-level requires_env by convention.
 cites:

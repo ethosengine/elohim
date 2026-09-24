@@ -2,7 +2,7 @@
 title: "Matthew Edge Resiliency — RCA Fanout Synthesis (2026-06-15)"
 id: matthew-edge-resiliency-rca-fanout-synthesis
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-15
 topic: [conductor-oom, doorway-watchdog, arc-factor, matthew-edge, rca, alpha]

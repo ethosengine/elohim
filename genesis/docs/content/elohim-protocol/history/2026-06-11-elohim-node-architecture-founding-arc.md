@@ -2,7 +2,7 @@
 title: "History: The elohim-node architecture founding arc (January 2026)"
 id: elohim-node-architecture-founding-arc
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [steward-node, elohim-node, sync, automerge, libp2p, cluster, nat-traversal, reach, config, design-arc]

@@ -2,7 +2,7 @@
 title: "Arc-factor feasibility findings (for Pillar 3 spec)"
 id: arc-factor-feasibility-spike-findings
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-14
 topic: [arc-factor, kitsune2, holochain-p2p, feasibility, spike]

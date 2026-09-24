@@ -2,7 +2,8 @@
 title: "History/Finding: adam slow-link melt — gossip storm saturates the conductor write guard (composition defect, not placement)"
 id: adam-slow-link-write-guard-saturation
 type: incident-analysis
-status: Resolved — serving layer (structural + breaker fix landed 2026-07-20/21); A/B trend decided 2026-07-21 → verdict B (steady-state), conductor-fork patch now CONFIRMED-WARRANTED (teed up, not yet executed)
+status: Accepted
+resolution: "serving layer (structural + breaker fix landed 2026-07-20/21); A/B trend decided 2026-07-21 → verdict B (steady-state), conductor-fork patch now CONFIRMED-WARRANTED (teed up, not yet executed)"
 tier: history
 created: 2026-07-20
 topic: [dataplane, kitsune2, gossip, holochain-sqlite, ptxnguard, doorway-breaker, shem, wireguard, inventory-sync]

@@ -1,7 +1,7 @@
 ---
 title: "Reach Reconciliation Slice 3 — retired-6 library strand, alias burn-down, policy canonicalization, content.reach backfill"
 id: reach-vocab-slice3-burn-down-plan
-status: In-progress
+status: In-flight
 class: substrate
 landing_state: |
   Partially landed as of 2026-08-05 (verified against the tree during the worktree commit

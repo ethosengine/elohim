@@ -2,7 +2,9 @@
 title: "Vision-Gap STUB — O3 Runtime Limit-Respect Governor (observe→govern feedback loop)"
 id: vision-gap-limit-governor-stub
 date: 2026-06-14
-status: stub-greenlight-to-expand
+status: proposal
+triage_note: "vision-gap stub (was: stub-greenlight-to-expand); awaiting an operator expand/decline"
+triaged: 2026-09-24
 objective: O3 (governance that helps individuals respect THEIR OWN limits + coordinate in virtuous feedback loops)
 requires_env: household-nodes
 companions:

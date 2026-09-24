@@ -1,7 +1,9 @@
 ---
 title: "Design — light the EPR resilience card's data path (self_cid derivation + provide-loop + re-anchor backfill)"
 id: resilience-card-self-cid-provide-loop-design
-status: Implemented
+status: claimed-not-verified
+verification_note: "code landed (b4fe420e9); its own graduation-trigger asks for the levers to be seen lighting the card on live alpha — not yet evidenced"
+landed_commit: b4fe420e9
 class: substrate
 context-tier: disclosed
 steward: cartographer

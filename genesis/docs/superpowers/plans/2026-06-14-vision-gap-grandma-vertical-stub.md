@@ -1,6 +1,8 @@
 ---
 id: vision-gap-grandma-vertical-stub
-status: STUB — GREENLIGHT-TO-EXPAND (operator blessing required before plan-expansion)
+status: proposal
+triage_note: "vision-gap stub (was: STUB — GREENLIGHT-TO-EXPAND (operator blessing required before plan-expansion)); awaiting an operator expand/decline"
+triaged: 2026-09-24
 authored: 2026-06-14
 authored-against:
   - VISION-ALIGNMENT-2026-06-14.md §6 Decision F (the reframing)

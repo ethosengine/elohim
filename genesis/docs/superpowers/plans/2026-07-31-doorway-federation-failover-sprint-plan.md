@@ -1,7 +1,7 @@
 ---
 title: Doorway Federation & Failover Sprint — anycast-ready doorways for alpha + elohim.host
 id: doorway-federation-failover-sprint-plan
-status: open
+status: In-flight
 class: substrate
 sprint: born 2026-07-31 from the resiliency-saga close-out planning session (ch04 frontier). Mixed plan — no doc-level requires_env by convention; every task here is exercisable against the live alpha pair (read-mostly probes) or in-repo; the only externally-gated legs are the operator ceiling items (§Operator menu).
 cites:

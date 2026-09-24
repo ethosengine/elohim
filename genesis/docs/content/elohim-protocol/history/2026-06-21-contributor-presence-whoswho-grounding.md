@@ -2,7 +2,7 @@
 title: Who's-Who / Contributor-Presence Grounding — the inspirer-attribution backbone
 id: contributor-presence-whoswho-grounding
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-21
 author: fork:contributor-presence-grounding

@@ -189,6 +189,9 @@ async function main() {
   );
   ajv.addSchema(sessionLifecycleStateSchema, 'epr:enums/session-lifecycle-state.schema.json');
 
+  const closureSchema = await loadJson(resolve(__dirname, '../v1/enums/closure.schema.json'));
+  ajv.addSchema(closureSchema, 'epr:enums/closure.schema.json');
+
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
   );

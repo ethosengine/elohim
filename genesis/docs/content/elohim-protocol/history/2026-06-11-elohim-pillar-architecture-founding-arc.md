@@ -1,6 +1,6 @@
 ---
 id: elohim-pillar-architecture-founding-arc
-status: noted
+status: Accepted
 tier: history
 derived_from:
   - app/elohim-app/src/app/elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md   # retired to git 2026-06-11 (elohim-pillar island recompose)

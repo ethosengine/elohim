@@ -2,7 +2,7 @@
 title: "History: The lamad v1 schema museum — the RNA toolkit's companion snapshot vs what actually grew (Dec 2025 – Jun 2026)"
 id: lamad-v1-schema-museum
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-06-11
 topic: [holochain, dna, lamad, schema, entry-types, migration, mastery-levels, rna-toolkit, v1]

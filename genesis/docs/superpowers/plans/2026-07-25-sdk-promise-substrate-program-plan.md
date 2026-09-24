@@ -1,7 +1,7 @@
 ---
 title: "SDK-promise substrate — the six-property implementation path (legibility first, then propagation, convergence, and the three unwired reds)"
 id: sdk-promise-substrate-program-plan
-status: Ready
+status: approved
 class: substrate
 context-tier: disclosed
 steward: rust-architect

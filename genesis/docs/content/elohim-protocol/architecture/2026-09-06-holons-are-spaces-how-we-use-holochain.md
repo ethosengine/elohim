@@ -2,7 +2,7 @@
 title: Holons, Spaces, and Holochain — What the Vision Requires Us to Reconsider
 id: holons-are-spaces-how-we-use-holochain
 date: 2026-09-06
-status: reference
+status: Living reference
 author: orchestrator (overnight shift, 2026-09-06; grounded in the 0.7 fleet line at fork 25dd2d0be and kitsune2 0.5.1)
 tier: architecture
 stewardship-frame: adversary

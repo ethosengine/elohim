@@ -1,6 +1,7 @@
 ---
 name: reference-codex-model-ids
 title: "Codex CLI model ids and exec flags"
+id: reference-codex-model-ids
 description: "gpt-5.6 only as -luna/-sol/-terra (plain rejected), plus gpt-5.5, gpt-6-astra; review vs write exec flags."
 metadata: 
   node_type: memory
@@ -8,6 +9,8 @@ metadata:
   type: reference
   originSessionId: 81f8cba7-09d3-4cc0-83a9-af45293320fd
   modified: 2026-09-22T02:39:16.214Z
+cites:
+  - .epr-meta/elohim/algorithms/recall-contract.json  # lens_table.stated keys Codex model ids (gpt-5.6-sol); an id the CLI stops accepting drifts that table
 ---
 
 Codex CLI (`codex exec`, `CODEX_HOME=/projects/.codex-config`, config default `gpt-6-astra`, reasoning `medium`):

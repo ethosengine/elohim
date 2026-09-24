@@ -2,7 +2,9 @@
 title: "`.epr-meta` Policy Registry + Measure Tier — Define-Once-Bind-Many Rules (Mishpat::Precedent lineage)"
 id: epr-meta-policy-registry-measure
 tier: spec
-status: Implemented
+status: landed
+verified_by: "2026-09-24 re-run: .claude/scripts/_lib/__tests__/epr_meta_policy_test.py 39 assertions pass"
+landed_commit: 68798e487
 created: 2026-07-02
 maintainers: Matthew Dowell + Claude Fable 5
 class: process-meta

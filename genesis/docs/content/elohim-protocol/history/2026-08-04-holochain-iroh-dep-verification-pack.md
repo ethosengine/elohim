@@ -2,7 +2,7 @@
 title: "Holochain/iroh dependency verification pack — dalek, bootstrap wire, and transport config"
 id: holochain-iroh-dep-verification-pack
 type: history-gotcha
-status: noted
+status: Accepted
 tier: history
 created: 2026-08-04
 author: Codex (Holochain/iroh convergence campaign, Wave 1 Lane D)

@@ -1,6 +1,6 @@
 ---
 id: lamad-mvp-implementation-arc
-status: noted
+status: Accepted
 tier: history
 derived_from:
   - app/lamad/docs/IMPLEMENTATION_PLAN.md   # retired to git 2026-06-11 (lamad island recompose)
