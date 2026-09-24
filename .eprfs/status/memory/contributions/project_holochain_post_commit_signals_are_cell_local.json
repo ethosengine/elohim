@@ -28,7 +28,7 @@
     "display": "post_commit signals are cell-local",
     "file": "project_holochain_post_commit_signals_are_cell_local.md",
     "scopePath": ".claude/memory/project_holochain_post_commit_signals_are_cell_local.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

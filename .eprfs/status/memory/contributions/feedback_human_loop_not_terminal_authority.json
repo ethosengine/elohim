@@ -28,7 +28,7 @@
     "display": "Human-in-loop is not terminal authority",
     "file": "feedback_human_loop_not_terminal_authority.md",
     "scopePath": ".claude/memory/feedback_human_loop_not_terminal_authority.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

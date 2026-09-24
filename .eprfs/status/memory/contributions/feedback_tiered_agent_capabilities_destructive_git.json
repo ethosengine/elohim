@@ -28,7 +28,7 @@
     "display": "Destructive git needs tier or team check",
     "file": "feedback_tiered_agent_capabilities_destructive_git.md",
     "scopePath": ".claude/memory/feedback_tiered_agent_capabilities_destructive_git.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

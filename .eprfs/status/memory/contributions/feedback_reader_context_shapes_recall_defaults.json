@@ -28,7 +28,7 @@
     "display": "Reader context shapes recall defaults",
     "file": "feedback_reader_context_shapes_recall_defaults.md",
     "scopePath": ".claude/memory/feedback_reader_context_shapes_recall_defaults.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

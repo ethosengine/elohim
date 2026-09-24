@@ -28,7 +28,7 @@
     "display": "Commit-only; integrator pushes",
     "file": "feedback_commit_only_integrator_pushes.md",
     "scopePath": ".claude/memory/feedback_commit_only_integrator_pushes.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

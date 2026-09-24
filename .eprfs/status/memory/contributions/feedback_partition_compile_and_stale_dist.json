@@ -28,7 +28,7 @@
     "display": "Commit partitions respect compile deps",
     "file": "feedback_partition_compile_and_stale_dist.md",
     "scopePath": ".claude/memory/feedback_partition_compile_and_stale_dist.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

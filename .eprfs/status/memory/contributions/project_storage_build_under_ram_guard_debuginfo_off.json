@@ -28,7 +28,7 @@
     "display": "Storage builds under the RAM guard",
     "file": "project_storage_build_under_ram_guard_debuginfo_off.md",
     "scopePath": ".claude/memory/project_storage_build_under_ram_guard_debuginfo_off.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

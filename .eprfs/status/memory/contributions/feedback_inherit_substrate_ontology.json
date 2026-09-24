@@ -28,7 +28,7 @@
     "display": "Inherit substrate ontology, never duplicate it",
     "file": "feedback_inherit_substrate_ontology.md",
     "scopePath": ".claude/memory/feedback_inherit_substrate_ontology.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

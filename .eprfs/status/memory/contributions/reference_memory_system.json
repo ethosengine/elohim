@@ -28,7 +28,7 @@
     "display": "Memory-system references (umbrella)",
     "file": "reference_memory_system.md",
     "scopePath": ".claude/memory/reference_memory_system.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "reference",
     "indexed": true
   }

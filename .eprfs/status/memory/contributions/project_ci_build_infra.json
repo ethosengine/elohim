@@ -28,7 +28,7 @@
     "display": "CI build infra — images, caches, registries (umbrella)",
     "file": "project_ci_build_infra.md",
     "scopePath": ".claude/memory/project_ci_build_infra.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

@@ -28,7 +28,7 @@
     "display": "Worktree pushes and the husky gate — check hooksPath, don't assume",
     "file": "feedback_worktree_push_bypasses_husky_gate.md",
     "scopePath": ".claude/memory/feedback_worktree_push_bypasses_husky_gate.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

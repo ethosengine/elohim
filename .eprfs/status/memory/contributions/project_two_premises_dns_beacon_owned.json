@@ -28,7 +28,7 @@
     "display": "DNS premises + anycast doorway names (umbrella)",
     "file": "project_two_premises_dns_beacon_owned.md",
     "scopePath": ".claude/memory/project_two_premises_dns_beacon_owned.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

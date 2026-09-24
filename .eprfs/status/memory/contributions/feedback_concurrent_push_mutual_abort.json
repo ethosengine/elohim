@@ -28,7 +28,7 @@
     "display": "Concurrent-push mutual abort",
     "file": "feedback_concurrent_push_mutual_abort.md",
     "scopePath": ".claude/memory/feedback_concurrent_push_mutual_abort.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

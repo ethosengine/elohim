@@ -28,7 +28,7 @@
     "display": "Cargo/PVC disk + build-env discipline (umbrella)",
     "file": "project_cargo_pvc_disk_discipline.md",
     "scopePath": ".claude/memory/project_cargo_pvc_disk_discipline.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

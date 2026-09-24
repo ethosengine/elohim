@@ -28,7 +28,7 @@
     "display": "Delegate research legwork to Opus/Sonnet/Codex",
     "file": "feedback_delegate_research_to_opus_sonnet_codex.md",
     "scopePath": ".claude/memory/feedback_delegate_research_to_opus_sonnet_codex.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

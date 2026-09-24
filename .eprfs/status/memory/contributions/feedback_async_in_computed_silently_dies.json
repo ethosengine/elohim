@@ -28,7 +28,7 @@
     "display": "void async inside computed() dies silently",
     "file": "feedback_async_in_computed_silently_dies.md",
     "scopePath": ".claude/memory/feedback_async_in_computed_silently_dies.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

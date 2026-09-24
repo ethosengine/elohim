@@ -28,7 +28,7 @@
     "display": "Sealed decisions must not outrun evidence",
     "file": "feedback_sealed_decisions_must_not_outrun_evidence.md",
     "scopePath": ".claude/memory/feedback_sealed_decisions_must_not_outrun_evidence.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

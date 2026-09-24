@@ -28,7 +28,7 @@
     "display": "Never start mesh daemons inside a flock'd shell",
     "file": "project_flock_lane_lock_inherited_by_daemons.md",
     "scopePath": ".claude/memory/project_flock_lane_lock_inherited_by_daemons.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

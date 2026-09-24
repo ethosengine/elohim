@@ -28,7 +28,7 @@
     "display": "Edge deploy restarts genesis-pair conductors",
     "file": "project_edge_deploy_restarts_genesis_conductors.md",
     "scopePath": ".claude/memory/project_edge_deploy_restarts_genesis_conductors.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "Per-node GB memory = conductor full-arc authority",
     "file": "project_per_node_memory_is_conductor_authority_arc.md",
     "scopePath": ".claude/memory/project_per_node_memory_is_conductor_authority_arc.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

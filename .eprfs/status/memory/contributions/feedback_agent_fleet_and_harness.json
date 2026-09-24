@@ -28,7 +28,7 @@
     "display": "Agent fleet + harness discipline (umbrella)",
     "file": "feedback_agent_fleet_and_harness.md",
     "scopePath": ".claude/memory/feedback_agent_fleet_and_harness.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

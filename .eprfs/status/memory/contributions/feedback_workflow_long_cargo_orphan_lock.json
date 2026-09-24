@@ -28,7 +28,7 @@
     "display": "Workflow long-cargo orphan lock",
     "file": "feedback_workflow_long_cargo_orphan_lock.md",
     "scopePath": ".claude/memory/feedback_workflow_long_cargo_orphan_lock.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

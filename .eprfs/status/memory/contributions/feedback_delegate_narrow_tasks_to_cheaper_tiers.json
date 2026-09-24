@@ -28,7 +28,7 @@
     "display": "Delegate narrow tasks to Opus/Sonnet; top-tier fleets burn the limit",
     "file": "feedback_delegate_narrow_tasks_to_cheaper_tiers.md",
     "scopePath": ".claude/memory/feedback_delegate_narrow_tasks_to_cheaper_tiers.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

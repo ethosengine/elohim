@@ -28,7 +28,7 @@
     "display": "Role split: I orchestrate, the operator executes",
     "file": "feedback_role_coherence_orchestration_operator_executes.md",
     "scopePath": ".claude/memory/feedback_role_coherence_orchestration_operator_executes.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

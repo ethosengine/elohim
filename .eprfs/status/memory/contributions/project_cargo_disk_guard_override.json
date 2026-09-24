@@ -28,7 +28,7 @@
     "display": "Cargo disk-guard override",
     "file": "project_cargo_disk_guard_override.md",
     "scopePath": ".claude/memory/project_cargo_disk_guard_override.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

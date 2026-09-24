@@ -28,7 +28,7 @@
     "display": "sccache cache corruption recovery",
     "file": "feedback_sccache_cache_corruption_recovery.md",
     "scopePath": ".claude/memory/feedback_sccache_cache_corruption_recovery.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

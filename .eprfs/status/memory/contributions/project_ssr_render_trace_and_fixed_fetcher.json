@@ -28,7 +28,7 @@
     "display": "SSR render-trace + per-request fetcher swap (elohim-render)",
     "file": "project_ssr_render_trace_and_fixed_fetcher.md",
     "scopePath": ".claude/memory/project_ssr_render_trace_and_fixed_fetcher.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

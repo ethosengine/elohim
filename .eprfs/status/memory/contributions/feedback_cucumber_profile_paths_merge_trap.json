@@ -28,7 +28,7 @@
     "display": "Cucumber profile paths MERGE with positionals",
     "file": "feedback_cucumber_profile_paths_merge_trap.md",
     "scopePath": ".claude/memory/feedback_cucumber_profile_paths_merge_trap.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

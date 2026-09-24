@@ -28,7 +28,7 @@
     "display": "DNA hash depends on the absolute build path",
     "file": "project_dna_hash_depends_on_build_path.md",
     "scopePath": ".claude/memory/project_dna_hash_depends_on_build_path.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "Disjoint side-tasks go to the shared backlog",
     "file": "feedback_codex_side_delegation_queue.md",
     "scopePath": ".claude/memory/feedback_codex_side_delegation_queue.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "ci-playwright = ci-builder + playwright",
     "file": "project_ci_playwright_image.md",
     "scopePath": ".claude/memory/project_ci_playwright_image.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

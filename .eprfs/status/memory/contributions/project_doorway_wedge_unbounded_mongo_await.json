@@ -28,7 +28,7 @@
     "display": "Doorway wedge — blocking getaddrinfo parks tokio workers",
     "file": "project_doorway_wedge_unbounded_mongo_await.md",
     "scopePath": ".claude/memory/project_doorway_wedge_unbounded_mongo_await.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "Push policy — che-devworkspaces main yes, elohim main no",
     "file": "feedback_che_devworkspaces_direct_to_main.md",
     "scopePath": ".claude/memory/feedback_che_devworkspaces_direct_to_main.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

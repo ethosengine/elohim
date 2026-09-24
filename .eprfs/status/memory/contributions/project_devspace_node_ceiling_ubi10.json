@@ -28,7 +28,7 @@
     "display": "Devspace node is capped at 22.x by UBI10; CI runs 24",
     "file": "project_devspace_node_ceiling_ubi10.md",
     "scopePath": ".claude/memory/project_devspace_node_ceiling_ubi10.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

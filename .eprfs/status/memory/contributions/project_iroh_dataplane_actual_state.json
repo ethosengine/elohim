@@ -28,7 +28,7 @@
     "display": "iroh dataplane actual state — merge-ready, dual-stack gap",
     "file": "project_iroh_dataplane_actual_state.md",
     "scopePath": ".claude/memory/project_iroh_dataplane_actual_state.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

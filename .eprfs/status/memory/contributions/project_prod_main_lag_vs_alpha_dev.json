@@ -28,7 +28,7 @@
     "display": "Per-host doorway deploy lag (elohim.host = dev alpha-b)",
     "file": "project_prod_main_lag_vs_alpha_dev.md",
     "scopePath": ".claude/memory/project_prod_main_lag_vs_alpha_dev.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "zone.js native-await phantom uncaught",
     "file": "feedback_zone_native_await_unhandled_rejection.md",
     "scopePath": ".claude/memory/feedback_zone_native_await_unhandled_rejection.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

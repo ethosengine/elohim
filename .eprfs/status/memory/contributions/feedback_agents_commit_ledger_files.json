@@ -28,7 +28,7 @@
     "display": "Agent commits drag in hook-maintained ledgers",
     "file": "feedback_agents_commit_ledger_files.md",
     "scopePath": ".claude/memory/feedback_agents_commit_ledger_files.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

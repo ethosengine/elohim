@@ -28,7 +28,7 @@
     "display": "Multi-agent integration = coherence (take/leave)",
     "file": "feedback_multi_agent_coherence_take_leave.md",
     "scopePath": ".claude/memory/feedback_multi_agent_coherence_take_leave.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

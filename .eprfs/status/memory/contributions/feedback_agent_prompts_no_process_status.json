@@ -28,7 +28,7 @@
     "display": "Gospel surfaces: no process-status phrasing",
     "file": "feedback_agent_prompts_no_process_status.md",
     "scopePath": ".claude/memory/feedback_agent_prompts_no_process_status.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

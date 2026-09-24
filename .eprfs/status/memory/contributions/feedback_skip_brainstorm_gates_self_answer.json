@@ -28,7 +28,7 @@
     "display": "Skip brainstorm gates — self-answer, present one summary",
     "file": "feedback_skip_brainstorm_gates_self_answer.md",
     "scopePath": ".claude/memory/feedback_skip_brainstorm_gates_self_answer.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

@@ -28,7 +28,7 @@
     "display": "Peer collectives are starved, not failing — check your register",
     "file": "feedback_peer_collectives_starved_of_coordination_scale.md",
     "scopePath": ".claude/memory/feedback_peer_collectives_starved_of_coordination_scale.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

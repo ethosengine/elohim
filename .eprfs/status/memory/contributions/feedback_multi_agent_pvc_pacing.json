@@ -28,7 +28,7 @@
     "display": "Multi-agent pacing + PVC thresholds",
     "file": "feedback_multi_agent_pvc_pacing.md",
     "scopePath": ".claude/memory/feedback_multi_agent_pvc_pacing.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

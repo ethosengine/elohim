@@ -28,7 +28,7 @@
     "display": "Pipeline dispatch & deploy ordering (umbrella)",
     "file": "project_pipeline_dispatch_ordering.md",
     "scopePath": ".claude/memory/project_pipeline_dispatch_ordering.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

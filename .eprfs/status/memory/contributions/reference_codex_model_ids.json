@@ -28,7 +28,7 @@
     "display": "Codex CLI model ids and exec flags",
     "file": "reference_codex_model_ids.md",
     "scopePath": ".claude/memory/reference_codex_model_ids.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "reference",
     "indexed": true
   }

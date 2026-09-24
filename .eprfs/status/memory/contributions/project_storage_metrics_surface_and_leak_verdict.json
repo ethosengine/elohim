@@ -28,7 +28,7 @@
     "display": "Storage /metrics surface + conductor-leak verdict",
     "file": "project_storage_metrics_surface_and_leak_verdict.md",
     "scopePath": ".claude/memory/project_storage_metrics_surface_and_leak_verdict.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "Sync-state contract — epoch, position, caught-up",
     "file": "project_sync_state_contract.md",
     "scopePath": ".claude/memory/project_sync_state_contract.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

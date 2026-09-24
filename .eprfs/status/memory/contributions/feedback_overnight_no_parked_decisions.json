@@ -28,7 +28,7 @@
     "display": "Overnight shifts decide, never park decisions",
     "file": "feedback_overnight_no_parked_decisions.md",
     "scopePath": ".claude/memory/feedback_overnight_no_parked_decisions.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

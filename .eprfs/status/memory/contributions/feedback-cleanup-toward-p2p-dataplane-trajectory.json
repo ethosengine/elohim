@@ -28,7 +28,7 @@
     "display": "Per-host scaffold — clean up toward P2P dataplane",
     "file": "feedback-cleanup-toward-p2p-dataplane-trajectory.md",
     "scopePath": ".claude/memory/feedback-cleanup-toward-p2p-dataplane-trajectory.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

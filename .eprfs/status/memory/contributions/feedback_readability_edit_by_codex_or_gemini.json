@@ -28,7 +28,7 @@
     "display": "Explainers get a Codex/Gemini readability edit",
     "file": "feedback_readability_edit_by_codex_or_gemini.md",
     "scopePath": ".claude/memory/feedback_readability_edit_by_codex_or_gemini.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

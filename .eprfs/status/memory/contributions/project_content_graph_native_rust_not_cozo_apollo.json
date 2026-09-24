@@ -28,7 +28,7 @@
     "display": "Content graph = native Rust, not Cozo/Kuzu/Apollo",
     "file": "project_content_graph_native_rust_not_cozo_apollo.md",
     "scopePath": ".claude/memory/project_content_graph_native_rust_not_cozo_apollo.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

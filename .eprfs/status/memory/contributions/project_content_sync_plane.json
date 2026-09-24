@@ -28,7 +28,7 @@
     "display": "Content sync / replication plane (umbrella)",
     "file": "project_content_sync_plane.md",
     "scopePath": ".claude/memory/project_content_sync_plane.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

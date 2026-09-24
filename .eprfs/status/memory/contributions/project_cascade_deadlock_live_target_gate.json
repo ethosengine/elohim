@@ -28,7 +28,7 @@
     "display": "Cascade deadlock — live-target gate blocks its own fix",
     "file": "project_cascade_deadlock_live_target_gate.md",
     "scopePath": ".claude/memory/project_cascade_deadlock_live_target_gate.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

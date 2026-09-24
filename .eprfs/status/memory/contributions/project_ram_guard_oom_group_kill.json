@@ -28,7 +28,7 @@
     "display": "RAM guard — workspace OOM is a group kill",
     "file": "project_ram_guard_oom_group_kill.md",
     "scopePath": ".claude/memory/project_ram_guard_oom_group_kill.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

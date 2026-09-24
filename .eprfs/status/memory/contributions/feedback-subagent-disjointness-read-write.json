@@ -28,7 +28,7 @@
     "display": "Subagent disjointness = read-set ∩ write-set",
     "file": "feedback-subagent-disjointness-read-write.md",
     "scopePath": ".claude/memory/feedback-subagent-disjointness-read-write.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

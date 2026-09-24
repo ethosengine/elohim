@@ -28,7 +28,7 @@
     "display": "sprint/* not orchestrator-indexed",
     "file": "project_sprint_branch_not_orchestrator_indexed.md",
     "scopePath": ".claude/memory/project_sprint_branch_not_orchestrator_indexed.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

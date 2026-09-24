@@ -28,7 +28,7 @@
     "display": "Sprint cadence — batch locally, one Jenkins pass",
     "file": "feedback_sprint_cadence_local_batch_then_jenkins.md",
     "scopePath": ".claude/memory/feedback_sprint_cadence_local_batch_then_jenkins.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "Flag→agent→canon→stasis automation pattern",
     "file": "feedback_deterministic_flag_agent_canon_stasis_pattern.md",
     "scopePath": ".claude/memory/feedback_deterministic_flag_agent_canon_stasis_pattern.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

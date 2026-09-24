@@ -28,7 +28,7 @@
     "display": "Pin legibility-judging agents to an explicit Opus ID",
     "file": "feedback_pin_reader_agents_to_older_opus.md",
     "scopePath": ".claude/memory/feedback_pin_reader_agents_to_older_opus.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

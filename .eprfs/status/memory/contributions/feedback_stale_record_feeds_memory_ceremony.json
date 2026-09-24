@@ -28,7 +28,7 @@
     "display": "Stale record feeds the memory-ceremony",
     "file": "feedback_stale_record_feeds_memory_ceremony.md",
     "scopePath": ".claude/memory/feedback_stale_record_feeds_memory_ceremony.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

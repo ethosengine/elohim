@@ -28,7 +28,7 @@
     "display": "LLM-memory horizon scans",
     "file": "reference_horizon_scans.md",
     "scopePath": ".claude/memory/reference_horizon_scans.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "reference",
     "indexed": false
   }

@@ -28,7 +28,7 @@
     "display": "New path-dep needs Dockerfile COPY",
     "file": "project_new_path_dep_needs_dockerfile_copy.md",
     "scopePath": ".claude/memory/project_new_path_dep_needs_dockerfile_copy.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

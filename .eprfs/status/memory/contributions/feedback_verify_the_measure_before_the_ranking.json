@@ -28,7 +28,7 @@
     "display": "Verify a drift audit's measure before its ranking",
     "file": "feedback_verify_the_measure_before_the_ranking.md",
     "scopePath": ".claude/memory/feedback_verify_the_measure_before_the_ranking.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

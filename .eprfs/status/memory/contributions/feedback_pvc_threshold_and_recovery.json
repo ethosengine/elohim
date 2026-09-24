@@ -28,7 +28,7 @@
     "display": "PVC threshold — act at 85%+; cargo-pool legacy-targets first",
     "file": "feedback_pvc_threshold_and_recovery.md",
     "scopePath": ".claude/memory/feedback_pvc_threshold_and_recovery.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

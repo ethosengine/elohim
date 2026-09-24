@@ -28,7 +28,7 @@
     "display": "Schema codegen Prettier oscillation",
     "file": "feedback_codegen_prettier_oscillation.md",
     "scopePath": ".claude/memory/feedback_codegen_prettier_oscillation.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

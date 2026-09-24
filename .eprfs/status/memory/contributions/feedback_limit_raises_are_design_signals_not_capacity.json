@@ -28,7 +28,7 @@
     "display": "Limit raises are design signals, not capacity",
     "file": "feedback_limit_raises_are_design_signals_not_capacity.md",
     "scopePath": ".claude/memory/feedback_limit_raises_are_design_signals_not_capacity.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

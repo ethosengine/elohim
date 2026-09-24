@@ -28,7 +28,7 @@
     "display": "REA compute-commitment primitive (gospel-tier)",
     "file": "project_rea_compute_commitment_primitive.md",
     "scopePath": ".claude/memory/project_rea_compute_commitment_primitive.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

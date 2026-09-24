@@ -28,7 +28,7 @@
     "display": "SSR first deploy — seed, then restart doorway",
     "file": "project_ssr_first_deploy_seed_then_restart.md",
     "scopePath": ".claude/memory/project_ssr_first_deploy_seed_then_restart.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

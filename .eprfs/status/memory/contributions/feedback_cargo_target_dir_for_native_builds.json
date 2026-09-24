@@ -28,7 +28,7 @@
     "display": "Set CARGO_TARGET_DIR for native builds",
     "file": "feedback_cargo_target_dir_for_native_builds.md",
     "scopePath": ".claude/memory/feedback_cargo_target_dir_for_native_builds.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

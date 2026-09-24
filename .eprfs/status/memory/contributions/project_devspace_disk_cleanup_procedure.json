@@ -28,7 +28,7 @@
     "display": "Devspace disk cleanup procedure",
     "file": "project_devspace_disk_cleanup_procedure.md",
     "scopePath": ".claude/memory/project_devspace_disk_cleanup_procedure.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

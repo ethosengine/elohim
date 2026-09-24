@@ -28,7 +28,7 @@
     "display": "P2P inventory ≠ byte replication",
     "file": "project_inventory_exchange_not_byte_replication.md",
     "scopePath": ".claude/memory/project_inventory_exchange_not_byte_replication.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

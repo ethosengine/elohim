@@ -28,7 +28,7 @@
     "display": "Conductor CPU storm starves storage reads — triage order",
     "file": "project_conductor_storm_starves_storage_reads.md",
     "scopePath": ".claude/memory/project_conductor_storm_starves_storage_reads.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": false
   }

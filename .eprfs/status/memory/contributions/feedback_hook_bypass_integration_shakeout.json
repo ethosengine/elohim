@@ -28,7 +28,7 @@
     "display": "Hook-bypass grant for CI-pipeline integration shakeout",
     "file": "feedback_hook_bypass_integration_shakeout.md",
     "scopePath": ".claude/memory/feedback_hook_bypass_integration_shakeout.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

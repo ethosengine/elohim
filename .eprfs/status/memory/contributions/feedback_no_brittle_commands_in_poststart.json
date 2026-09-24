@@ -28,7 +28,7 @@
     "display": "No brittle commands in devfile postStart",
     "file": "feedback_no_brittle_commands_in_poststart.md",
     "scopePath": ".claude/memory/feedback_no_brittle_commands_in_poststart.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

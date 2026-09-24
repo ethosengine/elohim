@@ -28,7 +28,7 @@
     "display": "Workflow StructuredOutput hang",
     "file": "feedback_workflow_structuredoutput_hang.md",
     "scopePath": ".claude/memory/feedback_workflow_structuredoutput_hang.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

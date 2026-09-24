@@ -28,7 +28,7 @@
     "display": "Swarm edits need fresh-tree build first",
     "file": "feedback_swarm_composition_fresh_tree_build.md",
     "scopePath": ".claude/memory/feedback_swarm_composition_fresh_tree_build.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

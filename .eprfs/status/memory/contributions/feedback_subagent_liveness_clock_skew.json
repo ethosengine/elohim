@@ -28,7 +28,7 @@
     "display": "Subagent liveness ≠ transcript mtime",
     "file": "feedback_subagent_liveness_clock_skew.md",
     "scopePath": ".claude/memory/feedback_subagent_liveness_clock_skew.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }

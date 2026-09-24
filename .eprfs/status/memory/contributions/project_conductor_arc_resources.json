@@ -28,7 +28,7 @@
     "display": "Conductor arc, memory & CPU incidents (umbrella)",
     "file": "project_conductor_arc_resources.md",
     "scopePath": ".claude/memory/project_conductor_arc_resources.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

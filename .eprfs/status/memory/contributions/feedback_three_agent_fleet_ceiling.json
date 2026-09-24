@@ -28,7 +28,7 @@
     "display": "Fleet ceiling: three concurrent agents, orchestrator does design",
     "file": "feedback_three_agent_fleet_ceiling.md",
     "scopePath": ".claude/memory/feedback_three_agent_fleet_ceiling.md",
-    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": false
   }
