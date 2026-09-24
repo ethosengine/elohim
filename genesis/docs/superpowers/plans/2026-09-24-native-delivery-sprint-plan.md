@@ -366,6 +366,12 @@ subset of the nerve endings (3 of 7) and a random look-back window (2–14 days)
 evidence is never surveyed the same way twice. The seed and the draw are written into the
 firing's `epr flow note --kind observation` so a surprise is still auditable. (4) Never on a
 hook, never at SessionStart.
+**Created 2026-09-24:** cloud routine `trig_01Pm5R6UBgRUNFQoPDUWPNAR` (Default environment,
+driver claude-opus-5-5, cron `17 9 * * *` UTC, no connectors), operator rulings: the write
+channel is a `pain/<YYYYMMDD>-<seed>` branch pushed to origin (the firing record IS the commit,
+subject carries `seed=` and `draw=`; an empty commit when nothing is minted); cap/floor are read
+from `origin/pain/*` tip dates plus `algedonic-designer seed=` commits on dev; the
+delivery-stasis pain-sweep station merges `pain/*` into dev locally (station edit owed: E4).
 Its own success measure: `operator-surfaced-pain@1` — count of pains the operator had to name
 in a week (source: messages/handoffs tagged by the sweep) — the number this persona drives to 0.
 
