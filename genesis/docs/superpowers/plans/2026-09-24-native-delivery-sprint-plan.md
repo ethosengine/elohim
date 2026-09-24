@@ -148,6 +148,18 @@ uncommitted §8/habit delta — with pins moved forward and gates green.
 Verify: merged `dev` builds the orchestrator tests green; `habits-status.py` renders both active
 habits; `git log --oneline -1` on dev is a merge commit whose parents are the two heads.
 
+**Lane 0b — second reconciliation (after wave 1 lands; before ANY push).** The closed shift
+(`.claude/shifts/2026-09-24T04-30-land-batch-c-deliver-app.sprint-result.md`) landed batch C
+(`ed1d7a9b5..2015f3e6c`) on origin/dev at 14:45Z; dev is now 36 ahead / 11 behind. Merge
+`2015f3e6c` the same way (criss-cross expected on the ledgers, README, package.json, lockfile —
+resolve as in Lane 0). **Pin hazard, verified 2026-09-24:** local dev carries the conductor
+gitlink at `7e553f9c3` (d8b8aa19f, d3d7175ce) while origin/dev and the merge-base hold
+`25dd2d0be`; the household deliverability lane passes on 25dd2d0be and missed doorway-B
+convergence 3× on 7e553f9c3 (memory `project_conductor_pin_7e553f9c3_convergence_regression`).
+The merge MUST land a `build(conductor): pin held at 25dd2d0be pending K0 bisect + window
+measurement` commit so the next push does not roll the regressed pin. That push is batch C's
+fresh trigger (orchestrator #1904 died before dispatching anything).
+
 ---
 
 ## Lane A — Concern-scoped phases + readiness precondition (scripts/ci, root Jenkinsfile)
@@ -235,6 +247,12 @@ becomes `every { stepClass(it) <= 'verify' }`.
   and gate stages with `classAllows('deploy')`-style defs; `shouldRunStep` learns the class. The
   App pipeline's Publish phase runs only for class ≥ deploy; SonarQube/telemetry only for `profile`
   unless changed files demand it.
+- **B5 (from the 2026-09-24 handoff, one line, lands with B3):** `genesis/orchestrator/Jenkinsfile`
+  stage `Brit Plan (advisory)` (~:2333) wraps its steps in `catchError(buildResult: null,
+  stageResult: 'UNSTABLE') { … }` so a durable-task launch flake (`process apparently never
+  started`, exit -2 — orchestrator #1904, 7 pipelines aborted before start) can no longer cascade
+  to FAILURE with 0 dispatched. Advisory means advisory. Test: a case asserting the stage body is
+  guarded.
 - Tests: extend `validate-only-pipeline.test.mjs` → `run-class.test.mjs` (class derivation table,
   tag override, `[build:*]` still forces `build`), `graph-walker.test.mjs` (class exposed per step),
   a `rakia affected` oracle round-trip on a fixture repo (pattern in `gate-oracle.test.mjs`).
@@ -399,8 +417,24 @@ The 2-hour not-ready window is the kitsune2 DHT-model rebuild on restart (backlo
 `perf/k2-dht-model-sargable-arc` (e0bfc6c7a, local only, off pin 25dd2d0be; 146+8 tests, clippy
 clean, ~20× synthetic).
 
-1. Push the fork branch; open its PR; the fork's own CI attests it (this is exactly what the
-   attested-pin gate reads).
+0. **K0 — measure before moving (from the 2026-09-24 handoff; quiet host, no other cargo/mesh):**
+   (a) bisect the pin on the batch-C tree with the prebuilt `hc-fork-61565f320d0e` pair:
+   `scratchpad/bisect-lane.sh 61565f320d0e mid` (script under the closed session's scratchpad
+   `/tmp/claude-0/-projects-elohim/3a11e1a8-…/scratchpad/`; copy it into `genesis/local-dev/`
+   with a header if it proves useful) — pass ⇒ suspect `0efa40939` (publish selects only locally
+   validated ops), fail ⇒ suspect `ff2ea44c6` (iroh receive throttle); load, not the pin, is the
+   demonstrated factor in the household misses. (b) measure the post-restart window on the
+   persisted 2.3 GB matthew store for both pins with the direct-launch script
+   (`scratchpad/measure-conductor-window.sh <checkout> <label>` on 25dd2d0be, then with
+   `FORK_BIN_DIR=/projects/.claude-config/tools/hc-fork-7e553f9c30d5/bin`; hc_* exported on
+   :9464–9466) — the number the CellDisabled backlog asks for, and the three-run split (WAL
+   recovery vs DHT-model rebuild) the store-growth report names. Only after (a)+(b) does the
+   gitlink move.
+1. Publish the fork: fast-forward `elohim-0.7` → 7e553f9c3 and push `perf/k2-dht-model-sargable-arc`
+   (both dry-run as plain fast-forwards). **Operator authorized 2026-09-24** ("if elohim-0.7 is
+   useful then push it"); the controller's own push was refused by the harness classifier, so the
+   operator runs the two push lines. Then open the branch's PR; the fork's own CI attests it (this
+   is exactly what the attested-pin gate reads).
 2. Move the `elohim/holochain-conductor` gitlink; `[build:conductor]`; the edge build consumes
    the tag through `CONDUCTOR_SOURCE_IMAGE`.
 3. One staggered roll (content-keyed, so only conductors move); record per pod
