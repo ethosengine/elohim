@@ -88,7 +88,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.1: Declare the model and the measure as governed artifacts (no behaviour change)
 
-- [ ] Task 4.1: Declare the model and the measure as governed artifacts
+- [x] Task 4.1: Declare the model and the measure as governed artifacts
 
 1. **Step 1:** Write `embedding-models/all-minilm-l6-v2.json`: `artifact_type: model-manifest` (a Manifest EPR), `model_bytes` = CIDv1 (raw, sha256) of `model.onnx`, `tokenizer_bytes` likewise, `license: Apache-2.0`, `dims: 384`, `pooling: mean`, `normalize: true`, `max_tokens: 256`, `source: sentence-transformers/all-MiniLM-L6-v2`, `resolve: [~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx, $EPR_EMBED_MODEL_DIR]`, `procedure: <CID of embed.py>` (filled at 4.2), `fitness: recall-bank-reach@1` (the fold that judges it).
 2. **Step 2:** Write `recall-semantic-index.json` as an `IndexMeasure`: `measure: recall-semantic-index@1`; `chunk_rule` = CID of the declared rule object (`{markdown: heading ≤ 4, python: def/class, other: passage_window_bytes windows, max_chunk_bytes: 2000, max_chunks_per_file: 12}` — the same sectioning `passage.rs` already applies); `embedding: ModelPin{model_bytes, license, dims}`; `ranking: Vector{Cosine}`; `reach: ceiling SelfScope`; `surfaces: SurfaceRule::new(kinds, contract.source_roots ∖ discovery.exclude_directories)`; `retention: DemoteAfter{count: 1, per: fold}`; `fold_lag: Bound{limit: 25, unit: files, sense: Ceiling, source: Declared}`.
@@ -98,7 +98,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.2: The embedder as a pinned, bounded fold procedure
 
-- [ ] Task 4.2: The embedder as a pinned, bounded fold procedure
+- [x] Task 4.2: The embedder as a pinned, bounded fold procedure
 
 1. **Step 1:** `embedder/embed.py` (stdlib + `onnxruntime` + `tokenizers` + `numpy`): reads `{"model_dir", "pin": {"model_bytes", "tokenizer_bytes"}, "texts": [...]}` on stdin; hashes both files and **refuses with exit 3** on pin mismatch; batches of 32, truncation 256, mean pooling over the attention mask, L2 normalise; writes `{"dims": 384, "vectors": [[f32…]]}`. No network, no writes.
 2. **Step 2:** In `providers.rs`, `trait Embedder { fn embed(&self, texts: &[String], contract) -> FlowResult<Embedding> }` with two impls: `PinnedProcedure` (resolves the model dir from the manifest's `resolve` list, runs `embed.py` through `bounded_process` under `provider_bytes`/`provider_seconds`, maps exit 3 to `unavailable: model bytes do not match the pin`, a missing interpreter/module to `unavailable: <reason>`) and `Fixture` (deterministic hashed bag-of-words vectors, 384 dims — test interchange only, declared like the existing `fixture` provider, never live-fit).
@@ -108,7 +108,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.3: The fold — incremental, fingerprinted, attested, bounded per run
 
-- [ ] Task 4.3: The fold — incremental, fingerprinted, attested, bounded per run
+- [x] Task 4.3: The fold — incremental, fingerprinted, attested, bounded per run
 
 1. **Step 1:** `recall/index.rs`: `epr flow memory index fold [--scope <dir>] [--max-files N] [--embedder fixture]` walks the measure's surfaces with the contract's `exclude_directories` and `first_screen_globs`, fingerprints each file (canonical body sha256, the cites convention), diffs against the `chunks` table in `.eprfs/status/index/<measure-cid>/fold.sqlite`, re-chunks and re-embeds only changed/new files (up to `--max-files`, default from `index-fold-files-per-run@1`), marks removed files `demoted_at` (never deleted — `Retention`), appends vectors to `vectors.f32`, and writes a `FoldAttestation{measure, shard: ShardManifest{atoms, bytes, manifest cid}, heads_at, state, attested_by: actor sidecar ref, at}` — `Complete` when no file remains behind, `Degraded{retried}` when the run cap stopped it, `Failed{why}` on procedure refusal.
 2. **Step 2:** `epr flow memory index status [--json]`: lag (files behind or absent), last attestation state and time, measure CID, model CID, chunks, bytes. The store is derived and gitignored (`/.eprfs/status/*` already ignores it); a missing or corrupt `fold.sqlite` is rebuilt, never repaired by hand.
@@ -117,7 +117,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.4: The `Semantic` provider ranks natively
 
-- [ ] Task 4.4: The Semantic provider ranks natively
+- [x] Task 4.4: The Semantic provider ranks natively
 
 1. **Step 1:** `Semantic` implements `Provider`: embeds the question once (the *question text*, not the term list — terms are the lexical route's shape), cosine over every non-demoted chunk vector in the fold, best chunk per file, top `search_results` (or the lens's `choice_count`) files; each candidate carries `path`, `score`, `producer: "semantic"`, `method: <IndexMeasure CID>`, `model: <model CID>`, `fold_lag` at answer time, and `best_section` resolved through the existing `best_section` path so the linked `read` choice lands on the passage.
 2. **Step 2:** `retrieve()` gains a `"semantic"` arm and `search --provider semantic` works; `providers_for` returns it when declared; absent fold → `unresolved: ["semantic: no fold — run epr flow memory index fold"]`, empty candidates, no error.
@@ -126,7 +126,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.5: Fusion for order on the focused first screen
 
-- [ ] Task 4.5: Fusion for order on the focused first screen
+- [x] Task 4.5: Fusion for order on the focused first screen
 
 1. **Step 1:** Contract v15 `discovery.first_screen_fusion = {recipe: "rrf-v1", k: 60, producers: ["local", "semantic"]}` (a `RankingMethod::Fused` declared in the recipe). In `first_screen`, when a focused area or the root authority screen has lexical candidates *and* the semantic provider answers within budget, fuse by reciprocal rank for **order only**; each candidate keeps `ranks: {local: n|null, semantic: n|null}`. When the semantic provider is unavailable or has no fold, the screen is the lexical screen plus one omission line naming why.
 2. **Step 2:** `render.rs`: a candidate line prints its producer ranks (`local #2 · semantic #1`) and the method CID handle at `standard` and above; at `minimal`/`simple` one collapsed tag (`fused`). The honesty floor line names the fusion recipe. Assert at the render floor that no standing or human signal enters the order (a unit test feeds a candidate with a `standing` field and checks the order is unchanged).
@@ -136,7 +136,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.6: Fold-lag freshness replaces the mine gate
 
-- [ ] Task 4.6: Fold-lag freshness replaces the mine gate
+- [x] Task 4.6: Fold-lag freshness replaces the mine gate
 
 1. **Step 1:** `measures.yaml`: `index-fold-lag@1` (family `index`, unit files, `derive: fold-manifest-vs-tree` — native, re-derivable), `index-fold-lag-ceiling@1` (`headline: index`, `hard: 25`, consumes `index-fold-lag@1`, `skipped` when no fold exists — never zero), `index-fold-files-per-run@1` (default 40, the per-run cap), `recall-bank-reach@1` (fraction of bank questions reached, folded with `env model=<cid>`).
 2. **Step 2:** `report.rs`: `HEADLINE_ORDER` replaces `mempalace` with `index`; `mempalace` stays in the vocabulary (as `memkit` did) so a reader asking by name gets its own word back. The headline reads `index: N files behind the fold within hard 25 ✅` or `⚠ failed`, or `skipped — no fold`.
@@ -147,7 +147,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.7: Evidence, fitness fold, and the close
 
-- [ ] Task 4.7: Evidence, fitness fold, and the close
+- [x] Task 4.7: Evidence, fitness fold, and the close
 
 1. **Step 1:** Build a real fold over the declared surfaces (`index fold` to `Complete`; record wall-clock and chunk count in the atom delta). Run the deterministic bank: `epr flow memory recall sample --question <id> --reader agent:steward@fixture` for all six. Target: ≥ 6 of 6 reached with fusion (baseline 5 of 6; spike ranks in the table above). Fold `recall-bank-reach@1` with `env model=<model cid>` — the first fitness evidence on the model artifact.
 2. **Step 2:** The palace removal test: with `ceremony.providers.mempalace` deleted from a copy of the contract, the bank result is unchanged — removing the visitor loses only the second opinion (the spec's done-test for station 4).
@@ -157,7 +157,7 @@ Two facts the plan is built on: the two routes miss *different* questions, so fu
 
 ### Task 4.8: The FTS5 lexical provider (BM25) behind the trait
 
-- [ ] Task 4.8: The FTS5 lexical provider (BM25) behind the trait
+- [x] Task 4.8: The FTS5 lexical provider (BM25) behind the trait
 
 1. **Step 1:** `Lexical` implements `Provider` over the fold's FTS5 table: BM25 (`bm25()` rank), the question's `question_terms` as the match expression with prefix terms, top `search_results` files by best chunk, `ranking_known: true`, `method` = a second `IndexMeasure` (`recall-lexical-index@1`, `ranking: Bm25`, no `ModelPin` — `validate()` refuses a pin nothing uses) declared beside the semantic one and sharing the fold.
 2. **Step 2:** Contract v15 declares `providers.lexical {kind: "lexical", measure: ".epr-meta/elohim/algorithms/recall-lexical-index.json", optional: true}`. The existing `local` metadata traversal stays the always-present default; `lexical` is a third producer the fusion recipe may name (`producers: ["local", "semantic", "lexical"]`) once its bank evidence is in.
