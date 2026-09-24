@@ -9,9 +9,12 @@
 //! refused. One answer:
 //!
 //! 1. the question's terms (`discovery::question_terms`), each suffix-stemmed (`discovery::stem`)
-//!    and quoted as an FTS5 prefix string (`"fold"*` matches `folded`, `folds`, `folding`), OR-joined
-//!    — every term quoted, so no question text is ever FTS5 syntax (`NEAR`, `OR`, `*`, `^`, a
-//!    column filter are words here); no tokenizer change (that is a schema change and a re-fold);
+//!    and quoted as an FTS5 string, OR-joined — every term quoted, so no question text is ever
+//!    FTS5 syntax (`NEAR`, `OR`, `*`, `^`, a column filter are words here). A term whose last
+//!    token has four or more characters is a PREFIX string (`"fold"*` matches `folded`, `folds`,
+//!    `folding`); a shorter one — a declared short term (`top`, `red`, `cid`) or a phrase of them
+//!    (`top red`) — matches exactly, the same floor `stem` keeps, so `top` never matches
+//!    `topology`. No tokenizer change (that is a schema change and a re-fold);
 //! 2. FTS5 `bm25()` over every LIVE chunk that matches, each file keeping its best chunk; the score
 //!    printed is `bm25()` negated (higher ranks first) at 4 decimals — no standing, no behaviour
 //!    signal;
@@ -20,9 +23,11 @@
 //! 4. each candidate prints `producer: lexical`, the lexical measure CID as `method`, the fold's lag
 //!    at answer time and a `best_section` located exactly as the semantic route locates its chunk.
 //!
-//! The FTS query reads a DERIVED store: it is reported in `usage` (`lexical_query_ms`,
-//! `lexical_chunks_matched`), never charged to `source_bytes`; locating a winner's heading reads
-//! the source file and is charged to the scan counters, as on every route.
+//! The FTS query reads a DERIVED store: it is reported in `usage` (`lexical_query_ms` — the FTS
+//! query and the ranking only — and `lexical_chunks_matched`), never charged to `source_bytes`.
+//! The fold-lag walk is timed on its own as `lexical_lag_ms` (each producer on a fused screen
+//! walks its own lag; nothing is shared between them). Locating a winner's heading reads the
+//! source file and is charged to the scan counters, as on every route.
 //!
 //! Absence is honest, never an error: no fold, a fold built under another method, or a question
 //! with no term to match each answer with ONE `unresolved` line, no candidates and `ranking_known:
@@ -50,21 +55,45 @@ pub(super) const NO_TERMS: &str =
     "lexical: the question carries no term to match; name --query or --need with words of four \
      or more characters";
 
+/// The shortest last token a prefix match extends: `stem`'s own floor, so a short declared term
+/// (`top`, `red`) never matches a longer word that merely begins with it.
+const PREFIX_FLOOR: usize = 4;
+
 const SELECTION: &str = "FTS5 bm25() over every live chunk in the shared fold, each question term \
-                         stemmed and matched as a quoted prefix; each file's best chunk; top \
+                         stemmed and quoted (a prefix from four characters, short terms \
+                         exact); each file's best chunk; top \
                          limits.search_results files, ties by path; score = -bm25(); not authority";
 
-/// The FTS5 match expression for `terms`: each term with at least one letter or digit, stemmed,
-/// quoted as an FTS5 string (an inner `"` doubled) and marked a prefix, OR-joined. `None` when no
-/// term is left. Quoting is what makes question text inert: inside a string, FTS5 reads only the
-/// tokenizer's tokens — never an operator, a column filter or a `NEAR` group.
+/// The FTS5 match expression for `terms`: each term with at least one letter or digit, its last
+/// token stemmed, quoted as an FTS5 string (an inner `"` doubled), OR-joined. `None` when no term is left.
+/// Quoting is what makes question text inert: inside a string, FTS5 reads only the tokenizer's
+/// tokens — never an operator, a column filter or a `NEAR` group. The string is a prefix (`*`,
+/// which applies to its last token) only when that last token has at least [`PREFIX_FLOOR`]
+/// characters: a declared short term and a phrase of them match exactly.
 pub(super) fn match_expression(terms: &[String]) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
     for term in terms {
         if !term.chars().any(char::is_alphanumeric) {
             continue;
         }
-        let quoted = format!("\"{}\"*", stem(term).replace('"', "\"\""));
+        // FTS5's `*` extends the string's LAST token, and a phrase's other tokens must match
+        // exactly — so only the last token is stemmed (`top red` stays `top red`; stemming the
+        // whole phrase would cut `red` to `r`). The tokenizer splits on everything that is not a
+        // letter or digit, so trailing punctuation is no token and is dropped.
+        let body = term.trim_end_matches(|c: char| !c.is_alphanumeric());
+        let split = body
+            .char_indices()
+            .rev()
+            .find(|(_, c)| !c.is_alphanumeric())
+            .map_or(0, |(at, c)| at + c.len_utf8());
+        let last = stem(&body[split..]);
+        let prefix = if last.chars().count() >= PREFIX_FLOOR {
+            "*"
+        } else {
+            ""
+        };
+        let text = format!("{}{last}", &body[..split]);
+        let quoted = format!("\"{}\"{prefix}", text.replace('"', "\"\""));
         if !parts.contains(&quoted) {
             parts.push(quoted);
         }
@@ -92,7 +121,6 @@ pub(super) fn search(
     terms: &[String],
     scope: &str,
 ) -> Value {
-    let began = Instant::now();
     let mut answer = json!({
         "producer": PRODUCER,
         "ranking_known": true,
@@ -114,7 +142,6 @@ pub(super) fn search(
         answer["candidates"] = json!([]);
         answer["unresolved"] = json!([line]);
     }
-    answer["usage"]["lexical_query_ms"] = json!(began.elapsed().as_millis() as u64);
     answer
 }
 
@@ -163,7 +190,10 @@ fn answer_into(
 
     // The lag at answer time: a stale fold answers, and says so.
     let mut omissions: Vec<String> = Vec::new();
-    let lag = match fold.lag(root, &reader) {
+    let lag_began = Instant::now();
+    let walked = fold.lag(root, &reader);
+    answer["usage"]["lexical_lag_ms"] = json!(lag_began.elapsed().as_millis() as u64);
+    let lag = match walked {
         Ok(lag) => {
             if lag > 0 {
                 omissions.push(format!(
@@ -183,6 +213,7 @@ fn answer_into(
 
     // BM25 over every live matching chunk; each file keeps its best (bm25 is lower-is-better, so
     // the kept score is its negation).
+    let query_began = Instant::now();
     let mut best = BestPerFile::default();
     let mut in_view = 0usize;
     let matched = reader
@@ -206,7 +237,9 @@ fn answer_into(
     let roots = contract.source_roots();
     let mut candidates: Vec<Value> = Vec::new();
     let mut outside = 0usize;
-    for hit in best.ranked() {
+    let ranked = best.ranked();
+    answer["usage"]["lexical_query_ms"] = json!(query_began.elapsed().as_millis() as u64);
+    for hit in ranked {
         if candidates.len() >= limit {
             break;
         }
@@ -321,6 +354,16 @@ mod tests {
             Some("\"habit\"*")
         );
         assert_eq!(match_expression(&[]), None);
+        // A short declared term, and a phrase of them, match exactly: `top` is not `topology`.
+        assert_eq!(
+            match_expression(&terms(&["habit", "top", "top red", "red", "wasm"])).as_deref(),
+            Some("\"habit\"* OR \"top\" OR \"top red\" OR \"red\" OR \"wasm\"*")
+        );
+        // Only a phrase's last token is stemmed: `stamps folding` keeps `stamps` exact.
+        assert_eq!(
+            match_expression(&terms(&["stamps folding"])).as_deref(),
+            Some("\"stamps fold\"*")
+        );
         assert_eq!(
             match_expression(&terms(&["-", "./"])),
             None,
@@ -333,8 +376,8 @@ mod tests {
     #[test]
     fn fts_syntax_in_a_term_stays_inside_its_string() {
         assert_eq!(
-            match_expression(&terms(&["near(a", "b\" OR c", "col:x^"])).as_deref(),
-            Some("\"near(a\"* OR \"b\"\" OR c\"* OR \"col:x^\"*")
+            match_expression(&terms(&["near(ab", "b\" OR cdef", "col:x^"])).as_deref(),
+            Some("\"near(ab\" OR \"b\"\" OR cdef\"* OR \"col:x\"")
         );
     }
 

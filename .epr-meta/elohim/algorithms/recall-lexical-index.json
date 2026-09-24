@@ -45,7 +45,6 @@
     "unit": "files",
     "thresholdPct": 100
   },
-  "_fold": ".epr-meta/elohim/algorithms/recall-semantic-index.json",
   "_chunk_rule": {
     "markdown": {
       "split": "heading",
@@ -64,7 +63,7 @@
     "max_chunk_bytes": 2000,
     "max_chunks_per_file": 40
   },
-  "_rule": "An IndexMeasure (elohim_epr_rea::index) and a Manifest EPR; it deserializes straight into the protocol type, CIDs spelled as strings. It ranks by FTS5 bm25() over the FTS5 table of the semantic fold named in _fold and folds nothing of its own: chunkRule, _chunk_rule, surfaces, retention and foldLag are the fold measure's, and the lexical provider refuses a fold whose chunk rule or surfaces differ (\"the fold was built under another method — refold\"). It pins no model (IndexMeasure::validate() refuses a pin no ranking uses) and it never runs an embedder. The match expression is the question's terms (discovery::question_terms), each suffix-stemmed (discovery::stem) and quoted as an FTS5 prefix string, OR-joined: question text is never FTS5 syntax. The fold's tokenizer is FTS5's default unicode61; inflection is matched by stem plus prefix, never by a tokenizer change (that is a schema change and a full re-fold). The measure's method CID is IndexMeasure::cid() over the typed value; the underscore keys are not part of it.",
+  "_rule": "An IndexMeasure (elohim_epr_rea::index) and a Manifest EPR; it deserializes straight into the protocol type, CIDs spelled as strings. It ranks by FTS5 bm25() over the FTS5 table of the semantic fold that the contract's ceremony.providers.<key>.fold names (that declaration is the fold reference's one home) and folds nothing of its own: chunkRule, _chunk_rule, surfaces, retention and foldLag are the fold measure's, and the lexical provider refuses a fold whose chunk rule or surfaces differ (\"the fold was built under another method — refold\"). It pins no model (IndexMeasure::validate() refuses a pin no ranking uses) and it never runs an embedder. The match expression is the question's terms (discovery::question_terms), each suffix-stemmed (discovery::stem) and quoted as an FTS5 string, OR-joined: question text is never FTS5 syntax. A term whose last token is four or more characters is a prefix string (\"fold\"* matches folded); a shorter one — a declared short term such as top or red, or a phrase of them — matches exactly, so top never matches topology. The fold's tokenizer is FTS5's default unicode61; inflection is matched by stem plus prefix, never by a tokenizer change (that is a schema change and a full re-fold). The measure's method CID is IndexMeasure::cid() over the typed value; the underscore keys are not part of it.",
   "_surfaces": "The fold measure's surface, unchanged: the lexical route ranks the chunks that fold holds, so a different surface would be a different fold.",
   "_retention": "Retention has no fold-count period (elohim_epr::measure::Period is wall-clock), so 'demote at the next fold' is declared as a zero delay: a removed or superseded file is demoted by the first fold that observes it, never deleted."
 }

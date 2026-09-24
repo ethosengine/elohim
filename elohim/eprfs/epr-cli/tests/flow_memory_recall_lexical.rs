@@ -168,6 +168,10 @@ fn the_lexical_measure_shares_the_semantic_fold_and_pins_no_model() {
     );
     assert_eq!(lexical["ranking"], json!({"method": "bm25"}));
     assert!(lexical.get("embedding").is_none(), "no model pin");
+    assert!(
+        lexical.get("_fold").is_none(),
+        "the contract's providers.<key>.fold is the fold reference's one home"
+    );
     for key in [
         "chunkRule",
         "_chunk_rule",
@@ -235,6 +239,43 @@ fn an_inflection_matches_through_stem_and_prefix() {
         "{answer}"
     );
     assert_eq!(answer["match"], "\"fold\"* OR \"stamp\"*", "{answer}");
+}
+
+/// A declared short term (`top`, `red`) and the phrase of them match EXACTLY: a file that only
+/// says `reduce topology` is not a `top red` match, however often it says it, and the file that
+/// carries `top red habit` ranks first.
+#[test]
+fn a_short_declared_term_matches_exactly_never_as_a_prefix() {
+    let dir = tree();
+    let root = dir.path();
+    common::write(
+        root,
+        "genesis/topology.md",
+        "# Shape\nWe reduce topology; reduce the topology again, and reduce it once more.\n",
+    );
+    common::write(
+        root,
+        "genesis/register.md",
+        "# Register\nThe top red habit.\n",
+    );
+    fold(root);
+    let answer = ask(root, "Which habit is top red right now?");
+    assert_eq!(answer["ranking_known"], true, "{answer}");
+    let found = paths(&answer["candidates"]);
+    assert_eq!(
+        found.first().map(String::as_str),
+        Some("genesis/register.md"),
+        "{answer}"
+    );
+    assert!(
+        !found.contains(&"genesis/topology.md".to_string()),
+        "`top`/`red` are not prefixes of `topology`/`reduce`: {answer}"
+    );
+    let expression = answer["match"].as_str().unwrap();
+    assert!(
+        expression.contains("\"top red\"") && !expression.contains("\"top\"*"),
+        "{expression}"
+    );
 }
 
 /// FTS5 syntax typed into the question is inert: every term is a quoted string, so `NEAR(`, `OR`,
@@ -326,6 +367,10 @@ fn every_candidate_prints_the_lexical_method_cid() {
         "{usage}"
     );
     assert!(usage["lexical_query_ms"].is_u64(), "{usage}");
+    assert!(
+        usage["lexical_lag_ms"].is_u64(),
+        "the lag walk is timed apart: {usage}"
+    );
     assert!(usage.get("source_bytes").is_none(), "{usage}");
     assert!(usage.get("embedding_processes").is_none(), "{usage}");
 }
@@ -375,6 +420,33 @@ fn a_fold_under_another_method_is_refused() {
     let answer = ask(root, "stewardship ledger");
     assert_eq!(answer["ranking_known"], false, "{answer}");
     assert_eq!(lines(&answer["unresolved"]), vec![OTHER_METHOD.to_string()]);
+}
+
+/// The chunk rule is part of the method: a lexical measure cutting by another rule — its
+/// `_chunk_rule` changed and `chunkRule` re-hashed to match, so the declaration itself is sound —
+/// does not share a fold cut under the semantic measure's rule.
+#[test]
+fn a_lexical_measure_under_another_chunk_rule_is_refused() {
+    let dir = tree();
+    let root = dir.path();
+    fold(root);
+    let mut measure: Value =
+        serde_json::from_slice(&std::fs::read(root.join(LEXICAL_REL)).unwrap()).unwrap();
+    measure["_chunk_rule"]["max_chunks_per_file"] = json!(12);
+    measure["chunkRule"] = json!(elohim_epr_rea::atom_cid(&measure["_chunk_rule"])
+        .unwrap()
+        .to_string());
+    put_json(root, LEXICAL_REL, &measure);
+    let typed: IndexMeasure = serde_json::from_value(measure).unwrap();
+    typed.validate().expect("precondition: a sound declaration");
+    let answer = ask(root, "stewardship ledger");
+    assert_eq!(answer["ranking_known"], false, "{answer}");
+    assert_eq!(lines(&answer["unresolved"]), vec![OTHER_METHOD.to_string()]);
+    assert_eq!(
+        answer["method"],
+        cid_of(root, LEXICAL_REL).as_str(),
+        "the method it declared is still named"
+    );
 }
 
 /// A stale fold answers, and says how stale.

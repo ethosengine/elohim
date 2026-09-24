@@ -334,9 +334,8 @@ impl Provider for MemPalace {
 /// named this one), `mempalace` whenever declared with kind `mempalace`, `semantic` whenever
 /// declared with kind `semantic` and `lexical` whenever declared with kind `lexical` (each named by
 /// its declaration key, which it reads its measure, fold and embedder from). A declared `fixture`
-/// provider (test interchange only,
-/// never live-fit) is not a `Provider` and is not returned here; `retrieve()` still answers it
-/// directly by name.
+/// provider (test interchange only, never live-fit) is not a `Provider` and is not returned here;
+/// `retrieve()` still answers it directly by name.
 ///
 /// **A coupling to keep in step:** each returned `Provider`'s `id()` is a hard-coded literal
 /// (`"local"`/`"mempalace"`) matched by `kind`, not by the declaration's own JSON key —
