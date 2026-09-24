@@ -120,7 +120,7 @@ async function authorDeclare(
 ): Promise<string> {
   const bulk = await fetch(`${storage}/db/content/bulk`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
     body: JSON.stringify([
       {
         id,

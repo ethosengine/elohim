@@ -440,7 +440,7 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   );
   const response = await fetch(`${storageUrl}/db/content/bulk`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
     body: JSON.stringify([
       {
         id: record.slug,
