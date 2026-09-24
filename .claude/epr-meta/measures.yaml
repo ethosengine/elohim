@@ -1038,6 +1038,84 @@ measures:
       ships nothing; cost per delivered bundle can. It is the number a push's author pays and the
       one the cost sentinel §8 names as never built.
 
+  # ── the store that grows (algedonic-designer, first real firing, 2026-09-24; plan Lane H4) ──
+  # Named by the operator from the 2026-09-24 conductor-store-growth report before any channel
+  # felt it: 2.3 GB in 42 hours, 27,317 of 30,787 lamad entries a doorway health probe writing on
+  # behalf of nobody, a 1.4 GB WAL that never resets. Household probe: the offline sniffer on a
+  # STOPPED conductor (never a running one — a long read snapshot is the checkpoint starvation it
+  # measures). Concern address: idle-is-free (plan Lane H routes the pain there verbatim).
+  - id: dna-actions-per-day
+    version: 1
+    family: store-growth
+    unit: actions/day
+    procedure: >
+      Household: `app/elohim-app/scripts/conductor-store-sniff.py <conductor-data-root> --json` on a
+      STOPPED conductor; take the `dnas[]` entry whose hash the installed elohim hApp maps to the
+      role named by `--env dna=<role>` (lamad is the largest, `dnas[0]`); from its
+      `actions_per_hour` (UTC "MM-DD HH" buckets, every author — at full arc a replica stores the
+      whole household's writes, so this is the bill one peer pays) keep the complete hours inside
+      the window `--env window=` names (`idle`: hours no a2o lane or mesh lease was held, read from
+      the berth ledger), and fold the median hour × 24 with `--env dna=<role> --env
+      window=<idle|all> --env peer=<name>`. Fleet proxy: the conductor's own Prometheus rendering
+      of `hc.conductor.workflow.integrated_ops` (label dna_hash) on the `<prefix>-conductor` pods'
+      `hc-metrics` port 9464 (alpha-edgenode PodMonitor), 24 h increase ÷ 3 ops per Create or
+      CreateLink — integrated ops, not authored actions, which at full arc is the same bill.
+    provenance: "genesis/docs/content/elohim-protocol/architecture/2026-09-24-conductor-store-growth-report.md §3 — household idle window Sep 22 05:00–11:00: a flat 648 Create + 1,296 CreateLink per hour in matthew's lamad DHT"
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      A per-DNA growth budget is the register the report says we lack (§7.3). Nothing measured
+      write volume at all: 46,656 actions a day entered each peer's lamad store while the
+      household sat idle, and the first person to see it was the operator reading a 2.3 GB
+      directory.
+
+  - id: wal-main-ratio
+    version: 1
+    family: store-growth
+    unit: ratio
+    procedure: >
+      Household: `conductor-store-sniff.py <conductor-data-root> --json` on a STOPPED conductor;
+      for the `dnas[]` entry of the role `--env dna=<role>` names, fold `wal_mb / main_mb` (the
+      `-wal` file against the main database, both read by size before any writer reopens them)
+      with `--env dna=<role> --env peer=<name>`; a household reading is the largest peer's.
+      Fleet probe: ABSENT. Neither elohim-storage (`hc_client.rs get_health` logs
+      `STORAGE_INFO bytes_used` from `blobs.used_by_entries` and exports nothing) nor the fork's
+      exporter publishes a database or WAL size; plan Lane H3's O(1) `storage_info`
+      (page_count × page_size + WAL size) is where one would be born.
+    provenance: "conductor-store-growth report §1 — lamad main/WAL: matthew 322/1,407 MB, jessica 531/1,681 MB, james 473/414 MB; §4 — WAL mode, default auto-checkpoint, no explicit checkpoint or journal_size_limit in the fork"
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      A WAL that never restarts from frame zero is invisible until a restart pays for it: recovery
+      reads the whole log and the first write checkpoints it before the cell is RUNNING. The
+      ratio is the reading because it is size-independent — above 1 means every page has been
+      rewritten into the log more often than it exists.
+
+  - id: subject-anchor-links
+    version: 1
+    family: store-growth
+    unit: links
+    procedure: >
+      Household: open the STOPPED conductor's lamad DHT with `open_db` from
+      `app/elohim-app/scripts/conductor-store-sniff.py` (loaded with importlib; the same key
+      derivation and read-only pragmas) and fold `select count(*) from Link where zome_index = <the
+      content_store_integrity zome's integrity index> and link_type = <the declaration-order index
+      of AttestationToSubject in content_store_integrity's LinkTypes> group by base_hash order by 1
+      desc limit 1` — the hottest attestation subject anchor — with `--env dna=lamad --env
+      peer=<name>`. The sniffer's `--json` does not carry it (`links_by_type_tag` groups by zome,
+      type and tag, never by base), so this probe is one query beyond it. Fleet probe: ABSENT.
+    provenance: "conductor-store-growth report §2 — 27,092 AttestationToSubject links over 179 subjects, 600+ on one subject anchor and rising; §7.4 — a get_links on a hot anchor returns the whole history"
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      The same doorway attested every 150 s forever, mostly as `unreachable` about doorways that
+      lived four minutes, lands as one more link on one anchor each time; the anchor is what a
+      reader of that subject pays for. Repetition with no settled-state memory shows up here
+      first, and it is linear in history rather than in doorways that exist.
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -1697,3 +1775,71 @@ lenses:
       At most one pipeline-hour per delivered bundle. A healthy App run is ~30 minutes end to end,
       so an hour absorbs one failed run per delivery; above it, the pipeline is spending more
       retrying than shipping.
+
+  # ── store-growth bounds (algedonic-designer, 2026-09-24; plan Lane H4) ──
+  # Declared here rather than as policies.yaml rows for the reason the delivery-cost bounds above
+  # give: policies.yaml sits within 1 KB of the 64 KB registry cap. Rendered by
+  # `epr flow report --bound <id>`, named in the idle-is-free habit's checks; the SessionStart
+  # headline has five fixed slots and none of them is this one. A raise is a design signal
+  # (feedback_limit_raises_are_design_signals_not_capacity), never a capacity ask.
+  - id: dna-actions-per-day-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [dna-actions-per-day@1]
+    env: { dna: lamad, window: idle }
+    subject: .
+    context: stopped-conductor-store
+    hard: 5000
+    concern: idle-is-free
+    retire-when: >
+      when a running node reports its own per-DNA write rate against a declared ceiling (the
+      idle-is-free habit's own exit), so a stopped-store sniff is redundant
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      Lamad at most 5,000 actions a day per peer at idle — the report's priced first value
+      (§7.3). 5,000 / 24 ≈ 208 an hour, room for the one-per-event writers (registrations,
+      canonical heads) with the health sample moved off the DHT (plan Lane H2). The idle reading
+      is 648 + 1,296 = 1,944 an hour × 24 = 46,656 a day, 9.3× over.
+
+  - id: wal-main-ratio-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [wal-main-ratio@1]
+    env: { dna: lamad }
+    subject: .
+    context: stopped-conductor-store
+    hard: 1
+    concern: idle-is-free
+    retire-when: >
+      when the conductor checkpoints its WAL by construction (plan Lane H3: PASSIVE after each
+      integration batch, TRUNCATE at idle, journal_size_limit) and exports its WAL size, so the
+      ratio is held by the writer rather than watched from outside
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      WAL no larger than the database it logs — the report's priced value (§7.3). Matthew reads
+      1,407 / 322 = 4.37, jessica 1,681 / 531 = 3.17, james 414 / 473 = 0.88.
+
+  - id: subject-anchor-links-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [subject-anchor-links@1]
+    env: { dna: lamad }
+    subject: .
+    context: stopped-conductor-store
+    hard: 100
+    concern: idle-is-free
+    retire-when: >
+      when every anchor that grows with time is bucketed or capped by construction (report §7.4),
+      so no subject anchor's link count depends on how long the node has run
+    status: active
+    established_by: algedonic-designer-2026-09-24
+    why: >
+      At most 100 attestation links on one subject anchor — the report's priced value (§7.3).
+      The household's hottest subject anchor held 600+ after 42 hours. At one probe per 150 s,
+      42 hours is 1,008 probes per probing doorway, so 600 means timeouts slowed the writer, not
+      that it settled.
