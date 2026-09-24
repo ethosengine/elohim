@@ -282,6 +282,7 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
         // UNSTABLE. The notarized head is NOT authored here — authorHeadOnce does
         // that exactly once, via a live conductor bridge.
         def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
+        def legStart = System.currentTimeMillis()
         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE',
                    message: "seed ${host} ${bundle.slug} (${kind}): blob byte upload failed after retries; see junit testcase") {
             withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "DO_PATCH=${doPatch}", "DELIVERABILITY_VERDICT_FILE=${verdictFile}"]) {
@@ -298,6 +299,7 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
             // before this line on any failure path.
             outcomes[outcomeKey] = true
         }
+        outcomes["ms|seed|${outcomeKey}".toString()] = System.currentTimeMillis() - legStart
         // Read the deliverability marker AFTER catchError so a failed (caught)
         // stage still records BROKEN_HEAD if stage-spa-blob.sh wrote one before
         // exiting non-zero — authorHeadOnce below is the sole consumer.
@@ -346,6 +348,9 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
     // bucket (that swallows the verdict and never reaches the post-Phase-2
     // error()).
     def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
+    // Wall-clock of the author leg (fail-over included, declare fan-out excluded).
+    def msKey = "ms|author|${bundle.slug}|${kind}".toString()
+    def authorStart = System.currentTimeMillis()
     for (int i = 0; i < doorwayEprUrls.size(); i++) {
         def doorwayEprUrl = doorwayEprUrls[i]
         def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
@@ -364,6 +369,7 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
         if (rc == 0) {
             echo "authorHeadOnce: ${bundle.slug} (${kind}) — head authored via ${host}'s conductor bridge; DHT witnesses it, converges to all peers"
             outcomes[authorKey] = host
+            outcomes[msKey] = System.currentTimeMillis() - authorStart
             if (fileExists(hashFile)) {
                 outcomes["hash|${bundle.slug}|${kind}".toString()] = readFile(hashFile).trim()
             }
@@ -387,10 +393,17 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
                 // successful declare records ordering on the peer, after which
                 // the monotonic heal converges it automatically each sweep.
                 def declareRc = 1
+                def declareKey = "${doorwayEprUrls[j].replaceFirst(/^https?:\/\//, '')}|${bundle.slug}|${kind}".toString()
+                def declareStart = System.currentTimeMillis()
                 withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", 'DECLARE_ONLY=1', 'DECLARE_MAX_ATTEMPTS=24', "SOURCE_DOORWAY_URL=${doorwayEprUrl}"]) {
                     declareRc = sh(returnStatus: true,
                        script: "bash '${env.WORKSPACE}/scripts/ci/stage-spa-blob.sh' '-' '${bundle.slug}' '${doorwayEprUrls[j]}' '${kind}'")
                 }
+                // converge.declare is its own phase in the junit report (Lane A4 retires it).
+                def declareMs = System.currentTimeMillis() - declareStart
+                outcomes["declare|${declareKey}".toString()] = (declareRc == 0)
+                outcomes["ms|declare|${declareKey}".toString()] = declareMs
+                outcomes['time|converge.declare'] = (outcomes['time|converge.declare'] ?: 0L) + declareMs
                 if (declareRc != 0) {
                     unstable("canonical-head declare ${bundle.slug} (${kind}): ${doorwayEprUrls[j]} did not confirm propagation (exit ${declareRc}) — that doorway may stay stale until the next declare-cycle or heal converges it; see stage-spa-blob.sh DECLARE_ONLY log above")
                 }
@@ -410,10 +423,12 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
         def verdict = readFile(verdictFile).trim()
         if (verdict.startsWith('BROKEN_HEAD')) {
             outcomes["broken|${bundle.slug}|${kind}".toString()] = verdict
+            outcomes[msKey] = System.currentTimeMillis() - authorStart
             echo "authorHeadOnce: ${bundle.slug} (${kind}) SKIPPED — ${verdict}; the peer judged this bundle broken during the author-head gate run; no head will be authored"
             return null
         }
     }
+    outcomes[msKey] = System.currentTimeMillis() - authorStart
     echo "authorHeadOnce: NO doorway could author ${bundle.slug} (${kind}) — no live conductor bridge in the fabric to witness the head"
     return null
 }
@@ -459,8 +474,10 @@ def verifyProjectedHeads(List<String> doorwayEprUrls, List<Map> bundles, String 
         if (!bundle.ssrPath) { failures << "${bundle.slug}: SSR render route was not declared"; continue }
         for (doorwayEprUrl in doorwayEprUrls) {
             def host = doorwayEprUrl.replaceFirst(/^https?:\/\//, '')
+            def legStart = System.currentTimeMillis()
             def rc = sh(returnStatus: true,
                     script: "bash '${env.WORKSPACE}/scripts/ci/verify-projected-head.sh' '${doorwayEprUrl}' '${bundle.slug}' '${expectedHash}' '${gitCommitHash ?: ''}' '${bundle.ssrPath}' '${bundle.ssrHeading ?: ''}'")
+            outcomes["ms|projhead|${host}|${bundle.slug}|${kind}".toString()] = System.currentTimeMillis() - legStart
             outcomes["projhead|${host}|${bundle.slug}|${kind}".toString()] = (rc == 0)
             if (rc != 0) { failures << "${host}/${bundle.slug}: SSR head not served" }
         }
@@ -549,23 +566,33 @@ def resolveStorageAdminKey() {
 }
 
 def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, String gitCommitHash) {
-    // Two-phase deploy of the pillar-EPR bundles (Task B21). Deploy-seed is
-    // post-build and transient-prone (conductor/doorway 503 during cluster
-    // churn); the orchestrator runs this pipeline wait-for-result at Level 0, so
-    // a hard FAILURE here aborts the whole dependency graph. catchError ->
-    // UNSTABLE keeps the chain alive (the orchestrator treats UNSTABLE as
-    // success). The credential-missing guard stays a hard error upstream
-    // (resolveStorageAdminKey).
+    // Deploy of the pillar-EPR bundles (Task B21) in CONCERN-SCOPED PHASES — no
+    // new Jenkins stages (the root stage model sits at its CPS cliff). Each leg's
+    // wall-clock lands in outcomes['ms|…'], each phase's in outcomes['time|…'],
+    // and emitAppDeployJunit reports them as junit time= under the phase's name
+    // (classname stays elohim-app.deploy.<env>, so ci-harvest reads it as before).
     //
-    //   Phase 1 (byte-seed, per host): PUT the content-addressed blob bytes onto
-    //     EVERY serving backend — bytes don't auto-replicate P2P yet, so this is
-    //     legitimate load-spread, not a divergent write.
-    //   Phase 2 (author head, ONCE): PATCH the notarized head exactly once, via
-    //     the first doorway that reaches a live conductor bridge. The conductor
-    //     authors the DHT entry, the peer network witnesses it, and it gossips to
-    //     every peer (run_content_sweep) — so the other backends converge WITHOUT
-    //     a per-host head write. This replaces the retired per-host `amber` PATCH
-    //     that minted divergent, un-witnessed heads (the per-host stranding class).
+    //   readiness        precondition: refuses in SECONDS, never waits (fleetWriteReady).
+    //   publish.seed     PUT the content-addressed bytes onto EVERY backend — bytes
+    //                    don't auto-replicate P2P yet, so this is load-spread, not a
+    //                    divergent write.
+    //   publish.author   PATCH the notarized head exactly ONCE via the first doorway
+    //                    with a live conductor bridge; the DHT witnesses it and it
+    //                    gossips to every peer (run_content_sweep). The retired
+    //                    per-host `amber` PATCH minted divergent, un-witnessed heads.
+    //   converge.declare DECLARE_ONLY fan-out of that head to the other doorways.
+    //   verify.mounts · verify.projected · verify.shell — the serving seatbelts.
+    //
+    // WHY A PRECONDITION. The App manifest dependsOn elohim-edge, so the
+    // orchestrator dispatches this pipeline the minute a roll ends — straight into
+    // the fleet's post-roll not-ready window (~20-120 min). App #1719-#1725 waited
+    // it out here (STAGE_CELL_READY_BUDGET_SECS=7200) and delivered nothing in
+    // ~12 pipeline-hours. Now a NOT READY fleet refuses the deploy, archives
+    // deploy-intent.json and goes UNSTABLE; re-dispatch is an event, not a poll.
+    // Transient legs stay catchError -> UNSTABLE (the orchestrator reads UNSTABLE
+    // as success); a bundle a peer judged BROKEN and a shell that cannot boot are
+    // hard FAILURE. The credential-missing guard stays upstream
+    // (resolveStorageAdminKey).
     def bundles = [
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
         [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server", ssrPath: "/"],
@@ -573,29 +600,86 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server", ssrPath: "/lamad/path/elohim-protocol", ssrHeading: "Elohim Protocol: Living Documentation"],
     ]
     def outcomes = [:]
+    try {
+        if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes)) {
+            return
+        }
+        // Past the precondition the readiness wait is TAIL tolerance only. The
+        // 7200s default in stage-spa-blob.sh stays for the household prologue's
+        // own override; it is no longer the CI value.
+        withEnv(['STAGE_CELL_READY_BUDGET_SECS=300']) {
+            publishAndVerifyBundles(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes)
+        }
+    } finally {
+        // In a finally so a refused, BROKEN or unbootable deploy still reports
+        // every phase that ran, with its time.
+        emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
+    }
+}
 
-    // Phase 1 — byte-seed every backend. Per-(host,slug) isolation lives INSIDE
-    // stageSpaBlobs; this outer catchError is a backstop for non-sh throws only.
+// Phase 0 — the readiness PRECONDITION (native-delivery sprint Lane A2). One
+// single-shot probe per doorway (scripts/ci/fleet-write-readiness.sh: GET
+// /health/serving + a zero-byte PUT re-ask). Exit 3 = NOT READY: record the face,
+// archive deploy-intent.json (commit, env, bundle sha256s, face, retryAfter,
+// doorway), go UNSTABLE, return false — no seed, no author, no wait. Exit 2 = the
+// probe could not judge: proceed, because an unproven NO must not block a deploy
+// the tail-tolerance ladder can still land. Returns true to proceed.
+def fleetWriteReady(List<String> doorwayEprUrls, List<Map> bundles, String adminKey, String gitCommitHash, Map outcomes) {
+    def started = System.currentTimeMillis()
+    def resultFile = "${env.WORKSPACE}/.ci-fleet-readiness.txt"
+    def intentFile = 'deploy-intent.json'
+    def specs = bundles.collect { b -> "${b.slug}:${b.kind ?: 'browser'}:${b.distDir}" }.join(' ')
+    def urls = doorwayEprUrls.collect { u -> "'${u}'" }.join(' ')
+    def rc = 0
+    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "READINESS_OUT=${resultFile}",
+             "DEPLOY_INTENT_OUT=${env.WORKSPACE}/${intentFile}", "DEPLOY_INTENT_COMMIT=${gitCommitHash ?: ''}",
+             "DEPLOY_INTENT_ENV=${env.BRANCH_NAME ?: 'dev'}", "DEPLOY_INTENT_BUNDLES=${specs}"]) {
+        sh "rm -f '${resultFile}' '${env.WORKSPACE}/${intentFile}'"
+        rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/fleet-write-readiness.sh' ${urls}")
+    }
+    outcomes['ms|readiness'] = System.currentTimeMillis() - started
+    def lines = fileExists(resultFile) ? readFile(resultFile).trim().replace('\n', '; ') : ''
+    if (rc != 3) {
+        outcomes['readiness'] = (rc == 0) ? 'ready' : 'unknown'
+        if (rc != 0) {
+            echo "fleetWriteReady: the probe could not judge (exit ${rc}) — proceeding on the tail-tolerance ladder: ${lines}"
+        }
+        return true
+    }
+    outcomes['readiness'] = 'refused'
+    outcomes['readiness|detail'] = lines
+    archiveArtifacts(artifacts: intentFile, allowEmptyArchive: true)
+    unstable("Fleet not write-ready — ${lines}. Deploy refused in seconds (no seed, no author, no wait); ${intentFile} archived for the re-dispatch once the fleet is writable.")
+    return false
+}
+
+// Phases 1-5 behind the precondition. Own def = own CPS method (keeps the caller
+// small); bash bodies stay in scripts/ci/*.sh.
+def publishAndVerifyBundles(List<String> doorwayEprUrls, List<Map> bundles, String adminKey, String gitCommitHash, Map outcomes) {
+    // publish.seed — per-(host,slug) isolation lives INSIDE stageSpaBlobs; this
+    // catchError is a backstop for non-sh throws only.
+    def started = System.currentTimeMillis()
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
             stageSpaBlobs(doorwayEprUrls[i], bundles, adminKey, outcomes)
         }
     }
+    outcomes['time|publish.seed'] = System.currentTimeMillis() - started
 
-    // Phase 2 — author each bundle's head EXACTLY once (failover to a live
-    // bridge). authorHeadOnce swallows a bridgeless 503 to try the next doorway;
-    // a bundle whose head NO doorway could witness is NAMED UNSTABLE by
-    // emitAppDeployJunit. Unlike the retired per-host PATCH, we never write an
-    // un-witnessed local head as a fallback.
+    // publish.author (+ converge.declare, timed inside authorHeadOnce). A bundle
+    // whose head NO doorway could witness is NAMED by emitAppDeployJunit; we never
+    // write an un-witnessed local head as a fallback.
+    started = System.currentTimeMillis()
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
         for (bundle in bundles) {
             authorHeadOnce(doorwayEprUrls, bundle, adminKey, outcomes)
         }
     }
-    // Hard gate, OUTSIDE Phase 2's catchError above (so it is a real FAILURE,
-    // never swallowed to UNSTABLE): authorHeadOnce recorded 'broken|...' and
-    // returned without authoring for every bundle a peer judged BROKEN_HEAD.
-    // A plain keySet() loop (not findAll/collect) keeps this CPS-safe.
+    outcomes['time|publish.author'] = System.currentTimeMillis() - started - (outcomes['time|converge.declare'] ?: 0L)
+
+    // Hard gate, OUTSIDE the catchError above (a real FAILURE, never swallowed to
+    // UNSTABLE): authorHeadOnce recorded 'broken|...' for every bundle a peer
+    // judged BROKEN_HEAD. A plain keySet() loop keeps this CPS-safe.
     def broken = []
     for (k in outcomes.keySet()) {
         if (k.startsWith('broken|')) {
@@ -605,42 +689,42 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
     if (!broken.isEmpty()) {
         error("Deploy refused: ${broken.size()} bundle(s) cannot boot — ${broken.join('; ')}. The peer judged the bytes; fix the build, do not re-run.")
     }
-
-    // End-to-end serving seatbelt: probe the EPR-routed mounts a human actually
-    // visits. Each host serves 200 via its own converged head OR via doorway
-    // failover during the convergence window. Skipped on STORAGE_URL override (a
-    // raw storage backend has no EPR router). UNSTABLE per the dependency-chain
-    // rule.
-    if (!env.STORAGE_URL) {
-        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-            for (int i = 0; i < doorwayEprUrls.size(); i++) {
-                verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
-            }
-        }
-
-        // Phase 4 (Track-4 T4-2) — served-vs-declared propagation probe: does the
-        // running doorway PROCESS actually serve the head just authored above,
-        // not merely a 200'ing mount over a stale materialization? Skipped on
-        // STORAGE_URL override for the same reason verifyEprMounts is (a raw
-        // storage backend has no health-surface EPR attestation either).
-        verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
-
-        // Phase 5 — the boot-through-doorway gate (spec 2026-09-08
-        // epr-app-deliverability-through-doorway, D4b). HARD FAILURE: an EPR app
-        // that cannot boot through a doorway does not ship. Not catchError'd —
-        // the orchestrator reads UNSTABLE as success, which is how the 2026-09-04
-        // and 2026-09-08 blank pages reached visitors with green builds.
-        try {
-            verifyServedShells(doorwayEprUrls, bundles, outcomes)
-        } finally {
-            archiveArtifacts artifacts: 'genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
-        }
+    // The seatbelts are skipped on a STORAGE_URL override (a raw storage backend
+    // has no EPR router and no health-surface attestation).
+    if (env.STORAGE_URL) {
+        return
     }
-
-    // Moved to the END (was previously emitted before verifyEprMounts/
-    // verifyProjectedHeads ran): both later legs now feed named outcomes into
-    // this report, so it must run after every leg has populated `outcomes`.
-    emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
+    // verify.mounts — the EPR-routed mounts a human actually visits, per host
+    // (served via its own converged head OR doorway failover). UNSTABLE per host.
+    started = System.currentTimeMillis()
+    for (int i = 0; i < doorwayEprUrls.size(); i++) {
+        def host = doorwayEprUrls[i].replaceFirst(/^https?:\/\//, '')
+        def legStart = System.currentTimeMillis()
+        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+            verifyEprMounts(doorwayEprUrls[i], ['/', '/lamad'])
+            outcomes["mounts|${host}".toString()] = true
+        }
+        outcomes["ms|mounts|${host}".toString()] = System.currentTimeMillis() - legStart
+    }
+    outcomes['time|verify.mounts'] = System.currentTimeMillis() - started
+    // verify.projected (Track-4 T4-2) — does the running doorway PROCESS serve the
+    // head just authored, not merely a 200'ing mount over a stale materialization?
+    started = System.currentTimeMillis()
+    try {
+        verifyProjectedHeads(doorwayEprUrls, bundles, gitCommitHash, outcomes)
+    } finally {
+        outcomes['time|verify.projected'] = System.currentTimeMillis() - started
+    }
+    // verify.shell — the boot-through-doorway gate (spec 2026-09-08, D4b). HARD
+    // FAILURE, not catchError'd: the orchestrator reads UNSTABLE as success, which
+    // is how the 2026-09-04 and 2026-09-08 blank pages shipped with green builds.
+    started = System.currentTimeMillis()
+    try {
+        verifyServedShells(doorwayEprUrls, bundles, outcomes)
+    } finally {
+        outcomes['time|verify.shell'] = System.currentTimeMillis() - started
+        archiveArtifacts artifacts: 'genesis/a2o/reports/served-shell/**', allowEmptyArchive: true
+    }
 }
 
 // Phase 5 helper — one call per (doorway, browser bundle). Bash body lives in
@@ -655,8 +739,12 @@ def verifyServedShells(List<String> doorwayEprUrls, List<Map> bundles, Map outco
         if (!head) { failures << "${bundle.slug}: browser head was not authored"; continue }
         def mount = bundle.slug == 'elohim-host-landing' ? '/' : "/${bundle.slug.replaceFirst(/-spa$/, '')}"
         for (int i = 0; i < doorwayEprUrls.size(); i++) {
+            def shellKey = "${doorwayEprUrls[i].replaceFirst(/^https?:\/\//, '')}|${bundle.slug}".toString()
+            def legStart = System.currentTimeMillis()
             def rc = sh(returnStatus: true,
                         script: "bash '${env.WORKSPACE}/scripts/ci/verify-served-shell.sh' '${doorwayEprUrls[i]}' '${mount}' '${bundle.slug}' '${head}'")
+            outcomes["ms|shell|${shellKey}".toString()] = System.currentTimeMillis() - legStart
+            outcomes["shell|${shellKey}".toString()] = (rc == 0)
             if (rc != 0) { failures << "${doorwayEprUrls[i]}${mount} (${bundle.slug} @ ${head.take(19)}…)".toString() }
         }
     }
@@ -665,69 +753,84 @@ def verifyServedShells(List<String> doorwayEprUrls, List<Map> bundles, Map outco
     }
 }
 
-// Emit a junit-style report for the per-(host,slug) SPA-blob deploy (Part B,
-// 2026-06-27). One testcase per (host, bundle) cell, classname
+// Emit a junit-style report for the App delivery, one testcase per leg, named by
+// its CONCERN-SCOPED PHASE (readiness · publish.seed · publish.author ·
+// converge.declare · verify.mounts · verify.projected · verify.shell), classname
 // `elohim-app.deploy.<env>`. Registered via junit() so a STALE host surfaces in
 // the test-report tab + getTestResults even though the build stays UNSTABLE —
-// the orchestrator treats UNSTABLE as success, so a swallowed leg was
-// previously invisible (the per-host deploy-lag class: elohim.host stuck on an
-// old bundle while alpha advanced). A passing leg => outcomes["host|slug|kind"]
-// == true (set inside stageSpaBlobs only on clean return). Mirrors the edge
-// emitDeployJunit. Own top-level def = own CPS method; no heredoc (CPS 64KB).
+// the orchestrator treats UNSTABLE as success, so a swallowed leg was previously
+// invisible (the per-host deploy-lag class, Part B 2026-06-27). time= is the
+// leg's measured wall-clock (outcomes['ms|…']), so the report prices each phase.
+// A leg that never ran (a refused precondition, a hard gate earlier) is not
+// emitted. Own top-level def = own CPS method; no heredoc (CPS 64KB).
 def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bundles, Map outcomes) {
     def safeEnv = (envName ?: 'dev').replaceAll('[^A-Za-z0-9._-]', '-')
     def cases = []
-    // Byte-seed legs: one per (host, bundle). Passed => the blob bytes landed on
-    // that backend (outcome recorded true inside stageSpaBlobs on clean return).
+    def readiness = outcomes['readiness']
+    if (readiness != null) {
+        cases << [name: 'readiness', kind: 'readiness', passed: readiness != 'refused',
+                  ms: outcomes['ms|readiness'], detail: outcomes['readiness|detail'] ?: '']
+    }
+    if (readiness == 'refused') {
+        bundles = []
+    }
+    // publish.seed: one per (host, bundle). Passed => the blob bytes landed on
+    // that backend (recorded true inside stageSpaBlobs on clean return).
     doorwayEprUrls.each { url ->
         def host = url.replaceFirst(/^https?:\/\//, '')
         bundles.each { b ->
-            def kind = b.kind ?: 'browser'
-            cases << [name: "seed ${host} ${b.slug} (${kind})".toString(),
-                      kind: 'seed',
-                      passed: outcomes["${host}|${b.slug}|${kind}".toString()] == true]
+            def leg = "${host}|${b.slug}|${b.kind ?: 'browser'}".toString()
+            cases << [name: "publish.seed ${host} ${b.slug} (${b.kind ?: 'browser'})".toString(), kind: 'seed',
+                      passed: outcomes[leg] == true, ms: outcomes["ms|seed|${leg}".toString()]]
         }
     }
-    // Author legs: one per bundle. Passed => some doorway's conductor witnessed
+    // publish.author: one per bundle. Passed => some doorway's conductor witnessed
     // the single head (outcomes["author|slug|kind"] holds the authoring host).
     bundles.each { b ->
-        def kind = b.kind ?: 'browser'
-        cases << [name: "author ${b.slug} (${kind})".toString(),
-                  kind: 'author',
-                  passed: outcomes["author|${b.slug}|${kind}".toString()] != null]
+        def leg = "${b.slug}|${b.kind ?: 'browser'}".toString()
+        cases << [name: "publish.author ${b.slug} (${b.kind ?: 'browser'})".toString(), kind: 'author',
+                  passed: outcomes["author|${leg}".toString()] != null, ms: outcomes["ms|author|${leg}".toString()]]
     }
-    // Projected-head legs (Track-4 T4-2): one per (host, server-bundle). Passed
-    // => this host's health surface (/health/startup or /health) served the
-    // just-authored serverBlobHash AND the declared SSR route rendered it.
-    // Missing attestation is a failed proof. Only server-kind bundles carry a
-    // servedBundleHeads entry in the contract; a leg is only emitted when the
-    // author leg actually recorded a hash to check against (outcomes["hash|…"]).
-    doorwayEprUrls.each { url ->
-        def host = url.replaceFirst(/^https?:\/\//, '')
-        bundles.each { b ->
-            def kind = b.kind ?: 'browser'
-            if (kind != 'server') { return }
-            def key = "projhead|${host}|${b.slug}|${kind}".toString()
-            if (!outcomes.containsKey(key)) { return }
-            cases << [name: "projected-head ${host} ${b.slug} (${kind})".toString(),
-                      kind: 'projhead',
-                      passed: outcomes[key] == true]
+    // Legs that exist only once their phase ran, in phase order: the declare
+    // fan-out, the mounts, the projected-head probe (server bundles; T4-1
+    // health-surface contract) and the served-shell boot gate (browser bundles).
+    // A missing key means the leg never ran, so it is not reported.
+    for (phase in ['converge.declare', 'verify.mounts', 'verify.projected', 'verify.shell']) {
+        def prefix = [
+            'converge.declare': 'declare', 'verify.mounts': 'mounts',
+            'verify.projected': 'projhead', 'verify.shell': 'shell',
+        ][phase]
+        doorwayEprUrls.each { url ->
+            def host = url.replaceFirst(/^https?:\/\//, '')
+            def legs = []
+            if (prefix == 'mounts') {
+                if (!bundles.isEmpty()) { legs << [key: host, name: "${phase} ${host}"] }
+            } else {
+                bundles.each { b ->
+                    def kind = b.kind ?: 'browser'
+                    if (prefix == 'shell') {
+                        if (kind == 'browser') { legs << [key: "${host}|${b.slug}", name: "${phase} ${host} ${b.slug}"] }
+                    } else {
+                        legs << [key: "${host}|${b.slug}|${kind}", name: "${phase} ${host} ${b.slug} (${kind})"]
+                    }
+                }
+            }
+            legs.each { l ->
+                if (outcomes.containsKey("ms|${prefix}|${l.key}".toString())) {
+                    cases << [name: l.name.toString(), kind: prefix,
+                              passed: outcomes["${prefix}|${l.key}".toString()] == true,
+                              ms: outcomes["ms|${prefix}|${l.key}".toString()]]
+                }
+            }
         }
     }
     def failed = cases.count { !it.passed }
     def lines = cases.collect { c ->
-        def attrs = "classname=\"elohim-app.deploy.${safeEnv}\" name=\"${c.name}\" time=\"0\""
+        def attrs = "classname=\"elohim-app.deploy.${safeEnv}\" name=\"${c.name}\" time=\"${junitSecs(c.ms)}\""
         if (c.passed) {
             "  <testcase ${attrs}/>"
         } else {
-            def msg
-            if (c.kind == 'author') {
-                msg = "Head author '${c.name}' failed: NO doorway in the fabric reached a live conductor bridge to author (witness) this bundle's single notarized head. The head cannot green or converge until a conductor bridge is live. Check the alpha peers' conductor health (storage /health, conductor app-WS)."
-            } else if (c.kind == 'projhead') {
-                msg = "Projected-head probe '${c.name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
-            } else {
-                msg = "Blob byte-seed '${c.name}' failed after retries (PUT /admin/seed/blob): this backend did not receive the bundle bytes. A transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the backend is down. Re-run the App pipeline, or check the host storage /health."
-            }
+            def msg = appDeployFailureMessage(c.kind, c.name, c.detail)
             msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
             "  <testcase ${attrs}><failure message=\"${msg}\" type=\"spa-blob-${c.kind}\"/></testcase>"
         }
@@ -742,12 +845,47 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     writeFile(file: reportFile, text: xml)
     archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
     junit(testResults: reportFile, allowEmptyResults: true)
-    def passed = cases.size() - failed
-    echo "App SPA-blob deploy for ${safeEnv}: ${passed}/${cases.size()} legs landed (byte-seed per host + one witnessed head author per bundle)"
+    def timings = []
+    for (p in ['readiness', 'publish.seed', 'publish.author', 'converge.declare', 'verify.mounts', 'verify.projected', 'verify.shell']) {
+        def key = (p == 'readiness') ? 'ms|readiness' : "time|${p}".toString()
+        if (outcomes.containsKey(key)) { timings << "${p}=${junitSecs(outcomes[key])}s" }
+    }
+    echo "App delivery for ${safeEnv}: ${cases.size() - failed}/${cases.size()} legs passed; phase wall-clock: ${timings.join(' ')}"
     if (failed > 0) {
         def failedNames = cases.findAll { !it.passed }.collect { it.name }.join('; ')
-        echo "App deploy partial failure: ${failed}/${cases.size()} legs failed — ${failedNames}. Build UNSTABLE (test shape); orchestrator proceeds. A failed 'author' leg means the single head was never witnessed; a failed 'seed' leg means a backend lacks the bytes."
+        echo "App delivery partial failure: ${failed}/${cases.size()} legs failed — ${failedNames}. Build UNSTABLE (test shape); orchestrator proceeds."
     }
+}
+
+// junit time= (seconds, 3 decimals) from a millisecond count; integer math only.
+def junitSecs(def ms) {
+    long m = (ms ?: 0L) as long
+    if (m < 0) { m = 0 }
+    def frac = (m % 1000).toString()
+    while (frac.length() < 3) { frac = '0' + frac }
+    return "${(long) ((m - (m % 1000)) / 1000)}.${frac}".toString()
+}
+
+def appDeployFailureMessage(String kind, String name, def detail) {
+    if (kind == 'readiness') {
+        return "Fleet not write-ready — ${detail}. The deploy was refused in seconds (no seed, no author, no wait); deploy-intent.json is archived for the re-dispatch once the fleet is writable. The face names the regime (catching-up, storage-refused, shedding, …); scripts/ci/fleet-write-readiness.sh lists them."
+    }
+    if (kind == 'author') {
+        return "Head author '${name}' failed: NO doorway in the fabric reached a live conductor bridge to author (witness) this bundle's single notarized head. The head cannot green or converge until a conductor bridge is live. Check the alpha peers' conductor health (storage /health, conductor app-WS)."
+    }
+    if (kind == 'declare') {
+        return "Canonical-head declare '${name}' did not confirm propagation: the DECLARE_ONLY fan-out exhausted its ladder, so that doorway keeps its own head until gossip/heal converges it. See the stage-spa-blob.sh DECLARE_ONLY log."
+    }
+    if (kind == 'mounts') {
+        return "Mount probe '${name}' failed: an EPR-routed mount ('/' or '/lamad') did not serve 200 through the router's self-heal window (scripts/ci/verify-epr-mount.sh) — the content row may point at a blob this host's storage no longer holds."
+    }
+    if (kind == 'projhead') {
+        return "Projected-head probe '${name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
+    }
+    if (kind == 'shell') {
+        return "Served-shell gate '${name}' failed: the shell does not boot through this doorway/mount (scripts/ci/verify-served-shell.sh) — see the ✗ lines for the asset and the x-elohim-bundle marker."
+    }
+    return "Blob byte-seed '${name}' failed after retries (PUT /admin/seed/blob): this backend did not receive the bundle bytes. A transient 503 during cluster churn is the usual cause (now retried in stage-spa-blob.sh); a persistent failure means the backend is down. Re-run the App pipeline, or check the host storage /health."
 }
 
 // ============================================================================
@@ -857,6 +995,7 @@ spec:
             defaultValue: false,
             description: 'No-op for this pipeline. Accepted so the orchestrator can propagate the flag uniformly; orchestrator skips triggering elohim-app when DEPLOY_ONLY=true.'
         )
+        string(name: 'RUN_CLASS', defaultValue: 'build', description: 'Run class the orchestrator derived (build|deploy|verify|measure|profile). Declared; nothing gates on it yet.')
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -1757,22 +1896,13 @@ VEOF
                         script {
                             def props = loadBuildVars()
                             withBuildVars(props) {
-                                // Advisory by design. This E2E runs against the LIVE
-                                // alpha target (runE2ETests opens with a `timeout 60s
-                                // curl https://alpha.elohim.host`). A down/flapping
-                                // alpha must NOT drive this build to FAILURE — a Level-0
-                                // FAILURE trips the orchestrator's fail-fast abort
-                                // (genesis/orchestrator/Jenkinsfile ~1807), which then
-                                // never dispatches elohim-edge (Level 1+), the ONLY
-                                // pipeline that runs `kubectl apply`. That deadlocks the
-                                // deploy that would FIX alpha behind alpha being up
-                                // (observed: orchestrator #1240, 2026-06-13). UNSTABLE is
-                                // treated as success by triggerPipeline (success ==
-                                // result in [SUCCESS, UNSTABLE]) so the cascade proceeds
-                                // and edge deploys; E2E results still publish below. This
-                                // mirrors the orchestrator's own post-flight/P2P/fed-smoke
-                                // gates, which are all catchError -> UNSTABLE. App
-                                // build/compile/Sonar failures upstream still hard-gate.
+                                // Advisory by design: this E2E runs against the LIVE alpha
+                                // target, and a down alpha must not red the build. The app
+                                // runs after elohim-edge (manifest dependsOn), so a FAILURE
+                                // here no longer blocks the roll, but it would still abort every
+                                // later orchestrator level (fail-fast). UNSTABLE reads as
+                                // success (triggerPipeline); results publish below.
+                                // Build/compile/Sonar failures upstream still hard-gate.
                                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                                     runE2ETests('alpha', 'https://alpha.elohim.host', env.GIT_COMMIT_HASH)
                                 }
