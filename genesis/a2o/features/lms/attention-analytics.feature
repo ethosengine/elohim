@@ -45,6 +45,11 @@ Feature: Protocol-Native Attention Analytics
 
   # --- Learner Attention Dashboard ---
 
+  # SUPERSEDED (2026-09-24) by features/lms/attention-witnessed-privately.feature
+  # (@concern:attention-witnessed-privately): a person's reading is kept as a private
+  # note on their own storage peer and shown back to them at /lamad/me/stream with the
+  # arranging recipe's address printed. That scenario is the live specification; this
+  # one is kept, unwired, as the earlier "view becomes an economic event" framing.
   Scenario: Learner sees their attention flow
     Given Maya has viewed 5 content nodes this week
     When Maya navigates to "/lamad/attention"
