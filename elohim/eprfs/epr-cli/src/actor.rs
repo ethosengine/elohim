@@ -40,9 +40,10 @@ use std::process::ExitCode;
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_participant_ref, record_signing_message, standing_human, verify_binding, ActorClaim,
-    ActorRecord, ActorStore, ActorWitness, FabricError, ParticipantRef, ParticipantRow,
-    RecordSignature, Roster, SidecarActorStore, SidecarRoster, SignatureVerifier,
+    parse_participant_ref, record_signing_message, standing_human_pinned, verify_binding,
+    ActorClaim, ActorRecord, ActorStore, ActorWitness, FabricError, ParticipantRef, ParticipantRow,
+    RecordSignature, Roster, RosterStanding, RosterVia, SidecarActorStore, SidecarRoster,
+    SignatureVerifier,
 };
 use eprfs_meta::hex_lower;
 use rand_core::{OsRng, RngCore};
@@ -86,6 +87,10 @@ pub enum ActorError {
 
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
+
+    /// A multi-store act failed part-way and left a named row behind; the message names it.
+    #[error("orphan: {0}")]
+    Orphan(String),
 }
 
 pub type ActorResult<T> = std::result::Result<T, ActorError>;
@@ -139,11 +144,28 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
         }
         "current" => {
             let (opts, rest) = parse_global(&args[1..])?;
-            let session = take_opt(&rest, "--session")?.ok_or_else(|| {
-                ActorError::InvalidArguments("current needs --session <id>".into())
-            })?;
+            let device_only = rest.iter().any(|a| a == "--device");
+            let session = take_opt(&rest, "--session")?;
             let key_file = device_key::resolve_path().ok();
-            let outcome = current_on_device(&opts.root, &session, key_file.as_deref())?;
+            let outcome = match (device_only, session) {
+                // `--device`: the device's standing alone, consulting no session at all — the
+                // read a hook makes beside an agent's own claim. A session label would be
+                // claimable, and a claimed label would hide the device (finding M8).
+                (true, None) => device_current(&opts.root, key_file.as_deref()),
+                (true, Some(_)) => {
+                    return Err(ActorError::InvalidArguments(
+                        "current takes --session <id> or --device, not both".into(),
+                    ))
+                }
+                (false, Some(session)) => {
+                    current_on_device(&opts.root, &session, key_file.as_deref())?
+                }
+                (false, None) => {
+                    return Err(ActorError::InvalidArguments(
+                        "current needs --session <id> (or --device for the device alone)".into(),
+                    ))
+                }
+            };
             print_outcome(opts.json, &outcome, CurrentOutcome::render)
         }
         "witness" => {
@@ -161,14 +183,18 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
                 "witness needs --basis \"<one line you stand behind>\"",
             )?;
             let again = rest.iter().any(|a| a == "--again");
+            let answers = take_opt(&rest, "--answers")?;
             let key = DeviceKey::open()?;
-            let outcome = witness(
+            let outcome = witness_answering(
                 &opts.root,
-                &subject,
-                &witness_as,
-                &session,
-                &basis,
-                again,
+                &WitnessRequest {
+                    subject: &subject,
+                    witness_as: &witness_as,
+                    session: &session,
+                    basis: &basis,
+                    again,
+                    answers: answers.as_deref(),
+                },
                 &key,
             )?;
             print_outcome(opts.json, &outcome, WitnessOutcome::render)
@@ -476,7 +502,8 @@ pub struct CurrentClaim {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentOutcome {
-    pub session: String,
+    /// The session read, or `null` for a `--device` read, which consults no session.
+    pub session: Option<String>,
     /// `None` — serialized as an explicit `null`, never an omitted key — when the session
     /// registered nothing. A caller distinguishes "nobody claimed" from "could not read" by the
     /// exit code, so this key must always be present for the first case to be readable at all.
@@ -485,15 +512,19 @@ pub struct CurrentOutcome {
     /// standing is per device, not per session), or `null` when the device is unwitnessed.
     /// Always `null` beside a present claim: the session's own claim is the answer then.
     pub standing: Option<Standing>,
+    /// When the device would stand but the roster's chain root differs from the root this
+    /// device pinned (ruling R-P15): the handle and both roots. Omitted otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contested: Option<RootContest>,
 }
 
 impl CurrentOutcome {
     pub fn render(&self) {
+        let session = self.session.as_deref().unwrap_or("(device read)");
         match &self.claim {
             Some(claim) => {
                 println!(
-                    "actor   session {} → {}  {}",
-                    self.session,
+                    "actor   session {session} → {}  {}",
                     claim.claimed,
                     short_cid_str(&claim.record_cid)
                 );
@@ -503,13 +534,49 @@ impl CurrentOutcome {
                 }
             }
             None => {
-                println!("actor   session {} → (no claim registered)", self.session);
-                match &self.standing {
-                    Some(standing) => println!("        {}", standing.describe()),
-                    None => println!("        (unwitnessed)"),
+                println!("actor   session {session} → (no claim registered)");
+                match (&self.standing, &self.contested) {
+                    (Some(standing), _) => println!("        {}", standing.describe()),
+                    (None, Some(contest)) => {
+                        println!("        {CONTESTED_ROOT_LINE}");
+                        println!("        {}", contest.describe());
+                    }
+                    (None, None) => println!("        (unwitnessed)"),
                 }
             }
         }
+    }
+}
+
+/// The line `current` (and the SessionStart hook) prints for a root that differs from the pin.
+pub const CONTESTED_ROOT_LINE: &str = "contested (roster root differs from this device's pin)";
+
+/// A handle whose roster root differs from this device's pin — contested, never standing.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RootContest {
+    /// `human:<handle>`.
+    pub subject: String,
+    pub handle: String,
+    /// The root this device pinned on its first verified read.
+    pub pinned: String,
+    /// The root the roster in this checkout verifies to now.
+    pub found: String,
+    /// Where the pin lives on this device.
+    pub pin_path: String,
+    /// This device, `did:key:…`.
+    pub device: String,
+}
+
+impl RootContest {
+    fn describe(&self) -> String {
+        format!(
+            "{}: pinned {} here, the roster roots at {} (pin {})",
+            self.subject,
+            short_did(&self.pinned),
+            short_did(&self.found),
+            self.pin_path
+        )
     }
 }
 
@@ -525,7 +592,8 @@ pub fn current(root: &Path, session: &str) -> ActorResult<CurrentOutcome> {
 /// the session registered none — the standing human of the device whose key lives at `key_file`.
 ///
 /// A missing key file is an unwitnessed device, never a reason to mint one: a read never writes a
-/// key.
+/// key. It MAY write one thing: the roster root pin, on this device's first verified read of a
+/// roster it is a member of (ruling R-P15).
 pub fn current_on_device(
     root: &Path,
     session: &str,
@@ -542,15 +610,29 @@ pub fn current_on_device(
             definition_cid: claim.definition_cid,
             record_cid: cid.to_string(),
         });
-    let standing = match (&claim, key_file) {
-        (None, Some(key_file)) => standing_on_device(root, key_file),
-        _ => None,
+    let state = match (&claim, key_file) {
+        (None, Some(key_file)) => device_state(root, key_file),
+        _ => DeviceState::Unwitnessed,
     };
+    let (standing, contested) = state.split();
     Ok(CurrentOutcome {
-        session: session.to_string(),
+        session: Some(session.to_string()),
         claim,
         standing,
+        contested,
     })
+}
+
+/// `epr actor current --device`: this device's standing alone, consulting no session (M8).
+pub fn device_current(root: &Path, key_file: Option<&Path>) -> CurrentOutcome {
+    let state = key_file.map_or(DeviceState::Unwitnessed, |k| device_state(root, k));
+    let (standing, contested) = state.split();
+    CurrentOutcome {
+        session: None,
+        claim: None,
+        standing,
+        contested,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -565,30 +647,51 @@ pub struct Standing {
     pub subject: String,
     /// The `<handle>` alone.
     pub handle: String,
-    /// CID of the standing record — the `Witness`, or the human's own `Claim`.
+    /// CID of the standing record — the `Witness`, or the human's own `Claim`; for a standing
+    /// read from the roster alone, the founding record a genesis names or the binding row.
     pub record_cid: String,
-    /// The agent that witnessed, or `None` when the standing record is the human's own claim.
+    /// The agent that witnessed, or `None` when the standing record is the human's own claim (or
+    /// the standing was read from the roster alone, which names no agent).
     pub witnessed_by: Option<String>,
-    /// The standing record's own date (the tree it was made against).
+    /// The standing record's own date (the tree it was made against); empty for a standing read
+    /// from the roster alone, which carries no dates.
     pub claimed_at: String,
     /// This device, `did:key:…`.
     pub device: String,
+    /// Set when the standing was derived from the tracked roster alone — this checkout's actor
+    /// sidecar holds none of the device's records (a fresh worktree on a witnessed device,
+    /// ruling R-P16). Omitted otherwise, so a records-derived payload is what it always was.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roster: Option<RosterBasis>,
+}
+
+/// Which roster row a roster-derived [`Standing`] rests on.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterBasis {
+    /// The row's CID.
+    pub row_cid: String,
+    /// `chain-root` (the handle's genesis) or `bound` (a binding row).
+    pub via: String,
 }
 
 impl Standing {
     /// The one line `current` prints for it.
     pub fn describe(&self) -> String {
         let on = self.claimed_at.get(..10).unwrap_or(&self.claimed_at);
-        match &self.witnessed_by {
-            Some(witness) => format!(
-                "standing {} (witnessed by {witness} on {on}, device {})",
-                self.subject,
-                short_did(&self.device)
+        let device = short_did(&self.device);
+        match (&self.roster, &self.witnessed_by) {
+            (Some(basis), _) => format!(
+                "standing {} (by the tracked roster, {} device {device})",
+                self.subject, basis.via
             ),
-            None => format!(
-                "standing {} (claimed by themselves on {on}, device {})",
-                self.subject,
-                short_did(&self.device)
+            (None, Some(witness)) => format!(
+                "standing {} (witnessed by {witness} on {on}, device {device})",
+                self.subject
+            ),
+            (None, None) => format!(
+                "standing {} (claimed by themselves on {on}, device {device})",
+                self.subject
             ),
         }
     }
@@ -599,50 +702,175 @@ impl Standing {
     }
 }
 
+/// What a device's standing read found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeviceState {
+    Standing(Standing),
+    /// A roster this device is pinned to now roots elsewhere — contested, never standing.
+    RootContested(RootContest),
+    Unwitnessed,
+}
+
+impl DeviceState {
+    fn split(self) -> (Option<Standing>, Option<RootContest>) {
+        match self {
+            DeviceState::Standing(standing) => (Some(standing), None),
+            DeviceState::RootContested(contest) => (None, Some(contest)),
+            DeviceState::Unwitnessed => (None, None),
+        }
+    }
+}
+
 /// The standing human of THIS device, resolving the key the way every command does
 /// (`ELOHIM_DEVICE_KEY_FILE`, then the config home). The attribution arms read this.
 pub fn standing_here(root: &Path) -> Option<Standing> {
     standing_on_device(root, &device_key::resolve_path().ok()?)
 }
 
-/// The standing human of the device whose key lives at `key_file`, over every roster under
-/// `root` and the actor sidecar — or `None`.
+/// The standing human of the device whose key lives at `key_file` — or `None` (unwitnessed, or
+/// contested by a root that differs from this device's pin). See [`device_state`].
+pub fn standing_on_device(root: &Path, key_file: &Path) -> Option<Standing> {
+    match device_state(root, key_file) {
+        DeviceState::Standing(standing) => Some(standing),
+        _ => None,
+    }
+}
+
+/// The device whose key lives at `key_file`, read against every roster under `root` and the
+/// actor sidecar.
 ///
 /// Read-only and cheap when there is nothing to find: no roster directory means no key is even
 /// opened, and a key file that does not exist is an unwitnessed device (a read never mints a
 /// key). Every failure along the way is honest absence, never an error: standing enriches
 /// attribution and must never veto it.
-pub fn standing_on_device(root: &Path, key_file: &Path) -> Option<Standing> {
+///
+/// Standing is per DEVICE (R-P16): the actor sidecar's signed records are the richer source when
+/// this checkout holds them, and when it holds none of this device's records for a handle, the
+/// tracked roster alone decides — the chain root on its genesis, a bound device on its binding.
+/// Each roster is first checked against the root this device pinned for the handle (R-P15); the
+/// first verified read of a roster this device is a member of writes that pin.
+pub fn device_state(root: &Path, key_file: &Path) -> DeviceState {
     let handles = roster_handles(root);
-    if handles.is_empty() || !key_file.is_file() || !root.join(ACTOR_LOG_REL).is_file() {
-        return None;
+    if handles.is_empty() || !key_file.is_file() {
+        return DeviceState::Unwitnessed;
     }
-    let did = DeviceKey::load_or_generate(key_file).ok()?.did_key();
-    let records = SidecarActorStore::open(root).ok()?.records().ok()?;
-    standing_for_did(root, &handles, &records, &did)
+    let Ok(key) = DeviceKey::load(key_file) else {
+        return DeviceState::Unwitnessed;
+    };
+    let records = if root.join(ACTOR_LOG_REL).is_file() {
+        match SidecarActorStore::open(root).and_then(|store| store.records()) {
+            Ok(records) => records,
+            Err(_) => return DeviceState::Unwitnessed,
+        }
+    } else {
+        Vec::new()
+    };
+    device_state_for(root, &handles, &records, &key.did_key(), Some(key_file))
 }
 
-/// The latest standing record for `did` across `handles` (the latest by append order wins when a
-/// device somehow stands for two handles).
-fn standing_for_did(
+/// [`device_state`] over already-read records. `key_file` locates the device's root pins; `None`
+/// reads without pins (and writes none).
+fn device_state_for(
     root: &Path,
     handles: &[String],
     records: &[(Cid, ActorRecord)],
     did: &str,
-) -> Option<Standing> {
+    key_file: Option<&Path>,
+) -> DeviceState {
+    let verifier = verifier();
     let plain: Vec<ActorRecord> = records.iter().map(|(_, r)| r.clone()).collect();
-    handles
-        .iter()
-        .filter_map(|handle| {
-            let roster = read_roster(root, handle).ok()?;
+    let mut best: Option<(usize, Standing)> = None;
+    let mut contested: Option<RootContest> = None;
+    for handle in handles {
+        let Ok(roster) = read_roster(root, handle) else {
+            continue;
+        };
+        let Some(chain_root) = roster.chain_root(&verifier) else {
+            continue;
+        };
+        let pin = match key_file.map(|k| device_key::read_root_pin(k, handle)) {
+            Some(Ok(pin)) => pin,
+            // An unreadable pin is never read as "unpinned": that would let this read pin anew.
+            Some(Err(_)) => continue,
+            None => None,
+        };
+        if let (Some(pin), Some(key_file)) = (&pin, key_file) {
+            if !roster.chain_root_matches(pin, &verifier) {
+                contested.get_or_insert(RootContest {
+                    subject: format!("human:{handle}"),
+                    handle: handle.clone(),
+                    pinned: pin.clone(),
+                    found: chain_root.clone(),
+                    pin_path: device_key::root_pin_path(key_file, handle)
+                        .display()
+                        .to_string(),
+                    device: did.to_string(),
+                });
+                continue;
+            }
+        }
+        if pin.is_none() && roster.members(&verifier).contains(did) {
+            if let Some(key_file) = key_file {
+                // First verified read of a roster this device belongs to: pin its root. A pin
+                // that cannot be written leaves the device unpinned, never unstanding.
+                let _ = device_key::write_root_pin(key_file, handle, &chain_root);
+            }
+        }
+        let found = if device_holds_records(records, handle, did) {
             // The epr-rea resolver is the authority on WHETHER the device stands; the index
             // below only names WHICH record it stands on.
-            standing_human(&roster, &plain, did, &verifier())?;
-            let index = standing_index(&roster, records, did)?;
-            Some((index, standing_view(handle, &records[index], did)?))
-        })
-        .max_by_key(|(index, _)| *index)
-        .map(|(_, standing)| standing)
+            standing_human_pinned(&roster, &plain, did, &verifier, pin.as_deref())
+                .and_then(|_| standing_index(&roster, records, did))
+                .and_then(|index| Some((index + 1, standing_view(handle, &records[index], did)?)))
+        } else {
+            roster
+                .device_standing_row(did, &verifier)
+                .map(|row| (0, roster_standing(handle, row, did)))
+        };
+        if let Some((rank, standing)) = found {
+            if best.as_ref().is_none_or(|(r, _)| rank >= *r) {
+                best = Some((rank, standing));
+            }
+        }
+    }
+    match (best, contested) {
+        (Some((_, standing)), _) => DeviceState::Standing(standing),
+        (None, Some(contest)) => DeviceState::RootContested(contest),
+        (None, None) => DeviceState::Unwitnessed,
+    }
+}
+
+/// Whether this checkout's actor sidecar holds any human record of `handle` that `did` verifiably
+/// signed — i.e. whether the records, rather than the roster alone, decide the device's standing.
+fn device_holds_records(records: &[(Cid, ActorRecord)], handle: &str, did: &str) -> bool {
+    let verifier = verifier();
+    records.iter().any(|(_, record)| match record {
+        ActorRecord::Signed(sig) if sig.signer == did && sig.verify(&verifier) => {
+            records.iter().any(|(cid, r)| {
+                cid.to_string() == sig.claim_cid && human_handle(r).as_deref() == Some(handle)
+            })
+        }
+        _ => false,
+    })
+}
+
+fn roster_standing(handle: &str, row: RosterStanding, did: &str) -> Standing {
+    Standing {
+        subject: format!("human:{handle}"),
+        handle: handle.to_string(),
+        record_cid: row.record_cid,
+        witnessed_by: None,
+        claimed_at: String::new(),
+        device: did.to_string(),
+        roster: Some(RosterBasis {
+            row_cid: row.row_cid,
+            via: match row.via {
+                RosterVia::Genesis => "chain-root",
+                RosterVia::Binding => "bound",
+            }
+            .to_string(),
+        }),
+    }
 }
 
 /// The index of the record `standing_human` stands on: the latest human record of the roster's
@@ -651,16 +879,6 @@ fn standing_for_did(
 fn standing_index(roster: &Roster, records: &[(Cid, ActorRecord)], did: &str) -> Option<usize> {
     let verifier = verifier();
     let contested = roster.contested(&verifier);
-    let signed_by_device = |record_cid: &str| {
-        records.iter().rev().find_map(|(cid, record)| match record {
-            ActorRecord::Signed(sig)
-                if sig.claim_cid == record_cid && sig.signer == did && sig.verify(&verifier) =>
-            {
-                Some(cid.to_string())
-            }
-            _ => None,
-        })
-    };
     records
         .iter()
         .enumerate()
@@ -670,12 +888,25 @@ fn standing_index(roster: &Roster, records: &[(Cid, ActorRecord)], did: &str) ->
                 return None;
             }
             let record_cid = cid.to_string();
-            let signed_cid = signed_by_device(&record_cid)?;
+            let signed_cid = signed_by_device(records, &record_cid, did)?;
             if contested.contains(&record_cid) || contested.contains(&signed_cid) {
                 return None;
             }
             Some(index)
         })
+}
+
+/// The CID of the latest `Signed` record by `did` over `record_cid` that verifies.
+fn signed_by_device(records: &[(Cid, ActorRecord)], record_cid: &str, did: &str) -> Option<String> {
+    let verifier = verifier();
+    records.iter().rev().find_map(|(cid, record)| match record {
+        ActorRecord::Signed(sig)
+            if sig.claim_cid == record_cid && sig.signer == did && sig.verify(&verifier) =>
+        {
+            Some(cid.to_string())
+        }
+        _ => None,
+    })
 }
 
 /// The handle a human record speaks about — a witness's subject or a human's own claim.
@@ -703,6 +934,7 @@ fn standing_view(handle: &str, (cid, record): &(Cid, ActorRecord), did: &str) ->
         witnessed_by,
         claimed_at,
         device: did.to_string(),
+        roster: None,
     })
 }
 
@@ -794,6 +1026,9 @@ pub struct WitnessOutcome {
     pub roster: RosterState,
     /// The earlier witness of this subject on this device, when `--again` superseded one.
     pub prior: Option<String>,
+    /// The roster `Contest` row this re-witness answers (`--answers`). Omitted when none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answers: Option<String>,
 }
 
 impl WitnessOutcome {
@@ -823,20 +1058,28 @@ impl WitnessOutcome {
         if let Some(prior) = &self.prior {
             println!("        re-witnesses: {}", short_cid_str(prior));
         }
+        if let Some(contest) = &self.answers {
+            println!("        answers contest: {}", short_cid_str(contest));
+        }
     }
+}
+
+/// The arguments of one `witness` act.
+#[derive(Debug, Clone, Copy)]
+pub struct WitnessRequest<'a> {
+    pub subject: &'a str,
+    pub witness_as: &'a str,
+    pub session: &'a str,
+    pub basis: &'a str,
+    /// Re-witness a subject this device already witnessed.
+    pub again: bool,
+    /// The roster `Contest` row a re-witness after a contest answers (ruling R-P19).
+    pub answers: Option<&'a str>,
 }
 
 /// `epr actor witness --subject human:<h> --as agent:<role>@<model> --session <id> --basis
 /// "<line>" [--again]` — a present agent witnesses a human, signed from this device (ruling R-P9).
-///
-/// Phase 1 resolves and refuses without touching anything: the witness's shape (`ActorWitness::new`
-/// refuses a human `--as`, a non-human subject and an empty basis), the tree's date, the record
-/// and its signature. Phase 2, under the actor sidecar's lock: refuses a subject this device has
-/// already witnessed unless `again`, appends the `Witness` and the `Signed` record, then — when the
-/// handle has no roster — appends the roster's `Genesis` row (`chain_root` = this device).
-///
-/// Deliberate, once per device, by the agent who knows who is present; nothing calls this on its
-/// own.
+/// The library form without `--answers`; see [`witness_answering`].
 pub fn witness(
     root: &Path,
     subject: &str,
@@ -846,16 +1089,74 @@ pub fn witness(
     again: bool,
     device: &DeviceKey,
 ) -> ActorResult<WitnessOutcome> {
+    witness_answering(
+        root,
+        &WitnessRequest {
+            subject,
+            witness_as,
+            session,
+            basis,
+            again,
+            answers: None,
+        },
+        device,
+    )
+}
+
+/// `epr actor witness … [--again [--answers <contest cid>]]`.
+///
+/// **Phase 1** resolves and refuses without touching anything: the witness's shape
+/// (`ActorWitness::new` refuses a human `--as`, a non-human subject and an empty basis), the
+/// `--answers` address, the tree's date, the record and its signature.
+///
+/// **Phase 2 is one ordered, locked sequence** (finding M1): the actor sidecar's lock, then the
+/// handle's roster lock, both held to the end. Under them: refuse a subject this device already
+/// witnessed unless `again` — "already" read from the sidecar AND from the roster (a fresh
+/// checkout on a witnessed device has the roster and no records, R-P16); refuse a re-witness
+/// that does not answer an open contest of this device's standing, or answers something that is
+/// not one (R-P19 — the contest row is already in the roster, so the re-witness postdates it by
+/// construction); then append the roster's `Genesis` row FIRST when the handle has no roster,
+/// and only then the `Witness` and its `Signed` record. A roster that cannot be read or written
+/// therefore leaves no signed witness behind; a sidecar append that fails after a genesis names
+/// the orphaned genesis row in its error.
+///
+/// Deliberate, once per device, by the agent who knows who is present; nothing calls this on its
+/// own.
+pub fn witness_answering(
+    root: &Path,
+    request: &WitnessRequest<'_>,
+    device: &DeviceKey,
+) -> ActorResult<WitnessOutcome> {
+    let WitnessRequest {
+        subject,
+        witness_as,
+        session,
+        basis,
+        again,
+        answers,
+    } = *request;
+
     // ── Phase 1: resolve. Shape before date, so a malformed witness never runs git. ──
     let session = non_empty(session, "--session")?;
-    ActorWitness::new(subject, witness_as, session, basis, "shape-check")?;
+    let shape = ActorWitness::new(subject, witness_as, session, basis, "shape-check")?;
+    if let Some(contest) = answers {
+        shape.answering(contest)?;
+        if !again {
+            return Err(ActorError::InvalidArguments(
+                "--answers names the contest a RE-witness answers; pass it with --again".into(),
+            ));
+        }
+    }
     let (_steward, claimed_at) = head_commit_provenance(root).ok_or_else(|| {
         ActorError::InvalidArguments(format!(
             "cannot date a witness in `{}`: git has no HEAD commit to make it against",
             root.display()
         ))
     })?;
-    let witness = ActorWitness::new(subject, witness_as, session, basis, &claimed_at)?;
+    let mut witness = ActorWitness::new(subject, witness_as, session, basis, &claimed_at)?;
+    if let Some(contest) = answers {
+        witness = witness.answering(contest)?;
+    }
     let handle = witness.handle()?;
     let record = ActorRecord::Witness(witness.clone());
     let record_cid = record.cid()?;
@@ -863,10 +1164,15 @@ pub fn witness(
     let signed_cid = signed.cid()?;
     let did = device.did_key();
 
-    // ── Phase 2: the actor sidecar, under its lock. ──
+    // ── Phase 2: the actor sidecar's lock, then the roster's — held together to the end. ──
     let mut store = SidecarActorStore::open(root)?.transaction()?;
+    let mut roster_tx = SidecarRoster::open(root, &handle)?.transaction()?;
     let records = store.records()?;
-    let prior = prior_witness_on_device(&records, subject, &did);
+    let roster = roster_tx.read()?;
+    let verifier = verifier();
+
+    let prior =
+        prior_witness_on_device(&records, subject, &did).or_else(|| prior_on_roster(&roster, &did));
     if let Some(prior_cid) = &prior {
         if !again {
             return Err(ActorError::InvalidArguments(format!(
@@ -877,17 +1183,31 @@ pub fn witness(
             )));
         }
     }
-    if !records.iter().any(|(cid, _)| *cid == record_cid) {
-        store.append(record)?;
+    let open = open_contests(&roster, &records, &handle, &did);
+    match (answers, open.is_empty()) {
+        (None, false) if again => {
+            return Err(ActorError::InvalidArguments(format!(
+                "{subject}'s standing on this device was contested — a re-witness after a \
+                 contest must name the contest it answers: --answers <contest cid> (open: {})",
+                open.join(", ")
+            )))
+        }
+        (Some(named), _) if !open.iter().any(|c| c == named) => {
+            return Err(ActorError::InvalidArguments(format!(
+                "--answers {} is not an open contest of {subject}'s standing on this device{}",
+                short_cid_str(named),
+                if open.is_empty() {
+                    " — nothing here is contested".to_string()
+                } else {
+                    format!(" — open: {}", open.join(", "))
+                }
+            )))
+        }
+        _ => {}
     }
-    if !records.iter().any(|(cid, _)| *cid == signed_cid) {
-        store.append(signed)?;
-    }
-    drop(store);
 
-    // ── Phase 3: the roster. Genesis when the handle has none. ──
-    let roster = read_roster(root, &handle)?;
-    let state = if roster.rows().is_empty() {
+    // The roster first: a genesis that cannot be written leaves no signed witness behind.
+    let (state, genesis_cid) = if roster.rows().is_empty() {
         let row = signed_row(
             ParticipantRow::Genesis {
                 handle: handle.clone(),
@@ -898,13 +1218,34 @@ pub fn witness(
             },
             device,
         )?;
-        SidecarRoster::open(root, &handle)?.append(row)?;
-        RosterState::Genesis
-    } else if roster.members(&verifier()).contains(&did) {
-        RosterState::Joined
+        (RosterState::Genesis, Some(roster_tx.append(row)?))
+    } else if roster.members(&verifier).contains(&did) {
+        (RosterState::Joined, None)
     } else {
-        RosterState::Unbound
+        (RosterState::Unbound, None)
     };
+
+    let appended: ActorResult<()> = (|| {
+        if !records.iter().any(|(cid, _)| *cid == record_cid) {
+            store.append(record)?;
+        }
+        if !records.iter().any(|(cid, _)| *cid == signed_cid) {
+            store.append(signed)?;
+        }
+        Ok(())
+    })();
+    if let Err(error) = appended {
+        return Err(match genesis_cid {
+            Some(genesis) => ActorError::Orphan(format!(
+                "the roster genesis row {genesis} ({}) was appended, but the witness record \
+                 {record_cid} it names could not be written to the actor sidecar: {error}",
+                roster_rel(&handle)
+            )),
+            None => error,
+        });
+    }
+    drop(roster_tx);
+    drop(store);
 
     Ok(WitnessOutcome {
         subject: subject.to_string(),
@@ -918,6 +1259,7 @@ pub fn witness(
         roster_path: roster_rel(&handle),
         roster: state,
         prior: prior.filter(|p| *p != record_cid.to_string()),
+        answers: witness.answers,
     })
 }
 
@@ -944,6 +1286,81 @@ fn prior_witness_on_device(
             })
             .then_some(cid)
     })
+}
+
+/// A device already in the handle's roster has been witnessed (as its chain root) or bound —
+/// the record it stands on by the roster alone, contested or not (R-P16: `--again` reads the
+/// roster too, so a fresh checkout cannot quietly re-witness).
+fn prior_on_roster(roster: &Roster, did: &str) -> Option<String> {
+    let verifier = verifier();
+    if !roster.members(&verifier).contains(did) {
+        return None;
+    }
+    roster.rows().iter().find_map(|(cid, row)| match row {
+        ParticipantRow::Genesis {
+            chain_root,
+            record_cid,
+            ..
+        } if chain_root == did => Some(record_cid.clone()),
+        ParticipantRow::Binding { controller, .. } if controller == did => Some(cid.to_string()),
+        _ => None,
+    })
+}
+
+/// The effective contests of this device's standing for `handle` that no witness in `records`
+/// has answered yet: every admissible, effective `Contest` row naming a human record of the
+/// handle this device signed (or its signature over it), or the roster row the device stands on
+/// by the roster alone.
+fn open_contests(
+    roster: &Roster,
+    records: &[(Cid, ActorRecord)],
+    handle: &str,
+    did: &str,
+) -> Vec<String> {
+    let verifier = verifier();
+    let mut targets: Vec<String> = Vec::new();
+    for (cid, record) in records {
+        if human_handle(record).as_deref() != Some(handle) {
+            continue;
+        }
+        let record_cid = cid.to_string();
+        if let Some(signed) = signed_by_device(records, &record_cid, did) {
+            targets.push(record_cid);
+            targets.push(signed);
+        }
+    }
+    for (cid, row) in roster.rows() {
+        match row {
+            ParticipantRow::Genesis {
+                chain_root,
+                record_cid,
+                ..
+            } if chain_root == did => {
+                targets.push(record_cid.clone());
+                targets.push(cid.to_string());
+            }
+            ParticipantRow::Binding { controller, .. } if controller == did => {
+                targets.push(cid.to_string());
+            }
+            _ => {}
+        }
+    }
+    let answered: Vec<&str> = records
+        .iter()
+        .filter_map(|(_, record)| match record {
+            ActorRecord::Witness(w) => w.answers.as_deref(),
+            _ => None,
+        })
+        .collect();
+    let mut open: Vec<String> = Vec::new();
+    for target in targets {
+        for contest in roster.effective_contests_of(&target, &verifier) {
+            if !answered.contains(&contest.as_str()) && !open.contains(&contest) {
+                open.push(contest);
+            }
+        }
+    }
+    open
 }
 
 /// Fill a row's own signature slot (`signature` on a genesis or a contest) with `device`'s
@@ -1037,7 +1454,7 @@ pub fn contest(
     }
 
     let did = device.did_key();
-    let standing = standing_for_handle(root, &handle, &did)?.ok_or_else(|| {
+    let standing = standing_for_handle(root, &handle, &did, device.path())?.ok_or_else(|| {
         ActorError::InvalidArguments(format!(
             "nothing standing for {subject} on this device ({}) to contest",
             short_did(&did)
@@ -1067,13 +1484,28 @@ pub fn contest(
     })
 }
 
-/// The standing record of `did` for one handle, reading the stores without creating them.
-fn standing_for_handle(root: &Path, handle: &str, did: &str) -> ActorResult<Option<Standing>> {
-    if !roster_file(root, handle).is_file() || !root.join(ACTOR_LOG_REL).is_file() {
+/// The standing record of `did` for one handle, reading the stores without creating them (the
+/// roster alone decides when this checkout's sidecar holds none of the device's records).
+fn standing_for_handle(
+    root: &Path,
+    handle: &str,
+    did: &str,
+    key_file: &Path,
+) -> ActorResult<Option<Standing>> {
+    if !roster_file(root, handle).is_file() {
         return Ok(None);
     }
-    let records = SidecarActorStore::open(root)?.records()?;
-    Ok(standing_for_did(root, &[handle.to_string()], &records, did))
+    let records = if root.join(ACTOR_LOG_REL).is_file() {
+        SidecarActorStore::open(root)?.records()?
+    } else {
+        Vec::new()
+    };
+    Ok(
+        match device_state_for(root, &[handle.to_string()], &records, did, Some(key_file)) {
+            DeviceState::Standing(standing) => Some(standing),
+            _ => None,
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1373,11 +1805,11 @@ fn parse_global(args: &[String]) -> ActorResult<(GlobalOpts, Vec<String>)> {
                 root = PathBuf::from(value);
                 i += 2;
             }
-            "--again" => {
+            "--again" | "--device" => {
                 rest.push(args[i].clone());
                 i += 1;
             }
-            "--as" | "--session" | "--subject" | "--basis" | "--handle" => {
+            "--as" | "--session" | "--subject" | "--basis" | "--handle" | "--answers" => {
                 let value = args.get(i + 1).ok_or_else(|| {
                     ActorError::InvalidArguments(format!("{} needs a value", args[i]))
                 })?;
@@ -1406,9 +1838,9 @@ fn short_cid_str(cid: &str) -> String {
 pub fn usage() -> String {
     "usage: epr actor <\n  \
      claim --as agent:<role>@<model> | human:<handle> --session <id> [--json] [--root DIR]\n  \
-     | current --session <id> [--json] [--root DIR]\n  \
+     | current --session <id> | --device [--json] [--root DIR]\n  \
      | witness --subject human:<handle> --as agent:<role>@<model> --session <id> \
-     --basis \"<line>\" [--again] [--json] [--root DIR]\n  \
+     --basis \"<line>\" [--again [--answers <contest-cid>]] [--json] [--root DIR]\n  \
      | contest --subject human:<handle> --as <participant> --session <id> --basis \"<line>\" \
      [--json] [--root DIR]\n  \
      | device enroll --handle <handle> [--root DIR]\n  \

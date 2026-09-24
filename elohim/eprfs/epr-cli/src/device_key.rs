@@ -23,7 +23,24 @@
 //! regenerated over (a silent new key is a silent identity change); a fresh key is written to an
 //! unpredictable `O_EXCL` temp sibling at mode 0600 from creation and published with a hard link,
 //! so two processes racing a first run converge on ONE key — the loser discards its own and loads
-//! the winner's.
+//! the winner's. A filesystem that refuses hard links (some FUSE and network mounts) falls back
+//! to a `rename` of the same temp file onto an ABSENT path, then re-reads what is on disk, so the
+//! key a process returns is always the key the file holds.
+//!
+//! **Where the key may live** (ruling R-P19). The override `ELOHIM_DEVICE_KEY_FILE` must be an
+//! absolute path outside every git repository — a relative path resolves differently in every
+//! checkout, and a path inside a repository is one commit away from publishing the seed. The
+//! directory holding the key must not be group- or world-writable: whoever can write there can
+//! swap the key. Both refusals are errors, never a silent fallback to the config home.
+//!
+//! **Reading never widens anything.** [`DeviceKey::load`] — the read every standing lookup makes —
+//! never mints a key, and touches the file's mode only when it MUST: when the seed is readable or
+//! writable by group or others. A seed stricter than 0600 (0400, say) is left exactly as it is.
+//!
+//! **The roster pins live beside the key.** The chain root a device first verified for a handle
+//! is recorded at `<key dir>/rosters/<handle>.root` — for the default key path that is
+//! `<config home>/elohim/device/rosters/<handle>.root` (ruling R-P15) — so a device's pins travel
+//! with its key and a temp test key gets temp pins.
 
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -75,7 +92,8 @@ pub fn resolve_path() -> io::Result<PathBuf> {
 
 /// Resolve the seed path from an environment lookup, in order:
 ///
-/// 1. `ELOHIM_DEVICE_KEY_FILE`, when set and non-empty — used verbatim.
+/// 1. `ELOHIM_DEVICE_KEY_FILE`, when set and non-empty — it must be ABSOLUTE and lie outside
+///    every git repository (see [`check_override_path`]); anything else is refused, never used.
 /// 2. `$XDG_CONFIG_HOME/elohim/device/ed25519.seed`, when `XDG_CONFIG_HOME` is set to an
 ///    ABSOLUTE path (the XDG base-directory spec says a relative value is invalid and ignored).
 /// 3. `$HOME/.config/elohim/device/ed25519.seed`.
@@ -92,7 +110,9 @@ where
     let non_empty = |name: &str| lookup(name).filter(|value| !value.is_empty());
 
     if let Some(explicit) = non_empty(DEVICE_KEY_ENV) {
-        return Ok(PathBuf::from(explicit));
+        let explicit = PathBuf::from(explicit);
+        check_override_path(&explicit)?;
+        return Ok(explicit);
     }
     let config_home = match non_empty("XDG_CONFIG_HOME").map(PathBuf::from) {
         Some(xdg) if xdg.is_absolute() => xdg,
@@ -116,18 +136,91 @@ where
         .join("ed25519.seed"))
 }
 
+/// Refuse an `ELOHIM_DEVICE_KEY_FILE` that is relative, or that lies inside a git repository.
+///
+/// The repository test walks up from the path's parent looking for a `.git` entry (a directory in
+/// a clone, a file in a worktree or submodule); the first one found refuses.
+pub fn check_override_path(path: &Path) -> io::Result<()> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "{DEVICE_KEY_ENV}=`{}` is relative — a relative key path names a different key in \
+                 every checkout; give an absolute path outside any repository",
+                path.display()
+            ),
+        ));
+    }
+    let mut dir = path.parent();
+    while let Some(current) = dir {
+        if current.join(".git").exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "{DEVICE_KEY_ENV}=`{}` lies inside the git repository at `{}` — a seed in a \
+                     repository is one commit from being published; keep it outside every \
+                     checkout",
+                    path.display(),
+                    current.display()
+                ),
+            ));
+        }
+        dir = current.parent();
+    }
+    Ok(())
+}
+
+/// Refuse a key directory that group or others may write: whoever can write it can replace the
+/// key. Only an EXISTING directory is checked — one this module creates is 0700 from birth.
+#[cfg(unix)]
+fn check_key_dir(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
+        return Ok(());
+    };
+    match fs::metadata(parent) {
+        Ok(meta) if meta.permissions().mode() & 0o022 != 0 => Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!(
+                "the device key directory `{}` is group- or world-writable (mode {:o}) — anyone \
+                 who can write there can swap the key; `chmod go-w` it first",
+                parent.display(),
+                meta.permissions().mode() & 0o777
+            ),
+        )),
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+#[cfg(not(unix))]
+fn check_key_dir(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
+
 impl DeviceKey {
     /// Open this device's key at the resolved path, generating it on first use.
     pub fn open() -> io::Result<Self> {
         Self::load_or_generate(&resolve_path()?)
     }
 
+    /// Load the EXISTING seed at `path` — the read path: never mints a key (a missing file is
+    /// `NotFound`), and changes the file's mode only when it must (group/other bits set).
+    pub fn load(path: &Path) -> io::Result<Self> {
+        check_key_dir(path)?;
+        let keypair = load_existing(path)?;
+        Ok(Self::new(keypair, path, KeyOrigin::Loaded))
+    }
+
     /// Load the seed at `path`, or generate one and publish it there if the file does not exist.
     ///
     /// A present file of the wrong length (including empty) is a hard `InvalidData` error and is
-    /// left untouched. An existing file with a mode wider than 0600 is tightened in place rather
-    /// than refused: a loose mode is a hygiene fault, not evidence of a different key.
+    /// left untouched. An existing file readable or writable by group or others is tightened in
+    /// place (owner bits kept) rather than refused: a loose mode is a hygiene fault, not evidence
+    /// of a different key. A group- or world-writable key directory is refused.
     pub fn load_or_generate(path: &Path) -> io::Result<Self> {
+        check_key_dir(path)?;
         match fs::read(path) {
             Ok(bytes) => {
                 let keypair = parse_seed(path, &bytes)?;
@@ -281,7 +374,8 @@ fn create_temp_seed_file(path: &Path, bytes: &[u8]) -> io::Result<PathBuf> {
 
 /// Publish by hard-linking the temp file to `path` — first writer wins, atomically. On a lost
 /// race (`AlreadyExists`) the temp is discarded and the WINNER's key is loaded, so two processes
-/// never hold two different keys for one path.
+/// never hold two different keys for one path. A filesystem that refuses links falls back to
+/// [`publish_by_rename`].
 fn publish(tmp_path: &Path, path: &Path, generated: AgentKeypair) -> io::Result<DeviceKey> {
     match fs::hard_link(tmp_path, path) {
         Ok(()) => {
@@ -295,11 +389,46 @@ fn publish(tmp_path: &Path, path: &Path, generated: AgentKeypair) -> io::Result<
             let winner = load_existing(path)?;
             Ok(DeviceKey::new(winner, path, KeyOrigin::Loaded))
         }
+        Err(e) if links_refused(&e) => publish_by_rename(tmp_path, path, generated),
         Err(e) => {
             let _ = fs::remove_file(tmp_path);
             Err(e)
         }
     }
+}
+
+/// Whether a `hard_link` error means "this filesystem does not do links" rather than a real
+/// failure: `EPERM` (1), `EMLINK` (31), `EOPNOTSUPP` (95), or an `Unsupported` kind.
+fn links_refused(error: &io::Error) -> bool {
+    error.kind() == io::ErrorKind::Unsupported || matches!(error.raw_os_error(), Some(1 | 31 | 95))
+}
+
+/// The link-less fallback: rename the temp file onto `path` only while `path` is still absent,
+/// then load whatever the file holds. `rename` replaces, so it cannot be first-writer-wins on its
+/// own; re-reading after the rename means this process returns the key on DISK, and a racer that
+/// lands later is loaded, never shadowed by a key held only in memory.
+fn publish_by_rename(
+    tmp_path: &Path,
+    path: &Path,
+    generated: AgentKeypair,
+) -> io::Result<DeviceKey> {
+    if path.exists() {
+        let _ = fs::remove_file(tmp_path);
+        let winner = load_existing(path)?;
+        return Ok(DeviceKey::new(winner, path, KeyOrigin::Loaded));
+    }
+    if let Err(e) = fs::rename(tmp_path, path) {
+        let _ = fs::remove_file(tmp_path);
+        return Err(e);
+    }
+    fsync_parent_dir(path)?;
+    let on_disk = load_existing(path)?;
+    let origin = if on_disk.public_key_bytes() == generated.public_key_bytes() {
+        KeyOrigin::Generated
+    } else {
+        KeyOrigin::Loaded
+    };
+    Ok(DeviceKey::new(on_disk, path, origin))
 }
 
 /// `.{name}.{pid}.{16 random hex}.tmp` beside `path` — same filesystem for the hard link, and
@@ -338,15 +467,77 @@ fn fsync_parent_dir(_path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Tighten an existing seed file to 0600 if its mode is wider.
+/// Tighten an existing seed file only when it MUST be: when group or others hold any bit. The
+/// owner's bits are kept (a 0400 seed stays 0400; a 0644 seed becomes 0600), so a read never
+/// widens a mode and never rewrites a mode that is already private.
 #[cfg(unix)]
 fn tighten_permissions_if_needed(path: &Path) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let mode = fs::metadata(path)?.permissions().mode() & 0o777;
-    if mode != 0o600 {
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    if mode & 0o077 != 0 {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode & 0o700))?;
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// roster root pins (ruling R-P15)
+// ---------------------------------------------------------------------------
+
+/// Where this device pins `handle`'s chain root: `<key dir>/rosters/<handle>.root`.
+pub fn root_pin_path(key_file: &Path, handle: &str) -> PathBuf {
+    key_file
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join("rosters")
+        .join(format!("{handle}.root"))
+}
+
+/// The chain root this device pinned for `handle`, or `None` when it has never pinned one. An
+/// empty pin file is an error, never "unpinned": unpinned would let the next read pin anew.
+pub fn read_root_pin(key_file: &Path, handle: &str) -> io::Result<Option<String>> {
+    let path = root_pin_path(key_file, handle);
+    match fs::read_to_string(&path) {
+        Ok(text) if text.trim().is_empty() => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "the roster pin {} is empty — refusing to read it as unpinned",
+                path.display()
+            ),
+        )),
+        Ok(text) => Ok(Some(text.trim().to_string())),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Pin `root` for `handle` on this device, once. First writer wins (the key's own temp-and-link
+/// publish, with the same rename fallback), and the pin that ends up on disk is returned — a
+/// racer's pin is read back, never overwritten.
+pub fn write_root_pin(key_file: &Path, handle: &str, root: &str) -> io::Result<String> {
+    if let Some(existing) = read_root_pin(key_file, handle)? {
+        return Ok(existing);
+    }
+    let path = root_pin_path(key_file, handle);
+    if let Some(parent) = path.parent() {
+        create_private_dir_all(parent)?;
+    }
+    let tmp = create_temp_seed_file(&path, format!("{root}\n").as_bytes())?;
+    let published = match fs::hard_link(&tmp, &path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(e) if links_refused(&e) && !path.exists() => fs::rename(&tmp, &path),
+        Err(e) => Err(e),
+    };
+    let _ = fs::remove_file(&tmp);
+    published?;
+    fsync_parent_dir(&path)?;
+    read_root_pin(key_file, handle)?.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("the roster pin {} vanished after writing", path.display()),
+        )
+    })
 }
 
 #[cfg(test)]
@@ -497,6 +688,93 @@ mod tests {
         assert!(
             resolve_path_with(env(&[])).is_err(),
             "no home is an error, never the working directory"
+        );
+    }
+
+    #[test]
+    fn m4_relative_or_in_repo_key_path_refused() {
+        let relative = resolve_path_with(env(&[
+            (DEVICE_KEY_ENV, "keys/ed25519.seed"),
+            ("HOME", "/home/u"),
+        ]))
+        .expect_err("a relative override is refused, never resolved against the cwd");
+        assert_eq!(relative.kind(), io::ErrorKind::InvalidInput);
+        assert!(relative.to_string().contains("relative"), "{relative}");
+
+        // A path anywhere under a directory holding `.git` (a clone's dir or a worktree's file).
+        let repo = tempfile::tempdir().unwrap();
+        std::fs::create_dir(repo.path().join(".git")).unwrap();
+        let inside = repo.path().join("deep/er/ed25519.seed");
+        let err = resolve_path_with(env(&[(DEVICE_KEY_ENV, inside.to_str().unwrap())]))
+            .expect_err("a seed inside a repository is refused");
+        assert!(err.to_string().contains("git repository"), "{err}");
+        let worktree = tempfile::tempdir().unwrap();
+        std::fs::write(worktree.path().join(".git"), "gitdir: /elsewhere\n").unwrap();
+        assert!(check_override_path(&worktree.path().join("k.seed")).is_err());
+
+        // Outside every repository: accepted as given.
+        let outside = tempfile::tempdir().unwrap();
+        let fine = outside.path().join("ed25519.seed");
+        assert_eq!(
+            resolve_path_with(env(&[(DEVICE_KEY_ENV, fine.to_str().unwrap())])).unwrap(),
+            fine
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m4_a_writable_key_dir_is_refused_and_a_read_leaves_a_private_mode_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let shared = dir.path().join("shared");
+        fs::create_dir(&shared).unwrap();
+        fs::set_permissions(&shared, fs::Permissions::from_mode(0o777)).unwrap();
+        let err = DeviceKey::load_or_generate(&shared.join("ed25519.seed"))
+            .expect_err("anyone who can write the directory can swap the key");
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert!(
+            !shared.join("ed25519.seed").exists(),
+            "nothing minted there"
+        );
+
+        // A 0400 seed is stricter than 0600: the read path leaves it exactly as it is.
+        let path = dir.path().join("private").join("ed25519.seed");
+        DeviceKey::load_or_generate(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+        DeviceKey::load(&path).unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o400, "a read never rewrites a private mode");
+        // And the read never mints.
+        let missing = dir.path().join("private").join("absent.seed");
+        assert_eq!(
+            DeviceKey::load(&missing).unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+        assert!(!missing.exists());
+    }
+
+    #[test]
+    fn root_pin_is_written_once_and_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("device").join("ed25519.seed");
+        assert_eq!(read_root_pin(&key_file, "matthew").unwrap(), None);
+        assert_eq!(
+            write_root_pin(&key_file, "matthew", "did:key:zFirst").unwrap(),
+            "did:key:zFirst"
+        );
+        assert_eq!(
+            write_root_pin(&key_file, "matthew", "did:key:zSecond").unwrap(),
+            "did:key:zFirst",
+            "first writer wins; a later root never overwrites the pin"
+        );
+        assert_eq!(
+            root_pin_path(&key_file, "matthew"),
+            dir.path().join("device/rosters/matthew.root")
+        );
+        fs::write(root_pin_path(&key_file, "matthew"), "  \n").unwrap();
+        assert!(
+            read_root_pin(&key_file, "matthew").is_err(),
+            "an empty pin is an error, never unpinned"
         );
     }
 

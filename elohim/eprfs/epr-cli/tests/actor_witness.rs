@@ -563,3 +563,314 @@ fn current_prints_unwitnessed_on_a_bare_device() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(json["standing"].is_null(), "{json}");
 }
+
+// ── review findings (post-station-4 Lane P, rulings R-P15, R-P16, R-P19) ─────────────────────
+
+/// Copy the tracked roster of `from` into `to` — what a fresh clone or worktree of a pushed
+/// checkout holds: the roster, and none of the gitignored actor sidecar.
+fn carry_roster(from: &Path, to: &Path, handle: &str) {
+    let rel = format!(".eprfs/status/participants/{handle}.jsonl");
+    std::fs::create_dir_all(to.join(".eprfs/status/participants")).unwrap();
+    std::fs::copy(from.join(&rel), to.join(&rel)).unwrap();
+}
+
+fn current_json(root: &Path, key_file: &Path, extra: &[&str]) -> serde_json::Value {
+    let mut args = vec!["actor", "current", "--json"];
+    args.extend_from_slice(extra);
+    let out = epr(root, key_file, &args);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+#[test]
+fn w2_root_pin_is_written_on_first_verified_read() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, key) = device(&keys, "a");
+    let pin = device_key::root_pin_path(&key_file, "matthew");
+    assert_eq!(pin, keys.path().join("a/rosters/matthew.root"));
+
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &key).unwrap();
+    assert!(!pin.exists(), "witnessing writes the roster, not the pin");
+
+    let json = current_json(root, &key_file, &["--session", "fresh"]);
+    assert_eq!(json["standing"]["subject"], SUBJECT);
+    assert_eq!(
+        std::fs::read_to_string(&pin).unwrap().trim(),
+        key.did_key(),
+        "the first verified read pins the chain root beside the key"
+    );
+
+    // A device that is not a member pins nothing.
+    let (other_file, _) = device(&keys, "stranger");
+    let json = current_json(root, &other_file, &["--session", "fresh"]);
+    assert!(json["standing"].is_null());
+    assert!(!device_key::root_pin_path(&other_file, "matthew").exists());
+}
+
+#[test]
+fn w2_current_prints_contested_when_the_root_differs_from_the_pin() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, key) = device(&keys, "a");
+    let (_, eve) = device(&keys, "eve");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &key).unwrap();
+    // This device pinned ANOTHER root on an earlier read (the lineage it first saw).
+    device_key::write_root_pin(&key_file, "matthew", &eve.did_key()).unwrap();
+
+    let json = current_json(root, &key_file, &["--session", "fresh"]);
+    assert!(
+        json["standing"].is_null(),
+        "contested, never standing: {json}"
+    );
+    assert_eq!(json["contested"]["subject"], SUBJECT);
+    assert_eq!(json["contested"]["pinned"], eve.did_key());
+    assert_eq!(json["contested"]["found"], key.did_key());
+    assert_eq!(
+        actor::standing_on_device(root, &key_file),
+        None,
+        "attribution sees no standing either"
+    );
+
+    let out = epr(root, &key_file, &["actor", "current", "--session", "fresh"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("contested (roster root differs from this device's pin)"),
+        "{text}"
+    );
+    // The pin is never silently re-written to the roster's root.
+    assert_eq!(
+        device_key::read_root_pin(&key_file, "matthew").unwrap(),
+        Some(eve.did_key())
+    );
+}
+
+#[test]
+fn w3_fresh_checkout_on_a_witnessed_device_is_standing() {
+    let witnessed = fixture();
+    let fresh = fixture();
+    let keys = TempDir::new().unwrap();
+    let (a_file, a) = device(&keys, "a");
+    let (b_file, b) = device(&keys, "b");
+    witness(
+        witnessed.path(),
+        SUBJECT,
+        WITNESS,
+        SESSION,
+        BASIS,
+        false,
+        &a,
+    )
+    .unwrap();
+    let request = device_enroll(witnessed.path(), "matthew", &b).unwrap();
+    let auth = device_authorize(
+        witnessed.path(),
+        &serde_json::to_string(&request).unwrap(),
+        &a,
+    )
+    .unwrap();
+    device_bind(witnessed.path(), &serde_json::to_string(&auth).unwrap(), &b).unwrap();
+
+    carry_roster(witnessed.path(), fresh.path(), "matthew");
+    assert!(!fresh.path().join(".eprfs/status/actors.jsonl").exists());
+
+    let json = current_json(fresh.path(), &a_file, &["--session", "worktree-session"]);
+    assert_eq!(json["standing"]["subject"], SUBJECT, "{json}");
+    assert_eq!(json["standing"]["roster"]["via"], "chain-root");
+    let on_a = actor::standing_on_device(fresh.path(), &a_file).expect("A stands");
+    assert_eq!(
+        on_a.record_cid,
+        roster_rows(witnessed.path(), "matthew")
+            .iter()
+            .find_map(|r| match r {
+                ParticipantRow::Genesis { record_cid, .. } => Some(record_cid.clone()),
+                _ => None,
+            })
+            .unwrap(),
+        "the chain root stands on the founding record its genesis names"
+    );
+
+    let json = current_json(fresh.path(), &b_file, &["--session", "worktree-session"]);
+    assert_eq!(json["standing"]["subject"], SUBJECT, "{json}");
+    assert_eq!(json["standing"]["roster"]["via"], "bound");
+
+    let out = epr(
+        fresh.path(),
+        &a_file,
+        &["actor", "current", "--session", "worktree-session"],
+    );
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("standing human:matthew (by the tracked roster"),
+        "{text}"
+    );
+    assert!(!text.contains("(unwitnessed)"), "{text}");
+}
+
+#[test]
+fn w3_again_reads_the_roster() {
+    let witnessed = fixture();
+    let fresh = fixture();
+    let keys = TempDir::new().unwrap();
+    let (_, a) = device(&keys, "a");
+    let first = witness(
+        witnessed.path(),
+        SUBJECT,
+        WITNESS,
+        SESSION,
+        BASIS,
+        false,
+        &a,
+    )
+    .unwrap();
+    carry_roster(witnessed.path(), fresh.path(), "matthew");
+
+    let err = witness(fresh.path(), SUBJECT, WITNESS, "wt", BASIS, false, &a)
+        .expect_err("the roster says this device is already witnessed");
+    assert!(err.to_string().contains("--again"), "{err}");
+    assert!(
+        !fresh.path().join(".eprfs/status/actors.jsonl").exists()
+            || records(fresh.path()).is_empty(),
+        "the refusal appended nothing"
+    );
+
+    let again = witness(fresh.path(), SUBJECT, WITNESS, "wt", BASIS, true, &a).expect("--again");
+    assert_eq!(again.prior.as_deref(), Some(first.record_cid.as_str()));
+    assert_eq!(again.roster, RosterState::Joined);
+    assert_eq!(roster_rows(fresh.path(), "matthew").len(), 1);
+}
+
+#[test]
+fn m1_roster_failure_leaves_no_orphan_witness() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (_, key) = device(&keys, "a");
+    // A roster whose bytes no longer match their CIDs — unreadable, so the genesis decision
+    // cannot be made.
+    let rel = root.join(".eprfs/status/participants/matthew.jsonl");
+    std::fs::create_dir_all(rel.parent().unwrap()).unwrap();
+    std::fs::write(&rel, "{\"cid\":\"bafyreinotacid\",\"row\":{}}\n").unwrap();
+
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &key)
+        .expect_err("an unreadable roster refuses the witness");
+    let signed = if root.join(".eprfs/status/actors.jsonl").exists() {
+        records(root).len()
+    } else {
+        0
+    };
+    assert_eq!(
+        signed, 0,
+        "no signed witness is left behind a roster failure"
+    );
+}
+
+#[test]
+fn m5_rewitness_after_contest_must_name_it() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, key) = device(&keys, "a");
+    let first = witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &key).unwrap();
+    let contested = contest(root, SUBJECT, "human:matthew", "c", "not me", &key).unwrap();
+    assert_eq!(actor::standing_on_device(root, &key_file), None);
+    let before = records(root).len();
+
+    let request = |answers: Option<&'static str>, again: bool| actor::WitnessRequest {
+        subject: SUBJECT,
+        witness_as: WITNESS,
+        session: "rewitness",
+        basis: BASIS,
+        again,
+        answers,
+    };
+    let err = actor::witness_answering(root, &request(None, true), &key)
+        .expect_err("a re-witness after a contest names it");
+    assert!(err.to_string().contains("--answers"), "{err}");
+    assert!(
+        err.to_string()
+            .contains(&contested.row_cid[contested.row_cid.len() - 6..]),
+        "the refusal names the open contest: {err}"
+    );
+
+    let not_a_contest: &'static str = Box::leak(first.record_cid.clone().into_boxed_str());
+    let err = actor::witness_answering(root, &request(Some(not_a_contest), true), &key)
+        .expect_err("--answers must name an open contest");
+    assert!(err.to_string().contains("not an open contest"), "{err}");
+
+    let row: &'static str = Box::leak(contested.row_cid.clone().into_boxed_str());
+    let err = actor::witness_answering(root, &request(Some(row), false), &key)
+        .expect_err("--answers is a re-witness flag");
+    assert!(err.to_string().contains("--again"), "{err}");
+    assert_eq!(
+        records(root).len(),
+        before,
+        "every refusal appended nothing"
+    );
+
+    let answered = actor::witness_answering(root, &request(Some(row), true), &key)
+        .expect("the answering re-witness");
+    assert_eq!(answered.answers.as_deref(), Some(row));
+    let ActorRecord::Witness(w) = records(root)
+        .into_iter()
+        .find(|r| r.cid().unwrap().to_string() == answered.record_cid)
+        .unwrap()
+    else {
+        panic!("a witness record")
+    };
+    assert_eq!(
+        w.answers.as_deref(),
+        Some(row),
+        "the record names what it answers"
+    );
+    assert!(
+        actor::standing_on_device(root, &key_file).is_some(),
+        "stands again"
+    );
+
+    // Answered: a later --again needs no --answers for that contest.
+    witness(root, SUBJECT, WITNESS, "third", BASIS, true, &key).expect("nothing open");
+}
+
+#[test]
+fn m8_current_device_reads_the_device_under_no_claimable_session() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, key) = device(&keys, "a");
+    witness(root, SUBJECT, WITNESS, SESSION, BASIS, false, &key).unwrap();
+    // Whatever label a hook might have used, someone can claim it — and a claim hides the device.
+    actor::claim(
+        root,
+        "agent:scribe@opus-5",
+        "participant-standing:device-read",
+    )
+    .unwrap();
+    let hidden = current_json(
+        root,
+        &key_file,
+        &["--session", "participant-standing:device-read"],
+    );
+    assert!(
+        hidden["standing"].is_null(),
+        "a claimed label hides the device"
+    );
+
+    let json = current_json(root, &key_file, &["--device"]);
+    assert!(json["session"].is_null(), "{json}");
+    assert!(json["claim"].is_null());
+    assert_eq!(json["standing"]["subject"], SUBJECT);
+
+    let both = epr(
+        root,
+        &key_file,
+        &["actor", "current", "--device", "--session", "s"],
+    );
+    assert!(!both.status.success(), "--device consults no session");
+}

@@ -397,7 +397,7 @@ fn current_answers_with_a_null_claim_rather_than_failing_when_nobody_registered(
 
     // No claim has ever been made, and no sidecar exists yet — still an ANSWER, not a failure.
     let outcome = current(root, SESSION).expect("an unregistered session is exit-0");
-    assert_eq!(outcome.session, SESSION);
+    assert_eq!(outcome.session.as_deref(), Some(SESSION));
     assert!(outcome.claim.is_none());
 
     let json: serde_json::Value = serde_json::to_value(&outcome).unwrap();
