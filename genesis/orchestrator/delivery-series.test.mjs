@@ -208,3 +208,51 @@ test('the --stages defaults are the bounds declared in measures.yaml, not a seco
   assert.equal(STAGE_BOUNDS.maxPublishVerifyP90Min, hard('stage-wallclock-ceiling'));
   assert.equal(STAGE_BOUNDS.maxCostHours, hard('delivery-cost-ceiling'));
 });
+
+test('a stage absent from a build is no sample: p50/p90 over present samples only, n per stage', () => {
+  // A phased build carries a stage the unsplit builds never ran; a refused phased build has
+  // no verify leg. Absence must shrink n, never enter the percentile as NaN.
+  const phased = (n, readinessWaitMin, cases) =>
+    stageRun(
+      { number: n, result: 'UNSTABLE', durationMs: 40 * 60_000 },
+      normalizeStages({
+        stages: [
+          { name: 'Build App', status: 'SUCCESS', durationMillis: 60_000 },
+          { name: 'Await Doorway Readiness', status: 'SUCCESS', durationMillis: readinessWaitMin * 60_000 },
+        ],
+      }),
+      phaseCases({ suites: [{ cases }] })
+    );
+  const leg = (name, status, duration) => ({ className: 'elohim-app.deploy.dev', name, status, duration });
+  const ok = phased(1900, 4, [leg('readiness a', 'PASSED', 60), leg('publish.seed a', 'PASSED', 120), leg('verify.shell a', 'PASSED', 30)]);
+  const refused = phased(1899, 12, [leg('readiness a', 'FAILED', 300)]);
+  const unsplit = stageRun(
+    { number: 1898, result: 'SUCCESS', durationMs: 30 * 60_000 },
+    normalizeStages({
+      stages: [
+        { name: 'Build App', status: 'SUCCESS', durationMillis: 120_000 },
+        { name: 'Publish and Verify App Delivery', status: 'SUCCESS', durationMillis: 8 * 60_000 },
+      ],
+    }),
+    []
+  );
+  const s = summarizeStages([ok, refused, unsplit, deliveredRun(1897)], { window: 10 });
+
+  const finiteOrNull = v => v === null || Number.isFinite(v);
+  for (const [name, st] of [...Object.entries(s.stages), ...Object.entries(s.phases), ['publishVerify', s.publishVerify]]) {
+    assert.ok(Number.isInteger(st.n), `${name}: n is a count`);
+    assert.ok(finiteOrNull(st.p50Min) && finiteOrNull(st.p90Min), `${name}: p50/p90 finite or null, never NaN`);
+    if (st.n === 0) assert.deepEqual([st.p50Min, st.p90Min], [null, null], `${name}: n=0 reads as absent, not a number`);
+  }
+  assert.ok(!/NaN/.test(JSON.stringify(s)), 'no NaN reaches the JSON (it would serialize as null)');
+
+  assert.deepEqual(s.stages['Await Doorway Readiness'], { n: 2, p50Min: 4, p90Min: 12 }, 'only the two phased builds ran it');
+  assert.deepEqual(s.stages['Publish and Verify App Delivery'], { n: 2, p50Min: 8, p90Min: 8 });
+  assert.deepEqual(s.stages['Build App'], { n: 3, p50Min: 1, p90Min: 2 });
+  assert.deepEqual(s.phases.readiness, { n: 2, p50Min: 1, p90Min: 5 });
+  assert.deepEqual(s.phases.verify, { n: 1, p50Min: 0.5, p90Min: 0.5 }, 'the refused build ran no verify leg');
+  assert.equal(s.phases.converge.n, 0);
+
+  const allUnsplit = summarizeStages([unsplit, deliveredRun(1)], { window: 10 });
+  assert.deepEqual(allUnsplit.phases.readiness, { n: 0, p50Min: null, p90Min: null });
+});

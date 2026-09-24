@@ -201,8 +201,13 @@ export function stageRun(build, stages, phases) {
 const tenth = v => (v == null ? null : Math.round(v * 10) / 10);
 const hundredth = v => Math.round(v * 100) / 100;
 
+/**
+ * p50/p90 over the PRESENT samples only, with their count. A build that did not run a
+ * stage or phase contributes no sample (null/undefined/NaN), so an absent stage reads
+ * n=0 with null percentiles — never a number, and never a NaN that poisons the sort.
+ */
 function spread(values) {
-  const sorted = values.filter(v => v != null).sort((a, b) => a - b);
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   return { n: sorted.length, p50Min: tenth(percentile(sorted, 50)), p90Min: tenth(percentile(sorted, 90)) };
 }
 
@@ -211,7 +216,13 @@ export function summarizeStages(runs, { window = 10 } = {}) {
   const recent = runs.filter(Boolean).slice(0, window);
   const names = [...new Set(recent.flatMap(r => r.stages.map(s => s.name)))];
   const stages = Object.fromEntries(
-    names.map(name => [name, spread(recent.map(r => r.stages.find(s => s.name === name)?.durationMs / 60_000))])
+    names.map(name => [
+      name,
+      spread(recent.map(r => {
+        const stage = r.stages.find(s => s.name === name);
+        return stage ? stage.durationMs / 60_000 : null;
+      })),
+    ])
   );
   const phases = Object.fromEntries(PHASES.map(p => [p, spread(recent.map(r => r.phases[p]))]));
   const delivered = recent.reduce((n, r) => n + r.delivered, 0);
@@ -337,7 +348,7 @@ async function stagesMain(argv) {
     }
     const pv = s.publishVerify;
     console.log(
-      `publish+verify p50 ${fmt(pv.p50Min)} p90 ${fmt(pv.p90Min)} (bound ≤${maxPublishVerifyP90Min}m) · ` +
+      `publish+verify p50 ${fmt(pv.p50Min)} p90 ${fmt(pv.p90Min)} (n=${pv.n}, bound ≤${maxPublishVerifyP90Min}m) · ` +
         `split: ${s.split.phases} phased / ${s.split.stage} unsplit · ` +
         `${s.pipelineHours} pipeline-h for ${s.delivered} delivered → ` +
         `cost ${s.costPerDeliveredHours == null ? '∞ (nothing delivered)' : `${s.costPerDeliveredHours}h`} per bundle ` +
