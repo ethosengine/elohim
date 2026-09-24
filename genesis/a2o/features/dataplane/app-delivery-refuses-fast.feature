@@ -4,6 +4,8 @@
 #
 # Plan: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md (Lane C).
 # Habit: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md.
+# The @concern tag on the Feature line is the label that habit's check names to find this
+# file. It joins the claim to its proof and changes nothing about how a scenario runs.
 #
 # Run every scenario with:
 #   just test mesh features/dataplane/app-delivery-refuses-fast.feature
@@ -34,11 +36,21 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   CELL. A write that reaches a doorway whose conductor has no running cell for it cannot
   be taken, however healthy the doorway looks.
 
-  An app is shipped as a BUNDLE (a zip of the files a browser needs), and its record
-  names one bundle, by content hash, as current: its DECLARED HEAD. A DEPLOY does two
+  An app is shipped as an EPR (Elohim Protocol Resource). An EPR has two parts. Its
+  BUNDLE is a zip of the files a browser needs. Its EPR RECORD names one bundle, by
+  content hash, as current: that hash is the record's DECLARED HEAD. A bundle is COHERENT
+  when every file its index page names is inside it. Every bundle below is coherent, so a
+  page that fails to appear is never the bundle's fault. A DEPLOY does two
   things. First it hands the bundle's bytes to every doorway. Then it declares the new
   head exactly once, through one doorway. Only the second act needs a running cell, so
   it is the act a not-ready doorway refuses.
+
+  Two actors appear in the steps. THIS RUN is the test itself, standing where the
+  steward's pipeline stands: it builds the bundles, and it deploys them with the same
+  script the pipeline runs, scripts/ci/stage-spa-blob.sh. What the deploy does here is
+  what it does for the person who pushed. THE HOUSEHOLD is the local mesh this run owns.
+  A step that says the household "makes", "lets" or "restarts" something uses a control
+  that answers only on the household's own machine.
 
   A doorway is NOT READY while it answers requests but cannot take a write. The period
   after a restart during which that is true is the NOT-READY WINDOW. Every not-ready
@@ -63,13 +75,19 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   status 2 means it was called wrongly. It never waits for a window to close. Its whole
   job is to answer in seconds, so that a pipeline can decide instead of block.
 
+  A doorway also gives its own account of itself on its health route. It has CAUGHT UP
+  when that route answers, its storage peer says it is caught up, and its view of the
+  mesh is not stale. That is a different question from the probe's. A doorway can report
+  caught up a little before the cell behind it is running again, which is why station 2
+  asks both.
+
   A deploy is told two budgets. Its READINESS BUDGET is how long it may keep re-offering
   the same declaration while the doorway is not ready. The clock starts at the first
   not-ready answer. Its TRANSPORT BUDGET is how long it may keep retrying ordinary
   failures such as a dropped connection. Re-offering sends the same bundle hash again,
   which is safe to repeat. A budget decides when a new attempt may START. An attempt
-  already on the wire when the deadline passes is allowed to finish, and thirty seconds
-  covers that attempt. The deploy prints a TIMING LINE every time it waits, in the form
+  already on the wire when the deadline passes is allowed to finish, within the GRACE
+  named below. The deploy prints a TIMING LINE every time it waits, in the form
   "N seconds waited, M left of B". Reading those lines back is how this story checks that
   the deploy obeyed what it was told.
 
@@ -80,7 +98,8 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   hours on another. The household holds far less, so a household still behind after ten
   minutes is stuck, and the run has measured that. Seventy-five seconds for a doorway to
   serve a newly declared version: each doorway re-reads the declared head every thirty
-  seconds, so two re-reads plus fifteen seconds of slack.
+  seconds, so two re-reads plus fifteen seconds of slack. Thirty seconds of GRACE after a
+  deploy's deadline, for the one attempt already on the wire when the deadline passed.
 
   The last two scenarios publish a small site of their own: an index page, one entry
   script, one stylesheet and a BUILD STAMP (a version file naming which build made the
@@ -91,11 +110,16 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
 
   An ACT names the substrate a scenario is measured on. Act I runs against a household
   mesh the test run owns and may write to. Act II runs against the deployed fleet, which
-  it may only read. A feature file carries exactly one act tag. `@requires:owned-substrate`
+  it may only read. A feature file carries exactly one act tag, and this file is Act I
+  only. `@requires:owned-substrate`
   is the permission to break things on purpose: it is satisfied only on a mesh this run
   owns. Every scenario here sheds a doorway or restarts conductors, so every scenario
   carries it. On the shared fleet they are held, never run.
 
+  # Each line names a doorway (first) and where to reach it (second). On the household the
+  # second is an alias the run resolves to one of its own two doorways. The step says
+  # "peer" because files that also talk to the storage peer behind a doorway share it; here
+  # only the doorway is used.
   Background:
     Given peer "alpha-A" at "alpha-A"
     And peer "elohim.host" at "elohim.host"
@@ -143,12 +167,15 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   # time.
   @requires:owned-substrate
   Scenario: a deploy that meets a shorter window waits it out and goes through without being sent again
+    # The PREVIOUS VERSION: publish one working version, and see alpha-A serve it.
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
     And each doorway is handed the bundle's bytes
     And only doorway "alpha-A" is told this bundle is the new version
     And within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
+    # The readiness budget the deploy of the next version is given.
     And this run's deploy is told it may wait at most 60 seconds for a doorway that is not ready
+    # The NEXT VERSION: its bytes first, then the shed, then its declaration.
     When this run builds a next version of its site and hands its bytes to each doorway
     And the household makes doorway "alpha-A" shed every write for 40 seconds
     And this run tells doorway "alpha-A", while it sheds, that the next version is current
@@ -161,17 +188,20 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   # deadline and says why.
   #
   # This is the household form of the cost bound. The shed lasts two minutes and the deploy
-  # may wait twenty seconds. It must stop within thirty seconds of its deadline, name the
+  # may wait twenty seconds. It must stop within the GRACE after its deadline, name the
   # face it kept meeting, and leave the previous version as the declared head. It must not
   # half-declare the next version. The earlier pipeline stopped after hours.
   @requires:owned-substrate
   Scenario: a deploy that meets a longer window stops at its deadline, names the face, and leaves the previous version in place
+    # The PREVIOUS VERSION: publish one working version, and see alpha-A serve it.
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
     And each doorway is handed the bundle's bytes
     And only doorway "alpha-A" is told this bundle is the new version
     And within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
+    # The readiness budget the deploy of the next version is given.
     And this run's deploy is told it may wait at most 20 seconds for a doorway that is not ready
+    # The NEXT VERSION: its bytes first, then the shed, then its declaration.
     When this run builds a next version of its site and hands its bytes to each doorway
     And the household makes doorway "alpha-A" shed every write for 120 seconds
     And this run tells doorway "alpha-A", while it sheds, that the next version is current
