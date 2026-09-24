@@ -79,7 +79,9 @@
  * Two provenances hide behind one number in pipeline-baselines.json:
  *   - VERDICT-BACKED. recordPipelineResult advances the baseline after a
  *     SUCCESS or UNSTABLE downstream result, and HOLDS it on ABORTED/FAILURE
- *     (Jenkinsfile:530-535 / :536-540). B_P really was built green.
+ *     (Jenkinsfile:530-535 / :536-540) and on an App readiness refusal (an
+ *     UNSTABLE that delivered nothing — see DEPLOY-PENDING below). B_P really
+ *     was built green.
  *   - DISPATCH-ONLY (optimistic). A `longRunning: true` manifest makes
  *     triggerPipeline fire-and-forget — `shouldWait = !(config.longRunning)`
  *     (Jenkinsfile:750) — so dispatchResult returns `dispatched: true` with no
@@ -134,17 +136,30 @@
  * state is introduced.
  *
  * Used by:
- *   - genesis/orchestrator/Jenkinsfile (applyAlreadyBuiltFilter, walkNarrowGroups)
+ *   - genesis/orchestrator/Jenkinsfile (applyAlreadyBuiltFilter, walkNarrowGroups,
+ *     readinessRefusal, applyDeployPendingPass)
  */
 
 import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
+/**
+ * The level-checkpoint key the deploy-pending pass reads (see the section
+ * "DEPLOY-PENDING" below). It rides in pipeline-baselines.json beside
+ * `__global__` so it persists across runs exactly as the baselines do.
+ */
+export const PENDING_DEPLOY_KEY = '__pendingDeploy__';
+
+/** The App pipeline — the one whose deploy the readiness precondition refuses. */
+export const APP_PIPELINE = 'elohim';
+
 /** Baseline keys that are bookkeeping, never dispatchable pipeline names. */
-const RESERVED_BASELINE_KEYS = new Set(['__global__']);
+const RESERVED_BASELINE_KEYS = new Set(['__global__', PENDING_DEPLOY_KEY]);
 
 /** genesis/orchestrator/ -> repo root. cwd-independent on purpose. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -217,6 +232,30 @@ export function defaultDeps(root = REPO_ROOT) {
     async dependsOn(name) {
       const content = await metaOf(name);
       return Array.isArray(content?.dependsOn) ? content.dependsOn : [];
+    },
+    /**
+     * ONE pass of scripts/ci/fleet-write-readiness.sh over the intent's
+     * doorways — the same precondition the App pipeline runs, so "ready" means
+     * the same thing on both sides. It never sleeps; its stderr (the per-leg
+     * diagnostics) goes straight to the console. STORAGE_API_KEY_ADMIN is
+     * inherited from the caller's environment (withCredentials).
+     * Returns {rc, lines}; rc null when the probe was killed or never ran.
+     */
+    probe(doorways) {
+      const script = join(root, 'scripts/ci/fleet-write-readiness.sh');
+      try {
+        const out = execFileSync('bash', [script, ...doorways], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'inherit'],
+          timeout: 10 * 60 * 1000,
+        });
+        return { rc: 0, lines: out };
+      } catch (err) {
+        return {
+          rc: typeof err?.status === 'number' ? err.status : null,
+          lines: String(err?.stdout ?? ''),
+        };
+      }
     },
   };
 }
@@ -463,15 +502,258 @@ export function partitionViolation(planned, dispatch, skipped) {
   return null;
 }
 
+// ── DEPLOY-PENDING ───────────────────────────────────────────────────────────
+//
+// WHY (native-delivery sprint Lane A3, 2026-09-24). The App pipeline refuses a
+// deploy in seconds when the fleet is not write-ready (scripts/ci/fleet-write-
+// readiness.sh, Lane A1/A2): it archives deploy-intent.json, emits a failing
+// junit `readiness` case and goes UNSTABLE. The orchestrator used to read that
+// UNSTABLE as delivered and advance the App baseline — so a refused deploy was
+// never re-dispatched, and the only way to deliver was to wait out the window
+// INSIDE the App pipeline (app #1719–#1725: ~12 pipeline-hours, nothing
+// delivered). Re-dispatch is an EVENT, not a poll:
+//
+//   1. readinessRefusal — an UNSTABLE App result whose archived intent (and,
+//      when readable, junit) says "readiness refused" HOLDS the App baseline and
+//      records `__pendingDeploy__: {commit, intentCid, …}` in the level
+//      checkpoint (pipeline-baselines.json).
+//   2. pendingDeployPass — every auto-mode orchestrator run (push or the
+//      existing timer) asks the fleet ONCE, over the intent's doorways; exit 0
+//      dispatches the App with RUN_CLASS=deploy and DEPLOY_ONLY=true, added
+//      after the already-built filter (so the filter never judges it). Not
+//      ready, cannot judge, or a wave that is about to roll the fleet: held.
+//   3. A delivered App (SUCCESS, or UNSTABLE that is not a readiness refusal)
+//      clears the key; a re-dispatch that goes red drops it (the red is the
+//      verdict, and the next push touching the App re-selects it).
+//
+// Direction of safety: every uncertainty HOLDS the re-dispatch (a pending
+// intent costs nothing while it waits) and never touches the ordinary plan.
+
+const INTENT_FILE = 'deploy-intent.json';
+const JUNIT_FILE = /^deploy-app-[A-Za-z0-9._-]+-junit\.xml$/;
+const DOORWAY_URL = /^https?:\/\/[^\s'"`$\\]+$/;
+
+/** The content id of the intent's exact bytes — the X-Blob-Hash convention. */
+export function intentCid(text) {
+  return `sha256-${createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex')}`;
+}
+
+/** Why `intent` is not a usable deploy intent, or null when it is. */
+export function intentViolation(intent) {
+  if (!intent || typeof intent !== 'object' || Array.isArray(intent)) return 'is not an object';
+  if (intent.kind !== 'deploy-intent') return `kind is ${JSON.stringify(intent.kind)}, not "deploy-intent"`;
+  if (typeof intent.commit !== 'string' || !FULL_SHA.test(intent.commit)) {
+    return 'carries no full-40-hex commit';
+  }
+  if (!Array.isArray(intent.doorways) || intent.doorways.length === 0) return 'names no doorways';
+  for (const url of intent.doorways) {
+    if (typeof url !== 'string' || !DOORWAY_URL.test(url)) {
+      return `names a doorway that is not a plain http(s) URL: ${JSON.stringify(url)}`;
+    }
+  }
+  if (!Array.isArray(intent.notReady) || intent.notReady.length === 0) {
+    return 'records no notReady doorway — nothing was refused';
+  }
+  return null;
+}
+
+/**
+ * 'refused' | 'passed' | 'absent' — the junit `readiness` testcase in the App
+ * deploy report (emitAppDeployJunit: classname elohim-app.deploy.<env>).
+ */
+export function readinessCase(junitText) {
+  const testcase = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+  for (const m of String(junitText).matchAll(testcase)) {
+    if (!/\bname="readiness"/.test(m[1])) continue;
+    return /<failure\b/.test(m[2] ?? '') ? 'refused' : 'passed';
+  }
+  return 'absent';
+}
+
+/**
+ * Is this App result a readiness refusal? Only then is the baseline held.
+ *
+ * The intent is decisive — fleetWriteReady archives it ONLY on a refusal (it
+ * deletes any leftover before probing). The junit report corroborates: when it
+ * is readable and its `readiness` case is absent or passed, this is not a
+ * refusal and the App delivered as before.
+ *
+ * Never throws.
+ *
+ * @param {{result?: string, intentText?: string|null, junitText?: string|null,
+ *          build?: number|string|null}} input
+ * @returns {{hold: boolean, reason: string, pendingDeploy?: object}}
+ */
+export function readinessRefusal({ result, intentText = null, junitText = null, build = null } = {}) {
+  if (result !== 'UNSTABLE') return { hold: false, reason: `result ${result} is not UNSTABLE` };
+  if (typeof intentText !== 'string' || intentText.trim() === '') {
+    return { hold: false, reason: `no ${INTENT_FILE} archived — not a readiness refusal` };
+  }
+  let intent;
+  try {
+    intent = JSON.parse(intentText);
+  } catch {
+    return { hold: false, reason: `${INTENT_FILE} is not JSON — the refusal cannot be re-dispatched` };
+  }
+  const bad = intentViolation(intent);
+  if (bad !== null) {
+    return { hold: false, reason: `${INTENT_FILE} ${bad} — the refusal cannot be re-dispatched` };
+  }
+  if (typeof junitText === 'string') {
+    const seen = readinessCase(junitText);
+    if (seen !== 'refused') {
+      return {
+        hold: false,
+        reason: `the junit readiness case is ${seen} — the intent is not a refusal of this build`,
+      };
+    }
+  }
+  const cid = intentCid(intentText);
+  const faces = intent.notReady
+    .map((n) => `${n?.doorway ?? '?'} face=${n?.face ?? '?'}`)
+    .join('; ');
+  return {
+    hold: true,
+    reason: `readiness refused the deploy (${faces})`,
+    pendingDeploy: {
+      commit: intent.commit,
+      intentCid: cid,
+      env: typeof intent.env === 'string' ? intent.env : '',
+      doorways: [...intent.doorways],
+      notReady: intent.notReady,
+      build: build === null || build === undefined ? null : String(build),
+      recordedAt: typeof intent.recordedAt === 'string' ? intent.recordedAt : null,
+    },
+  };
+}
+
+/** A recorded pendingDeploy the pass can act on, or null. */
+function usablePending(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (typeof value.commit !== 'string' || !FULL_SHA.test(value.commit)) return null;
+  if (typeof value.intentCid !== 'string' || !value.intentCid) return null;
+  if (!Array.isArray(value.doorways) || value.doorways.length === 0) return null;
+  if (!value.doorways.every((u) => typeof u === 'string' && DOORWAY_URL.test(u))) return null;
+  return value;
+}
+
+/**
+ * The deploy-pending pass. Decides whether this orchestrator run re-dispatches
+ * a refused App deploy.
+ *
+ * Never throws.
+ *
+ * @param {object} state
+ * @param {Record<string, unknown>} [state.baselines] pipeline-baselines.json
+ * @param {string[]} [state.wave]      the dispatch set after every filter
+ * @param {string} [state.suppressed]  why this run must not add a deploy ('' = free)
+ * @param {string} [state.trigger]     log label only
+ * @param {object} [deps]              {dependsOn(name), probe(doorways)}
+ * @returns {Promise<{dispatch: boolean, pending: object|null, probeRc: number|null,
+ *                    logLines: string[]}>}
+ */
+export async function pendingDeployPass(state = {}, deps = defaultDeps()) {
+  const trigger = String(state.trigger || 'UNKNOWN');
+  const app = APP_PIPELINE;
+  const say = (line) => `${trigger} deploy-pending pass: ${line}`;
+  const held = (line, pending, probeRc = null) => ({
+    dispatch: false,
+    pending,
+    probeRc,
+    logLines: [say(line)],
+  });
+
+  const baselines =
+    state.baselines && typeof state.baselines === 'object' ? state.baselines : {};
+  const raw = baselines[PENDING_DEPLOY_KEY];
+  if (raw === undefined || raw === null) return { dispatch: false, pending: null, probeRc: null, logLines: [] };
+  const pending = usablePending(raw);
+  if (pending === null) {
+    return held(`⚠️  ${PENDING_DEPLOY_KEY} is present but unusable (${JSON.stringify(raw).slice(0, 200)}) — nothing re-dispatched`, null);
+  }
+  const what = `${app} intent ${pending.intentCid.slice(0, 19)}… (commit ${pending.commit.slice(0, 8)})`;
+
+  if (state.suppressed) return held(`⏸️  ${what} held — ${state.suppressed}`, pending);
+
+  const wave = Array.isArray(state.wave) ? state.wave : [];
+  if (wave.includes(app)) {
+    return held(`▶️  ${what} — ${app} is already in this wave, which delivers it`, pending);
+  }
+
+  let producers;
+  try {
+    producers = await deps.dependsOn(app);
+  } catch (err) {
+    return held(`⏸️  ${what} held — ${app}'s dependsOn is unreadable (${err?.message ?? err})`, pending);
+  }
+  const rolling = (Array.isArray(producers) ? producers : []).filter((p) => wave.includes(p));
+  if (rolling.length > 0) {
+    return held(
+      `⏸️  ${what} held — this wave dispatches ${rolling.join(', ')}, which rolls the fleet ` +
+        'after this probe; readiness now says nothing about after the roll',
+      pending,
+    );
+  }
+
+  let probed;
+  try {
+    probed = deps.probe(pending.doorways);
+  } catch (err) {
+    return held(`⏸️  ${what} held — the readiness probe did not run (${err?.message ?? err})`, pending);
+  }
+  const rc = typeof probed?.rc === 'number' ? probed.rc : null;
+  const lines = String(probed?.lines ?? '').trim().replace(/\n+/g, '; ');
+  if (rc === 0) {
+    return {
+      dispatch: true,
+      pending,
+      probeRc: 0,
+      logLines: [
+        say(
+          `🚀 ${what} — the fleet is write-ready (${lines || 'FLEET-READY'}); dispatching ${app} ` +
+            'RUN_CLASS=deploy DEPLOY_ONLY=true (exempt from the already-built filter)',
+        ),
+      ],
+    };
+  }
+  if (rc === 3) return held(`⏸️  ${what} held — fleet not write-ready: ${lines}`, pending, 3);
+  return held(
+    `⏸️  ${what} held — the probe could not judge (exit ${rc ?? 'none'}${lines ? `: ${lines}` : ''}); ` +
+      'only a proven-ready fleet re-dispatches',
+    pending,
+    rc,
+  );
+}
+
+/** The App build's archived intent + junit, from the directory copyArtifacts filled. */
+export function readRefusalEvidence(dir) {
+  let intentText = null;
+  let junitText = null;
+  try {
+    intentText = readFileSync(join(dir, INTENT_FILE), 'utf8');
+  } catch {
+    intentText = null;
+  }
+  try {
+    const junit = readdirSync(dir).filter((f) => JUNIT_FILE.test(f)).sort()[0];
+    if (junit) junitText = readFileSync(join(dir, junit), 'utf8');
+  } catch {
+    junitText = null;
+  }
+  return { intentText, junitText };
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
 // `node timer-dispatch.mjs groups <state.json>`                  → phase 1 JSON
 // `node timer-dispatch.mjs decide <state.json> <plan> <walks>`   → phase 3 JSON
+// `node timer-dispatch.mjs readiness-refusal <result> <dir> [build]`
+//                                                    → readinessRefusal JSON
+// `node timer-dispatch.mjs pending <state.json>`     → pendingDeployPass JSON
 // State always travels by FILE, never argv — same contract as
 // commit-tag-parser.mjs, so untrusted text and large maps stay out of the shell
 // command line.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [verb, ...paths] = process.argv.slice(2);
-  const { readFileSync } = await import('node:fs');
   const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
   if (verb === 'groups' && paths.length === 1) {
@@ -491,10 +773,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       process.exit(3);
     }
     process.stdout.write(JSON.stringify(out));
+  } else if (verb === 'readiness-refusal' && (paths.length === 2 || paths.length === 3)) {
+    const [result, dir, build = null] = paths;
+    process.stdout.write(
+      JSON.stringify(readinessRefusal({ result, build, ...readRefusalEvidence(dir) })),
+    );
+  } else if (verb === 'pending' && paths.length === 1) {
+    process.stdout.write(JSON.stringify(await pendingDeployPass(read(paths[0]))));
   } else {
     console.error(
       'usage: timer-dispatch.mjs groups <state.json>\n' +
-        '       timer-dispatch.mjs decide <state.json> <plan.json> <walks.json>',
+        '       timer-dispatch.mjs decide <state.json> <plan.json> <walks.json>\n' +
+        '       timer-dispatch.mjs readiness-refusal <result> <artifact-dir> [build]\n' +
+        '       timer-dispatch.mjs pending <state.json>',
     );
     process.exit(2);
   }

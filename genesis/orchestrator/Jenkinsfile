@@ -230,7 +230,7 @@ def archivePipelineBaselines(String checkpoint) {
         error "pipeline-baselines.json missing after writeJSON (checkpoint=${checkpoint})"
     }
     archiveArtifacts artifacts: 'pipeline-baselines.json', fingerprint: true
-    def perPipelineCount = baselines.keySet().findAll { it != '__global__' }.size()
+    def perPipelineCount = baselines.keySet().findAll { !it.toString().startsWith('__') }.size()
     echo "[baseline:${checkpoint}] archived — __global__=${baselines['__global__']?.toString()?.take(8) ?: '(null)'}, per-pipeline=${perPipelineCount}"
 }
 
@@ -467,7 +467,7 @@ def loadPipelineBaselines() {
             } else {
                 echo "Loaded per-pipeline baselines from previous successful build"
                 baselines.each { name, commit ->
-                    echo "   ${name}: ${commit.take(8)}"
+                    echo "   ${name}: ${commit instanceof CharSequence ? commit.toString().take(8) : commit}"
                 }
             }
         } else if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
@@ -515,6 +515,8 @@ def loadPipelineBaselines() {
  * 2026-05-17 rca-orchestrator-963 shift.
  */
 def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
+    // A local, never a binding: this runs inside parallel branches.
+    def pending = (result.success && result.unstable) ? readinessRefusal(name, result) : null
     if (result.success) {
         if (result.skipped) {
             echo "⏭️ ${name}: SKIPPED — Jenkins job not provisioned (${result.error})"
@@ -528,12 +530,18 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
             def buildRef = result.buildNumber ? "#${result.buildNumber}" : "(queued)"
             echo "🚀 ${name}: DISPATCHED ${buildRef} — fire-and-forget; baseline advanced optimistically"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL
-        } else if (result.unstable) {
-            echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+        } else if (pending != null) {
+            // A readiness refusal delivered NOTHING: hold the baseline and record
+            // the intent in the level checkpoint for the deploy-pending pass.
+            echo "⏸️ ${name}: UNSTABLE — readiness refused the deploy; baseline HELD, pendingDeploy ${pending.intentCid} recorded for the deploy-pending pass"
+            pipelineBaselines['__pendingDeploy__'] = pending
         } else {
-            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+            echo "${result.unstable ? '⚠️' : '✅'} ${name}: ${result.unstable ? 'UNSTABLE' : 'SUCCESS'} (${result.duration / 1000}s)"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL
+            if (name == 'elohim' && pipelineBaselines.containsKey('__pendingDeploy__')) {
+                pipelineBaselines.remove('__pendingDeploy__')
+                echo "📦 ${name}: delivered — pendingDeploy cleared"
+            }
         }
     } else if (result.wasted) {
         // ABORTED — superseded, or an operator pressed Stop. The work was never
@@ -544,7 +552,143 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
     } else {
         echo "❌ ${name}: ${result.result}"
         if (result.error) echo "   Error: ${result.error}"
+        // A deploy-pending re-dispatch that went red: the red is the verdict, so
+        // the intent is dropped (no re-dispatch loop); the next push touching
+        // the App re-selects it through the graph.
+        if (name == env.PENDING_DEPLOY_DISPATCH && pipelineBaselines.containsKey('__pendingDeploy__')) {
+            pipelineBaselines.remove('__pendingDeploy__')
+            echo "   pendingDeploy dropped — the re-dispatch went ${result.result}"
+        }
     }
+}
+
+/**
+ * Was this App result a READINESS REFUSAL (native-delivery sprint Lane A3)?
+ * Returns the pendingDeploy map to record, or null.
+ *
+ * The App pipeline's readiness precondition (root Jenkinsfile fleetWriteReady)
+ * refuses a not-write-ready fleet in seconds: it archives deploy-intent.json,
+ * emits a failing junit `readiness` case into deploy-app-<env>-junit.xml and
+ * goes UNSTABLE. That UNSTABLE delivered nothing, so the baseline must not
+ * advance on it. The decision lives in timer-dispatch.mjs `readiness-refusal`
+ * (tested in pending-deploy.test.mjs); this only fetches the two artifacts.
+ *
+ * Every failure here returns null — today's behaviour (the baseline advances)
+ * — never a thrown build. Interruption is re-thrown.
+ */
+def readinessRefusal(String name, Map result) {
+    if (name != 'elohim' || !result.buildNumber) return null
+    String dir = "downstream-artifacts/${name}-${result.buildNumber}"
+    String outFile = "${dir}/readiness-refusal.json"
+    try {
+        sh "mkdir -p '${dir}'"
+        copyArtifacts(
+            projectName: "${getPipelineMetadata(name).jenkinsJob ?: name}/${env.BRANCH_NAME}",
+            selector: specific(result.buildNumber.toString()),
+            filter: 'deploy-intent.json,deploy-app-*-junit.xml',
+            target: dir,
+            optional: true,
+            flatten: true,
+            fingerprintArtifacts: false,
+        )
+        int rc = sh(script: "node genesis/orchestrator/timer-dispatch.mjs readiness-refusal UNSTABLE '${dir}' ${result.buildNumber} > '${outFile}'", returnStatus: true)
+        if (rc != 0) {
+            echo "⚠️  readiness-refusal read exited ${rc} — ${name} UNSTABLE treated as delivered"
+            return null
+        }
+        def out = readJSON(file: outFile)
+        echo "   readiness-refusal: ${out.reason}"
+        return (out.hold == true) ? out.pendingDeploy : null
+    } catch (Exception e) {
+        String seen = e.toString()
+        if (seen.contains('FlowInterrupted') || seen.contains('InterruptedException')) throw e
+        echo "⚠️  readiness-refusal unavailable (${seen}) — ${name} UNSTABLE treated as delivered"
+        return null
+    }
+}
+
+/**
+ * Run a command with the storage admin key (for the readiness probe's
+ * zero-byte PUT) bound as STORAGE_API_KEY_ADMIN — the same two credential ids,
+ * in the same order, as the App pipeline's resolveStorageAdminKey. When
+ * neither is visible at this job's scope the command runs without it and a
+ * gated doorway answers 401 (the probe's exit 2: cannot judge — held).
+ */
+def runWithStorageAdminKey(String cmd) {
+    def ids = ['storage-api-key-admin', 'doorway-admin-bootstrap-key']
+    for (int i = 0; i < ids.size(); i++) {
+        int rc = -1
+        try {
+            withCredentials([string(credentialsId: ids[i], variable: 'STORAGE_API_KEY_ADMIN')]) {
+                rc = sh(script: cmd, returnStatus: true)
+            }
+        } catch (Exception e) {
+            String seen = e.toString()
+            if (seen.contains('FlowInterrupted') || seen.contains('InterruptedException')) throw e
+            echo "deploy-pending: credential '${ids[i]}' not visible (${seen})"
+            continue
+        }
+        return rc
+    }
+    echo 'deploy-pending: no storage admin credential visible — probing without it'
+    return sh(script: cmd, returnStatus: true)
+}
+
+/**
+ * The deploy-pending pass (native-delivery sprint Lane A3). When the level
+ * checkpoint carries a pendingDeploy (a refused App deploy), ask the fleet ONCE
+ * — scripts/ci/fleet-write-readiness.sh over the intent's doorways — and, only
+ * on exit 0, add the App to this wave with RUN_CLASS=deploy and DEPLOY_ONLY=true.
+ * It runs on every auto-mode run (a push, or the existing timer), AFTER the
+ * already-built filter, so the filter never judges it. Re-dispatch is an event,
+ * never a poll inside the App pipeline. All policy lives in timer-dispatch.mjs
+ * `pending` (pending-deploy.test.mjs); any failure here leaves the plan as it
+ * was. Closure-free indexed loops (sandbox JSONArray rule, see
+ * applyAlreadyBuiltFilter).
+ */
+def applyDeployPendingPass(String mode, graphPipelines, Map runClasses) {
+    String suppressed = ''
+    if (mode != 'auto') suppressed = "mode ${mode} dispatches no deploy"
+    if (env.RUN_CLASS_FROM_TAG) suppressed = "[run:${env.RUN_CLASS_FROM_TAG}] caps this run below deploy"
+    if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') suppressed = '[edge:validate-only] isolates this run'
+    if (params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true') suppressed = 'DEPLOY_ONLY redeploys the edge only'
+    String stateFile = '.orch-deploy-pending-state.json'
+    String outFile = '.orch-deploy-pending.json'
+    def wave = []
+    for (int i = 0; i < graphPipelines.size(); i++) {
+        wave.add(graphPipelines[i].toString())
+    }
+    try {
+        writeJSON file: stateFile, json: [
+            trigger: env.BUILD_TRIGGER ?: 'UNKNOWN',
+            wave: wave,
+            suppressed: suppressed,
+            baselines: readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+        ]
+        int rc = runWithStorageAdminKey("node genesis/orchestrator/timer-dispatch.mjs pending ${stateFile} > ${outFile}")
+        if (rc != 0) {
+            echo "⚠️  deploy-pending pass exited ${rc} — no re-dispatch this run"
+            return graphPipelines
+        }
+        def out = readJSON(file: outFile)
+        def lines = out.logLines ?: []
+        for (int i = 0; i < lines.size(); i++) {
+            echo lines[i].toString()
+        }
+        if (out.dispatch == true) {
+            wave.add('elohim')
+            runClasses['elohim'] = 'deploy'
+            env.PENDING_DEPLOY_DISPATCH = 'elohim'
+            return wave
+        }
+    } catch (Exception e) {
+        String seen = e.toString()
+        if (seen.contains('FlowInterrupted') || seen.contains('InterruptedException')) throw e
+        echo "⚠️  deploy-pending pass unavailable (${seen}) — no re-dispatch this run"
+    } finally {
+        sh "rm -f ${stateFile} ${outFile}"
+    }
+    return graphPipelines
 }
 
 /**
@@ -837,7 +981,8 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // declared downstream pipelines — each one accepts the param as a no-op
         // when not deploy-bearing.
         // Two activation paths: operator param OR [deploy-only] commit tag.
-        def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true'
+        // Third path: the deploy-pending re-dispatch of the App (applyDeployPendingPass).
+        def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true' || env.PENDING_DEPLOY_DISPATCH == name
         buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: deployOnlyDownstream))
         if (name == 'elohim-edge') {
             buildParams.add(booleanParam(name: 'VALIDATE_ONLY', value: validateOnlyDownstream))
@@ -1427,6 +1572,10 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
                 graphPipelines.add('elohim-genesis')
             }
         }
+        // After every filter and the genesis auto-include: a refused App deploy
+        // re-dispatched here is never judged by the already-built filter and
+        // never pulls Genesis in.
+        graphPipelines = applyDeployPendingPass(mode, graphPipelines, runClasses)
     } else {
         graphPipelines = fallbackPipelines
     }
