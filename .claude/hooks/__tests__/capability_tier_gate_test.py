@@ -81,7 +81,7 @@ policies:
         - { sub: symbolic-ref, any_flags: ["-d", "--delete"] }
       rm-force-recursive-targets: [".", "./", "..", "*", "~", "/"]
       tier-floor: claude-opus-5
-      tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol]
+      tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol, human]
       unknown-tier: deny
       remedy: "check with the team first: ask the controller/operator to run this"
 """
@@ -450,6 +450,53 @@ class CapabilityTierGateCase(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         reason = _deny_reason(r)
         self.assertIn("unknown", reason)
+
+    # ── R-P7: `human` is a tier, ranked above every model tier ───────────────────────────────
+    def test_human_claim_resolves_to_human_tier(self):
+        # A `human:` ref carries no `@model`; before R-P7 it fell through to `unknown` and the
+        # operator — the team the gate asks for — was denied like an unclaimed actor.
+        session = "human-sess-1"
+        _write_project(
+            self.proj, FIXTURE_POLICY,
+            actor_lines=[_actor_claim_line("human:matthew", session)],
+        )
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "", "a human claim must clear the floor")
+
+        # And the tier it resolves to is literally `human`, not a lucky default: against a table
+        # that does not rank `human`, the deny names the resolved tier.
+        unranked = _pin(FIXTURE_POLICY_BODY.replace(", gpt-5.6-sol, human]", ", gpt-5.6-sol]"))
+        _write_project(
+            self.proj, unranked, actor_lines=[_actor_claim_line("human:matthew", session)],
+        )
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        reason = _deny_reason(r)
+        self.assertIn("Resolved tier: human", reason)
+        self.assertNotIn("Resolved tier: unknown", reason)
+
+    def test_human_tier_is_above_the_floor(self):
+        # The REAL committed row ranks `human` at the top of tier-order, above every model tier.
+        import yaml
+
+        data = yaml.safe_load((REPO / ".claude" / "epr-meta" / "policies.yaml").read_text())
+        row = next(p for p in data["policies"] if p.get("id") == "destructive-git-requires-tier")
+        order = row["parameters"]["tier-order"]
+        floor = row["parameters"]["tier-floor"]
+        self.assertEqual(order[-1], "human", order)
+        self.assertGreater(order.index("human"), order.index(floor))
+        self.assertGreater(order.index("human"), order.index("gpt-5.6-sol"))
+
+    def test_an_agent_claim_still_resolves_to_its_model(self):
+        # The `human:` arm must not swallow agent refs: a haiku agent claim still denies.
+        session = "agent-sess-haiku"
+        _write_project(
+            self.proj, FIXTURE_POLICY,
+            actor_lines=[_actor_claim_line("agent:sweeper@claude-haiku-4-5", session)],
+        )
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_CODE_SESSION_ID": session})
+        self.assertIn("Resolved tier: claude-haiku-4-5", _deny_reason(r))
 
     # ── contentHash pin verification (round 1, still asserted) ──────────────────────────────
     def test_tampered_row_denies_every_git_rm_candidate(self):

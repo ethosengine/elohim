@@ -908,6 +908,11 @@ def _resolve_tier(session_id: str) -> str:
         return env_tier.strip()
     if session_id:
         claimed = _latest_claim(session_id)
+        if claimed and claimed.startswith("human:"):
+            # R-P7: a human claim carries no `@model` — it resolves to the tier `human`, which
+            # the declared tier-order ranks above every model tier (the operator IS the team
+            # check the remedy asks for).
+            return "human"
         if claimed:
             _, _, model = claimed.partition("@")
             if model:
