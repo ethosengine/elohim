@@ -51,8 +51,21 @@ export interface OwnedDoorwayPairReceipt {
   >;
   executableHash: string;
   lifecycle: 'started' | 'cleaned' | 'cleanup-failed';
+  /** Per scenario doorway: did teardown take it off the DHT federation roster? */
+  deregistration: Partial<Record<DoorwayName, DeregistrationOutcome>>;
   logs: Record<DoorwayName | 'mongo', string>;
 }
+
+/**
+ * What `POST /admin/federation/deregister` did for one scenario doorway.
+ * `unsupported` = the pinned doorway binary predates the verb (404/405);
+ * `failed` = it answered but could not deregister (e.g. 502 when the
+ * conductor's infrastructure coordinator predates `deregister_doorway`).
+ */
+export type DeregistrationOutcome =
+  | { status: 'deregistered'; linksDeleted: number }
+  | { status: 'unsupported'; httpStatus: number }
+  | { status: 'failed'; detail: string };
 
 export interface OwnedDoorwayPairOptions {
   storagePeers: Record<
@@ -153,6 +166,78 @@ export async function stopFixtureProcesses(
     }
   }
   if (failures.length) throw new AggregateError(failures, 'owned doorway fixture cleanup failed');
+}
+
+/**
+ * Take one scenario doorway off the infrastructure DHT's federation roster,
+ * through the same surface it registered itself with (the doorway's own zome
+ * caller). Never throws: teardown must still stop the processes, and the
+ * outcome is recorded in the receipt instead.
+ *
+ * Why: every run registered two scenario doorways and never removed them, and
+ * every sibling's peer-health probe attested each dead one every round
+ * (genesis/docs/content/elohim-protocol/architecture/
+ * 2026-09-24-conductor-store-growth-report.md §3, §7.1).
+ */
+export async function deregisterFixtureDoorway(
+  url: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<DeregistrationOutcome> {
+  try {
+    const response = await fetchImpl(`${url}/admin/federation/deregister`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { linksDeleted?: unknown };
+      const linksDeleted = typeof body.linksDeleted === 'number' ? body.linksDeleted : 0;
+      return { status: 'deregistered', linksDeleted };
+    }
+    if (response.status === 404 || response.status === 405) {
+      return { status: 'unsupported', httpStatus: response.status };
+    }
+    return { status: 'failed', detail: `${response.status} ${await response.text()}` };
+  } catch (error) {
+    return { status: 'failed', detail: String(error) };
+  }
+}
+
+interface TeardownTarget {
+  name: DoorwayName;
+  url: string;
+  handle: OwnedProcessHandle;
+}
+
+/**
+ * Fixture teardown order: deregister every scenario doorway WHILE it still
+ * runs (it is the only one that can deregister itself), then stop the
+ * doorways and mongod. Deregistration never blocks the stop.
+ */
+export async function teardownFixtureDoorways(
+  doorways: TeardownTarget[],
+  mongo: OwnedProcessHandle,
+  deps: {
+    deregister?: (url: string) => Promise<DeregistrationOutcome>;
+    stop?: typeof stopOwnedProcess;
+  } = {}
+): Promise<Partial<Record<DoorwayName, DeregistrationOutcome>>> {
+  const deregister =
+    deps.deregister ?? (async (url: string) => await deregisterFixtureDoorway(url));
+  const outcomes: Partial<Record<DoorwayName, DeregistrationOutcome>> = {};
+  for (const doorway of doorways) {
+    outcomes[doorway.name] = await deregister(doorway.url);
+  }
+  await stopFixtureProcesses(
+    [
+      ...doorways.map(doorway => ({
+        handle: doorway.handle,
+        label: `fixture doorway ${doorway.name}`,
+      })),
+      { handle: mongo, label: 'fixture mongod' },
+    ],
+    deps.stop
+  );
+  return outcomes;
 }
 
 export function fixtureDoorwayLaunch(
@@ -289,6 +374,7 @@ export async function startOwnedChild(
 
 export class OwnedDoorwayPair {
   private lifecycle: OwnedDoorwayPairReceipt['lifecycle'] = 'started';
+  private deregistration: OwnedDoorwayPairReceipt['deregistration'] = {};
   private constructor(
     private readonly root: string,
     private readonly mongo: OwnedProcessHandle,
@@ -477,6 +563,7 @@ export class OwnedDoorwayPair {
       storageTopology: this.storageTopology,
       executableHash: this.doorways.a.template.executableHash,
       lifecycle: this.lifecycle,
+      deregistration: this.deregistration,
       logs: {
         a: this.doorways.a.logPath,
         b: this.doorways.b.logPath,
@@ -487,11 +574,18 @@ export class OwnedDoorwayPair {
 
   async close(): Promise<void> {
     try {
-      await stopFixtureProcesses([
-        { handle: this.doorways.b.handle, label: 'fixture doorway b' },
-        { handle: this.doorways.a.handle, label: 'fixture doorway a' },
-        { handle: this.mongo, label: 'fixture mongod' },
-      ]);
+      this.deregistration = await teardownFixtureDoorways(
+        [this.doorways.b, this.doorways.a],
+        this.mongo
+      );
+      for (const [name, outcome] of Object.entries(this.deregistration)) {
+        if (outcome.status !== 'deregistered') {
+          console.warn(
+            `[owned-doorway-pair] scenario doorway ${name} left on the federation roster: ` +
+              JSON.stringify(outcome)
+          );
+        }
+      }
       this.lifecycle = 'cleaned';
       const archive = process.env['A2O_FIXTURE_DIR'] ?? join(process.cwd(), 'reports', 'fixtures');
       await mkdir(archive, { recursive: true });

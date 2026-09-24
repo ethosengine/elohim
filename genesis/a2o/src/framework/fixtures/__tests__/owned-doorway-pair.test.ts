@@ -6,10 +6,13 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
+  deregisterFixtureDoorway,
   fixtureDoorwayLaunch,
   startOwnedChild,
   stopFixtureProcesses,
+  teardownFixtureDoorways,
   withExtraSsrSlug,
+  type DeregistrationOutcome,
   type LaunchTemplate,
 } from '../owned-doorway-pair.js';
 import { stopOwnedProcess } from '../owned-doorway-process.js';
@@ -195,4 +198,131 @@ void test('owned child that ignores TERM is confirmed gone after bounded KILL', 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── Teardown deregisters the scenario doorways (conductor-store growth report
+//    2026-09-24 §7.1: two doorways per run stayed on the roster forever and
+//    every sibling attested each one every probe round) ─────────────────────
+
+const FIXTURE_A_URL = 'http://127.0.0.1:19001';
+const FIXTURE_B_URL = 'http://127.0.0.1:19002';
+
+function fakeFetch(
+  respond: (url: string, init?: RequestInit) => Response | Promise<Response>,
+  calls: { url: string; method?: string }[]
+): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    let url: string;
+    if (typeof input === 'string') url = input;
+    else if (input instanceof URL) url = input.href;
+    else url = input.url;
+    calls.push({ url, method: init?.method });
+    return await respond(url, init);
+  }) as typeof fetch;
+}
+
+void test('deregistration POSTs the doorway own verb and reports the links it removed', async () => {
+  const calls: { url: string; method?: string }[] = [];
+  const outcome = await deregisterFixtureDoorway(
+    FIXTURE_A_URL,
+    fakeFetch(
+      () =>
+        new Response(JSON.stringify({ doorwayId: 'fixture-a', linksDeleted: 4 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      calls
+    )
+  );
+  assert.deepEqual(calls, [
+    { url: `${FIXTURE_A_URL}/admin/federation/deregister`, method: 'POST' },
+  ]);
+  assert.deepEqual(outcome, { status: 'deregistered', linksDeleted: 4 });
+});
+
+void test('deregistration names an older binary unsupported and never throws on failure', async () => {
+  const calls: { url: string; method?: string }[] = [];
+  assert.deepEqual(
+    await deregisterFixtureDoorway(
+      FIXTURE_A_URL,
+      fakeFetch(() => new Response('not found', { status: 404 }), calls)
+    ),
+    { status: 'unsupported', httpStatus: 404 }
+  );
+  const failed = await deregisterFixtureDoorway(
+    FIXTURE_A_URL,
+    fakeFetch(
+      () => new Response('{"error":"deregistration zome call failed"}', { status: 502 }),
+      calls
+    )
+  );
+  assert.equal(failed.status, 'failed');
+  const unreachable = await deregisterFixtureDoorway(
+    FIXTURE_A_URL,
+    fakeFetch(async () => await Promise.reject(new Error('ECONNREFUSED')), calls)
+  );
+  assert.equal(unreachable.status, 'failed');
+});
+
+void test('teardown deregisters every scenario doorway while it runs, then stops them and mongod', async () => {
+  const events: string[] = [];
+  const outcomes = await teardownFixtureDoorways(
+    [
+      {
+        name: 'b',
+        url: FIXTURE_B_URL,
+        handle: { pid: 21, ticks: '1', executable: '/d' },
+      },
+      {
+        name: 'a',
+        url: FIXTURE_A_URL,
+        handle: { pid: 22, ticks: '2', executable: '/d' },
+      },
+    ],
+    { pid: 23, ticks: '3', executable: '/mongod' },
+    {
+      deregister: async (url: string): Promise<DeregistrationOutcome> => {
+        events.push(`deregister ${url}`);
+        return await Promise.resolve({ status: 'deregistered', linksDeleted: 4 });
+      },
+      stop: async (_handle, label) => {
+        events.push(`stop ${label}`);
+        return await Promise.resolve('term');
+      },
+    }
+  );
+  assert.deepEqual(events, [
+    `deregister ${FIXTURE_B_URL}`,
+    `deregister ${FIXTURE_A_URL}`,
+    'stop fixture doorway b',
+    'stop fixture doorway a',
+    'stop fixture mongod',
+  ]);
+  assert.deepEqual(outcomes, {
+    b: { status: 'deregistered', linksDeleted: 4 },
+    a: { status: 'deregistered', linksDeleted: 4 },
+  });
+});
+
+void test('a failed deregistration is recorded and never keeps the fixture processes alive', async () => {
+  const stopped: string[] = [];
+  const outcomes = await teardownFixtureDoorways(
+    [
+      {
+        name: 'a',
+        url: FIXTURE_A_URL,
+        handle: { pid: 22, ticks: '2', executable: '/d' },
+      },
+    ],
+    { pid: 23, ticks: '3', executable: '/mongod' },
+    {
+      deregister: async () => await Promise.resolve({ status: 'failed', detail: '502' } as const),
+      stop: async (_handle, label) => {
+        stopped.push(label);
+        return await Promise.resolve('term');
+      },
+    }
+  );
+  assert.deepEqual(stopped, ['fixture doorway a', 'fixture mongod']);
+  assert.deepEqual(outcomes, { a: { status: 'failed', detail: '502' } });
 });
