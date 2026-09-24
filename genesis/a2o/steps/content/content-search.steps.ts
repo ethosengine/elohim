@@ -358,13 +358,28 @@ Then(
   }
 );
 
+/**
+ * Two answers are honest here, and which one the env var's peer gives depends on HOW it was
+ * kept without an index (ruling R-S11, W2):
+ *
+ * - `absent` (`observed_absent`) — the peer RUNS a fold, its store opened, and nothing is
+ *   attested beside it yet. An ordinary storage peer that has simply never folded.
+ * - `unreachable` (`refused`) — the peer runs no fold at all: its declarations were refused at
+ *   boot or its store could not be opened, so `search_index` is `None` and the route answers
+ *   through `answer_unlit`.
+ *
+ * Both say the same thing to the reader — this peer cannot vouch for an order — and neither is
+ * an empty list dressed as a ranking, which is the only answer this step exists to refuse. The
+ * same promise is pinned meanwhile by the storage integration test
+ * `unfolded_store_answers_fold_absent` (the `absent` half, asked of a store directly).
+ */
 Then('the answer says that peer holds no index', function (this: E2EWorld) {
   if (!process.env[UNFOLDED_STORAGE_ENV]) return PENDING;
   const answer = answerOf(this);
-  assert.equal(
-    answer.fold.state,
-    'absent',
-    `a peer booted without an index reported fold "${answer.fold.state}" instead of "absent"`
+  assert.ok(
+    answer.fold.state === 'absent' || answer.fold.state === 'unreachable',
+    `a peer booted without an index reported fold "${answer.fold.state}" instead of ` +
+      `"absent" (a fold that has attested nothing) or "unreachable" (no fold on this peer)`
   );
   return undefined;
 });
