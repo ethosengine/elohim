@@ -968,6 +968,30 @@ measures:
       validator reads, not a magic 2 buried in Python. Teeth-free by construction like every measure
       here; the lens is where the enforcement class lives.
 
+  # ── the subconscious's own measure (native-delivery sprint, Lane E, 2026-09-24) ─────────
+  # The algedonic-designer persona senses burden no declared measure sees and registers the
+  # sensor for it. Its success is what the operator no longer has to say out loud.
+  - id: operator-surfaced-pain
+    version: 1
+    family: algedonic-sensing
+    unit: count
+    procedure: >
+      One fold per distinct pain the OPERATOR had to name in words (a message or handoff inside the
+      sweep's look-back window) before any declared measure or bound fired on it — read by the
+      algedonic-designer sweep through its "apology and rant" nerve ending and tagged with
+      `epr flow note --kind observation --measure operator-surfaced-pain@1 --subject <concern-or-.>
+      --value 1 --env week=<YYYY-Www>`. The weekly reading is the sum of the folds whose `week`
+      matches. A pain a declared measure fired on first is not counted: it was felt, not surfaced.
+    provenance: "genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md Lane E; app #1719–#1725 (≈12 pipeline-hours, nothing delivered) was named by the operator before any measure fired"
+    default-authority: observation
+    status: active
+    established_by: operator-requested-2026-09-24
+    why: >
+      The number the algedonic-designer exists to drive to zero. Every other sensor it mints serves
+      an existing habit; this one measures the persona itself. A week in which the operator names
+      no pain the system had not already felt is the subconscious doing its job. Teeth-free like
+      every measure here; it renders `skipped`, never 0, until a sweep has folded a reading.
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
