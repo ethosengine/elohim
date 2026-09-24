@@ -26,18 +26,20 @@
   {
    "text": "G1 Layer-A labeling-function bank + normalized shadow + triggers() with a scan-size cap; sovereignty guard rebound as first consumer (parity-proven) — in the native evaluator",
    "line": 723,
-   "state": "OPEN",
+   "state": "CLAIMED",
    "id": "specs__2026-07-15-sense-respond-governance-classifier-design#3",
    "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L723",
-   "class": "process-meta"
+   "class": "process-meta",
+   "note": "Landed in the native evaluator (plan 2026-09-25 Lane C): frames.rs NFKC+confusable shadow, scan cap -> substring + unscanned-tail, sovereignty and ownership guards rebound (e13b306af); Python mirror (488f6b81c); parity proven by .claude/scripts/_lib/__tests__/frame_classifier_parity_test.py (habit guards-sense-frames check (a)). Claimed, awaiting verification."
   },
   {
    "text": "G2 frames/*.md ontology + frame-ontology@1 / frame-<name>@1 policy rows, cite-sealed",
    "line": 225,
-   "state": "OPEN",
+   "state": "CLAIMED",
    "id": "specs__2026-07-15-sense-respond-governance-classifier-design#4",
    "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L225",
-   "class": "process-meta"
+   "class": "process-meta",
+   "note": "Landed as runtime-read JSON frame atoms, not frames/*.md (ruling R-C2): elohim/sdk/schemas/v1/frames/{frame.schema.json,frame-sovereignty-apex.json,frame-ownership-inalienable.json,frame-ontology.json} (9f11253b1, e13b306af); policy rows sovereignty-ontology-guard@4 / ownership-ontology-guard@4 declare frame: + frame-ref: equal to the atom CID (c0b6d9fc7; habit check (b)). Claimed, awaiting verification."
   },
   {
    "text": "G3 engine-modification gap: Verdict carries FrameClassification (evaluate stays pure), co-resolution pre-pass, defer verdict, unregistered->ask split, rubric surfacing",
@@ -61,7 +63,8 @@
    "state": "OPEN",
    "id": "specs__2026-07-15-sense-respond-governance-classifier-design#7",
    "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L507",
-   "class": "process-meta"
+   "class": "process-meta",
+   "note": "PARTIAL (plan 2026-09-25 Lane C): the sovereignty-guard POST hook writes frame_ref and a native classification_cid to the existing sovereignty-guard.jsonl ledger, the CID minted off the critical path by a detached child (67e7ae062, 25c4e47fa). Drift keyed id@version exists via sovereignty-landings@1; the commit-seam net-new hunk lines and content-hash dedup remain OPEN."
   },
   {
    "text": "G6 Family-2 async semantic recall: harvest poller + apex anchors + local encoder + triage via the source-agnostic resolve_escalation (compute-source toggle)",
@@ -69,7 +72,8 @@
    "state": "OPEN",
    "id": "specs__2026-07-15-sense-respond-governance-classifier-design#8",
    "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L312",
-   "class": "process-meta"
+   "class": "process-meta",
+   "note": "PARTIAL (plan 2026-09-25 Lane C, C9): the Family-2 shadow probe lands as a detached, abstain-only child of the POST hook: fold the landed file -> recall open -> ONE semantic search scoped to its dir; at/above the atom cosine floor it appends an abstain row and folds frame-probe-abstain@1 (25c4e47fa). No harvest poller, no apex anchors, no triage via resolve_escalation / compute-source toggle yet."
   },
   {
    "text": "G7 guard: SessionStart gate line + stasis loop",
