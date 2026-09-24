@@ -1503,9 +1503,11 @@ assert_no_live_peer_processes() { # <verb> — 0 only when every peer is idle
 # sufficient: embedded migration comments contain that text even in the
 # default-feature binary.
 storage_has_iroh_feature() { # <binary>
-  # Drain strings: grep -q can close early and turn a match into SIGPIPE
-  # failure when the caller enables pipefail.
-  strings "$1" 2>/dev/null | grep -F 'elohim_storage::p2p_iroh' >/dev/null
+  # Read the file directly: `strings | grep` walked a 488 MB debug binary in
+  # ~10s idle and far longer under I/O contention (three concurrent restores
+  # on 2026-09-23 outlived their caller's budget). A binary grep is ~4x faster,
+  # and with no pipe there is no SIGPIPE-under-pipefail hazard for -q.
+  grep -a -q -F 'elohim_storage::p2p_iroh' "$1" 2>/dev/null
 }
 
 print_iroh_build_command() { # <binary>

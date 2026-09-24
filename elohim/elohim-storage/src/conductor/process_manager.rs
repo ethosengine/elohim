@@ -66,6 +66,185 @@ fn read_proc_nice(pid: u32) -> Option<i32> {
     after_comm.split_whitespace().nth(16)?.parse().ok()
 }
 
+/// The in-proc lair keystore type string, exactly as written by every
+/// conductor-config.yaml this codebase generates (edgenode template,
+/// household mesh, `hc sandbox`).
+const LAIR_SERVER_IN_PROC: &str = "lair_server_in_proc";
+
+/// Read `keystore.lair_root` from a conductor config, but ONLY when the
+/// keystore type is the in-proc lair server (`lair_server_in_proc`) — an
+/// external/remote lair-keystore process is not this node's to touch.
+///
+/// This is a small line scan, not a YAML parser — a full YAML dependency is
+/// unwarranted for reading two scalar fields out of a flat `keystore:`
+/// mapping. See [`keystore_block_lines`] / [`yaml_scalar_value`].
+///
+/// Returns `None` — a safe no-op, never an error — for a missing file, no
+/// top-level `keystore:` block, a different keystore type, or a `keystore`
+/// block with no `lair_root`. A guard that cannot determine the lair root
+/// must never block conductor spawn.
+fn read_in_proc_lair_root(config_path: &std::path::Path) -> Option<PathBuf> {
+    let contents = std::fs::read_to_string(config_path).ok()?;
+    let block = keystore_block_lines(&contents);
+    if yaml_scalar_value(&block, "type").as_deref() != Some(LAIR_SERVER_IN_PROC) {
+        return None;
+    }
+    yaml_scalar_value(&block, "lair_root").map(PathBuf::from)
+}
+
+/// The lines belonging to a top-level `keystore:` mapping — every line
+/// starting at column 0 with `keystore:` is Holochain's convention here
+/// (verified against every conductor-config.yaml this codebase writes: the
+/// edgenode template, the household mesh, `hc sandbox`). Collects lines
+/// until the next column-0 line (the start of the next top-level key) or
+/// EOF. Empty (not `None`) when there is no top-level `keystore:` key at
+/// all — `yaml_scalar_value` over an empty block already yields `None` for
+/// every key, so the two "nothing to read" cases don't need to be told
+/// apart by the caller.
+fn keystore_block_lines(contents: &str) -> Vec<&str> {
+    let mut lines = contents.lines();
+    let found = lines.by_ref().any(|line| line == "keystore:");
+    if !found {
+        return Vec::new();
+    }
+    let mut block = Vec::new();
+    for line in lines {
+        let indented = line.starts_with(' ') || line.starts_with('\t');
+        if indented || line.trim().is_empty() {
+            block.push(line);
+        } else {
+            break; // the next top-level key — the keystore mapping ended.
+        }
+    }
+    block
+}
+
+/// Find a flat `key: value` pair within a block of lines already scoped to
+/// one YAML mapping (see [`keystore_block_lines`]). Ignores comment-only
+/// lines; strips a trailing `# comment` and surrounding quotes from the
+/// value. `None` when the key is absent or its value is empty.
+fn yaml_scalar_value(block: &[&str], key: &str) -> Option<String> {
+    let prefix = format!("{key}:");
+    for line in block {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            continue;
+        }
+        let Some(rest) = trimmed.strip_prefix(&prefix) else {
+            continue;
+        };
+        let value = rest.split('#').next().unwrap_or(rest).trim();
+        let value = value.trim_matches('"').trim_matches('\'').trim();
+        if value.is_empty() {
+            return None;
+        }
+        return Some(value.to_string());
+    }
+    None
+}
+
+/// Whether a pid is a currently-live process, checked via `/proc/<pid>`.
+#[cfg(target_os = "linux")]
+fn pid_is_alive(pid: u32) -> bool {
+    std::path::Path::new(&format!("/proc/{pid}")).exists()
+}
+
+/// Off Linux there is no `/proc` to consult. Conservatively report "alive" so
+/// the guard never removes a live lair's files on a platform it cannot
+/// verify liveness on.
+#[cfg(not(target_os = "linux"))]
+fn pid_is_alive(_pid: u32) -> bool {
+    true
+}
+
+/// Heal a stale Lair keystore left behind by a prior crash (the 2026-09-23
+/// ethosengine incident: the node crashed, an EMPTY `pid_file` and an
+/// orphaned unix socket were left in the Lair root, and the next conductor
+/// spawn crash-looped against them until an operator deleted both by hand).
+///
+/// Only inspects and possibly removes two files, `pid_file` and the paired
+/// `socket` (Lair's fixed layout — verified against every running household
+/// `ks/` directory: `pid_file`, `socket`, `store_file*`,
+/// `lair-keystore-config.yaml`), and only in the stale-pid case:
+///
+/// - `pid_file` missing → no-op (nothing to heal).
+/// - `pid_file` empty, unparseable as a pid, or names a pid that is not
+///   alive → remove `pid_file`, then remove `socket` if present.
+/// - `pid_file` names a LIVE pid → leave everything alone; another lair
+///   server owns this root.
+///
+/// HARD RULE: never touches `store_file*` or `lair-keystore-config.yaml` —
+/// those hold the agent keys, and deleting them re-keys the node.
+fn heal_stale_lair_socket(lair_root: &std::path::Path) {
+    let pid_file = lair_root.join("pid_file");
+    let Ok(contents) = std::fs::read_to_string(&pid_file) else {
+        // Missing (or unreadable) pid_file — nothing to heal.
+        return;
+    };
+
+    let trimmed = contents.trim();
+    let stale_reason: &str = if trimmed.is_empty() {
+        "pid_file is empty"
+    } else {
+        match trimmed.parse::<u32>() {
+            Ok(pid) if pid_is_alive(pid) => {
+                // A live process owns this lair root — leave pid_file and
+                // socket untouched.
+                return;
+            }
+            Ok(_) => "pid_file names a pid that is not alive",
+            Err(_) => "pid_file is not a valid pid",
+        }
+    };
+
+    warn!(
+        lair_root = %lair_root.display(),
+        pid_file = %pid_file.display(),
+        reason = stale_reason,
+        "Removing stale Lair pid_file left by a prior crash"
+    );
+    if let Err(e) = std::fs::remove_file(&pid_file) {
+        warn!(
+            path = %pid_file.display(),
+            error = %e,
+            "Failed to remove stale Lair pid_file"
+        );
+    }
+
+    let socket_path = lair_root.join("socket");
+    match std::fs::remove_file(&socket_path) {
+        Ok(()) => {
+            warn!(
+                lair_root = %lair_root.display(),
+                socket = %socket_path.display(),
+                reason = stale_reason,
+                "Removing stale Lair unix socket left by a prior crash"
+            );
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // No socket to clean up — the crash left only the pid_file.
+        }
+        Err(e) => {
+            warn!(
+                path = %socket_path.display(),
+                error = %e,
+                "Failed to remove stale Lair unix socket"
+            );
+        }
+    }
+}
+
+/// Entry point called before every conductor spawn: resolve the in-proc lair
+/// root from the conductor config the process manager is about to use, and
+/// heal a stale pid_file/socket pair in it. A config with no in-proc lair
+/// root (different keystore type, unreadable/unparseable config) is a
+/// deliberate no-op — see [`read_in_proc_lair_root`].
+fn heal_stale_lair_state(config_path: &std::path::Path) {
+    if let Some(lair_root) = read_in_proc_lair_root(config_path) {
+        heal_stale_lair_socket(&lair_root);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct DbPoolSaturation {
     kind: &'static str,
@@ -336,6 +515,12 @@ impl ConductorManager {
             admin_port = self.admin_port,
             "Starting Holochain conductor"
         );
+
+        // Heal a stale Lair keystore left by a prior crash BEFORE spawning —
+        // see `heal_stale_lair_state`. Never touches store_file*/
+        // lair-keystore-config.yaml; a pid_file naming a live process is
+        // left untouched.
+        heal_stale_lair_state(&self.config_path);
 
         let nice = resolve_conductor_nice(std::env::var("ELOHIM_CONDUCTOR_NICE").ok().as_deref());
         let mut cmd = Command::new(&self.conductor_binary);
@@ -919,6 +1104,304 @@ mod tests {
         // last_n caps the tail even when the ring holds more.
         assert_eq!(ring.last_n(2), vec!["c".to_string(), "d".to_string()]);
         assert_eq!(ring.last_n(0), Vec::<String>::new());
+    }
+
+    // --- Lair pid_file / socket crash-recovery guard ---------------------
+
+    /// Fresh tempdir standing in for a lair_root (`ks/`), pre-populated with
+    /// the sensitive files the guard must NEVER touch — every test asserts
+    /// these survive.
+    fn fresh_lair_root(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_{tag}_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("store_file"), b"sqlcipher-secrets").unwrap();
+        std::fs::write(dir.join("store_file-shm"), b"shm").unwrap();
+        std::fs::write(dir.join("store_file-wal"), b"wal").unwrap();
+        std::fs::write(
+            dir.join("lair-keystore-config.yaml"),
+            b"connectionUrl: unix://x",
+        )
+        .unwrap();
+        dir
+    }
+
+    fn assert_sensitive_lair_files_untouched(lair_root: &std::path::Path) {
+        assert_eq!(
+            std::fs::read(lair_root.join("store_file")).unwrap(),
+            b"sqlcipher-secrets",
+            "store_file must never be touched by the guard"
+        );
+        assert_eq!(
+            std::fs::read(lair_root.join("store_file-shm")).unwrap(),
+            b"shm"
+        );
+        assert_eq!(
+            std::fs::read(lair_root.join("store_file-wal")).unwrap(),
+            b"wal"
+        );
+        assert!(
+            lair_root.join("lair-keystore-config.yaml").exists(),
+            "lair-keystore-config.yaml must never be touched by the guard"
+        );
+    }
+
+    #[test]
+    fn heal_stale_lair_socket_removes_empty_pid_file_and_socket() {
+        let dir = fresh_lair_root("empty_pid");
+        std::fs::write(dir.join("pid_file"), b"").unwrap();
+        std::fs::write(dir.join("socket"), b"").unwrap();
+
+        heal_stale_lair_socket(&dir);
+
+        assert!(!dir.join("pid_file").exists(), "empty pid_file removed");
+        assert!(!dir.join("socket").exists(), "paired socket removed");
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_socket_removes_garbage_pid_file_and_socket() {
+        let dir = fresh_lair_root("garbage_pid");
+        std::fs::write(dir.join("pid_file"), b"not-a-pid\n").unwrap();
+        std::fs::write(dir.join("socket"), b"").unwrap();
+
+        heal_stale_lair_socket(&dir);
+
+        assert!(!dir.join("pid_file").exists(), "garbage pid_file removed");
+        assert!(!dir.join("socket").exists(), "paired socket removed");
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_socket_removes_dead_pid_file_and_socket() {
+        let dir = fresh_lair_root("dead_pid");
+        // A pid extremely unlikely to be alive in this container, and never
+        // equal to our own pid or any pid we spawn in these tests.
+        std::fs::write(dir.join("pid_file"), b"999999\n").unwrap();
+        std::fs::write(dir.join("socket"), b"").unwrap();
+        assert!(!pid_is_alive(999_999), "precondition: 999999 must be dead");
+
+        heal_stale_lair_socket(&dir);
+
+        assert!(!dir.join("pid_file").exists(), "dead-pid pid_file removed");
+        assert!(!dir.join("socket").exists(), "stale socket removed");
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_socket_leaves_live_pid_file_and_socket_intact() {
+        let dir = fresh_lair_root("live_pid");
+        let own_pid = std::process::id();
+        std::fs::write(dir.join("pid_file"), own_pid.to_string()).unwrap();
+        std::fs::write(dir.join("socket"), b"live-socket-bytes").unwrap();
+
+        heal_stale_lair_socket(&dir);
+
+        assert!(
+            dir.join("pid_file").exists(),
+            "live-pid pid_file must be left intact — another lair owns it"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("pid_file")).unwrap(),
+            own_pid.to_string()
+        );
+        assert_eq!(
+            std::fs::read(dir.join("socket")).unwrap(),
+            b"live-socket-bytes",
+            "socket must be left intact alongside a live pid_file"
+        );
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_socket_is_a_noop_with_no_pid_file() {
+        let dir = fresh_lair_root("no_pid_file");
+        std::fs::write(dir.join("socket"), b"orphan-but-no-pid-file").unwrap();
+
+        heal_stale_lair_socket(&dir);
+
+        assert!(
+            dir.join("socket").exists(),
+            "a socket with no pid_file at all is left alone — nothing to conclude staleness from"
+        );
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_state_is_a_noop_for_missing_lair_root() {
+        // A config path that doesn't exist, or that parses to a keystore
+        // type this guard doesn't own, must never panic or error — just do
+        // nothing. Exercised via the full entry point (config -> lair_root
+        // resolution -> heal) rather than the lower-level heal function.
+        let missing_config = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_missing_config_{}.yaml",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&missing_config);
+        heal_stale_lair_state(&missing_config); // must not panic
+
+        let dir = fresh_lair_root("other_keystore_type");
+        let config_path = dir.join("conductor-config.yaml");
+        std::fs::write(
+            &config_path,
+            format!(
+                "keystore:\n  type: lair_server\n  connection_url: unix://{}/socket\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+        // Leave a pid_file/socket pair that WOULD be healed under
+        // lair_server_in_proc, to prove the non-matching keystore type is
+        // what stops it, not an accidental empty lair_root.
+        std::fs::write(dir.join("pid_file"), b"").unwrap();
+        std::fs::write(dir.join("socket"), b"").unwrap();
+
+        heal_stale_lair_state(&config_path);
+
+        assert!(
+            dir.join("pid_file").exists(),
+            "a non-in-proc keystore type must never be touched"
+        );
+        assert!(dir.join("socket").exists());
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_in_proc_lair_root_parses_type_and_path() {
+        let dir = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_config_parse_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("conductor-config.yaml");
+        std::fs::write(
+            &config_path,
+            format!(
+                "data_root_path: \"/var/local/lib/holochain\"\nkeystore:\n  type: lair_server_in_proc\n  lair_root: \"{}/ks\"\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+
+        let resolved = read_in_proc_lair_root(&config_path);
+        assert_eq!(resolved, Some(dir.join("ks")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_in_proc_lair_root_none_for_unreadable_config() {
+        let missing = std::path::Path::new("/nonexistent/conductor-config.yaml");
+        assert_eq!(read_in_proc_lair_root(missing), None);
+    }
+
+    #[test]
+    fn read_in_proc_lair_root_parses_the_edgenode_template_snippet() {
+        // The exact shape emitted by genesis/orchestrator/manifests/humans/
+        // _edgenode-conductor.template.yaml (and matched by every real
+        // household conductor-config.yaml inspected during this fix).
+        let dir = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_template_snippet_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("conductor-config.yaml");
+        std::fs::write(
+            &config_path,
+            "network:\n  bootstrap_url: \"https://example\"\nkeystore:\n  type: lair_server_in_proc\n  lair_root: \"/var/local/lib/holochain/ks\"\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_in_proc_lair_root(&config_path),
+            Some(PathBuf::from("/var/local/lib/holochain/ks"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_in_proc_lair_root_none_for_config_with_no_keystore_block() {
+        let dir = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_no_keystore_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("conductor-config.yaml");
+        std::fs::write(
+            &config_path,
+            "network:\n  bootstrap_url: \"https://example\"\nadmin_interfaces: []\n",
+        )
+        .unwrap();
+
+        assert_eq!(read_in_proc_lair_root(&config_path), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_in_proc_lair_root_none_for_non_in_proc_keystore_type() {
+        let dir = std::env::temp_dir().join(format!(
+            "elohim_lair_guard_test_remote_keystore_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("conductor-config.yaml");
+        std::fs::write(
+            &config_path,
+            format!(
+                "keystore:\n  type: lair_server\n  connection_url: \"unix://{}/socket\"\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_in_proc_lair_root(&config_path),
+            None,
+            "a non-in-proc keystore type is not this node's lair root to touch"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn heal_stale_lair_state_end_to_end_via_real_config_shape() {
+        // Wires the full path: a real conductor-config.yaml (the shape this
+        // codebase's templates generate) -> lair_root resolution -> the
+        // heal itself — the exact call `start()` makes.
+        let dir = fresh_lair_root("end_to_end");
+        let config_path = dir.parent().unwrap().join(format!(
+            "{}_conductor-config.yaml",
+            dir.file_name().unwrap().to_string_lossy()
+        ));
+        std::fs::write(
+            &config_path,
+            format!(
+                "network:\n  target_arc_factor: 1\ndata_root_path: \"/var/local/lib/holochain\"\nkeystore:\n  type: lair_server_in_proc\n  lair_root: \"{}\"\nadmin_interfaces: []\n",
+                dir.display()
+            ),
+        )
+        .unwrap();
+        std::fs::write(dir.join("pid_file"), b"999999\n").unwrap();
+        std::fs::write(dir.join("socket"), b"").unwrap();
+
+        heal_stale_lair_state(&config_path);
+
+        assert!(!dir.join("pid_file").exists());
+        assert!(!dir.join("socket").exists());
+        assert_sensitive_lair_files_untouched(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&config_path);
     }
 
     #[test]

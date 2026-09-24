@@ -196,7 +196,7 @@ const BUSY_WINDOW_SETTLE_MARGIN_MS = 2_000;
  * `gamma` joined when the balance scenario gave "garden" a second holder — it is a real
  * owned mesh process with its own `doorway-c.log`, so every log/`/proc` helper here can
  * reach it exactly as it reaches its two siblings. */
-const MESH_LETTER: Readonly<Record<string, 'a' | 'b' | 'c'>> = {
+export const MESH_LETTER: Readonly<Record<string, 'a' | 'b' | 'c'>> = {
   alpha: 'a',
   beta: 'b',
   gamma: 'c',
@@ -455,7 +455,7 @@ function buildZip(name: string, content: Uint8Array): Buffer {
   return Buffer.concat([localEntry, centralEntry, endRecord]);
 }
 
-interface StagedArchive {
+export interface StagedArchive {
   contentId: string;
   doorwayUrl: string;
 }
@@ -569,7 +569,7 @@ function normalizeOrigin(value: string): string {
   }
 }
 
-function originsEqual(a: string, b: string): boolean {
+export function originsEqual(a: string, b: string): boolean {
   return normalizeOrigin(a) === normalizeOrigin(b);
 }
 
@@ -577,20 +577,20 @@ function originsEqual(a: string, b: string): boolean {
 // HTTP: raw GET (via the shared dataplane surface) + admin POST/PATCH
 // ---------------------------------------------------------------------------
 
-interface RawResponse {
+export interface RawResponse {
   status: number;
   text: string;
   headers: Record<string, string | undefined>;
 }
 
-async function rawGet(url: string, headers?: Record<string, string>): Promise<RawResponse> {
+export async function rawGet(url: string, headers?: Record<string, string>): Promise<RawResponse> {
   return getRawWithHeaders(url, { timeoutMs: REQUEST_TIMEOUT_MS, headers });
 }
 
 /** Force LOCAL-ONLY evaluation — the same header the relay itself stamps on an
  * outbound hop, which `relay_precondition` refuses to relay past. A genuine test
  * tool: the honest way to ask "does THIS doorway, by itself, hold a mount here?" */
-async function localOnlyGet(url: string): Promise<RawResponse> {
+export async function localOnlyGet(url: string): Promise<RawResponse> {
   return rawGet(url, { 'x-federation-hop': '1' });
 }
 
@@ -699,18 +699,31 @@ function shedRouteForbidden(res: ShedResponse): boolean {
   return res.status === 403;
 }
 
-/** Throws a message naming exactly what opens `PUT /admin/dev/shed` — see
- * `shedRouteForbidden`'s doc. Every caller of `putShedOverride` in this file checks this
- * before trusting anything else about the response. */
-function explainShedForbidden(doorwayId: string, doorwayUrl: string, res: ShedResponse): never {
+/** Throws a message naming exactly what opens `PUT {doorwayUrl}{routePath}` — see
+ * `shedRouteForbidden`'s doc. Both `/admin/dev/shed` and `/admin/dev/federation-deaf`
+ * share ONE gate (`fixture_surface_gate`), so this is ONE message parametrized by the
+ * route path, never two near-duplicate throws that could drift apart. */
+function explainFixtureForbidden(
+  routePath: string,
+  doorwayId: string,
+  doorwayUrl: string,
+  res: ShedResponse
+): never {
   throw new Error(
-    `PUT ${doorwayUrl}/admin/dev/shed refused HTTP 403 for doorway "${doorwayId}": ` +
+    `PUT ${doorwayUrl}${routePath} refused HTTP 403 for doorway "${doorwayId}": ` +
       `${res.text.slice(0, 300)} — this fixture-only surface opens only when the doorway ` +
       'declares ELOHIM_NETWORK_STAKES=simulacra at boot AND the caller reaches it over ' +
       'loopback (fixture_surface_gate, doorway-service/src/routes/admin_dev.rs). Check ' +
       `hc-mesh.sh's ELOHIM_NETWORK_STAKES wiring for doorway "${doorwayId}" and that this ` +
       'request was not proxied through something that changed its peer address.'
   );
+}
+
+/** Throws a message naming exactly what opens `PUT /admin/dev/shed` — see
+ * `shedRouteForbidden`'s doc. Every caller of `putShedOverride` in this file checks this
+ * before trusting anything else about the response. */
+function explainShedForbidden(doorwayId: string, doorwayUrl: string, res: ShedResponse): never {
+  explainFixtureForbidden('/admin/dev/shed', doorwayId, doorwayUrl, res);
 }
 
 /**
@@ -732,6 +745,73 @@ function pendingShedRoute(world: E2EWorld, doorwayId: string, res: ShedResponse)
   );
   return 'pending';
 }
+
+/**
+ * `PUT {doorwayUrl}/admin/dev/federation-deaf` (story 4.2 slice 1,
+ * `doorway/doorway-service/src/routes/admin_dev.rs::handle_set_federation_deaf`).
+ * Same dev-gated, doorway-local OPERATIONAL-state shape as `putShedOverride`
+ * (`{"secs": N}`, `0` clears, self-clearing, same `fixture_surface_gate`) —
+ * a distinct fixture surface, so it gets its own helper rather than
+ * overloading `putShedOverride`'s body shape (`retryAfterSecs`) or messages.
+ */
+async function putFederationDeafOverride(doorwayUrl: string, secs: number): Promise<ShedResponse> {
+  const response = await fetch(`${doorwayUrl}/admin/dev/federation-deaf`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secs }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const text = await response.text();
+  const headers: Record<string, string | undefined> = {};
+  response.headers.forEach((value, key) => {
+    headers[key.toLowerCase()] = value;
+  });
+  return { status: response.status, text, headers };
+}
+
+/** See `pendingShedRoute`'s doc — the same degrade shape, worded for the
+ * federation-deaf fixture (story 4.2 slice 1) instead of the busy-holder shed
+ * fixture (story 3.1), so a report never blames the wrong scenario. */
+function pendingFederationDeafRoute(
+  world: E2EWorld,
+  doorwayId: string,
+  res: ShedResponse
+): 'pending' {
+  world.attach?.(
+    `PENDING: PUT ${world.getDoorway(doorwayId).url}/admin/dev/federation-deaf answered HTTP ` +
+      `${res.status} — this dev-gated doorbell-deaf fixture route is not built yet on this ` +
+      'doorway (doorway/doorway-service/src/routes/admin_dev.rs::handle_set_federation_deaf, ' +
+      'story 4.2 slice 1). A scenario needing doorway ' +
+      `"${doorwayId}" deaf to doorbells cannot arrange that without it.`
+  );
+  return 'pending';
+}
+
+/** `Given doorway "{doorway}" is deaf to doorbells for {int} seconds` — story
+ * 4.2 slice 1's counterfactual control. Reused by two features:
+ * `name-routing.feature` scenario 4 (so a doorbell cannot make beta fresh
+ * before that scenario's stale-relay premise can be observed) and
+ * `projection-index-doorbell.feature` scenario 3 (proves scenario 1's "within
+ * 10 seconds" claim came from the doorbell, not a lucky discovery-poll tick).
+ * Same missing/forbidden degrade shape as the busy-holder shed fixture — a
+ * genuinely absent route degrades to Cucumber PENDING, never a false green. */
+Given(
+  'doorway {string} is deaf to doorbells for {int} seconds',
+  async function (this: E2EWorld, doorwayId: string, secs: number): Promise<string | void> {
+    const doorway = this.getDoorway(doorwayId);
+    const declared = await putFederationDeafOverride(doorway.url, secs);
+    if (shedRouteMissing(declared)) return pendingFederationDeafRoute(this, doorwayId, declared);
+    if (shedRouteForbidden(declared)) {
+      explainFixtureForbidden('/admin/dev/federation-deaf', doorwayId, doorway.url, declared);
+    }
+    assert.equal(
+      declared.status,
+      200,
+      `PUT ${doorway.url}/admin/dev/federation-deaf {"secs":${secs}} failed: ` +
+        `HTTP ${declared.status} ${declared.text.slice(0, 300)}`
+    );
+  }
+);
 
 async function coherenceManifest(
   doorwayUrl: string
@@ -762,7 +842,7 @@ async function registerFederationPeer(
 // project-epr staging (test-only commitments, never the household's real mounts)
 // ---------------------------------------------------------------------------
 
-interface StagedContract {
+export interface StagedContract {
   commitmentId: string;
   doorwayUrl: string;
   doorwayId: string;
@@ -868,7 +948,7 @@ function testCommitmentId(doorwayId: string, mount: string): string {
  * root — the 409 branch below exists only for a genuine cucumber RETRY of this same
  * attempt (identical nonce), where the prior partial attempt's rows are reactivated rather
  * than duplicated. */
-async function stageRoot(
+export async function stageRoot(
   doorwayUrl: string,
   doorwayId: string,
   mount: string,
@@ -927,7 +1007,7 @@ async function stageRoot(
   return { commitmentId: id, doorwayUrl, doorwayId, mount, archive };
 }
 
-async function lapseContract(staged: StagedContract): Promise<void> {
+export async function lapseContract(staged: StagedContract): Promise<void> {
   const res = await adminCall(
     'PATCH',
     `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`,
@@ -962,7 +1042,7 @@ async function cancelContractQuiet(staged: StagedContract): Promise<void> {
  * EprRouter via its SSE-driven refresh subscriber — asynchronous relative to the POST
  * response — so a single immediate check races that refresh and flakes; this bounds the
  * wait instead. */
-async function waitForLocalMount(
+export async function waitForLocalMount(
   doorwayUrl: string,
   doorwayLabel: string,
   path: string,
@@ -1191,7 +1271,7 @@ async function assertExactlyOneCommitmentForMount(
 // Structured JSON log reading (doorway's tracing_subscriber::fmt::layer().json())
 // ---------------------------------------------------------------------------
 
-interface LogLineFields extends Record<string, unknown> {
+export interface LogLineFields extends Record<string, unknown> {
   message?: string;
 }
 
@@ -1209,8 +1289,8 @@ function parseLogLines(text: string): LogLineFields[] {
   return out;
 }
 
-const MSG_RELAYED = 'name-route: relayed one hop to the holder of this name';
-const MSG_ALL_FAILED = 'name-route: every holder failed — preserving the local verdict';
+export const MSG_RELAYED = 'name-route: relayed one hop to the holder of this name';
+export const MSG_ALL_FAILED = 'name-route: every holder failed — preserving the local verdict';
 
 /** The doorway logs EVERY inbound request at the top of `handle_request`
  * (`info!("[{}] {} {} (host: {})", addr, method, path, host)`) — positional, not
@@ -1227,12 +1307,12 @@ function requestLineHits(lines: LogLineFields[], path: string): number {
   return count;
 }
 
-async function doorwayLogPath(letter: 'a' | 'b' | 'c', label: string): Promise<string> {
+export async function doorwayLogPath(letter: 'a' | 'b' | 'c', label: string): Promise<string> {
   const handle = await resolveOwnedMeshProcess('doorway', letter, label);
   return readlink(`/proc/${handle.pid}/fd/1`);
 }
 
-async function logLength(path: string): Promise<number> {
+export async function logLength(path: string): Promise<number> {
   try {
     return (await readFile(path, 'utf8')).length;
   } catch {
@@ -1240,7 +1320,7 @@ async function logLength(path: string): Promise<number> {
   }
 }
 
-async function logSince(path: string, offset: number): Promise<string> {
+export async function logSince(path: string, offset: number): Promise<string> {
   const text = await readFile(path, 'utf8');
   return text.length >= offset ? text.slice(offset) : text;
 }
@@ -1368,7 +1448,7 @@ function releaseLease(world: E2EWorld): void {
 // Scenario state
 // ---------------------------------------------------------------------------
 
-interface AskCapture {
+export interface AskCapture {
   askedId: string;
   requestUrl: string;
   response: RawResponse;
@@ -1412,7 +1492,7 @@ interface BusyOverrideState {
   clearedAtMs?: number;
 }
 
-interface NameRoutingState {
+export interface NameRoutingState {
   root: string;
   /** The project-epr commitment's `urlPath` (no trailing slash — `/nrt-garden`). */
   mount: string;
@@ -1457,13 +1537,13 @@ function holderFixtureIds(world: E2EWorld, state: NameRoutingState): string[] {
 const states = new WeakMap<E2EWorld, NameRoutingState>();
 const doorwayIdCache = new WeakMap<E2EWorld, Map<string, string>>();
 
-function getState(world: E2EWorld): NameRoutingState {
+export function getState(world: E2EWorld): NameRoutingState {
   const state = states.get(world);
   assert.ok(state, 'the scenario must stage a root before asking a doorway about it');
   return state;
 }
 
-function beginScenario(world: E2EWorld, root: string): NameRoutingState {
+export function beginScenario(world: E2EWorld, root: string): NameRoutingState {
   const state: NameRoutingState = {
     root,
     mount: nrtMount(root),
@@ -1506,7 +1586,7 @@ async function captureBaselineStartTicks(
   state.startTicksByDoorwayId.set(doorwayId, handle.ticks);
 }
 
-async function resolvedDoorwayId(
+export async function resolvedDoorwayId(
   world: E2EWorld,
   doorwayId: string,
   doorwayUrl: string
@@ -1527,7 +1607,7 @@ const NO_SECOND_ASK_CAPTURED =
   'no second ask captured yet — a second "Jessica asks ..." (or "Jessica\'s client asks ... again") must run first';
 
 /** The FIRST captured ask this scenario made. */
-function requireAsk(state: NameRoutingState): AskCapture {
+export function requireAsk(state: NameRoutingState): AskCapture {
   assert.ok(state.ask, NO_ASK_CAPTURED);
   return state.ask;
 }

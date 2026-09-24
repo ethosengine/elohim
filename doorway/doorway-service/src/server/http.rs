@@ -510,6 +510,30 @@ pub struct AppState {
     /// reconstructable by re-fetching the same path, so a restart that empties
     /// it costs one round trip per path and nothing else.
     pub freshness_pantry: Arc<crate::routes::freshness::FreshnessPantry>,
+
+    /// Story 4.2 slice 1 (doorbell): receiver-side pull coordination — at
+    /// most one fetch-then-install in flight per holder, plus one dirty bit.
+    /// See `crate::services::federation_doorbell::DoorbellReceiver`.
+    pub doorbell_receiver: Arc<crate::services::federation_doorbell::DoorbellReceiver>,
+
+    /// Pooled HTTP client for the doorbell receiver's pull-a-holder's-own-
+    /// manifest fetches (`POST /api/v1/federation/doorbell` and
+    /// `POST /admin/federation/peers/refresh`). Deliberately separate from
+    /// `storage_proxy_client` (a different target class entirely — sibling
+    /// doorways, not this doorway's own storage).
+    pub doorbell_client: Arc<reqwest::Client>,
+
+    /// **DEV/FIXTURE ONLY** — `Some(until_secs)` while this doorway declares
+    /// itself DEAF to incoming doorbells (story 4.2 slice 1 scenario 3's
+    /// counterfactual control: it proves scenario 1's speed came from the
+    /// doorbell, not a lucky poll tick). Doorway-local OPERATIONAL state —
+    /// Category C, no DHT entry, no persistence, self-clearing. Written by
+    /// the household-fixture-only `PUT /admin/dev/federation-deaf`
+    /// (`routes::admin_dev::handle_set_federation_deaf`, gated by the SAME
+    /// `fixture_surface_gate` as `PUT /admin/dev/shed` — never `dev_mode`).
+    /// While standing, `routes::coherence::handle_doorbell` answers
+    /// `202 {"pulled":false,"reason":"deaf"}` without touching `name_routes`.
+    pub federation_deaf_until: Arc<tokio::sync::RwLock<Option<u64>>>,
 }
 
 /// Retry-After (seconds) advertised when doorway sheds an inbound request at
@@ -557,6 +581,20 @@ fn init_storage_proxy_client() -> Arc<reqwest::Client> {
             .timeout(std::time::Duration::from_secs(
                 crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
             ))
+            .build()
+            .unwrap_or_default(),
+    )
+}
+
+/// The ONE pooled HTTP client the doorbell receiver uses to pull a holder's
+/// own coherence manifest (story 4.2 slice 1) — a different target class from
+/// `storage_proxy_client` (sibling doorways, not this doorway's own storage),
+/// so it gets its own client rather than borrowing one sized for a different
+/// purpose. Matches the F-COHERENCE probe's own client timeout (5s).
+fn init_doorbell_client() -> Arc<reqwest::Client> {
+    Arc::new(
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
             .build()
             .unwrap_or_default(),
     )
@@ -808,6 +846,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -929,6 +972,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1065,6 +1113,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1221,6 +1274,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -7990,6 +8048,43 @@ async fn handle_request(
             routes::coherence::handle_federation_coherence(Arc::clone(&state)).await,
         ),
 
+        // Doorbell — story 4.2 slice 1: a sibling rings this doorway on its
+        // own digest change so this doorway learns within seconds, without
+        // waiting on the 60s discovery poll. See
+        // `services::federation_doorbell` / `routes::coherence::handle_doorbell`.
+        (Method::POST, "/api/v1/federation/doorbell") => {
+            // Bounded like every other small-JSON mutator (`admin_dev`,
+            // `p2p_manifests`): the body is `{doorwayId, digest}`, and this
+            // route is reachable by any peer before the peer-cache check runs,
+            // so an unbounded `collect()` here is an allocation any caller can
+            // size.
+            let body = match http_body_util::Limited::new(
+                req.into_body(),
+                routes::coherence::MAX_DOORBELL_BODY_BYTES,
+            )
+            .collect()
+            .await
+            {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Doorbell body rejected: {}", e);
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::PAYLOAD_TOO_LARGE)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                "{{\"error\":\"request body exceeds {} bytes\"}}",
+                                routes::coherence::MAX_DOORBELL_BODY_BYTES
+                            ))))
+                            .unwrap(),
+                    ));
+                }
+            };
+            return Ok(to_boxed(
+                routes::coherence::handle_doorbell(Arc::clone(&state), body).await,
+            ));
+        }
+
         // Hosted-at binding resolution (T2.2). Doorway-specific logic (single
         // storage read + honest 404/502 split), so it earns an explicit arm
         // rather than a registry declaration. `/api/` is already covered by
@@ -8405,6 +8500,22 @@ async fn handle_request(
         (Method::PUT, "/admin/dev/shed") => to_boxed(
             routes::admin_dev::handle_set_shed(req, Arc::clone(&state), peer_is_loopback(&addr))
                 .await,
+        ),
+
+        // ====================================================================
+        // DEV/FIXTURE ONLY — household-fixture declared deafness to doorbells
+        // (story 4.2 slice 1). SAME fixture_surface_gate as PUT /admin/dev/shed
+        // — deliberately NOT dev_mode. Scenario 3's counterfactual control:
+        // proves scenario 1's speed came from the doorbell, not a lucky poll
+        // tick.
+        // ====================================================================
+        (Method::PUT, "/admin/dev/federation-deaf") => to_boxed(
+            routes::admin_dev::handle_set_federation_deaf(
+                req,
+                Arc::clone(&state),
+                peer_is_loopback(&addr),
+            )
+            .await,
         ),
 
         // ====================================================================

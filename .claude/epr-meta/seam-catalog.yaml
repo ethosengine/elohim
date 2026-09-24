@@ -321,7 +321,10 @@ seams:
     # mishpat (delegates-compute / custody grant notary, bounded commitments) and rakia-executor
     # (prebuilt task execution inside a native runtime's admitted envelope) are the T1 and runtime
     # sides of admission: what may be asked, of whom, within which budget.
-    registry_crates: [mishpat, rakia-executor]
+    # rakia-executor's seam-registry.yaml is not in the pinned elohim/rakia submodule (13cb31d);
+    # it rides the next rakia pin bump — re-add it here in that push (the harness's
+    # real-not-declared check will insist).
+    registry_crates: [mishpat]
     habits: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 

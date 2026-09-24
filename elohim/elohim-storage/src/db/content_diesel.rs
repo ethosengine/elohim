@@ -240,6 +240,49 @@ pub fn count_dead_anchor_content(
         .map_err(|e| StorageError::Internal(format!("count_dead_anchor_content failed: {e}")))
 }
 
+/// Heal candidates for the pointer-audit sweep (story 1.4d) — declared rows
+/// (`declared_head_action_hash IS NOT NULL`) that also carry a blob pointer
+/// (`blob_cid IS NOT NULL`). Only app bundles carry blob pointers in practice
+/// (the 1.4a design pass sampled 3,770 content items with none), so this set
+/// is small by construction, not by a LIMIT alone.
+///
+/// `after_id` is the round-robin keyset cursor, same contract as
+/// [`list_half_blob_row_ids`]: `Some(id)` resumes strictly AFTER that id
+/// (`content::id.gt`), `None` starts from the beginning. The caller wraps to
+/// `None` when a page returns fewer than `limit` rows, so every candidate is
+/// visited over successive sweeps rather than the same head of the id space
+/// every time.
+///
+/// This ONLY selects candidates — it does not read or compare pointer values.
+/// The per-row decision of whether a candidate's pointer actually needs
+/// healing is [`head_adoption::pointer_heal_patch`], run by the sweep after a
+/// fresh conductor resolve.
+pub fn list_declared_blob_pointer_candidates(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    limit: i64,
+    after_id: Option<&str>,
+) -> Result<Vec<String>, StorageError> {
+    if limit <= 0 {
+        return Ok(Vec::new());
+    }
+    let mut q = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::declared_head_action_hash.is_not_null())
+        .filter(content::blob_cid.is_not_null())
+        .into_boxed();
+    if let Some(after) = after_id {
+        q = q.filter(content::id.gt(after));
+    }
+    q.order(content::id.asc())
+        .limit(limit)
+        .select(content::id)
+        .load::<String>(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("list_declared_blob_pointer_candidates failed: {e}"))
+        })
+}
+
 /// Apply the trust gate as a per-row WHERE filter on a boxed `content` query.
 ///
 /// REQ-N7: this is a per-row WHERE filter, never a fail-closed collect. The

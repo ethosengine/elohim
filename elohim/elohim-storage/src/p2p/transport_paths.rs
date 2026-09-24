@@ -445,6 +445,37 @@ impl PathObservations {
         crate::metrics::inc_transport_route(transport.as_str(), class.as_str(), "fallback");
     }
 
+    /// Best (lowest) locally-observed EWMA RTT, in whole milliseconds, across
+    /// every transport/op-class sample recorded under any of `labels`.
+    ///
+    /// `labels` lets a caller offer every cross-plane alias a peer may have
+    /// been recorded under (agent_cid, a resolved libp2p PeerId, a resolved
+    /// iroh NodeId — see the module doc's "cross-plane LABEL" convention): a
+    /// sample for the same peer may land under a different label depending on
+    /// which binding was known at record time.
+    ///
+    /// This is a **locally-observed, unsigned** measurement (Entity class
+    /// Ephemeral/C, per the module doc) — this node's own asymmetric view of
+    /// its RTT to the peer, never a peer-signed attestation. Returns `None`
+    /// when no plane has ever produced a successful sample under any given
+    /// label — an honest "not yet observed", not a claim of zero latency.
+    pub fn best_known_rtt_ms(&self, labels: &[&str]) -> Option<u32> {
+        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut best: Option<f64> = None;
+        for label in labels {
+            for t in [Transport::Libp2p, Transport::Iroh] {
+                for c in [OpClass::Small, OpClass::Bulk] {
+                    if let Some(obs) = inner.get(&((*label).to_string(), t, c)) {
+                        if let Some(ms) = obs.rtt_ewma_ms {
+                            best = Some(best.map_or(ms, |b: f64| b.min(ms)));
+                        }
+                    }
+                }
+            }
+        }
+        best.map(|ms| ms.round() as u32)
+    }
+
     pub fn view(&self) -> Vec<TransportPathView> {
         let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let mut rows: Vec<TransportPathView> = inner
@@ -688,5 +719,67 @@ mod tests {
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].state, PathState::Sampled);
         assert_eq!(v[0].attempts, 1);
+    }
+
+    #[test]
+    fn best_known_rtt_ms_returns_none_when_no_sample_recorded() {
+        let s = PathObservations::default();
+        assert_eq!(s.best_known_rtt_ms(&["unseen-peer"]), None);
+    }
+
+    #[test]
+    fn best_known_rtt_ms_reads_a_recorded_sample() {
+        let s = PathObservations::default();
+        s.record(
+            "peer-a",
+            Transport::Libp2p,
+            OpClass::Bulk,
+            Some(Duration::from_millis(20)),
+            true,
+            false,
+        );
+        assert_eq!(s.best_known_rtt_ms(&["peer-a"]), Some(20));
+    }
+
+    #[test]
+    fn best_known_rtt_ms_checks_every_offered_label() {
+        // A sample recorded under the peer's resolved libp2p PeerId label is
+        // still found when the caller only knows the agent_cid alias,
+        // because it offers both as candidate labels.
+        let s = PathObservations::default();
+        s.record(
+            "12D3KooWResolved",
+            Transport::Libp2p,
+            OpClass::Bulk,
+            Some(Duration::from_millis(15)),
+            true,
+            false,
+        );
+        assert_eq!(
+            s.best_known_rtt_ms(&["uhCAk-agent-x", "12D3KooWResolved"]),
+            Some(15)
+        );
+    }
+
+    #[test]
+    fn best_known_rtt_ms_takes_the_lowest_across_planes_and_classes() {
+        let s = PathObservations::default();
+        s.record(
+            "peer-b",
+            Transport::Libp2p,
+            OpClass::Bulk,
+            Some(Duration::from_millis(90)),
+            true,
+            false,
+        );
+        s.record(
+            "peer-b",
+            Transport::Iroh,
+            OpClass::Small,
+            Some(Duration::from_millis(12)),
+            true,
+            false,
+        );
+        assert_eq!(s.best_known_rtt_ms(&["peer-b"]), Some(12));
     }
 }

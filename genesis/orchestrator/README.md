@@ -37,6 +37,13 @@ GitHub Webhook → Orchestrator → Analyze Changesets → Trigger Pipelines →
    later levels. A selected long-running producer is awaited through a detached
    completion barrier when a selected consumer depends on it; otherwise it stays
    fire-and-forget.
+   Levels run one after another, so a coupled change pays each level's full
+   time in sequence. Every dispatchable pipeline owns its wall-clock budget in
+   its own Jenkinsfile `options { timeout }`, and the orchestrator's budget is
+   the **sum** along the longest dependency chain plus its own stages — never a
+   tuned number. `pipeline-budget.test.mjs` enforces both, so the orchestrator
+   is never the clock that stops a downstream. When a downstream budget grows,
+   the fix is to shrink that downstream, not to raise the sum.
 4. **Run Genesis** — on eligible dev branches, a selected pipeline with
    `triggersGenesis: true` adds Genesis unless `SKIP_GENESIS` is set. Genesis runs
    after every selected non-Genesis level returns a successful dispatch result.

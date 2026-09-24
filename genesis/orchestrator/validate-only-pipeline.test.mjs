@@ -175,6 +175,46 @@ describe("orchestrator validate-only dispatch", () => {
   });
 });
 
+describe("orchestrator graph-derived validate-only (a2o-only change)", () => {
+  const edgeManifest = JSON.parse(
+    readFileSync(
+      new URL("../../elohim/holochain/build-manifest.json", import.meta.url),
+      "utf8",
+    ),
+  );
+
+  test("dataplane-validation deploys nothing, so it alone can never roll the fleet", () => {
+    const step = edgeManifest.steps["dataplane-validation"];
+    assert.ok(step, "edge manifest lost its dataplane-validation step");
+    assert.deepEqual(step.depends ?? [], []);
+    for (const [name, other] of Object.entries(edgeManifest.steps)) {
+      assert.ok(
+        !(other.depends ?? []).includes("dataplane-validation"),
+        `${name} depends on dataplane-validation — a validation-only change would cascade into it`,
+      );
+    }
+  });
+
+  test("an edge selection with only dataplane-validation stale dispatches validate-only", () => {
+    const rule = orchestrator.match(
+      /edgeStaleSteps\.every \{ it == 'dataplane-validation' \} && !edgeForced\) \{\s*env\.EDGE_VALIDATE_ONLY_FROM_GRAPH = 'true'/,
+    );
+    assert.ok(rule, "graph-derived validate-only rule is missing");
+    assert.match(orchestrator, /\(env\.FORCE_BUILD_PIPELINES \?: ''\)\.split\(','\)\.findAll \{ it \}\.contains\('elohim-edge'\)/);
+    assert.match(
+      orchestrator,
+      /validateOnlyDownstream = name == 'elohim-edge' &&\s*\(env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' \|\| env\.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true'\)/,
+    );
+  });
+
+  test("a validate-only edge never pulls Genesis in", () => {
+    assert.match(
+      orchestrator,
+      /triggersGenesis && !\(it == 'elohim-edge' && env\.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true'\)/,
+    );
+  });
+});
+
 describe("edge validate-only stage allowlist", () => {
   const stages = assertEdgeStageContract(edge);
 
