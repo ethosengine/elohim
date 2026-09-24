@@ -35,7 +35,8 @@ const MEASURE = {
     dumps: { type: 'number' },             // anti-dump: NO-EXIT + DRIFT-DEAD + DUMP + archive files + shifts past the ~14d budget
     path_drift: { type: 'number' },        // architecture seeds changed since MAP.md update (headline `path:`)
     roadmap_stale: { type: 'boolean' },    // roadmap artifact stale vs the gap-ledger x cluster-state (headline `roadmap:`)
-    fold_behind: { type: 'boolean' },  // the native semantic fold is behind the tree (headline `index:`)
+    fold_behind: { type: 'boolean' },  // the native semantic fold is behind the tree (headline `index:`) — a REAL lag only
+    index_attention: { type: 'string' },  // the `index:` line verbatim when it is NOT a lag a fold can drain (unusable / unreadable / last fold failed); '' otherwise
     cites_legacy: { type: 'number' },      // legacy doc path-cites to migrate to content-addressed envelopes (audit CITE-FORMAT-CANDIDATE)
     index_unloaded: { type: 'number' },    // MEMORY.md index rows past the harness load cap — entries no session can ever read (memory-index-drift.json)
     open_gaps: { type: 'number' },
@@ -79,7 +80,7 @@ while (round < ROUND_CAP) {
     `Run, from /projects/elohim, and return the numbers as the schema. Edit NOTHING.\n` +
     `  ${AUDIT} --ledger --json   -> pressure_total = sum of rows whose state is one of NEEDS-TRIAGE, MEM-UNLINKED, CLAIMED-ONLY, REGRESSED, SUPERSEDED, UNKNOWN-STATUS; dominant = the largest of those classes ('none' if pressure_total is 0); open_gaps/claimed_gaps from "DECOMPOSED GAPS".\n` +
     `  ${AUDIT} --coverage --json -> uncaptured.\n` +
-    `  ${HEADLINE}                -> fold_behind = true unless the \`index:\` line ends \`✅\` (\`index: skipped — no fold\` is NOT behind — nothing has been folded; it is a first-fold decision for the operator, not a drain). There is no \`mempalace:\` dimension any more: the palace is the declared visitor and its mine left the headline 2026-09-24. There is no \`memkit:\` dimension any more: the report tier it bounded was removed 2026-09-11 and its bound is \`status: superseded\`, so the headline prints \`memkit: retired\` and nothing reads it.\n` +
+    `  ${HEADLINE}                -> fold_behind = true ONLY for a real lag a fold can drain: the \`index:\` line reports \`N files behind the fold\` and does not end \`✅\` (past the hard bound, or \`⚠ last fold degraded\`). Every other reading is NOT behind: \`index: skipped — no fold\` (nothing folded; a first-fold decision for the operator), \`index: skipped — fold unusable (…)\`, \`index: skipped — fold status unreadable …\` and \`index: ⚠ last fold failed (…)\` — a fold dispatched into those would fail the same way. For those four, set index_attention = the \`index:\` line verbatim (else '') so the loop REPORTS it instead of draining it. There is no \`mempalace:\` dimension any more: the palace is the declared visitor and its mine left the headline 2026-09-24. There is no \`memkit:\` dimension any more: the report tier it bounded was removed 2026-09-11 and its bound is \`status: superseded\`, so the headline prints \`memkit: retired\` and nothing reads it.\n` +
     `  ${AUDIT} --ledger --json   -> decompose_due = the count of rows whose state is SUPERSEDED or REGRESSED in an ACTIVE home (the \`decompose:\` number); roadmap_stale / path_drift come from the same payload's \`gaps\` and the map-currency bound (\`${EPR} flow report --bound map-currency-drift-ceiling --json\` -> contributingFolds).\n` +
     `  ${AUDIT} --stasis           -> STRUCTURAL EQUILIBRIUM section: dumps = NO-EXIT + DRIFT-DEAD + DUMP + archive(_retired) file count; pressure_dirs_empty = true iff every pressure dir shows 0 docs.\n` +
     `  epr flow cites stamp --all 2>/dev/null | grep -oE "stamped: [0-9]+" ; python3 .epr-meta/elohim/lenses/memory/memory-coherence-audit.py 2>/dev/null | grep -oE "format-candidate \\(cites_legacy\\): [0-9]+"  -> cites_legacy = the format-candidate count (legacy doc-cites to migrate to envelopes).\n` +
@@ -93,6 +94,7 @@ while (round < ROUND_CAP) {
   const remaining = m.pressure_total + m.uncaptured + m.decompose_due + m.dumps + m.path_drift + m.index_unloaded + (m.roadmap_stale ? 1 : 0) + (m.fold_behind ? 1 : 0)
   history.push({ round, remaining, stasis_score: m.stasis_score, uncaptured: m.uncaptured, pressure: m.pressure_total, decompose_due: m.decompose_due, dumps: m.dumps, path_drift: m.path_drift, roadmap_stale: m.roadmap_stale, fold_behind: m.fold_behind, index_unloaded: m.index_unloaded })
   log(`round ${round}: coverage=${(m.stasis_score * 100).toFixed(1)}% · pressure=${m.pressure_total} · uncaptured=${m.uncaptured} · decompose-due=${m.decompose_due} · dumps=${m.dumps} · path-drift=${m.path_drift} · roadmap-stale=${m.roadmap_stale} · fold-behind=${m.fold_behind} · index-unloaded=${m.index_unloaded}`)
+  if (m.index_attention) log(`round ${round}: index needs the operator, not a fold — ${m.index_attention}`)
 
   // 2. STASIS? "done" = EVERY discipline at equilibrium: compaction in band + captured + no dumps +
   //    decompose-due drained + MAP current + roadmap current + index fresh
@@ -143,7 +145,7 @@ while (round < ROUND_CAP) {
 // final measurement so the return reflects reality after the last drain
 const finalCov = await agent(
   `Run from /projects/elohim: ${AUDIT} --stasis --json, ${AUDIT} --coverage --json, ${AUDIT} --ledger --json and ${HEADLINE}. Return the MEASURE schema ` +
-  `(pressure_total, uncaptured, decompose_due, dumps, path_drift, roadmap_stale, fold_behind, open_gaps, claimed_gaps, pressure_dirs_empty, stasis_score, at_stasis, dominant), plus index_unloaded = the length of \`unloadedRows\` from \`epr flow memory project --index --json\`. Edit nothing.`,
+  `(pressure_total, uncaptured, decompose_due, dumps, path_drift, roadmap_stale, fold_behind, index_attention (per the same rule as the round measure), open_gaps, claimed_gaps, pressure_dirs_empty, stasis_score, at_stasis, dominant), plus index_unloaded = the length of \`unloadedRows\` from \`epr flow memory project --index --json\`. Edit nothing.`,
   { label: 'measure:final', phase: 'Loop', schema: MEASURE, model: 'haiku' },
 )
 
@@ -153,6 +155,7 @@ return {
   rounds: round,
   reached_stasis: reached,
   final_score: finalCov.stasis_score,
+  index_attention: finalCov.index_attention || '',  // an index reading a fold cannot drain — the operator's, not the loop's
   final: { uncaptured: finalCov.uncaptured, decompose_due: finalCov.decompose_due, dumps: finalCov.dumps, path_drift: finalCov.path_drift, roadmap_stale: finalCov.roadmap_stale, pressure: finalCov.pressure_total, index_unloaded: finalCov.index_unloaded },
   history,
   note: 'One loop, every discipline. It drains compaction debt, un-captured prose, decompose-due plans, forming dumps (cardinal — fixed first), MAP path-drift, and roadmap staleness until all hit equilibrium or stop falling. Residual OPEN gaps are the implementation backlog for /plan; CLAIMED gaps await ci-investigator; blocked-by-env is held, not failed.',

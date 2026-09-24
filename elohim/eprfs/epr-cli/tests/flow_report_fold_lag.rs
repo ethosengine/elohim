@@ -317,3 +317,112 @@ fn the_live_registry_declares_the_index_measures_coherently() {
     // The mempalace bound stays declared, off the headline order.
     row("lenses", "mempalace-surfaces-changed-ceiling");
 }
+
+/// Rewrite the pinned store's latest attestation with `state` (the fixture fold wrote a
+/// `complete` one; the derive reads whatever the latest snapshot says).
+fn set_last_attestation(root: &Path, state: Value) {
+    let cid = measure_cid(root);
+    let from = index::store_dir(root, &cid, EmbedderChoice::Fixture).join("attestation.json");
+    let to = index::store_dir(root, &cid, EmbedderChoice::Pinned).join("attestation.json");
+    let mut attestation: Value = serde_json::from_slice(&std::fs::read(from).unwrap()).unwrap();
+    attestation["state"] = state;
+    std::fs::write(to, serde_json::to_vec(&attestation).unwrap()).unwrap();
+}
+
+/// Fix round 1: a FAILED last fold is never green, even at lag 0 — the manifest being current says
+/// nothing about a method that could not run. The reason prints with no absolute path.
+#[test]
+fn a_failed_last_fold_never_reads_green() {
+    let dir = tree();
+    let root = dir.path();
+    fold_into_pinned(root);
+    let why = format!(
+        "unavailable: no model directory resolves under {}/models",
+        root.display()
+    );
+    set_last_attestation(root, json!({"state": "failed", "why": why}));
+
+    let outcome = index_outcome(root);
+    assert_eq!(outcome.outcome, OutcomeStatus::Failed, "{outcome:?}");
+    assert_eq!(outcome.observed, Some(0.0));
+    let line = slot(root, "index");
+    assert_eq!(
+        line,
+        "index: ⚠ last fold failed (unavailable: no model directory resolves under models) — 0 \
+         files behind the fold"
+    );
+    assert!(!line.contains('✅'), "{line}");
+}
+
+/// A DEGRADED last fold stays visible beside a passing bound, without failing it on its own.
+#[test]
+fn a_degraded_last_fold_stays_visible_without_failing_the_bound() {
+    let dir = tree();
+    let root = dir.path();
+    fold_into_pinned(root);
+    set_last_attestation(root, json!({"state": "degraded", "retried": 2}));
+    add_notes(root, 0, 3);
+
+    let outcome = index_outcome(root);
+    assert_eq!(outcome.outcome, OutcomeStatus::Passed, "{outcome:?}");
+    let line = slot(root, "index");
+    assert_eq!(
+        line,
+        "index: 3 files behind the fold within hard 25 — ⚠ last fold degraded (retried 2)"
+    );
+    assert!(!line.contains('✅'), "{line}");
+}
+
+/// A store file that exists but cannot serve is `skipped — fold unusable (<reason>)`, never
+/// `no fold`; the reason carries no absolute path.
+#[test]
+fn an_unusable_store_is_not_no_fold() {
+    let dir = tree();
+    let root = dir.path();
+    let pinned = index::store_dir(root, &measure_cid(root), EmbedderChoice::Pinned);
+    std::fs::create_dir_all(&pinned).unwrap();
+    std::fs::write(
+        pinned.join("fold.sqlite"),
+        b"not a sqlite store, not even close",
+    )
+    .unwrap();
+
+    let seen = index::status(root, EmbedderChoice::Pinned).unwrap();
+    assert!(seen["lag"].is_null());
+    assert!(seen["unusable"].is_string(), "{seen}");
+
+    let outcome = index_outcome(root);
+    assert_eq!(outcome.outcome, OutcomeStatus::Skipped);
+    assert_eq!(outcome.observed, None);
+    let line = slot(root, "index");
+    assert!(
+        line.starts_with("index: skipped — fold unusable ("),
+        "{line}"
+    );
+    assert!(!line.contains("no fold"), "{line}");
+    assert!(
+        !line.contains(&*root.to_string_lossy()),
+        "no absolute path: {line}"
+    );
+}
+
+/// With no contract at all the status cannot be read; the reason names the repo-relative path.
+#[test]
+fn an_unreadable_status_names_a_repo_relative_path() {
+    let dir = tree();
+    let root = dir.path();
+    std::fs::remove_file(root.join(CONTRACT_REL)).unwrap();
+    let line = slot(root, "index");
+    assert!(
+        line.starts_with("index: skipped — fold status unreadable"),
+        "{line}"
+    );
+    assert!(
+        line.contains(".epr-meta/elohim/algorithms/recall-contract.json"),
+        "{line}"
+    );
+    assert!(
+        !line.contains(&*root.to_string_lossy()),
+        "no absolute path: {line}"
+    );
+}

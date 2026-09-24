@@ -1145,10 +1145,13 @@ impl FoldReader {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /// `epr flow memory index status`: the stable shape later routes read — `{measure, embedder,
-/// source, model, chunk_rule, chunks, demoted, bytes, lag, unreadable, last}`. `model` is `null`
-/// for the fixture (its vectors are no model's). `lag`/`unreadable` are `null` when there is no
-/// readable fold; `last` is the latest attestation's `{state, at, attested_by}` or `null`.
-/// Status writes nothing: the store is opened read-only, and an unchanged file is not re-hashed.
+/// source, model, chunk_rule, chunks, demoted, bytes, lag, unreadable, unusable, last}`. `model`
+/// is `null` for the fixture (its vectors are no model's). `lag`/`unreadable` are `null` when there
+/// is no readable fold; `unusable` then says WHY when a store file exists but cannot serve (another
+/// schema or measure, a failed integrity check — the next fold builds a fresh one), and is `null`
+/// when there is simply no store: "no fold" and "a fold nobody can read" are different answers.
+/// `last` is the latest attestation's `{state, at, attested_by}` or `null`. Status writes nothing:
+/// the store is opened read-only, and an unchanged file is not re-hashed.
 pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
     let declared = Declared::load(root)?;
     let dir = store_dir(root, &declared.cid.to_string(), embedder);
@@ -1171,9 +1174,17 @@ pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
         "bytes": 0,
         "lag": Value::Null,
         "unreadable": Value::Null,
+        "unusable": Value::Null,
         "last": last.unwrap_or(Value::Null),
     });
-    if let Ok(Some(store)) = Store::open_existing(&dir.join(STORE_FILE), &declared, true) {
+    let store = match Store::open_existing(&dir.join(STORE_FILE), &declared, true) {
+        Ok(store) => store,
+        Err(why) => {
+            view["unusable"] = json!(why);
+            None
+        }
+    };
+    if let Some(store) = store {
         view["chunks"] =
             json!(store.count("SELECT count(*) FROM chunks WHERE demoted_at IS NULL")?);
         view["demoted"] =
@@ -1205,7 +1216,10 @@ fn render_status(view: &Value, declared_lag: &str) -> String {
             "{n} files behind ({declared_lag}), {} unreadable",
             view["unreadable"]
         ),
-        None => "skipped — no fold".to_string(),
+        None => match view["unusable"].as_str() {
+            Some(why) => format!("skipped — fold unusable ({why})"),
+            None => "skipped — no fold".to_string(),
+        },
     };
     format!(
         "index status\nmeasure     {}\nembedder    {} ({} source)\nmodel       {}\n\

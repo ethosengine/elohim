@@ -772,11 +772,16 @@ fn status_without_a_fold_says_skipped() {
         "bytes",
         "lag",
         "unreadable",
+        "unusable",
         "last",
     ];
     expected.sort_unstable();
     assert_eq!(got, expected);
     assert!(seen["lag"].is_null());
+    assert!(
+        seen["unusable"].is_null(),
+        "no store is not an unusable store"
+    );
     assert!(seen["last"].is_null());
     assert_eq!(seen["measure"], measure_cid(root));
 

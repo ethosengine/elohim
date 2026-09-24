@@ -1169,16 +1169,28 @@ fn evaluate_fold_lag(
         Err(error) => {
             return outcome(
                 OutcomeStatus::Skipped,
-                format!("fold status unreadable — {error}"),
+                format!(
+                    "fold status unreadable — {}",
+                    repo_relative(root, &error.to_string())
+                ),
                 None,
             )
         }
     };
     let Some(lag) = view["lag"].as_u64() else {
+        // A store file that exists but cannot serve is not "no fold": the next fold rebuilds it,
+        // and the reader should be told which of the two it is looking at.
+        if let Some(why) = view["unusable"].as_str() {
+            return outcome(
+                OutcomeStatus::Skipped,
+                format!("fold unusable ({})", repo_relative(root, why)),
+                None,
+            );
+        }
         return outcome(
             OutcomeStatus::Skipped,
             format!(
-                "no fold for {} — no readable pinned store for the semantic index measure",
+                "no fold for {} — no pinned store for the semantic index measure",
                 bound.measure
             ),
             None,
@@ -1189,8 +1201,58 @@ fn evaluate_fold_lag(
         reading.push_str(&format!(" ({unreadable} unreadable)"));
     }
     let observed = lag as f64;
-    let (status, summary) = judge_reading(bound, observed, &reading);
-    outcome(status, summary, Some(observed))
+    // The last attestation is part of the reading. A FAILED last fold is never green, whatever the
+    // lag says — a lag of 0 over a fold that could not run means the manifest is current and the
+    // method is broken, which is exactly what a session must see. A DEGRADED one (the run cap or an
+    // unreadable file stopped it) stays visible beside a passing bound without failing it.
+    let last = &view["last"]["state"];
+    match last["state"].as_str() {
+        Some("failed") => {
+            let why = last["why"].as_str().unwrap_or("no reason recorded");
+            outcome(
+                OutcomeStatus::Failed,
+                format!(
+                    "{LAST_FOLD_FAILED} ({}) — {reading}",
+                    repo_relative(root, why)
+                ),
+                Some(observed),
+            )
+        }
+        Some("degraded") => {
+            let (status, summary) = judge_reading(bound, observed, &reading);
+            let retried = last["retried"].as_u64().unwrap_or(0);
+            outcome(
+                status,
+                format!("{summary} — ⚠ {LAST_FOLD_DEGRADED} (retried {retried})"),
+                Some(observed),
+            )
+        }
+        _ => {
+            let (status, summary) = judge_reading(bound, observed, &reading);
+            outcome(status, summary, Some(observed))
+        }
+    }
+}
+
+/// The phrase a fold-lag outcome's summary carries when the last attestation was `failed`.
+const LAST_FOLD_FAILED: &str = "last fold failed";
+/// The phrase it carries when the last attestation was `degraded`.
+const LAST_FOLD_DEGRADED: &str = "last fold degraded";
+
+/// A reason with the repository root stripped, so a headline never prints an absolute path.
+fn repo_relative(root: &Path, text: &str) -> String {
+    let mut out = text.to_string();
+    for base in [root.canonicalize().ok(), Some(root.to_path_buf())]
+        .into_iter()
+        .flatten()
+    {
+        let shown = base.display().to_string();
+        if shown.is_empty() || shown == "." {
+            continue;
+        }
+        out = out.replace(&format!("{shown}/"), "").replace(&shown, ".");
+    }
+    out
 }
 
 /// Compare an observed magnitude against a bound's watermarks, in the vocabulary every other
@@ -1906,6 +1968,21 @@ impl ReportPayload {
             // outcome's summary names the measure; the session reader is told what is missing.
             OutcomeStatus::Skipped if slot == "index" && outcome.summary.starts_with("no fold") => {
                 format!("{prefix}: skipped — no fold")
+            }
+            OutcomeStatus::Skipped if slot == "index" => {
+                format!("{prefix}: skipped — {}", outcome.summary)
+            }
+            // A failed last fold is its own failure, not a watermark crossing: say it first.
+            OutcomeStatus::Failed
+                if slot == "index" && outcome.summary.starts_with(LAST_FOLD_FAILED) =>
+            {
+                format!("{prefix}: ⚠ {}", outcome.summary)
+            }
+            // A degraded last fold keeps its warning and loses the check mark.
+            OutcomeStatus::Passed
+                if slot == "index" && outcome.summary.contains(LAST_FOLD_DEGRADED) =>
+            {
+                format!("{prefix}: {}", outcome.summary.trim_start_matches("warn: "))
             }
             OutcomeStatus::Skipped => format!("{prefix}: skipped ({})", outcome.summary),
             OutcomeStatus::Failed => format!("{prefix}: ⚠ failed — {}", outcome.summary),

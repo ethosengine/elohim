@@ -15,6 +15,11 @@ reads `epr flow memory index status --json` for the fold's lag. Properties pinne
   5. `epr` missing, or failing -> silent, exit 0 (surfacing never blocks a prompt).
   6. the DEGRADED banner prints only when the lag is past the measure's declared foldLag limit.
   7. the recall session is opened before the search, under `surfacing-<session>`.
+  8. (fix round 1) every injected line prints its producer and short method CID, and the fold lag
+     when behind; a candidate carrying no method is not surfaced.
+  9. (fix round 1) the lag is read from the search answer; `index status` runs only as the
+     fallback when the search gave no reading.
+ 10. (fix round 1) past 1 MiB, the spawn log keeps its last 256 KiB before the next append.
 
 Every leg runs a stub `epr` (EPR_BIN, the resolver's first choice) on a temporary project dir
 carrying the live contract and the live semantic-index measure.
@@ -45,7 +50,8 @@ CONTRACT_REL = ".epr-meta/elohim/algorithms/recall-contract.json"
 MEASURE_REL = ".epr-meta/elohim/algorithms/recall-semantic-index.json"
 
 # The stub. Every invocation appends its argv to $STUB_LOG. `index status --json` reports $LAG;
-# `recall search` answers $CANDIDATES; `index fold` records whether it leads its own session,
+# `recall search` answers $CANDIDATES, each carrying `fold_lag` $SEARCH_LAG (default $LAG; SEARCH_FAIL=1
+# makes the search refuse); `index fold` records whether it leads its own session,
 # then sleeps $FOLD_SLEEP so a hook that waited on it would be caught by the clock.
 # STUB_FAIL=1 makes every command exit 1 with non-JSON output.
 STUB = '''#!/usr/bin/env python3
@@ -67,8 +73,13 @@ elif argv[:4] == ["flow", "memory", "index", "fold"]:
 elif argv[:4] == ["flow", "memory", "recall", "open"]:
     print(json.dumps({"operation": "open"}))
 elif argv[:4] == ["flow", "memory", "recall", "search"]:
-    print(json.dumps({"operation": "search",
-                      "retrieval": {"candidates": json.loads(os.environ["CANDIDATES"])}}))
+    if os.environ.get("SEARCH_FAIL") == "1":
+        print("semantic: unavailable"); sys.exit(1)
+    lag = os.environ.get("SEARCH_LAG", os.environ.get("LAG", "0"))
+    candidates = json.loads(os.environ["CANDIDATES"])
+    for candidate in candidates:
+        candidate["fold_lag"] = None if lag == "null" else int(lag)
+    print(json.dumps({"operation": "search", "retrieval": {"candidates": candidates}}))
 else:
     print("unknown", argv, file=sys.stderr); sys.exit(2)
 '''
@@ -77,7 +88,7 @@ HIT = {
     "path": "genesis/docs/plan.md",
     "score": 0.61,
     "producer": "semantic",
-    "method": "bafyfixturemethod",
+    "method": "bafyreigdsxgzho6gcbnfilr2ry5itsejmtaixvpf44ej6wgqccgxy6rn6e",
     "model": "bafkfixturemodel",
     "fold_lag": 3,
     "best_section": {"title": "Task 4.6: Fold-lag freshness", "lines": "137:147"},
@@ -253,6 +264,63 @@ class SurfacingTest(unittest.TestCase):
         self.assertEqual(searched[searched.index("--search-scope") + 1], ".")
         self.assertIn("--json", searched)
         self.assertIn("genesis/docs/plan.md", done.stdout)
+
+    def status_calls(self) -> list[list[str]]:
+        return [argv for argv in self.calls() if argv[:4] == ["flow", "memory", "index", "status"]]
+
+    # 8
+    def test_every_line_prints_its_producer_and_method(self) -> None:
+        done, _ = self.prompt(LAG="3")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        hit_lines = [line for line in done.stdout.splitlines() if line.strip().startswith("[cosine")]
+        self.assertEqual(len(hit_lines), 1, done.stdout)
+        self.assertIn("· semantic · method bafyreig…rn6e", hit_lines[0])
+        self.assertIn("· fold 3 files behind", hit_lines[0])
+
+        self.session = f"t46-{uuid.uuid4().hex[:12]}"
+        current, _ = self.prompt(LAG="0")
+        line = [l for l in current.stdout.splitlines() if l.strip().startswith("[cosine")][0]
+        self.assertIn("· semantic · method bafyreig…rn6e", line)
+        self.assertNotIn("files behind", line, "a current fold adds no lag clause")
+
+    def test_a_candidate_with_no_method_is_not_surfaced(self) -> None:
+        unmethodical = {k: v for k, v in HIT.items() if k != "method"}
+        done, _ = self.prompt(CANDIDATES=json.dumps([unmethodical]))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout, "")
+
+    # 9
+    def test_the_lag_is_read_from_the_search_answer(self) -> None:
+        done, _ = self.prompt(LAG="3")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.wait_for_fold()
+        self.assertEqual(self.status_calls(), [], "no separate status call when the answer carries the lag")
+        self.assertEqual(len(self._fold_calls()), 1)
+
+    def test_status_is_the_fallback_when_the_search_gave_no_reading(self) -> None:
+        done, _ = self.prompt(LAG="4", SEARCH_FAIL="1")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout, "")
+        self.assertEqual(len(self.status_calls()), 1)
+        self.wait_for_fold()
+        self.assertEqual(len(self._fold_calls()), 1, "the fallback lag still converges the fold")
+
+    # 10
+    def test_the_spawn_log_keeps_its_tail_past_one_mebibyte(self) -> None:
+        log = self.root / ".eprfs/status/index/fold-spawn.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        old_line = b"old spawn output line that retention may drop\n"
+        body = old_line * ((1 << 20) // len(old_line) + 200)
+        body += b"THE-NEWEST-OLD-LINE\n"
+        log.write_bytes(body)
+        done, _ = self.prompt(LAG="3")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.wait_for_fold()
+        text = log.read_bytes()
+        self.assertLessEqual(len(text), (256 << 10) + 4096, len(text))
+        self.assertIn(b"THE-NEWEST-OLD-LINE", text, "the tail survives")
+        self.assertTrue(text.startswith(old_line), "the kept tail starts at a line boundary")
+        self.assertIn(b"surfacing spawns index fold", text)
 
 
 if __name__ == "__main__":
