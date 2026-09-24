@@ -598,3 +598,69 @@ fn rebuild_starts_the_retry_count_fresh() {
         assert!(retried <= 1, "the retry count starts fresh, got {retried}");
     }
 }
+
+#[test]
+fn unparsed_updated_at_keeps_the_fold_degraded_across_runs() {
+    // A row the fold could not date is a hole in the watermark's order. The count persists in the
+    // store's own `meta` and is OR'd into every later run's verdict, so the degraded reading does
+    // not vanish the moment a later batch happens to read only datable rows (ruling R-S11, W3).
+    let peer = peer();
+    let index = open_with(&peer, declared_with_cap(10));
+    create(
+        &peer,
+        input("readable", "Readable row", serde_json::json!({})),
+    );
+    create(
+        &peer,
+        input("undated", "Undated row", serde_json::json!({})),
+    );
+    sql(
+        &peer,
+        "UPDATE content SET updated_at = 'whenever, really' WHERE id = 'undated'",
+    );
+    let first = fold(&peer, &index);
+    assert_eq!(
+        first.unparsed_at, 1,
+        "the undated row is counted: {first:?}"
+    );
+    assert!(
+        matches!(
+            index.snapshot().attestation.unwrap().state,
+            FoldState::Degraded { .. }
+        ),
+        "the run that read it attests degraded"
+    );
+
+    // Every row is datable now, and the watermark has passed them: a later run reads nothing
+    // undated at all — and must still not claim a complete fold.
+    age_rows(&peer);
+    let later = fold(&peer, &index);
+    assert_eq!(
+        later.unparsed_at, 0,
+        "this batch itself dated every row it read: {later:?}"
+    );
+    let state = index.snapshot().attestation.expect("a run attests").state;
+    assert!(
+        matches!(state, FoldState::Degraded { .. }),
+        "the persisted count keeps the verdict degraded until a rebuild: {state:?}"
+    );
+
+    // Only a rebuild clears it: a new store starts with no unparsed rows to its name.
+    drop(index);
+    let path = store_path(peer.dir.path(), &declared_with_cap(10).measure_cid);
+    std::fs::write(&path, b"this is not a sqlite database").unwrap();
+    let index = open_with(&peer, declared_with_cap(10));
+    assert!(
+        index.opened().starts_with("rebuilt ("),
+        "{}",
+        index.opened()
+    );
+    for _ in 0..3 {
+        fold(&peer, &index);
+    }
+    let state = index.snapshot().attestation.expect("a run attests").state;
+    assert!(
+        matches!(state, FoldState::Complete),
+        "a rebuilt store starts honest: {state:?}"
+    );
+}

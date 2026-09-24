@@ -76,6 +76,11 @@ pub const META_WATERMARK_AT: &str = "watermark_updated_at";
 pub const META_WATERMARK_ID: &str = "watermark_id";
 /// How far the demotion sweep has walked the store's own unit ids (ruling R-S10, review W1).
 pub const META_DEMOTE_CURSOR: &str = "demote_cursor";
+/// Rows this fold has read and could NOT date — `datetime()` could not read their `updated_at`
+/// (ruling R-S11, review W3). It lives in the store's own `meta`, so it survives a restart, and
+/// it is cleared only when the store is rebuilt: a hole in the watermark's order is not repaired
+/// by a later batch that happens to read only datable rows.
+pub const META_UNPARSED_AT: &str = "unparsed_at";
 
 /// The one surface root a content fold's heads are taken per: the `Content` kind it declares.
 const SURFACE_ROOT: &str = "Content";
@@ -276,6 +281,11 @@ pub struct FoldReport {
     pub swept: usize,
     /// Rows in this batch whose `updated_at` SQLite's `datetime()` could not read (review m2).
     pub unparsed_at: usize,
+    /// Rows the fold has read and could not date since the store was built — this batch's count
+    /// OR'd into the one persisted in `meta` (ruling R-S11, review W3). This, and not this
+    /// batch's own count, is what the run's attestation reads: a rebuild clears it, a quiet
+    /// batch does not.
+    pub unparsed_at_known: usize,
     /// Body chunks the per-unit cap dropped.
     pub dropped: usize,
     /// Content rows past the last row this run read.
@@ -595,16 +605,28 @@ impl SearchIndex {
                  lexically and the fold attests degraded rather than complete"
             );
         }
+        // The unparsed tally is sticky until a rebuild: this run's count, or the one the store
+        // already carries, whichever is larger. A row the fold could not date sits at an unknown
+        // place in the watermark's order, and the next run reading only datable rows does not
+        // make that hole go away (ruling R-S11, review W3).
+        let carried: usize = meta
+            .get(META_UNPARSED_AT)
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0);
+        report.unparsed_at_known = carried.max(report.unparsed_at);
+        let unparsed_moved = report.unparsed_at_known != carried;
         let changed = !insert.is_empty() || !demote.is_empty();
         let cursor_moved = next_cursor != cursor;
-        if changed || report.advanced || cursor_moved {
+        if changed || report.advanced || cursor_moved || unparsed_moved {
             let at = chrono::Utc::now().timestamp();
             store
                 .fold_txn(at, &demote, &insert, |tx| {
+                    let unparsed = report.unparsed_at_known.to_string();
                     for (key, value) in [
                         (META_WATERMARK_AT, next_mark.0.as_str()),
                         (META_WATERMARK_ID, next_mark.1.as_str()),
                         (META_DEMOTE_CURSOR, next_cursor.as_str()),
+                        (META_UNPARSED_AT, unparsed.as_str()),
                     ] {
                         tx.execute(
                             "INSERT INTO meta (key, value) VALUES (?1, ?2) \
@@ -621,8 +643,10 @@ impl SearchIndex {
         // A row whose `updated_at` cannot be read is unaccounted for — its place in the
         // watermark's order is a guess — so the run says degraded rather than claiming a complete
         // fold of rows it could not date. `FoldAttestation` carries no omissions list, so the
-        // state is where this lands; the ids are named in the log above (review m2).
-        let state_now = if report.behind == 0 && report.unparsed_at == 0 {
+        // state is where this lands; the ids are named in the log above (review m2). The count is
+        // the store's persisted one, not just this batch's: a degraded verdict earned by an
+        // undated row stands until the fold is rebuilt (ruling R-S11, review W3).
+        let state_now = if report.behind == 0 && report.unparsed_at_known == 0 {
             FoldState::Complete
         } else {
             FoldState::Degraded {
