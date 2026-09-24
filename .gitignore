@@ -154,6 +154,18 @@ genesis/research/repos/
 # shape as gap-items and memory above: only the ROOT store is reopened; `**/.eprfs/` still ignores
 # every NESTED sidecar under this path.
 !/.eprfs/status/balance/
+# FOURTH EXCEPTION: `.eprfs/status/participants/` holds the participant ROSTERS, one
+# `<handle>.jsonl` per human handle (ruling R-P5 of the 2026-09-25 post-station-4 sprint plan):
+# append-only, device-signed rows carrying only PUBLIC material — a witness or self-claim genesis
+# row, device bindings, contests; `did:key` identities and signatures, never an email, a git name
+# or a Che namespace. A roster is the one place a human's standing survives past this working
+# tree (git is its transport at the repo node, the way `mishpat::bind_identity` will be on the
+# DHT), and it has a reader from the day it is born (`epr actor current`'s standing read). Same
+# ladder shape as the three above: only the ROOT store is reopened. The `.enroll-<handle>.json`
+# files beside the rosters are a device's PENDING enrolment nonce, spent by `epr actor device
+# bind` — per-device and transient, so they stay ignored inside the reopened directory.
+!/.eprfs/status/participants/
+/.eprfs/status/participants/.enroll-*.json
 # TERMINAL, and deliberately NOT a re-include: `.eprfs/status/recall/` holds recall receipts and
 # session continuations. Those are PRIVATE records under `private-thought-governed-fruit` §2 — a
 # participant's reasoning trace, never fruit — so they are never imported, witnessed, projected or
