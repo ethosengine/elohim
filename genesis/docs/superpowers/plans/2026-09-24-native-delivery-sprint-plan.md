@@ -805,8 +805,27 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
   commitments (Z.D). The **social boundary is a reach elevation**: the first *other* human's device
   claiming into the commons is the moment the collective exists and Qahal governance (membership,
   consent, redress) applies to the same record set. Home: imagodei/stewardship first (D2/D4), Qahal
-  (D7) at the boundary. Needs its own brainstorm + spec; the first collective-discipline work with a
-  felt user.
+  (D7) at the boundary. **Second refinement (operator, same day): the first expression is
+  peer-native, not git notes.** Two workspaces (this Che workspace and the operator's P52s
+  ThinkPad) run simultaneously as *peer-aware peer runtimes* — each a stewarded device of matthew
+  joined to the same network (the T3 rung `just dev conductor alpha`, `local-conductor` set
+  per-run). The story already exists and is HELD only on that capability:
+  `genesis/a2o/held/features/auth/stewarded-device-sync.feature` (workspace agent W bound as a
+  controller of matthew's identity head; transport binding; writes recognised at community reach
+  under a `delegates-compute` grant; "a second household device makes the same handshake") — spec
+  `2026-08-30-workspace-stewarded-device-peer-design.md`. The collaboration records ride the
+  node-registry DNA the devices already join (`NodeRegistration` + `NodeHeartbeat` = the berth
+  mooring made native). A claim on `dev` integration / a write-set / cargo / the fleet pin is
+  **an REA Commitment** — the vocabulary `epr flow claim` already mints in the sidecar — notarized
+  on the DHT between the devices (`CustodianAssignment` was checked and is content custody, the
+  wrong shape for a lease); both devices see each other's claims through the DHT and pre-push reads
+  the claim from the local peer. Git notes-refs remain only as the projection for runtime-less
+  peers (the CI runner). **Trajectory (operator):** VS Code (local) + OSS VS Code (Eclipse Che) →
+  `lvi` (local: the runtime IS the peer, the editor attaches) → `lvi` on a peer through a doorway
+  (Che rebuilt native); the peer-awareness is the same at every rung, lvi only makes the device a
+  peer by construction (`project_lvi_devspace_peer_runtime`, spec 2026-07-20). Needs its own
+  brainstorm + spec; the first collective-discipline work with a felt user, and the story that
+  returns the held feature to the plate.
 
 - rakia portal aesthetic pass (graphos) — input: Lane G data contract.
 - kitsune2 structural fixes (running_cells not hostage to join; one read per sector) — arc rung 3.
