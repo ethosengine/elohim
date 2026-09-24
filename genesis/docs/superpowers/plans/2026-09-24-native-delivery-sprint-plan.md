@@ -798,8 +798,15 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
   notes-refs on the shared remote (`refs/notes/ethosengine/claims/*`) written by `berth claim`,
   read by pre-push (refuse while another device holds the lease or an open claim overlaps the
   changed paths; TTL on claims); the qahal DNA hosts the same records later and the notes-refs become
-  its projection. Needs its own brainstorm + spec (D7, Qahal); the first Qahal work with a felt
-  user.
+  its projection. **Refined by the operator the same day:** every device and agent is *matthew's*
+  stewarded device, so the level is born at reach `self` — a self-governed steward collective
+  (one human, many hands): witness + claims, no consent ceremony; conflicts are the same person's
+  two hands and the steward's own rule resolves them; agents' claims are bounded by the steward's
+  commitments (Z.D). The **social boundary is a reach elevation**: the first *other* human's device
+  claiming into the commons is the moment the collective exists and Qahal governance (membership,
+  consent, redress) applies to the same record set. Home: imagodei/stewardship first (D2/D4), Qahal
+  (D7) at the boundary. Needs its own brainstorm + spec; the first collective-discipline work with a
+  felt user.
 
 - rakia portal aesthetic pass (graphos) — input: Lane G data contract.
 - kitsune2 structural fixes (running_cells not hostage to join; one read per sector) — arc rung 3.
