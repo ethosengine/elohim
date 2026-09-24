@@ -16,6 +16,7 @@
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/epr/**",
           "elohim/epr-rea/**",
+          "elohim/epr-index/**",
           "elohim/Cargo.toml",
           "bridges/did/Cargo.toml",
           "bridges/did/did-bridge/**",
