@@ -911,25 +911,21 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
 fi
 
 # Package locally through the SDK's checked archive operation. The source dist
-# is immutable; every retry uploads the exact same checked archive bytes.
-SDK_PACKAGE="$(cd "$(dirname "$0")/../.." && pwd)/elohim/sdk/scripts/package-app.mjs"
+# is immutable; every retry uploads the exact same checked archive bytes. The
+# recipe lives in lib/bundle-zip.sh so the deploy intent (fleet-write-readiness.sh)
+# and the release publisher name the SAME CID this leg uploads.
+# shellcheck source=lib/bundle-zip.sh
+. "$(dirname "$0")/lib/bundle-zip.sh"
 # No trap here: the ONE exit trap at the top of this file already names
 # package_dir, and a second `trap … EXIT` would silently replace it.
 package_dir=$(mktemp -d)
-app_dir=$(cd "$DIST_DIR/../../.." && pwd)
-package_args=(--adapter "$(dirname "$SDK_PACKAGE")/package-angular.mjs" --dist "$DIST_DIR" --kind "$KIND" --out "$package_dir" --app-dir "$app_dir")
-# Server/browser artifacts are published separately, but their build context is
-# checked together. The actual server build must carry the same build stamp.
-if [ "$KIND" = server ] && [ -f "$DIST_DIR/../browser/version.json" ]; then
-    package_args+=(--version "$DIST_DIR/../browser/version.json")
-fi
-if ! node "$SDK_PACKAGE" "${package_args[@]}"; then
+if ! bundle_zip "$DIST_DIR" "$KIND" "$package_dir"; then
     echo "ERROR: [$SLUG] local package checks failed before upload" >&2
     exit 2
 fi
-SPA_ARCHIVE="$package_dir/$KIND.zip"
-SPA_HASH="sha256-$(sha256sum "$SPA_ARCHIVE" | awk '{print $1}')"
-SPA_SIZE="$(du -h "$SPA_ARCHIVE" | cut -f1)"
+SPA_ARCHIVE="$BUNDLE_ZIP_ARCHIVE"
+SPA_HASH="$BUNDLE_ZIP_HASH"
+SPA_SIZE="$BUNDLE_ZIP_SIZE"
 echo "[${SLUG}] blob hash: ${SPA_HASH}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 

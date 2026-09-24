@@ -589,6 +589,8 @@ check "(j) a structural 4xx is still immediate" \
 # attempt, with its two arguments and no wrapper of any kind.
 shim="${root}/shim"; mkdir -p "${shim}"
 cp "${script}" "${shim}/stage-spa-blob.sh"
+# The packaging recipe the script sources travels with it (lib/bundle-zip.sh).
+mkdir -p "${shim}/lib" && cp "$(dirname "${script}")/lib/bundle-zip.sh" "${shim}/lib/"
 cat > "${shim}/deliverability-gate.sh" <<'GATE'
 #!/bin/bash
 printf '%s\n' "$*" >> "${FAKE_STATE}/gate-calls"
