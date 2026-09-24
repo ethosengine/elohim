@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as AjvNs from 'ajv/dist/2020.js';
@@ -21,6 +21,7 @@ const addFormatsFn: (ajv: AjvNs.default) => void =
 
 import { aggregate } from './lib/aggregate.js';
 import { readDeclaredConcerns } from './lib/declared-concerns.js';
+import { publishHouseholdEvidence } from './lib/household-attestation.js';
 import { loadConsoleArtifacts } from './lib/load-console.js';
 import { loadCoverageGap } from './lib/load-coverage-gap.js';
 import { loadCucumber } from './lib/load-cucumber.js';
@@ -169,6 +170,18 @@ function main() {
     );
     process.exit(3);
   }
+
+  // The report is the evidence; these are its projections, and neither changes the verdict.
+  // A household run fulfils its valueflow commitments (`epr flow fulfill`, formerly by hand)
+  // and leaves one signed ValidationAttestation per concern, keyed by env.sut, that the
+  // pre-push T2 reader admits as the receipt (genesis/orchestrator/scripts/serving-receipt.mjs).
+  // Each step runs only when its binary is on this host and says so when it is not.
+  publishHouseholdEvidence({
+    report,
+    reportPath: resolve(args.outJson),
+    repoRoot: REPO_ROOT,
+    env: process.env,
+  });
 }
 
 /**
