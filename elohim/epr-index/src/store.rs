@@ -145,13 +145,27 @@ impl Store {
         Ok(Self { conn })
     }
 
-    /// Remove a store that cannot serve — its file and SQLite's journal, WAL and shared-memory
-    /// siblings — so the next [`Store::create`] starts clean. Replaced, never patched.
+    /// Remove a store that cannot serve — its file, SQLite's journal, WAL and shared-memory
+    /// siblings, AND the attestation history beside it — so the next [`Store::create`] starts
+    /// clean. Replaced, never patched.
+    ///
+    /// The attestations go with the store because they describe THAT store: a rebuilt fold holds
+    /// none of the units the old log attested, and `next_retry` reading the old
+    /// [`crate::attest::LATEST_FILE`] would carry a retry count earned by a store that no longer
+    /// exists into the first run of one that has never failed (review m1, ruling R-S10).
     pub fn remove(path: &Path) -> std::io::Result<()> {
         for suffix in ["", "-journal", "-wal", "-shm"] {
             let stale = PathBuf::from(format!("{}{suffix}", path.display()));
             if stale.exists() {
                 std::fs::remove_file(&stale)?;
+            }
+        }
+        if let Some(dir) = path.parent() {
+            for name in [crate::attest::LATEST_FILE, crate::attest::LOG_FILE] {
+                let stale = dir.join(name);
+                if stale.exists() {
+                    std::fs::remove_file(&stale)?;
+                }
             }
         }
         Ok(())
@@ -212,6 +226,45 @@ impl Store {
                 },
             ))
         })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// The live units among `unit_ids` — the batch-scoped read a fold uses to decide which of
+    /// the rows it just read have moved. [`Store::live_units`] materialises every unit the fold
+    /// holds; this reads only what the caller is about to compare (ruling R-S10, review W3).
+    pub fn live_units_for(&self, unit_ids: &[String]) -> Result<BTreeMap<String, LiveUnit>> {
+        if unit_ids.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let places = std::iter::repeat_n("?", unit_ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let mut statement = self.conn.prepare(&format!(
+            "SELECT unit_id, fingerprint, stat FROM units \
+             WHERE demoted_at IS NULL AND unit_id IN ({places})"
+        ))?;
+        let rows = statement.query_map(rusqlite::params_from_iter(unit_ids), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                LiveUnit {
+                    fingerprint: row.get(1)?,
+                    stat: row.get(2)?,
+                },
+            ))
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// The next `limit` live unit ids after `cursor`, in id order — one page of the demotion
+    /// sweep. A fold walks the store a bounded page at a time and asks its own source whether
+    /// those ids still exist, instead of materialising every id on both sides each run (ruling
+    /// R-S10, reviews W1 and W3).
+    pub fn live_unit_ids_after(&self, cursor: &str, limit: u32) -> Result<Vec<String>> {
+        let mut statement = self.conn.prepare(
+            "SELECT unit_id FROM units WHERE demoted_at IS NULL AND unit_id > ?1 \
+             ORDER BY unit_id LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![cursor, limit], |row| row.get::<_, String>(0))?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 

@@ -74,6 +74,8 @@ pub const META_MEASURE: &str = "measure";
 pub const META_UNIT: &str = "unit";
 pub const META_WATERMARK_AT: &str = "watermark_updated_at";
 pub const META_WATERMARK_ID: &str = "watermark_id";
+/// How far the demotion sweep has walked the store's own unit ids (ruling R-S10, review W1).
+pub const META_DEMOTE_CURSOR: &str = "demote_cursor";
 
 /// The one surface root a content fold's heads are taken per: the `Content` kind it declares.
 const SURFACE_ROOT: &str = "Content";
@@ -135,6 +137,10 @@ pub struct ContentRow {
     /// `updated_at` on one clock: `coalesce(datetime(updated_at), updated_at)`.
     #[diesel(sql_type = Text)]
     pub at_key: String,
+    /// 1 when SQLite's `datetime()` could not read this row's `updated_at`, so its `at_key` is
+    /// the raw string and orders lexically among the parsed ones (review m2).
+    #[diesel(sql_type = BigInt)]
+    pub at_unparsed: i64,
 }
 
 #[derive(QueryableByName)]
@@ -149,6 +155,13 @@ struct IdRow {
     id: String,
 }
 
+/// One `datetime()` value read from the database's own clock.
+#[derive(QueryableByName)]
+struct AtRow {
+    #[diesel(sql_type = Text)]
+    at_key: String,
+}
+
 #[derive(QueryableByName)]
 struct CountRow {
     #[diesel(sql_type = BigInt)]
@@ -161,10 +174,24 @@ const AT_KEY: &str = "coalesce(datetime(updated_at), updated_at)";
 fn rows_after_sql() -> String {
     format!(
         "SELECT id, h_app_id, title, description, content_format, content_body, blob_cid, \
-         {AT_KEY} AS at_key FROM content \
+         {AT_KEY} AS at_key, (datetime(updated_at) IS NULL) AS at_unparsed FROM content \
          WHERE {AT_KEY} > ?1 OR ({AT_KEY} = ?1 AND id > ?2) \
          ORDER BY at_key, id LIMIT ?3"
     )
+}
+
+/// The settle cutoff, read from the SAME connection the `updated_at` values are compared on:
+/// `datetime('now', '-N seconds')`. Taking it from the process clock instead compares two
+/// clocks that can disagree — a forward step on either side parks the watermark at a time the
+/// rows never reach, and the run goes on attesting against a cutoff its own store cannot
+/// explain (ruling R-S10, review W2).
+pub fn settle_cutoff(conn: &mut SqliteConnection) -> Result<String, String> {
+    Ok(diesel::sql_query(format!(
+        "SELECT datetime('now', '-{SETTLE_SECONDS} seconds') AS at_key"
+    ))
+    .get_result::<AtRow>(conn)
+    .map_err(fault("read the database clock"))?
+    .at_key)
 }
 
 fn count_after_sql() -> String {
@@ -245,6 +272,10 @@ pub struct FoldReport {
     pub unchanged: usize,
     /// Units demoted because their row is gone.
     pub demoted: usize,
+    /// Live units the demotion sweep compared against `content` this run (its bounded page).
+    pub swept: usize,
+    /// Rows in this batch whose `updated_at` SQLite's `datetime()` could not read (review m2).
+    pub unparsed_at: usize,
     /// Body chunks the per-unit cap dropped.
     pub dropped: usize,
     /// Content rows past the last row this run read.
@@ -455,7 +486,11 @@ impl SearchIndex {
             .load(conn)
             .map_err(fault("read content"))?;
 
-        let live: BTreeMap<String, LiveUnit> = store.live_units().map_err(|e| e.to_string())?;
+        // Batch-scoped: only the units this run is about to compare, never the whole fold.
+        let batch_ids: Vec<String> = rows.iter().map(|row| row.id.clone()).collect();
+        let live: BTreeMap<String, LiveUnit> = store
+            .live_units_for(&batch_ids)
+            .map_err(|e| e.to_string())?;
         let mut report = FoldReport {
             seen: rows.len(),
             ..FoldReport::default()
@@ -482,26 +517,52 @@ impl SearchIndex {
                 report.dropped += dropped;
                 insert.push(unit);
             }
+            report.unparsed_at += usize::from(row.at_unparsed != 0);
         }
 
-        // A unit whose row is gone is demoted by the first run that observes it.
-        let present: BTreeSet<String> = diesel::sql_query("SELECT id FROM content")
-            .load::<IdRow>(conn)
-            .map_err(fault("list content ids"))?
-            .into_iter()
-            .map(|r| r.id)
-            .collect();
-        let demote: Vec<String> = live
-            .keys()
+        // A unit whose row is gone is demoted — swept ONE bounded page of the store's own ids per
+        // run, from a cursor that drains across runs, and asked about in a single `IN` query.
+        // Materialising every live unit and every content id each run made a no-op sweep cost the
+        // whole corpus twice (ruling R-S10, reviews W1 and W3).
+        let cursor = meta.get(META_DEMOTE_CURSOR).cloned().unwrap_or_default();
+        let page = store
+            .live_unit_ids_after(&cursor, cap as u32)
+            .map_err(|e| e.to_string())?;
+        report.swept = page.len();
+        let present: BTreeSet<String> = if page.is_empty() {
+            BTreeSet::new()
+        } else {
+            let places = std::iter::repeat_n("?", page.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let mut query =
+                diesel::sql_query(format!("SELECT id FROM content WHERE id IN ({places})"))
+                    .into_boxed();
+            for id in &page {
+                query = query.bind::<Text, _>(id);
+            }
+            query
+                .load::<IdRow>(conn)
+                .map_err(fault("check swept ids"))?
+                .into_iter()
+                .map(|r| r.id)
+                .collect()
+        };
+        let demote: Vec<String> = page
+            .iter()
             .filter(|id| !present.contains(*id))
             .cloned()
             .collect();
+        // A short page is the end of a cycle: the next run starts the walk again.
+        let next_cursor = match page.last() {
+            Some(last) if page.len() as i64 == cap => last.clone(),
+            _ => String::new(),
+        };
 
-        // The watermark: the last row read, but never past the settle window.
+        // The watermark: the last row read, but never past the settle window — and the window is
+        // measured by the database's own clock, the one the rows are stamped and compared on.
         let last = rows.last().map(|r| (r.at_key.clone(), r.id.clone()));
-        let cutoff = (chrono::Utc::now() - chrono::Duration::seconds(SETTLE_SECONDS))
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
+        let cutoff = settle_cutoff(conn)?;
         let next_mark = match &last {
             None => mark.clone(),
             Some(key) if key.0 < cutoff => key.clone(),
@@ -520,14 +581,30 @@ impl SearchIndex {
 
         report.folded = insert.len();
         report.demoted = demote.len();
+        if report.unparsed_at > 0 {
+            let named: Vec<&str> = rows
+                .iter()
+                .filter(|row| row.at_unparsed != 0)
+                .map(|row| row.id.as_str())
+                .take(5)
+                .collect();
+            tracing::warn!(
+                unparsed = report.unparsed_at,
+                ids = ?named,
+                "content search: rows whose updated_at datetime() cannot read — they order \
+                 lexically and the fold attests degraded rather than complete"
+            );
+        }
         let changed = !insert.is_empty() || !demote.is_empty();
-        if changed || report.advanced {
+        let cursor_moved = next_cursor != cursor;
+        if changed || report.advanced || cursor_moved {
             let at = chrono::Utc::now().timestamp();
             store
                 .fold_txn(at, &demote, &insert, |tx| {
                     for (key, value) in [
                         (META_WATERMARK_AT, next_mark.0.as_str()),
                         (META_WATERMARK_ID, next_mark.1.as_str()),
+                        (META_DEMOTE_CURSOR, next_cursor.as_str()),
                     ] {
                         tx.execute(
                             "INSERT INTO meta (key, value) VALUES (?1, ?2) \
@@ -541,7 +618,11 @@ impl SearchIndex {
         }
         drop(store);
 
-        let state_now = if report.behind == 0 {
+        // A row whose `updated_at` cannot be read is unaccounted for — its place in the
+        // watermark's order is a guess — so the run says degraded rather than claiming a complete
+        // fold of rows it could not date. `FoldAttestation` carries no omissions list, so the
+        // state is where this lands; the ids are named in the log above (review m2).
+        let state_now = if report.behind == 0 && report.unparsed_at == 0 {
             FoldState::Complete
         } else {
             FoldState::Degraded {

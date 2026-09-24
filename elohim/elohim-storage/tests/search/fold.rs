@@ -6,12 +6,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use diesel::connection::SimpleConnection;
+use diesel::RunQueryDsl;
 use elohim_epr_index::attest::{LATEST_FILE, LOG_FILE};
 use elohim_epr_index::terms::match_expression;
 use elohim_epr_rea::{FoldAttestation, FoldState};
 use elohim_storage::db::content_diesel::{self, CreateContentInput};
 use elohim_storage::db::{init_pool_from_dir, AppContext, DbPool};
 use elohim_storage::search::fold::{store_path, HEAD_SECTION, INDEX_DIR, STORE_FILE, TAGS_SECTION};
+use elohim_storage::search::measure::{MEASURE_JSON, RECIPE_JSON};
 use elohim_storage::search::{Declared, SearchIndex};
 use elohim_storage::services::events::EventBus;
 use elohim_storage::services::ContentService;
@@ -81,6 +83,17 @@ fn matches(index: &SearchIndex, term: &str) -> Vec<(String, String)> {
             .map(|(_, id, unit)| (unit, store.chunk(id).unwrap().0))
             .collect()
     })
+}
+
+/// Move every row's `updated_at` a minute into the past — out of the settle window, which
+/// deliberately re-reads anything stamped within [`SETTLE_SECONDS`] of now. A fixture that needs
+/// the watermark to advance across several runs ages its rows first; without this a small
+/// per-run cap can never get past its first batch, because every row is still settling.
+fn age_rows(peer: &Peer) {
+    sql(
+        peer,
+        "UPDATE content SET updated_at = datetime('now', '-1 minute')",
+    );
 }
 
 fn sql(peer: &Peer, statement: &str) {
@@ -315,4 +328,273 @@ async fn notify_wakes_the_loop() {
         matches(&index, "orchard"),
         [("woken".into(), HEAD_SECTION.into())]
     );
+}
+
+// ── The fold loop's bounds (ruling R-S10, the first-tranche review) ──
+
+/// A `Declared` whose fold-lag limit — the per-run cap on rows read AND on units swept for
+/// demotion — is `limit`, so a bound that the shipped 200 would need 200 rows to show is
+/// measurable with a handful.
+fn declared_with_cap(limit: u64) -> Declared {
+    let mut measure: serde_json::Value = serde_json::from_str(MEASURE_JSON).unwrap();
+    measure["foldLag"]["limit"] = serde_json::json!(limit);
+    Declared::from_json(&measure.to_string(), RECIPE_JSON).expect("a capped declaration")
+}
+
+fn open_with(peer: &Peer, declared: Declared) -> SearchIndex {
+    SearchIndex::open(peer.dir.path(), declared, "test-peer").unwrap()
+}
+
+#[test]
+fn demote_set_is_capped_per_run_and_drained() {
+    let peer = peer();
+    let index = open_with(&peer, declared_with_cap(3));
+    for n in 0..7 {
+        create(
+            &peer,
+            input(
+                &format!("orchard-{n}"),
+                &format!("Orchard {n}"),
+                serde_json::json!({}),
+            ),
+        );
+    }
+    age_rows(&peer);
+    // Fold them in (3 rows a run, the same cap).
+    for _ in 0..4 {
+        fold(&peer, &index);
+    }
+    assert_eq!(matches(&index, "orchard").len(), 7, "all seven are folded");
+
+    sql(&peer, "DELETE FROM content");
+    let mut demoted = 0;
+    let mut runs = 0;
+    for _ in 0..10 {
+        let report = fold(&peer, &index);
+        assert!(
+            report.demoted <= 3,
+            "a run demotes at most the declared cap: {report:?}"
+        );
+        assert!(
+            report.swept <= 3,
+            "a run sweeps at most the declared cap: {report:?}"
+        );
+        demoted += report.demoted;
+        runs += 1;
+        if matches(&index, "orchard").is_empty() {
+            break;
+        }
+    }
+    assert_eq!(demoted, 7, "every unit drains across runs");
+    assert!(
+        runs >= 3,
+        "seven units at three a run cannot drain in fewer: {runs}"
+    );
+    assert!(
+        matches(&index, "orchard").is_empty(),
+        "nothing stays live once its row is gone"
+    );
+}
+
+#[test]
+fn settle_cutoff_is_read_from_the_database_clock() {
+    let peer = peer();
+    let mut conn = peer.pool.get().unwrap();
+    let cutoff = elohim_storage::search::fold::settle_cutoff(&mut conn).expect("the db clock");
+
+    #[derive(diesel::QueryableByName)]
+    struct At {
+        #[diesel(sql_type = diesel::sql_types::Text)]
+        at_key: String,
+    }
+    let now: String = diesel::sql_query("SELECT datetime('now') AS at_key")
+        .get_result::<At>(&mut conn)
+        .unwrap()
+        .at_key;
+    let floor: String = diesel::sql_query("SELECT datetime('now', '-30 seconds') AS at_key")
+        .get_result::<At>(&mut conn)
+        .unwrap()
+        .at_key;
+    // The cutoff is this database's own time, a settle window back — not a second clock's.
+    assert!(cutoff < now, "{cutoff} is behind the db's now {now}");
+    assert!(
+        cutoff > floor,
+        "{cutoff} is inside the settle window of {now}"
+    );
+    assert_eq!(cutoff.len(), now.len(), "the same datetime() spelling");
+}
+
+#[test]
+fn forward_clock_step_does_not_park_the_watermark() {
+    let peer = peer();
+    let index = open_with(&peer, declared_with_cap(10));
+    create(
+        &peer,
+        input("settled", "Settled row", serde_json::json!({})),
+    );
+    // A row stamped ahead of the database's clock — a writer whose clock stepped forward.
+    create(
+        &peer,
+        input("ahead", "Row from the future", serde_json::json!({})),
+    );
+    sql(
+        &peer,
+        "UPDATE content SET updated_at = datetime('now', '+1 hour') WHERE id = 'ahead'",
+    );
+
+    let first = fold(&peer, &index);
+    assert_eq!(first.folded, 2, "both rows fold: {first:?}");
+
+    // The cutoff is the DATABASE's now, so the future row sits beyond it and the watermark
+    // clamps to the settle window — by design, that row is re-read (and found unchanged) until
+    // the clock catches up. What must NOT happen is the run reporting a backlog it has already
+    // folded, or attesting degraded forever because one writer's clock ran ahead.
+    let mut last = first;
+    for _ in 0..3 {
+        last = fold(&peer, &index);
+    }
+    assert_eq!(last.folded, 0, "nothing is re-chunked: {last:?}");
+    assert_eq!(
+        last.behind, 0,
+        "no phantom backlog behind the watermark: {last:?}"
+    );
+    assert!(
+        last.unchanged <= 2,
+        "at most the settling batch is re-read, never the corpus: {last:?}"
+    );
+    assert!(
+        matches!(
+            index.snapshot().attestation.map(|a| a.state),
+            Some(FoldState::Complete)
+        ),
+        "a fold that has read everything it can date attests complete"
+    );
+    assert_eq!(matches(&index, "future").len(), 1, "it is searchable");
+}
+
+#[test]
+fn a_no_op_sweep_reads_only_a_bounded_page() {
+    let peer = peer();
+    let index = open_with(&peer, declared_with_cap(4));
+    for n in 0..20 {
+        create(
+            &peer,
+            input(
+                &format!("meadow-{n:02}"),
+                &format!("Meadow {n}"),
+                serde_json::json!({}),
+            ),
+        );
+    }
+    age_rows(&peer);
+    for _ in 0..6 {
+        fold(&peer, &index);
+    }
+    assert_eq!(matches(&index, "meadow").len(), 20);
+
+    // Steady state: nothing changed, so a run reads one page of units (the cap) and nothing else.
+    // The old sweep materialised every live unit AND every content id on every run.
+    for _ in 0..5 {
+        let report = fold(&peer, &index);
+        assert_eq!(
+            report.demoted, 0,
+            "a no-op sweep demotes nothing: {report:?}"
+        );
+        assert!(
+            report.swept <= 4,
+            "a no-op sweep reads one bounded page, not the corpus: {report:?}"
+        );
+    }
+    assert_eq!(matches(&index, "meadow").len(), 20, "nothing was lost");
+}
+
+#[test]
+fn unparsable_updated_at_is_counted_and_keeps_the_fold_honest() {
+    let peer = peer();
+    let index = open_with(&peer, declared_with_cap(10));
+    create(
+        &peer,
+        input("readable", "Readable row", serde_json::json!({})),
+    );
+    create(
+        &peer,
+        input("undated", "Undated row", serde_json::json!({})),
+    );
+    sql(
+        &peer,
+        "UPDATE content SET updated_at = 'whenever, really' WHERE id = 'undated'",
+    );
+
+    let report = fold(&peer, &index);
+    assert_eq!(
+        report.unparsed_at, 1,
+        "the undated row is counted: {report:?}"
+    );
+    let state = index.snapshot().attestation.expect("a run attests").state;
+    assert!(
+        matches!(state, FoldState::Degraded { .. }),
+        "a fold that could not date a row it read does not claim complete: {state:?}"
+    );
+}
+
+#[test]
+fn rebuild_starts_the_retry_count_fresh() {
+    let peer = peer();
+    let index = open(&peer);
+    let dir = index.store_dir().to_path_buf();
+    create(&peer, input("a", "Repair cafe", serde_json::json!({})));
+    fold(&peer, &index);
+    // Stand in for a history of failed runs: an attestation whose retry count is high.
+    let attestation: FoldAttestation =
+        serde_json::from_slice(&std::fs::read(dir.join(LATEST_FILE)).unwrap()).unwrap();
+    let degraded = FoldAttestation {
+        state: FoldState::Degraded { retried: 9 },
+        ..attestation
+    };
+    std::fs::write(
+        dir.join(LATEST_FILE),
+        serde_json::to_vec(&degraded).unwrap(),
+    )
+    .unwrap();
+    drop(index);
+
+    // A store that cannot serve is replaced — and the attestation history goes with it, because
+    // it describes the store that is gone (review m1).
+    std::fs::write(
+        store_path(peer.dir.path(), &Declared::load().unwrap().measure_cid),
+        b"not a database",
+    )
+    .unwrap();
+    let index = open(&peer);
+    assert!(
+        index.opened().starts_with("rebuilt ("),
+        "{}",
+        index.opened()
+    );
+    assert!(
+        !dir.join(LATEST_FILE).exists(),
+        "the latest attestation went with the store"
+    );
+    assert!(!dir.join(LOG_FILE).exists(), "so did the log");
+    assert!(
+        index.snapshot().attestation.is_none(),
+        "a rebuilt store carries no attestation from the one it replaced"
+    );
+
+    // Its first degraded run starts counting from zero, not from the replaced store's nine.
+    for _ in 0..12 {
+        create(
+            &peer,
+            input(
+                &format!("row-{}", uuid::Uuid::new_v4().simple()),
+                "Repair cafe",
+                serde_json::json!({}),
+            ),
+        );
+    }
+    let index = open_with(&peer, declared_with_cap(2));
+    fold(&peer, &index);
+    if let Some(FoldState::Degraded { retried }) = index.snapshot().attestation.map(|a| a.state) {
+        assert!(retried <= 1, "the retry count starts fresh, got {retried}");
+    }
 }
