@@ -468,8 +468,8 @@
       }
     },
     {
-      "citesContentCid": "bafyreidmgsrdcdkiews5qqbojz3aeid22wmhpbkufdntxa4m4urruaunn4",
-      "citesContentSha256": "sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f",
+      "citesContentCid": "bafyreidhhj6ri4iuvrhnwip45zwvuayaisviuw4y7abogmwoonragxrqn4",
+      "citesContentSha256": "sha256:673a7d147114ac4edb21fcee6d5a030044aa8a5b98f802e332ce7362035e306f",
       "registry": "policies.yaml",
       "precedent": {
         "id": "destructive-git-requires-tier@1",
