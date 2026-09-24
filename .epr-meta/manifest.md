@@ -119,8 +119,10 @@ rules:
         create, move or rewrite files; report to the editing agent and let development continue.
     why: >
       Handoff documents are not an artifact class here: the handoff pattern was retired in
-      df250665f (2026-06-11) and the decompose discipline replaced it on 2026-06-23
-      (.claude/handoffs/archive/README.md). A concluded session's durable carrier is its sprint
+      df250665f (2026-06-11) and the decompose discipline replaced it on 2026-06-23; the last
+      holding pen (.claude/handoffs/) was drained to zero residue and deleted on 2026-09-24
+      (genesis/data/timeline/backlog/handoff-sprawl-decompose-2026-06-23.md). A concluded
+      session's durable carrier is its sprint
       result in genesis/docs/superpowers/sprints/. Decompose the rest: open work to
       genesis/data/timeline/backlog/, a lesson to a memory file or to
       genesis/docs/content/elohim-protocol/history/, and the narration to git history.
@@ -233,9 +235,9 @@ record of the act it describes.
 
 Two prose classes kept being born at the top level and swept out by hand: session handoffs
 (`HANDOFF-*.md`) and vulnerability-cluster sheets (`VULNERABILITY_CLUSTER_*.md`). Each has a named
-route at birth. `handoff-routes-to-sprints` sends a handoff to `genesis/docs/superpowers/sprints/`,
-and `.claude/handoffs/.epr-meta` widens that same rule id to every markdown birth there.
-`vulnerability-cluster-routes-to-backlog` sends a cluster sheet to a `security-*.md` backlog entry.
+route at birth. `handoff-routes-to-sprints` sends a handoff to `genesis/docs/superpowers/sprints/`
+(the `.claude/handoffs/` holding pen that once widened this rule was drained and deleted on
+2026-09-24, so the root rule is the only one). `vulnerability-cluster-routes-to-backlog` sends a cluster sheet to a `security-*.md` backlog entry.
 Both dispatch a report-only librarian review and never block.
 
 **Top-level allow-list — authoritative, not gate-enforced in v1.** The repository root holds only:

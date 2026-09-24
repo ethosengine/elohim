@@ -58,3 +58,39 @@ elsewhere. Keep the allowlist scoped so it can't become a blanket mute
 
 A scenario tagged `@allow-doorway-flake` tolerates the named environmental error while still
 failing on any other console error.
+
+## The opposite failure on the same seam: navigation scenarios cannot see a 404
+
+*(Moved here 2026-09-24 from `handoff-sprawl-decompose-2026-06-23.md`, Track C, when that entry
+closed. Re-verified in-tree the same day: still open.)*
+
+The allowlist above deals with a gate that is too strict. The browser navigation scenarios have the
+opposite problem, a gate that is too loose, in the same filter layer.
+`Then the page should load successfully` (`genesis/a2o/steps/ui/navigation.steps.ts`) only waits for
+`<body>` to be visible. `isSpaRoutingNoise` (`genesis/a2o/src/framework/utils/console-filters.ts`)
+deliberately drops 404, 403 and status-0 resource errors. As a result, a route can 404 on its data,
+render the not-found component, and still pass every scenario in
+`genesis/a2o/features/browser/navigation-browser.feature`. A related trap: an undeclared doorway
+path answers `200 text/html` with the SPA shell. A probe of `/p2p-peers` did exactly that on
+2026-09-24. Any JSON assertion therefore has to check `content-type`, not just the status code.
+
+**The cure is scoped, never blanket.** Do not add a global "no httpErrors" gate. Some live
+signatures are intended (for example a 403 at a commons reach gate), and a blanket gate would keep
+genesis red. Instead, each fixed route gets a navigation scenario that asserts on a rendered
+`data-testid` and on the absence of the *specific* signature the fix removed. `look.ts` capture
+(`httpErrors`, `pageErrors`) and the `apex-transition.steps.ts` `httpErrors` assertions are the
+precedent. Candidate routes from the 2026-06-23 shakeout:
+
+1. `/identity*` and root deep-links render the SPA shell, not a conductor or JSON 404. The doorway
+   side is locked by unit test `shakeout_service_path_identity_narrowed_to_did`.
+2. No `/wasm/elohim-cache-core/...` request fires on alpha or prod. The live residue is tracked in
+   `wasm-cache-core-404-persists-after-preferwasm-gate-2026-06-23.md`.
+3. `/map` degrades gracefully: `data-testid="map-error"` is present and there is no uncaught
+   pageerror.
+4. `custodians/metrics/recommendations` returns an honest 404, never a panic 503.
+5. Operator portal and auth: `/threshold/*` versus `/dashboard`. Author this one only after the
+   hosted-auth surface settles.
+
+Done when each route above that is still live has a scoped scenario that fails on its specific
+signature, and the generic page-load step is either retired or documented as a render-only smoke
+check.

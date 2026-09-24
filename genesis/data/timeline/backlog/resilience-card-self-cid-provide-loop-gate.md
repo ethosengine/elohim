@@ -299,3 +299,15 @@ cluster-read this triage lacks) decides:
   control proof lands — see the blocked
   `2026-06-15-coherent-transport-identity-resolver-design.md`. This item carries a
   p2p-design-gate; it is operator/security-owned, not an autonomous repo fix.
+
+## Resolution of the fork (recorded 2026-09-24, verified in-tree)
+
+The `/auth/me` probe never became the deciding measurement. The fork closed through the
+2026-06-15 resolver design's §3.4 stopgap instead, and no boot self-session was minted.
+`928bbb5ec` (2026-07-21) made membership projection stamp `humans.agent_pub_key`. The stamp is
+NULL-only, matched by `humans.id`, gated to HOUSEHOLD kind and guarded by `is_agent_cid`. That
+mapping now lives in `crate::db::memberships::project_membership`, which the cross-peer
+participations reconcile arm shares. Later cures, including non-self fossil keys, rekey drift and
+the shard-push transport resolve, are carried in memory
+`project_resilience_card_data_plumbing`. The 2026-06-18 structural finding was correct: nothing
+wrote the key. The cure did not need the session path the fork anticipated.

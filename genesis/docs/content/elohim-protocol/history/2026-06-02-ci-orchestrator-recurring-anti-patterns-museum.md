@@ -219,6 +219,13 @@ case, where the timeouts were real.
 `2026-08-14T02-42-saga-leg2-drain-regressions-profiler-eyes`, archived in
 `/projects/.claude-config/archive/shifts-stale-2026-09-22.tar.gz`.)*
 
+**An UNSTABLE result does not mean the build has finished.** Jenkins sets the build `result` to
+UNSTABLE at the first `catchError` while later stages are still running. A watcher that stops when
+`result != null` therefore reads a mid-build snapshot as the verdict. To wait for completion, poll
+`building: false`.
+*(The UNSTABLE-is-not-finished paragraph was harvested on 2026-09-24 from the removed
+`.claude/handoffs/HANDOFF-2026-07-27-heads-converge-truthful-resilience.md`, which is in git history.)*
+
 The second cluster (**#3/#5/#6**) is the same shape under three disguises: a check that passes on the
 host but fails in CI because the CI environment differs (Docker context, sccache wrapper, `--run-ignored
 all`). Host-green ≠ CI-green; the gap is the environment, not your code.

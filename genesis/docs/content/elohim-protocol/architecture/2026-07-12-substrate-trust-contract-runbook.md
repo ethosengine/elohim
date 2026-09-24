@@ -145,7 +145,11 @@ hit:
    canonical record → transport question: verify `iceServers` present in the
    live conductor-config ConfigMap and TURN reachable. The dead-key class is
    render-gated, but config can drift by other paths.
-5. **Escalate** with the evidence bundle: both heads + timestamps, the
+5. **A doorway's surface dropped right after it recovered?** Check whether it
+   ever held the rows before reading the drop as a regression — the recovered
+   doorway usually reveals a gap that was already there. Reading:
+   [recovered doorway reveals a gap, not a regression](../history/2026-07-27-recovered-doorway-reveals-gap-not-regression.md).
+6. **Escalate** with the evidence bundle: both heads + timestamps, the
    propagation console line, both diagnostics reads, the Loki heal lines.
 
 **`peer-store` thin (<5 addressed).** The primary conductor lost bootstrap

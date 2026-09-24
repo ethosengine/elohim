@@ -109,6 +109,12 @@ Two non-blocking discoveries from the recovery, preserved:
 - App-WS 4445 auth timeouts seen during diagnosis are FLEET-WIDE, not
   shem: filed separately as
   `app-port-4445-auth-timeout-fleet-wide.md`.
+- Not investigated (carried here 2026-09-24 from the removed 2026-07-29
+  saga handoff): during the same night's `POST /admin/steward-peers/refresh`,
+  susan's storage failed the steward-peers manifest fetch (`:8090/manifest`).
+  susan was the last shem pod to recover (04:02Z), so this may be the
+  hairpin window and not a separate defect. If a steward-peers refresh
+  outside a shem outage shows the same failure, give it its own entry.
 3. THEN DoD-1 is one HTTP lever away — but decide head direction first
    (see the declared-vs-declared finding in saga ch06: A's head is OLDER,
    08:56:34Z, than B's, 10:30:38Z, and they point at different SPA blobs;

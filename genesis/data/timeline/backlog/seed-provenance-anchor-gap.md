@@ -96,6 +96,17 @@ trigger** that exposed both failure populations at once.
 
 ## OPEN core — the provenance-anchor fix
 
+> **Update 2026-09-24 (verified in-tree during the `.claude/handoffs` drain).** Candidate 1 has landed
+> on both halves. Storage: `38d9b2247` added `dhtAnchorHash` to the create path at ingest. Seeder:
+> `2ef0cba16` (2026-06-18) makes `genesis/seeder/src/seed-sqlite.ts` attach a content-derived CIDv1
+> through `deriveContentAnchor` on every bulk create. `stampProvenance` now only reconciles reach.
+> Three things remain. (a) Rows seeded before the fix still have NULL provenance and cannot be
+> healed through PATCH, because `UpdateContentInputView` has no `dhtAnchorHash`. (b) The batch-loop
+> call-site comment in `seed-sqlite.ts` ("Stamp p2pPublishedAt so the seeded rows pass…") is stale:
+> the anchor is now written at create time. (c) The creator-read-exemption question below is still
+> not built. The 2026-06-18 sprint recommended YES, narrowly: key it on
+> `content.created_by == resolved requester`.
+
 The durable fix has two candidate homes (the shift settles which, gated by the design question):
 
 1. **Seed/import writes a derived anchor.** `CreateContentInputView` (`elohim-views/src/lamad.rs:108`)

@@ -24,7 +24,7 @@
 # manifest only wires the automatic scrape.
 #
 # Plan: genesis/docs/superpowers/plans/2026-06-17-design-decision-toolkit-plan.md
-# Handoff: .claude/handoffs/HANDOFF-2026-06-17-doorway-metrics.md
+# Metrics surface: doorway/doorway-service/src/metrics.rs (M1–M5 registered there; the 2026-06-17 handoff was decomposed 2026-09-24)
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
