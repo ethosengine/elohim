@@ -819,8 +819,13 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
   **an REA Commitment** — the vocabulary `epr flow claim` already mints in the sidecar — notarized
   on the DHT between the devices (`CustodianAssignment` was checked and is content custody, the
   wrong shape for a lease); both devices see each other's claims through the DHT and pre-push reads
-  the claim from the local peer. Git notes-refs remain only as the projection for runtime-less
-  peers (the CI runner). **Trajectory (operator):** VS Code (local) + OSS VS Code (Eclipse Che) →
+  the claim from the local peer. **Between clones the same record travels through brit, not git
+  notes** (operator question, same day): brit is the covenant on git — EPR content nodes in
+  `.git/brit/objects` with the SAME CID as their DHT twin (F1's parity test), synced as refs; a
+  claim is one more `BritRefManager` family (`refs/brit/claim/<resource>`) beside build / deploy /
+  validate / reach, and `reach compute` folds claims into the admission verdict ("may this push
+  land on dev" is a reach computation). The CI runner is a brit peer (F3 already writes build
+  attestations through it), never a runtime-less one. **Trajectory (operator):** VS Code (local) + OSS VS Code (Eclipse Che) →
   `lvi` (local: the runtime IS the peer, the editor attaches) → `lvi` on a peer through a doorway
   (Che rebuilt native); the peer-awareness is the same at every rung, lvi only makes the device a
   peer by construction (`project_lvi_devspace_peer_runtime`, spec 2026-07-20). Needs its own
