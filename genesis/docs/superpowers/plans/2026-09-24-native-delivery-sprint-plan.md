@@ -788,6 +788,19 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
 
 ## Complementary work captured (backlog, not this sprint)
 
+- **`ethosengine` as a Qahal collective — the collaboration level between devices** (operator,
+  2026-09-24, from today's exhaust: two sessions committing to dev from one checkout, the same
+  merge resolved twice, cargo without a claim, a push refused on another session's CID sync).
+  Members = the operator's stewarded devices (Che workspace, local machine) + agent actors; commons
+  store = claims (integrator lease, write-set, cargo, mesh, fleet pin), receipts, and the admission
+  rule; a merge to `dev` becomes a governed reach elevation `self→trusted` (brit: merge consent read
+  from the parent EPR; Z.D's authority-as-commitment one level down). First expression: claims as
+  notes-refs on the shared remote (`refs/notes/ethosengine/claims/*`) written by `berth claim`,
+  read by pre-push (refuse while another device holds the lease or an open claim overlaps the
+  changed paths; TTL on claims); the qahal DNA hosts the same records later and the notes-refs become
+  its projection. Needs its own brainstorm + spec (D7, Qahal); the first Qahal work with a felt
+  user.
+
 - rakia portal aesthetic pass (graphos) — input: Lane G data contract.
 - kitsune2 structural fixes (running_cells not hostage to join; one read per sector) — arc rung 3.
 - Reach vocabulary in `release_attestation` promotion thresholds — after F1.
