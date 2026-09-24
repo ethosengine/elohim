@@ -420,6 +420,84 @@ impl ArtifactSource for BlobStoreArtifactSource {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Slice 2 — each app's browser zip, read as entries for the boot judge
+// ---------------------------------------------------------------------------
+
+/// Read one zip's entries the way the deliverability judge needs them: every
+/// file NAME, and the BYTES of `index.html` entries only (the judge resolves
+/// every other reference by name). Keeping only the shells' bytes bounds the
+/// memory this costs at a few KiB per app instead of the whole bundle.
+///
+/// `None` when the bytes are not a readable zip archive.
+pub fn browser_zip_entries(bytes: &[u8]) -> Option<Vec<(String, Vec<u8>)>> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).ok()?;
+    let mut entries = Vec::with_capacity(archive.len());
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).ok()?;
+        if file.is_dir() {
+            continue;
+        }
+        let name = file.name().to_string();
+        let body = if name == "index.html" || name.ends_with("/index.html") {
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).ok()?;
+            contents
+        } else {
+            Vec::new()
+        };
+        entries.push((name, body));
+    }
+    Some(entries)
+}
+
+/// **Slice 2.** Each app's BROWSER zip out of the staged bytes, for
+/// [`verify::verify_app_bundle_boots`].
+///
+/// `Answer::Absent` for every class but app-bundle. For an app bundle:
+/// `Unreachable` when a browser artifact was not staged, or its staged bytes
+/// do not match the manifest's length and digest (this runs before
+/// `verify_artifacts` has judged, so it re-checks rather than assumes — the
+/// same guard `apply::staged_bundle_evidence` keeps), or the file could not be
+/// read back. Bytes that prove out and are not a zip are
+/// [`verify::BrowserZip::NotAZip`] — a verdict about the release, not about
+/// this peer.
+pub async fn app_bundle_entries(
+    manifest: &super::ReleaseManifest,
+    fetched: &[FetchedArtifact],
+) -> Answer<verify::AppBundleEntries> {
+    if manifest.artifact_class != ArtifactClass::AppBundle {
+        return Answer::Absent;
+    }
+    let mut out = verify::AppBundleEntries::new();
+    for declared in &manifest.artifacts {
+        if declared.kind != Some(super::AppArtifactKind::Browser) {
+            continue;
+        }
+        let Some(slug) = declared.app.clone() else {
+            return Answer::Unreachable;
+        };
+        let Some(actual) = fetched.iter().find(|f| f.blob_cid == declared.blob_cid) else {
+            return Answer::Unreachable;
+        };
+        if actual.bytes != declared.bytes || !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
+            return Answer::Unreachable;
+        }
+        let Ok(bytes) = tokio::fs::read(&actual.path).await else {
+            return Answer::Unreachable;
+        };
+        let parsed = tokio::task::spawn_blocking(move || browser_zip_entries(&bytes)).await;
+        let zip = match parsed {
+            Ok(Some(entries)) => verify::BrowserZip::Entries(entries),
+            Ok(None) => verify::BrowserZip::NotAZip,
+            Err(_) => return Answer::Unreachable,
+        };
+        out.insert(slug, zip);
+    }
+    Answer::Present(out)
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
@@ -1561,6 +1639,9 @@ impl AdoptionController {
         let staged = super::apply::staged_bundle_evidence(&manifest, &fetched).await;
         let target_coordinators = staged.target_coordinators;
         let bundle_dna_hashes = staged.bundle_dna_hashes;
+        // Slice 2: an app bundle's browser zips, read as entries so the floor
+        // can judge whether each shell boots. Absent for every other class.
+        let app_bundle_entries = app_bundle_entries(&manifest, &fetched).await;
         // FRESHNESS GATE. The by-bytes exit STOPS work on the strength of the
         // installed-reality snapshot, so — unlike a refusal, which self-heals
         // on the next sweep — it may not be taken from a stale one. Exactly one
@@ -1589,6 +1670,7 @@ impl AdoptionController {
             tier: resolved.tier,
             target_coordinators: &target_coordinators,
             bundle_dna_hashes: &bundle_dna_hashes,
+            app_bundle_entries: &app_bundle_entries,
             // **Rung 6.** The fetch site (I1/C5): the commitment is read
             // through THIS peer's own conductor, its lifecycle off this
             // peer's own projection. Absent for every artifact class but
@@ -2584,6 +2666,8 @@ mod tests {
             filename: "content_store.wasm".to_string(),
             mime_type: None,
             role: None,
+            app: None,
+            kind: None,
         };
         let refusal = source
             .fetch(&artifact, dir.path())
@@ -2610,6 +2694,8 @@ mod tests {
             filename: "artifact.bin".to_string(),
             mime_type: None,
             role: None,
+            app: None,
+            kind: None,
         };
         let fetched = source.fetch(&good, dir.path()).await.expect("held locally");
         assert_eq!(fetched.bytes, payload.len() as u64);
@@ -3055,5 +3141,106 @@ mod tests {
             unfollowed.transition_log.is_some(),
             "an unfollow landing on a running node must also be answerable from a log line"
         );
+    }
+
+    // ── slice 2: browser zips read as entries ───────────────────────────────
+
+    fn zip_of(files: &[(&str, &str)]) -> Vec<u8> {
+        use std::io::Write;
+        let mut buf = std::io::Cursor::new(Vec::new());
+        {
+            let mut w = zip::ZipWriter::new(&mut buf);
+            let opts = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            for (name, body) in files {
+                w.start_file(*name, opts).unwrap();
+                w.write_all(body.as_bytes()).unwrap();
+            }
+            w.finish().unwrap();
+        }
+        buf.into_inner()
+    }
+
+    #[test]
+    fn a_browser_zip_keeps_every_name_and_only_the_shells_bytes() {
+        let bytes = zip_of(&[
+            ("index.html", "<script src=\"main-A.js\"></script>"),
+            ("main-A.js", "console.log('a big bundle')"),
+        ]);
+        let entries = browser_zip_entries(&bytes).expect("a zip");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].0, "index.html");
+        assert!(!entries[0].1.is_empty(), "the shell's bytes are kept");
+        assert_eq!(entries[1], ("main-A.js".to_string(), Vec::new()));
+        assert_eq!(
+            crate::app_deliverability::judge_deliverability(&entries),
+            crate::app_deliverability::DeliverabilityVerdict::Boots,
+            "names alone are enough for the judge beyond the shell"
+        );
+        assert!(browser_zip_entries(b"not a zip").is_none());
+    }
+
+    fn app_bundle_fixture() -> super::super::ReleaseManifest {
+        let text = std::fs::read_to_string(
+            "../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-app-bundle.json",
+        )
+        .expect("the app-bundle fixture is committed");
+        verify::verify_shape(&serde_json::from_str(&text).unwrap()).unwrap()
+    }
+
+    /// Stage real zips under a manifest whose artifacts describe them, then
+    /// read them back: every browser zip lands keyed by its slug; a staged
+    /// file that is not a zip is a verdict about the release; a missing or
+    /// digest-mismatched stage is this peer's problem (`Unreachable`).
+    #[tokio::test]
+    async fn app_bundle_entries_reads_each_slugs_browser_zip() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut manifest = app_bundle_fixture();
+        let mut fetched = Vec::new();
+        for artifact in manifest.artifacts.iter_mut() {
+            let bytes = if artifact.app.as_deref() == Some("lamad-spa")
+                && artifact.kind == Some(super::super::AppArtifactKind::Browser)
+            {
+                b"definitely not a zip".to_vec()
+            } else {
+                zip_of(&[("index.html", "<html></html>")])
+            };
+            let path = dir.path().join(&artifact.filename);
+            std::fs::write(&path, &bytes).unwrap();
+            artifact.bytes = bytes.len() as u64;
+            artifact.sha256 = sha256_hex(&bytes);
+            fetched.push(FetchedArtifact {
+                blob_cid: artifact.blob_cid.clone(),
+                path,
+                bytes: artifact.bytes,
+                sha256: artifact.sha256.clone(),
+            });
+        }
+        let Answer::Present(entries) = app_bundle_entries(&manifest, &fetched).await else {
+            panic!("every browser artifact was staged and proved out");
+        };
+        assert_eq!(entries.len(), 2, "server zips are never judged");
+        assert!(matches!(
+            entries["elohim-host-landing"],
+            verify::BrowserZip::Entries(_)
+        ));
+        assert_eq!(entries["lamad-spa"], verify::BrowserZip::NotAZip);
+
+        // A digest that does not match what was staged is not evidence.
+        let mut lying = manifest.clone();
+        lying.artifacts[0].sha256 = "0".repeat(64);
+        assert_eq!(
+            app_bundle_entries(&lying, &fetched).await,
+            Answer::Unreachable
+        );
+        // Nothing staged at all: Unreachable, never a pass.
+        assert_eq!(
+            app_bundle_entries(&manifest, &[]).await,
+            Answer::Unreachable
+        );
+        // And every other class: Absent.
+        let mut other = manifest.clone();
+        other.artifact_class = ArtifactClass::ConfigEpr;
+        assert_eq!(app_bundle_entries(&other, &fetched).await, Answer::Absent);
     }
 }

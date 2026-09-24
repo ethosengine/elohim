@@ -1,0 +1,91 @@
+{
+  "kind": "release-manifest",
+  "manifestVersion": "1.0",
+  "channelId": "runtime:app-bundle:alpha:dev",
+  "artifactClass": "app-bundle",
+  "artifacts": [
+    {
+      "blobCid": "bafkreicebevbdrjugeo7pmmdx6ck6zu3ru67e7d735xnj5pqddsq45yche",
+      "bytes": 39,
+      "sha256": "44092a11c534311df7b183bf84af669b8d3df27c7fdf6ed4f5f018e50e770239",
+      "filename": "elohim-host-landing-browser.zip",
+      "mimeType": "application/zip",
+      "app": "elohim-host-landing",
+      "kind": "browser"
+    },
+    {
+      "blobCid": "bafkreig42tzedolxst6ukj4a66pz4on4w4uw5gk46vzyfh5ip4rww5awye",
+      "bytes": 38,
+      "sha256": "dcd4f241b97794fd452780f79f9e39bcb7296e995cf573829fa87f236b7416c1",
+      "filename": "elohim-host-landing-server.zip",
+      "mimeType": "application/zip",
+      "app": "elohim-host-landing",
+      "kind": "server"
+    },
+    {
+      "blobCid": "bafkreif5vv66myeh3egwqkbzqyv3haltc3ofgqqgwadcze2i3h3wx2gs7e",
+      "bytes": 29,
+      "sha256": "bdad7de66087d90d682839862bb3817316dc534206b0062c9348d9f76be8d2f9",
+      "filename": "lamad-spa-browser.zip",
+      "mimeType": "application/zip",
+      "app": "lamad-spa",
+      "kind": "browser"
+    },
+    {
+      "blobCid": "bafkreifq6exyrgvu3hsz2e6qgyup62arjem7xdhevjxe3dwa4szw63xyfe",
+      "bytes": 28,
+      "sha256": "b0f12f889ab4d9e59d13d03628ff68114919fb8ce4aa6e4d8ec0e4b36f6ef829",
+      "filename": "lamad-spa-server.zip",
+      "mimeType": "application/zip",
+      "app": "lamad-spa",
+      "kind": "server"
+    }
+  ],
+  "appliesTo": {
+    "apps": {
+      "elohim-host-landing": {
+        "kinds": [
+          "browser",
+          "server"
+        ],
+        "mount": "/"
+      },
+      "lamad-spa": {
+        "kinds": [
+          "browser",
+          "server"
+        ],
+        "mount": "/lamad/"
+      }
+    }
+  },
+  "envelope": {
+    "wireEpochs": [
+      0
+    ],
+    "lineageParentCid": null,
+    "additiveOnly": true
+  },
+  "provenance": {
+    "builderAgent": "jenkins@elohim-app",
+    "toolchain": "node 24.4.0 / @angular/cli 22.0.0",
+    "buildInfo": {
+      "version": "0.1.0",
+      "commit": "b9e0943e2",
+      "service": "elohim-app"
+    },
+    "builtFrom": {
+      "gitCommit": "b9e0943e2",
+      "gitBranch": "dev",
+      "dirty": false
+    }
+  },
+  "declaredReach": "commons",
+  "adoptionDiscipline": {
+    "soakSecs": 60,
+    "attestationThreshold": 1,
+    "canaryOrder": [
+      "alpha"
+    ]
+  }
+}

@@ -178,6 +178,15 @@ pub enum ArtifactClass {
     /// the only class [`crate::services::release_adoption::verify::verify_path`]
     /// does anything for.
     HappLineage,
+    /// **Slice 2 of the elected-content spec (§12.8).** An app's browser and
+    /// server zips, published once as ONE release under
+    /// `runtime:app-bundle:<network>:<channel>`. The vehicle is
+    /// [`apply::AppBundleVehicle`]: it points every bound slug's content row
+    /// at the release's bytes in one transaction. It binds to no conductor
+    /// cell, so [`verify::verify_envelope`] skips the installed-reality leg for
+    /// it and [`verify::verify_app_bundle_boots`] judges the browser zips
+    /// instead.
+    AppBundle,
 }
 
 impl ArtifactClass {
@@ -188,6 +197,26 @@ impl ArtifactClass {
             ArtifactClass::StorageBinary => "storage-binary",
             ArtifactClass::HappBundle => "happ-bundle",
             ArtifactClass::HappLineage => "happ-lineage",
+            ArtifactClass::AppBundle => "app-bundle",
+        }
+    }
+}
+
+/// Which half of an app an [`ArtifactClass::AppBundle`] artifact is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AppArtifactKind {
+    /// The SPA zip the slug row's blob pointer serves (`blob_hash`).
+    Browser,
+    /// The SSR zip the slug row carries as `metadata_json.serverBlobHash`.
+    Server,
+}
+
+impl AppArtifactKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            AppArtifactKind::Browser => "browser",
+            AppArtifactKind::Server => "server",
         }
     }
 }
@@ -210,6 +239,15 @@ pub struct Artifact {
     pub mime_type: Option<String>,
     #[serde(default)]
     pub role: Option<String>,
+    /// **app-bundle only.** The content slug of the app this artifact is one
+    /// half of — a key of [`AppliesTo::apps`]. `None` (and absent from the
+    /// wire) for every other class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+    /// **app-bundle only.** Which half of the app this artifact is. Together
+    /// with [`Self::app`] it names exactly one artifact per (app, kind) pair.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<AppArtifactKind>,
 }
 
 /// The installed reality one role of a release binds to.
@@ -261,10 +299,43 @@ pub struct RoleBinding {
     pub constitution_root: Option<String>,
 }
 
-/// Role name → the installed reality this release binds to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// What this release binds to: conductor ROLES for every class that touches a
+/// cell, app SLUGS for [`ArtifactClass::AppBundle`].
+///
+/// Both halves are `serde(default)`: which one is REQUIRED is a per-class rule
+/// the schema states in its root `allOf` and [`verify::verify_shape`] enforces
+/// (a missing required half is `manifest_schema_invalid` either way, exactly
+/// as the decode error it replaces was).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppliesTo {
+    /// Role name → the installed reality this release binds to.
+    #[serde(default)]
     pub roles: std::collections::BTreeMap<String, RoleBinding>,
+    /// **app-bundle only.** App slug → what this release carries for it.
+    /// Absent from the wire for every other class, so their manifests
+    /// serialise byte-for-byte as before.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub apps: std::collections::BTreeMap<String, AppBinding>,
+}
+
+/// One app an [`ArtifactClass::AppBundle`] release carries.
+///
+/// The slug named by the key must ALSO name this release's channel in its own
+/// content metadata (`metadata_json.releaseChannel`) — the mutual binding
+/// [`apply::AppBundleVehicle`] checks before it moves a pointer, so a release
+/// can never capture a slug that did not choose to be elected this way.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppBinding {
+    /// The artifact kinds this release carries for the app — exactly one
+    /// artifact per listed kind. A binding without `server` REMOVES a
+    /// previously carried server bundle: the release is the whole truth for
+    /// the app.
+    pub kinds: Vec<AppArtifactKind>,
+    /// Optional URL mount the app is served under (`/`, `/lamad/`). Reported
+    /// on the receipt; never used to address bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mount: Option<String>,
 }
 
 /// The compatibility envelope — where unity is enforced (spec §8).
@@ -774,6 +845,27 @@ pub enum RefusalReason {
     /// installed root. Terminal for this release: only a release whose path
     /// was notarized under the peer's actual root can cross.
     RootMismatch,
+
+    // ── slice 2: the app bundle as elected content ─────────────────────────
+    /// **Verify arm.** A browser zip the release carries cannot boot:
+    /// `app_deliverability::judge_deliverability` read its `index.html` and
+    /// found a missing asset, no index at all, or not a zip. Terminal — the
+    /// bytes verified, so they will not become bootable; only a new release
+    /// changes it. No row moves.
+    AppBundleCannotBoot,
+    /// **Verify arm.** The browser zips could not be judged on this peer (the
+    /// staged bytes were not readable as entries). Transient — never a pass,
+    /// never a verdict about the release.
+    AppBundleNotJudged,
+    /// **Apply arm.** A slug the release binds has no content row on this peer
+    /// yet. Transient: the row may simply not have projected here.
+    AppSlugRowAbsent,
+    /// **Apply arm.** A slug the release binds does not name this channel in
+    /// its own `metadata_json.releaseChannel` — the mutual binding check. A
+    /// slug is elected by exactly one mechanism, chosen in its own metadata;
+    /// a release cannot capture a slug that did not choose it. Terminal until
+    /// the slug is bound (`release-ceremony.ts channel bind`).
+    AppSlugNotBoundToChannel,
 }
 
 impl ReasonLabel for RefusalReason {
@@ -811,6 +903,10 @@ impl ReasonLabel for RefusalReason {
         RefusalReason::PathRevoked,
         RefusalReason::QuorumUnmet,
         RefusalReason::RootMismatch,
+        RefusalReason::AppBundleCannotBoot,
+        RefusalReason::AppBundleNotJudged,
+        RefusalReason::AppSlugRowAbsent,
+        RefusalReason::AppSlugNotBoundToChannel,
     ];
 
     fn label(&self) -> &'static str {
@@ -848,6 +944,10 @@ impl ReasonLabel for RefusalReason {
             RefusalReason::PathRevoked => "path_revoked",
             RefusalReason::QuorumUnmet => "quorum_unmet",
             RefusalReason::RootMismatch => "root_mismatch",
+            RefusalReason::AppBundleCannotBoot => "app_bundle_cannot_boot",
+            RefusalReason::AppBundleNotJudged => "app_bundle_not_judged",
+            RefusalReason::AppSlugRowAbsent => "app_slug_row_absent",
+            RefusalReason::AppSlugNotBoundToChannel => "app_slug_not_bound_to_channel",
         }
     }
 }
@@ -884,7 +984,9 @@ impl RefusalReason {
             | RefusalReason::PathNotNotarized
             | RefusalReason::PathRevoked
             | RefusalReason::QuorumUnmet
-            | RefusalReason::RootMismatch => DecisionArm::Verify,
+            | RefusalReason::RootMismatch
+            | RefusalReason::AppBundleCannotBoot
+            | RefusalReason::AppBundleNotJudged => DecisionArm::Verify,
 
             RefusalReason::NoVehicleForClass
             | RefusalReason::ApplyNotPermitted
@@ -894,7 +996,9 @@ impl RefusalReason {
             | RefusalReason::BootstrapOutOfBand
             | RefusalReason::ConfigKnobBootOnly
             | RefusalReason::RuntimeConfigUnwatched
-            | RefusalReason::ApplyPayloadUnusable => DecisionArm::Apply,
+            | RefusalReason::ApplyPayloadUnusable
+            | RefusalReason::AppSlugRowAbsent
+            | RefusalReason::AppSlugNotBoundToChannel => DecisionArm::Apply,
         }
     }
 
@@ -940,6 +1044,13 @@ impl RefusalReason {
                 | RefusalReason::DeferredBackpressure
                 | RefusalReason::ApplyFailed
                 | RefusalReason::BootstrapOutOfBand
+                // Slice 2's transient half: bytes this peer could not read as
+                // entries, and a slug row that has not projected here yet.
+                // `app_bundle_cannot_boot` and `app_slug_not_bound_to_channel`
+                // are facts about the release and the slug's own declaration,
+                // so they are terminal.
+                | RefusalReason::AppBundleNotJudged
+                | RefusalReason::AppSlugRowAbsent
         )
     }
 }
@@ -1066,7 +1177,10 @@ pub(crate) mod test_support {
                 constitution_root: None,
             },
         );
-        m.applies_to = AppliesTo { roles };
+        m.applies_to = AppliesTo {
+            roles,
+            ..AppliesTo::default()
+        };
         m.adoption_discipline.path = Some(crate::services::release_attestation::PathRef {
             commitment_cid: lineage_path_cid(),
         });
@@ -1147,6 +1261,10 @@ mod tests {
             "path_revoked",
             "quorum_unmet",
             "root_mismatch",
+            "app_bundle_cannot_boot",
+            "app_bundle_not_judged",
+            "app_slug_row_absent",
+            "app_slug_not_bound_to_channel",
         ]);
         assert_reason_labels_stable::<DecisionArm>(&["watch", "fetch", "verify", "apply"]);
     }
@@ -1249,5 +1367,54 @@ mod tests {
         assert!(!RefusalReason::NoVehicleForClass.is_transient());
         assert!(!RefusalReason::RuntimeConfigUnwatched.is_transient());
         assert!(!RefusalReason::ApplyPayloadUnusable.is_transient());
+    }
+
+    /// **Slice 2.** A browser zip that cannot boot is a fact about the bytes
+    /// (terminal); one this peer could not judge is a fact about us
+    /// (transient). A slug row that has not projected yet heals on its own; a
+    /// slug that never chose this channel does not.
+    #[test]
+    fn the_app_bundle_refusals_split_the_bytes_from_the_substrate() {
+        assert!(!RefusalReason::AppBundleCannotBoot.is_transient());
+        assert!(RefusalReason::AppBundleNotJudged.is_transient());
+        assert!(RefusalReason::AppSlugRowAbsent.is_transient());
+        assert!(!RefusalReason::AppSlugNotBoundToChannel.is_transient());
+        assert_eq!(
+            RefusalReason::AppBundleCannotBoot.arm(),
+            DecisionArm::Verify
+        );
+        assert_eq!(
+            RefusalReason::AppSlugNotBoundToChannel.arm(),
+            DecisionArm::Apply
+        );
+    }
+
+    /// **Slice 2 wire floor.** An app-bundle artifact and binding round-trip
+    /// through the mirror, and a non-app manifest serialises WITHOUT the new
+    /// fields — so a peer one build behind reads every existing class
+    /// byte-for-byte as before.
+    #[test]
+    fn app_bundle_fields_are_additive_on_the_wire() {
+        let art: Artifact = serde_json::from_value(serde_json::json!({
+            "blobCid": format!("bafkrei{}", "a".repeat(52)),
+            "bytes": 3, "sha256": "a".repeat(64), "filename": "b.zip",
+            "app": "lamad-spa", "kind": "server"
+        }))
+        .expect("an app-bundle artifact decodes");
+        assert_eq!(art.app.as_deref(), Some("lamad-spa"));
+        assert_eq!(art.kind, Some(AppArtifactKind::Server));
+
+        let plain: Artifact = serde_json::from_value(serde_json::json!({
+            "blobCid": format!("bafkrei{}", "a".repeat(52)),
+            "bytes": 3, "sha256": "a".repeat(64), "filename": "c.wasm"
+        }))
+        .expect("a pre-slice-2 artifact still decodes");
+        let wire = serde_json::to_value(&plain).unwrap();
+        assert!(wire.get("app").is_none() && wire.get("kind").is_none());
+        let applies = serde_json::to_value(AppliesTo::default()).unwrap();
+        assert!(
+            applies.get("apps").is_none(),
+            "an empty apps map stays off the wire"
+        );
     }
 }

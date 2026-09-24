@@ -57,8 +57,9 @@ use seam_contracts::Answer;
 
 use super::path_evidence::DEFAULT_REQUIRED_SIGNATURES;
 use super::{
-    AdoptionRefusal, Artifact, ArtifactClass, HeadTier, PathEvidence, RefusalReason,
-    ReleaseManifest, RoleBinding, RosterEvidence, VerifiedRelease, RELEASE_MANIFEST_KIND,
+    AdoptionRefusal, AppArtifactKind, Artifact, ArtifactClass, HeadTier, PathEvidence,
+    RefusalReason, ReleaseManifest, RoleBinding, RosterEvidence, VerifiedRelease,
+    RELEASE_MANIFEST_KIND,
 };
 use crate::services::release_attestation::QualifyingEvidence;
 
@@ -343,7 +344,12 @@ pub fn verify_shape(body: &serde_json::Value) -> Result<ReleaseManifest, Adoptio
     for artifact in &manifest.artifacts {
         verify_artifact_shape(artifact)?;
     }
-    if manifest.applies_to.roles.is_empty() {
+    // Which half of `appliesTo` is required is a per-class rule (the schema's
+    // root `allOf`): an app bundle binds app SLUGS and no conductor cell;
+    // every other class binds ROLES.
+    if manifest.artifact_class == ArtifactClass::AppBundle {
+        verify_app_bundle_shape(&manifest)?;
+    } else if manifest.applies_to.roles.is_empty() {
         return Err(refuse(
             RefusalReason::ManifestSchemaInvalid,
             "appliesTo.roles must name at least one role",
@@ -469,6 +475,113 @@ pub fn verify_shape(body: &serde_json::Value) -> Result<ReleaseManifest, Adoptio
     Ok(manifest)
 }
 
+/// **Slice 2.** The app-bundle half of the shape floor — the cross-field
+/// agreement the schema states per artifact (`app` + `kind` required) and the
+/// part it cannot state at all: that the artifacts and `appliesTo.apps` name
+/// the SAME set of (app, kind) pairs, one artifact each.
+///
+/// Exactly-one-per-pair is what lets the vehicle resolve "the browser bytes of
+/// `lamad-spa`" without guessing. Two browser zips for one slug would make the
+/// served pointer a function of array order; a declared kind with no artifact
+/// would make the vehicle write half an app.
+fn verify_app_bundle_shape(manifest: &ReleaseManifest) -> Result<(), AdoptionRefusal> {
+    let apps = &manifest.applies_to.apps;
+    if apps.is_empty() {
+        return Err(refuse(
+            RefusalReason::ManifestSchemaInvalid,
+            "an app-bundle release must name at least one app in appliesTo.apps",
+        ));
+    }
+    let mut declared: BTreeSet<(&str, AppArtifactKind)> = BTreeSet::new();
+    for (slug, binding) in apps {
+        if !is_lower_slug(slug) {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!("appliesTo.apps key '{slug}' is not an app slug (^[a-z0-9][a-z0-9-]*$)"),
+            ));
+        }
+        if binding.kinds.is_empty() {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!("appliesTo.apps.{slug}.kinds must name at least one kind"),
+            ));
+        }
+        for kind in &binding.kinds {
+            if !declared.insert((slug.as_str(), *kind)) {
+                return Err(refuse(
+                    RefusalReason::ManifestSchemaInvalid,
+                    format!("appliesTo.apps.{slug}.kinds repeats '{}'", kind.label()),
+                ));
+            }
+        }
+        if let Some(mount) = binding.mount.as_deref() {
+            if !mount.starts_with('/') {
+                return Err(refuse(
+                    RefusalReason::ManifestSchemaInvalid,
+                    format!("appliesTo.apps.{slug}.mount '{mount}' must start with '/'"),
+                ));
+            }
+        }
+    }
+    let mut carried: BTreeSet<(&str, AppArtifactKind)> = BTreeSet::new();
+    let mut filenames: BTreeSet<&str> = BTreeSet::new();
+    for artifact in &manifest.artifacts {
+        // Artifacts are staged by filename into one directory per release, so
+        // two artifacts sharing a name would overwrite each other's bytes.
+        if !filenames.insert(artifact.filename.as_str()) {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!(
+                    "app-bundle carries two artifacts named '{}' — they would be staged over \
+                     each other",
+                    artifact.filename
+                ),
+            ));
+        }
+        let (Some(app), Some(kind)) = (artifact.app.as_deref(), artifact.kind) else {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!(
+                    "app-bundle artifact '{}' must name its app and kind",
+                    artifact.filename
+                ),
+            ));
+        };
+        if !declared.contains(&(app, kind)) {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!(
+                    "app-bundle artifact '{}' names ({app}, {}), which appliesTo.apps does not \
+                     declare",
+                    artifact.filename,
+                    kind.label()
+                ),
+            ));
+        }
+        if !carried.insert((app, kind)) {
+            return Err(refuse(
+                RefusalReason::ManifestSchemaInvalid,
+                format!(
+                    "app-bundle carries more than one artifact for ({app}, {}) — the served \
+                     pointer would be a function of array order",
+                    kind.label()
+                ),
+            ));
+        }
+    }
+    if let Some((app, kind)) = declared.difference(&carried).next() {
+        return Err(refuse(
+            RefusalReason::ManifestSchemaInvalid,
+            format!(
+                "appliesTo.apps.{app} declares kind '{}' but the release carries no artifact for \
+                 it — the vehicle would write half an app",
+                kind.label()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 fn verify_artifact_shape(artifact: &Artifact) -> Result<(), AdoptionRefusal> {
     if !is_blob_cid(&artifact.blob_cid) {
         return Err(refuse(
@@ -546,6 +659,15 @@ pub fn verify_envelope(
                 manifest.envelope.wire_epochs
             ),
         ));
+    }
+
+    // **Slice 2.** An app bundle binds app slugs, not conductor cells: there
+    // is no installed role for it to match and no DNA line for it to cross, so
+    // the installed-reality leg is skipped rather than refused. Its floor is
+    // [`verify_app_bundle_boots`] over the bytes, and the vehicle's mutual
+    // slug↔channel binding check at apply time.
+    if manifest.artifact_class == ArtifactClass::AppBundle {
+        return Ok(());
     }
 
     let installed = match installed {
@@ -1409,6 +1531,103 @@ pub fn verify_artifacts(
 }
 
 // ---------------------------------------------------------------------------
+// App bundle — the browser zips must boot (slice 2)
+// ---------------------------------------------------------------------------
+
+/// One app's BROWSER zip, as the caller read it out of the staged,
+/// digest-checked bytes (`watch::app_bundle_entries`; this module does no I/O).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BrowserZip {
+    /// The `(name, bytes)` list
+    /// [`crate::app_deliverability::judge_deliverability`] reads. Only the
+    /// `index.html` entries need their bytes; every other entry may carry an
+    /// empty body, because the judge reads names for everything else.
+    Entries(Vec<(String, Vec<u8>)>),
+    /// The bytes proved out against the manifest's digest and are not a
+    /// readable zip. A fact about the release — `invalid-zip`, never "not
+    /// judged".
+    NotAZip,
+}
+
+/// Each app's browser zip, keyed by app slug.
+pub type AppBundleEntries = BTreeMap<String, BrowserZip>;
+
+/// **Slice 2.** Every browser zip an app-bundle release carries must boot.
+///
+/// The same verdict the serving path computes for a head it already holds
+/// (`app_deliverability::judge_deliverability`, spec 2026-09-05 §2), moved to
+/// VERIFY time: a release whose shell names an asset its zip does not hold is
+/// refused on every peer before any row moves, instead of being served as a
+/// blank page and judged broken afterwards.
+///
+/// - `Answer::Present` — judged per app; the first broken app refuses
+///   `app_bundle_cannot_boot` (terminal) naming the slug and the reason.
+/// - `Answer::Absent` / `Unreachable`, or an app whose entries are missing —
+///   `app_bundle_not_judged` (transient). Unjudged is never a pass.
+///
+/// A no-op for every other artifact class.
+pub fn verify_app_bundle_boots(
+    manifest: &ReleaseManifest,
+    entries: &Answer<AppBundleEntries>,
+) -> Result<(), AdoptionRefusal> {
+    use crate::app_deliverability::{judge_deliverability, BrokenReason, DeliverabilityVerdict};
+
+    if manifest.artifact_class != ArtifactClass::AppBundle {
+        return Ok(());
+    }
+    let Answer::Present(entries) = entries else {
+        return Err(refuse(
+            RefusalReason::AppBundleNotJudged,
+            "the release's browser zips could not be read as entries on this peer — unjudged \
+             is never a pass",
+        ));
+    };
+    for (slug, binding) in &manifest.applies_to.apps {
+        if !binding.kinds.contains(&AppArtifactKind::Browser) {
+            continue;
+        }
+        let verdict = match entries.get(slug) {
+            Some(BrowserZip::Entries(app_entries)) => judge_deliverability(app_entries),
+            Some(BrowserZip::NotAZip) => DeliverabilityVerdict::Broken(BrokenReason::InvalidZip),
+            None => {
+                return Err(refuse(
+                    RefusalReason::AppBundleNotJudged,
+                    format!("the browser zip for '{slug}' was not read as entries on this peer"),
+                ));
+            }
+        };
+        let reason = || {
+            verdict
+                .reason_value()
+                .unwrap_or_else(|| verdict.header_value().to_string())
+        };
+        match &verdict {
+            DeliverabilityVerdict::Boots => {}
+            DeliverabilityVerdict::NotJudged(_) => {
+                return Err(refuse(
+                    RefusalReason::AppBundleNotJudged,
+                    format!(
+                        "the browser zip for '{slug}' could not be judged ({})",
+                        reason()
+                    ),
+                ));
+            }
+            DeliverabilityVerdict::Broken(_) => {
+                return Err(refuse(
+                    RefusalReason::AppBundleCannotBoot,
+                    format!(
+                        "the browser zip for '{slug}' cannot boot ({}) — its shell would be \
+                         served as a blank page; no row moves on any peer",
+                        reason()
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // The composed floor
 // ---------------------------------------------------------------------------
 
@@ -1452,6 +1671,10 @@ pub struct VerifyInput<'a> {
     /// is exactly what `verify_path` needs to be a no-op for the four
     /// existing artifact classes.
     pub path: Answer<PathEvidence>,
+    /// **Slice 2.** Each app's BROWSER zip, unzipped from the staged bytes
+    /// (`watch::app_bundle_entries`). Read only by [`verify_app_bundle_boots`],
+    /// and only for `app-bundle`; `Answer::Absent` for every other class.
+    pub app_bundle_entries: &'a Answer<AppBundleEntries>,
 }
 
 /// What the floor decided. Two ways to pass, and they are not the same fact.
@@ -1497,17 +1720,21 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
     verify_envelope(&manifest, input.installed)?;
     verify_lineage(&manifest, input.lineage)?;
 
+    let app_bundle = manifest.artifact_class == ArtifactClass::AppBundle;
+
     // **Rung 6.** `verify_envelope` above already required `input.installed`
-    // to be `Answer::Present` (any other answer is a refusal it already
-    // returned), so this match is exhaustive-but-unreachable on the other two
-    // arms rather than a second unwrap of an already-proven fact.
-    let installed_reality = match input.installed {
-        Answer::Present(reality) => reality,
+    // to be `Answer::Present` for every class that binds a conductor cell (any
+    // other answer is a refusal it already returned), so this match is
+    // exhaustive-but-unreachable on the other two arms for those classes. An
+    // app bundle binds no cell — `verify_envelope` returned before reading
+    // installed reality — and `verify_path` is a no-op for it anyway.
+    match input.installed {
+        Answer::Present(reality) => verify_path(&manifest, reality, &input.path)?,
+        Answer::Absent | Answer::Unreachable if app_bundle => {}
         Answer::Absent | Answer::Unreachable => {
             unreachable!("verify_envelope already required Answer::Present or returned Err")
         }
-    };
-    verify_path(&manifest, installed_reality, &input.path)?;
+    }
 
     // The threshold gates PROMOTION (an EARNED head), never staging adoption
     // — a STAGING head's evidence is read and reported elsewhere (the
@@ -1518,6 +1745,20 @@ pub fn verify(input: VerifyInput<'_>) -> Result<VerifyOutcome, AdoptionRefusal> 
         verify_threshold(&manifest, input.attestations)?;
     }
     let artifact_paths = verify_artifacts(&manifest, input.artifacts)?;
+
+    // **Slice 2.** An app bundle's floor ends here: the bytes proved out, and
+    // every browser zip must boot. It binds no cell, so the DNA line, the
+    // by-bytes exit and the coordinator lineage below have nothing to say
+    // about it — the vehicle's idempotent receipt is its convergence exit.
+    if app_bundle {
+        verify_app_bundle_boots(&manifest, input.app_bundle_entries)?;
+        return Ok(VerifyOutcome::Verified(Box::new(VerifiedRelease {
+            channel_id: input.channel_id.to_string(),
+            release_cid: input.release_cid.to_string(),
+            manifest,
+            artifact_paths,
+        })));
+    }
 
     // THE ARTIFACT'S OWN DNA LINE — after the digest check (so the bytes the
     // line was read out of are the bytes the manifest declares) and BEFORE the
@@ -1561,6 +1802,20 @@ mod tests {
 
     const FIXTURE_DIR: &str = "../../genesis/a2o/scripts/__tests__/fixtures";
     const SCHEMA_PATH: &str = "../rakia/schemas/v1/release-manifest.schema.json";
+    const APP_BUNDLE_FIXTURE: &str = "release-manifest-app-bundle.json";
+
+    /// The schema the mirror is measured against: the pinned rakia checkout,
+    /// or — with `ELOHIM_RAKIA_ROOT` set — another rakia tree, so a schema
+    /// change on a rakia branch can be proven against this mirror BEFORE the
+    /// pin moves (the attested pin gate forbids moving it to find out).
+    fn schema_path() -> std::path::PathBuf {
+        match std::env::var("ELOHIM_RAKIA_ROOT") {
+            Ok(root) if !root.trim().is_empty() => {
+                Path::new(&root).join("schemas/v1/release-manifest.schema.json")
+            }
+            _ => std::path::PathBuf::from(SCHEMA_PATH),
+        }
+    }
 
     fn fixture(name: &str) -> serde_json::Value {
         let path = Path::new(FIXTURE_DIR).join(name);
@@ -1703,7 +1958,8 @@ mod tests {
     /// measured against an independent artifact rather than against itself.
     #[test]
     fn release_manifest_mirror_accepts_every_committed_fixture() {
-        for (name, body) in all_fixtures() {
+        let app_bundle = (APP_BUNDLE_FIXTURE, fixture(APP_BUNDLE_FIXTURE));
+        for (name, body) in all_fixtures().into_iter().chain([app_bundle]) {
             let manifest = verify_shape(&body)
                 .unwrap_or_else(|e| panic!("fixture {name} refused by the shape floor: {e}"));
             assert_eq!(manifest.kind, RELEASE_MANIFEST_KIND, "{name}");
@@ -1716,8 +1972,9 @@ mod tests {
     /// real JSON-Schema validator — so neither can be measuring the other.
     #[test]
     fn release_manifest_mirror_agrees_with_the_rakia_schema() {
-        let schema_text = std::fs::read_to_string(SCHEMA_PATH)
-            .unwrap_or_else(|e| panic!("T1 schema unreadable at {SCHEMA_PATH}: {e}"));
+        let schema_path = schema_path();
+        let schema_text = std::fs::read_to_string(&schema_path)
+            .unwrap_or_else(|e| panic!("T1 schema unreadable at {}: {e}", schema_path.display()));
         let schema: serde_json::Value =
             serde_json::from_str(&schema_text).expect("T1 schema is JSON");
         let validator = jsonschema::validator_for(&schema).expect("T1 schema compiles");
@@ -1879,7 +2136,10 @@ mod tests {
                 constitution_root: None,
             },
         );
-        m.applies_to = AppliesTo { roles };
+        m.applies_to = AppliesTo {
+            roles,
+            ..AppliesTo::default()
+        };
         m
     }
 
@@ -3383,6 +3643,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("wrong channel");
@@ -3426,6 +3687,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("every arm passes");
@@ -3489,6 +3751,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &poisoned,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("the artifact contradicts installed reality for imagodei");
@@ -3512,6 +3775,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &honest,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("an artifact whose line agrees passes the floor as before");
@@ -3561,6 +3825,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("an EARNED head with an unmet threshold is still refused");
@@ -3577,6 +3842,7 @@ mod tests {
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("the SAME unmet evidence never refuses a STAGING head");
@@ -3598,6 +3864,7 @@ mod tests {
             tier: HeadTier::Earned,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect_err("unchecked is not a pass on an EARNED head");
@@ -3617,8 +3884,279 @@ mod tests {
             tier: HeadTier::Staging,
             target_coordinators: &Answer::Absent,
             bundle_dna_hashes: &Answer::Absent,
+            app_bundle_entries: &Answer::Absent,
             path: Answer::Absent,
         })
         .expect("an unread threshold never gates a STAGING head either");
+    }
+
+    // ── slice 2: the app bundle as elected content ──────────────────────────
+
+    fn app_bundle_manifest() -> (serde_json::Value, ReleaseManifest) {
+        let body = fixture(APP_BUNDLE_FIXTURE);
+        let manifest = verify_shape(&body).expect("the app-bundle fixture is a legal manifest");
+        (body, manifest)
+    }
+
+    /// A browser zip's entries as `judge_deliverability` reads them: a shell
+    /// naming `main-OK.js`, and the bundle holding (or not holding) it.
+    fn browser_entries(holds_main: bool) -> Vec<(String, Vec<u8>)> {
+        let mut entries = vec![(
+            "index.html".to_string(),
+            br#"<html><body><script src="main-OK.js" type="module"></script></body></html>"#
+                .to_vec(),
+        )];
+        if holds_main {
+            entries.push(("main-OK.js".to_string(), b"console.log(1)".to_vec()));
+        }
+        entries
+    }
+
+    fn entries_for(manifest: &ReleaseManifest, holds_main: bool) -> Answer<AppBundleEntries> {
+        Answer::Present(
+            manifest
+                .applies_to
+                .apps
+                .keys()
+                .map(|slug| {
+                    (
+                        slug.clone(),
+                        BrowserZip::Entries(browser_entries(holds_main)),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    /// The fixture's mirror and the schema agree ONCE the pin carries the
+    /// class. Until then the pinned schema must REFUSE it — which is exactly
+    /// what an old controller does (`manifest_schema_invalid`), and why the
+    /// fleet follows an app-bundle channel only after the binary carrying the
+    /// class is deployed. Either way the test measures the schema on disk;
+    /// it never skips.
+    #[test]
+    fn the_app_bundle_fixture_agrees_with_the_schema_once_the_pin_carries_the_class() {
+        let schema_path = schema_path();
+        let schema: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&schema_path).unwrap()).unwrap();
+        let validator = jsonschema::validator_for(&schema).expect("schema compiles");
+        let knows_class = schema["properties"]["artifactClass"]["enum"]
+            .as_array()
+            .is_some_and(|e| e.iter().any(|v| v == "app-bundle"));
+        let (body, _) = app_bundle_manifest();
+        if knows_class {
+            assert!(
+                validator.is_valid(&body),
+                "the schema at {} declares app-bundle but refuses the fixture",
+                schema_path.display()
+            );
+        } else {
+            assert!(
+                !validator.is_valid(&body),
+                "the schema at {} predates app-bundle yet accepts it",
+                schema_path.display()
+            );
+            eprintln!(
+                "NOTE: {} predates the app-bundle class — the rakia pin bump \
+                 (feat/app-bundle-class) is what makes this fixture schema-valid; \
+                 run with ELOHIM_RAKIA_ROOT=<that tree> to measure it",
+                schema_path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn an_app_bundle_binds_apps_not_roles() {
+        let (_, manifest) = app_bundle_manifest();
+        assert_eq!(manifest.artifact_class, ArtifactClass::AppBundle);
+        assert!(manifest.applies_to.roles.is_empty());
+        assert_eq!(
+            manifest.applies_to.apps.keys().collect::<Vec<_>>(),
+            ["elohim-host-landing", "lamad-spa"]
+        );
+        assert!(manifest
+            .artifacts
+            .iter()
+            .all(|a| a.app.is_some() && a.kind.is_some()));
+    }
+
+    /// The shape floor's app-bundle half: one artifact per declared (app,
+    /// kind), each naming a declared pair, and an `apps` map to declare them.
+    #[test]
+    fn the_app_bundle_shape_refuses_every_ambiguous_pairing() {
+        let (body, _) = app_bundle_manifest();
+        let refuses = |mutate: &dyn Fn(&mut serde_json::Value), why: &str| {
+            let mut b = body.clone();
+            mutate(&mut b);
+            let err = verify_shape(&b).expect_err(why);
+            assert_eq!(
+                err.reason_code(),
+                RefusalReason::ManifestSchemaInvalid,
+                "{why}"
+            );
+        };
+        refuses(
+            &|b| b["appliesTo"] = serde_json::json!({}),
+            "no apps at all",
+        );
+        refuses(
+            &|b| {
+                b["artifacts"][0].as_object_mut().unwrap().remove("kind");
+            },
+            "an artifact without its kind",
+        );
+        refuses(
+            &|b| b["artifacts"][0]["app"] = serde_json::json!("not-declared"),
+            "an artifact naming an undeclared app",
+        );
+        refuses(
+            &|b| b["artifacts"][1]["kind"] = serde_json::json!("browser"),
+            "two browser zips for one slug",
+        );
+        refuses(
+            &|b| {
+                b["artifacts"].as_array_mut().unwrap().remove(3);
+            },
+            "a declared kind with no artifact",
+        );
+        refuses(
+            &|b| b["appliesTo"]["apps"]["lamad-spa"]["mount"] = serde_json::json!("lamad"),
+            "a mount that is not a path",
+        );
+        refuses(
+            &|b| b["artifacts"][1]["filename"] = b["artifacts"][0]["filename"].clone(),
+            "two artifacts staged under one filename",
+        );
+        // A coordinator-bundle still needs roles — the per-class rule cuts
+        // both ways.
+        let mut coord = fixture("release-manifest-coordinator-bundle.json");
+        coord["appliesTo"] = serde_json::json!({ "apps": body["appliesTo"]["apps"].clone() });
+        assert_eq!(
+            verify_shape(&coord).unwrap_err().reason_code(),
+            RefusalReason::ManifestSchemaInvalid
+        );
+    }
+
+    /// An app bundle binds no conductor cell, so an unreadable installed
+    /// reality is not a refusal for it — while the additive floor and the
+    /// wire epochs still bind it like every other class.
+    #[test]
+    fn the_app_bundle_envelope_skips_installed_reality_only() {
+        let (_, mut manifest) = app_bundle_manifest();
+        verify_envelope(&manifest, &Answer::Unreachable)
+            .expect("no installed-reality leg for an app bundle");
+        manifest.envelope.additive_only = false;
+        assert_eq!(
+            verify_envelope(&manifest, &Answer::Unreachable)
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::AdditiveFloorBroken
+        );
+    }
+
+    #[test]
+    fn a_bootable_bundle_passes_and_a_broken_one_is_terminal() {
+        let (_, manifest) = app_bundle_manifest();
+        verify_app_bundle_boots(&manifest, &entries_for(&manifest, true)).expect("boots");
+
+        let broken = verify_app_bundle_boots(&manifest, &entries_for(&manifest, false))
+            .expect_err("a shell naming a missing main-*.js cannot boot");
+        assert_eq!(broken.reason_code(), RefusalReason::AppBundleCannotBoot);
+        assert!(!broken.transient);
+        assert!(
+            broken.detail.contains("missing-asset:main-OK.js"),
+            "{}",
+            broken.detail
+        );
+
+        // Digest-verified bytes that are not a zip are a fact about the
+        // release too.
+        let not_a_zip = Answer::Present(
+            manifest
+                .applies_to
+                .apps
+                .keys()
+                .map(|slug| (slug.clone(), BrowserZip::NotAZip))
+                .collect(),
+        );
+        let r = verify_app_bundle_boots(&manifest, &not_a_zip).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::AppBundleCannotBoot);
+        assert!(r.detail.contains("invalid-zip"), "{}", r.detail);
+    }
+
+    #[test]
+    fn an_unjudged_bundle_is_never_a_pass() {
+        let (_, manifest) = app_bundle_manifest();
+        for entries in [Answer::Absent, Answer::Unreachable] {
+            let r = verify_app_bundle_boots(&manifest, &entries).unwrap_err();
+            assert_eq!(r.reason_code(), RefusalReason::AppBundleNotJudged);
+            assert!(r.transient);
+        }
+        // One app judged, the other missing: still not a pass.
+        let mut partial = AppBundleEntries::new();
+        partial.insert(
+            "lamad-spa".to_string(),
+            BrowserZip::Entries(browser_entries(true)),
+        );
+        let r = verify_app_bundle_boots(&manifest, &Answer::Present(partial)).unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::AppBundleNotJudged);
+        assert!(r.detail.contains("elohim-host-landing"));
+
+        // And every other class ignores the arm entirely.
+        let coord = verify_shape(&fixture("release-manifest-coordinator-bundle.json")).unwrap();
+        verify_app_bundle_boots(&coord, &Answer::Absent).expect("not an app bundle");
+    }
+
+    fn fetched_for(manifest: &ReleaseManifest) -> Vec<FetchedArtifact> {
+        manifest
+            .artifacts
+            .iter()
+            .map(|a| FetchedArtifact {
+                blob_cid: a.blob_cid.clone(),
+                path: PathBuf::from(format!("/var/lib/elohim/release-staging/x/{}", a.filename)),
+                bytes: a.bytes,
+                sha256: a.sha256.clone(),
+            })
+            .collect()
+    }
+
+    /// The composed floor, end to end, for an app bundle on a peer whose
+    /// conductor inventory could not be read: the bytes prove out, the shells
+    /// boot, and a verified release is minted — one path per artifact, in
+    /// manifest order. A shell that cannot boot refuses before any vehicle.
+    #[test]
+    fn the_composed_floor_verifies_an_app_bundle_on_its_bytes_alone() {
+        let (body, manifest) = app_bundle_manifest();
+        let lineage = Answer::Present(LineageEvidence { supersedes: None });
+        let fetched = fetched_for(&manifest);
+        let run = |entries: &Answer<AppBundleEntries>| {
+            verify(VerifyInput {
+                channel_id: &manifest.channel_id,
+                release_cid: "uhCkkAppRelease",
+                body: &body,
+                installed: &Answer::Unreachable,
+                lineage: &lineage,
+                artifacts: &fetched,
+                attestations: None,
+                tier: HeadTier::Staging,
+                target_coordinators: &Answer::Absent,
+                bundle_dna_hashes: &Answer::Absent,
+                app_bundle_entries: entries,
+                path: Answer::Absent,
+            })
+        };
+        let verified = expect_verified(run(&entries_for(&manifest, true)).expect("boots"));
+        assert_eq!(verified.artifact_paths.len(), 4);
+        assert_eq!(
+            verified.manifest.artifact_class,
+            ArtifactClass::AppBundle,
+            "the class survives into the vehicle's currency"
+        );
+        assert_eq!(
+            run(&entries_for(&manifest, false))
+                .unwrap_err()
+                .reason_code(),
+            RefusalReason::AppBundleCannotBoot
+        );
     }
 }

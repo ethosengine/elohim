@@ -586,6 +586,8 @@ mod tests {
             filename: "coordinators.happ".to_string(),
             mime_type: None,
             role: None,
+            app: None,
+            kind: None,
         }
     }
 

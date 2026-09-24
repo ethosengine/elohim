@@ -8484,6 +8484,38 @@ impl HttpServer {
         }
     }
 
+    /// **Slice 2 (N4).** The candidate of a slug bound to a release channel —
+    /// resolved on the CHANNEL's election, never the slug's own
+    /// (`head_adoption::candidate_head_for_bound_slug`). Same 2 s budget and
+    /// the same honest `Unavailable` as [`Self::resolve_staging_candidate`].
+    async fn resolve_bound_slug_candidate(
+        &self,
+        channel_id: &str,
+        slug: &str,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        elohim_views::lamad::StagingCandidateState,
+    ) {
+        let Some(hc) = self
+            .hc_registry
+            .as_ref()
+            .and_then(|registry| registry.lamad_client())
+        else {
+            return (
+                None,
+                None,
+                elohim_views::lamad::StagingCandidateState::Unavailable,
+            );
+        };
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        let bound = crate::services::head_adoption::candidate_head_for_bound_slug(
+            &hc, channel_id, slug, deadline,
+        )
+        .await;
+        (bound.candidate, bound.blob_hash, bound.state)
+    }
+
     /// Resolve the blob named by an already-elected subordinate candidate.
     ///
     /// The public [`crate::sync::SyncManager::declared_head_blob`] resolver is
@@ -8743,10 +8775,30 @@ impl HttpServer {
                                 candidate_head_request_id = request_id,
                                 content_id = %content_id
                             );
-                            let (candidate, candidate_blob, candidate_state) = self
-                                .resolve_staging_candidate(content_id, &view.head_action_hash)
-                                .instrument(span)
-                                .await;
+                            // Slice 2 (N4): a slug bound to a release channel is
+                            // elected on its CHANNEL, so its candidate is the
+                            // channel's staged release's browser bytes for this
+                            // slug — the same `stagingCandidateBlobHash` field the
+                            // doorway's candidate channel already parses.
+                            let bound_channel =
+                                crate::services::head_adoption::bound_release_channel(
+                                    cwt.content.metadata_json.as_deref(),
+                                );
+                            let (candidate, candidate_blob, candidate_state) = match bound_channel {
+                                Some(channel) => {
+                                    self.resolve_bound_slug_candidate(&channel, content_id)
+                                        .instrument(span)
+                                        .await
+                                }
+                                None => {
+                                    self.resolve_staging_candidate(
+                                        content_id,
+                                        &view.head_action_hash,
+                                    )
+                                    .instrument(span)
+                                    .await
+                                }
+                            };
                             Ok(response::ok(&crate::views::with_staging_candidate(
                                 view,
                                 candidate,

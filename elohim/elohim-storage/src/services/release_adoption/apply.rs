@@ -16,6 +16,7 @@
 //! | `config-epr` | [`ConfigEprVehicle`] | the rung-4 watched runtime-config file + [`crate::runtime_config::reload_now`] |
 //! | `storage-binary` | [`StorageBinaryVehicle`] | the mesh exe-slot — **staged, never executed** |
 //! | `happ-bundle` | [`HappBundleVehicle`] | the same coordinator hot-swap, gated on being joined |
+//! | `app-bundle` | [`AppBundleVehicle`] | the same `ContentProjectionPatch` per-field write every row projection uses, for every bound slug in one transaction |
 //!
 //! That is the whole design claim, and it is load-bearing: a rung that invented
 //! its own apply mechanics would need its own soak, its own failure modes and
@@ -367,9 +368,11 @@ pub async fn staged_bundle_evidence(
         ArtifactClass::CoordinatorBundle
         | ArtifactClass::HappBundle
         | ArtifactClass::HappLineage => {}
-        // A config or binary release installs no coordinator wasm; "already
-        // current by coordinator bytes" is not a question it can answer.
-        ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary => {
+        // A config, binary or app release installs no coordinator wasm;
+        // "already current by coordinator bytes" is not a question it can
+        // answer. (An app bundle's convergence exit is its vehicle's
+        // idempotent receipt — the rows already point at these bytes.)
+        ArtifactClass::ConfigEpr | ArtifactClass::StorageBinary | ArtifactClass::AppBundle => {
             return StagedBundleEvidence::absent()
         }
     }
@@ -1438,6 +1441,372 @@ impl super::sunset::LineageSunsetter for HappLineageVehicle {
             super::state::now_unix(),
         )
         .await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// app-bundle → the app-mount pointers (slice 2 of the elected-content spec)
+// ---------------------------------------------------------------------------
+
+/// The serving pointers ONE app slug should carry after this release.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppMountPlan {
+    pub slug: String,
+    /// `(sha256-<hex>, bytes)` of the browser zip — `None` when the release
+    /// carries no browser half for this app (its pointer is left alone).
+    pub browser: Option<(String, u64)>,
+    /// `sha256-<hex>` of the server zip. `None` REMOVES a previously carried
+    /// server bundle: the release is the whole truth for the app.
+    pub server: Option<String>,
+    pub mount: Option<String>,
+}
+
+/// `sha256-<hex>` — the legacy blob-path spelling the row, `routes/apps`, SSR
+/// and `verify-served-shell.sh` all read. The same digest the manifest's
+/// `blobCid` addresses (`blob_store::compute_addresses` returns both and stores
+/// ONE file), so writing it changes no reader.
+fn row_blob_hash(sha256: &str) -> String {
+    format!("sha256-{}", sha256.to_ascii_lowercase())
+}
+
+/// **Pure.** What every bound slug's row should point at after `verified`.
+///
+/// The positional pairing between `manifest.artifacts` and the staged paths is
+/// checked here as every vehicle checks it; the shape floor has already proven
+/// one artifact per declared (app, kind), so a lookup miss below is a payload
+/// the vehicle cannot use, never a guess.
+pub fn plan_app_mounts(verified: &VerifiedRelease) -> Result<Vec<AppMountPlan>, AdoptionRefusal> {
+    use super::AppArtifactKind;
+
+    const VEHICLE: &str = "app_mount_pointers";
+    let manifest = &verified.manifest;
+    if verified.artifact_paths.len() != manifest.artifacts.len() {
+        return Err(AdoptionRefusal::new(
+            RefusalReason::ApplyPayloadUnusable,
+            format!(
+                "{VEHICLE}: {} verified paths for {} declared artifacts — the positional pairing \
+                 the vehicle relies on does not hold",
+                verified.artifact_paths.len(),
+                manifest.artifacts.len()
+            ),
+        ));
+    }
+    if manifest.applies_to.apps.is_empty() {
+        return Err(AdoptionRefusal::new(
+            RefusalReason::ApplyPayloadUnusable,
+            format!("{VEHICLE}: the release binds no app slug"),
+        ));
+    }
+    let artifact_for = |slug: &str, kind: AppArtifactKind| {
+        manifest
+            .artifacts
+            .iter()
+            .find(|a| a.app.as_deref() == Some(slug) && a.kind == Some(kind))
+    };
+    let mut plans = Vec::with_capacity(manifest.applies_to.apps.len());
+    for (slug, binding) in &manifest.applies_to.apps {
+        let mut plan = AppMountPlan {
+            slug: slug.clone(),
+            browser: None,
+            server: None,
+            mount: binding.mount.clone(),
+        };
+        for kind in &binding.kinds {
+            let Some(artifact) = artifact_for(slug, *kind) else {
+                return Err(AdoptionRefusal::new(
+                    RefusalReason::ApplyPayloadUnusable,
+                    format!(
+                        "{VEHICLE}: '{slug}' declares kind '{}' and the release carries no \
+                         artifact for it",
+                        kind.label()
+                    ),
+                ));
+            };
+            match kind {
+                AppArtifactKind::Browser => {
+                    plan.browser = Some((row_blob_hash(&artifact.sha256), artifact.bytes))
+                }
+                AppArtifactKind::Server => plan.server = Some(row_blob_hash(&artifact.sha256)),
+            }
+        }
+        plans.push(plan);
+    }
+    Ok(plans)
+}
+
+/// **Pure.** The row's metadata with `serverBlobHash` set to the plan's
+/// server bundle — or removed when the release carries none. Every other key
+/// (the slug's `releaseChannel` binding above all) is carried unchanged. A
+/// metadata value that is not a JSON object is replaced by one: a row whose
+/// metadata cannot be read cannot keep an executable identity either.
+pub fn metadata_with_server_bundle(existing: Option<&str>, server: Option<&str>) -> String {
+    let mut map = existing
+        .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+        .and_then(|v| match v {
+            serde_json::Value::Object(map) => Some(map),
+            _ => None,
+        })
+        .unwrap_or_default();
+    match server {
+        Some(hash) => {
+            map.insert(
+                "serverBlobHash".to_string(),
+                serde_json::Value::String(hash.to_string()),
+            );
+        }
+        None => {
+            map.remove("serverBlobHash");
+        }
+    }
+    serde_json::Value::Object(map).to_string()
+}
+
+/// One slug's row as the vehicle reads it before deciding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppRowState {
+    pub blob_hash: Option<String>,
+    pub content_size_bytes: Option<i32>,
+    pub server_blob_hash: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+/// **Pure.** The patch that brings `row` to `plan`, or `None` when the row
+/// already points at exactly these bytes (the idempotent no-op — a revert to
+/// the release a peer already serves, or a re-sweep).
+pub fn app_mount_patch(
+    plan: &AppMountPlan,
+    row: &AppRowState,
+) -> Option<crate::db::content_diesel::ContentProjectionPatch> {
+    let browser_current = match &plan.browser {
+        None => true,
+        Some((hash, bytes)) => {
+            row.blob_hash.as_deref() == Some(hash.as_str())
+                && row.content_size_bytes == Some(i32::try_from(*bytes).unwrap_or(i32::MAX))
+        }
+    };
+    let server_current = row.server_blob_hash.as_deref() == plan.server.as_deref();
+    if browser_current && server_current {
+        return None;
+    }
+    Some(crate::db::content_diesel::ContentProjectionPatch {
+        blob_cid: plan.browser.as_ref().map(|(hash, _)| hash.clone()),
+        content_size_bytes: plan
+            .browser
+            .as_ref()
+            .map(|(_, bytes)| i32::try_from(*bytes).unwrap_or(i32::MAX)),
+        metadata_json: Some(metadata_with_server_bundle(
+            row.metadata_json.as_deref(),
+            plan.server.as_deref(),
+        )),
+        ..Default::default()
+    })
+}
+
+/// **Slice 2's vehicle.** Point every slug an `app-bundle` release binds at
+/// the release's browser (and server) bytes — all of them in ONE diesel
+/// transaction, or none.
+///
+/// # What it checks before it writes anything
+///
+/// For every slug, first: the row exists (`app_slug_row_absent`, transient —
+/// the row may not have projected here yet), and the row's OWN metadata names
+/// this release's channel (`app_slug_not_bound_to_channel`, terminal — the
+/// mutual binding check: a release can never capture a slug that did not
+/// choose to be elected this way). A refusal on any slug writes no slug.
+///
+/// # What it writes
+///
+/// The same per-field `ContentProjectionPatch` write every row projection uses
+/// (`blob_cid`/`blob_hash` + `content_size_bytes`, and `metadata_json` whose
+/// `serverBlobHash` projects `server_blob_hash`) — never an anchor, never a
+/// head stamp. The slug's head is untouched; its channel elects its bytes, and
+/// `head_adoption::held_by_release_channel` keeps the heal from undoing it.
+///
+/// # Idempotent, and revert is free
+///
+/// A slug already pointing at these bytes is left alone; a release every slug
+/// already serves writes nothing and still returns a receipt (the C6b shape).
+/// Revert is this same apply on the prior manifest. After a commit that moved
+/// anything, `ContentUpdated{id: slug}` is emitted per moved slug, so the
+/// doorway's `bundle_heads` re-projects without waiting for its tick.
+pub struct AppBundleVehicle {
+    pool: crate::db::DbPool,
+    ctx: crate::db::AppContext,
+    events: Option<Arc<crate::services::events::EventBus>>,
+}
+
+impl AppBundleVehicle {
+    pub fn new(
+        pool: crate::db::DbPool,
+        ctx: crate::db::AppContext,
+        events: Option<Arc<crate::services::events::EventBus>>,
+    ) -> Self {
+        Self { pool, ctx, events }
+    }
+
+    /// Read, check and write every bound slug in one transaction. Returns the
+    /// slugs whose rows moved.
+    fn write_all(
+        &self,
+        channel_id: &str,
+        plans: &[AppMountPlan],
+    ) -> Result<Vec<String>, AdoptionRefusal> {
+        use crate::db::content_diesel;
+        use diesel::Connection;
+
+        /// Diesel's transaction wants an error it can build from its own; the
+        /// refusal rides beside it so a rollback never loses the reason.
+        enum TxError {
+            Refused(AdoptionRefusal),
+            Db(diesel::result::Error),
+        }
+        impl From<diesel::result::Error> for TxError {
+            fn from(e: diesel::result::Error) -> Self {
+                TxError::Db(e)
+            }
+        }
+        impl From<AdoptionRefusal> for TxError {
+            fn from(r: AdoptionRefusal) -> Self {
+                TxError::Refused(r)
+            }
+        }
+
+        let mut conn = self.pool.get().map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!("app_mount_pointers: no database connection ({e})"),
+            )
+        })?;
+        let outcome = conn.transaction::<Vec<String>, TxError, _>(|conn| {
+            // Every check before any write: a refusal on the last slug must
+            // leave the first one untouched, whatever the rollback does.
+            let mut patches = Vec::with_capacity(plans.len());
+            for plan in plans {
+                let row = content_diesel::get_content(
+                    conn,
+                    &self.ctx,
+                    &plan.slug,
+                    content_diesel::MinTrust::Invisible,
+                )
+                .map_err(|e| {
+                    AdoptionRefusal::new(
+                        RefusalReason::ApplyFailed,
+                        format!("app_mount_pointers: could not read '{}' ({e})", plan.slug),
+                    )
+                })?
+                .ok_or_else(|| {
+                    AdoptionRefusal::new(
+                        RefusalReason::AppSlugRowAbsent,
+                        format!(
+                            "'{}' has no content row on this peer yet — it may simply not have \
+                             projected here",
+                            plan.slug
+                        ),
+                    )
+                })?;
+                let bound = crate::services::head_adoption::bound_release_channel(
+                    row.metadata_json.as_deref(),
+                );
+                if bound.as_deref() != Some(channel_id) {
+                    return Err(AdoptionRefusal::new(
+                        RefusalReason::AppSlugNotBoundToChannel,
+                        format!(
+                            "'{}' names release channel {bound:?} in its own metadata, not \
+                             '{channel_id}' — a slug is elected by exactly one mechanism, chosen \
+                             in its own metadata (`release-ceremony.ts channel bind`)",
+                            plan.slug
+                        ),
+                    )
+                    .into());
+                }
+                let state = AppRowState {
+                    blob_hash: row.blob_hash.clone(),
+                    content_size_bytes: row.content_size_bytes,
+                    server_blob_hash: row.server_blob_hash.clone(),
+                    metadata_json: row.metadata_json.clone(),
+                };
+                if let Some(patch) = app_mount_patch(plan, &state) {
+                    patches.push((plan.slug.clone(), patch));
+                }
+            }
+            for (slug, patch) in &patches {
+                content_diesel::apply_content_patch_fields(conn, &self.ctx, slug, patch).map_err(
+                    |e| {
+                        AdoptionRefusal::new(
+                            RefusalReason::ApplyFailed,
+                            format!(
+                                "app_mount_pointers: writing '{slug}' failed ({e}) — the \
+                                 transaction rolled back, no slug moved"
+                            ),
+                        )
+                    },
+                )?;
+            }
+            Ok(patches.into_iter().map(|(slug, _)| slug).collect())
+        });
+        match outcome {
+            Ok(moved) => Ok(moved),
+            Err(TxError::Refused(refusal)) => Err(refusal),
+            Err(TxError::Db(e)) => Err(AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!("app_mount_pointers: the transaction failed ({e}) — no slug moved"),
+            )),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ApplyVehicle for AppBundleVehicle {
+    async fn apply(&self, verified: &VerifiedRelease) -> Result<AppliedReceipt, AdoptionRefusal> {
+        let plans = plan_app_mounts(verified)?;
+        let moved = self.write_all(&verified.channel_id, &plans)?;
+
+        if let Some(events) = self.events.as_ref() {
+            for slug in &moved {
+                events.emit(crate::services::events::StorageEvent::ContentUpdated {
+                    id: slug.clone(),
+                });
+            }
+        }
+
+        let apps: serde_json::Map<String, serde_json::Value> = plans
+            .iter()
+            .map(|plan| {
+                (
+                    plan.slug.clone(),
+                    serde_json::json!({
+                        "browser": plan.browser.as_ref().map(|(hash, _)| hash.clone()),
+                        "server": plan.server.clone(),
+                        "mount": plan.mount.clone(),
+                        "moved": moved.contains(&plan.slug),
+                    }),
+                )
+            })
+            .collect();
+        tracing::info!(
+            channel = %verified.channel_id,
+            release_cid = %verified.release_cid,
+            moved = ?moved,
+            slugs = plans.len(),
+            "release-adoption: app-bundle applied — bound slugs point at the release's bytes"
+        );
+        Ok(receipt(
+            verified,
+            "app_mount_pointers",
+            serde_json::json!({
+                "apps": apps,
+                "moved": moved.len(),
+                "alreadyCurrent": moved.is_empty(),
+            }),
+        ))
+    }
+
+    fn handles(&self) -> &'static [ArtifactClass] {
+        &[ArtifactClass::AppBundle]
+    }
+
+    fn name(&self) -> &'static str {
+        "app_mount_pointers"
     }
 }
 
@@ -2571,5 +2940,278 @@ mod tests {
         assert_eq!(refusal.reason_code(), RefusalReason::ApplyFailed);
         assert!(refusal.detail.contains("mishpat"));
         assert!(refusal.transient, "a timeout may not recur next sweep");
+    }
+
+    // ── slice 2: the app-mount pointer vehicle ──────────────────────────────
+
+    const APP_CHANNEL: &str = "runtime:app-bundle:alpha:dev";
+
+    fn app_bundle_release() -> VerifiedRelease {
+        let text = std::fs::read_to_string(
+            "../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-app-bundle.json",
+        )
+        .expect("the app-bundle fixture is committed");
+        let manifest =
+            super::super::verify::verify_shape(&serde_json::from_str(&text).unwrap()).unwrap();
+        VerifiedRelease {
+            channel_id: manifest.channel_id.clone(),
+            release_cid: "uhCkkAppRelease".to_string(),
+            artifact_paths: manifest
+                .artifacts
+                .iter()
+                .map(|a| PathBuf::from(format!("/staging/{}", a.filename)))
+                .collect(),
+            manifest,
+        }
+    }
+
+    fn seed_slug(pool: &crate::db::DbPool, slug: &str, metadata: &str) {
+        let mut conn = pool.get().unwrap();
+        crate::db::content_diesel::create_content(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            crate::db::content_diesel::CreateContentInput {
+                id: slug.to_string(),
+                title: slug.to_string(),
+                description: None,
+                content_type: "html5-app".to_string(),
+                content_format: "html5-app".to_string(),
+                blob_hash: Some("sha256-old-browser".to_string()),
+                blob_cid: Some("sha256-old-browser".to_string()),
+                content_size_bytes: Some(7),
+                metadata_json: Some(metadata.to_string()),
+                reach: "commons".to_string(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .unwrap();
+    }
+
+    fn bound_metadata(server: Option<&str>) -> String {
+        let mut m = serde_json::json!({ "releaseChannel": APP_CHANNEL });
+        if let Some(server) = server {
+            m["serverBlobHash"] = serde_json::json!(server);
+        }
+        m.to_string()
+    }
+
+    fn row(pool: &crate::db::DbPool, slug: &str) -> crate::db::models::Content {
+        let mut conn = pool.get().unwrap();
+        crate::db::content_diesel::get_content(
+            &mut conn,
+            &crate::db::AppContext::default_lamad(),
+            slug,
+            crate::db::content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .expect("row exists")
+    }
+
+    fn vehicle(
+        pool: &crate::db::DbPool,
+        events: Option<Arc<crate::services::events::EventBus>>,
+    ) -> AppBundleVehicle {
+        AppBundleVehicle::new(pool.clone(), crate::db::AppContext::default_lamad(), events)
+    }
+
+    #[test]
+    fn the_app_vehicle_declares_its_class() {
+        let v = vehicle(&crate::test_util::test_pool(), None);
+        assert_eq!(v.handles(), &[ArtifactClass::AppBundle]);
+        assert_eq!(v.name(), "app_mount_pointers");
+    }
+
+    #[test]
+    fn each_slug_is_planned_from_its_own_pair_of_artifacts() {
+        let verified = app_bundle_release();
+        let plans = plan_app_mounts(&verified).unwrap();
+        assert_eq!(plans.len(), 2);
+        for plan in &plans {
+            let browser = verified
+                .manifest
+                .artifacts
+                .iter()
+                .find(|a| {
+                    a.app.as_deref() == Some(plan.slug.as_str())
+                        && a.kind == Some(super::super::AppArtifactKind::Browser)
+                })
+                .unwrap();
+            assert_eq!(
+                plan.browser,
+                Some((format!("sha256-{}", browser.sha256), browser.bytes)),
+                "{}: the row is written in the legacy spelling every reader keys on",
+                plan.slug
+            );
+            assert!(plan
+                .server
+                .as_deref()
+                .is_some_and(|h| h.starts_with("sha256-")));
+        }
+        assert_eq!(plans[1].mount.as_deref(), Some("/lamad/"));
+
+        let mut short = app_bundle_release();
+        short.artifact_paths.pop();
+        assert_eq!(
+            plan_app_mounts(&short).unwrap_err().reason_code(),
+            RefusalReason::ApplyPayloadUnusable
+        );
+    }
+
+    #[test]
+    fn the_server_bundle_is_the_releases_whole_truth() {
+        let bound = bound_metadata(Some("sha256-old-server"));
+        let set: serde_json::Value = serde_json::from_str(&metadata_with_server_bundle(
+            Some(&bound),
+            Some("sha256-new"),
+        ))
+        .unwrap();
+        assert_eq!(set["serverBlobHash"], "sha256-new");
+        assert_eq!(set["releaseChannel"], APP_CHANNEL, "the binding is carried");
+        let removed: serde_json::Value =
+            serde_json::from_str(&metadata_with_server_bundle(Some(&bound), None)).unwrap();
+        assert!(removed.get("serverBlobHash").is_none());
+        assert_eq!(removed["releaseChannel"], APP_CHANNEL);
+        assert_eq!(metadata_with_server_bundle(Some("not json"), None), "{}");
+    }
+
+    /// The whole vehicle against a real migrated database: both bound slugs
+    /// move in one apply, each announced once; a re-apply moves nothing and
+    /// announces nothing (the idempotent receipt); the prior release applied
+    /// again is the revert.
+    #[tokio::test]
+    async fn the_vehicle_points_every_bound_slug_at_the_release_in_one_apply() {
+        let pool = crate::test_util::test_pool();
+        seed_slug(
+            &pool,
+            "elohim-host-landing",
+            &bound_metadata(Some("sha256-old-server")),
+        );
+        seed_slug(&pool, "lamad-spa", &bound_metadata(None));
+        let events = Arc::new(crate::services::events::EventBus::new());
+        let mut rx = events.subscribe();
+        let v = vehicle(&pool, Some(events.clone()));
+        let verified = app_bundle_release();
+        let plans = plan_app_mounts(&verified).unwrap();
+
+        let receipt = v.apply(&verified).await.expect("both slugs are bound");
+        assert_eq!(receipt.vehicle, "app_mount_pointers");
+        assert_eq!(receipt.detail["moved"], 2);
+        assert_eq!(receipt.detail["alreadyCurrent"], false);
+        for plan in &plans {
+            let r = row(&pool, &plan.slug);
+            let (hash, bytes) = plan.browser.clone().unwrap();
+            assert_eq!(r.blob_hash.as_deref(), Some(hash.as_str()));
+            assert_eq!(r.blob_cid.as_deref(), Some(hash.as_str()));
+            assert_eq!(r.content_size_bytes, Some(bytes as i32));
+            assert_eq!(r.server_blob_hash, plan.server, "{}", plan.slug);
+            assert_eq!(
+                crate::services::head_adoption::bound_release_channel(r.metadata_json.as_deref())
+                    .as_deref(),
+                Some(APP_CHANNEL),
+                "the binding survives the write"
+            );
+        }
+        let mut announced = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            if let crate::services::events::StorageEvent::ContentUpdated { id } = event {
+                announced.push(id);
+            }
+        }
+        announced.sort();
+        assert_eq!(announced, ["elohim-host-landing", "lamad-spa"]);
+
+        let again = v.apply(&verified).await.expect("idempotent");
+        assert_eq!(again.detail["moved"], 0);
+        assert_eq!(again.detail["alreadyCurrent"], true);
+        assert!(rx.try_recv().is_err(), "a no-op announces nothing");
+    }
+
+    /// A release that no longer carries a server half for an app removes the
+    /// row's server bundle — the release is the whole truth for the app.
+    #[tokio::test]
+    async fn a_release_without_a_server_half_removes_the_server_bundle() {
+        let pool = crate::test_util::test_pool();
+        seed_slug(
+            &pool,
+            "elohim-host-landing",
+            &bound_metadata(Some("sha256-old-server")),
+        );
+        seed_slug(
+            &pool,
+            "lamad-spa",
+            &bound_metadata(Some("sha256-old-server")),
+        );
+        let mut verified = app_bundle_release();
+        let keep: Vec<usize> = verified
+            .manifest
+            .artifacts
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| {
+                !(a.app.as_deref() == Some("lamad-spa")
+                    && a.kind == Some(super::super::AppArtifactKind::Server))
+            })
+            .map(|(i, _)| i)
+            .collect();
+        verified.manifest.artifacts = keep
+            .iter()
+            .map(|i| verified.manifest.artifacts[*i].clone())
+            .collect();
+        verified.artifact_paths = keep
+            .iter()
+            .map(|i| verified.artifact_paths[*i].clone())
+            .collect();
+        verified
+            .manifest
+            .applies_to
+            .apps
+            .get_mut("lamad-spa")
+            .unwrap()
+            .kinds = vec![super::super::AppArtifactKind::Browser];
+
+        vehicle(&pool, None).apply(&verified).await.unwrap();
+        assert_eq!(row(&pool, "lamad-spa").server_blob_hash, None);
+        assert!(row(&pool, "elohim-host-landing").server_blob_hash.is_some());
+    }
+
+    /// The mutual binding check, and the all-or-nothing write: one slug that
+    /// did not choose this channel refuses the WHOLE release, and the slug
+    /// that did choose it is left exactly as it was.
+    #[tokio::test]
+    async fn an_unbound_slug_refuses_the_release_and_no_slug_moves() {
+        let pool = crate::test_util::test_pool();
+        seed_slug(&pool, "elohim-host-landing", &bound_metadata(None));
+        seed_slug(&pool, "lamad-spa", "{}");
+        let r = vehicle(&pool, None)
+            .apply(&app_bundle_release())
+            .await
+            .unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::AppSlugNotBoundToChannel);
+        assert!(!r.transient);
+        assert!(r.detail.contains("lamad-spa"), "{}", r.detail);
+        assert_eq!(
+            row(&pool, "elohim-host-landing").blob_hash.as_deref(),
+            Some("sha256-old-browser"),
+            "the bound slug did not move either"
+        );
+
+        let pool = crate::test_util::test_pool();
+        seed_slug(&pool, "elohim-host-landing", &bound_metadata(None));
+        let r = vehicle(&pool, None)
+            .apply(&app_bundle_release())
+            .await
+            .unwrap_err();
+        assert_eq!(r.reason_code(), RefusalReason::AppSlugRowAbsent);
+        assert!(
+            r.transient,
+            "a row that has not projected here yet heals on its own"
+        );
+        assert_eq!(
+            row(&pool, "elohim-host-landing").blob_hash.as_deref(),
+            Some("sha256-old-browser")
+        );
     }
 }

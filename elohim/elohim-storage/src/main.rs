@@ -4470,6 +4470,13 @@ async fn async_main(
         }
     }
 
+    // The content EventBus the HTTP content service emits on, kept for the
+    // release-adoption controller wired at the end of boot: the app-bundle
+    // vehicle announces each slug it moves on the SAME bus (SSE + the sync
+    // producer read it), so a doorway re-projects without waiting for a tick.
+    let mut content_events_for_adoption: Option<Arc<elohim_storage::services::events::EventBus>> =
+        None;
+
     // Wire the shared Diesel pool into the HTTP server. Pool creation happens
     // once at startup (see `db_pool` above); this section only gates which
     // route groups register against it. `/db/*` requires --enable-content-db;
@@ -4478,6 +4485,7 @@ async fn async_main(
         if args.enable_content_db {
             // Create services with the shared pool
             let services = Arc::new(Services::new(pool.clone()));
+            content_events_for_adoption = Some(services.events.clone());
             http_server = http_server.with_services(services.clone());
 
             // Light the Automerge content-sync plane: subscribe the
@@ -6117,6 +6125,18 @@ async fn async_main(
         }
         if elohim_storage::runtime_config::config_path().is_some() {
             vehicles = vehicles.with(std::sync::Arc::new(apply::ConfigEprVehicle::new()));
+        }
+        // Slice 2 (elected-content spec §12.8): the app-mount pointer vehicle.
+        // Registered wherever there are content rows to point — it touches no
+        // conductor, only the slug rows its release binds, and only those
+        // whose own metadata names the channel. Without a pool `app-bundle`
+        // refuses `no_vehicle_for_class`, the honest answer.
+        if let Some(ref pool) = db_pool {
+            vehicles = vehicles.with(std::sync::Arc::new(apply::AppBundleVehicle::new(
+                pool.clone(),
+                elohim_storage::db::AppContext::default_lamad(),
+                content_events_for_adoption.clone(),
+            )));
         }
         // The storage-binary vehicle is registered on every node and refuses at
         // APPLY time on the declared stakes — deliberately, so the refusal is a

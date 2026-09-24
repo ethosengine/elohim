@@ -6541,6 +6541,30 @@ pub(crate) fn project_authenticated_content_head(
     let mut conn = pool
         .get()
         .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
+    // SLICE 2 — a slug bound to a release channel is elected by that channel:
+    // its serving pointer is the `AppBundleVehicle`'s to write. While the
+    // incoming record still names the same channel, this stamp would only put
+    // the slug's OWN (pre-release) bytes back, so it is skipped — reported as
+    // `SkippedDeclared`, "a declaration elsewhere owns this row". A record that
+    // UNBINDS (or rebinds) the slug proceeds, so the slug can leave the channel
+    // through the same notarized path it joined by. A binding this read cannot
+    // see degrades to the pre-slice behaviour (the stamp proceeds).
+    let local_channel =
+        crate::services::head_adoption::row_release_channel(&mut conn, app_ctx, &c.id)
+            .ok()
+            .flatten();
+    if crate::services::head_adoption::release_channel_owns_serving(
+        local_channel.as_deref(),
+        Some(c.metadata_json.as_str()),
+    ) {
+        tracing::debug!(
+            content_id = %c.id,
+            channel = ?local_channel,
+            "projection reconcile: stamp skipped — the slug's release channel owns its serving \
+             pointer"
+        );
+        return Ok(crate::db::content_diesel::StampOutcome::SkippedDeclared);
+    }
     // RC-4 non-narrowing reach guard: heal converges the HEAD, it must never
     // relitigate REACH. A conductor answer carrying a scoped reach over a
     // local row that already holds a distribution-safe one would permanently

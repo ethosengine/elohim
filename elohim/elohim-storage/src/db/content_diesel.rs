@@ -998,8 +998,11 @@ fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
 /// content address (same SHA256 per the Phase 0 refactor).
 ///
 /// Shared by [`upsert_with_anchor`] and [`stamp_declared_head`] so the per-field
-/// projection semantics stay byte-identical between the two write paths.
-fn apply_content_patch_fields(
+/// projection semantics stay byte-identical between the two write paths — and,
+/// crate-visible, by the release-adoption `AppBundleVehicle`, which points an
+/// app slug's row at a verified release's bytes WITHOUT an anchor or a head
+/// stamp (the slug's release channel, not its own head, elects its pointer).
+pub(crate) fn apply_content_patch_fields(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     id: &str,

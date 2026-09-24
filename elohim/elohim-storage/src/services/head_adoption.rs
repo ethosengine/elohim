@@ -1333,6 +1333,260 @@ pub fn ghost_decay_blocked_leg(
     None
 }
 
+// ---------------------------------------------------------------------------
+// Slice 2 — a slug elected by its RELEASE CHANNEL, not by its own head
+// ---------------------------------------------------------------------------
+//
+// An app slug (`elohim-host-landing`, `lamad-spa`) is today its OWN elected
+// head: the row's serving pointer is healed toward the notarized `Content`
+// entry of the head it obeys. Slice 2 of the elected-content spec (§12.8)
+// moves an app's bytes onto a release channel instead
+// (`runtime:app-bundle:<network>:<channel>`), and the adopting peer's
+// `AppBundleVehicle` points the row at the release's bytes. Left alone, the
+// heal below would put that pointer back every sweep.
+//
+// So a slug is elected by EXACTLY ONE mechanism, chosen in its own notarized
+// metadata: `metadata_json.releaseChannel` names the channel. A bound slug
+// returns [`AdoptOutcome::Held`] before any pointer or head stamp, and
+// `p2p::projection_reconcile` skips its verified stamp while the incoming
+// record still names the same channel. The binding itself is Notarized (A) —
+// one field on the slug's own content version — so it arrives, and leaves,
+// through the same DHT channels as any other field.
+
+/// The `metadata_json` key a slug names its release channel under.
+pub const RELEASE_CHANNEL_KEY: &str = "releaseChannel";
+
+/// The `arm` label on `elohim_content_adopt_held_total` for a slug whose
+/// release channel owns its serving pointer.
+pub const HELD_BOUND_TO_RELEASE_CHANNEL: &str = "held_bound_to_release_channel";
+
+/// `elohim_content_adopt_held_total{arm}` — adopt-before-author pre-flights
+/// that HELD because a declaration elsewhere owns the row. Registered on first
+/// touch against the process registry (this module's own series, kept beside
+/// the predicate that emits it).
+static ADOPT_HELD: std::sync::LazyLock<prometheus::IntCounterVec> =
+    std::sync::LazyLock::new(|| {
+        let counter = prometheus::IntCounterVec::new(
+            prometheus::Opts::new(
+                "elohim_content_adopt_held_total",
+                "Adopt-before-author pre-flights that held because another declared \
+                 mechanism owns the row, by arm.",
+            ),
+            &["arm"],
+        )
+        .expect("adopt-held counter");
+        // A second registration (a test re-initialising the registry) is not
+        // an error worth failing a sweep over.
+        let _ = crate::metrics::REGISTRY.register(Box::new(counter.clone()));
+        counter
+            .with_label_values(&[HELD_BOUND_TO_RELEASE_CHANNEL])
+            .inc_by(0);
+        counter
+    });
+
+/// Pre-touch `elohim_content_adopt_held_total` so a fleet with no bound slug
+/// reads a measured zero rather than an absent series.
+pub fn pretouch_adopt_held_metric() {
+    std::sync::LazyLock::force(&ADOPT_HELD);
+}
+
+fn note_held_bound_to_release_channel() {
+    ADOPT_HELD
+        .with_label_values(&[HELD_BOUND_TO_RELEASE_CHANNEL])
+        .inc();
+}
+
+/// **The Held predicate.** The release channel a slug's metadata binds it to,
+/// or `None` when the slug is its own elected head.
+///
+/// Only a value that IS a release channel id binds
+/// (`runtime:<class>:<network>:<name>`): a malformed or empty value is not a
+/// declaration of anything, and reading it as one would strand the slug with
+/// neither its own head nor a channel to follow.
+pub fn bound_release_channel(metadata_json: Option<&str>) -> Option<String> {
+    let parsed: serde_json::Value = serde_json::from_str(metadata_json?.trim()).ok()?;
+    let channel = parsed.get(RELEASE_CHANNEL_KEY)?.as_str()?.trim();
+    crate::services::release_adoption::verify::is_channel_id(channel).then(|| channel.to_string())
+}
+
+/// Read ONE row's binding. `Ok(None)` when there is no row, no metadata, or no
+/// binding.
+pub fn row_release_channel(
+    conn: &mut diesel::SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<String>, StorageError> {
+    use crate::db::diesel_schema::content;
+    use diesel::prelude::*;
+
+    let metadata: Option<Option<String>> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select(content::metadata_json)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("release-channel lookup failed: {e}")))?;
+    Ok(bound_release_channel(metadata.flatten().as_deref()))
+}
+
+/// **The pre-flight's first question** (`try_adopt_canonical_head` step -1):
+/// is this row a slug its release channel owns? Counts the hold on
+/// `elohim_content_adopt_held_total{arm="held_bound_to_release_channel"}`.
+///
+/// `false` when the row cannot be read: the pre-flight's own step (0) holds an
+/// unreadable row anyway, so this never has to guess in the author direction.
+pub fn held_by_release_channel(pool: &DbPool, ctx: &AppContext, id: &str) -> bool {
+    pretouch_adopt_held_metric();
+    let Ok(mut conn) = pool.get() else {
+        return false;
+    };
+    match row_release_channel(&mut conn, ctx, id) {
+        Ok(Some(channel)) => {
+            tracing::debug!(
+                content_id = %id, channel = %channel,
+                "adopt-before-author: held — the slug is bound to a release channel, which owns \
+                 its serving pointer"
+            );
+            note_held_bound_to_release_channel();
+            true
+        }
+        _ => false,
+    }
+}
+
+/// **The projection-side rule.** Whether a verified stamp of a record carrying
+/// `incoming` metadata onto a row bound to `local_channel`
+/// ([`row_release_channel`]) must be skipped because that channel owns the
+/// row's serving fields.
+///
+/// - local bound, incoming names the SAME channel (or carries no metadata) →
+///   skip: the head is unchanged in meaning and the pointer is the vehicle's.
+/// - local bound, incoming names NO channel or a different one → proceed: the
+///   slug was unbound (or rebound) by its own notarized version, and that
+///   declaration has to reach this row or it could never leave the channel.
+/// - local not bound → proceed, including when the incoming version is the
+///   one that BINDS it — that is how the binding arrives.
+pub fn release_channel_owns_serving(local_channel: Option<&str>, incoming: Option<&str>) -> bool {
+    let Some(local_channel) = local_channel else {
+        return false;
+    };
+    match incoming {
+        None => true,
+        Some(meta) if meta.trim().is_empty() => true,
+        Some(meta) => bound_release_channel(Some(meta)).as_deref() == Some(local_channel),
+    }
+}
+
+/// What a bound slug's CANDIDATE is, for the storage `GET /db/content/{id}/head`
+/// read (spec §12.8 N4).
+///
+/// A bound slug's staged release does not live on the slug's own election —
+/// it lives on its CHANNEL's. So the candidate a candidate-channel doorway
+/// serves is: the channel's staging candidate (a release version), proven
+/// through this conductor, whose manifest's `(app = slug, kind = browser)`
+/// artifact names the bytes. The `sha256-<hex>` spelling is what the doorway's
+/// `parse_candidate_head` already consumes as `stagingCandidateBlobHash`, so
+/// no doorway change is needed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundSlugCandidate {
+    /// The staged release version's action hash on the channel.
+    pub candidate: Option<String>,
+    /// That release's browser bytes for this slug, `sha256-<hex>`.
+    pub blob_hash: Option<String>,
+    pub state: elohim_views::lamad::StagingCandidateState,
+}
+
+/// **Pure.** The browser blob a (proven) release version carries for `slug`,
+/// or `None` when the version is not a release of `channel_id`, is not an app
+/// bundle, or carries no browser artifact for the slug.
+pub fn candidate_blob_for_bound_slug(
+    channel_id: &str,
+    slug: &str,
+    release_metadata_json: &str,
+) -> Option<String> {
+    use crate::services::release_adoption::{verify, watch, AppArtifactKind, ArtifactClass};
+
+    let body = watch::extract_release_body(release_metadata_json).ok()??;
+    let manifest = verify::verify_shape(&body).ok()?;
+    if manifest.channel_id != channel_id || manifest.artifact_class != ArtifactClass::AppBundle {
+        return None;
+    }
+    manifest
+        .artifacts
+        .iter()
+        .find(|a| a.app.as_deref() == Some(slug) && a.kind == Some(AppArtifactKind::Browser))
+        .map(|a| format!("sha256-{}", a.sha256.to_ascii_lowercase()))
+}
+
+/// **N4.** Resolve a bound slug's candidate on its CHANNEL's election.
+///
+/// Every failure is an honest `Unavailable` (never a guessed candidate); an
+/// election with no staging declaration is `None`. The whole read is bounded
+/// by `deadline`, because it runs on the serving hot path exactly as the
+/// slug-election candidate read it replaces does.
+pub async fn candidate_head_for_bound_slug(
+    hc: &Arc<HcClient>,
+    channel_id: &str,
+    slug: &str,
+    deadline: tokio::time::Instant,
+) -> BoundSlugCandidate {
+    use elohim_views::lamad::StagingCandidateState;
+
+    let unavailable = BoundSlugCandidate {
+        candidate: None,
+        blob_hash: None,
+        state: StagingCandidateState::Unavailable,
+    };
+    let election = match tokio::time::timeout_at(
+        deadline,
+        conductor_writes::call_resolve_canonical_election(hc, channel_id),
+    )
+    .await
+    {
+        Ok(Ok(election)) => election,
+        _ => return unavailable,
+    };
+    let Some(candidate) = election
+        .and_then(|e| e.staging_candidate)
+        .map(|h| h.to_string())
+    else {
+        return BoundSlugCandidate {
+            candidate: None,
+            blob_hash: None,
+            state: StagingCandidateState::None,
+        };
+    };
+    let carried = match tokio::time::timeout_at(
+        deadline,
+        conductor_writes::call_get_record_for_action(hc, &candidate),
+    )
+    .await
+    {
+        Ok(Ok(Some(carried))) if carried.action_hash == candidate => carried,
+        _ => return unavailable,
+    };
+    let proven = match tokio::time::timeout_at(
+        deadline,
+        conductor_writes::call_validate_carried_head_record(
+            hc,
+            channel_id,
+            &candidate,
+            Some(carried.record),
+        ),
+    )
+    .await
+    {
+        Ok(Ok(Some(proven))) => proven,
+        _ => return unavailable,
+    };
+    let blob_hash = candidate_blob_for_bound_slug(channel_id, slug, &proven.content.metadata_json);
+    BoundSlugCandidate {
+        candidate: Some(candidate),
+        blob_hash,
+        state: StagingCandidateState::Staged,
+    }
+}
+
 /// What the caller should do with this id after the pre-flight ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdoptOutcome {
@@ -1340,7 +1594,9 @@ pub enum AdoptOutcome {
     Adopted,
     /// The row already carries a declaration (or a declaration this pre-flight
     /// tried to move was refused as not-provably-forward). SKIP the author path
-    /// and leave it to the canonical channels.
+    /// and leave it to the canonical channels. Also returned — first, before
+    /// any read of the head plane — for a slug bound to a release channel
+    /// ([`bound_release_channel`]): its channel owns its serving pointer.
     Held,
     /// A canonical-head link was minted naming the PEER's head — one candidate
     /// added to the DHT election. The local row is deliberately UNCHANGED: the
@@ -1389,6 +1645,14 @@ pub async fn try_adopt_canonical_head(
     adopt: &AdoptContext<'_>,
     priced: PricedVerification,
 ) -> AdoptOutcome {
+    // (-1) SLICE 2 — a slug bound to a release channel is elected by that
+    // channel, not by its own head. Hold BEFORE any pointer or head stamp, or
+    // the heal below would put the vehicle-written pointer back every sweep.
+    // An unreadable row falls through to (0), which holds it anyway.
+    if held_by_release_channel(pool, ctx, id) {
+        return AdoptOutcome::Held;
+    }
+
     // (0) What does this row already claim? A pool failure is not a licence to
     // author — treat an unreadable row as declared (Hold) so a transient DB
     // problem can never mint a competing root.
@@ -6101,6 +6365,137 @@ mod tests {
             adopt, "adopt_peer",
             "the bypass must not share a series with the classic peer-adopt arm — \
              the whole convergence reading depends on telling them apart"
+        );
+    }
+
+    // ── slice 2: a slug elected by its release channel ──────────────────────
+
+    const CHANNEL: &str = "runtime:app-bundle:alpha:dev";
+
+    #[test]
+    fn only_a_channel_id_binds_a_slug() {
+        let bound = format!(r#"{{"releaseChannel":"{CHANNEL}","serverBlobHash":"sha256-s"}}"#);
+        assert_eq!(
+            bound_release_channel(Some(&bound)).as_deref(),
+            Some(CHANNEL)
+        );
+        for unbound in [
+            None,
+            Some(""),
+            Some("not json"),
+            Some("{}"),
+            Some(r#"{"releaseChannel":""}"#),
+            Some(r#"{"releaseChannel":"app-bundle-dev"}"#),
+            Some(r#"{"releaseChannel":42}"#),
+        ] {
+            assert_eq!(bound_release_channel(unbound), None, "{unbound:?}");
+        }
+    }
+
+    /// The row read and the pre-flight's first question, against a real
+    /// migrated database: a bound slug holds (and is counted), an unbound
+    /// slug and an absent row do not.
+    #[test]
+    fn a_bound_slug_is_held_before_any_stamp() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(
+            &pool,
+            "lamad-spa",
+            &format!(r#"{{"releaseChannel":"{CHANNEL}"}}"#),
+        );
+        seed_adoption_content(&pool, "elohim-host-landing", "{}");
+
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            row_release_channel(&mut conn, &ctx, "lamad-spa")
+                .unwrap()
+                .as_deref(),
+            Some(CHANNEL)
+        );
+        assert_eq!(
+            row_release_channel(&mut conn, &ctx, "elohim-host-landing").unwrap(),
+            None
+        );
+        assert_eq!(
+            row_release_channel(&mut conn, &ctx, "no-such-row").unwrap(),
+            None
+        );
+        drop(conn);
+
+        let before = ADOPT_HELD
+            .with_label_values(&[HELD_BOUND_TO_RELEASE_CHANNEL])
+            .get();
+        assert!(held_by_release_channel(&pool, &ctx, "lamad-spa"));
+        assert!(!held_by_release_channel(&pool, &ctx, "elohim-host-landing"));
+        assert!(!held_by_release_channel(&pool, &ctx, "no-such-row"));
+        assert!(
+            ADOPT_HELD
+                .with_label_values(&[HELD_BOUND_TO_RELEASE_CHANNEL])
+                .get()
+                > before,
+            "the hold is counted on its own arm"
+        );
+    }
+
+    #[test]
+    fn the_projection_skips_only_while_the_record_keeps_the_binding() {
+        let bound = format!(r#"{{"releaseChannel":"{CHANNEL}"}}"#);
+        let other = r#"{"releaseChannel":"runtime:app-bundle:alpha:canary"}"#;
+        // Bound, and the record still names the channel (or says nothing).
+        assert!(release_channel_owns_serving(Some(CHANNEL), Some(&bound)));
+        assert!(release_channel_owns_serving(Some(CHANNEL), None));
+        assert!(release_channel_owns_serving(Some(CHANNEL), Some("")));
+        // The record UNBINDS or REBINDS: that declaration must reach the row.
+        assert!(!release_channel_owns_serving(Some(CHANNEL), Some("{}")));
+        assert!(!release_channel_owns_serving(Some(CHANNEL), Some(other)));
+        // Not bound locally: proceed — including the version that binds it.
+        assert!(!release_channel_owns_serving(None, Some(&bound)));
+        assert!(!release_channel_owns_serving(None, None));
+    }
+
+    fn app_bundle_release_metadata() -> String {
+        let text = std::fs::read_to_string(
+            "../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-app-bundle.json",
+        )
+        .expect("the app-bundle fixture is committed");
+        let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
+        serde_json::json!({ "kind": "release-manifest", "manifest": manifest }).to_string()
+    }
+
+    /// N4's pure half: the candidate release's browser bytes for THIS slug,
+    /// in the `sha256-<hex>` spelling the doorway already parses — and
+    /// nothing for a release of another channel, another slug, or no release.
+    #[test]
+    fn a_bound_slugs_candidate_is_its_browser_artifact_on_the_channel() {
+        let meta = app_bundle_release_metadata();
+        let manifest: serde_json::Value =
+            serde_json::from_str::<serde_json::Value>(&meta).unwrap()["manifest"].clone();
+        let lamad_browser = manifest["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["app"] == "lamad-spa" && a["kind"] == "browser")
+            .unwrap()["sha256"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(
+            candidate_blob_for_bound_slug(CHANNEL, "lamad-spa", &meta),
+            Some(format!("sha256-{lamad_browser}"))
+        );
+        assert_eq!(
+            candidate_blob_for_bound_slug("runtime:app-bundle:alpha:canary", "lamad-spa", &meta),
+            None,
+            "a release of another channel never names this slug's candidate"
+        );
+        assert_eq!(
+            candidate_blob_for_bound_slug(CHANNEL, "unbound-app", &meta),
+            None
+        );
+        assert_eq!(
+            candidate_blob_for_bound_slug(CHANNEL, "lamad-spa", "{}"),
+            None
         );
     }
 }
