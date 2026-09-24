@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ElohimClient } from './elohim-client';
+import type { ContentSearchView } from '../generated/content-search-view';
 import type { BrowserMode, ContentReadable } from './types';
 
 interface TestContent extends ContentReadable {
@@ -257,5 +258,128 @@ describe('ElohimClient multi-host failover', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][0]).toBe(`${FALLBACK}/db/content/y`);
     expect(fetchMock.mock.calls[1][0]).toBe(`${PRIMARY}/db/content/y`);
+  });
+
+  // ── GET /db/content/search (plan Lane S, task S7 / ruling R-S6) ──
+  //
+  // The search VIEW is served whole by the storage peer: ranking, facets, totals and the
+  // provenance the reader is owed. The client is transport — it carries the query, it never
+  // reshapes the answer.
+
+  function searchView(overrides: Partial<ContentSearchView> = {}): ContentSearchView {
+    return {
+      query: 'watershed',
+      rankingKnown: true,
+      recipe: {
+        name: 'rrf-v2',
+        cid: 'bafyreirecipe',
+        k: 60,
+        orderOnly: true,
+        producers: [{ id: 'lexical', method: 'bafyreimeasure' }],
+      },
+      lens: { level: 'standard', choiceCount: 20, cid: 'bafyreilens', provenance: 'defaulted' },
+      selection: '1 of 1 admitted candidates',
+      fold: {
+        state: 'present',
+        value: {
+          measure: 'bafyreimeasure',
+          state: 'complete',
+          attestationCid: 'bafyreiattestation',
+          at: 1790000000,
+        },
+      },
+      foldLag: { state: 'present', value: { behind: 0, limit: 200, unit: 'units', within: true } },
+      candidates: [
+        {
+          contentId: 'watershed-keeping',
+          title: 'Watershed keeping',
+          contentType: 'concept',
+          reach: 'commons',
+          trust: 'notarized',
+          tags: ['water'],
+          score: 0.0164,
+          producer: 'lexical',
+          method: 'bafyreimeasure',
+          bestSection: { title: 'head', snippet: 'Swales slow the rain.' },
+        },
+      ],
+      facets: { contentType: [{ value: 'concept', count: 1 }], reach: [], tags: [] },
+      omissions: [],
+      unresolved: [],
+      totalCount: 1,
+      ...overrides,
+    };
+  }
+
+  it('(l) searchContent hits storageUrl directly when configured — no failover plane', async () => {
+    const mode: BrowserMode = {
+      type: 'browser',
+      doorway: { url: PRIMARY, fallbacks: [FALLBACK] },
+      storageUrl: 'http://localhost:8090',
+    };
+    const client = new ElohimClient({ mode });
+    fetchMock.mockResolvedValueOnce(jsonResponse(searchView()));
+
+    const view = await client.searchContent({
+      q: 'watershed',
+      lens: 'standard',
+      contentType: 'concept',
+      reach: 'commons',
+      tags: ['water', 'soil'],
+      limit: 20,
+      offset: 0,
+      recipe: 'bafyreirecipe',
+    });
+
+    expect(view).toEqual(searchView());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.origin + url.pathname).toBe('http://localhost:8090/db/content/search');
+    expect(url.searchParams.get('q')).toBe('watershed');
+    expect(url.searchParams.get('lens')).toBe('standard');
+    expect(url.searchParams.get('contentType')).toBe('concept');
+    expect(url.searchParams.get('reach')).toBe('commons');
+    // tags is ONE comma-separated parameter, as the route reads it.
+    expect(url.searchParams.get('tags')).toBe('water,soil');
+    expect(url.searchParams.get('limit')).toBe('20');
+    expect(url.searchParams.get('recipe')).toBe('bafyreirecipe');
+    // An offset of 0 is the default; it is not sent.
+    expect(url.searchParams.has('offset')).toBe(false);
+  });
+
+  it('(m) searchContent fails over across doorway hosts', async () => {
+    const client = makeClient([FALLBACK]);
+    fetchMock.mockImplementationOnce(networkError);
+    fetchMock.mockResolvedValueOnce(jsonResponse(searchView({ query: 'from-fallback' })));
+
+    const view = await client.searchContent({ q: 'from-fallback' });
+
+    expect(view.query).toBe('from-fallback');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${PRIMARY}/db/content/search?q=from-fallback`);
+    expect(fetchMock.mock.calls[1][0]).toBe(`${FALLBACK}/db/content/search?q=from-fallback`);
+  });
+
+  it('(n) searchContent propagates the HTTP error body', async () => {
+    const client = makeClient();
+    fetchMock.mockResolvedValueOnce(
+      new Response('invalid search query: limit', { status: 400 })
+    );
+
+    await expect(client.searchContent({ q: 'watershed' })).rejects.toThrow(
+      'HTTP 400 - invalid search query: limit'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('(o) searchContent in tauri mode refuses honestly — the sidecar serves no search view', async () => {
+    const client = new ElohimClient({
+      mode: { type: 'tauri', invoke: (async () => undefined) as never },
+    });
+
+    await expect(client.searchContent({ q: 'watershed' })).rejects.toThrow(
+      'content search view unavailable in tauri mode'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

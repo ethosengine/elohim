@@ -83,6 +83,7 @@ export {
   type ContentReadable,
   type ContentWriteable,
   type ContentQuery,
+  type ContentSearchQuery,
 
   // Config
   type ElohimClientConfig,

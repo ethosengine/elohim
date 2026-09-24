@@ -28,7 +28,8 @@ import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
 
 import type { KnowledgeMap, KnowledgeMapType } from '../models/knowledge-map.model';
 import type { PathExtension, UpstreamProposal } from '../models/path-extension.model';
-import type { ContentQuery } from '@elohim/service';
+import type { ContentQuery, ContentSearchQuery } from '@elohim/service';
+import type { ContentSearchView } from '../../generated/content-search-view';
 
 /**
  * Content query filters
@@ -444,6 +445,20 @@ export class ContentBackendService {
         return of(new Map());
       })
     );
+  }
+
+  /**
+   * Ask the storage peer's content search and hand back its view WHOLE
+   * (plan Lane S, ruling R-S6).
+   *
+   * Distinct from {@link searchContent}, which lists nodes through `queryContent`'s LIKE filter.
+   * This one is the ranked question: the peer ranks, facets and counts under its declared recipe,
+   * and the view carries the provenance a reader is owed (recipe CID, lens, fold state, fold lag,
+   * omissions). Nothing here re-scores, re-sorts or reshapes it — the backend is authoritative and
+   * the client senses. A transport failure surfaces as the error; the caller decides what to say.
+   */
+  searchContentView(query: ContentSearchQuery): Observable<ContentSearchView> {
+    return from(this.client.searchContent(query)).pipe(pendingUntilEvent(this.injector));
   }
 
   /**

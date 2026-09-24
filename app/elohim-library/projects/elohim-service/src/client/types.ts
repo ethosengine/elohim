@@ -232,6 +232,36 @@ export interface ContentQuery {
 }
 
 /**
+ * The query of `GET /db/content/search` — the storage peer's recipe-governed lexical search
+ * over its content projection (plan Lane S, rulings R-S4 / R-S6).
+ *
+ * Distinct from {@link ContentQuery}: that one lists rows with a `search` LIKE filter, this one
+ * asks a ranked question and is answered by a `ContentSearchView` — the ranking, the facets, the
+ * totals, and the provenance (recipe CID, lens, fold state) the reader is owed. Nothing here is
+ * scored client-side.
+ */
+export interface ContentSearchQuery {
+  /** The question, as the reader asked it. */
+  q: string;
+  /** A level of the recipe's lens table (`minimal` | `standard` | `whole`). Never refused: an
+   *  unknown level is answered at the recipe's default, with `lens.provenance: 'defaulted'`. */
+  lens?: string;
+  /** Filter to one content type. */
+  contentType?: string;
+  /** Filter to one reach ring. */
+  reach?: string;
+  /** Filter to rows carrying any of these tags; sent as one comma-separated parameter. */
+  tags?: string[];
+  /** Page size. The peer clamps it to 1..=100 (default 20) rather than refusing. */
+  limit?: number;
+  /** Page offset. */
+  offset?: number;
+  /** Pin the recipe an answer must have ranked under. A peer serving another one still answers,
+   *  and says so in `unresolved` — the pin is a question, not a demand. */
+  recipe?: string;
+}
+
+/**
  * Base interface for content that can be read
  */
 export interface ContentReadable {

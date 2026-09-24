@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { vi } from 'vitest';
 
 import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
+import type { ContentSearchView } from '../../generated/content-search-view';
 import { ContentBackendService } from './content-backend.service';
 import { ProjectionAPIService } from './projection-api.service';
 
@@ -120,5 +121,74 @@ describe('ContentBackendService transformContent', () => {
     expect(byId.get('o')?.trustScore).toBe(0.25);
     // Tags served by /db/content reach the node untouched.
     expect(byId.get('n')?.tags).toEqual(['a', 'b']);
+  });
+});
+
+describe('ContentBackendService searchContentView', () => {
+  it('searchContentView_returns_the_view_untransformed', async () => {
+    // The peer's whole answer: ranking, facets, totals, provenance. A service that mapped it to
+    // nodes would drop exactly what the reader is owed — which recipe ranked this, at which lens,
+    // over a fold in which state, and what the reach gate withheld.
+    const view: ContentSearchView = {
+      query: 'watershed',
+      rankingKnown: true,
+      recipe: {
+        name: 'rrf-v2',
+        cid: 'bafyreirecipe',
+        k: 60,
+        orderOnly: true,
+        producers: [{ id: 'lexical', method: 'bafyreimeasure' }],
+      },
+      lens: { level: 'standard', choiceCount: 20, cid: 'bafyreilens', provenance: 'defaulted' },
+      selection: '1 of 1 admitted candidates',
+      fold: {
+        state: 'present',
+        value: {
+          measure: 'bafyreimeasure',
+          state: 'complete',
+          attestationCid: 'bafyreiattestation',
+          at: 1790000000,
+        },
+      },
+      foldLag: { state: 'present', value: { behind: 0, limit: 200, unit: 'units', within: true } },
+      candidates: [
+        {
+          contentId: 'watershed-keeping',
+          title: 'Watershed keeping',
+          contentType: 'concept',
+          reach: 'commons',
+          trust: 'notarized',
+          tags: ['water'],
+          score: 0.0164,
+          producer: 'lexical',
+          method: 'bafyreimeasure',
+          bestSection: { title: 'head', snippet: 'Swales slow the rain.' },
+        },
+      ],
+      facets: { contentType: [{ value: 'concept', count: 1 }], reach: [], tags: [] },
+      omissions: ['1 ranked candidate withheld by the reach gate for an anonymous reader'],
+      unresolved: [],
+      totalCount: 1,
+    };
+    const searchContent = vi.fn().mockResolvedValue(view);
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        { provide: ELOHIM_CLIENT, useValue: { searchContent } },
+        { provide: BLOB_FETCHER, useValue: {} },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: {} },
+      ],
+    });
+
+    const query = { q: 'watershed', lens: 'standard', tags: ['water'] };
+    const answer = await firstValueFrom(
+      TestBed.inject(ContentBackendService).searchContentView(query)
+    );
+
+    expect(searchContent).toHaveBeenCalledWith(query);
+    expect(answer).toBe(view);
+    // `searchContent` (the node-returning method) is untouched and still its own thing.
+    expect(TestBed.inject(ContentBackendService).searchContent).toBeInstanceOf(Function);
   });
 });

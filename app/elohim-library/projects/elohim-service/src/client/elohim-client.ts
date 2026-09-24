@@ -33,10 +33,13 @@ import {
   WriteOp,
   ElohimClientConfig,
   ContentQuery,
+  ContentSearchQuery,
   ContentReadable,
   ContentWriteable,
   WriteBufferDefaults,
 } from './types';
+
+import type { ContentSearchView } from '../generated/content-search-view';
 
 function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
   return typeof (value as Promise<T>)?.then === 'function';
@@ -324,6 +327,27 @@ export class ElohimClient {
 
       case 'tauri':
         return this.queryFromTauri<T>(this.mode, query);
+    }
+  }
+
+  /**
+   * Ask the storage peer's content search (plan Lane S, ruling R-S6).
+   *
+   * The answer is the peer's whole `ContentSearchView` — server ranking, server facets, server
+   * `totalCount`, and the provenance every answer prints (the recipe CID, the lens it resolved,
+   * the fold it read and how far behind it is, what the reach gate withheld). It is returned
+   * UNTRANSFORMED: this client is transport, and a client that re-scored or re-sorted would be
+   * claiming a ranking the peer never made.
+   *
+   * Tauri mode rejects honestly until the local sidecar serves the route.
+   */
+  async searchContent(query: ContentSearchQuery): Promise<ContentSearchView> {
+    switch (this.mode.type) {
+      case 'browser':
+        return this.searchFromProjection(this.mode, query);
+
+      case 'tauri':
+        return Promise.reject(new Error('content search view unavailable in tauri mode'));
     }
   }
 
@@ -731,6 +755,49 @@ export class ElohimClient {
     // elohim-storage returns { items: [...], count, limit, offset }
     const result = (await response.json()) as { items: T[]; count: number };
     return result.items ?? [];
+  }
+
+  private async searchFromProjection(
+    mode: BrowserMode,
+    query: ContentSearchQuery
+  ): Promise<ContentSearchView> {
+    const params = new URLSearchParams();
+    params.set('q', query.q);
+    if (query.lens) params.set('lens', query.lens);
+    if (query.contentType) params.set('contentType', query.contentType);
+    if (query.reach) params.set('reach', query.reach);
+    if (query.tags?.length) params.set('tags', query.tags.join(','));
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    if (query.recipe) params.set('recipe', query.recipe);
+
+    const headers: Record<string, string> = {};
+
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass).
+    // Direct connection to local storage, not the public doorway plane — no
+    // multi-host failover applies here.
+    let response: Response;
+    if (mode.storageUrl) {
+      response = await fetch(`${mode.storageUrl}/db/content/search?${params}`, { headers });
+    } else {
+      // Only include auth header when using doorway (storage doesn't need it in dev)
+      if (mode.doorway.apiKey) {
+        headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
+      }
+      response = await this.fetchWithFailover(
+        mode,
+        baseUrl => `${baseUrl}/db/content/search?${params}`,
+        { headers },
+        { allowFailover: true, timeoutMs: ElohimClient.DEFAULT_ATTEMPT_TIMEOUT_MS }
+      );
+    }
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`HTTP ${response.status} - ${body}`);
+    }
+
+    // The view is the peer's answer, whole and untransformed.
+    return response.json() as Promise<ContentSearchView>;
   }
 
   private async flushToProjection(mode: BrowserMode, batch: WriteOp[]): Promise<void> {

@@ -109,6 +109,7 @@ export type {
   ContentReadable,
   ContentWriteable,
   ContentQuery,
+  ContentSearchQuery,
 
   // Write buffer
   WriteOp,
