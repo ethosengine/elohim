@@ -343,6 +343,15 @@ before investing.
     recall contract's `semantic_provider` no longer reads `mempalace`, and removing the palace
     loses only the second opinion. The palace itself stays, as one declared provider with
     `ranking_known: false` under the six-part admission contract (confidentiality row 10).
+    **Disposition 2026-09-24 — landed at L0** (station 4 of the three-seams spec, the
+    [plan](epr:governed-discovery-station-4-native-semantic-provider-plan)): the native
+    `semantic` provider ranks by cosine under a pinned model over a SQLite fold declared as an
+    `IndexMeasure`; the contract's `semantic_provider` reads `semantic`; the palace removal test
+    passed (every bank question keeps its fused rank with `providers.mempalace` deleted); the
+    FTS5 lexical provider is declared, reachable, and out of the fusion recipe by its own bank
+    evidence; the `index:` fold-lag headline replaced the `mempalace:` mine gate. Remainder
+    (L2 store, native runtime, model attestation) is item 26; the human half of lens negotiation
+    stays station 5. Evidence ledger: `.epr-meta/recall-reaches-authority.habit.md`.
 
 25. **In-flight recall friction during interrupted-sprint recovery (2026-09-13; operator-requested capture).**
     Observations from Codex resuming the doorway/P2P sprint; ideas for a later memory-system
@@ -464,6 +473,12 @@ before investing.
       as a Manifest EPR with a CID pin and one fitness fold (`recall-bank-reach@1` per model CID).
       Attestation of the model, reach beyond `Private`, and the palace's six-part admission are
       station 9 (three-seams spec §8; confidentiality-plane rows 10–11).
+    - *L0 landed 2026-09-24* with two more deviations recorded for the L2 pass: the fold's
+      surface is the git-tracked authority layer as gitignore-style globs (about 2,700 files, not
+      the whole tree — a whole-tree fold made the 25-file lag bound unreachable), and negation is
+      "any negation excludes" rather than gitignore's last-match-wins. Two surface negations are
+      owed to the next measure version: the generated habit register and the question bank
+      (both refused on first screens by rule today, still folded).
 
 ## Exit criteria
 
