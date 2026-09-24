@@ -7,7 +7,7 @@ invariant: >
   the delivered runs stays within 240 minutes. No pipeline is cut off by another pipeline's
   clock, and a push that changed nothing deployed does not roll the fleet.
 status: red
-active: false
+active: true
 checks:
   - "live series: `node genesis/orchestrator/delivery-series.mjs --window 10` reads each orchestrator run's archived actual-build-graph.json. Exit 0 within bounds, 1 outside, 2 not enough evidence (Jenkins unreadable or fewer than 3 work-bearing runs are never read as health)."
   - "budget arithmetic: `node --test genesis/orchestrator/pipeline-budget.test.mjs` checks that every dispatchable pipeline owns an options { timeout }, and that the orchestrator's limit covers the longest dependency chain of them."
@@ -24,6 +24,8 @@ retire-when: >
   no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
   and its wall clock stops being the delivery path this habit watches.
 ---
+DELTA 2026-09-24: ACTIVE for the native-delivery sprint (plan genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md) — app #1719–#1725 ≈12 pipeline-h, 0 delivered; the 7200 s readiness wait (a2d1d0975) is the app's cost; Lanes A/B/D/K serve this habit. Status stays RED until delivery-series reads within bounds.
+
 RED written 2026-09-22 on a live reading. `delivery-series.mjs --window 10` delivered 1 of 10 work-bearing
 runs (#1883-#1892). Five of them timed out. The last delivered run was #1883 (190.4 min, edge + genesis).
 No coupled push has reached app since 09-14, when app was ordered after edge inside a flat 240-minute budget.

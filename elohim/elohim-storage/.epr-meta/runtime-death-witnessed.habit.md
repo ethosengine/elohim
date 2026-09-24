@@ -9,7 +9,7 @@ invariant: >
   stranger, and attested once per incident when a conductor is next available — so a household
   operator reads why a peer died from the peer itself, with no cluster tool in the path.
 status: red
-active: true
+active: false
 checks:
   - "a2o @concern:death-witness (genesis/a2o/features/resilience/death-witness.feature — four stations in five scenarios (3a custodian render, 3b stranger refused), all @wip until the household mesh launches its conductors under the envelope; runnable then via cd genesis/a2o && npx cucumber-js --tags '@concern:death-witness and not @wip')"
   - "cargo test --lib conductor::process_manager (elohim/elohim-storage — ring_buffer_keeps_the_last_n_and_drops_the_oldest, readiness_outcome_prefers_child_death_over_attempt_budget: the dead-vs-slow classifier and the ring, landed 264ce8ce4; a local leg for the classifier only — nothing yet writes, names, offers, or attests a witness)"
@@ -25,6 +25,8 @@ retire-when: >
   build with no developer-shaped tool in the path — the habit then describes the runtime, not a
   storage feature.
 ---
+DELTA 2026-09-24: steps back from active (operator ruling, WIP fence) — receipts green, next station is an ark S2 item; push-delivers-within-budget takes the slot for the native-delivery sprint. NO status change.
+
 DELTA 2026-09-05: `just gate elohim-ark` passes 120 tests; a readiness timeout now remains a ReadinessFailed state until death is witnessed and judged by the restart governor, instead of closing as an intentional successful stop. Kernel executable identity is a new explicit readiness rung; custody/attestation delivery remains outside this local proof.
 
 DELTA 2026-09-02 (BORN red — design canonized, nothing built; the census refuses `unwired` when a
