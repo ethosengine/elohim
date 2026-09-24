@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
+import { loadManifests } from './manifest-utils.mjs';
 import { gateChildEnv, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -13,11 +14,37 @@ describe('manifest-driven local gate registry', () => {
   const registry = loadGateRegistry(ROOT);
 
   test('every project has typed execution metadata', () => {
-    assert.ok(registry.size >= 32);
+    assert.ok(registry.size >= 35);
     for (const project of registry.values()) {
-      assert.ok(['just', 'root-just'].includes(project.run.kind), project.name);
-      assert.match(project.run.recipe, /^_?[a-z][a-z0-9-]*$/);
+      assert.ok(['just', 'root-just', 'attested'].includes(project.run.kind), project.name);
+      if (project.run.kind === 'attested') {
+        assert.equal(project.run.recipe, undefined, `${project.name}: attested projects run no recipe`);
+        assert.equal(project.run.attestation.provider, 'github-checks', project.name);
+        assert.match(project.run.attestation.repo, /^[\w.-]+\/[\w.-]+$/, project.name);
+        assert.ok(project.run.attestation.check.length > 0, project.name);
+      } else {
+        assert.match(project.run.recipe, /^_?[a-z][a-z0-9-]*$/);
+      }
     }
+    for (const name of ['brit', 'rakia', 'sophia']) {
+      assert.equal(registry.get(name).run.kind, 'attested', `${name} is an attested component`);
+    }
+  });
+
+  test('a pin move is a direct input of its component step, in both matchers', () => {
+    for (const [component, gitlink] of [['brit', 'elohim/brit'], ['rakia', 'elohim/rakia'], ['sophia', 'sophia']]) {
+      const project = registry.get(component);
+      const manifest = loadManifests(ROOT).find(m => m.content.pipeline === project.pipeline);
+      const step = manifest.content.steps[project.steps[0]];
+      assert.ok(step.inputs.sources.includes(gitlink), `${component}: ${gitlink} listed verbatim, not only as a glob`);
+    }
+  });
+
+  test('a rakia pin move fires the two schema gates directly', () => {
+    const selected = projectsForChanges(ROOT, ['elohim/rakia']).map(p => p.name);
+    assert.ok(selected.includes('rakia-validate'));
+    assert.ok(selected.includes('rakia-codegen'));
+    assert.ok(selected.includes('rakia'));
   });
 
   test('resolves an explicit project or the most specific owning path', () => {
@@ -152,26 +179,30 @@ describe('manifest-driven local gate registry', () => {
   });
 
   test('cargo env merges the manifest with pool-policy overrides, manifest winning', () => {
-    // The rakia schema pins elohim/holochain/build-manifest.json's run.cargo shape
-    // (no `env` key yet), so the storage project's cargo cap declares in
-    // genesis/agentic/pool-policy.json's cargo_env_overrides instead. Merge rule:
-    // the manifest's own declaration always wins; the policy override only fills a
-    // gap the manifest leaves undeclared.
-    const noManifestEnv = { name: 'elohim-storage', run: { cargo: { workspace: 'elohim' } } };
+    // The rakia schema accepts run.cargo.env since 2b2cedb, and the storage cap now
+    // declares on its own manifest project. pool-policy's cargo_env_overrides remain
+    // for projects that have not moved their cap yet (eprfs, memory-ceremony). Merge
+    // rule: the manifest's own declaration always wins; the policy override only fills
+    // a gap the manifest leaves undeclared.
+    const noManifestEnv = { name: 'eprfs', run: { cargo: { targetDir: '/tmp/x' } } };
     const filled = gateChildEnv(noManifestEnv, {});
     assert.ok(Object.hasOwn(filled, 'GATE_CARGO_ENV'), 'pool-policy override applies when the manifest declares no cargo.env');
-    assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1' });
+    assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1' });
 
     const withManifestEnv = {
-      name: 'elohim-storage',
-      run: { cargo: { workspace: 'elohim', env: { CARGO_BUILD_JOBS: '3' } } },
+      name: 'eprfs',
+      run: { cargo: { targetDir: '/tmp/x', env: { CARGO_BUILD_JOBS: '3' } } },
     };
     const won = gateChildEnv(withManifestEnv, {});
     assert.deepStrictEqual(
       JSON.parse(won.GATE_CARGO_ENV),
-      { CARGO_BUILD_JOBS: '3' },
-      'a manifest-declared cargo.env value wins over the pool-policy override'
+      { CARGO_BUILD_JOBS: '3', RUST_TEST_THREADS: '1' },
+      'a manifest-declared cargo.env value wins over the pool-policy override; undeclared keys are still filled'
     );
+
+    const storage = registry.get('elohim-storage');
+    assert.deepStrictEqual(JSON.parse(gateChildEnv(storage, {}).GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1' },
+      'the storage cap is declared on its manifest, no longer in pool-policy');
 
     const neither = { name: 'not-a-real-project-xyz', run: { cargo: { workspace: 'x' } } };
     assert.equal(Object.hasOwn(gateChildEnv(neither, {}), 'GATE_CARGO_ENV'), false);

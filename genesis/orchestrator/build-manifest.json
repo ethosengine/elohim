@@ -40,6 +40,7 @@
         "dir": ".",
         "inputs": {
           "sources": [
+            "elohim/rakia",
             "elohim/rakia/schemas/**",
             "elohim/rakia/rakia-core/src/generated_types.rs",
             "elohim/rakia/rakia-core/src/manifest.rs"
@@ -51,7 +52,7 @@
       "rakia-validate": {
         "dir": ".",
         "inputs": {
-          "sources": ["**/build-manifest.json", "elohim/rakia/schemas/v1/build-manifest.schema.json"],
+          "sources": ["elohim/rakia", "**/build-manifest.json", "elohim/rakia/schemas/v1/build-manifest.schema.json"],
           "buildProcess": ["elohim/rakia/schemas/scripts/validate.mjs"]
         },
         "run": { "kind": "root-just", "recipe": "_gate-rakia-validate" }

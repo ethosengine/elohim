@@ -96,7 +96,8 @@
         "verify": null
       },
       "depends": [
-        "elohim-conductor:build-conductor-image"
+        "elohim-conductor:build-conductor-image",
+        "elohim-rakia:rakia-ci"
       ],
       "executor": {
         "stage": "Build Storage",
@@ -148,7 +149,9 @@
       "depends": [
         "cargo-build-doorway",
         "cargo-build-storage",
-        "elohim-holochain:build-happ"
+        "elohim-holochain:build-happ",
+        "elohim-brit:brit-ci",
+        "elohim-rakia:rakia-ci"
       ],
       "executor": {
         "stage": "Build Edge Node Image",
@@ -278,7 +281,8 @@
           "cargo": {
             "workspace": "elohim/elohim-storage",
             "profile": "dev",
-            "rustflags": "--cfg getrandom_backend=\"custom\""
+            "rustflags": "--cfg getrandom_backend=\"custom\"",
+            "env": { "CARGO_BUILD_JOBS": "1" }
           }
         }
       },
