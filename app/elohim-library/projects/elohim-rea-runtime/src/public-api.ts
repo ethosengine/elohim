@@ -44,6 +44,15 @@ export type { IAgentContext } from './lib/attention-tracker.service';
 export { AttentionTendingApiService } from './lib/attention-tending-api.service';
 export type { AttentionTendingIntent, AttentionTendingAck } from './lib/attention-tending-api.service';
 
+// ObservationEmitterService — dwell and scroll depth witnessed as an agent-private
+// lamad:content-viewed observation via POST /api/v1/observations (ruling R-A3)
+export {
+  ObservationEmitterService,
+  CONTENT_VIEWED_KIND,
+  scrollDepthPct,
+} from './lib/observation-emitter.service';
+export type { ObservationIntent, ObservationAck } from './lib/observation-emitter.service';
+
 // ResourceExplorerService — stewardship resource browsing
 export {
   ResourceExplorerService,
