@@ -647,13 +647,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"ownership\",\"Ownership\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "deliberated-2026-08-16-operator+agents",
+        "established_at": null,
+        "superseded_by": "ownership-ontology-guard@4",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":3}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreidvhf3kr4pvltz3q2qut7ggsuqskou6idr2p5siubhm3zpwe22djm",
+      "citesContentSha256": "sha256:753976a8f1f55cf3b86a149fcc69521253a9e40e3a7f648a04ecde5f626b434b",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "ownership-ontology-guard@4",
+        "title": "Ownership ontology guard — a content-addressed frame, background stewardship review",
+        "summary": "Ownership ontology guard — a content-addressed frame, background stewardship review",
+        "full_reasoning": "@4 keeps @3's dispatch class and storyteller sidecar and binds the guard to a content-addressed frame. The vocabulary, markers and legitimate frames live in the atom elohim/sdk/schemas/v1/frames/frame-ownership-inalienable.json; read its `linguistic_definition`. Each verdict carries a FrameClassification naming `frame-ref`. Advisory until a human ratifies a floor; `stewardship-frame:` still declares the frame and silences it.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"contains-any\":[\"ownership\",\"Ownership\"],\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "post-station-4-lane-c-2026-09-24",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":3}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":4}"
       }
     },
     {
@@ -731,13 +752,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"sovereign\",\"Sovereign\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "deliberated-2026-08-16-operator+agents",
+        "established_at": null,
+        "superseded_by": "sovereignty-ontology-guard@4",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":3}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreibbh3a7vbeeqt3qbduv4thwrpymetqqzqhtbuffp3saqco2sbogsi",
+      "citesContentSha256": "sha256:213ec1fa848484f7008e95e4cf68bf0c24e10cc0f30d0a57ee40809da905c692",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "sovereignty-ontology-guard@4",
+        "title": "Sovereignty ontology guard — a content-addressed frame, background vision review",
+        "summary": "Sovereignty ontology guard — a content-addressed frame, background vision review",
+        "full_reasoning": "@4 keeps @3's dispatch class and storyteller sidecar and binds the guard to a content-addressed frame. The vocabulary, markers and legitimate frames live in the atom elohim/sdk/schemas/v1/frames/frame-sovereignty-apex.json; read its `linguistic_definition`. Each verdict carries a FrameClassification naming `frame-ref`. Advisory until a human ratifies a floor; `sovereignty-frame:` still declares the frame and silences it.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"contains-any\":[\"sovereign\",\"Sovereign\"],\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "post-station-4-lane-c-2026-09-24",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":3}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":4}"
       }
     },
     {

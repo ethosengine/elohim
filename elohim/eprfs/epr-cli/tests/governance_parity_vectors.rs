@@ -20,8 +20,9 @@
 //! the hook calls, and it exists here at the composition root.
 //!
 //! Consequence for fixtures: each vector's temp root is a faithful mini-repo, so
-//! the shared validator-scope registry is copied into it. The provider resolves
-//! scope from `repo_root` exactly as it does in production — no test-only path.
+//! the shared validator-scope registry and the frame atoms are copied into it. The
+//! provider resolves scope and frames from `repo_root` exactly as it does in
+//! production — no test-only path.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -109,6 +110,27 @@ fn seed_validator_scope(root: &std::path::Path) {
     fs::write(target, body).unwrap();
 }
 
+/// Repo-relative home of the frame atoms the values guards read at runtime
+/// (`frames::load_frames(repo_root)`). Seeded from the live tree like the scope map:
+/// without them a guard is `Unavailable`, which the evaluator clamps to the rule's
+/// declared class — so a fires-vector would pass whether or not the classifier ran.
+const FRAMES_REL: &str = "elohim/sdk/schemas/v1/frames";
+
+fn seed_frames(root: &std::path::Path) {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sdk/schemas/v1/frames");
+    let Ok(entries) = fs::read_dir(&source) else {
+        return; // absent atoms → guards Unavailable → the silent-frame vectors go red. Loud.
+    };
+    let target = root.join(FRAMES_REL);
+    fs::create_dir_all(&target).unwrap();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "json") {
+            fs::copy(&path, target.join(entry.file_name())).unwrap();
+        }
+    }
+}
+
 /// Wrap a vector's bare YAML rules body into a valid `.epr-meta` frontmatter
 /// document. The repo-root manifest is marked `root: true`; nested manifests are
 /// children of their directory.
@@ -147,6 +169,7 @@ fn governance_parity_vectors_hold() {
 
         let dir = TempDir::new().unwrap();
         seed_validator_scope(dir.path());
+        seed_frames(dir.path());
         for (rel, body) in &vector.manifests {
             let full = dir.path().join(rel);
             if let Some(parent) = full.parent() {

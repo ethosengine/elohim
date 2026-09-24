@@ -11,6 +11,8 @@ Run: python3 .claude/scripts/_lib/__tests__/test_governance_parity.py  (exit 0 =
 Bespoke assert-based harness — matches this __tests__ dir's convention (pytest is not installed;
 see runtime_harvest_test.py's docstring)."""
 import json
+import os
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -59,6 +61,19 @@ def materialize(tmp_root: Path, manifests: dict) -> None:
         p.write_text("---\nepr-meta-version: 1\n" + textwrap.dedent(text).strip() + "\n---\n")
 
 
+FRAMES_REL = "elohim/sdk/schemas/v1/frames"
+
+
+def seed_frames(tmp_root: Path) -> None:
+    """Copy the live frame atoms into the fixture, as the Rust runner does. The values guards
+    read their vocabulary from these atoms at runtime; `run_vector` points `CLAUDE_PROJECT_DIR`
+    at the fixture so the Python host reads the same seeded bytes the native host reads from its
+    `repo_root`."""
+    source = REPO / FRAMES_REL
+    if source.is_dir():
+        shutil.copytree(source, tmp_root / FRAMES_REL)
+
+
 def run_vector(tmp_root: Path, vector: dict) -> dict:
     """Drive ONE vector through the real resolve_write() path. Returns the {decision, cls,
     rule_id, refer, witnessed} shape the vector's `expect` asserts against."""
@@ -74,7 +89,15 @@ def run_vector(tmp_root: Path, vector: dict) -> dict:
             target.write_text(content)
     write = {"path": str(target), "content": content, "is_new": is_new, "is_new_subdir": False}
     root = epr_meta.find_repo_root(target)
-    return epr_meta.resolve_write(target, write, root)
+    prior = os.environ.get("CLAUDE_PROJECT_DIR")
+    os.environ["CLAUDE_PROJECT_DIR"] = str(tmp_root)
+    try:
+        return epr_meta.resolve_write(target, write, root)
+    finally:
+        if prior is None:
+            os.environ.pop("CLAUDE_PROJECT_DIR", None)
+        else:
+            os.environ["CLAUDE_PROJECT_DIR"] = prior
 
 
 def main() -> int:
@@ -90,6 +113,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as td:
             tmp_root = Path(td)
             materialize(tmp_root, vector.get("manifests", {}))
+            seed_frames(tmp_root)
             result = run_vector(tmp_root, vector)
 
         print(f"\n[{name}] {vector.get('law', '')}")

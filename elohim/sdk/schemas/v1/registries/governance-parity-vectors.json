@@ -109,6 +109,42 @@
       "write": { "path": "bad/f.md", "new": false, "content": "x" },
       "expect": { "decision": "refer", "winning_class": "ask", "rule_id": null, "witnessed": true, "refer_reason": "governance-manifest-malformed" },
       "law": "Rule-integrity failure is a ceiling event: the gate cannot know what governance intended, so it routes rather than guessing — unless the write TARGETS the manifest itself (fixing is never blocked)."
+    },
+    {
+      "name": "sovereignty-guard-fires-advisory",
+      "manifests": {
+        "sg/.epr-meta": "rules:\n  - id: sovereignty-ontology-guard\n    class: dispatch\n    when: { write: \"*.md\" }\n    validator: epr:validator-sovereignty-ontology-guard\n    parameters: { dispatch-agent: storyteller, dispatch-prompt: \"review only the net-new framing\" }\n    why: test"
+      },
+      "write": { "path": "sg/w.md", "new": true, "content": "Members hold a self-sovereign identity.\n" },
+      "expect": { "decision": "permit", "winning_class": "dispatch", "rule_id": "sovereignty-ontology-guard", "witnessed": true, "directive": "dispatch" },
+      "law": "A values guard reads its vocabulary from a content-addressed frame atom (elohim/sdk/schemas/v1/frames/, seeded into every fixture) and classifies net-new apex framing with no declared frame as abstain. The verdict is advisory: it inherits the rule's declared class (dispatch), so it witnesses and directs the storyteller sidecar but never asks or denies (ruling R-C1; Python's `Verdict(None, …)` passthrough mirrors `ValidatorOutcome::Classified`, R-C7). This vector alone cannot go red on an unreadable atom: `Unavailable` clamps to the same declared dispatch class and permits, witnesses and directs exactly as a classification does. Its discriminating half is `sovereignty-guard-silent-on-declared-frame`."
+    },
+    {
+      "name": "ownership-guard-fires-advisory",
+      "manifests": {
+        "og/.epr-meta": "rules:\n  - id: ownership-ontology-guard\n    class: dispatch\n    when: { write: \"*.md\" }\n    validator: epr:validator-ownership-ontology-guard\n    parameters: { dispatch-agent: storyteller, dispatch-prompt: \"review only the net-new framing\" }\n    why: test"
+      },
+      "write": { "path": "og/w.md", "new": true, "content": "Members get true data ownership.\n" },
+      "expect": { "decision": "permit", "winning_class": "dispatch", "rule_id": "ownership-ontology-guard", "witnessed": true, "directive": "dispatch" },
+      "law": "The ownership sibling of `sovereignty-guard-fires-advisory`: the same frame-atom read, the same advisory inheritance of the declared dispatch class. Both hosts must agree that a classified frame verdict permits, witnesses and directs — never asks. This vector alone cannot go red on an unreadable atom: `Unavailable` clamps to the same declared dispatch class and permits, witnesses and directs exactly as a classification does. Its discriminating half is `ownership-guard-silent-on-declared-frame`."
+    },
+    {
+      "name": "sovereignty-guard-silent-on-declared-frame",
+      "manifests": {
+        "sd/.epr-meta": "rules:\n  - id: sovereignty-ontology-guard\n    class: dispatch\n    when: { write: \"*.md\" }\n    validator: epr:validator-sovereignty-ontology-guard\n    parameters: { dispatch-agent: storyteller, dispatch-prompt: \"review only the net-new framing\" }\n    why: test"
+      },
+      "write": { "path": "sd/w.md", "new": true, "content": "sovereignty-frame: bounded\nMembers hold a self-sovereign identity within the commons.\n" },
+      "expect": { "decision": "permit", "winning_class": null, "rule_id": null, "witnessed": false },
+      "law": "The discriminating half of `sovereignty-guard-fires-advisory`. A declared legitimate frame is silent, and only a guard that READ its atom can know that: an unreadable atom is `Unavailable`, which the evaluator clamps to the rule's declared class and witnesses. So a fires-vector alone passes whether or not the classifier ran; this vector goes red the moment a host cannot read the frame atoms it was seeded with."
+    },
+    {
+      "name": "ownership-guard-silent-on-declared-frame",
+      "manifests": {
+        "od/.epr-meta": "rules:\n  - id: ownership-ontology-guard\n    class: dispatch\n    when: { write: \"*.md\" }\n    validator: epr:validator-ownership-ontology-guard\n    parameters: { dispatch-agent: storyteller, dispatch-prompt: \"review only the net-new framing\" }\n    why: test"
+      },
+      "write": { "path": "od/w.md", "new": true, "content": "stewardship-frame: inalienable\nA person holds true ownership of her own image.\n" },
+      "expect": { "decision": "permit", "winning_class": null, "rule_id": null, "witnessed": false },
+      "law": "The ownership sibling of `sovereignty-guard-silent-on-declared-frame`: a declared stewardship frame (here the inalienable frame) is silent only when the host read the ownership atom."
     }
   ]
 }

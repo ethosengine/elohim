@@ -317,4 +317,31 @@ with tempfile.TemporaryDirectory() as td:
     check("ledger race: exactly one NEW directive across all racers",
           sum(1 for notes in results for n in notes if "NEW architecture finding" in n) == 1)
 
+# ── frame_rows_declare_frame_and_frame_ref_matching_atoms (plan task C6, rulings R-C1/R-C2) ──
+# The @4 values-guard rows declare the frame atom that judges them (`frame: <id>@<version>`) and
+# its content address (`frame-ref:`, the registry-row CID recipe over the atom). A declaration a
+# test proves against the atoms: an edited atom moves its CID and this goes red until re-declared.
+from _lib import frame_atoms  # noqa: E402
+
+_live_policies, _live_errs = epr_meta.load_policies(REPO)
+check("frame rows: the live registry loads clean", not _live_errs)
+_frames = frame_atoms.load_frames(REPO)
+for _gid, _validator in (("sovereignty-ontology-guard", "epr:validator-sovereignty-ontology-guard"),
+                         ("ownership-ontology-guard", "epr:validator-ownership-ontology-guard")):
+    _row = _live_policies.get(f"{_gid}@4")
+    check(f"frame rows: {_gid}@4 exists", _row is not None)
+    _atom, _ref = _frames[_validator]
+    check(f"frame rows: {_gid}@4 frame == {_atom['id']}@{_atom['version']}",
+          _row.get("frame") == f"{_atom['id']}@{_atom['version']}")
+    check(f"frame rows: {_gid}@4 frame-ref == frame_atoms.frame_ref(atom)",
+          _row.get("frame-ref") == frame_atoms.frame_ref(_atom) == _ref)
+    check(f"frame rows: {_gid}@4 keeps class dispatch + the @3 sidecar parameters",
+          _row.get("class") == "dispatch"
+          and _row.get("parameters") == _live_policies[f"{_gid}@3"].get("parameters"))
+    check(f"frame rows: {_gid}@4 validator binds the atom's validator",
+          _row.get("validator") == _atom["validator"])
+    check(f"frame rows: {_gid}@3 superseded by @4",
+          _live_policies[f"{_gid}@3"].get("status") == "superseded"
+          and _live_policies[f"{_gid}@3"].get("superseded_by") == f"{_gid}@4")
+
 print(f"  {_passed} assertions passed ✅")
