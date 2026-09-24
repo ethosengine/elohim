@@ -20,7 +20,12 @@ import { LEARNER_BACKEND } from '@app/lamad/interfaces/learner-backend.interface
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '@app/lamad/interfaces/storage.interface';
 import { LearnerBackendApiService } from '@app/lamad/services/learner-backend-api.service';
 
-import { ECONOMIC_EVENT_FACTORY, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
+import {
+  ECONOMIC_EVENT_FACTORY,
+  EVENT_API,
+  AGENT_CONTEXT,
+  OBSERVATION_STORAGE_BASE_URL,
+} from '@elohim/rea-runtime';
 import {
   BLOB_FETCHER,
   BUNDLE_ROUTE_CONTEXT,
@@ -182,6 +187,14 @@ export const appConfig: ApplicationConfig = {
     // local sidecar is non-origin) exactly as the rest of the storage surface does.
     {
       provide: CONTENT_SYNC_STORAGE_BASE_URL,
+      useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
+      deps: [StorageClientService],
+    },
+    // OBSERVATION_STORAGE_BASE_URL — the same seam for rea-runtime's
+    // ObservationEmitterService: the content viewer's attention write goes to the
+    // base the lifestream reads through, never the serving origin (ruling R-A11).
+    {
+      provide: OBSERVATION_STORAGE_BASE_URL,
       useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
       deps: [StorageClientService],
     },

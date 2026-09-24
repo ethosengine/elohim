@@ -122,6 +122,12 @@ import type {
   ContributorPresenceView,
 } from '@elohim/storage-client/generated';
 
+/**
+ * The viewer's root element: in focused view it is the fixed, overflow:auto
+ * scroller (`.focused-view-active` in the app's global styles).
+ */
+const VIEWER_CONTAINER_CLASS = 'content-viewer-container';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
@@ -283,6 +289,12 @@ export class ContentViewerComponent
   private readonly governanceApi = inject(GovernanceApiService);
   private readonly document = inject(DOCUMENT);
   private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  /**
+   * The open view still owed its first depth measurement (R-A11): taken in
+   * AfterViewChecked on the first pass that does not create the renderer, so
+   * the content is in the DOM and a long page is not mistaken for a short one.
+   */
+  private depthProbeFor: string | null = null;
 
   eprRelationships: EprRelationship[] = [];
 
@@ -318,6 +330,13 @@ export class ContentViewerComponent
     // The viewer owns scroll depth for the witnessed view (renderer listeners
     // are renderer-scoped). Passive: it never blocks scrolling.
     this.document.defaultView?.addEventListener('scroll', this.onWindowScroll, { passive: true });
+    // In focused view the viewer's own container is the scroller (fixed,
+    // overflow:auto) and the window stays still. A scroll event does not
+    // bubble, so the host listens in the capture phase (R-A11).
+    this.elRef.nativeElement.addEventListener('scroll', this.onContainerScroll, {
+      capture: true,
+      passive: true,
+    });
 
     // Handle direct content access: /lamad/resource/:resourceId
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
@@ -364,19 +383,58 @@ export class ContentViewerComponent
 
   /** Report the deepest point the window has reached on this page. */
   private readonly onWindowScroll = (): void => {
+    this.reportWindowDepth();
+  };
+
+  /** Report the focused-view container's depth when it is what scrolled. */
+  private readonly onContainerScroll = (event: Event): void => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.classList.contains(VIEWER_CONTAINER_CLASS)) {
+      this.reportElementDepth(target);
+    }
+  };
+
+  /**
+   * Measure depth where the person is reading now: the focused-view container
+   * when it is the scroller, else the window. Called once after a view opens so
+   * a page shorter than its viewport reports 100 without any scroll (R-A11).
+   */
+  private reportDepth(): void {
+    const container = this.isFocusedView
+      ? this.elRef.nativeElement.querySelector<HTMLElement>(`.${VIEWER_CONTAINER_CLASS}`)
+      : null;
+    if (container) {
+      this.reportElementDepth(container);
+    } else {
+      this.reportWindowDepth();
+    }
+  }
+
+  private reportWindowDepth(): void {
     const win = this.document.defaultView;
     if (!win) return;
     const root = this.document.documentElement;
     this.observationEmitter.noteScroll(
       scrollDepthPct(win.scrollY || root.scrollTop, win.innerHeight, root.scrollHeight)
     );
-  };
+  }
+
+  private reportElementDepth(el: HTMLElement): void {
+    this.observationEmitter.noteScroll(
+      scrollDepthPct(el.scrollTop, el.clientHeight, el.scrollHeight)
+    );
+  }
+
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyRenderer();
     this.document.defaultView?.removeEventListener('scroll', this.onWindowScroll);
+    this.elRef.nativeElement.removeEventListener('scroll', this.onContainerScroll, {
+      capture: true,
+    });
+    this.depthProbeFor = null;
     // Close the witnessed view of the current node
     if (this.nodeId) {
       this.observationEmitter.end(this.nodeId);
@@ -387,9 +445,20 @@ export class ContentViewerComponent
 
   ngAfterViewChecked(): void {
     // Load renderer when view is ready and we have a pending load request
+    let createdRenderer = false;
     if (this.pendingRendererLoad && this.node && this.rendererHost) {
       this.pendingRendererLoad = false;
       this.loadRenderer();
+      createdRenderer = true;
+    }
+    // The open view's first depth measurement, once its renderer has had a
+    // pass to render: a page shorter than its viewport reports 100 unscrolled.
+    if (!createdRenderer && this.depthProbeFor !== null) {
+      const probeFor = this.depthProbeFor;
+      this.depthProbeFor = null;
+      if (probeFor === this.nodeId) {
+        this.reportDepth();
+      }
     }
     // Re-wire the analytics loader if a fresh <elohim-content-analytics>
     // element has been materialized (e.g. tab switched into 'network' or
@@ -566,6 +635,7 @@ export class ContentViewerComponent
 
           // Open the witnessed view: dwell + scroll depth, posted on leave
           this.observationEmitter.begin(nodeId);
+          this.depthProbeFor = nodeId;
 
           // Manifest-driven attention signal (onConsume economic event)
           void this.signalHarness.onRendererComplete(contentNode, {

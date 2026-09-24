@@ -20,11 +20,38 @@
  * - The observer is never named in the body: the node takes it from the
  *   caller's `X-Agent-Cid` header, and a body naming anyone else is refused.
  * - A failed post is swallowed — witnessing attention never breaks reading.
+ * - The post goes to the storage base the host app resolves
+ *   ({@link OBSERVATION_STORAGE_BASE_URL}, the same `getStorageBaseUrl()` the
+ *   lifestream reads through), never a bare path on the serving origin (R-A11).
+ * - A hard leave still witnesses (R-A8): on `pagehide` every open view is
+ *   flushed with `navigator.sendBeacon`, or `fetch(…, {keepalive: true})` when
+ *   there is no beacon or the browser refuses it. `visibilitychange` → hidden
+ *   flushes only where `pagehide` does not exist; elsewhere hiding a tab just
+ *   pauses dwell. A flushed view is closed, so the in-app `end` that may follow
+ *   posts nothing more.
  */
 
 import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Injectable, OnDestroy, inject } from '@angular/core';
+import { Injectable, InjectionToken, OnDestroy, inject } from '@angular/core';
+
+/** The observation write route, relative to the storage base. */
+const OBSERVATIONS_PATH = '/api/v1/observations';
+
+/**
+ * Resolves the storage base URL observations are written to. The host app
+ * provides the same resolution its storage client reads through
+ * (`() => storageClient.getStorageBaseUrl()`), so a Tauri sidecar or a dev
+ * proxy write lands where the lifestream reads. The default is origin-relative
+ * (`''`), for hosts whose serving origin is the storage path.
+ */
+export const OBSERVATION_STORAGE_BASE_URL = new InjectionToken<() => string>(
+  'ObservationStorageBaseUrl',
+  {
+    providedIn: 'root',
+    factory: () => () => '',
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Wire types (aligned with inputs/observation-intent.schema.json and
@@ -109,6 +136,7 @@ interface OpenView {
 export class ObservationEmitterService implements OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
+  private readonly resolveBaseUrl = inject(OBSERVATION_STORAGE_BASE_URL);
 
   /** Open views keyed by the content's ref CID. */
   private readonly open = new Map<string, OpenView>();
@@ -116,6 +144,10 @@ export class ObservationEmitterService implements OnDestroy {
   private readonly onVisibilityChange = (): void => {
     const now = Date.now();
     const hidden = this.isHidden();
+    if (hidden && !this.hasPageHide) {
+      this.flushAll();
+      return;
+    }
     for (const view of this.open.values()) {
       if (hidden) {
         this.bank(view, now);
@@ -125,8 +157,19 @@ export class ObservationEmitterService implements OnDestroy {
     }
   };
 
+  /** The page is going away (tab close, full navigation): flush every open view. */
+  private readonly onPageHide = (): void => {
+    this.flushAll();
+  };
+
+  /** Where `pagehide` does not exist, hidden is the last reliable moment. */
+  private readonly hasPageHide: boolean;
+
   constructor() {
     this.document.addEventListener('visibilitychange', this.onVisibilityChange);
+    const win = this.document.defaultView;
+    this.hasPageHide = !!win && 'onpagehide' in win;
+    win?.addEventListener('pagehide', this.onPageHide);
   }
 
   /**
@@ -163,9 +206,33 @@ export class ObservationEmitterService implements OnDestroy {
    * A ref that was never begun (or already ended) posts nothing.
    */
   end(refCid: string): void {
+    const intent = this.close(refCid);
+    if (!intent) {
+      return;
+    }
+    this.http.post<ObservationAck>(this.url(), intent).subscribe({
+      error: () => {
+        // Swallowed: a missed witness never interrupts reading.
+      },
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    this.document.defaultView?.removeEventListener('pagehide', this.onPageHide);
+    this.open.clear();
+  }
+
+  /** The write URL on the host's storage base. */
+  private url(): string {
+    return `${this.resolveBaseUrl()}${OBSERVATIONS_PATH}`;
+  }
+
+  /** Close `refCid`'s open view and shape its intent; null when none is open. */
+  private close(refCid: string): ObservationIntent | null {
     const view = this.open.get(refCid);
     if (!view) {
-      return;
+      return null;
     }
     this.open.delete(refCid);
     this.bank(view, Date.now());
@@ -175,22 +242,52 @@ export class ObservationEmitterService implements OnDestroy {
       dwell_ms: Math.max(0, Math.round(view.bankedMs)),
       scroll_depth_pct: view.maxDepthPct,
     };
-    const intent: ObservationIntent = {
+    return {
       observationKind: CONTENT_VIEWED_KIND,
       subjectCid: refCid,
       subjectKind: 'content',
       payloadJson: JSON.stringify(payload),
     };
-    this.http.post<ObservationAck>('/api/v1/observations', intent).subscribe({
-      error: () => {
-        // Swallowed: a missed witness never interrupts reading.
-      },
-    });
   }
 
-  ngOnDestroy(): void {
-    this.document.removeEventListener('visibilitychange', this.onVisibilityChange);
-    this.open.clear();
+  /**
+   * Post every open view with a transport that outlives the page. Each view is
+   * closed first, so a later `end` for the same ref is a no-op.
+   */
+  private flushAll(): void {
+    for (const refCid of [...this.open.keys()]) {
+      const intent = this.close(refCid);
+      if (intent) {
+        this.sendOutlivingPage(JSON.stringify(intent));
+      }
+    }
+  }
+
+  /** `sendBeacon` when the browser has and accepts it, else a keepalive fetch. */
+  private sendOutlivingPage(body: string): void {
+    const url = this.url();
+    const nav = this.document.defaultView?.navigator;
+    try {
+      if (
+        typeof nav?.sendBeacon === 'function' &&
+        nav.sendBeacon(url, new Blob([body], { type: 'application/json' }))
+      ) {
+        return;
+      }
+    } catch {
+      // A beacon the browser rejects outright falls through to fetch.
+    }
+    if (typeof fetch !== 'function') {
+      return;
+    }
+    fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).catch(() => {
+      // Swallowed: a missed witness never interrupts leaving.
+    });
   }
 
   private isHidden(): boolean {

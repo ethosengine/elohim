@@ -16,7 +16,12 @@ import {
   type BundleRouteContext,
 } from '@elohim/service';
 import { LAMAD_ROUTE_CLAIMS } from './generated/route-claims';
-import { AGENT_CONTEXT, ECONOMIC_EVENT_FACTORY, EVENT_API } from '@elohim/rea-runtime';
+import {
+  AGENT_CONTEXT,
+  ECONOMIC_EVENT_FACTORY,
+  EVENT_API,
+  OBSERVATION_STORAGE_BASE_URL,
+} from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from './services/learner-backend-api.service';
@@ -172,6 +177,14 @@ export const appConfig: ApplicationConfig = {
     {
       provide: LAMAD_STORAGE_CLIENT,
       useFactory: () => withOriginRelativeBlobUrls(inject(StorageClientService)),
+    },
+    // OBSERVATION_STORAGE_BASE_URL — rea-runtime's ObservationEmitterService writes
+    // observations to the SAME base the lifestream reads through, so a Tauri sidecar
+    // or dev-proxy write cannot land on the serving origin instead (ruling R-A11).
+    {
+      provide: OBSERVATION_STORAGE_BASE_URL,
+      useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
+      deps: [StorageClientService],
     },
     { provide: LAMAD_AGENT, useExisting: AgentService },
     // Cross-pillar P+inversion tokens — concrete classes stay in elohim-app due to

@@ -15,6 +15,7 @@ import { of, throwError } from 'rxjs';
 
 import {
   CONTENT_VIEWED_KIND,
+  OBSERVATION_STORAGE_BASE_URL,
   ObservationEmitterService,
   scrollDepthPct,
 } from './observation-emitter.service';
@@ -194,5 +195,133 @@ describe('ObservationEmitterService', () => {
     service.end('bafy-node-1');
     setVisibility('hidden');
     expect(httpMock.post).not.toHaveBeenCalled();
+  });
+
+  // Ruling R-A11 (review W5): the emitter writes to the same storage base the
+  // lifestream reads from, never a bare path on whatever origin served the page.
+  it('emitter_posts_to_the_storage_base_not_the_serving_origin', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ObservationEmitterService,
+        { provide: HttpClient, useValue: httpMock },
+        { provide: OBSERVATION_STORAGE_BASE_URL, useValue: () => 'http://localhost:8090' },
+      ],
+    });
+    service.ngOnDestroy();
+    service = TestBed.inject(ObservationEmitterService);
+
+    service.begin('bafy-node-1');
+    service.end('bafy-node-1');
+    expect(httpMock.post).toHaveBeenCalledOnce();
+    expect(httpMock.post.mock.calls[0][0]).toBe('http://localhost:8090/api/v1/observations');
+  });
+
+  // Ruling R-A8: a hard leave (tab close, cross-bundle navigation) still
+  // witnesses the open view, through a request that outlives the page.
+  describe('hard leave', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+    let savedBeacon: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+      vi.stubGlobal('fetch', fetchMock);
+      savedBeacon = Object.getOwnPropertyDescriptor(navigator, 'sendBeacon');
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      if (savedBeacon) {
+        Object.defineProperty(navigator, 'sendBeacon', savedBeacon);
+      } else {
+        delete (navigator as unknown as Record<string, unknown>)['sendBeacon'];
+      }
+    });
+
+    function withoutBeacon(): void {
+      Object.defineProperty(navigator, 'sendBeacon', { value: undefined, configurable: true });
+    }
+
+    function withBeacon(accepted: boolean): ReturnType<typeof vi.fn> {
+      const beacon = vi.fn().mockReturnValue(accepted);
+      Object.defineProperty(navigator, 'sendBeacon', { value: beacon, configurable: true });
+      return beacon;
+    }
+
+    it('pagehide_flushes_open_observation_with_keepalive', async () => {
+      withoutBeacon();
+      service.begin('bafy-node-1');
+      vi.advanceTimersByTime(4000);
+      service.noteScroll(40);
+      window.dispatchEvent(new Event('pagehide'));
+
+      expect(httpMock.post).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('/api/v1/observations');
+      expect(init.method).toBe('POST');
+      expect(init.keepalive).toBe(true);
+      expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      expect(body['observationKind']).toBe('lamad:content-viewed');
+      expect(body['subjectCid']).toBe('bafy-node-1');
+      expect(JSON.parse(body['payloadJson'] as string)).toEqual({
+        ref_cid: 'bafy-node-1',
+        dwell_ms: 4000,
+        scroll_depth_pct: 40,
+      });
+    });
+
+    it('pagehide_prefers_send_beacon_and_falls_back_when_refused', async () => {
+      const beacon = withBeacon(true);
+      service.begin('bafy-node-1');
+      window.dispatchEvent(new Event('pagehide'));
+      expect(beacon).toHaveBeenCalledOnce();
+      expect(beacon.mock.calls[0][0]).toBe('/api/v1/observations');
+      const blob = beacon.mock.calls[0][1] as Blob;
+      expect(blob.type).toBe('application/json');
+      expect(JSON.parse(await blob.text())['subjectCid']).toBe('bafy-node-1');
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      // A beacon the browser refuses (queue full) falls back to keepalive fetch.
+      const refused = withBeacon(false);
+      service.begin('bafy-node-2');
+      window.dispatchEvent(new Event('pagehide'));
+      expect(refused).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect((fetchMock.mock.calls[0][1] as RequestInit).keepalive).toBe(true);
+    });
+
+    it('soft_leave_after_flush_does_not_double_post', () => {
+      withoutBeacon();
+      service.begin('bafy-node-1');
+      window.dispatchEvent(new Event('pagehide'));
+      expect(fetchMock).toHaveBeenCalledOnce();
+
+      // The in-app leave that follows (route change, destroy) posts nothing more.
+      service.end('bafy-node-1');
+      window.dispatchEvent(new Event('pagehide'));
+      expect(httpMock.post).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('hidden_tab_does_not_flush_where_pagehide_exists', () => {
+      // pagehide is the hard-leave signal; hiding a tab only pauses dwell.
+      withoutBeacon();
+      service.begin('bafy-node-1');
+      setVisibility('hidden');
+      expect(fetchMock).not.toHaveBeenCalled();
+      setVisibility('visible');
+      service.end('bafy-node-1');
+      expect(httpMock.post).toHaveBeenCalledOnce();
+    });
+
+    it('destroy_stops_listening_for_pagehide', () => {
+      withoutBeacon();
+      service.begin('bafy-node-1');
+      service.ngOnDestroy();
+      window.dispatchEvent(new Event('pagehide'));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

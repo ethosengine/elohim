@@ -73,6 +73,16 @@ describe('MyStreamComponent', () => {
     expect(getObservationStream).toHaveBeenCalledWith({ lens: 'all' });
   });
 
+  it('lede_says_kept_on_your_node_not_only_you_can_read_it', async () => {
+    // Ruling R-A10 (review W1): the node operator can read the rows and the log is
+    // unsigned, so the page never promises "only you can read it".
+    await render(streamView());
+
+    const lede = el().querySelector('.stream-lede')!.textContent ?? '';
+    expect(lede).toContain('kept on your node; not shared with other peers');
+    expect(lede.toLowerCase()).not.toContain('only you');
+  });
+
   it('renders_entries_newest_first_with_dwell_and_depth', async () => {
     // The node ranks (recency, then dwell); the page renders the recipe's order.
     await render(

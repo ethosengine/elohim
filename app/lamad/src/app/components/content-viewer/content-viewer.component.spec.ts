@@ -921,6 +921,13 @@ describe('ContentViewerComponent', () => {
       });
     };
 
+    // The route stream is driven from outside change detection, and TestBed runs
+    // zoneless: mark the viewer dirty so a pass actually refreshes it.
+    const rerender = (): void => {
+      fixture.componentRef.changeDetectorRef.markForCheck();
+      fixture.detectChanges();
+    };
+
     beforeEach(() => {
       emitter = TestBed.inject(ObservationEmitterService) as unknown as typeof emitter;
       tracker = TestBed.inject(AttentionTrackerService) as unknown as typeof tracker;
@@ -992,6 +999,68 @@ describe('ContentViewerComponent', () => {
         if (saved.innerHeight) Object.defineProperty(window, 'innerHeight', saved.innerHeight);
         delete (document.documentElement as unknown as Record<string, unknown>)['scrollHeight'];
       }
+    }));
+
+    // Ruling R-A11 (review W2): depth is measured once when the view opens, so a
+    // page shorter than its viewport reports 100 without any scroll.
+    it('short_page_reports_depth_100_without_scroll', fakeAsync(() => {
+      const saved = {
+        scrollY: Object.getOwnPropertyDescriptor(window, 'scrollY'),
+        innerHeight: Object.getOwnPropertyDescriptor(window, 'innerHeight'),
+      };
+      try {
+        geometry(0, 800, 500);
+        fixture.detectChanges();
+        params$.next({ resourceId: 'test-content-1' });
+        tick();
+        expect(emitter.noteScroll).not.toHaveBeenCalled();
+        // The first pass creates the renderer; the next one, with the content
+        // in the DOM, measures.
+        rerender();
+        rerender();
+
+        expect(emitter.begin).toHaveBeenCalledWith('test-content-1');
+        expect(emitter.noteScroll).toHaveBeenCalledWith(100);
+        // Measured after the view opened, so the report lands on it.
+        expect(emitter.noteScroll.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+          emitter.begin.mock.invocationCallOrder[0]
+        );
+      } finally {
+        if (saved.scrollY) Object.defineProperty(window, 'scrollY', saved.scrollY);
+        if (saved.innerHeight) Object.defineProperty(window, 'innerHeight', saved.innerHeight);
+        delete (document.documentElement as unknown as Record<string, unknown>)['scrollHeight'];
+      }
+    }));
+
+    // Ruling R-A11 (review W2): in focused view the viewer's own container is the
+    // fixed, overflow:auto scroller and the window never scrolls, so the
+    // container's scroll reports depth too.
+    it('focused_container_scroll_reports_depth', fakeAsync(() => {
+      fixture.detectChanges();
+      params$.next({ resourceId: 'test-content-1' });
+      tick();
+      component.isFocusedView = true;
+      rerender();
+
+      const container = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+        '.content-viewer-container'
+      )!;
+      expect(container).not.toBeNull();
+      expect(container.classList).toContain('focused-view-active');
+      Object.defineProperty(container, 'scrollTop', { value: 900, configurable: true });
+      Object.defineProperty(container, 'clientHeight', { value: 600, configurable: true });
+      Object.defineProperty(container, 'scrollHeight', { value: 3000, configurable: true });
+
+      // A scroll event does not bubble; the viewer must still hear it.
+      container.dispatchEvent(new Event('scroll'));
+      expect(emitter.noteScroll).toHaveBeenLastCalledWith(scrollDepthPct(900, 600, 3000));
+      expect(emitter.noteScroll).toHaveBeenLastCalledWith(50);
+
+      // Removed on destroy.
+      fixture.destroy();
+      const reports = emitter.noteScroll.mock.calls.length;
+      container.dispatchEvent(new Event('scroll'));
+      expect(emitter.noteScroll).toHaveBeenCalledTimes(reports);
     }));
 
     it('signal_harness_view_emit_still_fires', fakeAsync(() => {
