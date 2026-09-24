@@ -1,4 +1,23 @@
 {
-  "run": 0,
-  "known": {}
+  "run": 3,
+  "known": {
+    "31268684003f": {
+      "status": "open",
+      "first_run": 1,
+      "last_run": 1,
+      "seen": 1
+    },
+    "744cbd4f7d60": {
+      "status": "open",
+      "first_run": 2,
+      "last_run": 2,
+      "seen": 1
+    },
+    "152afafd4235": {
+      "status": "open",
+      "first_run": 3,
+      "last_run": 3,
+      "seen": 1
+    }
+  }
 }
