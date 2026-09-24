@@ -20,13 +20,17 @@ The line, one of:
 
     participant: human:<h> (did:key:z…<last 6>, standing; witnessed by agent:<…> <date>)
     participant: human:<h> (did:key:z…<last 6>, standing; claimed by themselves <date>)
+    participant: human:<h> (did:key:z…<last 6>, standing; by the tracked roster)
     participant: human:<h> (session claim <date>)
+    participant: contested (roster root differs from this device's pin) — human:<h>
     participant: (unwitnessed) — when you know who is present: epr actor witness …
     participant: (unknown — <why>)
 
 An agent claim on the session says who the AGENT is, not who the human is, and `current` returns
-`standing: null` beside any claim; the device is then read once more under a session label no
-one claims (still a read — `current` never writes, and never mints a key).
+`standing: null` beside any claim; the device is then read once more with `current --device`,
+which consults NO session (finding M8: any session label, however unlikely, is claimable, and a
+claimed label would hide the device). Still a read — `current` never mints a key; the one thing
+it may write is the device's roster root pin on its first verified read (R-P15).
 
 Emission: the `hookSpecificOutput.additionalContext` JSON wrapper, the documented landing path
 for a synchronous SessionStart hook (see load-project-context.py). Fail-open: every path exits
@@ -51,8 +55,8 @@ import sys
 
 _READ_TIMEOUT = 0.8  # seconds per `epr actor current`; at most two reads
 
-# A session label no one claims: the device read beside an agent's own session claim.
-_DEVICE_PROBE_SESSION = "participant-standing:device-read"
+# The contested line, verbatim from `epr actor current` (actor.rs CONTESTED_ROOT_LINE).
+CONTESTED_LINE = "contested (roster root differs from this device's pin)"
 
 WITNESS_HINT = (
     "participant: (unwitnessed) — when you know who is present: epr actor witness "
@@ -82,11 +86,13 @@ def _date(stamp) -> str:
     return str(stamp or "")[:10] or "undated"
 
 
-def _current(binary: str, project_dir: str, session: str):
-    """`epr actor current --json` as a dict, or an error string."""
+def _current(binary: str, project_dir: str, session):
+    """`epr actor current --json` as a dict, or an error string. `session=None` reads the
+    device alone (`--device`), consulting no session at all."""
+    which = ["--session", session] if session else ["--device"]
     try:
         r = subprocess.run(
-            [binary, "actor", "current", "--session", session, "--json", "--root", project_dir],
+            [binary, "actor", "current", *which, "--json", "--root", project_dir],
             capture_output=True, text=True, timeout=_READ_TIMEOUT, cwd=project_dir,
         )
     except subprocess.TimeoutExpired:
@@ -110,16 +116,21 @@ def _standing_line(body: dict):
                 f"rebuild it at HEAD)")
     standing = body.get("standing")
     if not isinstance(standing, dict):
+        contested = body.get("contested")
+        if isinstance(contested, dict):
+            return f"participant: {CONTESTED_LINE} — {contested.get('subject') or '?'}"
         return WITNESS_HINT
     subject = standing.get("subject") or f"human:{standing.get('handle', '?')}"
     device = _short_did(str(standing.get("device") or ""))
+    if isinstance(standing.get("roster"), dict):
+        return f"participant: {subject} ({device}, standing; by the tracked roster)"
     on = _date(standing.get("claimedAt"))
     witness = standing.get("witnessedBy")
     by = f"witnessed by {witness} {on}" if witness else f"claimed by themselves {on}"
     return f"participant: {subject} ({device}, standing; {by})"
 
 
-def participant_line(project_dir: str, session: str) -> str:
+def participant_line(project_dir: str, session) -> str:
     obs = _observation_module(project_dir)
     binary = obs.resolve_bin() if obs else None
     if not binary:
@@ -133,7 +144,7 @@ def participant_line(project_dir: str, session: str) -> str:
         if claimed.startswith("human:"):
             return f"participant: {claimed} (session claim {_date(claim.get('claimedAt'))})"
         # An agent's own claim hides the device standing; read the device on its own.
-        body = _current(binary, project_dir, _DEVICE_PROBE_SESSION)
+        body = _current(binary, project_dir, None)
         if isinstance(body, str):
             return f"participant: (unknown — {body})"
     return _standing_line(body)
@@ -150,7 +161,7 @@ def main() -> None:
     project_dir = (os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
     session = (str(payload.get("session_id") or "")
                or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
-               or _DEVICE_PROBE_SESSION)
+               or None)
     try:
         line = participant_line(project_dir, session)
     except Exception as e:  # fail-open, but spoken

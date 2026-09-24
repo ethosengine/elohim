@@ -196,6 +196,47 @@ class ParticipantStandingCase(unittest.TestCase):
         self.assertIn("participant: human:matthew (did:key:z…ta2doK, standing;", self.line(r))
         self.assertEqual(len(self.calls()), 2)
 
+    def test_the_device_read_consults_no_claimable_session(self):
+        # M8: the second read is `current --device` — no session label at all, so nothing anyone
+        # can claim hides the device.
+        self.line(self.run_hook({"session_id": "sess-k"}, current=STANDING,
+                                claimed={"sess-k": "agent:implementer@claude-opus-5-5"}))
+        first, second = self.calls()
+        self.assertIn("--session", first)
+        self.assertIn("--device", second)
+        self.assertNotIn("--session", second)
+        self.assertNotIn("participant-standing:device-read",
+                         (HOOKS / "participant-standing.py").read_text())
+
+    def test_no_session_at_all_reads_the_device(self):
+        r = self.run_hook("", current=STANDING)
+        self.assertIn("standing;", self.line(r))
+        self.assertEqual(self.calls(), [["actor", "current", "--device", "--json", "--root",
+                                         str(self.project)]])
+
+    def test_a_contested_root_is_named_not_unwitnessed(self):
+        contested = {"claim": None, "standing": None, "contested": {
+            "subject": "human:matthew", "handle": "matthew", "pinned": DEVICE,
+            "found": "did:key:z6MkOther", "pinPath": "/x/rosters/matthew.root",
+            "device": DEVICE}}
+        r = self.run_hook({"session_id": "sess-l"}, current=contested)
+        self.assertEqual(
+            self.line(r),
+            "participant: contested (roster root differs from this device's pin) — "
+            "human:matthew",
+        )
+
+    def test_a_roster_derived_standing_says_so(self):
+        roster = json.loads(json.dumps(STANDING))
+        roster["standing"]["witnessedBy"] = None
+        roster["standing"]["claimedAt"] = ""
+        roster["standing"]["roster"] = {"rowCid": "bafyreirow", "via": "chain-root"}
+        r = self.run_hook({"session_id": "sess-m"}, current=roster)
+        self.assertEqual(
+            self.line(r),
+            "participant: human:matthew (did:key:z…ta2doK, standing; by the tracked roster)",
+        )
+
     def test_a_human_session_claim_is_the_participant(self):
         r = self.run_hook({"session_id": "sess-h"}, claimed={"sess-h": "human:matthew"})
         self.assertEqual(self.line(r),

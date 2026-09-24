@@ -903,6 +903,10 @@ def _latest_claim(session_id: str) -> "str | None":
 
 
 def _resolve_tier(session_id: str) -> str:
+    # R-P17: the RUNNING model's tier is resolved before any claim. A subagent inherits its
+    # parent's session id, and with it the parent's claim — possibly `human:<handle>`, the top
+    # tier. `CLAUDE_MODEL` names the model actually executing, so it wins over whatever claim
+    # the inherited session carries; a claim only answers when no running model is declared.
     env_tier = os.environ.get("CLAUDE_MODEL")
     if env_tier and env_tier.strip():
         return env_tier.strip()
@@ -921,7 +925,13 @@ def _resolve_tier(session_id: str) -> str:
 
 
 def _session_id_from_env() -> str:
-    return os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or ""
+    # R-P17, the same order `epr` resolves: the agent-set ELOHIM_SESSION_ID (a subagent's own
+    # session), then the harness's CLAUDE_CODE_SESSION_ID, then CLAUDE_SESSION_ID.
+    for key in ("ELOHIM_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"):
+        value = (os.environ.get(key) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 # ── classification entry point (DENY ON AMBIGUITY, scoped) ──────────────────────────────────

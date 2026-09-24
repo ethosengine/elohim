@@ -169,7 +169,8 @@ def _write_project(tmp: Path, policy_text: str, actor_lines: "list[str] | None" 
 def run_hook(command: str, project_dir: Path, env_extra: "dict | None" = None):
     payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(project_dir)}
     env = dict(os.environ)
-    for k in ("CLAUDE_MODEL", "ANTHROPIC_MODEL", "CLAUDE_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+    for k in ("CLAUDE_MODEL", "ANTHROPIC_MODEL", "CLAUDE_SESSION_ID", "CLAUDE_CODE_SESSION_ID",
+              "ELOHIM_SESSION_ID"):
         env.pop(k, None)
     env["CLAUDE_PROJECT_DIR"] = str(project_dir)
     if env_extra:
@@ -487,6 +488,35 @@ class CapabilityTierGateCase(unittest.TestCase):
         self.assertEqual(order[-1], "human", order)
         self.assertGreater(order.index("human"), order.index(floor))
         self.assertGreater(order.index("human"), order.index("gpt-5.6-sol"))
+
+    def test_running_model_tier_beats_inherited_human_claim(self):
+        # R-P17: a haiku subagent inherits its parent's session, whose claim is `human:matthew`
+        # (the top tier). The running model — CLAUDE_MODEL — must win: the deny names haiku.
+        session = "inherited-human-sess"
+        _write_project(
+            self.proj, FIXTURE_POLICY,
+            actor_lines=[_actor_claim_line("human:matthew", session)],
+        )
+        r = run_hook("git reset --hard abc", self.proj,
+                     {"CLAUDE_CODE_SESSION_ID": session, "CLAUDE_MODEL": "claude-haiku-4-5"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        reason = _deny_reason(r)
+        self.assertIn("Resolved tier: claude-haiku-4-5", reason)
+        self.assertNotIn("Resolved tier: human", reason)
+
+    def test_elohim_session_id_is_read_before_the_harness_session(self):
+        # R-P17: an agent-set ELOHIM_SESSION_ID carves the subagent's own session; its claim —
+        # not the harness session's — resolves the tier.
+        _write_project(
+            self.proj, FIXTURE_POLICY,
+            actor_lines=[
+                _actor_claim_line("human:matthew", "harness-sess"),
+                _actor_claim_line("agent:sweeper@claude-haiku-4-5", "own-sess"),
+            ],
+        )
+        r = run_hook("git reset --hard abc", self.proj,
+                     {"CLAUDE_CODE_SESSION_ID": "harness-sess", "ELOHIM_SESSION_ID": "own-sess"})
+        self.assertIn("Resolved tier: claude-haiku-4-5", _deny_reason(r))
 
     def test_an_agent_claim_still_resolves_to_its_model(self):
         # The `human:` arm must not swallow agent refs: a haiku agent claim still denies.
