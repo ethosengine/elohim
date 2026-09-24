@@ -37,6 +37,6 @@
     "@angular/compiler-cli": "^22.1.0",
     "typescript": "~6.0.3",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   }
 }

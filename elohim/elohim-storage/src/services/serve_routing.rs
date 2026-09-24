@@ -16,15 +16,27 @@
 //!
 //! - `current_load` and `delivery_score` are neutral-defaulted (0.0, 1.0) — no source
 //!   column exists yet; follow-on projection work.
-//! - `attested_rtt_ms` is `None` — `custodian_metrics` is the eventual source but
-//!   its key namespace was unconfirmed (T0); neutral RTT → 0.5 factor in score.
-//! - Live cross-WAN RTT ordering (T7) requires `@requires:shem`; vacuous on household.
+//! - `attested_rtt_ms` is fed from `p2p::transport_paths` — the node's own EWMA of
+//!   round-trips it has actually measured to each peer (Entity class Ephemeral/C,
+//!   locally observed, in-memory, no DHT entry, no cross-peer sync). This is
+//!   deliberately **not** a signed `HealthAttestation`-style claim (no peer can
+//!   produce one yet) — the field name is inherited from `elohim_peer_fabric`'s
+//!   scoring vocabulary, but the value underneath it is an honest local
+//!   observation, not an attested one. A peer never sampled yet resolves to
+//!   `None`, which `score::rank` treats as neutral (0.5 factor) rather than a
+//!   penalty — so lacking data never demotes a peer below a known-slow one.
+//! - Live cross-WAN RTT ordering (T7) requires `@requires:shem` for a genuine
+//!   latency *spread* between candidates; vacuous on household topology where
+//!   peers are co-located. Household coverage lives in this module's unit tests
+//!   (below) and in `elohim_peer_fabric::score`'s ordering tests.
 
 use diesel::prelude::*;
 
 use crate::db::diesel_schema::{
-    humans, node_stewardship, rea_commitments, shard_locations, shard_manifests, stewarded_nodes,
+    humans, node_stewardship, peer_transport_manifest, rea_commitments, shard_locations,
+    shard_manifests, stewarded_nodes,
 };
+use crate::p2p::transport_paths;
 use crate::StorageError;
 use elohim_peer_fabric::score::{self, Candidate};
 
@@ -51,7 +63,12 @@ pub struct ServeRow {
     pub bonded: bool,
     /// Current load fraction (0.0..=1.0). Not yet projected — always `None` this wave.
     pub current_load: Option<f64>,
-    /// Attested RTT in milliseconds. Not yet projected — always `None` this wave.
+    /// This node's own locally-observed EWMA round-trip to the peer, in whole
+    /// milliseconds — read from `p2p::transport_paths` (Entity class Ephemeral/C,
+    /// in-memory, no DHT entry). `None` when this node has never sampled the
+    /// peer yet; `fold_candidates` maps that to `score::rank`'s neutral factor
+    /// (never a penalty), so an unattested peer is never demoted below a
+    /// known-slow one.
     pub attested_rtt_ms: Option<u32>,
     /// Delivery success score (0.0..=1.0). Not yet projected — always `None` this wave.
     pub delivery_score: Option<f64>,
@@ -60,7 +77,29 @@ pub struct ServeRow {
 /// Pure fold: map `ServeRow`s → `Candidate`s, applying neutral defaults for absent signals.
 ///
 /// No I/O; no diesel. Unit-testable without a running database.
+///
+/// **RTT is withheld from the whole batch unless every candidate has a sample
+/// (2026-09-22 story 3.2 follow-up fix).** `select_serve_peers`'s callers
+/// (`p2p/mod.rs` ~4549, `http.rs` ~4569) PREPEND its result ahead of the
+/// verified `peer_blob_inventory` candidate list — they do not intersect
+/// against it. `shard_locations` rows (this function's input) can be
+/// optimistic: a peer can be listed as a holder before its bytes have
+/// actually landed. Before RTT was fed, every row's `attested_rtt_ms` was
+/// `None`, so all candidates got the same neutral rtt_factor and ranking
+/// depended only on capability/headroom/bond/delivery — a peer that merely
+/// LOOKS well-connected (has a locally-recorded RTT sample from unrelated
+/// prior traffic) never got a boost over one that had genuinely just
+/// received the push (no sample yet). Feeding a *partial* RTT picture broke
+/// that: a well-known-but-possibly-not-yet-holding peer could now win the
+/// score purely on a fast historical RTT and get tried first, costing a
+/// retry when its bytes weren't actually there — observed as blob/bundle
+/// propagation missing its SLA on the household mesh. Gating RTT on
+/// "everyone in this batch has a sample" restores the pre-3.2 ordering
+/// whenever information is incomplete (the common case for a freshly-pushed
+/// blob) while still letting RTT discriminate once the whole candidate set
+/// has been observed.
 pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
+    let all_sampled = !rows.is_empty() && rows.iter().all(|r| r.attested_rtt_ms.is_some());
     rows.iter()
         .map(|r| {
             let raw_cap = r.capability_level.unwrap_or(MIN_CAP as i32);
@@ -70,7 +109,9 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
                 agent_cid: r.agent_cid.clone(),
                 capability_level,
                 current_load: r.current_load.unwrap_or(0.0), // full headroom
-                attested_rtt_ms: r.attested_rtt_ms,          // None → neutral 0.5 in score
+                // Withheld (None) unless every candidate in this batch has a
+                // sample — see the function doc above.
+                attested_rtt_ms: if all_sampled { r.attested_rtt_ms } else { None },
                 household_id: r.household_id.clone().unwrap_or_default(), // None → "" (no false grouping)
                 bonded: r.bonded,
                 delivery_score: r.delivery_score.unwrap_or(1.0), // optimistic default
@@ -81,7 +122,8 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
 
 /// Load serve candidates for `blob_hash` from the agent_cid-native shard tables.
 ///
-/// Join path (agent_cid-keyed throughout — no libp2p namespace crossing):
+/// Join path (agent_cid-keyed throughout — no libp2p namespace crossing in the
+/// SQL joins themselves):
 /// ```text
 /// shard_manifests (blob_hash → shard_hashes_json)
 ///   → shard_locations.shard_hash (peer_id = agent_cid)
@@ -90,8 +132,13 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
 ///   → rea_commitments.provider (bonded = active provide/replicates-*)
 /// ```
 ///
-/// `current_load`, `attested_rtt_ms`, `delivery_score` are always `None` this wave
-/// (source columns not yet projected).
+/// `current_load` and `delivery_score` are always `None` this wave (source
+/// columns not yet projected). `attested_rtt_ms` is resolved per-peer from the
+/// in-memory `p2p::transport_paths` store: `peer_transport_manifest` is
+/// consulted read-only for the agent_cid's optional resolved libp2p/iroh
+/// aliases (never SQL-joined — only offered as candidate lookup labels, per
+/// `transport_paths`'s own cross-plane LABEL convention), since a sample may
+/// have landed under whichever label was known when it was recorded.
 pub fn load_serve_rows(
     conn: &mut SqliteConnection,
     blob_hash: &str,
@@ -194,6 +241,29 @@ pub fn load_serve_rows(
         .into_iter()
         .collect();
 
+    // Step 5.5: resolve each agent_cid's optional cross-plane transport
+    // aliases (libp2p PeerId / iroh NodeId) — read-only, never SQL-joined.
+    // These are only offered as candidate lookup LABELS into the in-memory
+    // transport_paths RTT store (Step 6): a sample for a given peer may have
+    // landed under whichever label was known when it was recorded.
+    let transport_alias_rows: Vec<(String, Option<String>, Option<String>)> =
+        peer_transport_manifest::table
+            .filter(peer_transport_manifest::agent_cid.eq_any(&location_rows))
+            .select((
+                peer_transport_manifest::agent_cid,
+                peer_transport_manifest::libp2p_peer_id,
+                peer_transport_manifest::iroh_node_id,
+            ))
+            .load::<(String, Option<String>, Option<String>)>(conn)
+            .map_err(|e| StorageError::Database(format!("load_serve_rows transport: {e}")))?;
+    let transport_aliases_by_agent: std::collections::HashMap<
+        String,
+        (Option<String>, Option<String>),
+    > = transport_alias_rows
+        .into_iter()
+        .map(|(cid, libp2p_id, iroh_id)| (cid, (libp2p_id, iroh_id)))
+        .collect();
+
     // Step 6: assemble ServeRows.
     let rows = location_rows
         .into_iter()
@@ -205,14 +275,29 @@ pub fn load_serve_rows(
                 .copied()
                 .flatten();
             let bonded = bonded_providers.contains(&agent_cid);
+
+            // attested_rtt_ms: try every known label this peer may have been
+            // recorded under locally — agent_cid always, plus any resolved
+            // libp2p/iroh alias.
+            let mut labels: Vec<&str> = vec![agent_cid.as_str()];
+            if let Some((libp2p_id, iroh_id)) = transport_aliases_by_agent.get(&agent_cid) {
+                if let Some(id) = libp2p_id {
+                    labels.push(id.as_str());
+                }
+                if let Some(id) = iroh_id {
+                    labels.push(id.as_str());
+                }
+            }
+            let attested_rtt_ms = transport_paths::global().best_known_rtt_ms(&labels);
+
             ServeRow {
                 agent_cid,
                 household_id,
                 capability_level,
                 bonded,
-                current_load: None,    // not yet projected
-                attested_rtt_ms: None, // not yet projected
-                delivery_score: None,  // not yet projected
+                current_load: None, // not yet projected
+                attested_rtt_ms,
+                delivery_score: None, // not yet projected
             }
         })
         .collect();
@@ -326,5 +411,124 @@ mod tests {
         let cands = fold_candidates(&[]);
         let chosen = score::select_diverse(&cands, MIN_CAP, 3);
         assert!(chosen.is_empty(), "no rows → caller sheds (no fanout)");
+    }
+
+    fn row_with_rtt(cid: &str, hh: &str, rtt: Option<u32>) -> ServeRow {
+        ServeRow {
+            agent_cid: cid.into(),
+            household_id: Some(hh.into()),
+            capability_level: Some(5),
+            bonded: true,
+            current_load: None,
+            attested_rtt_ms: rtt,
+            delivery_score: None,
+        }
+    }
+
+    // --- 3.2: attested_rtt_ms feeds ordering (red-first coverage) ---------
+
+    #[test]
+    fn fold_and_rank_orders_lower_rtt_first_when_otherwise_equal() {
+        let rows = vec![
+            row_with_rtt("uhCAk-far", "h1", Some(300)),
+            row_with_rtt("uhCAk-near", "h2", Some(10)),
+        ];
+        let cands = fold_candidates(&rows);
+        let ranked = score::rank(&cands, MIN_CAP);
+        assert_eq!(
+            ranked[0].agent_cid, "uhCAk-near",
+            "lower attested_rtt_ms should rank first when capability/load/bond/delivery are equal"
+        );
+    }
+
+    #[test]
+    fn fold_and_rank_stable_ordering_when_rtt_absent_for_all() {
+        // No peer has been locally sampled yet (attested_rtt_ms = None for
+        // both) — every other signal is equal, so ordering must be a stable
+        // (input-order-preserving) sort, never an arbitrary flip driven by
+        // absent data.
+        let rows = vec![
+            row_with_rtt("uhCAk-first", "h1", None),
+            row_with_rtt("uhCAk-second", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        let ranked = score::rank(&cands, MIN_CAP);
+        assert_eq!(ranked[0].agent_cid, "uhCAk-first");
+        assert_eq!(ranked[1].agent_cid, "uhCAk-second");
+    }
+
+    #[test]
+    fn fold_and_rank_unknown_rtt_never_demoted_below_a_known_slow_peer() {
+        // A not-yet-sampled peer (None → neutral 0.5 rtt_factor once RTT is
+        // actually applied) must not rank below a peer with a measured SLOW
+        // rtt (~900ms → ~0.1 factor) purely because it lacks a sample. Under
+        // the all-sampled gate below, a mixed Some/None batch withholds RTT
+        // from BOTH candidates entirely — the safer form of "never demoted":
+        // absence of data never lets RTT demote anyone, because RTT simply
+        // does not participate in the comparison until every candidate has
+        // been observed.
+        let rows = vec![
+            row_with_rtt("uhCAk-slow", "h1", Some(900)),
+            row_with_rtt("uhCAk-unsampled", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        assert!(
+            cands.iter().all(|c| c.attested_rtt_ms.is_none()),
+            "a mixed Some/None batch must withhold RTT from every candidate, \
+             not just the unsampled one — see fold_withholds_rtt_from_the_whole_batch..."
+        );
+    }
+
+    // --- 2026-09-22 story 3.2 follow-up: withhold RTT on partial info -----
+    //
+    // Regression: select_serve_peers' callers PREPEND its result ahead of
+    // the verified peer_blob_inventory candidate list rather than
+    // intersecting against it (p2p/mod.rs ~4549, http.rs ~4569).
+    // shard_locations rows (this module's input) can be optimistic — a peer
+    // can be listed as a holder before its bytes have actually landed. Once
+    // RTT started differentiating per-row scores, a peer that merely LOOKS
+    // well-connected (a fast locally-recorded RTT sample from unrelated
+    // prior traffic) could win the score over a peer that had genuinely
+    // just received the push (no sample yet yet), get tried first, and
+    // cost a retry when its bytes weren't actually there — observed as
+    // blob/bundle propagation missing its SLA on the household mesh
+    // (epr-app-deliverability.feature ":184"/":214" timeouts). Withholding
+    // RTT from the whole batch unless every row has a sample restores the
+    // pre-3.2 ordering (capability/headroom/bond/delivery only) whenever
+    // information is incomplete — the common case right after a push.
+
+    #[test]
+    fn fold_withholds_rtt_from_the_whole_batch_unless_every_row_has_a_sample() {
+        let rows = vec![
+            row_with_rtt("uhCAk-well-known-maybe-not-holding-yet", "h1", Some(5)),
+            row_with_rtt("uhCAk-just-received-no-sample-yet", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        assert!(
+            cands.iter().all(|c| c.attested_rtt_ms.is_none()),
+            "a partial RTT picture must withhold RTT from every candidate, \
+             not just the unsampled one"
+        );
+    }
+
+    #[test]
+    fn fold_applies_rtt_once_every_candidate_in_the_batch_has_a_sample() {
+        let rows = vec![
+            row_with_rtt("uhCAk-far", "h1", Some(300)),
+            row_with_rtt("uhCAk-near", "h2", Some(10)),
+        ];
+        let cands = fold_candidates(&rows);
+        assert_eq!(cands[0].attested_rtt_ms, Some(300));
+        assert_eq!(cands[1].attested_rtt_ms, Some(10));
+    }
+
+    #[test]
+    fn fold_withholds_rtt_for_a_single_unsampled_candidate() {
+        // A lone candidate with no sample: all_sampled is false (the one row
+        // lacks a sample), so RTT is withheld — consistent with the batch
+        // rule, and harmless since there's no competing candidate anyway.
+        let rows = vec![row_with_rtt("uhCAk-solo", "h1", None)];
+        let cands = fold_candidates(&rows);
+        assert_eq!(cands[0].attested_rtt_ms, None);
     }
 }

@@ -8,11 +8,41 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { walkGraph } from './graph-walker.mjs';
+import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { recordCycle } from './gate-cycle.mjs';
+import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
+import { runAttested } from './gate-attest.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
+const ROOT = process.env.GATE_ROOT
+  ? resolve(process.env.GATE_ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+/**
+ * 'rakia' since 2026-09-23: the shadow run over the pin-moving commit 691b28cdf printed
+ * `[gate] oracle-diff: +elohim-storage +elohim-app` — exactly the depth-one consumers of the
+ * rakia and sophia pins — and over the full push range the two oracles agreed. The habit atom
+ * records the line. GATE_ORACLE=shadow|path remain available.
+ */
+export function oracleMode(env = process.env) {
+  const declared = (env.GATE_ORACLE || '').trim();
+  return ['shadow', 'rakia', 'path'].includes(declared) ? declared : 'rakia';
+}
+
+function nameSet(projects) {
+  return new Set(projects.map(p => p.name));
+}
+
+function oracleDiffLine(pathProjects, oracleProjects) {
+  const a = nameSet(pathProjects);
+  const b = nameSet(oracleProjects);
+  const plus = [...b].filter(n => !a.has(n));
+  const minus = [...a].filter(n => !b.has(n));
+  if (plus.length === 0 && minus.length === 0) return null;
+  const parts = [...plus.map(n => `+${n}`), ...minus.map(n => `-${n}`)];
+  return `[gate] oracle-diff: ${parts.join(' ')}`;
+}
 
 export function selectGateProjects(registry, target) {
   if (registry.has(target)) return [registry.get(target)];
@@ -26,22 +56,49 @@ export function selectGateProjects(registry, target) {
   return matches.filter(project => project.dir.length === longest);
 }
 
-export function projectsForChanges(root, changedFiles) {
+export function projectsForChanges(root, changedFiles, opts = {}) {
+  const env = opts.env || process.env;
+  const mode = opts.oracle || oracleMode(env);
+  // Diagnostics go to STDERR: the pre-push hook parses this command's stdout as
+  // project names (`--names`), so a line on stdout becomes a bogus gate target.
+  const log = opts.log || (line => process.stderr.write(`${line}\n`));
   const manifests = loadManifests(root);
   const registry = loadGateRegistry(root);
-  const result = walkGraph(manifests, filterChanged(changedFiles));
-  return result.projects.map(project => {
+  const files = filterChanged(changedFiles);
+
+  const byPath = walkGraph(manifests, files).projects;
+  let chosen = byPath;
+
+  if (mode !== 'path') {
+    const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env) }));
+    const stale = ask();
+    if (stale === null) {
+      // Said in both modes: in shadow mode an absent binary would otherwise mean the
+      // flip evidence silently never arrives.
+      log('[gate] rakia unavailable — path-only selection');
+    } else {
+      const byOracle = projectsFromStale(manifests, stale, files);
+      if (mode === 'rakia') {
+        chosen = byOracle;
+      } else {
+        const diff = oracleDiffLine(byPath, byOracle);
+        if (diff) log(diff);
+      }
+    }
+  }
+
+  return chosen.map(project => {
     const registered = registry.get(project.name);
     if (!registered) throw new Error(`Detected unregistered gate project: ${project.name}`);
     return { ...registered, reasons: project.reasons };
   });
 }
 
-// The rakia-validated manifest schema does not yet accept `run.cargo.env` (the
-// SOURCE schema lives in the pinned elohim/rakia submodule, operator-owned) — so
-// a per-project cargo resource cap declares in genesis/agentic/pool-policy.json's
-// `cargo_env_overrides` instead. Read once per call; a missing/malformed file is
-// not fatal to the gate.
+// The rakia-validated manifest schema accepts `run.cargo.env` since rakia 2b2cedb
+// (2026-09-23); a project's cap declares on its own manifest (elohim-storage does).
+// genesis/agentic/pool-policy.json's `cargo_env_overrides` remains for projects that
+// have not moved theirs yet. Read once per call; a missing/malformed file is not
+// fatal to the gate.
 function loadPoolPolicy(root) {
   try {
     return JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8'));
@@ -106,6 +163,18 @@ function runProject(project, printOnly, namesOnly) {
     return 0;
   }
 
+  if (project.run.kind === 'attested') {
+    // No local recipe: the pinned commit's own upstream attestation is the gate.
+    // Never reaches run-local-gate.sh (which keeps refusing unknown kinds).
+    process.stdout.write(`\n[gate] ${project.name} (${project.dir}) — attested, no local recipe\n`);
+    return runAttested(project, {
+      root: ROOT,
+      env: process.env,
+      log: line => process.stdout.write(`${line}\n`),
+      runEpr: eprArgs => spawnSync(process.env.EPR_BIN || 'epr', eprArgs, { cwd: ROOT, stdio: 'ignore', timeout: 30000 }).status,
+    });
+  }
+
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
   const childEnv = gateChildEnv(project, process.env);
   const started = process.hrtime.bigint();
@@ -140,7 +209,8 @@ function cargoEnvOf(childEnv) {
 }
 
 function usage() {
-  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print]');
+  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names]');
+  console.error('  env: GATE_ORACLE=shadow|rakia|path (default shadow) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
@@ -155,7 +225,10 @@ if (isMain) {
 
   if (args.includes('--list')) {
     for (const project of registry.values()) {
-      process.stdout.write(`${project.name}\t${project.dir}\t${project.run.kind}:${project.run.recipe}\n`);
+      const how = project.run.kind === 'attested'
+        ? `attested:${project.run.attestation.repo}#${project.run.attestation.check}`
+        : `${project.run.kind}:${project.run.recipe}`;
+      process.stdout.write(`${project.name}\t${project.dir}\t${how}\n`);
     }
     process.exit(0);
   } else if (args.includes('--changed-file-list')) {

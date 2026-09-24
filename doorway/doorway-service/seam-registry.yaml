@@ -4436,3 +4436,338 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/federation.rs
         testName: registration_that_succeeds_at_boot_never_retries
         kind: unit
+
+  - name: CoherenceDoorbell
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/routes/coherence.rs
+      modulePath: routes::coherence::CoherenceDoorbell
+      line: 155
+    summary: >
+      {doorwayId, digest} — story 4.2 slice 1. Sits next to CoherenceManifest and is NOT a
+      new authority: it carries no heads, so a receiver can never install anything from the
+      doorbell body itself. It is evidence that the sender's digest changed, triggering a
+      pull of the sender's own GET /api/v1/federation/coherence at a URL the receiver already
+      holds in peer_cache, never a URL taken from the body.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Federation plane (doorway<->doorway HTTP). Substrate truth stays in the DHT
+          project-epr commitment; this message carries no truth of its own.
+      - id: C1
+        status: answered
+        justification: >
+          A pull installs only the manifest's own heads, under its own doorwayId. See
+          pull_and_install_holder's IdMismatch arm (services::federation) for the anti-self-
+          election check this message's receiver runs before ever installing anything.
+      - id: C2
+        status: answered
+        justification: >
+          The message carries no head-set and stamps no head — monotonicity is entirely the
+          RECEIVER's job (NameRouteTable::replace_all_at), not this type's.
+      - id: C3
+        status: n-a
+        justification: Carries no liveness claim.
+      - id: C4
+        status: answered
+        justification: >
+          An unknown doorwayId 404s (routes::coherence::handle_doorbell); the household "deaf"
+          fixture answers 202 {"pulled":false,"reason":"deaf"} rather than silently dropping.
+      - id: C5
+        status: answered
+        justification: >
+          THE WHOLE POINT of this type: it carries no heads, so it cannot BE authority — only
+          the pulled GET .../coherence, fetched by the receiver from its own peer_cache URL,
+          can install anything.
+      - id: C6a
+        status: answered
+        justification: >
+          Every field is a String — cheap to parse and bounded by the route's own body-read
+          path (server/http.rs's req.collect()).
+      - id: C6b
+        status: answered
+        justification: >
+          A digest equal to the held one is a no-op (NameRouteTable::held_digest check in
+          receive_doorbell) — re-ringing the same digest costs one comparison, no re-install.
+      - id: C7
+        status: answered
+        justification: >
+          The sibling installs exactly what the holder's own GET serves — the doorbell never
+          advertises anything the coherence endpoint would not also answer.
+      - id: C8
+        status: answered
+        justification: >
+          doorway_federation_doorbell_total{side,outcome} records every ring and every
+          receive, pre-touched over the closed outcome vocabulary
+          (services::federation_doorbell::ALL_OUTCOMES).
+      - id: C9
+        status: answered
+        justification: >
+          doorwayId is the federation namespace, resolved only through peer_cache (the
+          signed-registry-seeded discovery cache) — never a cross-namespace compare.
+      - id: C10
+        status: answered
+        justification: >
+          A new route: an older sibling answers 404/405 and the sender mutes that peer for
+          OLD_SIBLING_MUTE (10 min). CoherenceManifest's own wire shape is unchanged by this
+          addition (additive: a new sibling route, not a field on an existing message).
+      - id: C11
+        status: answered
+        justification: >
+          A 503 from the receiver is dropped by the sender's ring loop; its Retry-After
+          (clamped 5-300s via clamp_retry_after, reusing name_routing::SHED_WINDOW_MIN/MAX_SECS)
+          mutes that peer. The poll backstops any lost ring.
+      - id: C12
+        status: answered
+        justification: >
+          No auth, deliberately — the message confers nothing (see C5). An eager SIGNED
+          payload is deferred to slice 2 (design §4).
+      - id: C13
+        status: n-a
+        justification: No authority is granted or graduated by this message.
+      - id: C14
+        status: answered
+        justification: >
+          Every dropped, muted, or failed ring is counted (OUTCOME_UNREACHABLE,
+          OUTCOME_MUTED_BACKPRESSURE, OUTCOME_MUTED_OLD_SIBLING, OUTCOME_REFUSED,
+          OUTCOME_SKIPPED_MUTED) — the residual is visible on /metrics, and the 60s poll heals
+          it regardless.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/coherence.rs
+        testName: router_fingerprint_is_deterministic_cid_and_camel_case
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: clamp_retry_after_honours_a_declared_window_within_bounds
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: clamp_retry_after_defaults_an_absent_header_to_the_no_window_named_default
+        kind: unit
+    notes: >
+      genesis/a2o/features/federation/projection-index-doorbell.feature scenario 1's "doorway
+      beta logged a doorbell pull from doorway alpha naming the digest that holds garden"
+      exercises the message end-to-end over a live household mesh (no unit test constructs
+      CoherenceDoorbell's JSON wire shape directly — it is a plain two-field struct with
+      #[serde(rename_all = "camelCase")], the same pattern CoherenceManifest's own tests
+      already pin).
+
+  - name: handle_doorbell
+    kind: verdict-fn
+    sourceLocation:
+      file: src/routes/coherence.rs
+      modulePath: routes::coherence::handle_doorbell
+      line: 175
+    summary: >
+      POST /api/v1/federation/doorbell (story 4.2 slice 1). Gates on the household "deaf"
+      fixture first, parses the body, then delegates the receive decision to
+      services::federation_doorbell::receive_doorbell (DoorbellReceipt) and maps it to the
+      HTTP response. Answers 202 in every non-404 case — the sender is never held for the
+      pull itself.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Federation plane, doorway-local dispatch only.
+      - id: C1
+        status: answered
+        justification: >
+          Delegated to services::federation::pull_and_install_holder's IdMismatch arm, which
+          receive_doorbell's spawned pull consults before ever installing anything.
+      - id: C2
+        status: answered
+        justification: >
+          The install this route triggers goes through NameRouteTable::replace_holder, which
+          stamps holder_installed_at — the guard a later, slower poll round respects (see
+          NameRouteTable's own entry, or replace_all_at directly).
+      - id: C3
+        status: partial
+        justification: >
+          A successful pull marks the holder Serving (via install_holder_snapshot's liveness
+          arg). A failed pull never demotes here — GAP is shared with the wider name-routing
+          liveness model: only the discovery poll and a live relay attempt (note_shed) demote.
+      - id: C4
+        status: answered
+        justification: >
+          Unknown doorwayId -> 404 {"error":"unknown-doorway"}. Deaf -> 202
+          {"pulled":false,"reason":"deaf"}. Digest already held -> 202 {"pulled":false}.
+          Pinned by the deaf-gate and DoorbellReceipt::UnknownDoorway/NoOp match arms.
+      - id: C5
+        status: answered
+        justification: >
+          The handler never installs anything itself — it only calls receive_doorbell, which
+          spawns a pull of the SENDER's own GET (never trusts the doorbell body as authority).
+      - id: C6a
+        status: answered
+        justification: >
+          services::federation_doorbell::DoorbellReceiver bounds the receiver to at most one
+          in-flight pull per holder plus one dirty bit — pinned by
+          a_burst_of_doorbells_for_the_same_holder_still_collapses_to_one_follow_up_pull.
+      - id: C6b
+        status: answered
+        justification: >
+          NameRouteTable::held_digest equality check answers 202 {"pulled":false} with no
+          pull spawned when the digest already matches.
+      - id: C7
+        status: answered
+        justification: >
+          The pull installs exactly the manifest the holder's own coherence GET serves — the
+          same relay a sibling would hit.
+      - id: C8
+        status: answered
+        justification: >
+          Every branch records doorway_federation_doorbell_total{side="receive",outcome=...},
+          and a successful pull logs one INFO "doorbell pull" line naming doorway_id + digest
+          + outcome — the exact line projection-index-doorbell.feature's a2o steps grep for.
+      - id: C9
+        status: answered
+        justification: >
+          doorwayId is resolved through peer_cache only (the signed-registry-seeded discovery
+          cache), never accepted as a bare claim from an unregistered caller.
+      - id: C10
+        status: answered
+        justification: >
+          A brand-new route: an older sibling that has not shipped it answers 404/405, which
+          the SENDER's ring loop (not this handler) mutes for OLD_SIBLING_MUTE.
+      - id: C11
+        status: answered
+        justification: >
+          A 503 from THIS handler (e.g. under admission shedding upstream of routing) is a
+          genuine backpressure signal a caller can read the same way any other doorway route's
+          503 is read; this route itself never emits one deliberately (it always answers
+          202/404/400).
+      - id: C12
+        status: answered
+        justification: >
+          Deliberately no auth (design §3, C12 "no auth, deliberately: the message confers
+          nothing"). A signed payload is a slice-2 deferral.
+      - id: C13
+        status: n-a
+        justification: No authority is granted or graduated by this route.
+      - id: C14
+        status: answered
+        justification: >
+          Every outcome (installed, id_mismatch, garbage_body, unreachable, unknown_doorway,
+          noop, deaf, queued) is counted and logged — nothing is silently dropped.
+    contractTests:
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: a_second_doorbell_while_the_first_pull_is_running_sets_the_dirty_bit_instead
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: finishing_with_no_dirty_bit_releases_the_holder_so_a_fresh_doorbell_begins_again
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_slower_poll_round_cannot_overwrite_a_newer_doorbell_install
+        kind: unit
+    notes: >
+      The full HTTP handler (deaf-gate -> body-parse -> receive_doorbell -> status mapping) is
+      exercised end-to-end by
+      genesis/a2o/features/federation/projection-index-doorbell.feature scenarios 1 and 3
+      against a live household mesh; no doorway-service-level integration test drives
+      handle_doorbell directly with a mocked hyper::Request.
+
+  - name: ring_doorbell
+    kind: state-transition
+    sourceLocation:
+      file: src/services/federation_doorbell.rs
+      modulePath: services::federation_doorbell::spawn_doorbell_ringer
+      line: 246
+    summary: >
+      Story 4.2 slice 1's sender loop. Wakes on EprRouter::changed() (one coalesced permit
+      per Notify — bounded, lossy), debounces 250ms, mints the self coherence digest, skips
+      re-ringing an unchanged digest, then POSTs CoherenceDoorbell to at most MAX_RING_PEERS
+      (32) registered peers, each under a 2s timeout with no retry, muting a peer on 503
+      (clamped Retry-After) or 404/405 (an older sibling) rather than hammering it every
+      round.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Federation plane, one outbound POST per registered peer per round.
+      - id: C1
+        status: n-a
+        justification: The sender elects nothing — it only rings; the receiver decides.
+      - id: C2
+        status: n-a
+        justification: The ringer stamps no head and carries no monotonic ordering itself.
+      - id: C3
+        status: n-a
+        justification: The ringer observes no liveness of its own — it only records outcomes.
+      - id: C4
+        status: answered
+        justification: >
+          A peer answering non-2xx is recorded honestly (OUTCOME_REFUSED /
+          OUTCOME_UNREACHABLE / the two mute outcomes), never silently swallowed.
+      - id: C5
+        status: answered
+        justification: >
+          The ringer never installs anything on the receiving end — it only signals "I
+          changed"; C5 is enforced entirely by the message shape (CoherenceDoorbell) and the
+          receiver, not by this loop.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded on every axis: MAX_RING_PEERS=32 peers, RING_TIMEOUT=2s per ring, no retry,
+          and a single coalesced Notify permit means a burst of local changes rings at most
+          once per RING_DEBOUNCE window, for the LAST digest.
+      - id: C6b
+        status: answered
+        justification: >
+          last_rung short-circuits a ring whose digest is unchanged from the last one sent —
+          the no-op periodic-refetch-bumps-generation-without-changing-digest case the design
+          calls out explicitly (§3.1 step 3).
+      - id: C7
+        status: answered
+        justification: >
+          The ringer advertises nothing beyond {doorwayId, digest} — what it rings with is a
+          strict subset of what GET .../coherence would answer.
+      - id: C8
+        status: answered
+        justification: >
+          One INFO "doorbell: ring round complete" line per round (peers, accepted, digest)
+          plus a doorway_federation_doorbell_total{side="ring",outcome} increment per peer
+          per round.
+      - id: C9
+        status: answered
+        justification: >
+          Rings by the doorwayId/URL peer_cache already resolved via the signed doorway
+          registry — never a caller-supplied target.
+      - id: C10
+        status: answered
+        justification: >
+          A 404/405 (older sibling, route not yet shipped) mutes that peer for
+          OLD_SIBLING_MUTE (10 min) rather than treating it as a hard failure every round —
+          pinned by the RingMutes tests.
+      - id: C11
+        status: answered
+        justification: >
+          A 503 mutes the peer for its clamped Retry-After (clamp_retry_after, [5,300]s,
+          defaulting to SHED_WINDOW_DEFAULT_SECS when absent/unparseable) — pinned by
+          clamp_retry_after_* tests.
+      - id: C12
+        status: n-a
+        justification: No authorization decision — the ringer only notifies.
+      - id: C13
+        status: n-a
+        justification: No graduated authority is exercised by ringing.
+      - id: C14
+        status: answered
+        justification: >
+          Every skipped-because-muted, refused, and unreachable ring is counted
+          (OUTCOME_SKIPPED_MUTED / OUTCOME_REFUSED / OUTCOME_UNREACHABLE) — the residual is
+          witnessed on /metrics, and the 60s discovery poll heals it regardless of whether any
+          ring ever lands.
+    contractTests:
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: a_muted_peer_is_muted_until_the_window_named_elapses
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: a_fresh_mute_replaces_the_standing_one_rather_than_extending_it
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation_doorbell.rs
+        testName: all_outcomes_has_no_duplicate_label
+        kind: unit
+    notes: >
+      The ring loop's timing and debounce behavior (Notify coalescing, 250ms debounce,
+      last_rung skip) is exercised only end-to-end by
+      genesis/a2o/features/federation/projection-index-doorbell.feature scenario 1 against a
+      live household mesh — no unit test drives spawn_doorbell_ringer's loop body directly (it
+      is a tokio::spawn'd infinite loop over live network I/O; the pure per-decision pieces it
+      calls, RingMutes and clamp_retry_after, ARE unit-tested above).

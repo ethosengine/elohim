@@ -852,6 +852,19 @@ async fn async_main(
         );
     }
 
+    // Pointer-audit sweep (story 1.4d — heal an already-torn declared row
+    // through the same guarded T7 path `adopt_local` already runs; never
+    // authors, declares, contests, or moves a head). Reconciliation over
+    // bytes/pointers this node's own conductor can already verify, NOT
+    // conscription — same posture as `CUSTODY_ROTATION_ENABLED`. Default ON;
+    // env DISABLES it: 0/false/off/no.
+    if let Ok(v) = std::env::var("ELOHIM_POINTER_AUDIT") {
+        config.pointer_audit_enabled = !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        );
+    }
+
     // Iroh parallel-stack toggle (see plan
     // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
     // Default `Libp2p` — existing deployments unaffected. `iroh` selects
@@ -2743,6 +2756,128 @@ async fn async_main(
                     });
                 }
 
+                // ── Pointer-audit sweep (story 1.4d — heal an already-torn
+                // declared row) ────────────────────────────────────────────
+                //
+                // A row whose declared head is intact but whose blob_cid no
+                // longer names the same blob as that head's OWN notarized
+                // record reads `InSync` to `classify_content_gap` (it
+                // compares anchors, not bytes) — nothing else re-selects it.
+                // This sweep walks declared+pointer-bearing rows on a keyset
+                // cursor and runs the SAME guarded T7 heal
+                // (`pointer_heal_patch` + `stamp_declared_head_mode(..,
+                // StampMode::HealCanonical, ..)`) that
+                // `head_adoption::adopt_local` already applies to a row some
+                // OTHER path selected. It never authors, declares, contests,
+                // or moves a head. Gated by `pointer_audit_enabled` (env
+                // ELOHIM_POINTER_AUDIT=0 to disable; default ON — same
+                // reconciliation-not-conscription posture as custody
+                // rotation above). Uses the SAME late-connect guard as the
+                // re-anchor backfill above: a slow conductor whose cells
+                // enable AFTER boot still gets swept.
+                if config.pointer_audit_enabled {
+                    let pa_pool = db_pool.clone();
+                    let pa_lamad_boot = registry.lamad_client();
+                    let pa_late_inputs = elohim_storage::hc_client_registry::HcRegistryInputs {
+                        admin_url: admin_url.clone(),
+                        app_url: args.app_url.clone(),
+                        app_id: args.app_id.clone(),
+                        lineage: std::sync::Arc::clone(&lineage_roles),
+                    };
+                    let pa_connect_shutdown = shutdown_tx.subscribe();
+                    let mut pa_shutdown = shutdown_tx.subscribe();
+                    tokio::spawn(async move {
+                        let Some(pool) = pa_pool else {
+                            info!("pointer_audit sweep skipped: db pool unavailable");
+                            return;
+                        };
+                        let hc = match pa_lamad_boot {
+                            Some(hc) => hc,
+                            None => {
+                                info!(
+                                    "pointer_audit: lamad bridge not up at boot — awaiting late connect"
+                                );
+                                match elohim_storage::hc_client_registry::HcClientRegistry::connect_role_forever(
+                                    &pa_late_inputs,
+                                    "lamad",
+                                    pa_connect_shutdown,
+                                )
+                                .await
+                                {
+                                    Some(hc) => hc,
+                                    None => {
+                                        info!(
+                                            "pointer_audit: lamad bridge never came up (shutdown) — skipping"
+                                        );
+                                        return;
+                                    }
+                                }
+                            }
+                        };
+                        let ctx = elohim_storage::db::AppContext::default_lamad();
+                        use tokio::time::{interval, Duration, MissedTickBehavior};
+                        let mut ticker = interval(Duration::from_secs(
+                            elohim_storage::services::pointer_audit::POINTER_AUDIT_TICK_SECONDS,
+                        ));
+                        ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                        let mut cursor: Option<String> = None;
+                        loop {
+                            tokio::select! {
+                                _ = ticker.tick() => {
+                                    match elohim_storage::services::pointer_audit::run_once(
+                                        &pool,
+                                        &hc,
+                                        &ctx,
+                                        cursor.as_deref(),
+                                        elohim_storage::services::pointer_audit::POINTER_AUDIT_BATCH,
+                                    )
+                                    .await
+                                    {
+                                        Ok((stats, next)) => {
+                                            if stats.healed > 0 || stats.error > 0 {
+                                                info!(
+                                                    scanned = stats.scanned,
+                                                    healed = stats.healed,
+                                                    in_step = stats.in_step,
+                                                    not_canonical = stats.not_canonical,
+                                                    unreadable = stats.unreadable,
+                                                    error = stats.error,
+                                                    "pointer_audit: sweep slice complete"
+                                                );
+                                            } else {
+                                                tracing::debug!(
+                                                    scanned = stats.scanned,
+                                                    "pointer_audit: nothing to heal in this slice"
+                                                );
+                                            }
+                                            cursor = next;
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                error = %e,
+                                                "pointer_audit sweep slice failed (retried next tick)"
+                                            );
+                                            cursor = None;
+                                        }
+                                    }
+                                }
+                                _ = pa_shutdown.recv() => {
+                                    tracing::debug!(
+                                        "pointer_audit sweep: shutdown signal received, exiting"
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                    info!(
+                        tick_seconds = elohim_storage::services::pointer_audit::POINTER_AUDIT_TICK_SECONDS,
+                        "pointer_audit sweep started (heals an already-torn declared row; story 1.4d)"
+                    );
+                } else {
+                    info!("pointer_audit sweep disabled (pointer_audit_enabled=false)");
+                }
+
                 // genesis #1122 (HTTP re-notarize leg): the bounded boot ramp
                 // `None`-stamps `lamad` when the conductor's cells take minutes
                 // to enable, permanently 503ing the PATCH /db/content re-notarize
@@ -4365,8 +4500,42 @@ async fn async_main(
                 let (announce_tx, mut announce_rx) =
                     tokio::sync::mpsc::channel::<elohim_storage::sync::projector::LocalChange>(256);
                 let announce_cmd_tx = node.handle().command_sender();
+                // Dual mode: the same forwarder also rings iroh, scoped to book
+                // peers with no libp2p leg (a dual peer is already rung above).
+                // One projection, two announcers — no second producer races the
+                // shared SyncManager.
+                #[cfg(feature = "p2p-iroh")]
+                let dual_iroh_announce_tx: Option<
+                    tokio::sync::mpsc::Sender<elohim_storage::sync::projector::LocalChange>,
+                > = match (_iroh_node.as_ref(), iroh_peer_book.as_ref()) {
+                    (Some(iroh_n), Some(book)) => {
+                        let (tx, rx) = tokio::sync::mpsc::channel::<
+                            elohim_storage::sync::projector::LocalChange,
+                        >(256);
+                        elohim_storage::p2p_iroh::spawn_iroh_announce_bridge(
+                            elohim_storage::p2p_iroh::IrohAnnounceInputs {
+                                endpoint: iroh_n.endpoint().clone(),
+                                book: book.clone(),
+                                sync_manager: node.sync_manager().clone(),
+                                scope: elohim_storage::p2p_iroh::AnnounceScope::IrohOnlyPeers,
+                            },
+                            rx,
+                        );
+                        info!("dual announce: iroh bridge spawned for iroh-only book peers");
+                        Some(tx)
+                    }
+                    _ => None,
+                };
                 tokio::spawn(async move {
                     while let Some(change) = announce_rx.recv().await {
+                        #[cfg(feature = "p2p-iroh")]
+                        if let Some(ref iroh_tx) = dual_iroh_announce_tx {
+                            if iroh_tx.try_send(change.clone()).is_err() {
+                                tracing::debug!(
+                                    "dual announce: iroh bridge queue full, the sync round will carry the change"
+                                );
+                            }
+                        }
                         if announce_cmd_tx
                             .try_send(elohim_storage::p2p::P2PCommand::AnnounceLocalChange {
                                 doc_id: change.doc_id,
@@ -4505,12 +4674,10 @@ async fn async_main(
                     // a push that fails, times out, or lands on a peer missing the
                     // change's dependencies costs latency, never correctness.
                     //
-                    // Wired in THIS arm only — `p2p_node.is_none()` is pure-iroh.
-                    // In Dual mode the libp2p arm above owns the one producer (and
-                    // both stacks share one `Arc<SyncManager>`), so exactly one
-                    // plane rings per change and there is no redundant fan-out to
-                    // bound. See `p2p_iroh::announce_change` for the full rationale
-                    // and the iroh-only-peer trade it names.
+                    // This arm is pure-iroh (`p2p_node.is_none()`) and rings every
+                    // book peer. In Dual mode the libp2p arm above owns the one
+                    // producer and rings iroh-only peers from its own forwarder.
+                    // See `p2p_iroh::announce_change`.
                     let iroh_announce_tx = match (_iroh_node.as_ref(), iroh_peer_book.as_ref()) {
                         (Some(iroh_n), Some(book)) => {
                             let (tx, rx) = tokio::sync::mpsc::channel::<
@@ -4521,6 +4688,7 @@ async fn async_main(
                                     endpoint: iroh_n.endpoint().clone(),
                                     book: book.clone(),
                                     sync_manager: iroh_sync.clone(),
+                                    scope: elohim_storage::p2p_iroh::AnnounceScope::AllBookPeers,
                                 },
                                 rx,
                             );

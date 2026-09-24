@@ -93,6 +93,20 @@
 #                   spawn_health_listener serves /health,/ready,/health/serving from
 #                   its own OS-thread runtime; unset ⇒ liveness rides the MAIN listener and the watchdog
 #                   a2o scenarios are unconstructible)
+#   MESH_DOORWAY_TLS  1 mints a household-local CA + per-doorway leaf cert under
+#                   $MESH_DIR/tls/ (openssl, idempotent — existing files are
+#                   reused across restarts) and passes DOORWAY_TLS_PORT /
+#                   DOORWAY_TLS_CERT_FILE / DOORWAY_TLS_KEY_FILE to each
+#                   doorway (story 5.2 — the doorway terminates its own TLS
+#                   beside the plain listener; DOORWAY_PORT keeps serving
+#                   plaintext unchanged). Default: 0 — off, no behavior change.
+#                   The leaf SAN covers MESH_MEMBERSHIP_NAME (default
+#                   elohim.local), MESH_MEMBERSHIP_CANDIDATE_NAME (default
+#                   alpha.elohim.local), localhost, and 127.0.0.1; import
+#                   $MESH_DIR/tls/ca.pem into a browser's trust store to reach
+#                   https://elohim.local without a warning.
+#   DOORWAY_A_TLS_PORT / DOORWAY_B_TLS_PORT / DOORWAY_C_TLS_PORT  TLS listener
+#                   ports when MESH_DOORWAY_TLS=1 (default 8843 / 8844 / 8846).
 #   STORAGE_BIN     elohim-storage binary (default: the mesh's own copy at
 #                   <pool>/elohim__elohim-storage/mesh-bin/ when present — the gate's
 #                   `cargo test` never overwrites it — else the pool release, then debug slot)
@@ -313,6 +327,12 @@ MESH_RELAY_BIN="${MESH_RELAY_BIN:-$(command -v iroh-relay 2>/dev/null || true)}"
 DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
 DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
 DOORWAY_C_HEALTH_PORT="${DOORWAY_C_HEALTH_PORT:-8099}"
+# Story 5.2 — opt-in rustls listener beside the plain one. Default off: no
+# behavior change to the household mesh unless explicitly requested.
+MESH_DOORWAY_TLS="${MESH_DOORWAY_TLS:-0}"
+DOORWAY_A_TLS_PORT="${DOORWAY_A_TLS_PORT:-8843}"
+DOORWAY_B_TLS_PORT="${DOORWAY_B_TLS_PORT:-8844}"
+DOORWAY_C_TLS_PORT="${DOORWAY_C_TLS_PORT:-8846}"
 # The household's public-name membership authority (see MESH_MEMBERSHIP above).
 # Off is a deliberate shape, not a fallback: with no legs staged, the document
 # never exists and the apex-transition scenarios fail naming the absence rather
@@ -990,12 +1010,63 @@ reset_household_state() {
   # The doorways are not in $PEERS, so their node identities are removed by name:
   # a recast household must not keep the signing keys of the one it replaces.
   rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key" "$MESH_DIR/doorway-c-node.key"
+  # Story 5.2 — the household's locally-minted CA + per-doorway TLS leaves, if
+  # MESH_DOORWAY_TLS was ever used against this household. Removed with the
+  # rest of the recast identity: a stale leaf signed by a CA nobody's trust
+  # store has anymore is worse than remint-on-next-start.
+  rm -rf "$MESH_DIR/tls"
   # Per-doorway SSR materialize scratch (see SSR_BUNDLE_PATH above) — pure
   # cache re-fetched from the substrate on next boot, but a stale reconcile
   # generation from a retired mesh has no reason to survive a recast.
   rm -rf "$MESH_DIR/doorway-a/ssr" "$MESH_DIR/doorway-b/ssr" "$MESH_DIR/doorway-c/ssr"
   rm -f "$MESH_DIR/household-fixture.json" "$MESH_DIR/prologue-hosted-humans.json"
   echo "mesh reset authorized: conductor, storage, and doorway-account state will be recast together"
+}
+
+# Story 5.2 — mint (once) a household-local CA plus one TLS leaf per doorway,
+# under $MESH_DIR/tls/. Idempotent: an existing ca.pem/ca.key or
+# doorway-<x>.pem/.key pair is reused across restarts rather than reminted, so
+# a browser that already imported ca.pem does not need to re-import it on
+# every `just mesh start`. Only called when MESH_DOORWAY_TLS=1 — a plain
+# (default) start never touches $MESH_DIR/tls and never shells out to openssl.
+#
+# The leaf SAN covers the household's converged and candidate public names
+# (MESH_MEMBERSHIP_NAME / MESH_MEMBERSHIP_CANDIDATE_NAME) plus localhost and
+# 127.0.0.1, so `https://elohim.local:$DOORWAY_A_TLS_PORT` (or a curl against
+# 127.0.0.1) both validate once ca.pem is trusted. No rotation or reissuance
+# here — 5.3 owns that; this is a one-shot local dev-CA mint.
+mesh_ensure_doorway_tls_ca() {
+  local tls_dir="$MESH_DIR/tls"
+  mkdir -p "$tls_dir"
+  if [ ! -f "$tls_dir/ca.pem" ] || [ ! -f "$tls_dir/ca.key" ]; then
+    openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+      -keyout "$tls_dir/ca.key" -out "$tls_dir/ca.pem" \
+      -subj "/O=Elohim Household Mesh/CN=household-dev-ca" \
+      >/dev/null 2>&1 \
+      || { echo "mesh_ensure_doorway_tls_ca: failed to mint the local CA (openssl missing?)" >&2; return 1; }
+    echo "minted household dev CA at $tls_dir/ca.pem — import it to trust https://${MESH_MEMBERSHIP_NAME:-elohim.local}"
+  fi
+  local san="DNS:${MESH_MEMBERSHIP_NAME:-elohim.local},DNS:${MESH_MEMBERSHIP_CANDIDATE_NAME:-alpha.elohim.local},DNS:localhost,IP:127.0.0.1"
+  local leaf
+  for leaf in a b c; do
+    if [ -f "$tls_dir/doorway-$leaf.pem" ] && [ -f "$tls_dir/doorway-$leaf.key" ]; then
+      continue
+    fi
+    openssl req -newkey rsa:2048 -sha256 -nodes \
+      -keyout "$tls_dir/doorway-$leaf.key" -out "$tls_dir/doorway-$leaf.csr" \
+      -subj "/O=Elohim Household Mesh/CN=doorway-$leaf.${MESH_MEMBERSHIP_NAME:-elohim.local}" \
+      >/dev/null 2>&1 \
+      || { echo "mesh_ensure_doorway_tls_ca: failed to mint doorway-$leaf's key/CSR" >&2; return 1; }
+    openssl x509 -req -in "$tls_dir/doorway-$leaf.csr" \
+      -CA "$tls_dir/ca.pem" -CAkey "$tls_dir/ca.key" -CAcreateserial \
+      -days 825 -sha256 \
+      -extfile <(printf 'subjectAltName=%s' "$san") \
+      -out "$tls_dir/doorway-$leaf.pem" \
+      >/dev/null 2>&1 \
+      || { echo "mesh_ensure_doorway_tls_ca: failed to sign doorway-$leaf's leaf cert" >&2; return 1; }
+    rm -f "$tls_dir/doorway-$leaf.csr"
+    echo "minted TLS leaf for doorway-$leaf at $tls_dir/doorway-$leaf.pem"
+  done
 }
 
 record_mesh_pid() { # <role> <name> <pid>
@@ -1298,6 +1369,11 @@ mesh_owned_ports() {
     "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$DOORWAY_C_HEALTH_PORT" \
     "$MONGO_PORT" "$THRESHOLD_PORT" \
     "$MESH_RELAY_PORT"
+  # Story 5.2 — only owned when the opt-in TLS listener is actually requested;
+  # unclaimed ports would otherwise wrongly gate a plain (MESH_DOORWAY_TLS=0) start.
+  if [ "$MESH_DOORWAY_TLS" = "1" ]; then
+    printf '%s\n' "$DOORWAY_A_TLS_PORT" "$DOORWAY_B_TLS_PORT" "$DOORWAY_C_TLS_PORT"
+  fi
   local i=0
   for _ in "${PEERS[@]}"; do
     printf '%s\n' "$(admin_port "$i")" "$(app_port "$i")" \
@@ -1439,9 +1515,11 @@ assert_no_live_peer_processes() { # <verb> — 0 only when every peer is idle
 # sufficient: embedded migration comments contain that text even in the
 # default-feature binary.
 storage_has_iroh_feature() { # <binary>
-  # Drain strings: grep -q can close early and turn a match into SIGPIPE
-  # failure when the caller enables pipefail.
-  strings "$1" 2>/dev/null | grep -F 'elohim_storage::p2p_iroh' >/dev/null
+  # Read the file directly: `strings | grep` walked a 488 MB debug binary in
+  # ~10s idle and far longer under I/O contention (three concurrent restores
+  # on 2026-09-23 outlived their caller's budget). A binary grep is ~4x faster,
+  # and with no pipe there is no SIGPIPE-under-pipefail hazard for -q.
+  grep -a -q -F 'elohim_storage::p2p_iroh' "$1" 2>/dev/null
 }
 
 print_iroh_build_command() { # <binary>
@@ -4491,6 +4569,14 @@ EOF
   # fine, one that never finds it reports 0 connections forever.
   start_local_relay || return 1
 
+  # Story 5.2 — mint the household's local CA + per-doorway leaves before any
+  # doorway launches, so the env blocks below can point DOORWAY_TLS_CERT_FILE/
+  # DOORWAY_TLS_KEY_FILE at files that already exist. No-op (and no openssl
+  # call) unless explicitly requested.
+  if [ "$MESH_DOORWAY_TLS" = "1" ]; then
+    mesh_ensure_doorway_tls_ca || return 1
+  fi
+
   # 1. Doorway first: it is the island DHT's bootstrap + signal home.
   if ! curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null; then
     local i=0 primary="" extras=""
@@ -4554,6 +4640,16 @@ EOF
     # project-epr rows, and served / as 503 and /lamad as 404 for a whole lane.
     local gw_a=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_a=("DOORWAY_URL=http://localhost:$DOORWAY_PORT")
+    # Story 5.2 — all-or-none TLS env, only when MESH_DOORWAY_TLS=1 (the CA
+    # and this leaf were already minted above by mesh_ensure_doorway_tls_ca).
+    local tls_a=()
+    if [ "$MESH_DOORWAY_TLS" = "1" ]; then
+      tls_a=(
+        "DOORWAY_TLS_PORT=$DOORWAY_A_TLS_PORT"
+        "DOORWAY_TLS_CERT_FILE=$MESH_DIR/tls/doorway-a.pem"
+        "DOORWAY_TLS_KEY_FILE=$MESH_DIR/tls/doorway-a.key"
+      )
+    fi
     # SSR_BUNDLE_PATH's directory is where the RendererRegistry materializes
     # every adopted server bundle (elohim-render::materialize_server_bundle
     # unzips into it fresh on boot, and reconcile.rs writes re-materializations
@@ -4568,7 +4664,7 @@ EOF
     # dir degrades exactly like the fleet does (renderer-less until reconcile
     # adopts the declared head).
     mkdir -p "$MESH_DIR/doorway-a/ssr"
-    env "${gw_a[@]}" \
+    env "${gw_a[@]}" "${tls_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-a-node.key" \
@@ -4614,9 +4710,17 @@ EOF
     local gw_b=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_b=("DOORWAY_URL=http://localhost:$DOORWAY_B_PORT")
     # See doorway A's block above for why this is a per-doorway $MESH_DIR
-    # directory rather than the source dist.
+    # directory rather than the source dist, and for the story 5.2 TLS wiring.
+    local tls_b=()
+    if [ "$MESH_DOORWAY_TLS" = "1" ]; then
+      tls_b=(
+        "DOORWAY_TLS_PORT=$DOORWAY_B_TLS_PORT"
+        "DOORWAY_TLS_CERT_FILE=$MESH_DIR/tls/doorway-b.pem"
+        "DOORWAY_TLS_KEY_FILE=$MESH_DIR/tls/doorway-b.key"
+      )
+    fi
     mkdir -p "$MESH_DIR/doorway-b/ssr"
-    env "${gw_b[@]}" \
+    env "${gw_b[@]}" "${tls_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-b-node.key" \
@@ -4676,9 +4780,17 @@ EOF
     local gw_c=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_c=("DOORWAY_URL=http://localhost:$DOORWAY_C_PORT")
     # See doorway A's block above for why this is a per-doorway $MESH_DIR
-    # directory rather than the source dist.
+    # directory rather than the source dist, and for the story 5.2 TLS wiring.
+    local tls_c=()
+    if [ "$MESH_DOORWAY_TLS" = "1" ]; then
+      tls_c=(
+        "DOORWAY_TLS_PORT=$DOORWAY_C_TLS_PORT"
+        "DOORWAY_TLS_CERT_FILE=$MESH_DIR/tls/doorway-c.pem"
+        "DOORWAY_TLS_KEY_FILE=$MESH_DIR/tls/doorway-c.key"
+      )
+    fi
     mkdir -p "$MESH_DIR/doorway-c/ssr"
-    env "${gw_c[@]}" \
+    env "${gw_c[@]}" "${tls_c[@]}" \
     DOORWAY_ID="${DOORWAY_C_ID:-gamma-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_C_HEALTH_PORT" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-c-node.key" \

@@ -271,15 +271,17 @@ export type StorageTransportMode = 'libp2p' | 'iroh' | 'dual' | 'unknown';
 /**
  * Classify the transport a storage peer proves on its live `/p2p/status` surface.
  *
- * Dual peers expose the normal libp2p status plus `irohNodeId`. A pure-iroh
- * peer exposes its 64-hex NodeId in `peerId`; a libp2p PeerId has a different
- * wire shape. Missing evidence stays unknown.
+ * Pure-iroh peers expose their NodeId in both `peerId` and `irohNodeId`, while
+ * dual peers expose a libp2p `peerId` and a distinct iroh NodeId. A libp2p
+ * PeerId has a different wire shape. Missing evidence stays unknown.
  */
 export function classifyStorageTransportStatus(
   status: Partial<P2PStatusSurface>
 ): StorageTransportMode {
-  if (typeof status.irohNodeId === 'string' && status.irohNodeId.length > 0) return 'dual';
   if (typeof status.peerId !== 'string' || status.peerId.length === 0) return 'unknown';
+  if (typeof status.irohNodeId === 'string' && status.irohNodeId.length > 0) {
+    return status.peerId === status.irohNodeId ? 'iroh' : 'dual';
+  }
   if (/^[0-9a-f]{64}$/.test(status.peerId)) return 'iroh';
   return 'libp2p';
 }
@@ -339,11 +341,76 @@ export interface ConductorDiagnosticsAgentEntry {
 
 /** Response from GET /db/p2p/conductor-diagnostics */
 export interface ConductorDiagnosticsSurface {
-  agentCount: number;
-  agents: ConductorDiagnosticsAgentEntry[];
+  /**
+   * FALSE when the conductor's peer store could not be read — `agents` and
+   * `agentCount` are then ABSENT, not empty. A cell that has not joined its
+   * network has no kitsune space, so `agent_info` answers `K2SpaceNotFound`;
+   * the route still answers 200 because the `cells` block (running-cell
+   * membership + per-role state) needs neither. Treat `false` as "the live
+   * agent set is not observable here", exactly as a 503 was treated — an empty
+   * agent list would read as "this conductor holds no agents", which is a
+   * different fact.
+   */
+  agentsObservable?: boolean;
+  agentsError?: string;
+  agentCount?: number;
+  agents?: ConductorDiagnosticsAgentEntry[];
   transportStats?: unknown;
   networkMetrics?: unknown;
+  /**
+   * Running-cell membership (`AdminRequest::ListCellIds`) plus each observed
+   * role's joined cell state. Source: elohim-storage
+   * `http.rs::cell_membership_block`. Present whenever the route answers 200.
+   */
+  cells?: {
+    membership?: Record<string, unknown>;
+    perRole?: Record<string, Record<string, unknown>>;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
+}
+
+/**
+ * Is the live agent set observable in this diagnostics body?
+ *
+ * The ONE place the `agentsObservable` contract is read, so a caller cannot
+ * accidentally treat an unreadable peer store as an empty one. `undefined`
+ * (an older storage build that had no flag) counts as observable — it only
+ * ever answered 200 when `agent_info` had succeeded.
+ */
+export function diagnosticsAgentsObservable(body: ConductorDiagnosticsSurface): boolean {
+  return body.agentsObservable !== false;
+}
+
+/**
+ * The one error class that DOES establish "the cells have not joined their
+ * network": `agent_info` resolves each space's peer store through
+ * `space_if_exists`, and a kitsune space is created only by a cell's network
+ * JOIN — so a missing-space error names that cause and nothing else does.
+ */
+const MISSING_KITSUNE_SPACE_RE = /K2SpaceNotFound|space not found/i;
+
+/**
+ * Why the live agent set is not observable, in words that assert only what the
+ * conductor's own error establishes.
+ *
+ * A closed socket ("Websocket closed: No connection"), an auth failure and a
+ * timeout all arrive on the same degraded-200 body as a missing kitsune space.
+ * Telling an operator the cells "have not joined their network" for ALL of them
+ * sends a reader hunting a startup window during a socket outage — the same
+ * unsupported-cause shape the Rust side now refuses. The conductor's own words
+ * are preserved verbatim either way.
+ */
+export function diagnosticsUnobservableReason(body: ConductorDiagnosticsSurface): string {
+  const raw =
+    typeof body.agentsError === 'string' && body.agentsError.length > 0
+      ? body.agentsError
+      : 'agentsObservable=false with no agentsError';
+  return MISSING_KITSUNE_SPACE_RE.test(raw)
+    ? `${raw} — that error names a MISSING KITSUNE SPACE, so this conductor's cells have not ` +
+        `joined their network`
+    : `${raw} — the peer store is UNREADABLE; this error text does not establish WHY, and in ` +
+        `particular does not establish that the cells have not joined their network`;
 }
 
 /**
@@ -1173,6 +1240,193 @@ export async function probeDeclaredHead(
 }
 
 /**
+ * What a `GET /db/content/{id}/head-record` answer establishes about the
+ * CONDUCTOR, as opposed to about the content.
+ *
+ * `head-record` is the one doorway-reachable route that cannot answer without
+ * a completed zome call: the handler resolves the declared head from the local
+ * projection, then calls `content_store::get_record_for_action` over the
+ * conductor's authenticated APP websocket
+ * (elohim-storage `http.rs::handle_content_head_record_inner` →
+ * `services::conductor_writes::call_get_record_for_action` →
+ * `HcClient::call_zome`). A peer store read, an `agent_info` answer or any
+ * admin-plane diagnostic proves none of that.
+ */
+export interface HeadRecordAnswer {
+  /**
+   * Did the conductor's app websocket actually EXECUTE the zome function?
+   *
+   * True for a 200 (a Record came back) and for the one 404 the handler emits
+   * AFTER the call returns empty ("no record to serve") — both required a live
+   * app websocket and a returning zome call. False for everything else,
+   * including the 404s the route emits BEFORE it reaches the conductor.
+   */
+  zomeAnswered: boolean;
+  headActionHash?: string;
+  /** base64 `Record` bytes; present only on 200. */
+  record?: string;
+  /** What this answer establishes, for a failure message that names it. */
+  detail: string;
+}
+
+/**
+ * The structured `code` elohim-storage puts on the ONE 404 this route emits
+ * AFTER the conductor has answered (`http.rs::HEAD_RECORD_EMPTY_CODE`).
+ *
+ * Matched as an exact field value, never as a substring of the message: every
+ * other 404 on this route is raised BEFORE the conductor is reached and shares
+ * the same `{"error": ...}` shape, and a content id may legally contain any
+ * phrase — so a row literally named `no record to serve` used to make the
+ * pre-conductor `{"error":"Content not found: no record to serve"}` read as
+ * proof of a zome call. A row cannot name itself into a sibling JSON field.
+ */
+const HEAD_RECORD_EMPTY_CODE = 'head-record-empty';
+
+/**
+ * Classify one `head-record` response. Pure, so the contract has one reader
+ * and a step cannot re-derive it slightly differently.
+ */
+export function classifyHeadRecordAnswer(status: number, text: string): HeadRecordAnswer {
+  if (status === 200) {
+    let body: { headActionHash?: unknown; record?: unknown };
+    try {
+      body = JSON.parse(text) as typeof body;
+    } catch {
+      return {
+        zomeAnswered: false,
+        detail: `HTTP 200 whose body is not JSON: ${text.slice(0, 160)}`,
+      };
+    }
+    if (typeof body.record !== 'string' || body.record.length === 0) {
+      return {
+        zomeAnswered: false,
+        detail: `HTTP 200 carrying no \`record\` — ${text.slice(0, 160)}`,
+      };
+    }
+    return {
+      zomeAnswered: true,
+      headActionHash: typeof body.headActionHash === 'string' ? body.headActionHash : undefined,
+      record: body.record,
+      detail: 'HTTP 200 carrying a Record — the zome call returned',
+    };
+  }
+  if (status === 404) {
+    let body: { code?: unknown; error?: unknown };
+    try {
+      body = JSON.parse(text) as typeof body;
+    } catch {
+      return {
+        zomeAnswered: false,
+        detail: `HTTP 404 whose body is not JSON: ${text.slice(0, 160)}`,
+      };
+    }
+    if (body.code === HEAD_RECORD_EMPTY_CODE) {
+      return {
+        zomeAnswered: true,
+        detail: `HTTP 404 code=${HEAD_RECORD_EMPTY_CODE} — the zome call RETURNED, holding no record`,
+      };
+    }
+    return {
+      zomeAnswered: false,
+      detail:
+        `HTTP 404 before the conductor was asked (no row, no declared head, or scoped reach): ` +
+        `${String(body.error ?? text).slice(0, 160)}`,
+    };
+  }
+  if (status === 502) {
+    return {
+      zomeAnswered: false,
+      detail: `HTTP 502 — the bridge exists and the zome call ERRORED: ${text.slice(0, 200)}`,
+    };
+  }
+  if (status === 503) {
+    return {
+      zomeAnswered: false,
+      detail: `HTTP 503 — no conductor bridge at all: ${text.slice(0, 200)}`,
+    };
+  }
+  return { zomeAnswered: false, detail: `HTTP ${status}: ${text.slice(0, 200)}` };
+}
+
+/**
+ * Content ids this peer currently serves, newest-projection-first, for a
+ * caller that needs SOME zome-backed read and does not care which.
+ *
+ * Reads the local projection (`GET /db/content?limit=N`) — not a zome call
+ * itself, and deliberately so: it is the discovery step, and the zome proof is
+ * {@link classifyHeadRecordAnswer} on the ids it returns.
+ */
+export async function listContentIds(peerUrl: string, limit = 25): Promise<string[]> {
+  const { status, text } = await getRaw(`${peerUrl}/db/content?limit=${limit}`);
+  if (status !== 200) return [];
+  let items: unknown;
+  try {
+    items = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(items)) return [];
+  return items
+    .map(item => (item as { id?: unknown })?.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+}
+
+/**
+ * Content ids on this peer that can actually REACH the conductor — rows with a
+ * resolvable declared head.
+ *
+ * A row without one answers `head-record` with a pre-conductor 404 and
+ * establishes nothing, so a fixed-size prefix of the newest rows is not a
+ * candidate set: six headless rows at the top of the projection permanently
+ * hide an eligible row seven, and every poll then repeats the same six
+ * pre-conductor 404s before diagnosing a failed re-authentication. Projection
+ * visibility admits P2P-published and CRDT-converged rows with neither a head
+ * nor an anchor, so this is the ordinary shape, not an edge case.
+ *
+ * Eligibility is established by `GET /db/content/{id}/head` — a 200 carrying a
+ * non-empty `headActionHash`. Bounded two ways: at most `scanLimit` rows are
+ * examined and at most `want` eligible ids are returned, so discovery cannot
+ * become an unbounded probe storm. `preferred` ids are tried FIRST and, when
+ * eligible, short-circuit the scan.
+ */
+export async function listHeadResolvableContentIds(
+  peerUrl: string,
+  opts: { want?: number; scanLimit?: number; preferred?: string[] } = {}
+): Promise<string[]> {
+  const want = opts.want ?? 3;
+  const scanLimit = opts.scanLimit ?? 50;
+  const preferred = opts.preferred ?? [];
+
+  const hasDeclaredHead = async (id: string): Promise<boolean> => {
+    const { status, text } = await getRaw(`${peerUrl}/db/content/${encodeDocId(id)}/head`);
+    if (status !== 200) return false;
+    try {
+      const head = JSON.parse(text) as { headActionHash?: unknown };
+      return typeof head.headActionHash === 'string' && head.headActionHash.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const eligible: string[] = [];
+  const seen = new Set<string>();
+  const consider = async (id: string): Promise<void> => {
+    if (eligible.length >= want || seen.has(id)) return;
+    seen.add(id);
+    if (await hasDeclaredHead(id)) eligible.push(id);
+  };
+
+  for (const id of preferred) await consider(id);
+  if (eligible.length >= want) return eligible;
+
+  for (const id of await listContentIds(peerUrl, scanLimit)) {
+    await consider(id);
+    if (eligible.length >= want) break;
+  }
+  return eligible;
+}
+
+/**
  * GET /p2p/status on the given STORAGE URL (not doorway URL).
  * This endpoint is NOT proxied by doorway — callers must supply the direct
  * storage base URL (e.g. from E2E_STORAGE_ALPHA).
@@ -1220,6 +1474,10 @@ export async function probeArcPolicy(
  * the doorway peer URL. Returns 503 when the peer's embedded conductor admin
  * connection is unavailable — callers should treat that as "not observable"
  * rather than a hard failure (mirrors the /p2p/status pending convention).
+ *
+ * A 200 whose `agentsObservable` is `false` is the SECOND not-observable shape:
+ * the admin connection exists but the peer store could not be read. Gate every
+ * `agents` read on {@link diagnosticsAgentsObservable}.
  */
 export async function probeConductorDiagnostics(
   peerUrl: string

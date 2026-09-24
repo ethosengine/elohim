@@ -105,7 +105,7 @@ not a readable gauge (that is the C8 clause these rows are watched by).
 | `seam-smoke[peer-store]` | same | each doorway's PRIMARY conductor holds addressed agent-infos |
 | `seam-smoke[dht-fetch]` | same (ADVISORY → flip `--gate` after scenario 2 is green ×2) | landing canonical head identical on A and B |
 | `✓/⚠ canonical head propagated` | every APP deploy console (`authorHeadOnce`) | live cross-conductor declare against a freshly-authored head |
-| `GET {doorway}/db/p2p/conductor-diagnostics` | on demand | the routed PRIMARY conductor's peer store (agent → relay URL); `?include=metrics` when conductor/client versions align |
+| `GET {doorway}/db/p2p/conductor-diagnostics` | on demand | the routed PRIMARY conductor's peer store (agent → relay URL) AND its running-cell membership; `?include=metrics` when conductor/client versions align |
 | `GET {doorway}/admin/bootstrap-coherence` | on demand | kitsune2 store shape |
 | `POST {doorway}/admin/steward-peers/refresh` | on demand | which storages answer, at which manifest (route counts); re-registers routes without a doorway restart |
 | Loki (`instance="<name>-alpha"`, container `elohim-node`) | on demand | conductor/storage behavior; heal lines are `projection-reconcile[content]` |
@@ -114,6 +114,26 @@ not a readable gauge (that is the C8 clause these rows are watched by).
 Primary routing fact for all reads: each doorway's declare/resolve rides its
 PRIMARY conductor — `elohim.host`→adam (shem), `doorway-alpha`→matthew
 (on-prem). "B can't X" means *adam's conductor* can't X.
+
+**`conductor-diagnostics` answers in two halves, and they fail apart.** The
+peer-store half (`agents[]`, `agentCount`) resolves each space's store through
+kitsune, and a cell creates its kitsune space only when it JOINS its network —
+so on a conductor that is still starting, or one whose app is Enabled while its
+cells are absent from the running map, that half answers `K2SpaceNotFound` and
+is simply not readable. The route no longer 503s there: it answers **200** with
+`agentsObservable: false`, an `agentsError` carrying the conductor's own words,
+and `agents`/`agentCount` **absent** rather than empty — because a `0` would read
+as "this conductor holds no agents", which is a different fact and the same
+lossy-measure shape as the 2026-08-07 doorway 404. Read `agentsObservable`
+before reading `agents`; `seam-smoke[peer-store]` prints `PROBE-DEGRADED` for
+this case and must not be read as a thin store. The second half, `cells`, needs
+neither kitsune nor a zome call — it is `AdminRequest::ListCellIds` (the
+conductor's own `running_cell_ids` map, the same map zome dispatch looks in)
+plus each observed role's joined state, with an `authoritative` flag saying
+whether the reading is still inside its authority window. It is the half that
+answers precisely when the other cannot, so start there. A 503 from this route
+still means exactly one thing: no admin connection at all (embedded or
+external), i.e. membership truth is not observable on that peer.
 
 ### 2a. Concern-canon probes (one row per live-metered invariant)
 

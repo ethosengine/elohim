@@ -8,6 +8,8 @@
  *
  * Step shape reference:
  *   Given peer {string} at {string}             — resolve + register a peer URL
+ *   Given peer {string} at {string}, or this scenario is pending  — opt-in peer,
+ *     env var read directly; HOLDS (not fails) when unset (story 5.2 TLS leg)
  *   When I query {string} on peer {string}       — hit any surface path, store JSON
  *   Then peer {string} /health p2p.caughtUp is true
  *   Then peer {string} /health peerCount >= {int}
@@ -63,6 +65,7 @@ import {
   probeEprNavContext,
   probeMetrics,
   probeConductorDiagnostics,
+  diagnosticsAgentsObservable,
   probeServedBundleHead,
   agentKeyMatchesDiagnosticAgent,
   pollForGauge,
@@ -332,6 +335,39 @@ Given(
     getPeerMap(this).set(peerName, url);
     // Also register as a doorway so shared doorway-based steps work on the same peer
     this.addDoorway(peerName, url);
+  }
+);
+
+/**
+ * Opt-in variant of the step above (story 5.2 — the doorway's rustls
+ * listener beside the plain one, not run by default). {envVar} is looked up
+ * DIRECTLY (never through resolvePeerUrl's alias table, which throws on an
+ * unset custom name) so an unset env var HOLDS the scenario — 'pending', not
+ * a failure — exactly the convention this file already uses for optional
+ * legs (see the module doc's "Steps that need it return 'pending'"). This is
+ * what lets served-shell-boots.feature's TLS scenario live permanently in
+ * the suite without failing every run that never set MESH_DOORWAY_TLS=1 (or
+ * the fleet's own TLS leg) and exported {envVar} to a reachable https URL.
+ *
+ * Example:
+ *   Given peer "doorway-a-tls" at "E2E_DOORWAY_A_TLS", or this scenario is pending
+ */
+Given(
+  'peer {string} at {string}, or this scenario is pending',
+  function (this: E2EWorld, peerName: string, envVar: string) {
+    const url = process.env[envVar];
+    if (!url) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `  PENDING: ${envVar} not set — this scenario needs an opt-in https leg ` +
+          `(story 5.2: MESH_DOORWAY_TLS=1 on the household mesh, or a deployed TLS ` +
+          `listener) reachable and exported as ${envVar}`
+      );
+      return 'pending';
+    }
+    getPeerMap(this).set(peerName, url);
+    this.addDoorway(peerName, url);
+    return undefined;
   }
 );
 
@@ -1441,9 +1477,14 @@ Then(
     }
 
     const { status: diagStatus, body: diagBody } = await probeConductorDiagnostics(url);
-    if (diagStatus !== 200) {
+    if (diagStatus !== 200 || !diagnosticsAgentsObservable(diagBody)) {
       // No embedded conductor admin connection on this peer (e.g. a doorway-only
-      // node) — live membership truth is not observable here at all.
+      // node), OR the connection exists but the conductor's peer store could not
+      // be read (a cell that has not joined its network has no kitsune space, so
+      // `agent_info` answers K2SpaceNotFound and `agents` is ABSENT, never empty).
+      // Either way live membership truth is not observable here at all — and
+      // reading an unreadable peer store as an empty one would flag every
+      // household member as a fossil.
       return;
     }
     const liveAgents = (diagBody.agents ?? [])

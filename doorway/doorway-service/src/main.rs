@@ -1681,6 +1681,22 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         );
     }
 
+    // Doorbell ringer — story 4.2 slice 1: rings registered siblings within
+    // seconds of a local EprRouter digest change, so a sibling learns without
+    // waiting on the 60s discovery poll. Mirrors F-COHERENCE's
+    // `coherence_self_id` gate: only meaningful with a real self identity.
+    // See `services::federation_doorbell::spawn_doorbell_ringer`.
+    if let Some(doorway_id) = args.doorway_id.clone() {
+        if !doorway_id.is_empty() && doorway_id != "unknown" {
+            services::federation_doorbell::spawn_doorbell_ringer(
+                Arc::clone(&state.epr_router),
+                state.peer_cache.clone(),
+                doorway_id,
+            );
+            info!("Doorbell ringer started (story 4.2 slice 1)");
+        }
+    }
+
     // Federation: register in DHT + start heartbeat task
     // Requires doorway_id + doorway_url to be configured
     if let Some(fed_config) = services::FederationConfig::from_args(&args) {

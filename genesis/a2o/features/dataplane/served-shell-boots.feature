@@ -75,3 +75,25 @@ Feature: The shell a doorway serves can boot
       | peer        |
       | alpha-A     |
       | elohim.host |
+
+  # Sprint 5.2 ("the doorway terminates its own TLS"): a rustls listener now
+  # runs beside the plain one on a household-mesh doorway, so the SAME
+  # entry-script and reachable-asset guarantee the scenario above proves over
+  # http must also hold over https — a second listener that is never asked
+  # this question is not proven to work. Only ONE doorway carries the opt-in
+  # leg today (the household mesh mints one TLS leaf per doorway, but the
+  # env wiring below names only doorway-a), so this scenario is single-peer
+  # by construction rather than as an oversight; it stays HELD (not failed)
+  # everywhere the opt-in leg isn't up. Wiring: env E2E_DOORWAY_A_TLS to a
+  # reachable https URL for a doorway booted with the story's TLS knobs.
+  # Deliberately static-only, mirroring Scenario 1 rather than Scenario 2: a
+  # browser-boot proof over this same https door is a follow-on station, not
+  # dropped scope — the TLS layer terminates below the app, so the dynamic
+  # bootstrap proof this file already runs plain is expected to transfer
+  # unchanged once wired, and doesn't need re-proving station by station.
+  @regression @requires:doorway-tls
+  Scenario: The site root names the declared entry script over the doorway's own TLS listener
+    Given peer "doorway-a-tls" at "E2E_DOORWAY_A_TLS", or this scenario is pending
+    When a visitor asks peer "doorway-a-tls" for the page at "/"
+    Then every script and stylesheet the page from peer "doorway-a-tls" names is one that peer serves
+    And the page from peer "doorway-a-tls" names the same browser entry point as the declared browser head of EPR "elohim-host-landing"

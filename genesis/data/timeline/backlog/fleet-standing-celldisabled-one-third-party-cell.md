@@ -13,6 +13,55 @@ jobs: [elohim-edge]
 tags: [fleet, conductor, cell-disabled, projection-reconcile, feedback-projector, alpha]
 ---
 
+**DELTA 2026-09-22 (ci-wallclock lane): root cause of the hours-long post-restart window found; fix written and
+unit-tested in the fork, NOT deployed. Status stays open until a conductor image carrying it rolls and the per-pod
+recovery times are re-read.**
+
+*Chain:* `Conductor::initialize_conductor` → per enabled app, `create_cells_and_startup`
+(`crates/holochain/src/conductor/conductor.rs:1923`) awaits every cell's network `join` (`:1959`) and only then
+adds the cells to `running_cells` → the first join of a DNA creates the kitsune2 space
+(`crates/holochain_p2p/src/spawn/actor.rs:1699`) → `K2Gossip::create` (kitsune2_gossip 0.5.0 `gossip.rs:145`)
+awaits `Dht::try_from_store` (kitsune2_dht 0.5.0-dev.6 `dht.rs:537`) → 512 sectors × `TimePartition::try_from_store`
+(`hash.rs:107`, `time.rs:156`): per sector two `earliest_timestamp_in_arc` reads plus one
+`retrieve_op_hashes_in_time_slice` per partial slice (~16; partial slices are never persisted, so every restart
+recomputes all of them). About 9–10k SQL reads per DNA before any cell of the first app runs.
+
+*Why each read is a full scan:* the 0.7 `holochain_data` DHT schema
+(`migrations/dht/20260422120000_initial_schema.up.sql`) has **no secondary index at all**. 0.6's `DhtOp` had
+`storage_center_loc` and `authored_timestamp` indexes. The arc filter in `dht/inner/sync_queries.rs`
+(`:97-101`, `:180-184`, `:848-852` at pin `25dd2d0be`) is
+`(?s<=?e AND loc>=?s AND loc<=?e) OR (?s>?e AND (loc<=?e OR loc>=?s))`, and its guard is only known at bind time.
+So SQLite cannot use a loc index even if one exists. Measured with the exact pinned SQL: `SCAN ChainOp` with and
+without an index. Cost is (reads × ChainOp rows), which is why it grows with each peer's store and runs from 56 min
+(matthew) to 6 h (eve). The same reads back the 15-minute DHT update task and gossip ring diffs. That is a likely
+(unmeasured) contributor to the week-long full-arc CPU peg in
+`fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md`.
+
+*Fix, on local fork branch `perf/k2-dht-model-sargable-arc` (commit `e0bfc6c7a`, local only — not pushed, gitlink not moved; off pin `25dd2d0be`; `holochain_data`
+only):* (1) Rust picks the arc shape: a plain range for non-wrapping arcs (every sector, and FULL), and the
+two-sided OR for wrapping arcs. The rows selected are the same. (2) A covering index
+`elohim_ChainOp_loc_sync_idx` and `elohim_WarrantOp_loc_idx`, created with `CREATE INDEX IF NOT EXISTS` at open.
+This is deliberately not a sqlx migration: an unknown applied migration makes an older binary refuse the DB
+(`VersionMissing`), and that would make a rollback an outage. Tests: 3 new unit tests (the plan uses the index and
+never `SCAN ChainOp`; the rows match across non-wrap, wrap, FULL and empty arcs; the index is idempotent and absent
+from `_sqlx_migrations`). `cargo test -p holochain_data` 146+8 pass, clippy `-D warnings` and fmt clean.
+`holochain_p2p --test integration op_store` 10/10 pass.
+
+*Measured (synthetic store, Python sqlite 3.46, exact pinned vs patched SQL, the startup read pattern for 512
+sectors):* 300k ops 501 s → 23.5 s. 1.2M ops ~2632 s → 131 s (index build 3 s, one time). That is about 20×.
+Fleet disks and encryption were not reproduced. On the fleet's per-peer scale that projects to roughly 3–20 min, not
+56 min–6 h. The patched SQL still makes one `Action` primary-key probe per sector row per read.
+
+*Next step:* bump the fork with this branch → `[build:conductor]` → pin move → one staggered roll, recording
+`conductor app is RUNNING again` minus restart per pod. The structural follow-ups are separate, and each is a kitsune2
+or holochain design change, not a patch. (a) Do not hold `running_cells` hostage to `join`: let cells run while
+the space's DHT model builds in the background (gossip refuses rounds until it is ready). (b) Cut the ~16 partial
+reads per sector to one. This needs the OpStore contract to return per-op timestamps, or `ChainOp` to carry the
+authored timestamp so a `(loc, ts)` index serves the slice directly. That is a schema move, so it needs a rollback
+story. Both belong to rung 3 (conductor-roll cost) of `upgrade-propagation-p2p-design-arc.md`.
+
+---
+
 **CORRECTED 2026-09-21 evening, after the first roll this item's own batch went through (edge #1472). Three
 claims below were wrong; they are left in place and corrected here, because the wrong version already steered a
 decision.**

@@ -115,6 +115,16 @@ HABITS_PATH = os.path.join(PROJECT, "genesis", "manifests", "habits.yaml")
 _NO_MEASURE_BANNER = "=== Dataplane Validation: DID NOT MEASURE ==="
 _NO_MEASURE_IDENT = "dataplane-validation-did-not-measure"
 
+# A build its OWN clock killed. Of the three ABORTED shapes the museum names
+# (superseded, restart-orphaned, manual stop) none is a verdict — but a
+# pipeline that outgrows its budget IS a signal, and RED alone never sees it:
+# from 09-19 to 09-22 the orchestrator hit its 240-minute limit on seven of
+# eleven runs and app delivered zero of eight dispatches while this ledger
+# stayed quiet. Jenkins prints this line when a timeout() step fires.
+_BUDGET_TIMEOUT_LINE = "Timeout has been exceeded"
+_BUDGET_EXHAUSTED_IDENT = "pipeline-budget-exhausted"
+_RESTART_SIGNATURE = re.compile(r"Waiting for reconnection of .+ before proceeding with build|Failed to load program")
+
 # ── Quiesce leg ──────────────────────────────────────────────────────────────
 # The fleet-quiesce gate prints, once per poll, everything needed to understand
 # why the fleet did or did not settle — then discards it into a console log that
@@ -339,6 +349,25 @@ def _scan_for_banner(tail):
     return None
 
 
+def _scan_for_budget_timeout(tail):
+    """An ABORTED build whose own timeout fired, as a finding; None otherwise.
+
+    Superseded runs and manual stops carry no timeout line and stay ignored.
+    A controller restart can also expire a stage timeout during the outage;
+    that shape belongs to CONTROLLER_RESTART (not a budget signal), so its
+    signature suppresses this finding."""
+    if not tail or _BUDGET_TIMEOUT_LINE not in tail:
+        return None
+    if _RESTART_SIGNATURE.search(tail):
+        return None
+    return {
+        "category": "BUDGET_EXHAUSTED",
+        "ident": _BUDGET_EXHAUSTED_IDENT,
+        "display": "ABORTED by its own timeout — the pipeline outgrew its wall-clock budget",
+        "class": "ci-failure",
+    }
+
+
 def _scan_console(tail, taxonomy, job):
     """Pure console-tail taxonomy classification (NO_MEASURE banner
     detection is a separate, unconditional pass — see _scan_for_banner).
@@ -503,6 +532,13 @@ def harvest_job(job, cursor, taxonomy):
         out.setdefault("sequence", []).append((b["number"], b["result"]))
         if b["result"] == "SUCCESS":
             out["green"] = max(out["green"] or 0, b["number"])
+        elif b["result"] == "ABORTED":
+            try:
+                budget = _scan_for_budget_timeout(get_console_tail(job, b["number"]))
+            except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+                budget = None
+            if budget is not None:
+                out["new"].append({"build": b["number"], **budget})
         elif b["result"] in RED:
             for f in collect_build_findings(job, b["number"], taxonomy):
                 entry = {

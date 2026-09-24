@@ -125,6 +125,14 @@ describe('candidateTargetPaths', () => {
     assert.deepEqual(paths, ['doorway/doorway-service/src/main.rs']);
   });
 
+  it('normalizes an explicit path that starts with ./ (gitoxide crates declare benches that way)', () => {
+    const paths = candidateTargetPaths(
+      { kind: 'bench', name: 'lookup', path: './benches/lookup.rs' },
+      'elohim/brit/gix-attributes',
+    );
+    assert.deepEqual(paths, ['elohim/brit/gix-attributes/benches/lookup.rs']);
+  });
+
   it('returns conventional paths for a bench with no explicit path', () => {
     const paths = candidateTargetPaths(
       { kind: 'bench', name: 'graph_traversal', path: null },

@@ -27,6 +27,22 @@ fake_json_body() {
         tx5)
           printf '%s\n' '{"agentCount":5,"agents":[{"url":"wss://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.alpha.elohim.host.:443/b"},{"url":"https://relay.elohim.host.:443/c"},{"url":"https://relay.alpha.elohim.host.:443/d"},{"url":"https://relay.elohim.host.:443/e"}]}'
           ;;
+        degraded-peer-store-socket)
+          # THE SAME DEGRADED 200, A DIFFERENT CAUSE. A closed websocket, an
+          # auth failure and a timeout all land on this body. Before 2026-09-22
+          # the script told the operator the cells "have not joined their
+          # network" for every one of them — an unsupported cause that points a
+          # socket outage at bootstrap diagnosis.
+          printf '%s\n' '{"agentsObservable":false,"agentsError":"conductor agent_info failed: Websocket closed: No connection — cause not established by this error text. Read `cells` for what IS established.","transportStats":{},"cells":{"membership":{"runningCount":0,"authoritative":true},"perRole":{}}}'
+          ;;
+        degraded-peer-store)
+          # HTTP 200 with the peer store UNREADABLE: a cell that has not joined
+          # its network has no kitsune space, so agent_info answers
+          # K2SpaceNotFound. `agents`/`agentCount` are ABSENT, never empty.
+          # Before 2026-09-22 this body printed "total=0 addressed=0" and read
+          # as a thin store, which points an operator at bootstrap diagnosis.
+          printf '%s\n' '{"agentsObservable":false,"agentsError":"conductor agent_info failed: K2SpaceNotFound(...) — that error names a MISSING KITSUNE SPACE","transportStats":{},"cells":{"membership":{"runningCount":0,"authoritative":true},"perRole":{}}}'
+          ;;
         *)
           # Both sovereign hosts use iroh's canonical trailing-dot form.
           printf '%s\n' '{"agentCount":5,"agents":[{"url":"https://relay.alpha.elohim.host.:443/a"},{"url":"https://relay.elohim.host.:443/b"},{"url":"https://relay.alpha.elohim.host.:443/c"},{"url":"https://relay.elohim.host.:443/d"},{"url":"https://relay.alpha.elohim.host.:443/e"}]}'
@@ -233,6 +249,64 @@ assert_fails_with missing-protocol 'protocol=missing'
 assert_fails_with wrong-protocol 'protocol=not-iroh'
 assert_fails_with n0 'seam-smoke[n0-contamination]: FAIL'
 assert_fails_with tx5 'seam-smoke[no-lingering-tx5]: FAIL'
+
+# A degraded 200 must name itself as NOT OBSERVABLE, never as a thin store, and
+# must not manufacture a relay-contamination verdict out of a body it could not
+# read. The regression this pins: `d.get('agentCount',0)` printing "0 0".
+assert_fails_with degraded-peer-store 'PROBE-DEGRADED'
+DEGRADED_OUTPUT="${TEST_ROOT}/degraded-peer-store.log"
+if grep -Fq 'peer store thin' "$DEGRADED_OUTPUT"; then
+  echo "degraded-peer-store reported a THIN store — an unreadable store is not an empty one" >&2
+  sed -n '1,200p' "$DEGRADED_OUTPUT" >&2
+  exit 1
+fi
+if grep -Fq 'total=0 addressed=0' "$DEGRADED_OUTPUT"; then
+  echo "degraded-peer-store printed the 0 0 default the parser used to emit" >&2
+  sed -n '1,200p' "$DEGRADED_OUTPUT" >&2
+  exit 1
+fi
+for leg in n0-contamination no-lingering-tx5; do
+  if grep -Fq "seam-smoke[${leg}]: FAIL" "$DEGRADED_OUTPUT"; then
+    echo "degraded-peer-store fabricated a ${leg} verdict from an unreadable body" >&2
+    sed -n '1,200p' "$DEGRADED_OUTPUT" >&2
+    exit 1
+  fi
+  if ! grep -Fq "seam-smoke[${leg}]: SKIP" "$DEGRADED_OUTPUT"; then
+    echo "degraded-peer-store did not SKIP the ${leg} leg" >&2
+    sed -n '1,200p' "$DEGRADED_OUTPUT" >&2
+    exit 1
+  fi
+done
+
+# A missing kitsune space DOES establish the network-join cause, so that one
+# body keeps the explanation.
+grep -Fq "that error names a MISSING KITSUNE SPACE, so the conductor's cells have not joined their network" "$DEGRADED_OUTPUT"
+grep -Fq 'K2SpaceNotFound' "$DEGRADED_OUTPUT"
+
+# A CLOSED SOCKET is the same degraded 200 with a different cause. It must still
+# be PROBE-DEGRADED, must preserve the conductor's own words verbatim, and must
+# NOT claim the cells have not joined their network.
+assert_fails_with degraded-peer-store-socket 'PROBE-DEGRADED'
+SOCKET_OUTPUT="${TEST_ROOT}/degraded-peer-store-socket.log"
+grep -Fq 'Websocket closed: No connection' "$SOCKET_OUTPUT"
+if grep -Fq "so the conductor's cells have not joined their network" "$SOCKET_OUTPUT"; then
+  echo "degraded-peer-store-socket asserted a network-join cause the error does not establish" >&2
+  sed -n '1,200p' "$SOCKET_OUTPUT" >&2
+  exit 1
+fi
+grep -Fq 'does NOT establish why' "$SOCKET_OUTPUT"
+if grep -Fq 'peer store thin' "$SOCKET_OUTPUT"; then
+  echo "degraded-peer-store-socket reported a THIN store" >&2
+  sed -n '1,200p' "$SOCKET_OUTPUT" >&2
+  exit 1
+fi
+for leg in n0-contamination no-lingering-tx5; do
+  if ! grep -Fq "seam-smoke[${leg}]: SKIP" "$SOCKET_OUTPUT"; then
+    echo "degraded-peer-store-socket did not SKIP the ${leg} leg" >&2
+    sed -n '1,200p' "$SOCKET_OUTPUT" >&2
+    exit 1
+  fi
+done
 
 # ── seam 6b: per-doorway head-record torn-row check ─────────────────────────
 

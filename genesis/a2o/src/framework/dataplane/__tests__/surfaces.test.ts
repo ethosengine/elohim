@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
   agentKeyMatchesDiagnosticAgent,
+  classifyHeadRecordAnswer,
   classifyStorageTransportStatus,
   describeCatchUpRide,
+  diagnosticsUnobservableReason,
   getRaw,
   getRawRidingCatchUp,
   parsePrometheusMetrics,
@@ -17,6 +19,10 @@ void describe('classifyStorageTransportStatus', () => {
   void it('distinguishes libp2p, iroh, dual, and unknown live status shapes', () => {
     assert.equal(classifyStorageTransportStatus({ peerId: '12D3KooWpeer' }), 'libp2p');
     assert.equal(classifyStorageTransportStatus({ peerId: 'a'.repeat(64) }), 'iroh');
+    assert.equal(
+      classifyStorageTransportStatus({ peerId: 'a'.repeat(64), irohNodeId: 'a'.repeat(64) }),
+      'iroh'
+    );
     assert.equal(
       classifyStorageTransportStatus({ peerId: '12D3KooWpeer', irohNodeId: 'b'.repeat(64) }),
       'dual'
@@ -329,6 +335,108 @@ void describe('getRaw — timeoutMs is a TOTAL bound, connect included', () => {
       elapsed < CEILING_MS,
       `getRaw ignored its ${BOUND_MS}ms bound: settled after ${elapsed}ms ` +
         `(the pre-fix connect-unbounded shape took ~10500ms)`
+    );
+  });
+});
+
+const HEAD_ACTION_HASH = 'uhCkk-head';
+
+void describe('classifyHeadRecordAnswer', () => {
+  void it('accepts a 200 carrying a Record as proof a zome call returned', () => {
+    const answer = classifyHeadRecordAnswer(
+      200,
+      JSON.stringify({ headActionHash: HEAD_ACTION_HASH, record: 'YmFzZTY0' })
+    );
+    assert.equal(answer.zomeAnswered, true);
+    assert.equal(answer.headActionHash, HEAD_ACTION_HASH);
+    assert.equal(answer.record, 'YmFzZTY0');
+  });
+
+  void it('rejects a 200 with no record — nothing establishes the call returned', () => {
+    assert.equal(
+      classifyHeadRecordAnswer(200, JSON.stringify({ headActionHash: HEAD_ACTION_HASH }))
+        .zomeAnswered,
+      false
+    );
+    assert.equal(classifyHeadRecordAnswer(200, 'not json').zomeAnswered, false);
+  });
+
+  void it('accepts the post-call empty 404 only on its structured code', () => {
+    assert.equal(
+      classifyHeadRecordAnswer(
+        404,
+        JSON.stringify({
+          error: 'this peer cannot retrieve the head action; no record to serve',
+          code: 'head-record-empty',
+        })
+      ).zomeAnswered,
+      true
+    );
+  });
+
+  void it('REFUSES a pre-conductor 404 whose message merely contains the phrase', () => {
+    // A content id may legally be named `no record to serve`. The handler then
+    // answers `{"error":"Content not found: no record to serve"}` BEFORE it ever
+    // resolves the conductor, and substring matching declared that recovery.
+    const spoof = classifyHeadRecordAnswer(
+      404,
+      JSON.stringify({ error: 'Content not found: no record to serve' })
+    );
+    assert.equal(
+      spoof.zomeAnswered,
+      false,
+      'a row cannot name itself into proof that a zome call returned'
+    );
+    // And the code must be a FIELD, not a substring of the message either.
+    assert.equal(
+      classifyHeadRecordAnswer(
+        404,
+        JSON.stringify({ error: 'Content not found: head-record-empty' })
+      ).zomeAnswered,
+      false
+    );
+  });
+
+  void it('names the pre/post-conductor failure shapes apart', () => {
+    assert.equal(classifyHeadRecordAnswer(502, '{"error":"boom"}').zomeAnswered, false);
+    assert.match(classifyHeadRecordAnswer(502, '{"error":"boom"}').detail, /ERRORED/);
+    assert.equal(classifyHeadRecordAnswer(503, '{"error":"no bridge"}').zomeAnswered, false);
+    assert.match(
+      classifyHeadRecordAnswer(503, '{"error":"no bridge"}').detail,
+      /no conductor bridge/
+    );
+    assert.equal(classifyHeadRecordAnswer(404, 'plain text').zomeAnswered, false);
+  });
+});
+
+void describe('diagnosticsUnobservableReason', () => {
+  void it('claims the network-join cause ONLY for a missing kitsune space', () => {
+    const missingSpace = diagnosticsUnobservableReason({
+      agentsObservable: false,
+      agentsError: 'conductor agent_info failed: K2SpaceNotFound(...)',
+    });
+    assert.match(missingSpace, /K2SpaceNotFound/);
+    assert.match(missingSpace, /have not joined their network/);
+  });
+
+  void it('preserves a socket error verbatim and claims no cause for it', () => {
+    const socket = diagnosticsUnobservableReason({
+      agentsObservable: false,
+      agentsError: 'conductor agent_info failed: Websocket closed: No connection',
+    });
+    assert.match(socket, /Websocket closed: No connection/);
+    assert.equal(
+      socket.includes('that error names a MISSING KITSUNE SPACE'),
+      false,
+      'a closed socket does not establish that the cells never joined'
+    );
+    assert.match(socket, /does not establish/);
+  });
+
+  void it('says something honest when there is no agentsError at all', () => {
+    assert.match(
+      diagnosticsUnobservableReason({ agentsObservable: false }),
+      /agentsObservable=false with no agentsError/
     );
   });
 });

@@ -1005,7 +1005,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             .findAll { !(it.suspended ?: false) }
                             .collect { "${it.name}=http://elohim-${it.name}-alpha.elohim-alpha.svc.cluster.local:8090" }
                             .join(',')
-                        withEnv(["COORDSWAP_PEERS=${peers}"]) {
+                        withEnv(["COORDSWAP_PEERS=${peers}", "COORDSWAP_RESULT_FILE=${env.WORKSPACE}/coordswap.result"]) {
                             sh "bash '${env.WORKSPACE}/scripts/ci/fleet-coordswap-dispatch.sh' '${env.WORKSPACE}/elohim/holochain/dna/elohim/elohim.happ' alpha"
                         }
                     }
@@ -1049,12 +1049,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 sh """
                                     oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
 
+                                    # Content roll key (scripts/ci/happ-roll-key.sh): lets the edge
+                                    # deploy skip a conductor roll for an identical-DNA rebuild.
+                                    ROLL_KEY="\$(bash '${env.WORKSPACE}/scripts/ci/happ-roll-key.sh' dna-hashes.actual workdir/happ.yaml elohim.happ '${env.WORKSPACE}/coordswap.result' || true)"
+                                    echo "hApp roll key: \${ROLL_KEY:-<none — edge falls back to the manifest digest>}"
+
                                     echo "Pushing hApp to Harbor..."
                                     oras push harbor.ethosengine.com/ethosengine/elohim-happ:${version} \\
+                                        \${ROLL_KEY:+--annotation "elohim.host/roll-key=\${ROLL_KEY}"} \\
                                         elohim.happ:application/octet-stream
 
                                     echo "Pushing hApp floating tag: ${floatingTag}..."
                                     oras push harbor.ethosengine.com/ethosengine/elohim-happ:${floatingTag} \\
+                                        \${ROLL_KEY:+--annotation "elohim.host/roll-key=\${ROLL_KEY}"} \\
                                         elohim.happ:application/octet-stream
 
                                     echo "Pushing WASM cache core to Harbor..."

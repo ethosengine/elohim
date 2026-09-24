@@ -510,6 +510,30 @@ pub struct AppState {
     /// reconstructable by re-fetching the same path, so a restart that empties
     /// it costs one round trip per path and nothing else.
     pub freshness_pantry: Arc<crate::routes::freshness::FreshnessPantry>,
+
+    /// Story 4.2 slice 1 (doorbell): receiver-side pull coordination — at
+    /// most one fetch-then-install in flight per holder, plus one dirty bit.
+    /// See `crate::services::federation_doorbell::DoorbellReceiver`.
+    pub doorbell_receiver: Arc<crate::services::federation_doorbell::DoorbellReceiver>,
+
+    /// Pooled HTTP client for the doorbell receiver's pull-a-holder's-own-
+    /// manifest fetches (`POST /api/v1/federation/doorbell` and
+    /// `POST /admin/federation/peers/refresh`). Deliberately separate from
+    /// `storage_proxy_client` (a different target class entirely — sibling
+    /// doorways, not this doorway's own storage).
+    pub doorbell_client: Arc<reqwest::Client>,
+
+    /// **DEV/FIXTURE ONLY** — `Some(until_secs)` while this doorway declares
+    /// itself DEAF to incoming doorbells (story 4.2 slice 1 scenario 3's
+    /// counterfactual control: it proves scenario 1's speed came from the
+    /// doorbell, not a lucky poll tick). Doorway-local OPERATIONAL state —
+    /// Category C, no DHT entry, no persistence, self-clearing. Written by
+    /// the household-fixture-only `PUT /admin/dev/federation-deaf`
+    /// (`routes::admin_dev::handle_set_federation_deaf`, gated by the SAME
+    /// `fixture_surface_gate` as `PUT /admin/dev/shed` — never `dev_mode`).
+    /// While standing, `routes::coherence::handle_doorbell` answers
+    /// `202 {"pulled":false,"reason":"deaf"}` without touching `name_routes`.
+    pub federation_deaf_until: Arc<tokio::sync::RwLock<Option<u64>>>,
 }
 
 /// Retry-After (seconds) advertised when doorway sheds an inbound request at
@@ -557,6 +581,20 @@ fn init_storage_proxy_client() -> Arc<reqwest::Client> {
             .timeout(std::time::Duration::from_secs(
                 crate::routes::storage_proxy::STORAGE_PROXY_REQUEST_TIMEOUT_SECS,
             ))
+            .build()
+            .unwrap_or_default(),
+    )
+}
+
+/// The ONE pooled HTTP client the doorbell receiver uses to pull a holder's
+/// own coherence manifest (story 4.2 slice 1) — a different target class from
+/// `storage_proxy_client` (sibling doorways, not this doorway's own storage),
+/// so it gets its own client rather than borrowing one sized for a different
+/// purpose. Matches the F-COHERENCE probe's own client timeout (5s).
+fn init_doorbell_client() -> Arc<reqwest::Client> {
+    Arc::new(
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
             .build()
             .unwrap_or_default(),
     )
@@ -808,6 +846,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -929,6 +972,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1065,6 +1113,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1221,6 +1274,11 @@ impl AppState {
                 std::collections::HashMap::new(),
             )),
             dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
+            doorbell_receiver: Arc::new(
+                crate::services::federation_doorbell::DoorbellReceiver::new(),
+            ),
+            doorbell_client: init_doorbell_client(),
+            federation_deaf_until: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -2216,6 +2274,47 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         state.args.listen, state.args.node_id
     );
 
+    // Optional TLS listener (story 5.2 — the doorway terminates its own TLS
+    // beside the plain listener above, serving the exact same router via
+    // `serve_connection`). `Args::validate()` already rejected a partial
+    // declaration at boot, so `tls_port` set here means cert_file/key_file
+    // are both `Some` too. A present-but-invalid cert/key pair aborts boot
+    // loudly — the same contract `node_identity::load_or_generate` uses for
+    // DOORWAY_NODE_KEY_FILE (story 5.1) — rather than silently degrading to
+    // plaintext-only. No cert issuance or rotation here (that's 5.3).
+    if let Some(port) = state.args.tls_port {
+        let cert_file = state
+            .args
+            .tls_cert_file
+            .as_ref()
+            .expect("Args::validate() guarantees all-or-none TLS declaration");
+        let key_file = state
+            .args
+            .tls_key_file
+            .as_ref()
+            .expect("Args::validate() guarantees all-or-none TLS declaration");
+        match crate::tls::load_server_config(cert_file, key_file) {
+            Ok(tls_config) => {
+                let mut tls_addr = state.args.listen;
+                tls_addr.set_port(port);
+                spawn_tls_listener(Arc::clone(&state), tls_addr, tls_config);
+            }
+            Err(e) => {
+                error!(
+                    cert = %cert_file.display(),
+                    key = %key_file.display(),
+                    error = %e,
+                    "Failed to load TLS certificate/key pair from DOORWAY_TLS_CERT_FILE / \
+                     DOORWAY_TLS_KEY_FILE; aborting boot rather than silently serving \
+                     plaintext-only"
+                );
+                return Err(DoorwayError::Config(format!(
+                    "TLS listener config invalid: {e}"
+                )));
+            }
+        }
+    }
+
     // Liveness watchdog (opt-in via DOORWAY_HEALTH_PORT): stamp a heartbeat from
     // the MAIN runtime and serve the liveness probe from a dedicated OS-thread
     // runtime, so a full worker-pool stall (e.g. blocking getaddrinfo during a
@@ -2345,99 +2444,158 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 let state = Arc::clone(&state);
-                tokio::spawn(async move {
-                    let io = TokioIo::new(stream);
-
-                    let service = service_fn(move |req: Request<Incoming>| {
-                        let state = Arc::clone(&state);
-                        async move {
-                            // Extract CORS context at the outermost level so every
-                            // response — including early returns — gets CORS headers.
-                            let request_origin: Option<String> = req
-                                .headers()
-                                .get(hyper::header::ORIGIN)
-                                .and_then(|v| v.to_str().ok())
-                                .map(|s| s.to_string());
-                            let cors_config = state.cors_config.clone();
-
-                            if req.method() == hyper::Method::OPTIONS {
-                                let resp: Result<Response<BoxBody>, hyper::Error> =
-                                    Ok(to_boxed(crate::cors::preflight_response(
-                                        &cors_config,
-                                        request_origin.as_deref(),
-                                    )));
-                                return resp;
-                            }
-
-                            // R1 — the Chain-R PARENT hop: whole inbound request,
-                            // entry to response. Timed HERE, at the single call
-                            // site, rather than inside `handle_request`, because
-                            // that function has many early returns and each one
-                            // would need its own timer — a shape that goes stale
-                            // the first time someone adds a return.
-                            //
-                            // `route_class` is a CLOSED set (service | epr | ws |
-                            // asset), never the raw path: a path label would make
-                            // this series unbounded in cardinality and turn the
-                            // instrument into the outage it exists to prevent.
-                            let hop_started = std::time::Instant::now();
-                            let hop_route_class =
-                                crate::metrics::classify_route(req.method(), req.uri().path());
-                            let response = handle_request(state, addr, req).await?;
-                            let hop_elapsed = hop_started.elapsed();
-                            let hop_outcome = if response.status().is_success() {
-                                "ok"
-                            } else if response.status().as_u16() == 503 {
-                                // Distinguished because a shed is the dominant
-                                // slow path on this fleet and must not be averaged
-                                // into healthy serves.
-                                "shed"
-                            } else {
-                                "err"
-                            };
-                            crate::metrics::observe_hop(
-                                crate::metrics::DoorwayHop::Serve,
-                                hop_route_class,
-                                hop_outcome,
-                                hop_elapsed,
-                            );
-                            // Self-reported elapsed, so a downstream prober can
-                            // compute (client RTT - serve) without differencing
-                            // two clocks. Container clocks here skew by hours;
-                            // a timestamp-differenced residual is poison by
-                            // construction. Joins the existing `x-ssr-*` header
-                            // convention.
-                            let mut response = response;
-                            if let Ok(v) = hyper::header::HeaderValue::from_str(&format!(
-                                "{:.3}",
-                                hop_elapsed.as_secs_f64() * 1_000.0
-                            )) {
-                                response.headers_mut().insert("x-elohim-hop-serve-ms", v);
-                            }
-                            Ok(crate::cors::apply_cors_headers(
-                                &cors_config,
-                                request_origin.as_deref(),
-                                response,
-                            ))
-                        }
-                    });
-
-                    if let Err(err) = http1::Builder::new()
-                        .preserve_header_case(true)
-                        .title_case_headers(true)
-                        .serve_connection(io, service)
-                        .with_upgrades()
-                        .await
-                    {
-                        error!("Error serving connection from {}: {:?}", addr, err);
-                    }
-                });
+                tokio::spawn(serve_connection(stream, addr, state));
             }
             Err(e) => {
                 error!("Error accepting connection: {:?}", e);
             }
         }
     }
+}
+
+/// Serve one accepted connection through the shared request pipeline — CORS,
+/// the R1 hop-timing instrument, and `handle_request` dispatch. Generic over
+/// the transport so both the plain listener above (`TcpStream`) and the TLS
+/// listener below (`tokio_rustls::server::TlsStream<TcpStream>`, story 5.2)
+/// call the exact same code: the TLS listener terminates rustls and then
+/// rejoins this one pipeline, so the two fronts can never diverge in routing
+/// behavior — it is one router with two doors, not two routers.
+async fn serve_connection<IO>(stream: IO, addr: SocketAddr, state: Arc<AppState>)
+where
+    IO: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let io = TokioIo::new(stream);
+
+    let service = service_fn(move |req: Request<Incoming>| {
+        let state = Arc::clone(&state);
+        async move {
+            // Extract CORS context at the outermost level so every
+            // response — including early returns — gets CORS headers.
+            let request_origin: Option<String> = req
+                .headers()
+                .get(hyper::header::ORIGIN)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let cors_config = state.cors_config.clone();
+
+            if req.method() == hyper::Method::OPTIONS {
+                let resp: Result<Response<BoxBody>, hyper::Error> = Ok(to_boxed(
+                    crate::cors::preflight_response(&cors_config, request_origin.as_deref()),
+                ));
+                return resp;
+            }
+
+            // R1 — the Chain-R PARENT hop: whole inbound request,
+            // entry to response. Timed HERE, at the single call
+            // site, rather than inside `handle_request`, because
+            // that function has many early returns and each one
+            // would need its own timer — a shape that goes stale
+            // the first time someone adds a return.
+            //
+            // `route_class` is a CLOSED set (service | epr | ws |
+            // asset), never the raw path: a path label would make
+            // this series unbounded in cardinality and turn the
+            // instrument into the outage it exists to prevent.
+            let hop_started = std::time::Instant::now();
+            let hop_route_class = crate::metrics::classify_route(req.method(), req.uri().path());
+            let response = handle_request(state, addr, req).await?;
+            let hop_elapsed = hop_started.elapsed();
+            let hop_outcome = if response.status().is_success() {
+                "ok"
+            } else if response.status().as_u16() == 503 {
+                // Distinguished because a shed is the dominant
+                // slow path on this fleet and must not be averaged
+                // into healthy serves.
+                "shed"
+            } else {
+                "err"
+            };
+            crate::metrics::observe_hop(
+                crate::metrics::DoorwayHop::Serve,
+                hop_route_class,
+                hop_outcome,
+                hop_elapsed,
+            );
+            // Self-reported elapsed, so a downstream prober can
+            // compute (client RTT - serve) without differencing
+            // two clocks. Container clocks here skew by hours;
+            // a timestamp-differenced residual is poison by
+            // construction. Joins the existing `x-ssr-*` header
+            // convention.
+            let mut response = response;
+            if let Ok(v) = hyper::header::HeaderValue::from_str(&format!(
+                "{:.3}",
+                hop_elapsed.as_secs_f64() * 1_000.0
+            )) {
+                response.headers_mut().insert("x-elohim-hop-serve-ms", v);
+            }
+            Ok(crate::cors::apply_cors_headers(
+                &cors_config,
+                request_origin.as_deref(),
+                response,
+            ))
+        }
+    });
+
+    if let Err(err) = http1::Builder::new()
+        .preserve_header_case(true)
+        .title_case_headers(true)
+        .serve_connection(io, service)
+        .with_upgrades()
+        .await
+    {
+        error!("Error serving connection from {}: {:?}", addr, err);
+    }
+}
+
+/// Spawn the optional TLS listener (story 5.2 — `DOORWAY_TLS_PORT` /
+/// `DOORWAY_TLS_CERT_FILE` / `DOORWAY_TLS_KEY_FILE`). Binds its own port and,
+/// per accepted connection, completes the rustls handshake before handing the
+/// resulting `TlsStream` to the SAME `serve_connection` pipeline the plain
+/// listener uses — a second front door onto one router, not a second
+/// gateway. A bind failure disables https for this boot without taking down
+/// the plain listener (the cert/key pair itself was already validated by the
+/// caller before this is invoked).
+fn spawn_tls_listener(
+    state: Arc<AppState>,
+    addr: SocketAddr,
+    tls_config: Arc<rustls::ServerConfig>,
+) {
+    let acceptor = tokio_rustls::TlsAcceptor::from(tls_config);
+    tokio::spawn(async move {
+        let listener = match TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                error!(
+                    "TLS listener failed to bind {}: {} — https disabled for this boot",
+                    addr, e
+                );
+                return;
+            }
+        };
+        info!("Doorway TLS listening on {}", addr);
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer_addr)) => {
+                    let acceptor = acceptor.clone();
+                    let state = Arc::clone(&state);
+                    tokio::spawn(async move {
+                        match acceptor.accept(stream).await {
+                            Ok(tls_stream) => {
+                                serve_connection(tls_stream, peer_addr, state).await;
+                            }
+                            Err(e) => {
+                                debug!("TLS handshake failed from {}: {:?}", peer_addr, e);
+                            }
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("TLS listener accept error: {:?}", e);
+                }
+            }
+        }
+    });
 }
 
 /// Wisdom-as-system-auth gate check for every state-changing HTTP request.
@@ -7890,6 +8048,43 @@ async fn handle_request(
             routes::coherence::handle_federation_coherence(Arc::clone(&state)).await,
         ),
 
+        // Doorbell — story 4.2 slice 1: a sibling rings this doorway on its
+        // own digest change so this doorway learns within seconds, without
+        // waiting on the 60s discovery poll. See
+        // `services::federation_doorbell` / `routes::coherence::handle_doorbell`.
+        (Method::POST, "/api/v1/federation/doorbell") => {
+            // Bounded like every other small-JSON mutator (`admin_dev`,
+            // `p2p_manifests`): the body is `{doorwayId, digest}`, and this
+            // route is reachable by any peer before the peer-cache check runs,
+            // so an unbounded `collect()` here is an allocation any caller can
+            // size.
+            let body = match http_body_util::Limited::new(
+                req.into_body(),
+                routes::coherence::MAX_DOORBELL_BODY_BYTES,
+            )
+            .collect()
+            .await
+            {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Doorbell body rejected: {}", e);
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::PAYLOAD_TOO_LARGE)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                "{{\"error\":\"request body exceeds {} bytes\"}}",
+                                routes::coherence::MAX_DOORBELL_BODY_BYTES
+                            ))))
+                            .unwrap(),
+                    ));
+                }
+            };
+            return Ok(to_boxed(
+                routes::coherence::handle_doorbell(Arc::clone(&state), body).await,
+            ));
+        }
+
         // Hosted-at binding resolution (T2.2). Doorway-specific logic (single
         // storage read + honest 404/502 split), so it earns an explicit arm
         // rather than a registry declaration. `/api/` is already covered by
@@ -8305,6 +8500,22 @@ async fn handle_request(
         (Method::PUT, "/admin/dev/shed") => to_boxed(
             routes::admin_dev::handle_set_shed(req, Arc::clone(&state), peer_is_loopback(&addr))
                 .await,
+        ),
+
+        // ====================================================================
+        // DEV/FIXTURE ONLY — household-fixture declared deafness to doorbells
+        // (story 4.2 slice 1). SAME fixture_surface_gate as PUT /admin/dev/shed
+        // — deliberately NOT dev_mode. Scenario 3's counterfactual control:
+        // proves scenario 1's speed came from the doorbell, not a lucky poll
+        // tick.
+        // ====================================================================
+        (Method::PUT, "/admin/dev/federation-deaf") => to_boxed(
+            routes::admin_dev::handle_set_federation_deaf(
+                req,
+                Arc::clone(&state),
+                peer_is_loopback(&addr),
+            )
+            .await,
         ),
 
         // ====================================================================

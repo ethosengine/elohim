@@ -10,7 +10,7 @@
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +101,12 @@ interface DeathWitnessState {
   };
   /** Station 3b-ii: the late joiner staged with no custody standing for Jessica. */
   lateJoiner?: { name: string; url: string; nodeId: string };
+  /**
+   * Station 3b-ii: each household peer's storage-log length (bytes) at the
+   * moment the late joiner came up — the withheld-evidence scan reads only
+   * what those peers logged after Daniel could first ask them for copies.
+   */
+  withholdLogOffsets?: Partial<Record<HouseholdPeer, number>>;
 }
 
 const scenarioStates = new WeakMap<E2EWorld, DeathWitnessState>();
@@ -1014,21 +1020,61 @@ function stageLateJoiner(name: string): { url: string; nodeId: string } {
   return { url: match[3], nodeId: match[4] };
 }
 
-/** Sums every Prometheus line naming `name`, tolerating any (or no) labels. */
-function metricTotal(text: string, name: string): number {
-  let total = 0;
-  let found = false;
-  for (const line of text.split('\n')) {
-    if (!line.startsWith(name)) continue;
-    const boundary = line[name.length];
-    if (boundary !== ' ' && boundary !== '{') continue;
-    const value = Number(line.trim().split(/\s+/).at(-1));
-    if (!Number.isFinite(value)) continue;
-    found = true;
-    total += value;
-  }
-  assert.ok(found, `metrics carried no "${name}" line at all`);
-  return total;
+/** How long the withheld-evidence step waits for a holder to log refusing Daniel. */
+const WITHHOLD_WINDOW_MS = 60_000;
+const WITHHOLD_POLL_MS = 2_000;
+/** The holder-side log line `ShardService::record_withhold` writes (storage `shard_service.rs`). */
+const WITHHELD_LOG_MARKER = 'reach-withheld';
+const ESC = String.fromCodePoint(27);
+const ANSI_SGR_AFTER_ESC = /^\[[0-9;]*m/;
+
+/** Drop terminal colour codes, so a coloured log line still reads `row=<id>`. */
+function stripAnsi(line: string): string {
+  return line
+    .split(ESC)
+    .map((segment, i) => (i === 0 ? segment : segment.replace(ANSI_SGR_AFTER_ESC, '')))
+    .join('');
+}
+
+/**
+ * A household storage peer's log path, from the live household fixture.
+ * `StoragePeerFixture` does not type `logPath` though the fixture JSON carries
+ * it — read here, same convention as delivery-notary.steps.ts's
+ * `storagePeerLogPath`, so this file's write-set stays its own.
+ */
+function householdStorageLogPath(peer: HouseholdPeer): string {
+  const raw = loadHouseholdMeshFixture().storagePeers?.[peer] as { logPath?: string } | undefined;
+  const logPath = raw?.logPath;
+  assert.ok(
+    logPath,
+    `household fixture's storage peer "${peer}" declares no logPath — cannot read its log ` +
+      `(set E2E_STORAGE_${peer.toUpperCase()}_LOG_PATH or storagePeers.${peer}.logPath)`
+  );
+  return logPath;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+/**
+ * The `reach-withheld` lines naming `rowId` that `peer` logged past `offset`
+ * bytes. A holder logs one per private row it refuses to hand a peer asking
+ * for copies without standing, with `row=<content id>` and the requester.
+ */
+async function withheldLinesFor(
+  peer: HouseholdPeer,
+  offset: number,
+  rowId: string
+): Promise<string[]> {
+  const path = householdStorageLogPath(peer);
+  if (!existsSync(path)) return [];
+  const tail = (await readFile(path)).subarray(offset).toString('utf8');
+  const namesRow = new RegExp(String.raw`\brow="?${escapeRegExp(rowId)}\b`);
+  return tail
+    .split('\n')
+    .map(stripAnsi)
+    .filter(line => line.includes(WITHHELD_LOG_MARKER) && namesRow.test(line));
 }
 
 Given(
@@ -1039,6 +1085,13 @@ Given(
     const state = scenario(this);
     const joined = stageLateJoiner(LATE_JOINER_NAME);
     state.lateJoiner = { name: LATE_JOINER_NAME, url: joined.url, nodeId: joined.nodeId };
+    // Mark where each household peer's log stands now, so the withheld step
+    // reads only refusals logged after Daniel could first ask for copies.
+    state.withholdLogOffsets = {};
+    for (const peer of HOUSEHOLD_PEERS) {
+      const path = householdStorageLogPath(peer);
+      state.withholdLogOffsets[peer] = existsSync(path) ? statSync(path).size : 0;
+    }
   }
 );
 
@@ -1071,25 +1124,40 @@ Then(
 );
 
 Then(
-  "Daniel's peer counts one skipped pre-authorization for it",
-  { timeout: 20_000 },
+  'a peer holding the witness withheld it from Daniel when he asked for copies',
+  { timeout: WITHHOLD_WINDOW_MS + 10_000 },
   async function (this: E2EWorld) {
     const state = scenario(this);
     assert.ok(
-      state.lateJoiner,
+      state.lateJoiner && state.withholdLogOffsets,
       'no late joiner was staged — the join step for this scenario did not run'
     );
-    const joiner = state.lateJoiner;
-    const { status, text } = await getRaw(`${joiner.url}/metrics`);
-    assert.equal(status, 200, `GET ${joiner.url}/metrics -> ${status}`);
-    // Metric name per the station-3b plan's Task 2 (elohim/elohim-storage/src/metrics.rs):
-    // storage_private_preauth_skipped_total{reason}. If Task 2 lands it under a different
-    // name, the orchestrator amends this literal, not the story.
-    const total = metricTotal(text, 'storage_private_preauth_skipped_total');
+    assert.ok(state.witnessRow, 'no witness row was resolved for this scenario');
+    const cid = state.witnessRow.cid;
+    const offsets = state.withholdLogOffsets;
+    const joiner = state.lateJoiner.name;
+    // Jessica holds the witness from the moment it is written; Matthew and James
+    // hold it once custody lands. Matthew and James have standing, so any refusal
+    // of this row after the join was a refusal to the only peer without it.
+    const deadline = Date.now() + WITHHOLD_WINDOW_MS;
+    let evidence: { peer: HouseholdPeer; line: string } | undefined;
+    while (evidence === undefined && Date.now() < deadline) {
+      for (const peer of HOUSEHOLD_PEERS) {
+        const lines = await withheldLinesFor(peer, offsets[peer] ?? 0, cid);
+        if (lines.length > 0) {
+          evidence = { peer, line: lines[0] };
+          break;
+        }
+      }
+      if (evidence === undefined) await new Promise(r => setTimeout(r, WITHHOLD_POLL_MS));
+    }
     assert.ok(
-      total >= 1,
-      `${joiner.name}'s peer's storage_private_preauth_skipped_total is ${total} — expected at ` +
-        'least one skip for the witness handed to it without standing'
+      evidence,
+      `no household peer logged withholding witness "${cid}" within ${WITHHOLD_WINDOW_MS / 1000}s ` +
+        `of ${joiner} joining. ${joiner}'s peer holds no copy, but with no refusal on record ` +
+        `that absence proves nothing: ${joiner} may never have asked. Check that ${joiner}'s peer ` +
+        'reached the household on the replication plane (its peer list) and that the holders ' +
+        `log target elohim_storage::reach at info.`
     );
   }
 );

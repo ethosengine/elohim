@@ -766,7 +766,8 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // tag directly, but the explicit parameter makes the dispatch contract
         // visible in Jenkins and keeps the guarantee independent of checkout
         // history depth.
-        boolean validateOnlyDownstream = name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'
+        boolean validateOnlyDownstream = name == 'elohim-edge' &&
+            (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
         // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
         // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
         // of them produces undefined-parameter warnings and no behaviour. They get
@@ -1016,7 +1017,7 @@ def manualModeAnalyze(String mode) {
  *
  * TIMER became its own class on 2026-09-22. It used to fall into the MANUAL
  * bucket, so nothing downstream could tell an operator's deliberate rebuild
- * from a 09:00Z soak run — and applyTimerAlreadyBuiltFilter needs exactly that
+ * from a 09:00Z soak run — and the already-built filter's log line needs that
  * distinction. Evidence of the old shape: orchestrator/dev #1886 logged
  * `Trigger: MANUAL (Started by timer)`.
  *
@@ -1056,78 +1057,245 @@ def classifyBuildTrigger() {
 }
 
 /**
- * On a TIMER run, drop every pipeline whose most recent build for THIS commit
- * already succeeded. A `[build:*]` tag always overrides.
+ * Re-walk the build graph over each narrow changeset the already-built filter
+ * proposes, using the SAME walker the plan stage used.
  *
- * WHY (2026-09-22). The cron exists for one stage — the Gate #6 iroh parity
- * soak, which runs cargo inside this pipeline's own container and needs
- * neither a fresh edge roll nor a running fleet. But the cron fires the whole
- * orchestrator, and the dispatch set comes from the `__global__` baseline,
- * which archivePipelineBaselines deliberately refuses to advance on a
- * FAILURE/ABORTED run. A string of red orchestrator runs therefore freezes
- * `__global__`, and every following nightly re-diffs the same range and
- * re-dispatches the same cascade.
+ * WHY THIS IS GROOVY. The filter must answer "would the plan have selected P
+ * from B_P..HEAD?" with the plan's own semantics. An earlier cut re-implemented
+ * glob matching in JavaScript over picomatch and got two things wrong at once:
+ * picomatch excludes dot segments where Groovy's matchesGlob() includes them
+ * (a changed `doorway/doorway-service/src/.hidden.rs` selected edge in the plan
+ * and vanished from the narrow walk, suppressing edge WITH changed source), and
+ * picomatch lives in node_modules, which this pipeline's clean checkout never
+ * installs — so every non-exact walk would have thrown into the filter's silent
+ * fall-through and the redundant rebuild would have survived. Calling
+ * walkBuildGraph again removes the second source of truth entirely: glob
+ * translation, buildProcess hashing, manualOnly exclusion and dependency
+ * propagation are identical by construction, not by parity test.
  *
- * Measured: #1886 (timer, 2026-09-21 09:00Z) loaded `__global__: 82dcb5c8`
- * beside `elohim-edge: bc81e107` — the edge baseline already equalled its own
- * HEAD — and still dispatched elohim-edge/dev #1471, which rebuilt the images
- * edge #1470 had shipped SUCCESS the previous day for that same sha and rolled
- * all seven alpha peers for 3h04m. Every roll restarts the conductor pods and
- * leaves storage cells answering CellDisabled for hours (first recovery
- * +108min; the authoring hosts' lamad cells still down +9h), so no app build
- * can author heads in that window. A nightly roll of an unchanged commit buys
- * a daily write outage with zero new information — and per
- * AP-TIMER-WEBHOOK-COLLISION it also abortPrevious's any push in flight.
+ * walkBuildGraph only READS (manifest discovery, sha256sum, copyArtifacts) —
+ * saveBuildState is called by runBuildGraph, not here. The one side effect is
+ * that its loadBuildState() re-copies the PREVIOUS build's build-state.json
+ * over the file runBuildGraph just saved, so the finally block restores the
+ * authoritative bytes from the env bridge; otherwise the post-Execute rewrite
+ * and the continuity guard would archive the old state (#1844's shape).
  *
- * The record is Jenkins' own `pipeline-baselines.json`, which
- * recordPipelineResult advances to GIT_COMMIT_FULL only on a non-failing
- * downstream outcome. No new state. The predicate has ONE home —
- * genesis/orchestrator/timer-dispatch.mjs — and state travels by FILE through
- * the same writeJSON/sh/readJSON mechanism applyConductorTag uses.
+ * Closure-free indexed loops only: readJSON hands back net.sf.json.JSONArray,
+ * whose collection methods Script Security blocks.
+ */
+def walkNarrowGroups(String planFile, String walksFile) {
+    def plan = readJSON(file: planFile)
+    def groups = plan.groups ?: [:]
+    def keys = groups.keySet().toList()
+    def walks = [:]
+    if (keys.isEmpty()) {
+        writeJSON file: walksFile, json: walks
+        return
+    }
+    def buildGraph = load('genesis/orchestrator/build-graph.groovy')
+    try {
+        for (int i = 0; i < keys.size(); i++) {
+            String sha = keys[i].toString()
+            def raw = groups[sha].changedFiles ?: []
+            def files = []
+            for (int j = 0; j < raw.size(); j++) {
+                files.add(raw[j].toString())
+            }
+            echo "🔁 already-built filter: narrow walk for baseline ${sha.take(8)} (${files.size()} changed files)"
+            def res = buildGraph.walkBuildGraph(files)
+            def names = res.pipelineSteps.keySet().toList()
+            def out = []
+            for (int k = 0; k < names.size(); k++) {
+                out.add(names[k].toString())
+            }
+            walks[sha] = out
+        }
+    } finally {
+        if (env.BUILD_STATE_JSON) {
+            writeFile file: 'build-state.json', text: env.BUILD_STATE_JSON
+        }
+    }
+    writeJSON file: walksFile, json: walks
+}
+
+/**
+ * Decode the filter's decision and require it to be an EXACT PARTITION of the
+ * planned set. Returns [dispatch: List|null, logLines: List]; a null dispatch
+ * means "do not trust this — dispatch the plan unchanged".
+ *
+ * Membership alone is not enough. For planned ["DNA","edge"], both of these
+ * are well-formed JSON with two lists and would have passed a weaker guard:
+ *   {"dispatch":[],"skipped":["invented","invented"]}   → empties the wave
+ *   {"dispatch":["edge"],"skipped":["edge"]}            → silently loses DNA
+ * So every member of BOTH lists must be a String naming a planned pipeline,
+ * no name may repeat within or across the lists, and the union must cover the
+ * planned set exactly. timer-dispatch.mjs self-checks the same predicate and
+ * exits non-zero on violation, so the rc guard and this decoder are
+ * independent barriers rather than one.
+ *
+ * Closure-free indexed loops only (JSONArray under Script Security).
+ */
+def decodeAlreadyBuiltDecision(String decideFile, graphPipelines) {
+    def rejected = [dispatch: null, logLines: []]
+    def out = readJSON(file: decideFile)
+    def dispatchRaw = out.dispatch
+    def skippedRaw = out.skipped
+    if (!(dispatchRaw instanceof List) || !(skippedRaw instanceof List)) {
+        echo "⚠️  already-built filter: decision carries no dispatch/skipped list — dispatching the plan unchanged"
+        return rejected
+    }
+    def picked = []
+    def seen = []
+    for (int pass = 0; pass < 2; pass++) {
+        def list = (pass == 0) ? dispatchRaw : skippedRaw
+        for (int i = 0; i < list.size(); i++) {
+            def entry = list[i]
+            if (!(entry instanceof CharSequence)) {
+                echo "⚠️  already-built filter: decision holds a non-string entry — dispatching the plan unchanged"
+                return rejected
+            }
+            String name = entry.toString()
+            if (!graphPipelines.contains(name)) {
+                echo "⚠️  already-built filter: decision names '${name}', which was never planned — dispatching the plan unchanged"
+                return rejected
+            }
+            if (seen.contains(name)) {
+                echo "⚠️  already-built filter: decision repeats '${name}' across dispatch/skipped — dispatching the plan unchanged"
+                return rejected
+            }
+            seen.add(name)
+            if (pass == 0) picked.add(name)
+        }
+    }
+    if (seen.size() != graphPipelines.size()) {
+        echo "⚠️  already-built filter: decision covers ${seen.size()} of ${graphPipelines.size()} planned pipelines — dispatching the plan unchanged"
+        return rejected
+    }
+    def lines = []
+    def linesRaw = out.logLines
+    if (linesRaw instanceof List) {
+        for (int i = 0; i < linesRaw.size(); i++) {
+            lines.add(linesRaw[i].toString())
+        }
+    }
+    return [dispatch: picked, logLines: lines]
+}
+
+/**
+ * Drop, from the dispatch set, every pipeline whose OWN baseline is strictly
+ * newer than the global diff base, whose watched inputs have not changed since,
+ * and whose artifact is proven present. A `[build:*]` tag always overrides.
+ * Fires on ANY trigger.
+ *
+ * WHY (2026-09-22). The plan computes ONE changeset, `git diff
+ * <__global__>..HEAD`. archivePipelineBaselines deliberately refuses to advance
+ * `__global__` on a FAILURE/ABORTED run, while recordPipelineResult DOES
+ * advance a per-pipeline baseline on a non-red downstream. Red orchestrator
+ * runs therefore freeze the diff base while the per-pipeline record keeps
+ * moving, and every later run re-diffs an already-built range.
+ *
+ * Measured twice. #1886 (TIMER, 2026-09-21) loaded `elohim-edge: bc81e107`
+ * equal to its own HEAD and still rolled the fleet for 3h04m. #1888 (WEBHOOK,
+ * 2026-09-22 04:51Z, HEAD 7d27b04c) loaded `__global__: 82dcb5c8` beside
+ * `elohim-holochain: 86e7c220` (frozen global — #1884–#1887 all died on the 4h
+ * timeout) and dispatched the ~53min DNA pipeline with FORCE_BUILD=true,
+ * although `86e7c220..7d27b04c` touches nothing under elohim/holochain. Every
+ * such dispatch rolls the alpha fleet and reopens a 1–6h CellDisabled write
+ * outage per peer for zero information.
+ *
+ * THREE PHASES, one home each. timer-dispatch.mjs `groups` does the git and
+ * manifest reads (ancestry, existence, per-baseline `git diff --name-only`,
+ * baseline provenance) and does NO matching; walkNarrowGroups re-runs the real
+ * walker over each narrow changeset; timer-dispatch.mjs `decide` turns those
+ * results into the dispatch set, including the producer-readiness rule: an
+ * optimistic (`longRunning`) producer that ANY surviving pipeline reaches
+ * through `dependsOn` is retained unconditionally. There is no controller
+ * check and no evidence exception — `dev-latest` is a floating tag the DNA job
+ * overwrites before its later publish steps (dna/Jenkinsfile:1057), so a
+ * historical SUCCESS at a baseline sha proves nothing about the bytes the
+ * consumer will fetch. Log lines arrive pre-rendered so no message is composed
+ * here.
+ *
+ * DIRECTION OF SAFETY. A non-zero exit from either phase, a throw anywhere, or
+ * a decision that fails validation dispatches the plan unchanged rather than
+ * failing the build. Jenkins interruption is re-thrown, never swallowed.
  *
  * Closure-free for the same reason as classifyBuildTrigger: indexed loops
  * materialize the JSON-derived arrays into plain ArrayLists (readJSON hands
  * back net.sf.json.JSONArray, whose collection methods Script Security blocks
  * — the hazard this file already documents at Post Predicted Build Graph).
  */
-def applyTimerAlreadyBuiltFilter(graphPipelines) {
-    if (env.BUILD_TRIGGER != 'TIMER') return graphPipelines
-
+def applyAlreadyBuiltFilter(graphPipelines) {
     def forcedTokens = (env.FORCE_BUILD_PIPELINES ?: '').split(',')
     def forced = []
     for (int i = 0; i < forcedTokens.size(); i++) {
         if (forcedTokens[i]) forced.add(forcedTokens[i])
     }
 
-    String stateFile = '.orchestrator-timer-dispatch.json'
-    def baselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
-    writeJSON file: stateFile, json: [
-        trigger: 'TIMER',
-        headSha: env.GIT_COMMIT_FULL ?: '',
-        pipelines: graphPipelines,
-        baselines: baselines,
-        forced: forced
-    ]
-    def json = sh(
-        script: "node genesis/orchestrator/timer-dispatch.mjs filter ${stateFile}",
-        returnStdout: true
-    ).trim()
-    sh "rm -f ${stateFile}"
-    def out = readJSON(text: json)
+    String stateFile = '.orch-already-built-state.json'
+    String planFile = '.orch-already-built-plan.json'
+    String walksFile = '.orch-already-built-walks.json'
+    String decideFile = '.orch-already-built-decision.json'
+    String cli = 'node genesis/orchestrator/timer-dispatch.mjs'
+    def dispatch = null
+    def logLines = []
 
-    def skipped = []
-    def skippedRaw = out.skipped ?: []
-    for (int i = 0; i < skippedRaw.size(); i++) {
-        skipped.add(skippedRaw[i].toString())
-    }
-    def dispatch = []
-    def dispatchRaw = out.dispatch ?: []
-    for (int i = 0; i < dispatchRaw.size(); i++) {
-        dispatch.add(dispatchRaw[i].toString())
+    try {
+        def baselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+        writeJSON file: stateFile, json: [
+            trigger: env.BUILD_TRIGGER ?: 'UNKNOWN',
+            headSha: env.GIT_COMMIT_FULL ?: '',
+            pipelines: graphPipelines,
+            baselines: baselines,
+            forced: forced
+        ]
+        int rc = sh(script: "${cli} groups ${stateFile} > ${planFile}", returnStatus: true)
+        if (rc != 0) {
+            echo "⚠️  already-built filter: git/provenance phase exited ${rc} — dispatching the plan unchanged"
+        } else {
+            walkNarrowGroups(planFile, walksFile)
+            int rc2 = sh(script: "${cli} decide ${stateFile} ${planFile} ${walksFile} > ${decideFile}", returnStatus: true)
+            if (rc2 != 0) {
+                echo "⚠️  already-built filter: decision phase exited ${rc2} — dispatching the plan unchanged"
+            } else {
+                def decoded = decodeAlreadyBuiltDecision(decideFile, graphPipelines)
+                dispatch = decoded.dispatch
+                logLines = decoded.logLines
+            }
+        }
+    } catch (Exception e) {
+        // Jenkins interruption (abortPrevious, operator Stop, agent channel
+        // loss) must propagate: swallowing it would turn an aborted run into a
+        // silently continuing one. Matched on the rendered class name because
+        // Throwable.toString() is unambiguously sandbox-safe where reflective
+        // class access is not.
+        String seen = e.toString()
+        if (seen.contains('FlowInterrupted') || seen.contains('InterruptedException') ||
+            seen.contains('ClosedChannelException')) {
+            throw e
+        }
+        dispatch = null
+        echo "⚠️  already-built filter unavailable (${seen}) — dispatching the plan unchanged"
+    } finally {
+        // Cleanup belongs here, not after the try: the catch above RETHROWS an
+        // interruption, so a trailing statement would leave all four temp files
+        // behind on every aborted run. Nested guards keep the exception already
+        // in flight intact — a failing `sh` must not become the thing that
+        // propagates, and neither must a failing `echo` about it.
+        try {
+            sh "rm -f ${stateFile} ${planFile} ${walksFile} ${decideFile}"
+        } catch (Exception cleanupError) {
+            try {
+                echo "⚠️  already-built filter: could not remove its temp files (${cleanupError.toString()})"
+            } catch (Exception ignored) {
+                // Reporting must never displace the exception in flight.
+            }
+        }
     }
 
-    if (skipped) {
-        echo "⏭️  TIMER already-built filter: ${skipped.join(', ')} already built ${env.GIT_COMMIT_SHORT} green — not re-dispatched (no new commit = no new information; force with [build:*])"
+    if (dispatch == null) return graphPipelines
+    for (int i = 0; i < logLines.size(); i++) {
+        echo logLines[i]
     }
     return dispatch
 }
@@ -1144,6 +1312,18 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         echo '\n=== Build Graph (Primary) ==='
         def graphResult = runBuildGraph(changedFiles)
         graphPipelines = graphResult.pipelineSteps.keySet().toList()
+
+        // An edge selection whose ONLY stale step is dataplane-validation changed
+        // nothing edge builds or deploys (a2o steps/features, the validation
+        // script): dispatch it validate-only instead of rebuilding and rolling
+        // all seven alpha peers (orchestrator #1726 → edge #1383 rolled the fleet
+        // for a step-definition edit). [build:edge] still forces a full run.
+        def edgeStaleSteps = graphResult.pipelineSteps['elohim-edge'] ?: []
+        boolean edgeForced = (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it }.contains('elohim-edge')
+        if (edgeStaleSteps && edgeStaleSteps.every { it == 'dataplane-validation' } && !edgeForced) {
+            env.EDGE_VALIDATE_ONLY_FROM_GRAPH = 'true'
+            echo '🧪 elohim-edge: only dataplane-validation is stale — dispatching validate-only (no build, no fleet roll)'
+        }
 
         // Filter to dispatchable pipelines (have jenkinsPath in their manifest).
         graphPipelines.removeAll { name -> !getPipelineMetadata(name).jenkinsPath }
@@ -1162,16 +1342,19 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
             }
         }
 
-        // TIMER already-built filter — runs BEFORE the genesis auto-include so
+        // Already-built filter — runs BEFORE the genesis auto-include so
         // genesis is never pulled in on behalf of a pipeline this filter just
         // dropped (and so an emptied plan stays empty, skipping Execute Builds
         // entirely while the Gate #6 parity stage still runs).
-        graphPipelines = applyTimerAlreadyBuiltFilter(graphPipelines)
+        graphPipelines = applyAlreadyBuiltFilter(graphPipelines)
 
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
             def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-            def triggeringPipeline = graphPipelines.find { getPipelineMetadata(it).triggersGenesis }
+            // A validate-only edge deploys nothing, so it never pulls Genesis in.
+            def triggeringPipeline = graphPipelines.find {
+                getPipelineMetadata(it).triggersGenesis && !(it == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
+            }
             if (triggeringPipeline && isDevBranch) {
                 graphPipelines.add('elohim-genesis')
             }
@@ -1715,7 +1898,7 @@ spec:
         // → ABORTED → orchestrator → NOT_BUILT). AP-TIMER-WEBHOOK-COLLISION.
         //
         // 2026-09-22: a timer run no longer re-dispatches a pipeline that already
-        // built this exact sha green — see applyTimerAlreadyBuiltFilter. The cron
+        // built this exact sha green — see applyAlreadyBuiltFilter. The cron
         // wants the soak stage, not a fleet roll: #1886 (timer) re-dispatched
         // elohim-edge #1471 for bc81e107, a commit edge #1470 had already shipped
         // SUCCESS, rolling all seven alpha peers for 3h04m and reopening the
@@ -1725,7 +1908,8 @@ spec:
     }
 
     options {
-        timeout(time: 240, unit: 'MINUTES')  // upstream parallel builds + genesis (60min) + a2o gap analysis
+        // Longest-chain sum of downstream budgets + own stages; see pipeline-budget.test.mjs.
+        timeout(time: 780, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
@@ -2195,6 +2379,16 @@ spec:
                                 archivePipelineBaselines('execute')
                                 error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
+
+                            // Checkpoint every completed level. The per-pipeline map above
+                            // is local to this stage, so a run killed mid-level by the
+                            // orchestrator's timeout used to lose every success already
+                            // recorded — DNA #1451 and edge #1477 both passed under
+                            // #1894, yet the next run re-dispatched both, re-spent the
+                            // same budget and timed out again (a livelock). The post
+                            // checkpoint still restores __global__ on a failed run.
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+                            archivePipelineBaselines('execute')
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)

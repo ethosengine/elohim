@@ -1,15 +1,21 @@
 ---
 epr-meta-version: 1
-id: genesis-orchestrator-ci-controller
+id: elohim-orchestrator-governance
 covers: subtree
 purpose: >
   The CI/CD orchestrator. It is the one pipeline that receives GitHub webhooks: it walks every
   build-manifest.json into a dependency graph, selects and orders the pipelines a change needs,
-  and dispatches them. It also hosts the local gate runner behind `just gate` and pre-push, the
-  manifest schema and validator, the Jenkins helper scripts, the rendered k8s manifests
-  (manifests/) and the per-human deployment records (data/).
+  and dispatches them level by level, writing the per-run predicted/actual build-graph artifacts.
+  It also hosts the local gate runner behind `just gate` and pre-push, the manifest schema and
+  validator, the Jenkins helper scripts, the rendered k8s manifests (manifests/) and the
+  per-human deployment records (data/). It hosts the habit atoms for end-to-end delivery (a push
+  reaches every pipeline it planned within a bounded wall clock) and for submodule pin
+  attestation. It carries no author-time rule. The drift this tree has suffered is arithmetic,
+  not a lexical pattern: a downstream budget growing past the parent's, or a dependency edge that
+  serialises levels. Tests guard that (pipeline-budget.test.mjs, validate-only-pipeline.test.mjs)
+  and so do the habits' live checks, not an edit-time predicate.
 ---
-# genesis/orchestrator — CI controller
+# genesis/orchestrator — CI controller governance package
 
 What belongs here: the orchestrator's Node modules, each with a `*.test.mjs` beside it
 (graph-walker, pipeline-registry, gate-runner, commit-tag-parser and the rest), the
@@ -23,3 +29,6 @@ its resource-budget policies). No rule is added at this level. The orchestrator'
 caught structurally, by its tests, `validate-manifests.mjs` and the Jenkinsfile size check.
 `CI_RELIABILITY.md` is a single dated note; if dated incident notes recur at this root, they take
 a dispatch route to the timeline backlog.
+
+The habit atoms here are projected into `genesis/manifests/habits.yaml` by
+`.claude/scripts/habits-project.py`. Edit the atom, never the projection.

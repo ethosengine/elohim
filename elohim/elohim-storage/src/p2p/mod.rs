@@ -8028,6 +8028,13 @@ impl P2PNode {
                     ok
                 });
                 if let Some(data) = data {
+                    let origin_timestamps = crate::sync::new_change_origin_timestamps(
+                        &self.sync_manager,
+                        &h_app_id,
+                        &doc_id,
+                        std::slice::from_ref(&data),
+                    )
+                    .await;
                     // Same apply path as a PULLED change (`SyncResponse::Changes`
                     // below) — an eager push is never validated less than a pull.
                     match self
@@ -8066,8 +8073,13 @@ impl P2PNode {
                             // CRDT-heal: reverse-project a converged content doc into
                             // the local SQL row (amber tier). Before moving the strings
                             // into the response.
-                            self.heal_content_row(&h_app_id, &doc_id, &peer.to_string())
-                                .await;
+                            self.heal_content_row(
+                                &h_app_id,
+                                &doc_id,
+                                &peer.to_string(),
+                                origin_timestamps,
+                            )
+                            .await;
                             SyncResponse::ChangeAck {
                                 h_app_id,
                                 doc_id,
@@ -8453,6 +8465,13 @@ impl P2PNode {
                     peer = %peer, h_app_id = %h_app_id, doc_id = %doc_id,
                     change_count = changes.len(), "Applying changes from peer"
                 );
+                let origin_timestamps = crate::sync::new_change_origin_timestamps(
+                    &self.sync_manager,
+                    &h_app_id,
+                    &doc_id,
+                    &changes,
+                )
+                .await;
                 if let Err(e) = self
                     .sync_manager
                     .apply_changes(&h_app_id, &doc_id, changes)
@@ -8469,7 +8488,7 @@ impl P2PNode {
                     );
                     // CRDT-heal: reverse-project a converged content doc into the
                     // local SQL row (amber tier) now that the changes landed.
-                    self.heal_content_row(&h_app_id, &doc_id, &peer.to_string())
+                    self.heal_content_row(&h_app_id, &doc_id, &peer.to_string(), origin_timestamps)
                         .await;
                 }
             }
@@ -8600,7 +8619,13 @@ impl P2PNode {
     ///
     /// A `None` `db_pool` (a p2p-only node with no SQL projection) skips silently;
     /// a reverse-projection error is logged (warn) but never fails the sync round.
-    async fn heal_content_row(&self, h_app_id: &str, doc_id: &str, peer: &str) {
+    async fn heal_content_row(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        peer: &str,
+        origin_timestamps: Vec<Option<i64>>,
+    ) {
         if h_app_id != crate::sync::projector::PROJECTION_NAMESPACE || !doc_id.starts_with("node:")
         {
             return;
@@ -8638,6 +8663,10 @@ impl P2PNode {
             }
         }
 
+        let projection_succeeded = projected.is_ok();
+        if projection_succeeded {
+            crate::metrics::observe_sync_projected_apply_staleness("libp2p", origin_timestamps);
+        }
         match projected {
             Ok(true) => {
                 debug!("content heal: reverse-projected {doc_id}");

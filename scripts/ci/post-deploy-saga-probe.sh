@@ -7,18 +7,21 @@ SA="${4:-$A}"; SB="${5:-$B}"; TIMEOUT="${PROBE_TIMEOUT:-20}"; RC=0
 ok() { echo "post-deploy[$1]: OK — $2"; }
 bad() { echo "post-deploy[$1]: FAIL — $2" >&2; RC=1; }
 get() { curl -fsS --max-time "$TIMEOUT" "$1" 2>/dev/null; }
+# Bodies reach python as FILES: one env string is capped at 128 KiB
+# (MAX_ARG_STRLEN) and storage /metrics outgrew it — see fleet-quiesce-gate.sh.
+BODY_DIR=$(mktemp -d); trap 'rm -rf "$BODY_DIR"' EXIT
 
 probe() {
-  local name="$1" doorway="$2" storage="$3" status metrics card verdict
-  status=$(get "${storage%/}/p2p/status") || { bad "$name/status" "GET failed"; return; }
-  metrics=$(get "${storage%/}/metrics") || { bad "$name/metrics" "GET failed"; return; }
-  verdict=$(STATUS="$status" METRICS="$metrics" python3 -c '
+  local name="$1" doorway="$2" storage="$3" card verdict
+  get "${storage%/}/p2p/status" > "$BODY_DIR/status" || { bad "$name/status" "GET failed"; return; }
+  get "${storage%/}/metrics" > "$BODY_DIR/metrics" || { bad "$name/metrics" "GET failed"; return; }
+  verdict=$(BODY_DIR="$BODY_DIR" python3 -c '
 import json,os,re,sys
-try: d=json.loads(os.environ["STATUS"])
+try: d=json.load(open(os.path.join(os.environ["BODY_DIR"],"status")))
 except Exception as e: print(e,file=sys.stderr); sys.exit(1)
 p=d.get("pull")
 if not isinstance(p,dict) or p.get("caughtUp") is not True: print("pull.caughtUp is not true",file=sys.stderr); sys.exit(1)
-t=os.environ["METRICS"]
+t=open(os.path.join(os.environ["BODY_DIR"],"metrics")).read()
 def v(n):
  x=[]
  for l in t.splitlines():

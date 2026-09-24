@@ -1,4 +1,5 @@
 /// <reference types="vitest" />
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -11,7 +12,8 @@ export default defineConfig({
     pool: 'forks',
     maxForks: 8,
     reporters: ['default'],
-    setupFiles: ['./vitest.setup.ts'],
+    // Absolute: vitest >=4.1 resolves setupFiles against `root` (./src), not this file's directory.
+    setupFiles: [fileURLToPath(new URL('./vitest.setup.ts', import.meta.url))],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

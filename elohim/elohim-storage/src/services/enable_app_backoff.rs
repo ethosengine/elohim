@@ -53,6 +53,7 @@
 //! is time to ask again.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -82,12 +83,16 @@ pub fn enable_backoff(attempt: u32) -> Duration {
 
 /// One role's attempt history.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct AttemptRecord {
+pub struct AttemptRecord {
     /// How many enable attempts this process has made while the app stayed
     /// disabled. 1-based once the first attempt lands.
     attempts: u32,
     /// When the most recent attempt was made.
     at: Instant,
+    /// Identity of the WRITE that produced this record, from a process-wide
+    /// counter. It is what lets a retraction ask "is this still MY attempt?"
+    /// rather than "does this look like it".
+    token: u64,
 }
 
 /// Per-role enable-attempt ledger.
@@ -130,12 +135,22 @@ impl EnableLedger {
     /// ladder. Called whether the attempt succeeded or failed: a successful
     /// `enable_app` that does not actually start the app must not buy a free
     /// retry, and [`Self::note_running`] is what clears the ladder.
-    pub fn note_attempt_at(&self, role: &str, now: Instant) {
+    pub fn note_attempt_at(&self, role: &str, now: Instant) -> u64 {
+        static TOKENS: AtomicU64 = AtomicU64::new(0);
+        let token = TOKENS.fetch_add(1, Ordering::SeqCst) + 1;
         let Ok(mut guard) = self.roles.lock() else {
-            return;
+            return token;
         };
         let attempts = guard.get(role).map_or(0, |r| r.attempts).saturating_add(1);
-        guard.insert(role.to_string(), AttemptRecord { attempts, at: now });
+        guard.insert(
+            role.to_string(),
+            AttemptRecord {
+                attempts,
+                at: now,
+                token,
+            },
+        );
+        token
     }
 
     /// [`Self::note_attempt_at`] against the monotonic clock.
@@ -154,6 +169,46 @@ impl EnableLedger {
         if let Ok(mut guard) = self.roles.lock() {
             guard.remove(role);
         }
+    }
+
+    /// UNDO one specific [`Self::note_attempt_at`] — the one that returned
+    /// `token` — and nothing else.
+    ///
+    /// For the one case a rung must not stand: the tick spent it, dispatched the
+    /// enable RPC, and by the time the RPC returned a zome call had LANDED. The
+    /// enable was a no-op against a serving app, and charging the ladder for it
+    /// would hand the NEXT outage a backoff window it did not earn.
+    ///
+    /// TOKEN-GATED, and that is the whole correctness of it. Restoring
+    /// `previous` unconditionally RESURRECTED the ladder that the successful
+    /// recovery had just cleared: six prior attempts, a seventh spent by this
+    /// tick, `record_role_success` clearing the ledger during the RPC, and then
+    /// this call putting `attempts = 6` back — so the next outage's first
+    /// attempt was its seventh and waited an hour. If the entry is gone, or
+    /// belongs to a later write, this does nothing: a recovery's reset is never
+    /// undone and a newer attempt is never clobbered.
+    pub fn retract_attempt(&self, role: &str, token: u64, previous: Option<AttemptRecord>) {
+        let Ok(mut guard) = self.roles.lock() else {
+            return;
+        };
+        // Still MY attempt?
+        if guard.get(role).map(|r| r.token) != Some(token) {
+            return;
+        }
+        match previous {
+            Some(record) => {
+                guard.insert(role.to_string(), record);
+            }
+            None => {
+                guard.remove(role);
+            }
+        }
+    }
+
+    /// The role's current attempt record, for a caller that may need to undo
+    /// the attempt it is about to make.
+    pub fn record_for(&self, role: &str) -> Option<AttemptRecord> {
+        self.roles.lock().ok().and_then(|g| g.get(role).cloned())
     }
 
     /// How many attempts have been made for `role` since it was last running.
@@ -176,6 +231,24 @@ pub fn enable_ledger() -> &'static EnableLedger {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retraction_preserves_a_recovery_reset_and_a_newer_attempt() {
+        let ledger = EnableLedger::new();
+        let now = Instant::now();
+        ledger.note_attempt_at("learning", now);
+        let previous = ledger.record_for("learning");
+        let token = ledger.note_attempt_at("learning", now + Duration::from_secs(60));
+        ledger.note_running("learning");
+        ledger.retract_attempt("learning", token, previous);
+        assert_eq!(ledger.record_for("learning"), None);
+
+        ledger.note_attempt_at("learning", now + Duration::from_secs(61));
+        let replacement = ledger.record_for("learning");
+        ledger.retract_attempt("learning", token, previous);
+        assert_eq!(ledger.record_for("learning"), replacement);
+        assert_eq!(ledger.attempts("learning"), 1);
+    }
 
     #[test]
     fn the_ladder_doubles_from_a_minute_to_an_hour_and_stops_there() {

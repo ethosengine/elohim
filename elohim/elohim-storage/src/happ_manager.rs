@@ -432,7 +432,7 @@ pub fn decide_boot_action(
     }
     match crate::conductor_bridge_health::classify_app_status(status) {
         crate::conductor_bridge_health::AppRunObservation::Running => BootAction::Serve,
-        crate::conductor_bridge_health::AppRunObservation::NotRunning { reason } => {
+        crate::conductor_bridge_health::AppRunObservation::NotRunning { reason, .. } => {
             if let Some(why) = fenced {
                 return BootAction::RefuseEnable {
                     reason: format!(

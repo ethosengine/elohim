@@ -97,16 +97,26 @@ execution. Both `just gate` and pre-push use
 `genesis/orchestrator/gate-runner.mjs`; do not add a grep detector or a second
 project-name command switch. Native gates resolve explicit cargo-pool slots and
 crate-specific `RUSTFLAGS`. A per-project cargo resource cap (`CARGO_BUILD_JOBS`,
-`RUST_TEST_THREADS`) lives today in `genesis/agentic/pool-policy.json`'s
-`cargo_env_overrides` — the gate-runner's `run.cargo.env` manifest key (and its
-`manifest.schema.json` mirror) is the schema-gated future home, live again once the
-operator widens the rakia-validated SOURCE schema (pinned `elohim/rakia` submodule)
-to accept it; until then the runner merges manifest `run.cargo.env` ∪ pool-policy
-`cargo_env_overrides`, manifest winning on conflict. `elohim-storage` is capped at
-`CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
+`RUST_TEST_THREADS`) declares on the gate project's own `run.cargo.env` in its
+`build-manifest.json` (the rakia-validated schema accepts it since rakia 2b2cedb,
+2026-09-23); `genesis/agentic/pool-policy.json`'s `cargo_env_overrides` only fills a
+cap a manifest has not declared, manifest winning on conflict. `elohim-storage`
+declares `CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
 cargo's default parallelism and is shed by the workspace RAM guard; at one job it
 peaks at 5.4 GB for ~12% wall-clock. DNA/WASM workspaces remain plain Cargo because
 Holochain packing requires their in-tree `./target`.
+
+**Submodule pins are attested, not re-tested.** A gate project whose `run.kind` is
+`attested` (brit, rakia, sophia — each declares itself in its own repo's manifest with
+the gitlink path as the step input) runs no local recipe: `gate-runner.mjs` dispatches it
+to `gate-attest.mjs`, which reads the pinned commit's named CI check on the upstream
+repo. A green check passes; red, cancelled, still-running, absent, or a commit the forge
+has never seen refuses; an unreachable read passes and prints `attested: claimed`.
+Selection asks `rakia affected` (`GATE_ORACLE=rakia` default; `shadow` prints a diff
+line, `path` ignores it) and keeps one hop, so a pin move re-selects the pin's direct
+consumers. Diagnostics go to stderr; the hook parses stdout as project names. Spec:
+`genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md`;
+habit `pin-attestation` in `genesis/orchestrator/.epr-meta/`.
 
 Focused escape hatches:
 

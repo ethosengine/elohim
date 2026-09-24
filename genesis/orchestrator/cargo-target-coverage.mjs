@@ -100,6 +100,11 @@ function posixJoin(...parts) {
   return parts
     .map((p, i) => (i === 0 ? p.replace(/\/+$/, '') : p.replace(/^\/+|\/+$/g, '')))
     .filter(Boolean)
+    .join('/')
+    // Cargo accepts `path = "./benches/x.rs"` (every gitoxide crate declares benches so);
+    // a literal `./` segment never matches a `<dir>/**` glob, so drop it.
+    .split('/')
+    .filter(segment => segment !== '.')
     .join('/');
 }
 

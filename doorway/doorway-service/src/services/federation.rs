@@ -919,7 +919,7 @@ pub fn new_peer_coherence_cache() -> PeerCoherenceCache {
 ///
 /// (X-COH-DEF: retry cadence DEFERS to `elohim_compute::backoff::jittered` when
 /// present — until then the existing loop interval is the cadence.)
-async fn fetch_peer_coherence(
+pub(crate) async fn fetch_peer_coherence(
     client: &reqwest::Client,
     peer_url: &str,
 ) -> (bool, Option<crate::routes::coherence::CoherenceManifest>) {
@@ -970,6 +970,13 @@ pub async fn refresh_coherence(
 ) {
     use crate::routes::coherence::{compare_to_peer, divergences_to_warn};
 
+    // Story 4.2 slice 1: the round's START, captured BEFORE any probe fires —
+    // this is the `fetch_started` `install_name_routes` hands to
+    // `NameRouteTable::replace_all_at` so a holder the doorbell installed
+    // WHILE this round was in flight is never clobbered by this round's
+    // (now-stale) copy of that holder (C2 monotonic).
+    let fetch_started = doorbell_now_secs();
+
     // Fix 1 + 6: probe every non-empty-url peer CONCURRENTLY; each future does
     // fetch + compare and yields its `PeerCoherence` verdict.
     //
@@ -992,7 +999,7 @@ pub async fn refresh_coherence(
     )> = futures::future::join_all(probes).await;
 
     if let Some(table) = name_routes {
-        install_name_routes(table, &probed);
+        install_name_routes(table, &probed, fetch_started);
     }
 
     let results: Vec<crate::routes::coherence::PeerCoherence> = probed
@@ -1047,6 +1054,89 @@ pub async fn refresh_coherence(
 /// the next holder serves. One wasted attempt, never a wrong answer.
 ///
 /// [`HolderContract`]: crate::services::name_routing::HolderContract
+///
+/// Build ONE peer's [`HolderContract`]s + liveness verdict from a probe
+/// result. Shared by the whole-batch fold ([`install_name_routes`]) and the
+/// single-holder install path ([`install_holder_snapshot`]), so both agree on
+/// exactly what "this peer's contracts" means (story 4.2 slice 1, design
+/// §3.2). Returns the RESOLVED doorway_id (the manifest's self-report when
+/// present, the probe's discovery id otherwise) alongside the built rows.
+fn holder_contracts_and_liveness(
+    peer_id: &str,
+    peer_url: &str,
+    reachable: bool,
+    manifest: Option<&crate::routes::coherence::CoherenceManifest>,
+) -> (
+    String,
+    Vec<crate::services::name_routing::HolderContract>,
+    crate::services::name_routing::HolderLiveness,
+) {
+    use crate::services::name_routing::{HolderContract, HolderLiveness};
+
+    match manifest {
+        Some(m) => {
+            let doorway_id = if m.doorway_id.trim().is_empty() {
+                peer_id.to_string()
+            } else {
+                m.doorway_id.clone()
+            };
+            let mut contracts = Vec::new();
+            for head in &m.heads {
+                if head.hostnames.is_empty() {
+                    contracts.push(
+                        HolderContract::any_host(&doorway_id, peer_url, &head.url_path)
+                            .with_projection(head.commitment_id.clone(), Some(head.epr_id.clone())),
+                    );
+                } else {
+                    for hostname in &head.hostnames {
+                        let Some(host) = crate::services::name_routing::RouteKey::new(
+                            Some(hostname),
+                            &head.url_path,
+                        )
+                        .host
+                        else {
+                            continue;
+                        };
+                        contracts.push(HolderContract {
+                            doorway_id: doorway_id.clone(),
+                            origin: peer_url.to_string(),
+                            url_path: head.url_path.clone(),
+                            host: Some(host),
+                            commitment_id: head.commitment_id.clone(),
+                            epr_id: Some(head.epr_id.clone()),
+                        });
+                    }
+                }
+            }
+            (doorway_id, contracts, HolderLiveness::Serving)
+        }
+        None => (
+            peer_id.to_string(),
+            Vec::new(),
+            if reachable {
+                HolderLiveness::Uncertain
+            } else {
+                HolderLiveness::Unreachable
+            },
+        ),
+    }
+}
+
+/// One shared sort key for the name-route table: doorway_id, then url_path,
+/// then host. The ONE definition — [`install_name_routes`],
+/// [`install_holder_snapshot`], and `NameRouteTable::replace_holder`/
+/// `replace_all_at` must all agree on the OwnerOrder tiebreak, or the fold's
+/// "stable final tiebreak" (see `selector_rank`) would depend on which path
+/// last touched a given holder.
+fn sort_contracts_by_owner_order(contracts: &mut [crate::services::name_routing::HolderContract]) {
+    contracts.sort_by(|left, right| {
+        left.doorway_id
+            .cmp(&right.doorway_id)
+            .then_with(|| left.url_path.cmp(&right.url_path))
+            .then_with(|| left.host.cmp(&right.host))
+    });
+}
+
 fn install_name_routes(
     table: &crate::services::name_routing::NameRouteTable,
     probed: &[(
@@ -1055,64 +1145,23 @@ fn install_name_routes(
         bool,
         Option<crate::routes::coherence::CoherenceManifest>,
     )],
+    fetch_started: u64,
 ) {
     use crate::services::name_routing::{HolderContract, HolderLiveness};
     use std::collections::HashMap;
 
     let mut contracts: Vec<HolderContract> = Vec::new();
     let mut liveness: HashMap<String, HolderLiveness> = HashMap::new();
+    let mut digests: HashMap<String, String> = HashMap::new();
 
     for (peer_id, peer_url, reachable, manifest) in probed {
-        match manifest {
-            Some(m) => {
-                let doorway_id = if m.doorway_id.trim().is_empty() {
-                    peer_id.clone()
-                } else {
-                    m.doorway_id.clone()
-                };
-                liveness.insert(doorway_id.clone(), HolderLiveness::Serving);
-                for head in &m.heads {
-                    if head.hostnames.is_empty() {
-                        contracts.push(
-                            HolderContract::any_host(&doorway_id, peer_url, &head.url_path)
-                                .with_projection(
-                                    head.commitment_id.clone(),
-                                    Some(head.epr_id.clone()),
-                                ),
-                        );
-                    } else {
-                        for hostname in &head.hostnames {
-                            let Some(host) = crate::services::name_routing::RouteKey::new(
-                                Some(hostname),
-                                &head.url_path,
-                            )
-                            .host
-                            else {
-                                continue;
-                            };
-                            contracts.push(HolderContract {
-                                doorway_id: doorway_id.clone(),
-                                origin: peer_url.clone(),
-                                url_path: head.url_path.clone(),
-                                host: Some(host),
-                                commitment_id: head.commitment_id.clone(),
-                                epr_id: Some(head.epr_id.clone()),
-                            });
-                        }
-                    }
-                }
-            }
-            None => {
-                liveness.insert(
-                    peer_id.clone(),
-                    if *reachable {
-                        HolderLiveness::Uncertain
-                    } else {
-                        HolderLiveness::Unreachable
-                    },
-                );
-            }
+        let (doorway_id, peer_contracts, peer_liveness) =
+            holder_contracts_and_liveness(peer_id, peer_url, *reachable, manifest.as_ref());
+        if let Some(m) = manifest {
+            digests.insert(doorway_id.clone(), m.digest.clone());
         }
+        liveness.insert(doorway_id, peer_liveness);
+        contracts.extend(peer_contracts);
     }
 
     // OwnerOrder — the selector's FINAL TIEBREAK — is the first-appearance order
@@ -1138,19 +1187,105 @@ fn install_name_routes(
     // to the place that discarded it. It is arbitrary-but-stable, which is
     // exactly what a final tiebreak must be — the meaningful terms
     // (Liveness, ReachStanding, Nearest, Weight) all rank above it.
-    contracts.sort_by(|left, right| {
-        left.doorway_id
-            .cmp(&right.doorway_id)
-            .then_with(|| left.url_path.cmp(&right.url_path))
-            .then_with(|| left.host.cmp(&right.host))
-    });
+    sort_contracts_by_owner_order(&mut contracts);
 
     debug!(
         contracts = contracts.len(),
         peers = probed.len(),
         "name-route table refreshed from the coherence probe"
     );
-    table.replace_all(contracts, liveness);
+    table.replace_all_at(contracts, liveness, digests, fetch_started);
+}
+
+/// Install ONE holder's manifest into `table` — the single-holder counterpart
+/// to [`install_name_routes`]'s whole-batch fold, sharing the same contract
+/// builder ([`holder_contracts_and_liveness`]) and the same final sort so both
+/// paths agree on exactly what "this peer's contracts" means (story 4.2
+/// slice 1, design §3.2). Used by the doorbell receiver
+/// (`services::federation_doorbell::receive_doorbell`) and the admin refresh
+/// verb (`routes::federation::handle_admin_refresh_federation_peers`).
+pub(crate) fn install_holder_snapshot(
+    table: &crate::services::name_routing::NameRouteTable,
+    peer_id: &str,
+    peer_url: &str,
+    manifest: &crate::routes::coherence::CoherenceManifest,
+    now: u64,
+) {
+    let (doorway_id, mut contracts, liveness) =
+        holder_contracts_and_liveness(peer_id, peer_url, true, Some(manifest));
+    sort_contracts_by_owner_order(&mut contracts);
+    table.replace_holder(
+        &doorway_id,
+        contracts,
+        liveness,
+        manifest.digest.clone(),
+        now,
+    );
+}
+
+/// Outcome of pulling and installing one sibling's manifest under an EXPECTED
+/// doorway_id (the id the caller resolved from `peer_cache` or a doorbell
+/// body) — shared by the doorbell receiver and the admin refresh verb (design
+/// §3.2/§3.3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PullOutcome {
+    Installed,
+    /// Reachable, but the manifest's self-reported `doorwayId` differs from
+    /// what the caller expected (risk 2 / C1 anti-self-election) — never
+    /// installed under the wrong key. The next discovery poll catches this
+    /// peer instead; the skip is logged, not hidden.
+    IdMismatch {
+        manifest_doorway_id: String,
+    },
+    /// Transport error, 404, or any non-200 (5xx included).
+    Unreachable,
+    /// 200 OK but the body did not deserialize.
+    GarbageBody,
+}
+
+/// Fetch `expected_doorway_id`'s own coherence manifest at `peer_url` and, if
+/// it checks out, install it as that ONE holder's snapshot via
+/// [`install_holder_snapshot`]. Shared by `routes::coherence::handle_doorbell`
+/// (through `services::federation_doorbell::receive_doorbell`) and
+/// `routes::federation::handle_admin_refresh_federation_peers`.
+pub(crate) async fn pull_and_install_holder(
+    table: &crate::services::name_routing::NameRouteTable,
+    expected_doorway_id: &str,
+    peer_url: &str,
+    client: &reqwest::Client,
+) -> PullOutcome {
+    let (reachable, manifest) = fetch_peer_coherence(client, peer_url).await;
+    match (reachable, manifest) {
+        (true, Some(m)) => {
+            if !m.doorway_id.trim().is_empty() && m.doorway_id != expected_doorway_id {
+                return PullOutcome::IdMismatch {
+                    manifest_doorway_id: m.doorway_id,
+                };
+            }
+            install_holder_snapshot(
+                table,
+                expected_doorway_id,
+                peer_url,
+                &m,
+                doorbell_now_secs(),
+            );
+            PullOutcome::Installed
+        }
+        (true, None) => PullOutcome::GarbageBody,
+        (false, _) => PullOutcome::Unreachable,
+    }
+}
+
+/// Wall-clock seconds — the one clock boundary the doorbell/refresh pull path
+/// needs. Mirrors `services::name_routing`'s private `now_secs` (duplicated
+/// here rather than exposed across the module boundary, since that module
+/// deliberately keeps its clock read private so its pure logic stays
+/// clock-free in tests).
+pub(crate) fn doorbell_now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// Shared mutable list of federation peer URLs.
@@ -1839,6 +1974,7 @@ mod tests {
                     true,
                     Some(manifest),
                 )],
+                0,
             );
 
             let exact = table.holders_for(
@@ -2251,7 +2387,7 @@ mod tests {
 
             // gamma first in the probe — the live household order.
             let forward = NameRouteTable::new();
-            install_name_routes(&forward, &probed);
+            install_name_routes(&forward, &probed, 0);
             let forward_order: Vec<String> = forward
                 .holders_for(&RouteKey::path_only("/nrt-garden/"), "apex-elohim-host")
                 .into_iter()
@@ -2265,7 +2401,7 @@ mod tests {
             // alpha first in the probe — the SAME fold must come out.
             let reversed: Vec<_> = probed.into_iter().rev().collect();
             let backward = NameRouteTable::new();
-            install_name_routes(&backward, &reversed);
+            install_name_routes(&backward, &reversed, 0);
             let backward_order: Vec<String> = backward
                 .holders_for(&RouteKey::path_only("/nrt-garden/"), "apex-elohim-host")
                 .into_iter()

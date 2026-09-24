@@ -123,8 +123,20 @@ Feature: Jessica reaches a hosted site through a doorway and gets a bounded 404 
   # Request index.html explicitly: an extension-less root may instead answer
   # with the doorway's unrelated landing page. The recipient-side access log
   # proves alpha was contacted; its relay log proves it forwarded nothing onward.
+  # Story 4.2 slice 1 added a doorbell: a doorway rings its registered
+  # siblings within seconds of its own projection-index (its list of what it
+  # currently hosts) changing, so a sibling normally learns a withdrawal in
+  # about a second rather than waiting for its next registry refresh. That
+  # would make beta fresh before this scenario's premise ("before doorway
+  # beta next refreshes its registry") can be observed, so the next line
+  # deafens beta to doorbells first, for 150 seconds — comfortably longer
+  # than this scenario needs to withdraw the contract and assert the stale
+  # relay, so beta cannot un-deafen mid-scenario. The counterfactual control
+  # for the doorbell itself lives in projection-index-doorbell.feature; this
+  # line only keeps THIS scenario's own stale-registry premise true.
   Scenario: Beta returns 404 after a stale relay without further forwarding
-    Given the household stages the root "garden" as hosted by doorway "alpha" only
+    Given doorway "beta" is deaf to doorbells for 150 seconds
+    And the household stages the root "garden" as hosted by doorway "alpha" only
     And doorway "beta" still resolves "garden" to doorway "alpha" in its local registry
     When the household withdraws the contract for "garden" on doorway "alpha" before doorway "beta" next refreshes its registry
     Then doorway "alpha" has observed the withdrawal of its local hosting contract for "garden"

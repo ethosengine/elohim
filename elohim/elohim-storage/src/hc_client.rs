@@ -1023,6 +1023,27 @@ impl HcClient {
         &self.cell_id
     }
 
+    /// The `CellId` this client can reach for `role` — its own configured role,
+    /// or one of the two cross-cell roles it resolved from `app_info` at connect
+    /// time.
+    ///
+    /// `None` is a real answer: a minimal local-dev bundle provisions no
+    /// mishpat/imagodei role, and a caller asking about a role this client does
+    /// not carry must get "I cannot ask" rather than the configured cell. The
+    /// membership join uses this, and answering with the WRONG cell would report
+    /// one role's running state under another role's name — the same
+    /// misattribution `target_role_for_cell` exists to prevent on the error side.
+    pub fn cell_id_for_role(&self, role: &str) -> Option<&CellId> {
+        if role == self.role_key() {
+            return Some(&self.cell_id);
+        }
+        match role {
+            MISHPAT_ROLE => self.mishpat_cell_id.as_ref(),
+            IMAGODEI_ROLE => self.imagodei_cell_id.as_ref(),
+            _ => None,
+        }
+    }
+
     /// A handle to this client's conductor ADMIN websocket.
     ///
     /// `AdminWebsocket` is Clone (its internal state is refcounted), so this
@@ -1513,9 +1534,10 @@ impl HcClient {
                     crate::conductor_bridge_health::AppRunObservation::Running => {
                         BridgeProbe::Running
                     }
-                    crate::conductor_bridge_health::AppRunObservation::NotRunning { reason } => {
-                        BridgeProbe::NotRunning { reason }
-                    }
+                    crate::conductor_bridge_health::AppRunObservation::NotRunning {
+                        reason,
+                        ..
+                    } => BridgeProbe::NotRunning { reason },
                 })
             }
             // The socket answered but named no app. Not a transport failure and
@@ -1528,6 +1550,10 @@ impl HcClient {
                     self.role_key(),
                     &crate::conductor_bridge_health::AppRunObservation::NotRunning {
                         reason: reason.clone(),
+                        // No status was read, so nothing is established about
+                        // whether enable_app could act. `Unknown` keeps the
+                        // pre-existing cure rather than licensing or barring one.
+                        enable: crate::conductor_bridge_health::AppEnableEvidence::Unknown,
                     },
                 );
                 Ok(BridgeProbe::NotRunning { reason })

@@ -40,6 +40,7 @@ pub mod services;
 pub mod signal;
 pub mod signing;
 pub mod ssr;
+pub mod tls;
 pub mod types;
 pub mod worker;
 

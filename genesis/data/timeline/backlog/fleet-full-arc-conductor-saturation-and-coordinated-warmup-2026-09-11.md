@@ -104,3 +104,12 @@ the red `dataplane-convergence` habit receives evidence only after that executab
 
 - `rate(container_cpu_cfs_throttled_periods_total)/rate(container_cpu_cfs_periods_total)` < 0.9 on every alpha conductor for 24 h after a fleet roll; adam's publish-queue-Full lines drop to zero.
 - An edge roll shows per-peer sequencing in its log and no `503 catching-up` on the apex during app staging.
+
+## Delta 2026-09-22 — slice 4's gate no longer runs for rolls that never happened
+
+Edge #1474's roll summary read susan/jessica/james/gertrude/adam `DEADLINE` (449–749 s each)
+and eve `RELEASED`. The gates fired for every conductor because apply reported `configured` on
+an object-label change. CHANGED is now the live pod template before vs after apply
+(`scripts/ci/pod-inputs-fingerprint.sh`), and an identical-DNA hApp rebuild no longer moves that
+template (`conductor-happ-stamp.sh`). A deploy that restarts no conductor therefore pays no soak
+and no gate. Not yet proven on the fleet; the saturation itself is untouched.
