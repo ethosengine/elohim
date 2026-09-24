@@ -37,6 +37,11 @@ pub const MANIFEST_NAME: &str = ".epr-meta";
 pub const MANIFEST_FILE_NAME: &str = "manifest.md";
 pub const MAX_CASCADE_DEPTH: usize = 32;
 pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
+/// A registry is not a manifest. `MAX_MANIFEST_BYTES` is a parse-DoS guard for `.epr-meta`
+/// manifests, where largeness is itself pathological; a policy registry grows with every
+/// ratified row. Borrowing the manifest cap turned one more row into a total governance outage.
+/// The Python host's `load_policies` carries the same bound so the two hosts agree.
+pub const MAX_REGISTRY_BYTES: usize = 1024 * 1024;
 pub const MAX_FLOW_DEPTH: usize = 64;
 
 pub type Result<T> = std::result::Result<T, EprMetaError>;

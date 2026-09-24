@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::{canonical_body, flow_depth_ok, hex_lower, resolve_path, Result, MAX_MANIFEST_BYTES};
+use crate::{canonical_body, flow_depth_ok, hex_lower, resolve_path, Result, MAX_REGISTRY_BYTES};
 
 const POLICY_REGISTRY_REL: &str = ".claude/epr-meta/policies.yaml";
 
@@ -516,13 +516,13 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
             )
         }
     };
-    if text.len() > MAX_MANIFEST_BYTES {
+    if text.len() > MAX_REGISTRY_BYTES {
         return (
             BTreeMap::new(),
             vec![PolicyDiagnostic {
                 code: "policy.registry-size".into(),
                 message: format!(
-                    "{} exceeds the {MAX_MANIFEST_BYTES}-byte safety limit",
+                    "{} exceeds the {MAX_REGISTRY_BYTES}-byte safety limit",
                     path.display()
                 ),
             }],
@@ -997,6 +997,45 @@ policies:
                 .any(|d| d.code == "policy.registry-unparsable"),
             "expected a policy.registry-unparsable diagnostic, got: {diagnostics:?}"
         );
+    }
+
+    /// A registry is not a manifest. The policy registry grows with every ratified row, so it
+    /// must not borrow the manifest parse-DoS cap: past 64 KB it still loads, and the
+    /// manifest bound stays exactly where it was. Python's `load_policies` carries the same
+    /// registry bound, so the two hosts agree on every governed write.
+    #[test]
+    fn policy_registry_over_64k_still_loads() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join(".claude/epr-meta")).unwrap();
+        let row = "epr-meta-policies-version: 1\npolicies:\n  - id: loc\n    version: 1\n    \
+                   class: measure\n    scope: { write: \"*.rs\" }\n    \
+                   measure: { loc-soft: 2, loc-hard: 5 }\n";
+        let registry = format!("{row}{}", "# padding\n".repeat(70 * 1024 / 10));
+        assert!(registry.len() > crate::MAX_MANIFEST_BYTES);
+        fs::write(dir.path().join(POLICY_REGISTRY_REL), &registry).unwrap();
+
+        let (policies, diagnostics) = load_policies(dir.path());
+
+        assert!(
+            diagnostics.is_empty(),
+            "a 70 KB registry must load clean, got: {diagnostics:?}"
+        );
+        assert!(policies.contains_key("loc@1"), "got: {:?}", policies.keys());
+
+        // Past the registry bound it still fails loud, never as absence.
+        let oversized = format!("{row}{}", "#".repeat(MAX_REGISTRY_BYTES));
+        fs::write(dir.path().join(POLICY_REGISTRY_REL), oversized).unwrap();
+        let (policies, diagnostics) = load_policies(dir.path());
+        assert!(policies.is_empty());
+        assert!(diagnostics.iter().any(|d| d.code == "policy.registry-size"));
+
+        // The manifest bound is untouched: 64 KB + 1 is still refused before YAML parsing.
+        let manifest = dir.path().join(crate::MANIFEST_NAME);
+        fs::write(&manifest, "x".repeat(crate::MAX_MANIFEST_BYTES + 1)).unwrap();
+        assert!(matches!(
+            crate::parse_meta_file(&manifest).unwrap_err(),
+            crate::EprMetaError::ManifestTooLarge { .. }
+        ));
     }
 
     #[test]

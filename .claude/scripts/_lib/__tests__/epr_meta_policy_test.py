@@ -84,6 +84,20 @@ with tempfile.TemporaryDirectory() as td:
     (tmp / epr_meta.POLICY_REGISTRY_REL).write_text("not: a registry\n")
     p3, e3 = epr_meta.load_policies(tmp)
     check("load_policies: wrong version marker fails LOUD", p3 == {} and len(e3) == 1)
+    # registry_over_manifest_cap_loads — a REGISTRY is not a manifest: past 64KB it still loads
+    # (the native evaluator carries the same 1MiB bound, so the hosts agree), and past the
+    # registry cap it still fails LOUD, never as absence.
+    pad = "# padding\n" * ((70 * 1024) // 10)
+    (tmp / epr_meta.POLICY_REGISTRY_REL).write_text(REGISTRY + pad)
+    check("registry_over_manifest_cap_loads: 70KB registry sits above the manifest cap",
+          (tmp / epr_meta.POLICY_REGISTRY_REL).stat().st_size > epr_meta.MAX_MANIFEST_BYTES)
+    p5, e5 = epr_meta.load_policies(tmp)
+    check("registry_over_manifest_cap_loads: 70KB registry loads every policy, no errors",
+          set(p5) == {"loc-ceiling@1", "fm-at-birth@1", "routed-review@1"} and e5 == [])
+    (tmp / epr_meta.POLICY_REGISTRY_REL).write_text(REGISTRY + "#" * (1024 * 1024))
+    p6, e6 = epr_meta.load_policies(tmp)
+    check("registry_over_manifest_cap_loads: past the 1MiB registry cap fails LOUD",
+          p6 == {} and len(e6) == 1 and "1024KB size cap" in e6[0])
     # M2 footgun applies to the registry: enforcing policy with no actionable predicate is a
     # latent silent-allow — it must NOT load (so bindings drop LOUD via unknown-policy).
     (tmp / epr_meta.POLICY_REGISTRY_REL).write_text(

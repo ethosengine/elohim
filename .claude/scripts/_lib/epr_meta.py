@@ -1878,6 +1878,16 @@ def policy_content_hash(pol: dict) -> str:
     return "sha256:" + hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
+# A registry is NOT a manifest, and must not borrow a manifest's cap. `MAX_MANIFEST_BYTES` is a
+# parse-DoS guard for `.epr-meta` manifests, where largeness is itself pathological; the policy
+# registry grows with every ratified row, so growth is the goal. Borrowing the manifest cap made
+# one more row a total governance outage (every policy-bound rule read as "unknown policy").
+# `_lib/seam_census.py` carved out the same bound for the same reason. The native evaluator
+# applies the identical cap (`MAX_REGISTRY_BYTES`, elohim/eprfs/eprfs-meta/src/lib.rs), so the two
+# hosts agree. A guard, not a wall: a registry over it still fails LOUD, never as absence.
+_MAX_REGISTRY_BYTES = 1024 * 1024
+
+
 def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
     """Load the policy registry → ({'id@version': policy}, errors). Missing registry is a
     legitimate state → ({}, []). Unreadable/invalid → ({}, [reason]) so bindings fail LOUD
@@ -1888,22 +1898,8 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
     if yaml is None:
         return {}, [f"PyYAML unavailable — policy registry {POLICY_REGISTRY_REL} not loaded"]
     try:
-        # OPEN, ESCALATED 2026-09-13 — a REGISTRY is not a manifest, and should not borrow a
-        # manifest's cap. `_lib/seam_census.py` (~line 175) already ratified that distinction in
-        # prose and carved out `_MAX_REGISTRY_BYTES` after `elohim-storage`'s seam registry crossed
-        # 64KB and contributed ZERO cells to the concern x seam matrix for two days. This registry
-        # is the same artifact and sits at ~99% of the cap — its sibling `measures.yaml` is already
-        # 72KB and loads fine only because no cap is applied to it at all. One more policy row here
-        # flips this to `({}, [size cap])`, which drops EVERY policy-bound rule to "unknown policy
-        # — rule NOT enforced": a total governance outage from a bound borrowed off a different
-        # threat model. The carve-out is NOT taken unilaterally because the native evaluator
-        # applies the SAME cap at `elohim/eprfs/eprfs-meta/src/evaluation.rs:519` against
-        # `MAX_MANIFEST_BYTES` (lib.rs:39) — changing one host alone makes the two disagree
-        # (python=refer, rust=permit) on every governed write, and the installed `epr` binary
-        # would keep the old bound until rebuilt. The fix is a two-host change plus an `epr`
-        # rebuild; until then this file must stay under 64KB.
-        if p.stat().st_size > MAX_MANIFEST_BYTES:
-            return {}, [f"{POLICY_REGISTRY_REL} exceeds {MAX_MANIFEST_BYTES // 1024}KB size cap"]
+        if p.stat().st_size > _MAX_REGISTRY_BYTES:
+            return {}, [f"{POLICY_REGISTRY_REL} exceeds {_MAX_REGISTRY_BYTES // 1024}KB size cap"]
         text = p.read_text()
         if not _flow_depth_ok(text):
             return {}, [f"{POLICY_REGISTRY_REL} nesting too deep — refusing to parse"]
