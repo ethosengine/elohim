@@ -746,6 +746,8 @@ That history explains a year of our confusion: Axis 2 is *dormant*, present in t
 So the honest description of our arc surface is: *one Boolean per device, applied to every holon it is in,
 changed by restart.* That is not a policy surface. It is a fuse.
 
+Readings: the {0,1} switch was first established in the [arc-factor feasibility spike](../history/2026-06-14-arc-factor-feasibility-spike-findings.md), and the [matthew-edge RCA synthesis](../history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md) records why reaching for the arc could never touch the OOM.
+
 ### What the arc work is for, then
 
 If arcs cannot be adjusted per space or fractionally, what has the "EPR-native arc configuration" work been
@@ -1181,7 +1183,7 @@ legitimate work; their authorization contract needs design and evidence.
 ### 10.4 "On the fork: three patches, each with an open upstream PR — and refuse sharding."
 
 **Finding, per change.** Cross-relay fix: upstream it. Jemalloc: an image choice, not a patch.
-(Why it is an image choice: the 2026-06 conductor OOM was freed memory that glibc kept pinned, cured by swapping the allocator. See history `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`.)
+(Why it is an image choice: the 2026-06 conductor OOM was freed memory that glibc kept pinned, cured by swapping the allocator. See history `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`; the path to it — [diverse-eyes RCA](../history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md), [canary runbook](../history/2026-06-18-conductor-leak-canary-runbook.md), [production change set](../history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md), and the falsified [tx5 zombie-PeerConnection lead](../history/2026-06-17-tx5-zombie-peerconnection-upstream-contribution.md) — is kept beside it.)
 Sys-validation backoff: make it a config knob and PR the knob.
 A `list_blocks`/`unblock` admin API is **the best contribution we have**: small, genuinely missing upstream, and able to retire our worst risk.
 The per-space arc hint is small, PR-able plumbing for a field the conductor already ignores.

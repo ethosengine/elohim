@@ -6,6 +6,9 @@ status: Accepted
 tier: history
 created: 2026-06-14
 topic: [arc-factor, kitsune2, holochain-p2p, feasibility, spike]
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # §6½ — what is configurable about arcs today
 ---
 
 # Arc-factor feasibility findings (for Pillar 3 spec)

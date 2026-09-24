@@ -13,7 +13,7 @@ distills:
   - .claude/archive/2026-05-15/genesis/docs/superpowers/plans/2026-04-19-runtime-request-correlation.md
 # Bidirectional: the memory entry documenting the mechanism that REPLACED this.
 canonical:
-  - ../../../../../.claude/memory/project_che_browser_feedback_loop.md
+  - genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md   # successor home of the retired project_che_browser_feedback_loop memory (drained 7b0eefee9)
 memory_anchors:
   - project_che_browser_feedback_loop
   - feedback_haiku_observe_only_no_specifics

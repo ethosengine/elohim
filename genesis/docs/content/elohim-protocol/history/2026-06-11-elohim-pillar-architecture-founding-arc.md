@@ -20,6 +20,9 @@ cites:
   - "elohim-protocol-specification | the protocol canon whose three-pillar EPR taxonomy collides with this doc's five-app-pillar usage — the recorded name-collision hazard | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
   - "hardware-spec | Elohim Protocol Hardware Ecosystem: Technical Specification | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "qahal-api-spec-extraction-arc | sibling record — the qahal branch of the same 5e7e0b952 spec family; this record closes the family index | sha256:810ed38282d0cbc4 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-qahal-api-spec-extraction-arc.md"
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - app/elohim-app/src/app/elohim/CLAUDE.md   # the pillar gospel that names ELOHIM_PROTOCOL_ARCHITECTURE.md
 ---
 
 # The Elohim Pillar Architecture Founding Arc

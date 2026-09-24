@@ -57,3 +57,4 @@ Concern routing (content-addressed — slugs resolve via this file's `cites:` fr
 
 - Domain vocabulary: `elohim/sdk/domains/lamad/CLAUDE.md`
 - Protocol schemas: `elohim/sdk/schemas/CLAUDE.md`
+- History: [lamad MVP implementation arc](../../genesis/docs/content/elohim-protocol/history/2026-06-11-lamad-mvp-implementation-arc.md) — how the in-app pillar became this bundle, and which "post-MVP" phases shipped anyway

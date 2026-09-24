@@ -65,4 +65,5 @@ direction.
 ## Bidirectional links
 
 - **This record → canonical:** [attestation-consolidation design](../architecture/2026-05-11-attestation-consolidation-design.md) (the still-live design canon; the watch-out plants near its 7-stage migration-plan section).
+- **Wider arc:** [lamad v1 schema museum](2026-06-11-lamad-v1-schema-museum.md) — the v1 inventory whose single removed type, `Attestation`, is this dedup's work.
 - **Distilled-from (raw impl plan in git history):** attestation-consolidation-implementation-plan (linked in frontmatter).

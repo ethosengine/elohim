@@ -501,6 +501,10 @@ Ok(None)
 
 See `holochain/dna/elohim/` for a complete implementation example.
 
+## History
+
+The retired `NETWORK_UPGRADES.md`, whose upgrade philosophy graduated into this README: [network-upgrades stewarded-coordination arc](../../../genesis/docs/content/elohim-protocol/history/2026-06-11-network-upgrades-stewarded-coordination-arc.md).
+
 ## Contributing
 
 This module is part of the [Elohim Protocol](https://github.com/ethosengine/elohim). Contributions welcome.

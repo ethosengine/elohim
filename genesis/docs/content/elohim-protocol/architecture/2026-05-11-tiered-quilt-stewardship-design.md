@@ -10,8 +10,8 @@ informed-by:
   - app/graphos/vocabulary.md (quilt, pantry, stock, draw, shard, RS(N,K))
   - Phase 11 gate #2 — iroh-canonical `/blob` for BLAKE3-capable callers (hot plane)
 cites:
-  - genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-delivery-master.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-03-26-app-manifest-sdk-boundary-design.md
+  - "tiered-quilt-delivery-master | 2026-05-11-tiered-quilt-delivery-master | sha256:a0c88e355a68cd27 | path: genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md"
+  - genesis/plans/2026-03-26-app-manifest-sdk-boundary-design.md
   - "mutual-storage-replication-dwelling-hub-design | pledge-tier mechanism + donut clamp that the §4 amendment's negotiation gate extends — closes its floor-via-declaration gap one layer up | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md"
   - "app-manifest-staged-intents-design | manifest-substrate precedent the quiltPolicies extension follows (shape-vs-vocabulary boundary; substrate-landed/feature-held); its ceremony-id typo trap motivates validator-enforced referential integrity | sha256:98e0a6576d9a197a | path: genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md"
 informs:
@@ -1118,6 +1118,11 @@ Before the delivery master writes sub-plans:
   `genesis/orchestrator/manifests/ci-infra/RUNBOOK-minio-sccache-2026-05-09.md`
 - EPR substrate framing:
   `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`
+- History readings:
+  [DHT is a notary, not a byte store](../history/2026-06-01-dht-is-a-notary-not-a-byte-store.md) — bytes never live on the DHT;
+  [storage dual-plane arc](../history/2026-06-11-storage-dual-plane-design-arc.md) and
+  [P2P dataplane + sync-engine arc](../history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md) — the earlier drawings this vocabulary grew from, and which of their mechanisms never shipped;
+  [community-compute founding vision](../history/2026-06-11-community-compute-founding-vision-arc.md) — the March vision whose ideas became canon while its mechanisms did not.
 - Three-truth-layer model: memory anchor `project_three_layer_truth_model`
 - DePIN contracts as policy: memory anchor `project_depin_contracts_are_policy`
 - Placement signals as shefa inputs: memory anchor `project_placement_signals_are_shefa_inputs`

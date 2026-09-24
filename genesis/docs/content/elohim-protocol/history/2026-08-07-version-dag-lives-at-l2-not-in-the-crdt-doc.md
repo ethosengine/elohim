@@ -27,6 +27,9 @@ memory_anchors:
   - project_automerge_content_sync_plane_lit
   - project_mishpat_commitment_cid_is_entry_hash
   - feedback_reach_head_replication_distinct_planes
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/superpowers/specs/2026-07-01-crdt-authoritative-content-state-dht-notary-decouple-design.md   # the spec whose superseded clauses this decision amends
 ---
 
 # The version DAG lives at L2 (the DHT), not inside the Automerge doc

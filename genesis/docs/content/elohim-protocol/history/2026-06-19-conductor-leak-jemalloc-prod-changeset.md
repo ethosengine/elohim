@@ -6,6 +6,9 @@ status: Accepted
 tier: history
 created: 2026-06-19
 topic: [conductor-leak, jemalloc, production, changeset, edgenode]
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # §10.4 — jemalloc as an image choice, not a patch
 ---
 
 # jemalloc-PRODUCTION conductor change set — verified, ready-to-apply (2026-06-19)

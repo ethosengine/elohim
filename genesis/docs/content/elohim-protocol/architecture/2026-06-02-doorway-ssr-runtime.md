@@ -73,6 +73,7 @@ Standing up SSR against an Angular 19 bundle is a build-glue problem before it i
 
 - The Angular-19 **global-shape shim must cover exactly what Angular touches** — no more (over-shimming masks real bootstrap errors).
 - **`sophia-element` / the UMD bundle must NOT run server-side** — placeholder it via `CUSTOM_ELEMENTS_SCHEMA`; the web component renders client-side only.
+- Why the component layer is custom elements the server placeholders rather than Angular libraries: [Lit Web Components, not Angular libraries](../history/2026-05-06-lit-wc-component-layer-pivot.md).
 - **V8 cold-start is real:** observed wall-time 2s → 15s → 60s as the isolate warms. The pod needs a **memory bump + a `startupProbe`**, or the orchestrator kills it mid-warm.
 
 ### Pod resource floor when SSR is enabled (`SSR_BUNDLE_PATH` set)

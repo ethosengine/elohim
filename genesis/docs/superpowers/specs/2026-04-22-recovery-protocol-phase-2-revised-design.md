@@ -494,3 +494,7 @@ The 2026-04-21 spec's setup ritual, graduated UX, doorway-blind-proxy, and multi
 | Date | Change | Author |
 |---|---|---|
 | 2026-04-22 | Revised spec supersedes 2026-04-21 original. Graduated-authority, elohim-as-counsel, anti-lockout committed. M1-cleanup milestone added. | Matthew Dowell |
+
+## History readings
+
+- [recovery-protocol design arc](../../content/elohim-protocol/history/2026-06-11-doorway-recovery-protocol-arc.md) — shard tracking shipped as drawn; N-of-M challenge/response was superseded on paper by this revision before it was built.

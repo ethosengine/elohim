@@ -70,4 +70,5 @@ protocol's actual shape (peers stewarding shards in pantries).
 ## Bidirectional links
 
 - **This record → canonical:** [doorway server dispatch-contract CLAUDE](../../../../../doorway/doorway-service/src/server/CLAUDE.md) (the exact spot the regression recurs).
+- **Wider arc:** [doorway consolidation + federation arc](2026-06-11-doorway-consolidation-federation-arc.md) — the consolidation this dispatch contract sits inside.
 - **Distilled-from (raw bodies in git history):** doorway-blob-registry-routing + vocabulary-cleanup-sprint-kickoff (linked in frontmatter).

@@ -7,6 +7,9 @@ author: dht-unity arc close (Fable session, 2026-07-11/12)
 cites:
   - substrate-trust-contract-runbook | The Substrate Trust Contract | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
   - genesis/data/timeline/backlog/genesis-pair-cross-conductor-fetch-blocks-canonical-convergence.md
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md   # §5 — why the trust contract exists
 ---
 
 # The Five-Defect Convergence Arc (museum record)

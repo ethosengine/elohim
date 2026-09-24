@@ -136,3 +136,4 @@ Qahal governance gates are informed by other pillars:
 | Governance sprint plans | `genesis/plans/2026-03-15-governance-gateway-sprint{3-9}-plan.md` |
 | Protocol schemas | `elohim/sdk/schemas/v1/` |
 | Psephos design | See Sophia architecture notes |
+| History of the v1.0 API spec (what survives here) | [`history/2026-06-11-qahal-api-spec-extraction-arc.md`](../../../../genesis/docs/content/elohim-protocol/history/2026-06-11-qahal-api-spec-extraction-arc.md) |

@@ -9,6 +9,7 @@ cites:
 Infrastructure layer: data loading, agents, trust, source chain.
 
 **Architecture:** `ELOHIM_PROTOCOL_ARCHITECTURE.md`
+**History:** [elohim pillar founding arc](../../../../../genesis/docs/content/elohim-protocol/history/2026-06-11-elohim-pillar-architecture-founding-arc.md) — its "five pillars" collide with the protocol spec's three-pillar EPR taxonomy; read that before trusting the doc.
 
 ## Subject home & citation discipline (this pillar is a CONSUMER)
 

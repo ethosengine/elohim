@@ -497,3 +497,7 @@ The eight floors summarized in §3.5 are detailed here for the implementation pl
 ---
 
 **Authoring note for the implementation plan**: This spec is the source-of-truth for the consolidation direction. The implementation plan (to be authored next, per the brainstorming skill's handoff to `writing-plans`) will sequence the seven stages (A–G) into concrete tasks with file paths, test points, and commit boundaries. The implementation plan inherits the Wave 0 plan's pacing constraints (single worktree, sequential cargo builds, PVC discipline) and feeds back into the Wave 0 plan's master schedule.
+
+## History readings
+
+- [attestation consolidation phase 2a dedup](../history/2026-06-02-attestation-consolidation-phase2a-dedup.md) — how the 18+ entry types collapsed into one discriminated `Content` entry, and why a type is never deleted by name before its callers are counted.

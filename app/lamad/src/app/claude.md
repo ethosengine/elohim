@@ -40,7 +40,7 @@ elohim-app surface. Treat it as its own buildable unit with its own `package.jso
 | Domain vocabulary (manifest, schemas, coupling) | `elohim/sdk/domains/lamad/` |
 | Generated types | `app/lamad/src/app/generated/` (run `pnpm run lamad:codegen`; never hand-edit) |
 | Cross-bundle progress contract | localStorage key `lamad-progress-{agentId}-{pathId}` — the SAME template in both bundles' data-loaders (`app/elohim-app/.../data-loader.service.ts:791`, `app/lamad/.../data-loader.service.ts:801`); change in both or neither |
-| Legacy reference notes | git history of `app/lamad/docs/` (island retired 2026-06-11 — recomposed into the bloom-mastery seed, two `history/` records, and timeline backlog entries; see `genesis/docs/content/elohim-protocol/history/2026-06-11-lamad-mvp-implementation-arc.md`) |
+| Legacy reference notes | git history of `app/lamad/docs/` (island retired 2026-06-11 — recomposed into the bloom-mastery seed, two `history/` records, and timeline backlog entries; see `genesis/docs/content/elohim-protocol/history/2026-06-11-lamad-mvp-implementation-arc.md` and, for why the model is a flat `contentType` rather than a class tree, `genesis/docs/content/elohim-protocol/history/2026-06-11-lamad-deleted-concepts-2024.md`) |
 
 ---
 

@@ -6,6 +6,9 @@ status: Accepted
 tier: history
 created: 2026-06-18
 topic: [conductor-leak, oom, jemalloc, canary, glibc-arena, alpha]
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # §10.4 — jemalloc as an image choice, not a patch
 ---
 
 # Conductor leak — canary runbook (2026-06-18)

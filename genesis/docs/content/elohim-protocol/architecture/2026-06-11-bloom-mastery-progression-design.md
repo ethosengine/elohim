@@ -232,3 +232,7 @@ most) type definitions; each is itemized with line refs in the companion gap led
 - Source design's own open questions (gate flexibility per content type, domain-variant
   decay curves, cross-platform mastery credit, assessment anti-gaming) remain open —
   BLOOM-MASTERY-DESIGN.md:999-1009.
+
+## History readings
+
+- [lamad v1 schema museum](../history/2026-06-11-lamad-v1-schema-museum.md) — the v1 inventory decayed by omission, while the seams it specified (including the 8-level mastery ladder) survived.

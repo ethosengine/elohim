@@ -113,6 +113,8 @@ This policy is not prose-only; three layers enforce it:
 
 So the retired doc's STATUS note ("the rna/ module, currently on the backburner") was accurate about the migration *workflow* and misleading about the *crate* — hc-rna ships inside every DNA we build. Record both halves; bless neither beyond its evidence.
 
+How the retired doc's prose policy rotted in three directions at once is read in [network-upgrades stewarded-coordination arc](../history/2026-06-11-network-upgrades-stewarded-coordination-arc.md).
+
 ## 7. Stewarded coordination — summary only
 
 The governance answer to "DNA hash = network identity: feature or bug?" is **stewarded coordination**: the constraint is a constitutional checkpoint, and the elohim — constitutional stewards, not administrators — are the coordination mechanism that pure P2P networks lack. They cannot change rules (the DNA enforces them; users can audit the new DNA or keep running v1); they facilitate transitions. That philosophy's **living home is elohim/holochain/rna/README.md** (§Constitutional Evolution, §The Work of the Elohim — "consensus-finders" + translation across global/constitutional/local/personal levels, §RNA's Role in Constitutional Change). This seed deliberately does not restate it; read it there.

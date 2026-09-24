@@ -12,7 +12,7 @@ derived_from:
   - elohim/holochain/docs/SYNC-ENGINE.md    # retired to git 2026-06-11 (holochain docs island recompose; authored 2026-03-10)
 canonical:
   - genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
-  - .claude/skills/automerge-sync/SKILL.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md   # the three-truth-layer canon the 4-layer drawing grew into (the automerge-sync skill stays the behavior reference, cited below)
 cites:
   - storage-dual-plane-design-arc | the same-day sibling arc this record composes with — it owns ContentLocation/doorway-bootstrap/reach-inversion verdicts; this record owns the 4-layer drawing + sync mechanism ledger | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
   - conductor-agent-info-substrate-gossip | how conductor-side discovery actually landed in place of the doc's signal-server bootstrap flow | sha256:7ee98c749aadb58d | path: genesis/docs/content/elohim-protocol/history/2026-06-02-conductor-agent-info-substrate-gossip.md
@@ -164,6 +164,8 @@ including the 0.5-vs-3.0 version trap), the **live reference is
 `.claude/skills/automerge-sync/SKILL.md`** — it already points at the shipped
 steward/node files and the storage-client-ts methods. Read the skill, not the retired
 SYNC-ENGINE.md.
+
+The January node scaffold this engine shipped from nearly verbatim is read in [elohim-node architecture founding arc](2026-06-11-elohim-node-architecture-founding-arc.md).
 
 ## OPEN QUESTIONS
 

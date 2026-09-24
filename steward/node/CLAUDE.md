@@ -72,6 +72,8 @@ Builder: `SwarmBuilder::with_existing_identity(...).with_tokio().with_tcp(...).w
 
 Live runtime behavior of the Automerge sync loop is documented in `.claude/skills/automerge-sync/SKILL.md` — route there for behavior, not to this gospel.
 
+The January scaffold drawing this crate grew from, and which of its layers froze as stubs: [elohim-node architecture founding arc](../../genesis/docs/content/elohim-protocol/history/2026-06-11-elohim-node-architecture-founding-arc.md).
+
 ## Live HTTP surface
 
 The real HTTP surface is **`src/dashboard/` (axum router) + `src/elohim_service.rs`**, not `src/api/`.

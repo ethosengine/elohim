@@ -2826,6 +2826,8 @@ The gate reads these declarations to validate surface consistency. The manifest 
 
 **Backfill 3 — LINK_ARCHITECTURE deprecation sweep.** Formally retire the `*By{Attribute}` query-index link types from the `LinkTypes` enum. Migration: every retired `*By*` link gets its query workload moved to SQL projection (the operational layer that should have been carrying it from the start). LINK_ARCHITECTURE.md updates the deprecation checklist to show closure. Slots reclaimed are returned to the 256-cap budget; future structural link additions (D.1's `EprToEvent` + `EprToResource`) can land without immediately crowding the cap.
 
+Reading: [link-architecture arc](../history/2026-06-11-link-architecture-arc.md) — why the Signal Rule became canon while this sweep stayed unexecuted.
+
 **Sequencing.** Backfill 1 depends on D.10 (vocabulary governance landed first, so manifest authorization rules can be read by the floor logic). Backfills 2 and 3 are independent. All three land in Wave A so downstream gaps (D.1, D.6, D.7) ship against a substrate-floor that actually enforces what it documents.
 
 **Touches:**

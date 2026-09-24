@@ -69,6 +69,8 @@ it polls storage `p2p/status.pull.caughtUp`, the `elohim_projection_reconcile_co
 gauge, and doorway content-serving on both sides, and only declares
 quiescence once a fresh reconcile sweep has run and still reads converged.
 
+When write-guard contention shows up on one peer with no restart to explain it, read [adam slow-link write-guard saturation](../history/2026-07-20-adam-slow-link-write-guard-saturation.md): a slow link surfacing as a held local write guard is a composition defect, not a placement one.
+
 ### 1a. Concern-canon invariants (the live-metered classes only)
 
 Numbering continues I1–I6. These are the **cross-family concern classes** that
@@ -220,4 +222,5 @@ then blocked legitimate forward adoption, a probe racing publish lag, and a
 gate script that couldn't run in its own container. None were visible from
 the outcome measure alone; all are now watched by named probes. The lesson
 is the doctrine: **every trust claim gets a probe, every probe failure names
-itself, every fix leaves its guard behind.**
+itself, every fix leaves its guard behind.** Each defect's shape and the evidence that named it:
+[the five-defect convergence arc](../history/2026-07-12-substrate-convergence-five-defect-arc.md).

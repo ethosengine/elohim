@@ -125,3 +125,5 @@ home (coherence-index negative) — it travels, adopted as an *open vision compo
 with the quilt model* (not abandoned), alongside the unconsumed sovereignty/cluster
 scaffolding in the residue backlog entry
 `genesis/data/timeline/backlog/storage-island-harvest-residue.md`.
+
+The same-day sibling that owns the 4-layer drawing and the sync mechanism ledger: [P2P dataplane + sync-engine arc](2026-06-11-p2p-dataplane-sync-engine-design-arc.md).

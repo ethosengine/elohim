@@ -716,6 +716,7 @@ Per `.claude/skills/p2p-design-gate/` — classification for new entities introd
 - [2026-04-21 Elohim-Core Graph Substrate Design](2026-04-21-elohim-core-graph-substrate-design.md) — master spec; this spec is its Phase 3.7+4
 - [2026-05-01 Light Up the Graph Design](2026-05-01-light-up-the-graph-design.md) — Phase 3.5 signal-substrate sprint
 - [2026-04-18 Experience Story EPR Design](2026-04-18-experience-story-epr-design.md) — EPR atom prior art
+- History: [EPR foundation landed by waves](../../content/elohim-protocol/history/2026-06-02-epr-foundation-landed-by-waves.md) — audit-as-truth over checkbox-as-truth, the foundation this substrate succeeds; [light-up topology arc](../../content/elohim-protocol/history/2026-06-02-light-up-topology-operational-visibility-arc.md) — collapse read-views to one GraphQL subgraph rather than a one-off federation codec
 - [2026-04-23 EPR Phase 2C Libp2p Federation Design](2026-04-23-epr-phase-2c-libp2p-federation-design.md)
 - [2026-05-16 EPR WIP Disposition](../plans/2026-05-16-epr-wip-disposition.md) — routes the 3 graph-native scenarios this sprint addresses
 

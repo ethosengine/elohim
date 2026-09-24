@@ -6,6 +6,9 @@ status: Accepted
 tier: history
 created: 2026-06-17
 topic: [conductor-leak, tx5, upstream, contribution, ethosengine-bot]
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # §10.4 — jemalloc as an image choice, not a patch
 ---
 
 # Upstream comments — tx5/go-pion zombie-PeerConnection leak (2026-06-17)

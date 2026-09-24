@@ -18,6 +18,9 @@ topic:
 cites:
   - "holochain-iroh-convergence-upgrade-campaign | the governing campaign whose Wave 1 Task D1 this primary-source verification pack closes and whose Wave 2 transport flip consumes these verdicts | sha256:b61c697ad5814c52 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md"
   - genesis/data/timeline/backlog/2026-08-04-holochain-iroh-dep-verification-pack.md
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-08-05-wave2-relay-sovereignty-design.md   # the transport design built on these config-mapping verdicts
 ---
 
 # Holochain/iroh dependency verification pack

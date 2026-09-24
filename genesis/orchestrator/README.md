@@ -460,6 +460,9 @@ Each entry gives the symptom and the fix. [`CI_RELIABILITY.md`](CI_RELIABILITY.m
 in this directory is a dated incident note on build-state persistence and the
 Stage View layout.
 
+Why a deploy stage cannot be dispatched as its own graph node (`DEPLOY_ONLY` is the tactical answer, brit attestations the strategic one):
+[deploy is not a graph node](../docs/content/elohim-protocol/history/2026-06-02-deploy-is-not-a-graph-node.md).
+
 ### The preview and Jenkins disagree
 
 The two start from different inputs. The preview does not read commit

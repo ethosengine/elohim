@@ -495,6 +495,7 @@ This linkage is **explicitly out of scope for this spec**. It is a meta-concern 
 ## 14. References
 
 - `genesis/a2o/CLAUDE.md` — a2o test harness conventions
+- [experience-story discernment gate](../history/2026-06-02-experience-story-discernment-gate.md) — history: the TypeScript gate re-draft was reverted; discernment gates are Rust primitives in elohim-agent with manifest-declared rulesets
 - `genesis/a2o/src/framework/devices/playwright-device.ts:184–217` — current capture surface
 - `genesis/a2o/steps/common.steps.ts:139–222` — observation session lifecycle
 - `elohim/rakia/docs/plans/build-attestation-integration.md` — sibling pattern for build-state attestations

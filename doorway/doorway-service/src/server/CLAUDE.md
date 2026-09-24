@@ -31,4 +31,6 @@ The wildcard arm is unconditional — it consults the RouteRegistry on every req
 
 The dispatch tail used to be a hand-maintained list of prefixes (`/api/v1/`, `/account/`). Every new manifest path family (blob_proxy → `/blob/`, stream_proxy → `/stream/`) silently fell through to the SPA bootstrap until someone noticed thumbnails breaking. The `classify_dispatch` helper exists specifically so that pattern cannot recur.
 
+History: [dispatch registry fallback and vocabulary](../../../../genesis/docs/content/elohim-protocol/history/2026-06-02-doorway-dispatch-registry-fallback-and-vocabulary.md) — never reintroduce a prefix guard.
+
 New storage endpoints become routable automatically when declared in storage's `build_manifest()`. No doorway code changes needed.

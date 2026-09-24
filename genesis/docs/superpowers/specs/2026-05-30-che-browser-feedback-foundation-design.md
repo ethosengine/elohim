@@ -190,3 +190,7 @@ No change to `world.ts`, the device classes, `selectors.ts`, or any `.feature` f
 Fold `playwright install --with-deps chromium` into the che-devworkspaces udi-plus Dockerfile so
 the browser ships in the image and the per-workspace `a2o:setup` install becomes a no-op
 everywhere. Repo-side stays unchanged; `PLAYWRIGHT_BROWSERS_PATH` and `a2o:setup` forward-compat.
+
+## History readings
+
+- [cross-runtime request correlation — the path not taken](../../content/elohim-protocol/history/2026-06-02-request-correlation-path-not-taken.md) — the heavier correlation design this render-and-see loop made unnecessary.

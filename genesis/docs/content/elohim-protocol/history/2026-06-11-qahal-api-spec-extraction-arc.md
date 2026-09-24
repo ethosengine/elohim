@@ -19,6 +19,10 @@ cites:
   - qahal-domain-gospel | the subject home where the spec's surviving vocabulary and mechanism ladder are now canon | sha256:002d11309d8d9620 | path: elohim/sdk/domains/qahal/CLAUDE.md
   - mishpat-domain-gospel | the judgment-substrate boundary the spec never anticipated — qahal surface escalates into mishpat | sha256:d3a335f06f37c884 | path: elohim/sdk/domains/mishpat/CLAUDE.md
   - qahal-architecture-vision | the gospel-tier vision spec that superseded this ICD as qahal's forward canon | sha256:6a519b464b586832 | path: genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - elohim/sdk/domains/qahal/CLAUDE.md   # the qahal domain gospel — where the surviving vocabulary is canon (Related Files)
+  - app/elohim-app/src/app/qahal/CLAUDE.md   # the pillar gospel that names QAHAL_API_SPECIFICATION_v1.0.md
 ---
 
 # The Qahal API Spec Extraction Arc (v1.0)

@@ -281,6 +281,8 @@ Inverting this order would break shakeout delivery: if we ship Z.E first (delete
 ## Related artifacts
 
 - `doorway/CLAUDE.md` — "No Blob Fan-Out — Doorway is Single-Target Dispatch" (data-path; not warm-stream)
+- [D1–D5 node/household canon](../history/2026-04-19-d1-through-d5-node-and-household-canon.md) — D4: the doorway stays web2-only
+- [doorway consolidation + federation arc](../history/2026-06-11-doorway-consolidation-federation-arc.md) — federation plumbing shipped, but custodian-selection routing was inverted by No Blob Fan-Out
 - `doorway/REACH.md` — the reach-gate primitive
 - `doorway/doorway-service/RECOVERY-PROTOCOL.md` — recovery vision
 - `genesis/docs/superpowers/specs/2026-04-19-self-healing-p2p-dataplane-design.md` — blob substrate; Pattern A extends or sibling-specs this

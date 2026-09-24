@@ -133,6 +133,7 @@ it is wiring, readers, and one input-schema growth on a substrate that already a
 
 ## Grounding cross-refs
 - Companion: `2026-05-29-epr-reachability-economics.md` (reach + delivery axes).
+- History: [light-up topology operational-visibility arc](../../content/elohim-protocol/history/2026-06-02-light-up-topology-operational-visibility-arc.md) — the visibility sprint this vision succeeds; module exists ≠ table exists.
 - Memory: `project_substrate_floor_elohim_ceiling`, `project_placement_signals_are_shefa_inputs`,
   `project_elohim_agent_sense_respond_architecture`, `project_dwelling_hub_replication_pattern`,
   `project_household_is_resilience_unit`, `project_graduated_recovery_authority`,

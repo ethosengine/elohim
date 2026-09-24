@@ -13,6 +13,10 @@ cites:
   - app/lamad/src/app/lamad.routes.ts
   - "lamad-domain-gospel | CLAUDE | sha256:8671bbc2873bca32 | path: elohim/sdk/domains/lamad/CLAUDE.md"
   - "subject-routing-locus-graph-design | 2026-06-11-subject-routing-locus-graph-design | sha256:a884cdf639a04699 | path: genesis/docs/superpowers/specs/2026-06-11-subject-routing-locus-graph-design.md"
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - elohim/sdk/domains/lamad/CLAUDE.md   # the lamad domain gospel — flat contentType + type guards
+  - app/lamad/src/app/claude.md   # the lamad src/app gospel (legacy-notes row points here)
 ---
 
 # Lamad Deleted Concepts (Nov 2024) — museum record

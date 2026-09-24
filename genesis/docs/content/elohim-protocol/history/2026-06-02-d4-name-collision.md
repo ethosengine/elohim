@@ -13,6 +13,9 @@ cites:
   - "map | the product-only D1–D10 lattice with no meta axis that made D4 magnetic for process specs | sha256:4d707bfda967a21a | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
 qualifies:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md    # the magnetic D4 seed (innocent — the dogfood vocabulary it shares is the trap)
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - .claude/subject-routing.yaml   # the vocab-vs-target-mismatch gate that enforces this rule
 ---
 
 # The D4 name-collision

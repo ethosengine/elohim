@@ -13,7 +13,7 @@ distills:
   - genesis/docs/superpowers/specs/2026-05-28-conductor-agent-info-substrate-gossip-design.md
   - genesis/docs/superpowers/plans/2026-05-28-conductor-agent-info-substrate-gossip.md
 canonical:
-  - ../../../../../.claude/memory/project_multi_doorway_human_registration.md   # conductor peer-cache now substrate-warmed
+  - doorway/CLAUDE.md   # §Federation — where the retired project_multi_doorway_human_registration memory graduated (drained 7b0eefee9); conductor peer-cache now substrate-warmed
 memory_anchors:
   - project_multi_doorway_human_registration
   - project_doorway_single_target_no_fanout

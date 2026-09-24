@@ -126,6 +126,8 @@ if (isPathNode(node)) {
 }
 ```
 
+Why a flat `contentType` plus guards, not a class tree: [lamad deleted concepts (2024)](../../../../genesis/docs/content/elohim-protocol/history/2026-06-11-lamad-deleted-concepts-2024.md).
+
 ### Seeder and app share identical types
 
 Domain codegen writes the same files to every target. If a field exists in the app, it exists in the seeder. The seeder seeds what the app renders — no guesswork.

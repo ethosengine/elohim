@@ -290,3 +290,5 @@ The stewardship chain IS the standing/custody-succession instance of this bounda
 ## Settled decisions (history)
 
 The node / household / doorway / shem topology decisions this boundary design rests on were settled earlier and distilled into a history record: [D1–D5 Node / Household / Doorway / Shem canonical decisions](../history/2026-04-19-d1-through-d5-node-and-household-canon.md).
+
+The January elohim-node scaffold drawing — which layers shipped and which froze as stubs while their mechanisms moved homes — is read in [elohim-node architecture founding arc](../history/2026-06-11-elohim-node-architecture-founding-arc.md).

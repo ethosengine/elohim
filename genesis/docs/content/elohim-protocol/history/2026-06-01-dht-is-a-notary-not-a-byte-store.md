@@ -98,5 +98,6 @@ operational data — the exact anti-pattern `project_dht_vs_libp2p_scoping` was 
 ## Bidirectional links
 
 - **This gotcha → canonical:** [graph-substrate split architecture](../architecture/2026-04-21-elohim-core-graph-substrate-design.md), [tiered quilt (blob home)](../architecture/2026-05-11-tiered-quilt-stewardship-design.md)
-- **Canonical → this gotcha:** the graph-substrate spec's "large content" section now carries a back-pointer to this record (added 2026-06-01).
+- **Canonical → this gotcha:** the graph-substrate spec's "large content" section now carries a back-pointer to this record (added 2026-06-01); the tiered-quilt spec's §10 cross-references carry one too.
+- **Records that build on this one:** [community-compute founding vision](2026-06-11-community-compute-founding-vision-arc.md), [storage dual-plane arc](2026-06-11-storage-dual-plane-design-arc.md), [link-architecture arc](2026-06-11-link-architecture-arc.md), [EPR foundation landed by waves](2026-06-02-epr-foundation-landed-by-waves.md).
 - **Distilled-from (raw bodies in git history):** BATCH-C-PIVOT, blob-custody-reconciliation, stagespablob/Z.D (linked above).

@@ -289,3 +289,7 @@ Only after Phases 0–4 prove the git-file graph works. **This is net-new code: 
 - EPR graduation target (Phase 5 — **avodah/spec-ingestion has ZERO code; net-new machinery**): `/projects/elohim/genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md` §11; `/projects/elohim/elohim/epr/src/kind.rs` (`EprKind::Manifest`), `/projects/elohim/elohim/epr/src/envelope.rs` (`supersedes: Option<Cid>`)
 - Agent prompts requiring spec-corpus edits (Phase 2): `/projects/elohim/.claude/agents/{historian,librarian,storyteller,cartographer}.md`
 - MemPalace semantic layer (ChromaDB+SQLite, NOT GraphRAG): `/projects/elohim/.mempalace/config.json` (symlink `~/.mempalace` per session)
+
+## History readings
+
+- [archetype-primary a2o taxonomy, not executed](../../content/elohim-protocol/history/2026-06-02-archetype-primary-a2o-taxonomy-not-executed.md) — the bulk restructure this design replaced: express the archetype axis as `cites:` edges over the existing tree.

@@ -11,6 +11,10 @@ cites:
   - app/lamad/src/app/services/data-loader.service.ts
   - app/lamad/src/app/services/practice.service.ts
   - "subject-routing-locus-graph-design | 2026-06-11-subject-routing-locus-graph-design | sha256:a884cdf639a04699 | path: genesis/docs/superpowers/specs/2026-06-11-subject-routing-locus-graph-design.md"
+# Bidirectional: the canonical surface this record is a reading of (it points back).
+canonical:
+  - app/lamad/CLAUDE.md   # the lamad bundle gospel (See Also)
+  - app/lamad/src/app/claude.md   # the lamad src/app gospel (legacy-notes row points here)
 ---
 
 # The Lamad MVP Implementation Arc (Plan v5.0)

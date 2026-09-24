@@ -88,3 +88,5 @@ Concern class C4 (honest absence). Forcing incidents: `dd1824e03` (2026-07-22,
 *unreadable ≠ absent*), `d6c88e385` (2026-07-23, *unmeasured ≠ zero*),
 `270dbafac` (2026-07-11, absent-because-misspelled ran the fleet with zero ICE
 servers since inception).
+
+History: [seed-row shape satisfies view SQL predicates](../../../../../genesis/docs/content/elohim-protocol/history/2026-06-02-seed-row-shape-satisfies-view-sql-predicates.md) — a view's `WHERE` is a contract on seed-row shape; wrong values filter silently to a dark surface.

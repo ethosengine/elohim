@@ -147,6 +147,7 @@ Live federation mechanisms (doorway-service):
 - **DHT self-registration**: at startup the doorway registers itself as a `DoorwayRegistration` entry via the infrastructure zome (`doorway-service/src/services/federation.rs` → `register_doorway` coordinator fn) — doorway discovery is DHT-native, not a central registry.
 - **Cross-doorway JWT validation**: tokens carry `doorway_id`/`doorway_url` claims (`doorway-service/src/auth/jwt.rs`); a receiving doorway verifies against the issuer's `GET /.well-known/doorway-keys` (JWKS, `doorway-service/src/routes/federation.rs`). The doorway also serves its DID document at `/.well-known/did.json` (`doorway-service/src/routes/identity.rs`).
 - **Peer discovery**: `FEDERATION_PEERS` config + the startup peer-discovery task (`doorway-service/src/main.rs`).
+- History: [doorway consolidation + federation arc](../genesis/docs/content/elohim-protocol/history/2026-06-11-doorway-consolidation-federation-arc.md) — these shipped as drawn; the custodian-selection routing beside them was inverted by No Blob Fan-Out. [Agent-info substrate gossip](../genesis/docs/content/elohim-protocol/history/2026-06-02-conductor-agent-info-substrate-gossip.md): warming conductor peer caches carries DHT entries cross-mesh but does not project them on remote pods.
 
 ## Reach Enforcement
 
