@@ -125,6 +125,25 @@ _BUDGET_TIMEOUT_LINE = "Timeout has been exceeded"
 _BUDGET_EXHAUSTED_IDENT = "pipeline-budget-exhausted"
 _RESTART_SIGNATURE = re.compile(r"Waiting for reconnection of .+ before proceeding with build|Failed to load program")
 
+# ── Stage clock (native-delivery sprint Lane D2; evidence-ladder spec §8) ────────────────────
+# app #1718–#1726 each spent 122–132 min inside ONE stage waiting out the fleet's post-roll
+# window, and this ledger kept one fingerprint for all of it with no duration anywhere.
+# Durations stay OUT of fingerprint() (a duration there mints a finding per build); they ride as
+# the `durationMillis` FIELD instead. The budget is DECLARED, not a constant: the
+# stage-wallclock-ceiling@1 lens in measures.yaml (hard, in minutes, and the concern it prices).
+# Only jobs listed here are scanned; the stage pattern mirrors delivery-series.mjs.
+MEASURES_PATH = os.path.join(PROJECT, ".claude", "epr-meta", "measures.yaml")
+_STAGE_BUDGET_LENS = "stage-wallclock-ceiling"
+_STAGE_BUDGET_JOBS = {"elohim": re.compile(r"\bpublish\b.*\bverify\b", re.IGNORECASE)}
+# A stage Jenkins marks FAILED/ABORTED only because an earlier stage failed still reports a
+# sub-second duration; it never ran, so it has no clock.
+_SKIPPED_AFTER_FAILURE_MS = 1000
+# The habit a budget class threatens when the registry cannot be read — the same address the
+# lens declares; used only so an unreadable registry does not strip a timeout's address.
+_BUDGET_CONCERN_FALLBACK = "push-delivers-within-budget"
+DELIVERY_SERIES = os.path.join(PROJECT, "genesis", "orchestrator", "delivery-series.mjs")
+DELIVERY_JOB = "elohim"
+
 # ── Quiesce leg ──────────────────────────────────────────────────────────────
 # The fleet-quiesce gate prints, once per poll, everything needed to understand
 # why the fleet did or did not settle — then discards it into a console log that
@@ -349,6 +368,142 @@ def _scan_for_banner(tail):
     return None
 
 
+def declared_stage_budget(path=None):
+    """(minutes, concern) from the stage-wallclock-ceiling lens, or (None, None).
+
+    Stdlib only (harvest must not import yaml): the lens is one flat `  - id:` block, so its
+    `hard:` and `concern:` keys are read by regex. An unreadable registry is honest absence —
+    no budget means no STAGE_OVER_BUDGET finding, never a guessed number."""
+    try:
+        with open(path or MEASURES_PATH, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return (None, None)
+    for block in re.split(r"\n(?=  - id: )", text):
+        if not block.startswith(f"  - id: {_STAGE_BUDGET_LENS}\n"):
+            continue
+        hard = re.search(r"^    hard: ([0-9.]+)\s*$", block, re.M)
+        concern = re.search(r"^    concern: ([a-z0-9][a-z0-9-]*)\s*$", block, re.M)
+        return (float(hard.group(1)) if hard else None,
+                concern.group(1) if concern else None)
+    return (None, None)
+
+
+def _budget_concern():
+    return declared_stage_budget()[1] or _BUDGET_CONCERN_FALLBACK
+
+
+def _stage_ran(stage):
+    status = stage.get("status")
+    if status in (None, "NOT_EXECUTED", "IN_PROGRESS"):
+        return False
+    return not (status in ("FAILED", "ABORTED")
+                and (stage.get("durationMillis") or 0) < _SKIPPED_AFTER_FAILURE_MS)
+
+
+def _scan_stages_over_budget(job, describe, budget_minutes, concern):
+    """Stages of one build (wfapi/describe body) that ran longer than the declared budget.
+
+    Pure. The fingerprint input is `stage:<name>` only; the duration is the `durationMillis`
+    field, so a recurring slow stage bumps one finding instead of minting one per build."""
+    pattern = _STAGE_BUDGET_JOBS.get(job)
+    if pattern is None or not budget_minutes or not isinstance(describe, dict):
+        return []
+    out = []
+    for st in describe.get("stages") or []:
+        name = st.get("name") or ""
+        ms = st.get("durationMillis") or 0
+        if not pattern.search(name) or not _stage_ran(st) or ms <= budget_minutes * 60_000:
+            continue
+        finding = {
+            "category": "STAGE_OVER_BUDGET",
+            "ident": f"stage:{name}",
+            "display": f"stage {name} ran {round(ms / 60_000, 1)} min > declared budget "
+                       f"{budget_minutes:g} min ({_STAGE_BUDGET_LENS}@1)",
+            "class": "ci-failure",
+            "durationMillis": ms,
+        }
+        routed = concern_routes.route("ci-stage-over-budget", {"concern": concern})
+        if routed:
+            finding["concern"] = routed
+        out.append(finding)
+    return out
+
+
+def _unclassified_from_describe(describe):
+    """The stage-granularity fallback for a red build nothing classified, with its clock."""
+    stage = None
+    for st in (describe or {}).get("stages", []) if isinstance(describe, dict) else []:
+        if st.get("status") in ("FAILED", "UNSTABLE"):
+            stage = st
+            break
+    if stage is None:
+        return {"category": "UNCLASSIFIED", "ident": "unclassified",
+                "display": "red build, unclassified", "class": "ci-failure"}
+    ident = f"stage:{stage.get('name')}"
+    return {"category": "UNCLASSIFIED", "ident": ident, "display": f"red build, {ident}",
+            "class": "ci-failure", "durationMillis": stage.get("durationMillis") or 0}
+
+
+def _get_describe(job, build):
+    try:
+        return get_json(f"/job/{job}/job/{BRANCH}/{build}/wfapi/describe")
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+        return None
+
+
+def delivery_folds(series):
+    """[(measure, value, reason)] to fold from `delivery-series.mjs --stages --json`.
+
+    Pure. No publish+verify reading → no stage-wallclock fold (skipped, never 0). Nothing
+    delivered → the hours spent are folded as a LOWER BOUND on cost, and the reason says so."""
+    s = ((series or {}).get("pipelines") or {}).get(DELIVERY_JOB)
+    if not isinstance(s, dict) or not s.get("considered"):
+        return []
+    out = []
+    n = s.get("considered")
+    p90 = (s.get("publishVerify") or {}).get("p90Min")
+    if isinstance(p90, (int, float)):
+        out.append(("stage-wallclock@1", p90,
+                    f"ci-harvest: {DELIVERY_JOB}/dev publish+verify p90 over the last {n} builds"))
+    cost = s.get("costPerDeliveredHours")
+    hours = s.get("pipelineHours")
+    if isinstance(cost, (int, float)):
+        out.append(("delivery-cost@1", cost,
+                    f"ci-harvest: {hours} pipeline-h / {s.get('delivered')} delivered over {n} builds"))
+    elif isinstance(hours, (int, float)):
+        out.append(("delivery-cost@1", hours,
+                    f"ci-harvest: 0 delivered over {n} builds — {hours} pipeline-h spent is a "
+                    f"lower bound; the cost per bundle is unbounded"))
+    return out
+
+
+def record_delivery_measures():
+    """Fold stage-wallclock@1 / delivery-cost@1 through the native observation verb.
+
+    Fail-open end to end (no node, Jenkins unreadable, no epr binary): a harvest never fails
+    over a telemetry fold. Returns the folds that landed."""
+    import subprocess
+
+    try:
+        r = subprocess.run(["node", DELIVERY_SERIES, "--stages", "--json", "--window", "10",
+                            "--pipelines", DELIVERY_JOB],
+                           capture_output=True, text=True, timeout=45, cwd=PROJECT)
+        series = json.loads(r.stdout) if r.stdout.strip() else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+    try:
+        sys.path.insert(0, os.path.join(PROJECT, ".claude", "hooks"))
+        import _observation  # the shared emitter every fold producer uses
+    except Exception:  # noqa: BLE001
+        return []
+    landed = []
+    for measure, value, reason in delivery_folds(series):
+        if _observation.emit(measure, ".", value, reason=reason, root=PROJECT):
+            landed.append((measure, value))
+    return landed
+
+
 def _scan_for_budget_timeout(tail):
     """An ABORTED build whose own timeout fired, as a finding; None otherwise.
 
@@ -360,12 +515,16 @@ def _scan_for_budget_timeout(tail):
         return None
     if _RESTART_SIGNATURE.search(tail):
         return None
-    return {
+    finding = {
         "category": "BUDGET_EXHAUSTED",
         "ident": _BUDGET_EXHAUSTED_IDENT,
         "display": "ABORTED by its own timeout — the pipeline outgrew its wall-clock budget",
         "class": "ci-failure",
     }
+    routed = concern_routes.route("ci-budget-exhausted", {"concern": _budget_concern()})
+    if routed:
+        finding["concern"] = routed
+    return finding
 
 
 def _scan_console(tail, taxonomy, job):
@@ -405,7 +564,7 @@ def _scan_console(tail, taxonomy, job):
     return findings
 
 
-def collect_build_findings(job, build, taxonomy):
+def collect_build_findings(job, build, taxonomy, describe=None):
     """Findings for one red build: failed tests first, console classification
     as the fallback/supplement. Returns [{category, ident, display, class,
     concern?}].
@@ -455,26 +614,10 @@ def collect_build_findings(job, build, taxonomy):
     if not findings and tail is not None:
         findings.extend(_scan_console(tail, taxonomy, job))
 
-    # 4. Nothing classified: record the red at stage granularity if possible.
+    # 4. Nothing classified: record the red at stage granularity if possible, with that
+    # stage's clock as a field (never a fingerprint input).
     if not findings:
-        stage = None
-        try:
-            wf = get_json(f"/job/{job}/job/{BRANCH}/{build}/wfapi/describe")
-            for st in wf.get("stages", []):
-                if st.get("status") in ("FAILED", "UNSTABLE"):
-                    stage = st.get("name")
-                    break
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
-        ident = f"stage:{stage}" if stage else "unclassified"
-        findings.append(
-            {
-                "category": "UNCLASSIFIED",
-                "ident": ident,
-                "display": f"red build, {ident}",
-                "class": "ci-failure",
-            }
-        )
+        findings.append(_unclassified_from_describe(describe or _get_describe(job, build)))
     return findings
 
 
@@ -527,9 +670,16 @@ def harvest_job(job, cursor, taxonomy):
                 append_quiesce(rec)
                 seen.add(b["number"])
 
+    budget_minutes, budget_concern = (
+        declared_stage_budget() if job in _STAGE_BUDGET_JOBS else (None, None))
     for b in fresh:
         out["builds_seen"].append(b["number"])
         out.setdefault("sequence", []).append((b["number"], b["result"]))
+        # Stage clock — every result, because the slow stages are exactly the ones in
+        # FAILED/ABORTED builds that RED alone reads as a verdict and ignores as a cost.
+        describe = _get_describe(job, b["number"]) if budget_minutes else None
+        for f in _scan_stages_over_budget(job, describe, budget_minutes, budget_concern):
+            out["new"].append({"build": b["number"], **f})
         if b["result"] == "SUCCESS":
             out["green"] = max(out["green"] or 0, b["number"])
         elif b["result"] == "ABORTED":
@@ -540,7 +690,7 @@ def harvest_job(job, cursor, taxonomy):
             if budget is not None:
                 out["new"].append({"build": b["number"], **budget})
         elif b["result"] in RED:
-            for f in collect_build_findings(job, b["number"], taxonomy):
+            for f in collect_build_findings(job, b["number"], taxonomy, describe=describe):
                 entry = {
                     "build": b["number"],
                     "category": f["category"],
@@ -550,6 +700,8 @@ def harvest_job(job, cursor, taxonomy):
                 }
                 if f.get("concern"):
                     entry["concern"] = f["concern"]
+                if f.get("durationMillis") is not None:
+                    entry["durationMillis"] = f["durationMillis"]
                 out["new"].append(entry)
     return out
 
@@ -591,6 +743,9 @@ def reconcile(results, cursor):
                     "first_build": f["build"],
                     "last_build": f["build"],
                     **({"concern": f["concern"]} if f.get("concern") else {}),
+                    # A FIELD, never a fingerprint input (see _STAGE_BUDGET_LENS above).
+                    **({"durationMillis": f["durationMillis"]}
+                       if f.get("durationMillis") is not None else {}),
                 }
                 by_fp[fp] = entry
                 entries.append(entry)
@@ -598,6 +753,8 @@ def reconcile(results, cursor):
             elif f["build"] > entry.get("last_build", 0):
                 entry["seen"] = entry.get("seen", 1) + 1
                 entry["last_build"] = f["build"]
+                if f.get("durationMillis") is not None:
+                    entry["durationMillis"] = f["durationMillis"]  # the latest build's clock
                 if entry not in new_entries:
                     bumped.append(entry)
         if r["builds_seen"]:
@@ -755,6 +912,10 @@ def run_harvest(jobs, as_hook, dispatch=False):
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = list(ex.map(lambda j: harvest_job(j, cursor, taxonomy), jobs))
     new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
+    # Price it (Lane D1): a fresh App build moves the delivery series, so fold its two readings
+    # where `epr flow report` reads bounds. Only then — the node series costs Jenkins reads.
+    if any(r["job"] == DELIVERY_JOB and r["builds_seen"] for r in results):
+        record_delivery_measures()
     rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch)
     if rendered:
         print(rendered)
