@@ -286,17 +286,231 @@ fn validate_definition_cid(value: &str) -> Result<()> {
     Ok(())
 }
 
+/// A present agent witnessing a human participant — `human:<handle>` attested by
+/// `agent:<role>@<model>`, never self-declared by the substrate.
+///
+/// **The elohim witness the human.** A human's standing identity at the repository node is
+/// established by the act of an agent present with them, who names what it actually knows in
+/// `basis` and takes responsibility for it — the DHT's humanity-witness pattern (humanity is
+/// attested by others) taken up by the agents working here. It is never inferred from git, an
+/// email or a workspace namespace, and it is not a credential: a witness is contestable by an
+/// adverse attestation (a roster `Contest` row), and the human may always claim for themselves
+/// beside it.
+///
+/// Hashed as its own atom, exactly like [`ActorClaim`]: the same witness by the same agent in the
+/// same session at the same time with the same basis mints the same address, and a re-witness
+/// (any field different) is a new record rather than a mutation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActorWitness {
+    /// Who is witnessed: `human:<handle>`. Only a human is witnessed; an agent claims for itself.
+    pub subject: AgentRef,
+    /// Who witnesses: `agent:<role>@<model>`. A human's own act is a claim, not a witness.
+    pub witness: AgentRef,
+    /// The witnessing agent's session.
+    pub session: String,
+    /// One line the witness stands behind — what it actually knows of who is present.
+    pub basis: String,
+    /// When, in the caller's supplied encoding. Never read from a clock here.
+    pub claimed_at: String,
+}
+
+impl ActorWitness {
+    /// The sole constructor. Refuses a subject that is not a human, a witness that is not an
+    /// agent, an unscoped or undated witness, and — the load-bearing one — an empty basis: a
+    /// witness that names nothing it knows is an assertion nobody stands behind.
+    pub fn new(
+        subject: &str,
+        witness: &str,
+        session: &str,
+        basis: &str,
+        claimed_at: &str,
+    ) -> Result<Self> {
+        if !matches!(
+            parse_participant_ref(subject)?,
+            ParticipantRef::Human { .. }
+        ) {
+            return Err(FabricError::Decode(format!(
+                "witness subject `{subject}` is not a human participant — only `human:<handle>` \
+                 is witnessed; an agent claims for itself"
+            )));
+        }
+        // The agent parser refuses `human:` outright, so a human can never pass as a witness.
+        parse_agent_ref(witness).map_err(|e| {
+            FabricError::Decode(format!(
+                "witness `{witness}` is not an agent — a human's own act is a claim, not a \
+                 witness: {e}"
+            ))
+        })?;
+        let session = session.trim();
+        if session.is_empty() {
+            return Err(FabricError::Decode(
+                "a witness needs the witnessing agent's session".into(),
+            ));
+        }
+        let basis = basis.trim();
+        if basis.is_empty() {
+            return Err(FabricError::Decode(
+                "a witness needs a basis — one line the witness stands behind; a witness that \
+                 names nothing it knows is an assertion nobody is responsible for"
+                    .into(),
+            ));
+        }
+        let claimed_at = claimed_at.trim();
+        if claimed_at.is_empty() {
+            return Err(FabricError::Decode("a witness needs a claimed_at".into()));
+        }
+        Ok(Self {
+            subject: AgentRef(subject.to_string()),
+            witness: AgentRef(witness.to_string()),
+            session: session.to_string(),
+            basis: basis.to_string(),
+            claimed_at: claimed_at.to_string(),
+        })
+    }
+
+    /// The witnessed handle (the `<handle>` of `human:<handle>`).
+    pub fn handle(&self) -> Result<String> {
+        match parse_participant_ref(&self.subject.0)? {
+            ParticipantRef::Human { handle } => Ok(handle),
+            ParticipantRef::Agent { .. } => Err(FabricError::Decode(format!(
+                "witness subject `{}` is not a human participant",
+                self.subject.0
+            ))),
+        }
+    }
+}
+
+/// The domain tag every actor-record signature covers, ahead of the signed record's CID. A
+/// signature over a bare CID string could be replayed as a signature over anything else that
+/// signs the same string; the tag makes it mean exactly "this device signed this actor record".
+const RECORD_SIGNING_DOMAIN: &str = "elohim:actor-record-signature:v1:";
+
+/// The exact bytes a device signs for an actor record: the domain tag followed by the record's
+/// CID in its canonical string form.
+pub fn record_signing_message(record_cid: &str) -> Vec<u8> {
+    format!("{RECORD_SIGNING_DOMAIN}{record_cid}").into_bytes()
+}
+
+/// Checks a detached ed25519 signature against a signer named by its `did:key`.
+///
+/// A seam, not an implementation: this crate is a pure model and never decodes a did:key or
+/// holds a key. The caller supplies verification — `epr-cli`'s device-key module in practice —
+/// and every closure `Fn(&str, &[u8], &[u8]) -> bool` already is one.
+pub trait SignatureVerifier {
+    /// `true` iff `signature` is `signer_did_key`'s valid signature over `message`.
+    fn verify(&self, signer_did_key: &str, message: &[u8], signature: &[u8]) -> bool;
+}
+
+impl<F> SignatureVerifier for F
+where
+    F: Fn(&str, &[u8], &[u8]) -> bool,
+{
+    fn verify(&self, signer_did_key: &str, message: &[u8], signature: &[u8]) -> bool {
+        self(signer_did_key, message, signature)
+    }
+}
+
+/// A device's signature over one actor record — an [`ActorClaim`] or an [`ActorWitness`] — named
+/// by the record's CID.
+///
+/// **A second record, never a field.** The signature cannot sit inside the atom it signs, and
+/// adding a field to [`ActorClaim`] would re-address every claim ever written; so the signature is
+/// its own appended record pointing at the signed one. An unsigned claim stays exactly as valid as
+/// it always was — nothing anywhere refuses an act for want of this record. What it adds is that a
+/// later reader can check which device made the statement.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordSignature {
+    /// The CID of the signed record (a claim or a witness), in its canonical string form.
+    pub claim_cid: String,
+    /// The signing device, as a `did:key` — public material only.
+    pub signer: String,
+    /// The 64-byte ed25519 signature over [`record_signing_message`], lowercase hex.
+    pub signature: String,
+}
+
+impl RecordSignature {
+    /// Build from a record CID, the signer's did:key and the raw signature bytes. Refuses a
+    /// signer that is not did:key-shaped and a signature that is not 64 bytes; it does NOT
+    /// verify — verification needs a key this crate never holds (see [`SignatureVerifier`]).
+    pub fn new(claim_cid: &Cid, signer: &str, signature: &[u8]) -> Result<Self> {
+        validate_did_key_shape(signer)?;
+        if signature.len() != ED25519_SIGNATURE_LEN {
+            return Err(FabricError::Decode(format!(
+                "an ed25519 signature is {ED25519_SIGNATURE_LEN} bytes, got {}",
+                signature.len()
+            )));
+        }
+        Ok(Self {
+            claim_cid: claim_cid.to_string(),
+            signer: signer.to_string(),
+            signature: hex_encode(signature),
+        })
+    }
+
+    /// `true` iff the signature verifies, under `verifier`, as `signer`'s over the signed CID.
+    /// A malformed hex signature is simply `false`.
+    pub fn verify(&self, verifier: &dyn SignatureVerifier) -> bool {
+        match hex_decode(&self.signature) {
+            Some(bytes) => verifier.verify(
+                &self.signer,
+                &record_signing_message(&self.claim_cid),
+                &bytes,
+            ),
+            None => false,
+        }
+    }
+}
+
+/// Raw ed25519 signature length.
+pub(crate) const ED25519_SIGNATURE_LEN: usize = 64;
+
+/// A did:key carries an ed25519 key here and nothing else: `did:key:z` + base58btc. The shape is
+/// checked (this crate holds no base58 codec); whether it decodes is the verifier's question.
+pub(crate) fn validate_did_key_shape(value: &str) -> Result<()> {
+    const BASE58: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    match value.strip_prefix("did:key:z") {
+        Some(rest) if !rest.is_empty() && rest.chars().all(|c| BASE58.contains(c)) => Ok(()),
+        _ => Err(FabricError::Decode(format!(
+            "`{value}` is not a did:key (`did:key:z<base58btc>`)"
+        ))),
+    }
+}
+
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Lowercase hex only; anything else (odd length, upper case, non-hex) is `None`.
+pub(crate) fn hex_decode(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2)
+        || !text
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'))
+    {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&text[i..i + 2], 16).ok())
+        .collect()
+}
+
 /// One appended actor record. Append-only; supersessions are new records.
 ///
-/// A tagged envelope with a single variant is deliberate, not premature generality: the
-/// acceptance leg of this plane records a *different act* about the same claim, and it must be
-/// able to land without breaking the line format every already-written sidecar uses. The
-/// envelope is a storage detail and — exactly as in [`crate::store::FlowRecord`] — never
-/// participates in identity.
+/// A tagged envelope, so that a *different act* about the same statement lands without breaking
+/// the line format every already-written sidecar uses: a claim (the actor's own statement), a
+/// signature over a record (a device standing behind it) and a witness (a present agent attesting
+/// a human). The envelope is a storage detail and — exactly as in [`crate::store::FlowRecord`] —
+/// never participates in identity: each record's CID is its payload's, so every claim written
+/// before the second and third kinds existed keeps its address.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ActorRecord {
     Claim(ActorClaim),
+    Signed(RecordSignature),
+    Witness(ActorWitness),
 }
 
 impl ActorRecord {
@@ -304,6 +518,8 @@ impl ActorRecord {
     pub fn cid(&self) -> Result<Cid> {
         match self {
             ActorRecord::Claim(claim) => atom_cid(claim),
+            ActorRecord::Signed(signature) => atom_cid(signature),
+            ActorRecord::Witness(witness) => atom_cid(witness),
         }
     }
 }
@@ -318,12 +534,17 @@ pub trait ActorStore {
     /// Every claim in append order. An exhaustive `match` rather than an `if let`, so that a
     /// second record kind cannot slip through as a claim: adding one turns this into a compile
     /// error at exactly the place that has to decide what the new kind means to this reader.
+    ///
+    /// A signature and a witness are not claims: a signature is a device standing behind a
+    /// record, and a witness is one participant's statement about another. Neither says who is
+    /// acting in a session, so neither can answer [`Self::current_for`].
     fn claims(&self) -> Result<Vec<(Cid, ActorClaim)>> {
         Ok(self
             .records()?
             .into_iter()
-            .map(|(cid, record)| match record {
-                ActorRecord::Claim(claim) => (cid, claim),
+            .filter_map(|(cid, record)| match record {
+                ActorRecord::Claim(claim) => Some((cid, claim)),
+                ActorRecord::Signed(_) | ActorRecord::Witness(_) => None,
             })
             .collect())
     }

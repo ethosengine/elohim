@@ -35,6 +35,9 @@
 //! now EXISTS as an addressable record, so a later attestation has something precise to agree or
 //! disagree with. Its store is a separate sidecar for a load-bearing reason: a reader that
 //! consults identity must be able to fail to read it and still decide.
+//! Beside the claim sit two further acts about it — a device's signature over a record and a
+//! present agent's witness of a human — and [`participants`] keeps the tracked roster of which
+//! devices speak for a human handle; none of it ever refuses an unsigned claim.
 //!
 //! Resource is NOT an entity: anything content-addressed is a resource; resource *state*
 //! is a pure fold over event history ([`fold`]). Granularity is scale-free here — what
@@ -61,6 +64,7 @@ pub mod error;
 pub mod fold;
 pub mod index;
 pub mod model;
+pub mod participants;
 pub mod scope;
 #[cfg(feature = "sidecar")]
 mod sidecar;
@@ -71,8 +75,8 @@ pub mod walk;
 #[cfg(feature = "sidecar")]
 pub use actor::SidecarActorStore;
 pub use actor::{
-    parse_agent_ref, parse_participant_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore,
-    ParticipantRef,
+    parse_agent_ref, parse_participant_ref, record_signing_message, ActorClaim, ActorRecord,
+    ActorStore, ActorWitness, MemoryActorStore, ParticipantRef, RecordSignature, SignatureVerifier,
 };
 pub use epistemic::{
     cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,
@@ -89,6 +93,9 @@ pub use model::{
     EdgeSpec, EdgeStatus, FlowEvent, Governor, Intent, LimitSource, PinnedRef, Process,
     ProcessSpec, ResourceSpec, Sense, StageSpec, ValidatorRef,
 };
+#[cfg(feature = "sidecar")]
+pub use participants::SidecarRoster;
+pub use participants::{standing_human, verify_binding, ParticipantRow, Roster};
 pub use scope::{Containers, Scopes};
 pub use stock::{
     respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
