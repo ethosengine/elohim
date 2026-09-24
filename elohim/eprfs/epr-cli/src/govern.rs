@@ -30,7 +30,9 @@ use std::{
 };
 
 use elohim_epr_rea::{ActorClaim, ActorStore, SidecarActorStore};
-use eprfs_meta::{evaluate_path_with, hex_lower, resolve_decision, GovernanceWrite};
+use eprfs_meta::{
+    evaluate_path_with, hex_lower, resolve_decision, GovernanceWrite, ValidatorProvider,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -202,6 +204,16 @@ fn claimed_for(root: &Path, session: &str) -> Option<(cid::Cid, ActorClaim)> {
 
 /// Evaluate the prospective write and return the decision payload.
 pub fn evaluate(root: &Path, args: &[String]) -> Result<Value> {
+    evaluate_with(root, args, &ElohimRepositoryValidators)
+}
+
+/// `evaluate` against an explicit validator provider — the seam that lets a test prove the
+/// payload carries whatever a validator returns without naming a concrete one.
+fn evaluate_with(
+    root: &Path,
+    args: &[String],
+    validators: &dyn ValidatorProvider,
+) -> Result<Value> {
     let parsed = parse(args)?;
     let Some(rel) = parsed.path else {
         return Err(Error::InvalidArguments("govern needs --path".into()));
@@ -243,7 +255,7 @@ pub fn evaluate(root: &Path, args: &[String]) -> Result<Value> {
         is_new_subdir: parsed.is_new_subdir,
     };
 
-    let evaluation = evaluate_path_with(root, &target, &write, &ElohimRepositoryValidators)?;
+    let evaluation = evaluate_path_with(root, &target, &write, validators)?;
     let resolved = resolve_decision(&evaluation.verdicts);
 
     // The winning verdict's prose, so a client can surface WHY without
@@ -413,6 +425,48 @@ mod tests {
         assert!(
             decision.get("decision").is_some_and(|d| d.is_string()),
             "the identity plane must never cost the tree its verdict: {decision}"
+        );
+    }
+
+    /// A validator's evidence reaches the `--json` payload untouched: the evaluator carries it
+    /// opaquely on the verdict, and `govern` serializes verdicts as they are.
+    #[test]
+    fn govern_payload_carries_validator_evidence() {
+        struct StubClassifier;
+
+        impl eprfs_meta::ValidatorProvider for StubClassifier {
+            fn evaluate(
+                &self,
+                _request: &eprfs_meta::ValidatorRequest<'_>,
+            ) -> eprfs_meta::ValidatorOutcome {
+                eprfs_meta::ValidatorOutcome::Classified {
+                    reason: "stub classification".into(),
+                    evidence: json!({ "frameRef": "bafystub", "verdict": "drift" }),
+                }
+            }
+        }
+
+        let dir = TempDir::new().unwrap();
+        write(
+            dir.path(),
+            ".epr-meta",
+            "---\nepr-meta-version: 1\nid: root\nroot: true\nrules:\n  \
+             - id: classified\n    class: ask\n    when: { write: \"*.md\" }\n    \
+             validator: epr:validator-stub-classifier\n---\n",
+        );
+        let args = vec![
+            "--path".to_string(),
+            "notes/new.md".to_string(),
+            "--new".to_string(),
+        ];
+
+        let payload = evaluate_with(dir.path(), &args, &StubClassifier).expect("evaluator runs");
+
+        assert_eq!(payload["decision"], "refer", "payload: {payload}");
+        assert_eq!(
+            payload["verdicts"][0]["evidence"],
+            json!({ "frameRef": "bafystub", "verdict": "drift" }),
+            "payload: {payload}"
         );
     }
 

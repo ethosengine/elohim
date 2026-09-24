@@ -57,6 +57,12 @@ pub struct GovernanceVerdict {
     /// Otherwise `None` for non-referral classes (deny/inject/measure/dispatch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refer_reason: Option<String>,
+    /// Opaque evidence a validator attached to its outcome (`ValidatorOutcome::Classified`).
+    /// This crate carries it and never reads it: its shape belongs to the validator that
+    /// produced it, so the evaluator stays neutral about what any validator means. Absent
+    /// from the wire when `None`, so verdicts without evidence serialize as they always did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<Value>,
 }
 
 /// The single-winner projection of a set of verdicts onto the keel decision
@@ -212,6 +218,13 @@ pub enum ValidatorOutcome {
     Flag {
         reason: String,
     },
+    /// A flag that also carries the validator's own evidence (for example a classification
+    /// with spans). Decided exactly like `Flag` — same reason line, the rule's declared class —
+    /// and the evidence value crosses to the verdict opaquely, unread by this crate.
+    Classified {
+        reason: String,
+        evidence: Value,
+    },
     /// A provider evaluated a typed finding, including evidence freshness or invalid input.
     /// Reuses the governance class and referral vocabulary; adds no decision channel.
     Finding {
@@ -304,6 +317,7 @@ pub fn evaluate_path_with(
                     rule_id: String::new(),
                     policy_ref: None,
                     refer_reason: Some("governance-manifest-malformed".into()),
+                    evidence: None,
                 }],
                 diagnostics: vec![PolicyDiagnostic {
                     code: "manifest.malformed".into(),
@@ -357,6 +371,7 @@ pub fn evaluate_path_with(
                                 rule_id: binding.id.clone(),
                                 policy_ref: Some(binding.policy.clone()),
                                 refer_reason: Some("policy-pin-mismatch".into()),
+                                evidence: None,
                             });
                         }
                         continue;
@@ -651,6 +666,8 @@ fn evaluate_rule(
     }
 
     let why = rule.why.as_deref().unwrap_or("");
+    // Only a `Classified` validator outcome sets this; every other predicate carries none.
+    let mut evidence = None;
     let reason = match rule.predicate {
         GovernanceRulePredicate::RequireFrontmatter => {
             let present = frontmatter_fields(write.content.as_deref());
@@ -712,6 +729,13 @@ fn evaluate_rule(
                 ValidatorOutcome::Flag { reason } => {
                     format!("validator `{reference}` flagged this write: {reason}. {why}")
                 }
+                ValidatorOutcome::Classified {
+                    reason,
+                    evidence: carried,
+                } => {
+                    evidence = Some(carried);
+                    format!("validator `{reference}` flagged this write: {reason}. {why}")
+                }
                 ValidatorOutcome::Finding {
                     class,
                     reason,
@@ -723,6 +747,7 @@ fn evaluate_rule(
                         rule_id: rule.id.clone(),
                         policy_ref: None,
                         refer_reason,
+                        evidence: None,
                     });
                 }
                 // Unavailable-by-DECLARATION: the cascade (or the host's scope
@@ -771,6 +796,7 @@ fn evaluate_rule(
                         rule_id: rule.id.clone(),
                         policy_ref: rule.policy_ref.clone(),
                         refer_reason: Some("unresolvable-validator".into()),
+                        evidence: None,
                     });
                 }
             }
@@ -791,6 +817,7 @@ fn evaluate_rule(
                     rule_id: rule.id.clone(),
                     policy_ref: rule.policy_ref.clone(),
                     refer_reason: None,
+                    evidence: None,
                 });
             }
             if soft.is_some_and(|ceiling| lines >= ceiling) {
@@ -804,6 +831,7 @@ fn evaluate_rule(
                     rule_id: rule.id.clone(),
                     policy_ref: rule.policy_ref.clone(),
                     refer_reason: None,
+                    evidence: None,
                 });
             }
             return None;
@@ -823,6 +851,7 @@ fn evaluate_rule(
         rule_id: rule.id.clone(),
         policy_ref: rule.policy_ref.clone(),
         refer_reason,
+        evidence,
     })
 }
 
@@ -1180,6 +1209,97 @@ mod validator_declaration_tests {
             "a bare reference names a mechanism by trust; a cid names it by content, and \
              fuel is what bounds an otherwise-unbounded variety amplifier"
         );
+    }
+
+    /// A provider that classifies returns an opaque evidence value alongside its reason.
+    struct Classifier;
+
+    impl ValidatorProvider for Classifier {
+        fn evaluate(&self, _request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+            ValidatorOutcome::Classified {
+                reason: "frame drift".into(),
+                evidence: classified_evidence(),
+            }
+        }
+    }
+
+    struct Flagger;
+
+    impl ValidatorProvider for Flagger {
+        fn evaluate(&self, _request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+            ValidatorOutcome::Flag {
+                reason: "frame drift".into(),
+            }
+        }
+    }
+
+    fn classified_evidence() -> Value {
+        serde_json::json!({
+            "frameRef": "bafyframe",
+            "verdict": "drift",
+            "spans": [[0, 4]],
+        })
+    }
+
+    fn fired(provider: &dyn ValidatorProvider) -> GovernanceVerdict {
+        let dir = TempDir::new().unwrap();
+        write_manifest(&dir, "");
+        let write = GovernanceWrite {
+            path: "thing.rs".into(),
+            content: Some("fn main() {}".into()),
+            prior_content: None,
+            is_new: true,
+            is_new_subdir: false,
+        };
+        let evaluation =
+            evaluate_path_with(dir.path(), dir.path().join("thing.rs"), &write, provider).unwrap();
+        assert_eq!(evaluation.verdicts.len(), 1, "the validator rule must fire");
+        evaluation.verdicts.into_iter().next().unwrap()
+    }
+
+    /// Evidence crosses the evaluator opaquely: the verdict is shaped exactly like a Flag
+    /// (same reason line, the rule's own class, the same referral), and the value the
+    /// validator produced rides along untouched. The evaluator never reads it.
+    #[test]
+    fn classified_outcome_carries_evidence_to_the_verdict() {
+        let classified = fired(&Classifier);
+        let flagged = fired(&Flagger);
+
+        assert_eq!(classified.evidence, Some(classified_evidence()));
+        assert_eq!(classified.class, GovernanceRuleClass::Ask);
+        assert_eq!(classified.reason, flagged.reason);
+        assert!(classified.reason.starts_with(&format!(
+            "validator `{}` flagged this write: frame drift. ",
+            reference()
+        )));
+        assert_eq!(classified.refer_reason, flagged.refer_reason);
+        assert_eq!(classified.rule_id, flagged.rule_id);
+        assert_eq!(classified.policy_ref, flagged.policy_ref);
+        assert_eq!(flagged.evidence, None);
+    }
+
+    /// `evidence` is additive on the wire: a verdict without it serializes byte-for-byte as it
+    /// did before the field existed (the govern payload and the parity vectors stay put), and a
+    /// payload written before it existed still deserializes.
+    #[test]
+    fn evidence_serializes_only_when_present() {
+        let flagged = serde_json::to_value(fired(&Flagger)).unwrap();
+        assert!(
+            flagged.get("evidence").is_none(),
+            "a Flag verdict must carry no evidence key: {flagged}"
+        );
+
+        let classified = serde_json::to_value(fired(&Classifier)).unwrap();
+        assert_eq!(classified.get("evidence"), Some(&classified_evidence()));
+
+        let legacy: GovernanceVerdict = serde_json::from_value(serde_json::json!({
+            "class": "ask",
+            "reason": "r",
+            "ruleId": "x",
+            "policyRef": null,
+        }))
+        .unwrap();
+        assert_eq!(legacy.evidence, None);
     }
 
     /// An undeclared validator yields `None`, not a default. "No manifest named an identity
