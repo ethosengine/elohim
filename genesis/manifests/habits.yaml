@@ -4678,6 +4678,37 @@ habits:
       when Antigravity resolves Elohim capability packages and their eprfs derivation graph natively,
       making the checked-in .agents materialization an unnecessary compatibility projection.
 
+  - id: pin-attestation
+    declared: genesis/orchestrator/.epr-meta/pin-attestation.habit.md
+    invariant: >
+      A submodule pin move is gated by the pinned commit's own attestation and re-gates
+      the pin's direct consumers; the component's suite is never re-run from the monorepo.
+      A red, cancelled, pending or absent attestation refuses the pin; an unreachable read
+      passes on the floor and says `claimed`.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:pin-attestation (genesis/a2o/features/devflow/pin-attestation.feature — five scenarios over a scratch superproject with one gitlink and a fake `gh`: green passes, red refuses, absent refuses, unreachable passes as claimed, and a pin move selects the one-hop consumer and nothing deeper; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:pin-attestation')"
+      - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
+      - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
+    evidence: >
+      DELTA 2026-09-23 (born RED): spec and plan authored; the codegen gate was found red at the
+      pinned rakia schema and the two oracles disagree on a bare gitlink path. No landing yet.
+    guard: >
+      Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
+      listing the pin path — both oracles must agree by declaration, not by code;
+      (2) widening `gateAttestation` past its three fields (thresholds, signers) before
+      rung 2 exists to read them; (3) greening this habit by trusting a green badge
+      rather than reading it — `tier=claimed` is a pass, never evidence.
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md"
+      - "plan: genesis/docs/superpowers/plans/2026-09-23-submodule-pin-attestation-gate-plan.md"
+      - "ladder: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (rung 3 of the component ladder named 2026-09-23)"
+      - "oracle: elohim/rakia/docs/specs/2026-04-12-rakia-design.md §4 open question 4 (shadow, then switch)"
+    retire-when: >
+      when attestations are read from the dataplane rather than a forge — rung 2 landing makes
+      `github-checks` one provider among peers — and this habit describes a product, not a practice.
+
   - id: push-delivers-within-budget
     declared: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
     invariant: >

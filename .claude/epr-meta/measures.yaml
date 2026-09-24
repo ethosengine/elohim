@@ -361,6 +361,16 @@ measures:
     status: active
     established_by: operator-requested-2026-09-19
 
+  - id: pin-attestation
+    version: 1
+    family: dev-cycle
+    unit: reads
+    procedure: "genesis/orchestrator/gate-attest.mjs runAttested — ONE read of a submodule pin's upstream attestation, recorded as `epr flow note --kind observation --measure pin-attestation@1 --subject <gate dir> --value 1 --unit reads --env provider=<github-checks> --env check=<check-run name> --env conclusion=<success|failure|absent|pending|unreachable> --env tier=<witnessed|claimed>`. tier=witnessed when the read succeeded whatever it concluded; tier=claimed when the read itself failed (no gh, offline) and the gate passed on the floor. No ceiling reads it yet — it is the seed rung 1 grows from."
+    provenance: "2026-09-23: a sophia pointer move ran sophia's whole suite on a brit-focused host; a brit pointer move ran nothing. genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md §4.6."
+    default-authority: observation
+    status: active
+    established_by: spec-submodule-pin-attestation-gate-2026-09-23
+
   - id: cleanup-cycle-history
     version: 1
     family: cleanup-pressure

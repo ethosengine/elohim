@@ -150,9 +150,11 @@ projects with `inputs` are still matched in JS as today.
 
 ### 4.5 The attested gate
 
-`run-local-gate.sh` gains an `attested` branch. Provider, repo and check travel through the same
-serialized-env channel `run.cargo.env` uses (`GATE_ATTESTATION` as JSON), never argv: the positional
-contract stays at its current arity.
+`gate-runner.mjs` dispatches a project whose `run.kind` is `attested` to a new module,
+`genesis/orchestrator/gate-attest.mjs`, and never to `run-local-gate.sh` (which keeps refusing
+unknown kinds). Provider, repo and check come from the registry entry; nothing travels through
+argv or the environment. Keeping the read in Node lets the four outcomes be pinned by `node:test`
+with a fake `gh` and reuse the gate-cycle observation path.
 
 1. Resolve the pinned commit: `git rev-parse HEAD:<dir>`. A path that is not a gitlink is a manifest
    error (exit 2), not a gate failure.
