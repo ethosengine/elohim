@@ -33,7 +33,9 @@ export const MAPPINGS = [
     to: 'narrative/why/vision.md',
     title: 'I. Why / Vision' },
   // I. Narrative Flow / What
-  { from: 'graphos/elohim-protocol-design-spec.md',
+  // The design assets moved from genesis/graphos to app/graphos in the 2026-09 tree
+  // ceremony; `from` still resolves against GENESIS_DIR, so these two step up a level.
+  { from: '../app/graphos/elohim-protocol-design-spec.md',
     to: 'narrative/what/brand.md',
     title: 'I. What / Brand' },
   // I. Narrative Flow / How
@@ -50,7 +52,7 @@ export const MAPPINGS = [
     to: 'narrative/how/hardware-spec.md',
     title: 'I. How / Hardware Spec' },
   // II. Foundations
-  { from: 'graphos/vocabulary.md',
+  { from: '../app/graphos/vocabulary.md',
     to: 'foundations/vocabulary-register.md',
     title: 'II. Foundations / Vocabulary Register' },
   // III. Domains — single-file Reference Design (where genesis content exists)

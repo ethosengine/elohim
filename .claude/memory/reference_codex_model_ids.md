@@ -1,6 +1,7 @@
 ---
 name: reference-codex-model-ids
 title: "Codex CLI model ids and exec flags"
+id: reference-codex-model-ids
 description: "gpt-5.6 only as -luna/-sol/-terra (plain rejected), plus gpt-5.5, gpt-6-astra; review vs write exec flags."
 metadata: 
   node_type: memory

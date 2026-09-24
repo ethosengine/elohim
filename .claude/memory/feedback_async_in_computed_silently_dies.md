@@ -1,6 +1,7 @@
 ---
 name: feedback-async-in-computed-silently-dies
 title: "void async inside computed() dies silently"
+id: feedback-async-in-computed-silently-dies
 description: "Signal writes throw in computed(); an async trigger there dies at its first set() with no trace — use effect()."
 metadata: 
   node_type: memory
