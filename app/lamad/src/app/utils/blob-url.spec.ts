@@ -17,6 +17,7 @@ function sidecarDelegate(): ILamadStorageClient {
     getBlobUrl: (hash: string) => `${SIDECAR}/blob/${hash}`,
     getStorageBaseUrl: () => SIDECAR,
     getContentEngagement: vi.fn(() => of({} as never)),
+    getObservationStream: vi.fn(() => of({} as never)),
   };
 }
 
@@ -116,5 +117,16 @@ describe('withOriginRelativeBlobUrls', () => {
 
     client.getContentEngagement('some-content');
     expect(delegate.getContentEngagement).toHaveBeenCalledWith('some-content');
+  });
+
+  it('passes the lifestream read through to the delegate unchanged', () => {
+    const delegate = sidecarDelegate();
+    const client = withOriginRelativeBlobUrls(delegate, () => ({
+      mode: 'doorway',
+      origin: 'https://example.test',
+    }));
+
+    client.getObservationStream({ lens: 'long-dwell' });
+    expect(delegate.getObservationStream).toHaveBeenCalledWith({ lens: 'long-dwell' });
   });
 });

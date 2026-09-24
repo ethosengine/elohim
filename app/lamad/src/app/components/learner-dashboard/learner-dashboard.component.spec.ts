@@ -192,6 +192,28 @@ describe('LearnerDashboardComponent', () => {
     });
   });
 
+  describe('My stream link', () => {
+    const streamLinks = () =>
+      fixture.debugElement.queryAll(By.css('[data-testid="dashboard-my-stream"]'));
+
+    it('links to /me/stream from the dashboard', () => {
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+      const links = streamLinks();
+      expect(links).toHaveLength(1);
+      expect(links[0].attributes['routerLink']).toBe('/me/stream');
+    });
+
+    it('links to /me/stream from the empty state too', () => {
+      fixture.detectChanges();
+      profileSubject.next(null);
+      fixture.detectChanges();
+      const links = streamLinks();
+      expect(links).toHaveLength(1);
+      expect(links[0].attributes['routerLink']).toBe('/me/stream');
+    });
+  });
+
   describe('Dashboard header', () => {
     beforeEach(() => {
       profileSubject.next(buildProfile());

@@ -1,0 +1,91 @@
+<section class="my-stream" aria-labelledby="my-stream-title">
+  <header class="stream-header">
+    <div>
+      <h1 id="my-stream-title">My stream</h1>
+      <p class="stream-lede">
+        What you have looked at, kept on your own node. Only you can read it.
+      </p>
+    </div>
+    <div class="stream-controls">
+      <label for="stream-lens-select">Lens</label>
+      <select
+        id="stream-lens-select"
+        data-testid="stream-lens"
+        [value]="lens()"
+        (change)="onLensChange($event)"
+      >
+        @for (option of lenses; track option) {
+          <option [value]="option" [selected]="option === lens()">
+            {{ option }}
+          </option>
+        }
+      </select>
+    </div>
+  </header>
+
+  @switch (state().status) {
+    @case ('loading') {
+      <p class="stream-status" role="status">Reading your stream…</p>
+    }
+    @case ('error') {
+      <p class="stream-status" role="alert" data-testid="stream-error">
+        Your stream could not be read from your node right now.
+      </p>
+    }
+  }
+
+  @if (state(); as current) {
+    @if (current.status === 'ready') {
+      <p class="stream-provenance" data-testid="stream-provenance">
+        Arranged by the recipe
+        <strong>{{ current.view.recipe.name }}</strong>
+        <code class="recipe-cid">{{ current.view.recipe.cid }}</code>
+        <span class="provenance-sep" aria-hidden="true">·</span>
+        lens
+        <strong>{{ current.view.lens }}</strong>
+        <span class="provenance-sep" aria-hidden="true">·</span>
+        window {{ current.view.window }}
+      </p>
+
+      @if (current.view.entries.length === 0) {
+        <p class="stream-empty" data-testid="stream-empty">
+          Nothing witnessed in the last {{ current.view.window }} under the
+          {{ current.view.lens }} lens.
+        </p>
+      } @else {
+        <ol class="stream-entries">
+          @for (entry of current.view.entries; track $index) {
+            <li class="stream-entry" data-testid="stream-entry">
+              @if (eprHref(entry.subjectCid); as href) {
+                <a class="entry-title" [attr.href]="href">{{ label(entry) }}</a>
+              } @else {
+                <span class="entry-title">{{ label(entry) }}</span>
+              }
+              <span class="entry-meta">
+                <time [attr.datetime]="isoOf(entry.observedAt)">
+                  {{ entry.observedAt * 1000 | date: 'medium' }}
+                </time>
+                <span class="entry-measure">
+                  <span class="visually-hidden">dwell</span>
+                  {{ formatDwell(entry.dwellMs) }}
+                </span>
+                <span class="entry-measure">
+                  <span class="visually-hidden">scrolled to</span>
+                  {{ entry.scrollDepthPct }}%
+                </span>
+              </span>
+            </li>
+          }
+        </ol>
+      }
+
+      @if (current.view.omissions.length > 0) {
+        <ul class="stream-omissions" aria-label="What this view leaves out">
+          @for (line of current.view.omissions; track line) {
+            <li data-testid="stream-omission">{{ line }}</li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>

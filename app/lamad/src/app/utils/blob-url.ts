@@ -112,5 +112,6 @@ export function withOriginRelativeBlobUrls(
     getBlobUrl: (blobHash: string) => resolveBlobHref(blobHash, delegate, context()),
     getStorageBaseUrl: () => delegate.getStorageBaseUrl(),
     getContentEngagement: (contentId: string) => delegate.getContentEngagement(contentId),
+    getObservationStream: query => delegate.getObservationStream(query),
   };
 }

@@ -19,6 +19,7 @@ import type {
   ContentEngagementStatsView,
   ContentStewardshipView,
   ContributorPresenceView,
+  ObservationStreamView,
   StewardshipAllocationView,
 } from '@elohim/storage-client/generated';
 
@@ -128,11 +129,28 @@ export const LAMAD_STORAGE_API = new InjectionToken<ILamadStorageApi>('LamadStor
 // ILamadStorageClient — blob URL surface that lamad uses
 // ============================================================================
 
+/**
+ * Query for the person's own lifestream (GET /api/v1/observations/stream).
+ * No observer knob: the node reads only the requester's own rows.
+ */
+export interface LamadObservationStreamQuery {
+  /** Unix epoch seconds the window ends at (default: now). */
+  asOf?: number;
+  /** `Nd` or `Nh` (default: the recipe's window, 7d). */
+  window?: string;
+  /** A key of the lifestream recipe's lens table: all | content | long-dwell. */
+  lens?: string;
+  /** Narrow further to one manifest-declared observation kind. */
+  kind?: string;
+}
+
 export interface ILamadStorageClient {
   getBlobUrl(blobHash: string): string;
   getStorageBaseUrl(): string;
   // M-AGGR-3: server-side ContentEngagementStatsView projection
   getContentEngagement(contentId: string): Observable<ContentEngagementStatsView>;
+  // R-A4: the requester's own lifestream, rendered through the lifestream recipe
+  getObservationStream(query: LamadObservationStreamQuery): Observable<ObservationStreamView>;
 }
 
 /**

@@ -39,6 +39,15 @@ describe('Lamad Routes', () => {
     expect(resourceRoute?.loadComponent).toBeDefined();
   });
 
+  it('should have me/stream child route beside the learner dashboard', () => {
+    const children = LAMAD_ROUTES[0].children ?? [];
+    const meIndex = children.findIndex(r => r.path === 'me');
+    const streamIndex = children.findIndex(r => r.path === 'me/stream');
+    expect(streamIndex).toBeGreaterThan(-1);
+    expect(streamIndex).toBe(meIndex + 1);
+    expect(children[streamIndex].loadComponent).toBeDefined();
+  });
+
   it('should have search child route', () => {
     const children = LAMAD_ROUTES[0].children;
     const searchRoute = children?.find(r => r.path === 'search');

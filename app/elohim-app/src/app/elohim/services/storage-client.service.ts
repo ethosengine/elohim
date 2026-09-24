@@ -32,7 +32,7 @@ import { resolveDoorwayUrl } from '../utils/runtime-doorway';
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
 import type { ConnectionConfig } from '@elohim/service/connection';
-import type { ContentEngagementStatsView } from '@elohim/storage-client';
+import type { ContentEngagementStatsView, ObservationStreamView } from '@elohim/storage-client';
 
 /**
  * Schema-negotiation header sent on every guarded `/db/**\/bulk` write.
@@ -64,6 +64,14 @@ export interface StorageContentNode {
   validationStatus?: string;
   createdBy?: string;
   contentSizeBytes?: number;
+}
+
+/** Query for GET /api/v1/observations/stream (the requester's own lifestream). */
+export interface ObservationStreamQuery {
+  asOf?: number;
+  window?: string;
+  lens?: string;
+  kind?: string;
 }
 
 /** Content query filter */
@@ -211,6 +219,33 @@ export class StorageClientService {
     return this.http.get<ContentEngagementStatsView>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
       catchError((error: HttpErrorResponse) => this.handleError('getContentEngagement', error))
+    );
+  }
+
+  /**
+   * The requester's own lifestream: their agent-private observations, arranged
+   * by the observation-lifestream recipe whose name and CID the view carries.
+   *
+   * The node reads only rows whose observer is the caller (X-Agent-Cid — the
+   * doorway injects it from the session on the browser path; the native shell
+   * calls its own sidecar). There is no observer parameter.
+   *
+   * @endpoint GET /api/v1/observations/stream?asOf&window&lens&kind
+   */
+  getObservationStream(query: ObservationStreamQuery): Observable<ObservationStreamView> {
+    const baseUrl = this.getStorageBaseUrl();
+    const params = new URLSearchParams();
+    if (query.asOf !== undefined) params.set('asOf', String(query.asOf));
+    if (query.window) params.set('window', query.window);
+    if (query.lens) params.set('lens', query.lens);
+    if (query.kind) params.set('kind', query.kind);
+    const queryString = params.toString();
+    const path = `${baseUrl}/api/v1/observations/stream`;
+    const endpoint = queryString ? `${path}?${queryString}` : path;
+
+    return this.http.get<ObservationStreamView>(endpoint).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError((error: HttpErrorResponse) => this.handleError('getObservationStream', error))
     );
   }
 

@@ -112,6 +112,22 @@ export const LAMAD_ROUTES: Routes = [
         },
       },
 
+      // The person's own lifestream (R-A4): agent-private observations on
+      // their own node, arranged by the recipe whose CID the page prints.
+      {
+        path: 'me/stream',
+        loadComponent: async () =>
+          import('./components/my-stream/my-stream.component').then(m => m.MyStreamComponent),
+        data: {
+          title: 'My Stream',
+          seo: {
+            title: 'My Stream',
+            description: 'What you have looked at, kept privately on your own node.',
+            openGraph: { ogType: 'website' },
+          },
+        },
+      },
+
       // Profile page - session human profile management
       // SEO: Dynamic title set by ProfilePageComponent
       {

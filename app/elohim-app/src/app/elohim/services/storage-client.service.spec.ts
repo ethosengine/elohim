@@ -260,6 +260,46 @@ describe('StorageClientService', () => {
     }));
   });
 
+  describe('getObservationStream', () => {
+    it("reads the requester's own lifestream from the storage base with the lens", fakeAsync(() => {
+      const view = {
+        asOf: 1_790_000_000,
+        window: '7d',
+        recipe: { name: 'observation-lifestream', cid: 'blake3:abc' },
+        lens: 'long-dwell',
+        entries: [],
+        omissions: [],
+        totalCount: 0,
+      };
+      let result: unknown;
+
+      service.getObservationStream({ lens: 'long-dwell' }).subscribe(r => (result = r));
+
+      const req = httpMock.expectOne(
+        'http://localhost:8888/api/v1/observations/stream?lens=long-dwell'
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush(view);
+      tick();
+      expect(result).toEqual(view);
+    }));
+
+    it('carries asOf, window and kind when given, and no query string when empty', fakeAsync(() => {
+      service
+        .getObservationStream({ asOf: 1_790_000_000, window: '24h', kind: 'lamad:content-viewed' })
+        .subscribe();
+      httpMock
+        .expectOne(
+          'http://localhost:8888/api/v1/observations/stream?asOf=1790000000&window=24h&kind=lamad%3Acontent-viewed'
+        )
+        .flush({});
+
+      service.getObservationStream({}).subscribe();
+      httpMock.expectOne('http://localhost:8888/api/v1/observations/stream').flush({});
+      tick();
+    }));
+  });
+
   describe('queryContent', () => {
     it('should query content without filters', fakeAsync(() => {
       const mockResponse: ListResponse<StorageContentNode> = {
