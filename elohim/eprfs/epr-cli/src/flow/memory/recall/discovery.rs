@@ -611,8 +611,18 @@ pub const HABITS_REL: &str = "genesis/manifests/habits.yaml";
 /// root authority set and the semantic order alike). The habit register is a GENERATED
 /// projection (never an authority to edit or cite) and its rows already render as the screen's
 /// habits block; it would otherwise compete as a source with the atoms it is projected from.
-pub(super) fn offered_on_first_screen(path: &str) -> bool {
-    path != HABITS_REL
+///
+/// The question bank the contract declares (`question_bank`) is refused too: it is the exam
+/// sheet, not an answer — every bank question's own words are in it, so it would outrank the
+/// authority it asks about (station 4, Task 4.8 bank evidence). Read from the contract, never a
+/// literal: a contract naming another bank refuses that one.
+pub(super) fn offered_on_first_screen(contract: &Contract, path: &str) -> bool {
+    let bank = contract
+        .value
+        .get("question_bank")
+        .and_then(Value::as_str)
+        .map(|bank| bank.trim_start_matches("./"));
+    path != HABITS_REL && bank != Some(path.trim_start_matches("./"))
 }
 
 /// Words that carry no area, so they never select a habit or a source.
@@ -998,7 +1008,7 @@ pub(super) fn first_screen(
         candidates.retain(|candidate| {
             candidate["path"]
                 .as_str()
-                .is_some_and(offered_on_first_screen)
+                .is_some_and(|path| offered_on_first_screen(contract, path))
         });
         // Each candidate is located, not merely named: the section its terms land in, and a read
         // range bounded to one excerpt. The outline scan is charged to the scan counters.
@@ -1102,7 +1112,7 @@ fn root_authority_screen(
     let mut paths: Vec<String> = Vec::new();
     let roots = contract.source_roots();
     let mut push_if_file = |candidate: String| {
-        if paths.contains(&candidate) || !offered_on_first_screen(&candidate) {
+        if paths.contains(&candidate) || !offered_on_first_screen(contract, &candidate) {
             return;
         }
         // Every authority-set path passes the same declared-scope gate a question's read does:

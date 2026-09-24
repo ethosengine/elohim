@@ -406,6 +406,21 @@ mod tests {
         );
     }
 
+    /// Station 4 integration (Task 4.8 ruling): the LIVE contract declares the lexical provider —
+    /// no test-only declaration added — and `local` stays the default.
+    #[test]
+    fn providers_for_returns_the_lexical_provider_from_the_live_contract() {
+        let value = crate::flow::memory::recall::tests_support::minimal_contract();
+        assert_eq!(
+            value["ceremony"]["providers"]["lexical"]["kind"], "lexical",
+            "the live contract declares it"
+        );
+        let contract = Contract::from_value(value).unwrap();
+        let ids: Vec<ProviderId> = providers_for(&contract).iter().map(|p| p.id()).collect();
+        assert!(ids.contains(&"lexical".to_string()), "{ids:?}");
+        assert_eq!(ids.first().map(String::as_str), Some("local"), "{ids:?}");
+    }
+
     /// `lexical` sorts before `local` as a map key; the default a bare `search` names stays `local`.
     #[test]
     fn a_declared_lexical_provider_never_displaces_the_local_default() {

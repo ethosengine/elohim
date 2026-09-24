@@ -110,23 +110,29 @@ pub(super) struct Fused {
     pub ranks: Vec<(String, Option<usize>)>,
     /// The candidate as its first returning producer (in recipe order) shaped it, with `ranks`
     /// and, for every later producer that also returned it, that producer's own fields under
-    /// `native.<producer>`.
+    /// `native.<producer>`. Its `best_section` — the passage its linked read lands on — is the one
+    /// the best-ranked producer located (ties → the earlier producer, `local` first), named by
+    /// `passage_by`; a displaced passage is kept under `native.<producer>.best_section`.
     pub candidate: Value,
 }
 
 /// Reciprocal-rank fusion of `producers` (each an id and its candidates in its own order), for
 /// order only: a path's score is Σ 1/(k + rank) over the producers that returned it, rank
 /// 1-based among that producer's distinct paths; higher first, ties by path. Only each
-/// candidate's `path` and its position are read — no field a candidate carries can move it.
+/// candidate's `path` and its position are read for ORDER — no field a candidate carries can move
+/// it. The PASSAGE follows the ranking: the fused candidate reads the section the producer that
+/// ranked it best located (ties → earlier in recipe order, so `local`), and says which in
+/// `passage_by` — the linked read lands where the ranking producer matched (station 4
+/// integration, the q-hook-binary seam).
 pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
     struct Entry {
         score: f64,
         ranks: Vec<Option<usize>>,
-        candidate: Option<Value>,
-        native: Map<String, Value>,
+        /// Each producer's own candidate for this path, in recipe order.
+        own: Vec<Option<Value>>,
     }
     let mut entries: BTreeMap<String, Entry> = BTreeMap::new();
-    for (index, (producer, candidates)) in producers.iter().enumerate() {
+    for (index, (_, candidates)) in producers.iter().enumerate() {
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         for candidate in candidates {
             let Some(path) = candidate["path"].as_str() else {
@@ -139,40 +145,66 @@ pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
             let entry = entries.entry(path.to_string()).or_insert_with(|| Entry {
                 score: 0.0,
                 ranks: vec![None; producers.len()],
-                candidate: None,
-                native: Map::new(),
+                own: vec![None; producers.len()],
             });
             entry.score += 1.0 / (k as f64 + rank as f64);
             entry.ranks[index] = Some(rank);
-            match entry.candidate {
-                None => entry.candidate = Some(candidate.clone()),
-                Some(_) => {
-                    let mut own = candidate.clone();
-                    if let Some(fields) = own.as_object_mut() {
-                        fields.remove("path");
-                    }
-                    entry.native.insert(producer.clone(), own);
-                }
-            }
+            entry.own[index] = Some(candidate.clone());
         }
     }
     let mut fused: Vec<Fused> = entries
         .into_iter()
         .map(|(path, entry)| {
-            let ranks: Vec<(String, Option<usize>)> = producers
-                .iter()
-                .map(|(producer, _)| producer.clone())
-                .zip(entry.ranks)
-                .collect();
-            let mut candidate = entry.candidate.unwrap_or_else(|| json!({"path": path}));
+            let ids: Vec<&String> = producers.iter().map(|(producer, _)| producer).collect();
+            // The producer whose located passage the candidate reads: the best rank among those
+            // that located one; `min_by_key` keeps the first of equals, so a tie goes to the
+            // earlier producer in recipe order.
+            let passage = (0..ids.len())
+                .filter(|&i| {
+                    entry.own[i]
+                        .as_ref()
+                        .is_some_and(|own| !own["best_section"].is_null())
+                })
+                .min_by_key(|&i| entry.ranks[i].unwrap_or(usize::MAX));
+            let shaper = entry.own.iter().position(Option::is_some);
+            let mut candidate = json!({"path": path});
+            let mut native = Map::new();
+            for (i, own) in entry.own.into_iter().enumerate() {
+                let Some(mut own) = own else {
+                    continue;
+                };
+                if Some(i) == shaper {
+                    candidate = own;
+                } else if let Some(fields) = own.as_object_mut() {
+                    fields.remove("path");
+                    native.insert(ids[i].clone(), own);
+                }
+            }
+            if let (Some(chosen), Some(shaper)) = (passage, shaper) {
+                if chosen != shaper {
+                    let section = native
+                        .get(ids[chosen].as_str())
+                        .map_or(Value::Null, |own| own["best_section"].clone());
+                    let displaced = std::mem::replace(&mut candidate["best_section"], section);
+                    if !displaced.is_null() {
+                        let own = native
+                            .entry(ids[shaper].clone())
+                            .or_insert_with(|| json!({}));
+                        own["best_section"] = displaced;
+                    }
+                }
+                candidate["passage_by"] = json!(ids[chosen]);
+            }
+            let ranks: Vec<(String, Option<usize>)> =
+                ids.into_iter().cloned().zip(entry.ranks).collect();
             candidate["ranks"] = Value::Object(
                 ranks
                     .iter()
                     .map(|(producer, rank)| (producer.clone(), json!(rank)))
                     .collect(),
             );
-            if !entry.native.is_empty() {
-                candidate["native"] = Value::Object(entry.native);
+            if !native.is_empty() {
+                candidate["native"] = Value::Object(native);
             }
             Fused {
                 path,
@@ -212,7 +244,10 @@ pub(super) fn fuse_screen(
             return;
         }
     };
-    let local: Vec<Value> = offered(screen["candidates"].as_array().cloned().unwrap_or_default());
+    let local: Vec<Value> = offered(
+        contract,
+        screen["candidates"].as_array().cloned().unwrap_or_default(),
+    );
     let mut orders: Vec<(String, Vec<Value>)> = vec![(LOCAL.to_string(), local)];
     let mut methods: Vec<Value> = vec![json!({"id": LOCAL, "method": contract.method_cid()})];
     let declared = providers_for(contract);
@@ -267,7 +302,7 @@ pub(super) fn fuse_screen(
             push_omission(screen, line);
         }
         methods.push(json!({"id": producer, "method": answer.method}));
-        orders.push((producer.clone(), offered(answer.ranked)));
+        orders.push((producer.clone(), offered(contract, answer.ranked)));
     }
     if orders.len() < 2 {
         return;
@@ -369,10 +404,14 @@ fn declared_fields(
 
 /// Only the candidates a first screen may offer, in their producer's order
 /// ([`offered_on_first_screen`] — one rule for every producer).
-fn offered(candidates: Vec<Value>) -> Vec<Value> {
+fn offered(contract: &Contract, candidates: Vec<Value>) -> Vec<Value> {
     candidates
         .into_iter()
-        .filter(|c| c["path"].as_str().is_some_and(offered_on_first_screen))
+        .filter(|c| {
+            c["path"]
+                .as_str()
+                .is_some_and(|path| offered_on_first_screen(contract, path))
+        })
         .collect()
 }
 
@@ -534,6 +573,139 @@ mod tests {
             both.get("producer").is_none(),
             "never relabelled by a later producer"
         );
+    }
+
+    /// Integration fix (station 4): a fused candidate's passage comes from the producer that
+    /// ranked it higher — the linked read lands where the ranking producer matched. Ties go to
+    /// `local`; the displaced passage is kept under `native.<producer>`, never lost.
+    #[test]
+    fn the_passage_follows_the_producer_that_ranked_the_path_higher() {
+        let local = vec![
+            json!({"path": "first.md", "best_section": {"lines": "1:2", "title": "L first"}}),
+            json!({"path": "hook.py", "title": "hook.py",
+                   "best_section": {"lines": "188:237", "title": "def emit"}}),
+            json!({"path": "tie.md", "best_section": {"lines": "5:6", "title": "L tie"}}),
+            json!({"path": "lex.md", "best_section": {"lines": "9:9", "title": "L only"}}),
+        ];
+        let semantic = vec![
+            json!({"path": "hook.py", "producer": "semantic",
+                   "best_section": {"lines": "40:71", "title": "def resolve_bin"}}),
+            json!({"path": "first.md", "producer": "semantic",
+                   "best_section": {"lines": "30:31", "title": "S first"}}),
+            json!({"path": "tie.md", "producer": "semantic",
+                   "best_section": {"lines": "7:8", "title": "S tie"}}),
+            json!({"path": "sem.md", "producer": "semantic",
+                   "best_section": {"lines": "3:4", "title": "S only"}}),
+        ];
+        let fused = fuse(
+            &[("local".into(), local), ("semantic".into(), semantic)],
+            60,
+        );
+        let by = |path: &str| {
+            fused
+                .iter()
+                .find(|f| f.path == path)
+                .unwrap_or_else(|| panic!("{path} fused"))
+                .candidate
+                .clone()
+        };
+        // local #2 · semantic #1: the semantic chunk is the passage.
+        let hook = by("hook.py");
+        assert_eq!(hook["best_section"]["lines"], "40:71", "{hook}");
+        assert_eq!(hook["best_section"]["title"], "def resolve_bin");
+        assert_eq!(hook["passage_by"], "semantic");
+        assert_eq!(
+            hook["title"], "hook.py",
+            "the candidate is still shaped by local"
+        );
+        assert_eq!(
+            hook["native"]["local"]["best_section"]["lines"], "188:237",
+            "the displaced passage is kept, never lost"
+        );
+        // local #1 · semantic #2: local keeps it.
+        let first = by("first.md");
+        assert_eq!(first["best_section"]["lines"], "1:2");
+        assert_eq!(first["passage_by"], "local");
+        assert_eq!(
+            first["native"]["semantic"]["best_section"]["lines"],
+            "30:31"
+        );
+        // local #3 · semantic #3: a tie goes to local.
+        let tie = by("tie.md");
+        assert_eq!(tie["best_section"]["lines"], "5:6");
+        assert_eq!(tie["passage_by"], "local");
+        // One producer: its own passage, named.
+        assert_eq!(by("lex.md")["passage_by"], "local");
+        assert_eq!(by("sem.md")["passage_by"], "semantic");
+        assert_eq!(by("sem.md")["best_section"]["lines"], "3:4");
+    }
+
+    /// A better-ranked producer that located no passage does not erase the other's.
+    #[test]
+    fn a_producer_that_located_no_passage_never_takes_it() {
+        let local = vec![
+            json!({"path": "x.md"}),
+            json!({"path": "y.md", "best_section": {"lines": "2:3", "title": "L y"}}),
+        ];
+        let semantic = vec![
+            json!({"path": "y.md", "producer": "semantic"}),
+            json!({"path": "x.md", "producer": "semantic"}),
+        ];
+        let fused = fuse(
+            &[("local".into(), local), ("semantic".into(), semantic)],
+            60,
+        );
+        let y = &fused.iter().find(|f| f.path == "y.md").unwrap().candidate;
+        assert_eq!(y["best_section"]["lines"], "2:3", "{y}");
+        assert_eq!(y["passage_by"], "local");
+        let x = &fused.iter().find(|f| f.path == "x.md").unwrap().candidate;
+        assert!(
+            x.get("best_section").is_none() && x.get("passage_by").is_none(),
+            "{x}"
+        );
+    }
+
+    /// Station 4 integration (Task 4.8 ruling): the question bank is the exam sheet, not an
+    /// answer — the path the contract's own `question_bank` names is never offered on a first
+    /// screen, read from the contract, never a literal; the habit register stays refused.
+    #[test]
+    fn the_declared_question_bank_is_never_offered_on_a_first_screen() {
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        let bank = value["question_bank"].as_str().expect("bank").to_string();
+        assert_eq!(bank, ".epr-meta/elohim/algorithms/recall-questions.json");
+        let contract = Contract::from_value(value.clone()).unwrap();
+        assert!(!offered_on_first_screen(&contract, &bank));
+        assert!(!offered_on_first_screen(
+            &contract,
+            "genesis/manifests/habits.yaml"
+        ));
+        assert!(offered_on_first_screen(&contract, "genesis/exam.json"));
+
+        value["question_bank"] = json!("genesis/exam.json");
+        let moved = Contract::from_value(value.clone()).unwrap();
+        assert!(!offered_on_first_screen(&moved, "genesis/exam.json"));
+        assert!(
+            offered_on_first_screen(&moved, &bank),
+            "the rule reads the contract's declaration, not a literal"
+        );
+
+        value.as_object_mut().unwrap().remove("question_bank");
+        let none = Contract::from_value(value).unwrap();
+        assert!(offered_on_first_screen(&none, &bank));
+        assert!(!offered_on_first_screen(
+            &none,
+            "genesis/manifests/habits.yaml"
+        ));
+
+        let offered_paths: Vec<Value> = offered(
+            &contract,
+            vec![
+                json!({"path": bank}),
+                json!({"path": "genesis/exam.json"}),
+                json!({"path": "genesis/manifests/habits.yaml"}),
+            ],
+        );
+        assert_eq!(offered_paths, vec![json!({"path": "genesis/exam.json"})]);
     }
 
     #[test]

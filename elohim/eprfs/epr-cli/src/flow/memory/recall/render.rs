@@ -261,7 +261,8 @@ fn render_floor_line(
 
 /// A fused candidate's producer ranks and the method handle of each producer that returned it —
 /// `local #2 · semantic #1 · by local bafkrei…abcd, semantic bafkrei…wxyz`, `—` for a producer
-/// that did not return it — in the recipe's producer order. `None` for an unfused candidate.
+/// that did not return it — in the recipe's producer order, then which producer's located
+/// passage the linked read lands on (`· passage by semantic #1`). `None` for an unfused candidate.
 fn render_ranks(screen: &Value, candidate: &Value) -> Option<String> {
     let ranks = candidate["ranks"].as_object()?;
     let producers = screen["fusion"]["producers"].as_array()?;
@@ -280,7 +281,15 @@ fn render_ranks(screen: &Value, candidate: &Value) -> Option<String> {
             None => shown.push(format!("{id} —")),
         }
     }
-    Some(format!("{} · by {}", shown.join(" · "), methods.join(", ")))
+    let passage = candidate["passage_by"]
+        .as_str()
+        .and_then(|by| Some(format!(" · passage by {by} #{}", ranks.get(by)?.as_u64()?)))
+        .unwrap_or_default();
+    Some(format!(
+        "{} · by {}{passage}",
+        shown.join(" · "),
+        methods.join(", ")
+    ))
 }
 
 /// Governed-discovery station 2.1: `open --purpose bootstrap` names its top red right after the

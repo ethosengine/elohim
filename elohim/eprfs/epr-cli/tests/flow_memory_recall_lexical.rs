@@ -10,8 +10,8 @@
 //! a stale fold answers and says so. It never runs an embedder.
 //!
 //! Every test folds a temporary tree with the `Fixture` embedder and reads the real SQLite store.
-//! The contract is a COPY of the live one declaring `ceremony.providers.lexical` (the live
-//! declaration lands at integration).
+//! The contract is a COPY of the live one, re-declaring `ceremony.providers.lexical` to read the
+//! fixture store (the live declaration, contract v22, reads the pinned one).
 mod common;
 
 use std::path::Path;
@@ -784,4 +784,100 @@ fn an_absent_lexical_route_is_one_omission_on_the_screen() {
         .collect();
     assert_eq!(lexical, vec![NO_FOLD.to_string()], "{screen}");
     assert!(view["usage"].get("first_screen_lexical_calls").is_none());
+}
+
+/// The v21 contract's method CID (task 4.6); the integration declared `providers.lexical`, so the
+/// contract's bytes — and its address — moved off this one.
+const V21_METHOD_CID: &str = "bafkreic2grd6prwzdgcth45c7bf2henoiinyhn3jwgba6kte3326vr3jfu";
+
+/// Station 4 integration (Task 4.8 ruling): contract v22 DECLARES the lexical provider, keeps it
+/// out of the first screen's fusion recipe (the bank evidence decided), says so in its method
+/// prose, and the bank is re-pinned.
+#[test]
+fn contract_v22_declares_lexical_outside_the_fusion_recipe() {
+    let root = common::repo_root();
+    let contract = Contract::load(&root.join(CONTRACT_REL)).expect("live contract loads");
+    let value = common::live_contract();
+    assert!(
+        value["version"].as_u64() >= Some(22),
+        "{}",
+        value["version"]
+    );
+    assert_eq!(
+        value["ceremony"]["providers"]["lexical"],
+        json!({"kind": "lexical", "measure": LEXICAL_REL, "fold": FOLD_REL, "embedder": "pinned",
+               "ranking": "FTS5 bm25 over the shared fold's live chunks; short declared terms \
+                           exact, longer terms stem-prefixed",
+               "optional": true})
+    );
+    assert_eq!(
+        value["discovery"]["first_screen_fusion"]["producers"],
+        json!(["local", "semantic"]),
+        "lexical is declared, not fused"
+    );
+    let method_lines = value["method"].to_string();
+    assert!(
+        method_lines.contains("search --provider lexical")
+            && method_lines.contains("not yet in the first screen's fusion recipe"),
+        "{method_lines}"
+    );
+    let method = contract.method_cid();
+    assert_ne!(method, V21_METHOD_CID, "the contract's bytes moved");
+    let bank = live(value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v22 recipe");
+}
+
+/// `search --provider lexical` answers under the LIVE declaration — the tree's contract is the
+/// live one with only the store it reads flipped to the fixture embedder's; nothing is added.
+#[test]
+fn search_provider_lexical_answers_under_the_live_declaration() {
+    let dir = tree();
+    let root = dir.path();
+    let mut value = live(CONTRACT_REL);
+    value["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+    value["ceremony"]["providers"]
+        .get_mut("lexical")
+        .expect("the live contract declares the lexical provider")["embedder"] = json!("fixture");
+    put_json(root, CONTRACT_REL, &value);
+    commit(root);
+    fold(root);
+    let (code, stdout, stderr) = cli_with(
+        root,
+        CONTRACT_REL,
+        "live-lexical",
+        &["open", "--intent", "Find the stewardship ledger"],
+        &[],
+    );
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    let (code, stdout, stderr) = cli_with(
+        root,
+        CONTRACT_REL,
+        "live-lexical",
+        &[
+            "search",
+            "--provider",
+            "lexical",
+            "--query",
+            "stewardship ledger commons",
+            "--search-scope",
+            ".",
+            "--json",
+        ],
+        &[],
+    );
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    let view: Value = serde_json::from_str(&stdout).expect("json");
+    let retrieval = &view["retrieval"];
+    assert_eq!(retrieval["ranking_known"], true, "{view}");
+    assert_eq!(
+        paths(&retrieval["candidates"]).first().map(String::as_str),
+        Some("genesis/all.md"),
+        "{view}"
+    );
+    let first = &retrieval["candidates"][0];
+    assert_eq!(first["producer"], "lexical", "{first}");
+    assert_eq!(first["method"], json!(cid_of(root, LEXICAL_REL)), "{first}");
 }

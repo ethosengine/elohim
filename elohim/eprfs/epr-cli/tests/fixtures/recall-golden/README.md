@@ -179,3 +179,7 @@ Focused open re-baselined for the fixture contract CID alone (bafkreig…2kqm �
 ## 2026-09-24 — contract v21 (station 4, Task 4.6: `limits.fold_listing_bytes` — the fold's git listing is charged to its own budget, not the discovery `scan_bytes`)
 
 Focused and whole open re-baselined for the fixture contract CID alone (bafkreie…3il4 → bafkreic…jbrm); substituting the previous CID back into each new rendering reproduces `bb671091…` and `0d4f6566…` byte for byte. The refusal digest is unchanged.
+
+## 2026-09-24 — contract v22 (station 4 integration: `ceremony.providers.lexical` declared, not fused; the question bank never offered; a fused candidate's passage follows the ranking producer)
+
+Focused and whole open re-baselined for the fixture contract CID alone (bafkreic…jbrm → bafkreib…papm); substituting the previous CID back into each new rendering reproduces `dd29eba6…` and `6ed2f87c…` byte for byte. Neither fixture renders a fused candidate (the whole open's semantic route is absent), so the new `passage by <producer> #n` segment moves no pinned line. The refusal digest is unchanged.

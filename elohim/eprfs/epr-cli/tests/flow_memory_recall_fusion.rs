@@ -879,3 +879,153 @@ fn a_semantic_answer_with_nothing_in_the_area_leaves_the_lexical_screen() {
         "{text}"
     );
 }
+
+/// The live question bank's path — the path the live contract's `question_bank` names.
+const BANK_REL: &str = ".epr-meta/elohim/algorithms/recall-questions.json";
+
+/// Station 4 integration (Task 4.8 ruling): the question bank is the exam sheet, not an answer.
+/// A semantic-only hit on the file the contract's `question_bank` names never reaches a fused
+/// screen; a contract copy whose `question_bank` names a different file refuses THAT one instead
+/// (the rule reads the contract, never a literal).
+#[test]
+fn the_question_bank_never_reaches_a_fused_screen() {
+    let dir = tree();
+    let root = dir.path();
+    let exam = ".epr-meta/elohim/algorithms/exam.json";
+    let mut measure = live(MEASURE_REL);
+    let mut surface: Vec<Value> = SURFACE.iter().map(|p| json!(p)).collect();
+    surface.push(json!(BANK_REL));
+    surface.push(json!(exam));
+    measure["surfaces"]["paths"] = json!(surface);
+    put_json(root, MEASURE_REL, &measure);
+    for rel in [BANK_REL, exam] {
+        common::write(root, rel, "{\"question\": \"who can fix the bug now\"}\n");
+    }
+    common::git(root, &["add", "-A"]);
+    common::git(root, &["commit", "-qm", "bank"]);
+    fold(root);
+    let scope = ".epr-meta/elohim/algorithms";
+    assert_eq!(
+        contract(root).value["question_bank"],
+        json!(BANK_REL),
+        "precondition: the fixture's contract is the live one"
+    );
+    let semantic = retrieve(root, &contract(root), "semantic", NEED, scope, &[], &[])
+        .expect("an honest answer");
+    let ranked = paths(&semantic["candidates"]);
+    assert!(
+        ranked.contains(&BANK_REL.to_string()) && ranked.contains(&exam.to_string()),
+        "precondition: the semantic route ranks both: {semantic}"
+    );
+
+    let view = open_json(root, "bank", &["--need", NEED, "--scope", scope]);
+    let screen = &view["first_screen"];
+    assert_eq!(screen["fusion"]["recipe"], "rrf-v1", "{screen}");
+    let offered = paths(&screen["candidates"]);
+    assert!(!offered.contains(&BANK_REL.to_string()), "{screen}");
+    assert!(offered.contains(&exam.to_string()), "{screen}");
+
+    let mut moved = contract(root).value;
+    moved["question_bank"] = json!(exam);
+    put_json(root, "bank-moved.json", &moved);
+    let view = open_json_under(
+        root,
+        "bank-moved.json",
+        "bank-moved",
+        &["--need", NEED, "--scope", scope],
+    );
+    let offered = paths(&view["first_screen"]["candidates"]);
+    assert!(!offered.contains(&exam.to_string()), "{view}");
+    assert!(offered.contains(&BANK_REL.to_string()), "{view}");
+}
+
+/// Station 4 integration (the q-hook-binary seam): when local and semantic both return a path and
+/// disagree on its section, the fused candidate's passage — and its linked read — come from the
+/// producer that ranked it higher, and the line at `standard` names it (`passage by semantic #1`).
+#[test]
+fn a_fused_candidates_passage_follows_the_ranking_producer() {
+    let dir = tree();
+    let root = dir.path();
+    common::write(
+        root,
+        "genesis/hooks/observe.py",
+        "import os\n\ndef emit():\n    \"\"\"orbit orbit orbit\"\"\"\n    orbit = 1\n    \
+         return orbit\n\ndef resolve_bin():\n    \"\"\"who can fix the bug now, orbit\"\"\"\n    \
+         return 2\n",
+    );
+    common::write(
+        root,
+        "genesis/hooks/other.py",
+        "def spin():\n    \"\"\"orbit orbit orbit orbit orbit orbit orbit orbit\"\"\"\n    \
+         return 3\n",
+    );
+    common::git(root, &["add", "-A"]);
+    common::git(root, &["commit", "-qm", "hooks"]);
+    let scope = "genesis/hooks";
+    let target = "genesis/hooks/observe.py";
+    let find = |candidates: &Value| {
+        candidates
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["path"] == target)
+            .cloned()
+            .unwrap_or_else(|| panic!("{target} among {candidates}"))
+    };
+
+    // The local passage (before any fold, the screen is the lexical screen).
+    let lexical = open_json(root, "hooks-lexical", &["--need", NEED, "--scope", scope]);
+    let local_candidates = &lexical["first_screen"]["candidates"];
+    let local_section = find(local_candidates)["best_section"].clone();
+    assert_eq!(
+        paths(local_candidates).first().map(String::as_str),
+        Some("genesis/hooks/other.py"),
+        "precondition: local ranks the target second: {lexical}"
+    );
+
+    fold(root);
+    let semantic = retrieve(root, &contract(root), "semantic", NEED, scope, &[], &[])
+        .expect("an honest answer");
+    assert_eq!(
+        paths(&semantic["candidates"]).first().map(String::as_str),
+        Some(target),
+        "precondition: semantic ranks the target first: {semantic}"
+    );
+    let semantic_section = find(&semantic["candidates"])["best_section"].clone();
+    assert_ne!(
+        local_section["lines"], semantic_section["lines"],
+        "precondition: the producers disagree on the section"
+    );
+
+    let view = open_json(root, "hooks-fused", &["--need", NEED, "--scope", scope]);
+    let fused = find(&view["first_screen"]["candidates"]);
+    assert_eq!(
+        fused["ranks"],
+        json!({"local": 2, "semantic": 1}),
+        "{fused}"
+    );
+    assert_eq!(fused["passage_by"], "semantic", "{fused}");
+    assert_eq!(fused["best_section"], semantic_section, "{fused}");
+    assert_eq!(
+        fused["native"]["local"]["best_section"], local_section,
+        "the displaced passage is kept"
+    );
+    let read = format!(
+        "Read {target} — {} ({})",
+        semantic_section["title"].as_str().unwrap(),
+        semantic_section["lines"].as_str().unwrap()
+    );
+    let labels: Vec<&str> = view["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|a| a["label"].as_str())
+        .collect();
+    assert!(labels.contains(&read.as_str()), "{read} in {labels:?}");
+
+    let text = open_text(root, "hooks-text", &["--need", NEED, "--scope", scope]);
+    assert!(
+        text.contains("local #2 · semantic #1") && text.contains("passage by semantic #1"),
+        "{text}"
+    );
+}
