@@ -14,6 +14,7 @@
         "sources": [
           "elohim/epr/**",
           "elohim/epr-rea/**",
+          "elohim/epr-index/**",
           "elohim/Cargo.toml",
           "elohim/Cargo.lock"
         ],
