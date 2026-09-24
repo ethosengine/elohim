@@ -216,7 +216,7 @@ async fn handle_post(
 ///    manager (log head stamped and persisted with the row), with an empty
 ///    signature;
 /// 10. the gossip gate ([`crate::p2p::observation_gossip::announcement_for`])
-///    runs on the stamped row: an agent-private kind yields no announcement.
+///     runs on the stamped row: an agent-private kind yields no announcement.
 ///
 /// `seq` is read before the manager's append lock is taken, so two writes by
 /// the same observer racing each other can share a `seq`; `log_offset` (under
