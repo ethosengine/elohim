@@ -167,10 +167,9 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
 
 impl From<ContentWithTags> for ContentWithTagsView {
     fn from(c: ContentWithTags) -> Self {
-        Self {
-            content: c.content.into(),
-            tags: c.tags,
-        }
+        // Through `From<ContentWithTags> for ContentView`, so the row's tags land in the one
+        // field that carries them.
+        Self { content: c.into() }
     }
 }
 

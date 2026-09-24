@@ -182,13 +182,19 @@ pub struct ContentGraphView {
     pub total_nodes: usize,
 }
 
+/// A content row and its tags — now exactly [`ContentView`], flattened.
+///
+/// It once declared its own `tags` beside the flattened view. Since the view itself carries the
+/// row's tags (ruling R-S5, so `/db/content` stops dropping them), a second declaration emitted
+/// `tags` TWICE on the wire and generated a TypeScript type with a duplicate identifier. The
+/// tags field belongs to `ContentView`; this type stays as the name its one write surface
+/// (`PATCH /db/content/{id}`) and the TS consumers already use, and the wire shape is unchanged.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
 pub struct ContentWithTagsView {
     #[serde(flatten)]
     pub content: ContentView,
-    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
