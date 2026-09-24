@@ -6692,3 +6692,209 @@ fn observation_stream_view_rejects_missing_recipe_cid() {
         "a stream that cannot name its recipe must not validate"
     );
 }
+
+// ── Content search (post-station-4 sprint, Lane S, ruling R-S4) ──
+//
+// `GET /db/content/search` answers a `ContentSearchView`: Category C over the storage content
+// projection's derived lexical fold. The fold and its lag are answer envelopes (view rule 11).
+
+const CONTENT_SEARCH_SCHEMA: &str = "views/content-search-view.schema.json";
+
+fn sample_content_search_view(
+    fold: elohim_views::ContentSearchFoldAnswer,
+    fold_lag: elohim_views::ContentSearchFoldLagAnswer,
+    candidates: Vec<elohim_views::ContentSearchCandidateView>,
+) -> elohim_views::ContentSearchView {
+    use elohim_views::{
+        ContentSearchFacetsView, ContentSearchLensView, ContentSearchProducerView,
+        ContentSearchRecipeView, ContentSearchView,
+    };
+    let ranking_known = matches!(fold, elohim_views::ContentSearchFoldAnswer::Present { .. });
+    ContentSearchView {
+        query: "stewardship commons".into(),
+        ranking_known,
+        recipe: ContentSearchRecipeView {
+            name: "rrf-v2".into(),
+            cid: "bafyreirecipe".into(),
+            k: 60,
+            order_only: true,
+            producers: vec![ContentSearchProducerView {
+                id: "lexical".into(),
+                method: "bafyreimeasure".into(),
+            }],
+        },
+        lens: ContentSearchLensView {
+            level: "standard".into(),
+            choice_count: 20,
+            cid: "bafyreilens".into(),
+            provenance: "defaulted".into(),
+        },
+        selection: format!("top {} of {} by rrf-v2 order", candidates.len(), candidates.len()),
+        fold,
+        fold_lag,
+        total_count: candidates.len() as u64,
+        candidates,
+        facets: ContentSearchFacetsView::default(),
+        omissions: vec![],
+        unresolved: vec![],
+    }
+}
+
+fn content_search_accepts(instance: &Value) -> bool {
+    let schema = load_schema(CONTENT_SEARCH_SCHEMA);
+    jsonschema::validator_for(&schema)
+        .unwrap_or_else(|e| panic!("Failed to compile schema {CONTENT_SEARCH_SCHEMA}: {e}"))
+        .is_valid(instance)
+}
+
+#[test]
+fn content_search_view_matches_schema() {
+    use elohim_views::{
+        ContentSearchCandidateView, ContentSearchFoldAnswer, ContentSearchFoldLagAnswer,
+        ContentSearchFoldLagView, ContentSearchFoldView, ContentSearchSectionView,
+        FacetCountView,
+    };
+    assert_source_of_truth_declared(&load_schema(CONTENT_SEARCH_SCHEMA), CONTENT_SEARCH_SCHEMA);
+    let candidate = |id: &str, section: Option<ContentSearchSectionView>| ContentSearchCandidateView {
+        content_id: id.into(),
+        title: "The commons and its stewards".into(),
+        content_type: "concept".into(),
+        reach: "commons".into(),
+        trust: "notarized".into(),
+        tags: vec!["stewardship".into()],
+        score: 1.0 / 61.0,
+        producer: "lexical".into(),
+        method: "bafyreimeasure".into(),
+        best_section: section,
+    };
+    let mut view = sample_content_search_view(
+        ContentSearchFoldAnswer::Present {
+            value: ContentSearchFoldView {
+                measure: "bafyreimeasure".into(),
+                state: "complete".into(),
+                attestation_cid: "bafyreiattestation".into(),
+                at: 1_790_000_000,
+            },
+        },
+        ContentSearchFoldLagAnswer::Present {
+            value: ContentSearchFoldLagView {
+                behind: 0,
+                limit: 200,
+                unit: "units".into(),
+                within: true,
+            },
+        },
+        vec![
+            candidate(
+                "commons-stewards",
+                Some(ContentSearchSectionView {
+                    title: "head".into(),
+                    snippet: "The commons and its stewards".into(),
+                }),
+            ),
+            candidate("second", None),
+        ],
+    );
+    view.facets.content_type.push(FacetCountView {
+        value: "concept".into(),
+        count: 2,
+    });
+    view.facets.tags.push(FacetCountView {
+        value: "stewardship".into(),
+        count: 2,
+    });
+    view.omissions
+        .push("reach: 1 candidate withheld from this reader".into());
+    let json = serde_json::to_value(&view).unwrap();
+    assert_eq!(json["fold"]["state"], "present", "{json}");
+    assert_eq!(json["foldLag"]["value"]["limit"], 200, "{json}");
+    assert!(json["candidates"][1]["bestSection"].is_null(), "{json}");
+    validate_against_schema(CONTENT_SEARCH_SCHEMA, &json);
+
+    // Round-trips: the view is the shape a client deserializes.
+    let back: elohim_views::ContentSearchView = serde_json::from_value(json).unwrap();
+    assert_eq!(back, view);
+}
+
+#[test]
+fn content_search_view_absent_fold_matches_schema() {
+    use elohim_views::{
+        ContentSearchAbsentReason, ContentSearchFoldAnswer, ContentSearchFoldLagAnswer,
+        ContentSearchUnreachableReason,
+    };
+    let view = sample_content_search_view(
+        ContentSearchFoldAnswer::Absent {
+            reason: ContentSearchAbsentReason::ObservedAbsent,
+        },
+        ContentSearchFoldLagAnswer::Absent {
+            reason: ContentSearchAbsentReason::ObservedAbsent,
+        },
+        vec![],
+    );
+    assert!(!view.ranking_known);
+    let json = serde_json::to_value(&view).unwrap();
+    assert_eq!(
+        json["fold"],
+        serde_json::json!({"state": "absent", "reason": "observed_absent"})
+    );
+    assert_eq!(json["rankingKnown"], false);
+    assert_eq!(json["candidates"], serde_json::json!([]));
+    validate_against_schema(CONTENT_SEARCH_SCHEMA, &json);
+
+    // An unreachable fold carries a reason from the unreachable subset, never a value.
+    let unreachable = sample_content_search_view(
+        ContentSearchFoldAnswer::Unreachable {
+            reason: ContentSearchUnreachableReason::TransportError,
+        },
+        ContentSearchFoldLagAnswer::Unreachable {
+            reason: ContentSearchUnreachableReason::Unverifiable,
+        },
+        vec![],
+    );
+    let json = serde_json::to_value(&unreachable).unwrap();
+    assert_eq!(json["fold"]["reason"], "transport_error");
+    validate_against_schema(CONTENT_SEARCH_SCHEMA, &json);
+
+    // An absent fold that smuggles a value, or claims a network reason, does not validate.
+    let mut smuggled = serde_json::to_value(&view).unwrap();
+    smuggled["fold"]["value"] = serde_json::json!({});
+    assert!(!content_search_accepts(&smuggled), "absent never carries a value");
+    let mut misreasoned = serde_json::to_value(&view).unwrap();
+    misreasoned["fold"]["reason"] = serde_json::json!("timeout");
+    assert!(
+        !content_search_accepts(&misreasoned),
+        "absent is an observed absence; a timeout is unreachable"
+    );
+}
+
+#[test]
+fn content_search_view_rejects_snake_case() {
+    use elohim_views::{
+        ContentSearchAbsentReason, ContentSearchFoldAnswer, ContentSearchFoldLagAnswer,
+    };
+    let view = sample_content_search_view(
+        ContentSearchFoldAnswer::Absent {
+            reason: ContentSearchAbsentReason::ObservedAbsent,
+        },
+        ContentSearchFoldLagAnswer::Absent {
+            reason: ContentSearchAbsentReason::ObservedAbsent,
+        },
+        vec![],
+    );
+    let json = serde_json::to_value(&view).unwrap();
+    assert!(content_search_accepts(&json));
+    let text = json.to_string();
+    for snake in ["ranking_known", "fold_lag", "total_count", "order_only", "choice_count"] {
+        assert!(!text.contains(snake), "snake_case leaked onto the wire: {snake}");
+    }
+
+    let mut snaked = json.clone();
+    let rk = snaked.as_object_mut().unwrap().remove("rankingKnown").unwrap();
+    snaked["ranking_known"] = rk;
+    assert!(!content_search_accepts(&snaked), "a snake_case top-level key is refused");
+
+    let mut nested = json;
+    let oo = nested["recipe"].as_object_mut().unwrap().remove("orderOnly").unwrap();
+    nested["recipe"]["order_only"] = oo;
+    assert!(!content_search_accepts(&nested), "a snake_case nested key is refused");
+}

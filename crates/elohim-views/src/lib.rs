@@ -20,6 +20,7 @@
 
 pub mod acquisition;
 pub mod bounds;
+pub mod content_search;
 pub mod element_registry;
 pub mod epr;
 pub mod hub_capacity;
@@ -38,6 +39,7 @@ pub mod shefa;
 pub mod standing;
 
 // Re-export all domain types at the crate root for convenience
+pub use content_search::*;
 pub use epr::*;
 pub use imagodei::*;
 pub use infrastructure::*;

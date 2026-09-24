@@ -212,6 +212,9 @@ const INTERFACE_FILES = [
   // attention-witnessed-privately (plan task A4): the lifestream view — the
   // requester's own rows through the observation-lifestream recipe (Category C).
   { src: 'views/observation-stream-view.ts', dest: 'observation-stream-view.ts' },
+  // Lane S (post-station-4 sprint, R-S4) — GET /db/content/search: recipe, lens, fold
+  // answers and per-candidate provenance over the storage content projection's lexical fold.
+  { src: 'views/content-search-view.ts', dest: 'content-search-view.ts' },
 ];
 
 /**

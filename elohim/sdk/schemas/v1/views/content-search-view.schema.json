@@ -1,0 +1,446 @@
+{
+  "$id": "epr:schema:view:content-search-view",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentSearchView",
+  "description": "Source of truth: assembled read projection (Operational, Category C) over the storage content projection's derived lexical fold — the content-lexical-index measure's fold store, itself rebuilt from the content rows it folds and never synced. Rendered per request and never persisted. Response to GET /db/content/search?q&lens&contentType&reach&tags&limit&offset&recipe. Every answer names the recipe it ranked under (name and CID), the lens it resolved and why, the selection rule, the fold it read and how far behind the content rows that fold is. A fold that is absent or unreachable answers rankingKnown: false with no candidates, never an empty list dressed as a ranking. Candidates are reach-gated per reader after ranking; what the gate withheld is named in omissions, never silently dropped. facets are counted over the admitted set only.",
+  "type": "object",
+  "required": [
+    "query",
+    "rankingKnown",
+    "recipe",
+    "lens",
+    "selection",
+    "fold",
+    "foldLag",
+    "candidates",
+    "facets",
+    "omissions",
+    "unresolved",
+    "totalCount"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "The question as the reader asked it (the q parameter), unchanged."
+    },
+    "rankingKnown": {
+      "type": "boolean",
+      "description": "True only when the candidates were ordered by the declared recipe over a present fold. False whenever the fold is absent or unreachable; candidates is then empty."
+    },
+    "recipe": {
+      "$ref": "#/$defs/recipe"
+    },
+    "lens": {
+      "$ref": "#/$defs/lens"
+    },
+    "selection": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The selection rule, one line: which candidates this page shows of how many ranked, and by what order."
+    },
+    "fold": {
+      "title": "ContentSearchFoldAnswer",
+      "description": "The fold the ranking read, as an answer envelope (../objects/answer.schema.json) narrowed to this view: present with the fold's measure, state, attestation and time; absent when the store holds no fold; unreachable when it could not be read.",
+      "oneOf": [
+        {
+          "title": "ContentSearchFoldPresent",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "value"
+          ],
+          "properties": {
+            "state": {
+              "const": "present"
+            },
+            "value": {
+              "$ref": "#/$defs/foldValue"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/answerAbsent"
+        },
+        {
+          "$ref": "#/$defs/answerUnreachable"
+        }
+      ]
+    },
+    "foldLag": {
+      "title": "ContentSearchFoldLagAnswer",
+      "description": "How far the fold is behind the content rows, as an answer envelope (../objects/answer.schema.json) narrowed to this view: present with the count behind and the measure's declared bound; absent when there is no fold to be behind; unreachable when the lag could not be measured.",
+      "oneOf": [
+        {
+          "title": "ContentSearchFoldLagPresent",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "value"
+          ],
+          "properties": {
+            "state": {
+              "const": "present"
+            },
+            "value": {
+              "$ref": "#/$defs/foldLagValue"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/answerAbsent"
+        },
+        {
+          "$ref": "#/$defs/answerUnreachable"
+        }
+      ]
+    },
+    "candidates": {
+      "type": "array",
+      "description": "The admitted candidates of this page, in the recipe's order. Empty when rankingKnown is false.",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "facets": {
+      "$ref": "#/$defs/facets"
+    },
+    "omissions": {
+      "type": "array",
+      "description": "One named line per thing the view withheld or could not vouch for (a reach refusal, a fold that is behind). Present even when empty.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "description": "One named line per request parameter the view could not honour as asked (a recipe CID pin that names another recipe). Present even when empty.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "totalCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many candidates the reach gate admitted before the page was cut; candidates never exceed it."
+    }
+  },
+  "$defs": {
+    "recipe": {
+      "title": "ContentSearchRecipeView",
+      "type": "object",
+      "description": "The declared fusion recipe the ranking ran under.",
+      "required": [
+        "name",
+        "cid",
+        "k",
+        "orderOnly",
+        "producers"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The recipe id, e.g. rrf-v2."
+        },
+        "cid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The recipe's content address (atom_cid of its addressed keys)."
+        },
+        "k": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The reciprocal-rank constant."
+        },
+        "orderOnly": {
+          "type": "boolean",
+          "description": "Fusion orders; it never sums a producer's score."
+        },
+        "producers": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The producers fused, in recipe order.",
+          "items": {
+            "$ref": "#/$defs/producer"
+          }
+        }
+      }
+    },
+    "producer": {
+      "title": "ContentSearchProducerView",
+      "type": "object",
+      "description": "One producer of a ranking and the method it ranks under.",
+      "required": [
+        "id",
+        "method"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The producer id as the recipe names it, e.g. lexical."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The method the producer ranks under: its IndexMeasure CID."
+        }
+      }
+    },
+    "lens": {
+      "title": "ContentSearchLensView",
+      "type": "object",
+      "description": "The lens level the view resolved. A lens is never refused: an absent or unknown level resolves to the recipe's default with provenance defaulted.",
+      "required": [
+        "level",
+        "choiceCount",
+        "cid",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A level of the recipe's lens table, e.g. minimal, standard, whole."
+        },
+        "choiceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many candidates the level shows at most."
+        },
+        "cid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The content address of the lens table the level was read from."
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "requested when the reader named this level; defaulted when the reader named none, or one the table does not declare (never a refusal)."
+        }
+      }
+    },
+    "foldValue": {
+      "title": "ContentSearchFoldView",
+      "type": "object",
+      "description": "The fold the ranking read.",
+      "required": [
+        "measure",
+        "state",
+        "attestationCid",
+        "at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The IndexMeasure CID the fold executed."
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The state the fold's latest attestation reports (FoldState: complete, degraded or failed)."
+        },
+        "attestationCid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The content address of that attestation."
+        },
+        "at": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unix epoch seconds the attestation was made."
+        }
+      }
+    },
+    "foldLagValue": {
+      "title": "ContentSearchFoldLagView",
+      "type": "object",
+      "description": "How far the fold is behind, against the measure's declared bound.",
+      "required": [
+        "behind",
+        "limit",
+        "unit",
+        "within"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "behind": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Content rows changed since the fold's watermark."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The measure's declared fold-lag limit."
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the limit counts, e.g. units."
+        },
+        "within": {
+          "type": "boolean",
+          "description": "True when behind is within the limit."
+        }
+      }
+    },
+    "answerAbsent": {
+      "$ref": "../objects/answer.schema.json#/oneOf/1"
+    },
+    "answerUnreachable": {
+      "$ref": "../objects/answer.schema.json#/oneOf/2"
+    },
+    "candidate": {
+      "title": "ContentSearchCandidateView",
+      "type": "object",
+      "description": "One admitted candidate with its provenance: which producer ranked it, under which method.",
+      "required": [
+        "contentId",
+        "title",
+        "contentType",
+        "reach",
+        "trust",
+        "tags",
+        "score",
+        "producer",
+        "method",
+        "bestSection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The content row's id."
+        },
+        "title": {
+          "type": "string"
+        },
+        "contentType": {
+          "$ref": "../enums/content-type.schema.json"
+        },
+        "reach": {
+          "$ref": "../enums/reach.schema.json"
+        },
+        "trust": {
+          "type": "string",
+          "description": "The row's trust legibility label as ContentView.trust carries it: notarized, published or unconfirmed. Never a number."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The row's tags; an empty array is the honest 'no tags' answer."
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The fused reciprocal-rank score, for ORDER only; comparable within one answer, never across answers."
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The producer that ranked the candidate best."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "description": "That producer's method: its IndexMeasure CID."
+        },
+        "bestSection": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/section"
+            }
+          ],
+          "description": "The section the ranking producer matched, or null when it located none (one provenance: the fold was read and no section matched)."
+        }
+      }
+    },
+    "section": {
+      "title": "ContentSearchSectionView",
+      "type": "object",
+      "description": "The section of a candidate a match landed in.",
+      "required": [
+        "title",
+        "snippet"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The section's name: head, tags, a heading, or a line window."
+        },
+        "snippet": {
+          "type": "string",
+          "description": "A short excerpt of the section's text."
+        }
+      }
+    },
+    "facets": {
+      "title": "ContentSearchFacetsView",
+      "type": "object",
+      "description": "Counts over the admitted candidates only; a withheld row never counts.",
+      "required": [
+        "contentType",
+        "reach",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contentType": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/facetCount"
+          }
+        },
+        "reach": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/facetCount"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/facetCount"
+          }
+        }
+      }
+    },
+    "facetCount": {
+      "title": "FacetCountView",
+      "type": "object",
+      "description": "One facet value and how many admitted candidates carry it.",
+      "required": [
+        "value",
+        "count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
