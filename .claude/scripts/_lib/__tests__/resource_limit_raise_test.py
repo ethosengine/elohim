@@ -322,16 +322,16 @@ with tempfile.TemporaryDirectory() as td:
           "the durable lever is the arc" not in err17)
 
 print("\n── 6. declaration coherence ──")
-# The rule is declared INLINE in two manifests rather than bound to a pinned policy row: the
-# registry sat at 99.1% of a 65,536B cap that BOTH governance hosts enforce, so one more row would
-# have dropped every policy-bound rule to "unknown policy — rule NOT enforced". That constraint is
-# pinned here so a future reader does not "tidy" the rule into a registry that cannot hold it.
+# The rule is declared INLINE in two manifests rather than bound to a pinned policy row: when it
+# was written the registry sat at 99.1% of the 65,536B MANIFEST cap both governance hosts then
+# borrowed for it, so one more row would have dropped every policy-bound rule to "unknown policy —
+# rule NOT enforced". de4f75b20 gave the registry its own 1 MiB cap in both hosts
+# (`_MAX_REGISTRY_BYTES` / eprfs-meta `MAX_REGISTRY_BYTES`); the inline declaration stays, and this
+# check now reads the cap the registry is actually held to.
 REGISTRY = REPO / ".claude/epr-meta/policies.yaml"
 size = REGISTRY.stat().st_size
-check("the policy registry still loads (under the cap BOTH hosts enforce)",
-      size <= epr_meta.MAX_MANIFEST_BYTES, f"{size}B of {epr_meta.MAX_MANIFEST_BYTES}B")
-check("  ...and is within 1KB of it — the constraint that forced an inline declaration",
-      epr_meta.MAX_MANIFEST_BYTES - size < 1024, f"headroom {epr_meta.MAX_MANIFEST_BYTES - size}B")
+check("the policy registry still loads (under the registry cap BOTH hosts enforce)",
+      size <= epr_meta._MAX_REGISTRY_BYTES, f"{size}B of {epr_meta._MAX_REGISTRY_BYTES}B")
 policies, errs = epr_meta.load_policies(REPO)
 check("  every policy-bound rule is still resolvable (no governance outage)",
       bool(policies) and not errs, "; ".join(errs[:2]))

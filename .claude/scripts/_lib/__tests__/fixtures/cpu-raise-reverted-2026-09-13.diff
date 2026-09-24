@@ -1,7 +1,7 @@
 diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/data/deployments.json
 --- a/genesis/orchestrator/data/deployments.json
 +++ b/genesis/orchestrator/data/deployments.json
-@@ -33,8 +33,9 @@
+@@ -34,8 +34,9 @@
        "edgenodeMemoryRequest": "2Gi",
        "edgenodeMemoryLimit": "8Gi",
        "edgenodeCpuRequest": "1500m",
@@ -12,7 +12,7 @@ diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/d
        "runtimeConfig": {
          "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:workspace=observe"
        },
-@@ -61,8 +62,9 @@
+@@ -62,8 +63,9 @@
        "edgenodeMemoryRequest": "2Gi",
        "edgenodeMemoryLimit": "8Gi",
        "edgenodeCpuRequest": "1500m",
