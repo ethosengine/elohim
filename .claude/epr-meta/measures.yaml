@@ -992,6 +992,52 @@ measures:
       no pain the system had not already felt is the subconscious doing its job. Teeth-free like
       every measure here; it renders `skipped`, never 0, until a sweep has folded a reading.
 
+  # ── delivery cost (native-delivery sprint, Lane D1, 2026-09-24) ──
+  # The two numbers evidence-ladder spec §8 had to reconstruct by hand after app #1719–#1725 spent
+  # ≈12 pipeline-hours and delivered nothing: where the App pipeline's wall clock goes, and what
+  # one delivered bundle costs. Folded by .claude/scripts/ci-harvest.py after it harvests a fresh
+  # App build; the series itself is genesis/orchestrator/delivery-series.mjs --stages.
+  - id: stage-wallclock
+    version: 1
+    family: delivery
+    unit: minutes
+    procedure: >
+      node genesis/orchestrator/delivery-series.mjs --stages --json --window 10 — the p90, over the
+      newest ten completed elohim/dev (App) builds, of publish+verify wall clock: the junit phase
+      cases `publish.*` + `verify.*` (classname elohim-app.deploy.<env>) when a build records them,
+      else the whole "Publish and Verify App Delivery" stage from wfapi/describe, with the readiness
+      wait unsplit inside it. A stage Jenkins marks failed only because an earlier stage failed has
+      no wall clock and is not counted.
+    provenance: "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md §8 (122–132 min per build inside that one stage, #1718–#1726)"
+    default-authority: observation
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+    why: >
+      Durations were scrubbed from CI fingerprints on purpose (a duration in a fingerprint mints a
+      new finding per build), and nothing else kept them, so a stage that waited two hours per run
+      for fifteen days read the same as one that took two minutes. The p90 is the reading because a
+      readiness wait is a tail, not a mean.
+
+  - id: delivery-cost
+    version: 1
+    family: delivery
+    unit: pipeline-hours
+    procedure: >
+      node genesis/orchestrator/delivery-series.mjs --stages --json --window 10 — pipeline-hours
+      spent by the newest ten completed elohim/dev builds (ABORTED and FAILED included) divided by
+      the bundles they delivered: a build delivers when every `verify.shell` phase case passed, or,
+      before the phases exist, when its "Publish and Verify App Delivery" stage succeeded. With
+      nothing delivered the fold carries the hours spent as a lower bound and says so in its reason
+      — an unbounded cost is never folded as 0.
+    provenance: "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md §8 (≈12 pipeline-hours, 0 delivered)"
+    default-authority: observation
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+    why: >
+      Delivery rate alone cannot tell a pipeline that ships slowly from one that burns hours and
+      ships nothing; cost per delivered bundle can. It is the number a push's author pays and the
+      one the cost sentinel §8 names as never built.
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -1608,3 +1654,46 @@ lenses:
       when no gate project has crossed `soft` for two consecutive quarters
     status: active
     established_by: operator-requested-2026-09-19
+
+  # ── delivery cost bounds (native-delivery sprint, Lane D1) ──
+  # Declared here rather than as policies.yaml ceiling rows: the native report reads both homes as
+  # one bound shape, and policies.yaml sits within 1 KB of the 64 KB registry cap
+  # (_lib/epr_meta.py load_policies) — a row there would drop every policy-bound rule.
+  - id: stage-wallclock-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [stage-wallclock@1]
+    subject: .
+    context: session-headline
+    hard: 20
+    concern: push-delivers-within-budget
+    retire-when: >
+      when the App pipeline no longer publishes or verifies inside CI (the bundle is elected content
+      a peer adopts, plan Lane N) — then this stage has no wall clock to bound
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+    why: >
+      App publish+verify p90 at or under 20 minutes. Readiness is a precondition that refuses in
+      seconds, never a wait (sprint ruling 2), so what remains inside the stage is seeding,
+      authoring and one verify pass. Twenty minutes is that work with room; the 7200 s readiness
+      budget it replaces is the incident.
+
+  - id: delivery-cost-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [delivery-cost@1]
+    subject: .
+    context: session-headline
+    hard: 1
+    concern: push-delivers-within-budget
+    retire-when: >
+      when upgrades propagate peer to peer by change class without a CI publish, so a delivered
+      bundle no longer costs a pipeline run (the push-delivers-within-budget habit's own exit)
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+    why: >
+      At most one pipeline-hour per delivered bundle. A healthy App run is ~30 minutes end to end,
+      so an hour absorbs one failed run per delivery; above it, the pipeline is spending more
+      retrying than shipping.
