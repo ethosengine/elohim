@@ -59,6 +59,7 @@ conveyor mis-steers everything downstream).
 | `⚠ gate-error` on any instrument | repair the instrument FIRST | free |
 | memory gates firing | /memory-stasis-loop · /memory-ceremony | free |
 | OPEN gap-items, READY verdict | **pre-author** the /shift Objective | ceiling fires it |
+| conveyor has room (no pressure above this round) | pain-sweep (algedonic-designer): `/pain-sweep` with a fresh draw, background | free |
 
 One station per round for coupled pressures; parallel background dispatches
 when independent. Broad goals, not procedures — each station owns its HOW.

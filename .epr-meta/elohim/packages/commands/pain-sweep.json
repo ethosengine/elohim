@@ -1,0 +1,41 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "CommandPackage",
+  "metadata": {
+    "id": "pain-sweep",
+    "name": "pain-sweep",
+    "version": "1.0.0",
+    "description": "On-demand pain sweep — dispatch the algedonic-designer to sense burden no declared measure sees and register at most three sensors for it.",
+    "form": "command",
+    "sourceRuntime": "elohim-agent",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "composedBy": "claude-opus-5-5",
+    "master": "package",
+    "governance": {
+      "eprRef": "epr:elohim-agent/commands/pain-sweep",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "markdown",
+    "path": ".claude/commands/pain-sweep.md",
+    "body": "---\ndescription: On-demand pain sweep — dispatch the algedonic-designer to sense burden no declared measure sees and register at most three sensors for it.\nargument-hint: \"[--senses waiting,repetition,...] [--window-days 2-14] [--seed N]\"\n---\n\n# /pain-sweep\n\nDispatches the `algedonic-designer` subagent (Opus) for one firing. It reads raw pre-measure\nexhaust through its nerve endings, skips every pain a declared measure already covers, and\nregisters at most three sensors, each a 4-tuple: measure id@version · bound · concern address ·\nreader. It never fixes anything, never files a report, and never guesses an address.\n\nThis is the on-demand entry. The same persona also runs as the `pain-sweep` station of\n`/delivery-stasis` (when the conveyor has room) and as a daily surprise-auditor routine that\nfires with probability 0.2. It never runs from a hook or at SessionStart.\n\n## Steps\n\n1. **Draw.** Use the senses, window and seed the arguments name, if any. Otherwise draw fresh\n   ones: a random seed, 3 of the 7 nerve endings (waiting, repetition, effort with no fruit,\n   interruption, contradiction, apology and rant, numbness) and a look-back window of 2–14 days:\n   ```bash\n   python3 -c 'import random,secrets; s=secrets.randbits(32); r=random.Random(s); n=[\"waiting\",\"repetition\",\"effort-with-no-fruit\",\"interruption\",\"contradiction\",\"apology-and-rant\",\"numbness\"]; print(s, \",\".join(sorted(r.sample(n,3), key=n.index)), r.randint(2,14))'\n   ```\n2. **Dispatch** the `algedonic-designer` agent. The prompt carries only the draw: `seed=<s>\n   senses=<a,b,c> window_days=<d> origin=pain-sweep`. The persona holds its own method, so do not\n   restate it or hint at which pain to find.\n3. **Relay** what it returns: the draw, each minted sensor's 4-tuple and fold, the skipped\n   candidates with the measure that already covers each, and any `address=absent` pains. Add\n   nothing of your own. A firing that mints nothing is a valid result.\n"
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/commands/pain-sweep.md"
+    },
+    "codex": {
+      "path": ".codex/commands/pain-sweep.md"
+    }
+  }
+}
