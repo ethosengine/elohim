@@ -138,18 +138,22 @@
     },
     "gateRun": {
       "type": "object",
-      "required": ["kind", "recipe"],
+      "required": ["kind"],
       "additionalProperties": false,
+      "description": "How a gate project is executed locally. just / root-just run a recipe; attested runs nothing and reads the pinned commit's upstream attestation instead.",
       "properties": {
         "kind": {
           "type": "string",
-          "enum": ["just", "root-just"],
-          "description": "Run a recipe from the project's justfile or the repository-root justfile."
+          "title": "GateRunKind",
+          "enum": ["just", "root-just", "attested"],
+          "description": "just = recipe in the project dir's justfile; root-just = recipe in the repo-root justfile; attested = no local recipe — the gate reads the attestation the component's own CI recorded at the pinned commit"
         },
         "recipe": {
           "type": "string",
-          "pattern": "^_?[a-z][a-z0-9-]*$"
+          "pattern": "^_?[a-z][a-z0-9-]*$",
+          "description": "Recipe name to invoke (just and root-just only)"
         },
+        "attestation": { "$ref": "#/$defs/gateAttestation" },
         "cargo": {
           "type": "object",
           "additionalProperties": false,
@@ -169,6 +173,42 @@
             { "required": ["workspace"], "not": { "required": ["targetDir"] } },
             { "required": ["targetDir"], "not": { "required": ["workspace"] } }
           ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": { "kind": { "enum": ["just", "root-just"] } },
+          "required": ["recipe"],
+          "not": { "required": ["attestation"] }
+        },
+        {
+          "properties": { "kind": { "const": "attested" } },
+          "required": ["attestation"],
+          "not": { "anyOf": [{ "required": ["recipe"] }, { "required": ["cargo"] }] }
+        }
+      ]
+    },
+    "gateAttestation": {
+      "type": "object",
+      "required": ["provider", "repo", "check"],
+      "additionalProperties": false,
+      "description": "Where the pinned commit's attestation is read from. Exactly three fields by design: no thresholds, no signer lists, no reputation (spec 2026-09-23 §7).",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "title": "AttestationProvider",
+          "enum": ["github-checks"],
+          "description": "github-checks = GET /repos/{repo}/commits/{sha}/check-runs, the named check's newest run"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "description": "owner/name on the provider"
+        },
+        "check": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The check-run name that stands for 'this commit is attested' (brit: 'Tests pass'; rakia: 'test'; sophia: 'build')"
         }
       }
     },
@@ -219,6 +259,7 @@
         },
         "class": {
           "type": "string",
+          "title": "RunClass",
           "enum": ["build", "deploy", "verify", "measure", "profile"],
           "default": "build",
           "description": "Run class (mirror of rakia steps[].class), ordered build > deploy > verify > measure > profile. A dispatch's class is the highest class among its stale steps; a class executes only the steps at or below it. Absent means build."
