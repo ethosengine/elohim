@@ -28,6 +28,7 @@ cites:
   - "private-thought-governed-fruit | the reserve: claims and acts are fruit, recall receipts and transcripts never cross; §4 boundaries 5 and 6 bound the acts store | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "cradle-to-grave-capability-gradient | mediated agency named out of scope; no ward entity added here | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
   - "elohim-seam-map-concern-routing | places the actor plane: a repo-node rehearsal of the imagodei identity seam, not a new seam | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-protocol-manifesto | the canon the witness leg takes up: its section Witnessed Humanity: Attunement, Not Filters (humanity is witnessed by those who know you, never scored by a filter) is what an agent's epr actor witness rehearses at this node | sha256:7bc38f4e8e38b9a8 | path: genesis/docs/content/elohim-protocol/manifesto.md"
 ---
 
 # Human Participant in the Actor Plane
@@ -101,9 +102,13 @@ asking an agent to do the hook's job by hand.
 
 ### Entity: ParticipantClaim (the `human:` kind of `ActorClaim`)
 
-- **Classification**: Attested-Private (B2). The claim record itself lives on the participant's
-  own append-only ledger (`.eprfs/status/actors.jsonl`, sidecar, never tracked). Its *effect*, the
-  acts it signs, is what crosses into shared space.
+- **Classification**: Attested-Private (B2). The claim and witness records themselves (and the
+  device's `Signed` records over them) live on the participant's own append-only ledger
+  (`.eprfs/status/actors.jsonl`, untracked sidecar). The participant ROSTER
+  (`.eprfs/status/participants/<handle>.jsonl`: genesis, binding and contest rows) is tracked,
+  because git carries it between a person's devices at this node. It holds public material only:
+  handles, `did:key`s, CIDs, nonces and signatures, and never an email, a git name or a workspace
+  namespace. The claim's *effect*, the acts it signs, is what crosses into shared space.
 - **Justification**: Nobody needs the claim to validate anything except the acts that cite it, and
   those acts are fruit. On the DHT the analog already exists: imagodei `Human` (Notarized, keyed by
   `AgentPubKey`) with `HumanityWitness` as the attestation of humanity; the repo-node claim is the
