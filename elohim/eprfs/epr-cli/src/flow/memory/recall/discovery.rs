@@ -606,6 +606,15 @@ pub fn discover_scored(
 /// Where the habit register is projected. Read, never written, by this executor.
 pub const HABITS_REL: &str = "genesis/manifests/habits.yaml";
 
+/// Whether a first screen may offer `path` as a candidate source, whichever producer found it —
+/// the one rule every producer's order passes before it is shown or fused (the area screen, the
+/// root authority set and the semantic order alike). The habit register is a GENERATED
+/// projection (never an authority to edit or cite) and its rows already render as the screen's
+/// habits block; it would otherwise compete as a source with the atoms it is projected from.
+pub(super) fn offered_on_first_screen(path: &str) -> bool {
+    path != HABITS_REL
+}
+
 /// Words that carry no area, so they never select a habit or a source.
 const STOPWORDS: [&str; 49] = [
     "about", "after", "again", "against", "because", "before", "being", "between", "could", "does",
@@ -985,10 +994,12 @@ pub(super) fn first_screen(
         let charged = found["usage"].take();
         add_usage(usage, &charged);
         candidates = found["candidates"].as_array().cloned().unwrap_or_default();
-        // The habit register is a GENERATED projection (never an authority to edit or cite) and its
-        // rows already render as this screen's habits block; once the globs admit YAML it would
-        // otherwise compete as a source with the atoms it is projected from.
-        candidates.retain(|candidate| candidate["path"].as_str() != Some(HABITS_REL));
+        // Once the globs admit YAML, the generated register would compete as a source.
+        candidates.retain(|candidate| {
+            candidate["path"]
+                .as_str()
+                .is_some_and(offered_on_first_screen)
+        });
         // Each candidate is located, not merely named: the section its terms land in, and a read
         // range bounded to one excerpt. The outline scan is charged to the scan counters.
         for candidate in candidates.iter_mut() {
@@ -1091,7 +1102,7 @@ fn root_authority_screen(
     let mut paths: Vec<String> = Vec::new();
     let roots = contract.source_roots();
     let mut push_if_file = |candidate: String| {
-        if paths.contains(&candidate) {
+        if paths.contains(&candidate) || !offered_on_first_screen(&candidate) {
             return;
         }
         // Every authority-set path passes the same declared-scope gate a question's read does:
@@ -1245,7 +1256,7 @@ fn densest_subdir(groups: &Value) -> Option<String> {
 /// [`frontmatter_header`]'s bounded-read boundary proof, this runs once against a whole (already
 /// small, already budget-read) habit atom, because a `checks:`/`refs:` list can run to any length
 /// before the caller knows which entry names a path.
-fn frontmatter_value(text: &str) -> Option<serde_yaml::Value> {
+pub(super) fn frontmatter_value(text: &str) -> Option<serde_yaml::Value> {
     let mut lines = text.lines();
     if lines.next()?.trim() != "---" {
         return None;

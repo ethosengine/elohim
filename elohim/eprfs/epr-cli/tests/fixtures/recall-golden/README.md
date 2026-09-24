@@ -44,8 +44,8 @@ their own recent journeys revealed, and whether its table came from the contract
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `7a43faae1d28c8d87df44ef2d974ca2a28600e44e9e590e282c59716b850b2ca` |
-| Whole open | `whole_open_is_byte_identical` | `469d909e5878a8ab3b7e7f5d9a9677549d3af12012d6041d796a894723c9a3b6` |
+| Focused open | `focused_open_is_byte_identical` | `bb671091157ae855cd07ccb2a094f1de0fedf3e89901df266733b97a820d464f` |
+| Whole open | `whole_open_is_byte_identical` | `0d4f656893bf89a27c580dde0a12ff15b2b2ce5a0882e963c4c74e05dbb4a939` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged: a refusal exits before render()'s lens/floor preamble runs) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -171,3 +171,7 @@ The `Accounting:` line's rounded wall-clock segment (`· 0.0s ·`) is the same m
 ## 2026-09-24 — contract v19 (station 4, Task 4.5: `discovery.first_screen_fusion` declares the first screen's reciprocal-rank fusion)
 
 Focused open re-baselined for the fixture contract CID alone (bafkreid…nxm4 → bafkreig…2kqm); substituting the previous CID back reproduces `784cb347…` byte for byte. Whole open (a typed `--need`, so its `docs` area screen now asks the semantic route) moved for the CID and for the absent route's honest trace: one omission line (`semantic: the declared measure does not load: …` — the fixture carries no measure), the floor's `omissions` 5 → 6, and the semantic call's usage on the `Usage:` line (`provider_seconds 0`, `search_queries` 1 → 2, `semantic_chunks_scanned 0`, `semantic_query_ms`); reverting exactly those reproduces `cc285a54…`. `semantic_query_ms` is a measured wall-clock, so `run_text()` now normalizes it like `elapsed_seconds`. No fused tag or ranks appear: the route is absent, so the screen is the lexical screen. The refusal digest is unchanged.
+
+## 2026-09-24 — contract v20 (Task 4.5 fix round 1: the fused first screen's own semantic call is part of the screen, not the packet's search)
+
+Focused open re-baselined for the fixture contract CID alone (bafkreig…2kqm → bafkreie…3il4); substituting the previous CID back reproduces `7a43faae…`. Whole open moved for the CID and because an absent route is now charged nothing: the `Usage:` line drops `provider_seconds 0`, `semantic_chunks_scanned 0` and `semantic_query_ms`, and `search_queries` reverts 2 → 1. Reverting exactly those reproduces `469d909e…`. The omission line and the floor's `omissions: 6` are unchanged. The refusal digest is unchanged.

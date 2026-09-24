@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 19,
+  "version": 20,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -45,7 +45,7 @@
   "method": [
     "Try declared source routes first; verify locators and current bytes.",
     "Read the packet sources before querying the semantic index.",
-    "If routes are absent or insufficient, make at most one semantic search per packet (search --provider semantic, limits.search_results): the native semantic provider ranks by cosine over the declared fold and prints its method CID and fold lag on every candidate; verify returned sources within that packet’s remaining file/byte budget. MemPalace is the declared visitor, a second opinion whose ranking, version and freshness are unknown, never the index.",
+    "If routes are absent or insufficient, make at most one semantic search per packet (search --provider semantic, limits.search_results; the fused first screen's own semantic call is part of the screen and does not consume the packet's explicit search): the native semantic provider ranks by cosine over the declared fold and prints its method CID and fold lag on every candidate; verify returned sources within that packet’s remaining file/byte budget. MemPalace is the declared visitor, a second opinion whose ranking, version and freshness are unknown, never the index.",
     "Treat service ranking as candidate discovery, not authority; it may combine semantic and lexical scores. Record query, source locators and unknown ranking/version details.",
     "If useful evidence does not fit this packet, report its unresolved frontier. Autonomously open another focused packet with an explicit evidence question when expected value justifies it; carry cumulative cost forward and do not reset accounting to conceal repeated fruitless searches.",
     "An open with no --intent adopts the caller's own --need as the session intent: the question the agent actually carried is what every later operation, receipt and finish is accounted against. An explicit --intent still wins.",

@@ -27,6 +27,10 @@ const NO_FOLD: &str = "semantic: no fold — run epr flow memory index fold";
 /// contract's bytes — and its address — moved off this one.
 const V18_METHOD_CID: &str = "bafkreifo5g3r6ymjtpbopdappjnc32426f3qhplza2cninotofelfdrt3e";
 
+/// The v19 contract's method CID (task 4.5); its fix round declared that the fused first screen's
+/// own semantic call does not consume the packet's explicit search, so the address moved again.
+const V19_METHOD_CID: &str = "bafkreidf267h5ynctpq2lsh35yo3llfz53oi32pckie7bmqvqoqz2kbdi4";
+
 /// The fixture's fold surface (the live measure's is the repository's authority layer).
 const SURFACE: [&str; 4] = [
     "genesis/**/*.md",
@@ -229,7 +233,7 @@ fn contract_v19_declares_the_fusion_recipe_and_repins_the_bank() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 19);
+    assert!(value["version"].as_u64() >= Some(19));
     assert_eq!(
         value["discovery"]["first_screen_fusion"],
         json!({"recipe": "rrf-v1", "k": 60, "producers": ["local", "semantic"],
@@ -237,11 +241,34 @@ fn contract_v19_declares_the_fusion_recipe_and_repins_the_bank() {
     );
     let method = contract.method_cid();
     assert_ne!(method, V18_METHOD_CID, "the contract's bytes moved");
+    assert_ne!(method, V19_METHOD_CID, "and moved again at v20");
     let bank = live(value["question_bank"].as_str().expect("bank"));
     assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
     contract
         .question_bank()
         .expect("every question is in scope of the v19 recipe");
+}
+
+/// Contract v20 (fix round 1, controller ruling): the method prose says the fused first screen's
+/// own semantic call is part of the screen and does not consume the packet's explicit search.
+#[test]
+fn contract_v20_says_the_first_screens_semantic_call_is_part_of_the_screen() {
+    let root = common::repo_root();
+    let contract = Contract::load(&root.join(CONTRACT_REL)).expect("live contract loads");
+    let value = common::live_contract();
+    assert_eq!(value["version"], 20);
+    let method_lines = value["method"].to_string();
+    assert!(
+        method_lines.contains("does not consume the packet's explicit search"),
+        "{method_lines}"
+    );
+    let method = contract.method_cid();
+    assert_ne!(method, V19_METHOD_CID, "the contract's bytes moved");
+    let bank = live(value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v20 recipe");
 }
 
 /// Step 4: the fused order is RRF over the two producer orders; a lexical-only target and a
@@ -323,7 +350,24 @@ fn the_fused_order_is_rrf_over_the_lexical_and_semantic_orders() {
     assert_eq!(screen["fusion"]["k"], 60);
     assert!(semantic_lines(screen).is_empty(), "{screen}");
 
-    // Budget honesty: the semantic call is in the view's usage, never charged as source bytes.
+    // Budget honesty: the semantic call is in the view's usage as part of the screen — its own
+    // key, never the packet's `search_queries` — and never charged as source bytes.
+    assert_eq!(
+        view["usage"]["first_screen_semantic_calls"], 1,
+        "{}",
+        view["usage"]
+    );
+    assert_eq!(
+        view["usage"]["search_queries"], lexical["usage"]["search_queries"],
+        "the screen's own call does not consume the packet's search"
+    );
+    assert!(lexical["usage"]
+        .get("first_screen_semantic_calls")
+        .is_none());
+    assert!(
+        lexical["usage"].get("semantic_query_ms").is_none(),
+        "an absent route charges nothing"
+    );
     assert!(view["usage"]["semantic_chunks_scanned"].as_u64().unwrap() > 0);
     assert!(view["usage"]["semantic_query_ms"].is_u64());
     assert_eq!(
@@ -375,8 +419,8 @@ fn the_lens_cut_and_the_content_floor_apply_after_fusion() {
     common::write(
         root,
         "genesis/erratum.md",
-        "---\ntitle: Erratum\ncontent_class: correction\n---\n# Erratum\nThe orbit table was \
-         wrong.\n",
+        "---\ntitle: Erratum\ncontent_class: correction\n---\n# Erratum\nWho can fix the bug \
+         now? Not the one we named.\n",
     );
     common::git(root, &["add", "-A"]);
     common::git(root, &["commit", "-qm", "erratum"]);
@@ -395,6 +439,12 @@ fn the_lens_cut_and_the_content_floor_apply_after_fusion() {
         at > 0,
         "precondition: the correction is past the cut: {fused:?}"
     );
+    // Only the semantic route found it (it never says `orbit`), so its content class was read by
+    // the fusion step itself.
+    let erratum = &view["first_screen"]["candidates"][at];
+    assert!(erratum["ranks"]["local"].is_null(), "{erratum}");
+    assert_eq!(erratum["content_class"], "correction");
+    assert_eq!(erratum["title"], "Erratum");
 
     let text = open_text(
         root,
@@ -657,5 +707,114 @@ fn bootstrap_spawns_no_embedding_process() {
     assert!(
         absent[0].starts_with("semantic: unavailable:"),
         "{absent:?}"
+    );
+}
+
+/// Fix round 1, finding 1: the generated habit register is never offered on a first screen,
+/// whichever producer found it — a semantic-only hit on it never reaches the fused screen.
+#[test]
+fn a_semantic_hit_on_the_habit_register_never_reaches_the_fused_screen() {
+    let dir = tree();
+    let root = dir.path();
+    let mut measure = live(MEASURE_REL);
+    let mut surface: Vec<&str> = SURFACE.to_vec();
+    surface.push("genesis/**/*.yaml");
+    measure["surfaces"]["paths"] = json!(surface);
+    put_json(root, MEASURE_REL, &measure);
+    common::write(
+        root,
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: triage\n  status: red\n  invariant: who can fix the bug now\n",
+    );
+    common::git(root, &["add", "-A"]);
+    common::git(root, &["commit", "-qm", "register"]);
+    fold(root);
+    let semantic = retrieve(root, &contract(root), "semantic", NEED, "genesis", &[], &[])
+        .expect("an honest answer");
+    assert!(
+        paths(&semantic["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string()),
+        "precondition: the semantic route ranks the register: {semantic}"
+    );
+    let view = focused(root, "register");
+    let screen = &view["first_screen"];
+    assert_eq!(screen["fusion"]["recipe"], "rrf-v1", "{screen}");
+    assert!(
+        !paths(&screen["candidates"]).contains(&"genesis/manifests/habits.yaml".to_string()),
+        "{screen}"
+    );
+}
+
+/// Fix round 1, finding 5: one absent producer does not cancel fusion for the others — the
+/// screen fuses over those that answered, with one omission line per absent producer.
+#[test]
+fn an_absent_third_producer_does_not_cancel_fusion() {
+    let dir = tree();
+    let root = dir.path();
+    fold(root);
+    let mut value = contract(root).value;
+    value["discovery"]["first_screen_fusion"]["producers"] =
+        json!(["local", "semantic", "mempalace"]);
+    put_json(root, "three-producers.json", &value);
+    let view = open_json_under(
+        root,
+        "three-producers.json",
+        "three",
+        &["--need", NEED, "--scope", "genesis"],
+    );
+    let screen = &view["first_screen"];
+    assert_eq!(screen["fusion"]["recipe"], "rrf-v1", "{screen}");
+    let mempalace: Vec<String> = lines(&screen["omissions"])
+        .into_iter()
+        .filter(|line| line.starts_with("mempalace:"))
+        .collect();
+    assert_eq!(mempalace.len(), 1, "{screen}");
+    let producers: Vec<&str> = screen["fusion"]["producers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|p| p["id"].as_str())
+        .collect();
+    assert_eq!(producers, vec!["local", "semantic"]);
+    assert!(
+        paths(&screen["candidates"]).contains(&"genesis/triage.md".to_string()),
+        "{screen}"
+    );
+}
+
+/// Fix round 1, finding 6: no fusion token over nothing — a semantic route that answers with no
+/// candidate in the area leaves the lexical screen, with no `fusion`, ranks or tag.
+#[test]
+fn a_semantic_answer_with_nothing_in_the_area_leaves_the_lexical_screen() {
+    let dir = tree();
+    let root = dir.path();
+    common::write(
+        root,
+        "genesis/data/orbit.json",
+        "{\"orbit\": \"orbit period\"}\n",
+    );
+    common::git(root, &["add", "-A"]);
+    common::git(root, &["commit", "-qm", "data"]);
+    fold(root);
+    let view = open_json(
+        root,
+        "nothing",
+        &["--need", NEED, "--scope", "genesis/data"],
+    );
+    let screen = &view["first_screen"];
+    assert_eq!(
+        paths(&screen["candidates"]),
+        vec!["genesis/data/orbit.json".to_string()],
+        "{screen}"
+    );
+    assert!(screen.get("fusion").is_none_or(Value::is_null), "{screen}");
+    assert!(screen["candidates"][0].get("ranks").is_none(), "{screen}");
+    let text = open_text(
+        root,
+        "nothing-text",
+        &["--need", NEED, "--scope", "genesis/data"],
+    );
+    assert!(
+        !text.contains("fusion rrf-v1") && !text.contains("local #"),
+        "{text}"
     );
 }

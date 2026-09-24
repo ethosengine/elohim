@@ -72,8 +72,7 @@ fn redact_accounting_elapsed(text: &str) -> String {
 
 /// Replaces the numeric value following every `needle` occurrence with a fixed placeholder — a
 /// measured wall-clock duration, not part of the pinned rendering: `elapsed_seconds`, and (task
-/// 4.5) `semantic_query_ms`, the first screen's semantic call, which a loaded machine moves off
-/// zero even when the route is absent.
+/// 4.5) `semantic_query_ms`, the first screen's semantic call when its route answers.
 fn redact_measured(text: &str, needle: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
@@ -101,8 +100,8 @@ fn digest(s: &str) -> String {
 // `recipe` CID (`Contract::method_cid()` over the WHOLE contract's bytes), so any contract edit
 // moves GOLDEN_FOCUSED and GOLDEN_WHOLE. GOLDEN_REFUSAL has never moved: a refusal never reaches
 // `render()`'s orientation/lens/floor preamble, so it never prints a `recipe` line.
-const GOLDEN_FOCUSED: &str = "7a43faae1d28c8d87df44ef2d974ca2a28600e44e9e590e282c59716b850b2ca";
-const GOLDEN_WHOLE: &str = "469d909e5878a8ab3b7e7f5d9a9677549d3af12012d6041d796a894723c9a3b6";
+const GOLDEN_FOCUSED: &str = "bb671091157ae855cd07ccb2a094f1de0fedf3e89901df266733b97a820d464f";
+const GOLDEN_WHOLE: &str = "0d4f656893bf89a27c580dde0a12ff15b2b2ce5a0882e963c4c74e05dbb4a939";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

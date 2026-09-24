@@ -16,13 +16,19 @@
 //! **When it runs.** Only on a focused open whose `--need` was typed (the first screen does not
 //! exist otherwise, so `open --purpose bootstrap` never asks the semantic route anything), over
 //! the focused area if one resolved, else the session scope. An absent, unavailable or
-//! other-method route is ONE omission line naming why, and the screen stays the lexical screen —
-//! never an exit 2 for the whole screen. A stale fold fuses, and its `fold N files behind` line
-//! rides into the screen's omissions. The lens cut and the content floor apply after fusion, in
-//! `render.rs`: fusion orders; the lens chooses how many.
+//! other-method route is ONE omission line naming why and fusion proceeds over the producers that
+//! answered; with only `local` left, or no other producer's rank on the screen, it stays the
+//! lexical screen — never an exit 2 for the whole screen. A stale fold fuses, and its `fold N
+//! files behind` line rides into the screen's omissions. Every producer's order passes the same
+//! first-screen offer rule (`discovery::offered_on_first_screen`) before it is fused. The call is
+//! part of the screen, charged as `first_screen_<producer>_calls`, never as the packet's
+//! `search_queries`. The lens cut and the content floor apply after fusion, in `render.rs`:
+//! fusion orders; the lens chooses how many.
 use elohim_epr_rea::atom_cid;
 
-use super::discovery::{frontmatter_header, trim_to_character_boundary};
+use super::discovery::{
+    frontmatter_header, frontmatter_value, offered_on_first_screen, trim_to_character_boundary,
+};
 use super::providers::{providers_for, ProviderResult};
 use super::*;
 
@@ -186,9 +192,9 @@ pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
 
 /// Fuse `screen`'s lexical candidates with the recipe's other producers, in place, asking each
 /// over `scope` with the typed question. Nothing happens when the contract declares no fusion.
-/// A producer that could not rank (absent, unavailable, undeclared) adds ONE omission line and
-/// the screen stays the lexical screen; a known ranking's own omissions (a stale fold's
-/// `fold N files behind`) ride into the screen's. Every producer's usage is charged to `usage`.
+/// A producer that could not rank (absent, unavailable, undeclared) adds ONE omission line and is
+/// left out of the fusion, charged nothing; a known ranking's own omissions (a stale fold's
+/// `fold N files behind`) ride into the screen's and its usage is charged as part of the screen.
 pub(super) fn fuse_screen(
     args: &Args,
     contract: &Contract,
@@ -205,57 +211,70 @@ pub(super) fn fuse_screen(
             return;
         }
     };
-    let local: Vec<Value> = screen["candidates"].as_array().cloned().unwrap_or_default();
+    let local: Vec<Value> = offered(screen["candidates"].as_array().cloned().unwrap_or_default());
     let mut orders: Vec<(String, Vec<Value>)> = vec![(LOCAL.to_string(), local)];
     let mut methods: Vec<Value> = vec![json!({"id": LOCAL, "method": contract.method_cid()})];
     let declared = providers_for(contract);
-    let mut absent = false;
     for producer in recipe.producers.iter().skip(1) {
+        // Each producer that cannot rank is ONE omission line, and fusion proceeds over the
+        // producers that answered.
         let Some(provider) = declared.iter().find(|p| p.id() == *producer) else {
             push_omission(
                 screen,
                 format!("{producer}: not declared by the recipe's ceremony.providers"),
             );
-            absent = true;
             continue;
         };
-        let answer = provider.candidates(
+        let answer = match provider.candidates(
             args.need.trim(),
             terms,
             Path::new(scope),
             contract,
             &args.root,
-        );
-        let answer: ProviderResult = match answer {
+        ) {
             Ok(answer) => answer,
             Err(error) => {
                 push_omission(screen, format!("{producer}: unavailable: {error}"));
-                absent = true;
                 continue;
             }
         };
-        add_usage(usage, &answer.usage);
         if !answer.ranking_known {
-            // Exactly one line naming why — the route's own reason when it gave one.
+            // An absent route ran nothing the screen should be charged for.
             let why = if answer.unresolved.is_empty() {
-                format!("{producer}: ranking unknown; not fused")
+                "ranking unknown; not fused".to_string()
             } else {
                 answer.unresolved.join("; ")
             };
-            push_omission(screen, why);
-            absent = true;
+            let prefix = format!("{producer}:");
+            push_omission(
+                screen,
+                if why.starts_with(&prefix) {
+                    why
+                } else {
+                    format!("{prefix} {why}")
+                },
+            );
             continue;
         }
+        charge_screen_call(usage, producer, &answer);
         for line in answer.omissions {
             push_omission(screen, line);
         }
         methods.push(json!({"id": producer, "method": answer.method}));
-        orders.push((producer.clone(), answer.ranked));
+        orders.push((producer.clone(), offered(answer.ranked)));
     }
-    if absent {
+    if orders.len() < 2 {
         return;
     }
     let fused = fuse(&orders, recipe.k);
+    // No fusion token over nothing: when no other producer's rank reached the screen, it stays
+    // the lexical screen (its omissions still say what the others answered).
+    if fused
+        .iter()
+        .all(|f| f.ranks.iter().skip(1).all(|(_, rank)| rank.is_none()))
+    {
+        return;
+    }
     let candidates: Vec<Value> = fused
         .into_iter()
         .map(|fused| {
@@ -331,19 +350,36 @@ fn declared_fields(
     let Some(text) = trim_to_character_boundary(&data) else {
         return (None, None);
     };
-    let Some(header) = frontmatter_header(&text, data.len(), file_bytes) else {
+    // The header's boundary is proven against the bounded read before it is parsed.
+    if frontmatter_header(&text, data.len(), file_bytes).is_none() {
+        return (None, None);
+    }
+    let Some(value) = frontmatter_value(&text) else {
         return (None, None);
     };
-    let Ok(value) = serde_yaml::from_str::<serde_yaml::Value>(&header[4..]) else {
-        return (None, None);
-    };
-    let field = |key: &str| {
-        value
-            .as_mapping()
-            .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some(key)))
-            .and_then(|(_, v)| v.as_str().map(str::to_string))
-    };
+    let field = |key: &str| value.get(key).and_then(|v| v.as_str().map(str::to_string));
     (field("title"), field("content_class"))
+}
+
+/// Only the candidates a first screen may offer, in their producer's order
+/// ([`offered_on_first_screen`] — one rule for every producer).
+fn offered(candidates: Vec<Value>) -> Vec<Value> {
+    candidates
+        .into_iter()
+        .filter(|c| c["path"].as_str().is_some_and(offered_on_first_screen))
+        .collect()
+}
+
+/// A producer's first-screen call is part of the SCREEN, not the packet's explicit search
+/// (contract v20): its usage is charged under its own keys — `first_screen_<producer>_calls`
+/// plus the producer's measured ones — and never to `search_queries`.
+fn charge_screen_call(usage: &mut Value, producer: &str, answer: &ProviderResult) {
+    let mut charged = answer.usage.clone();
+    if let Some(fields) = charged.as_object_mut() {
+        fields.remove("search_queries");
+        fields.insert(format!("first_screen_{producer}_calls"), json!(1));
+    }
+    add_usage(usage, &charged);
 }
 
 fn push_omission(screen: &mut Value, line: String) {
