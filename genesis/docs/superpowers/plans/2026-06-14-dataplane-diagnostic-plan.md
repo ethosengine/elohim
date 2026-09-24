@@ -1,3 +1,13 @@
+---
+title: "Diagnostic Read-Model End-to-End Wiring — Implementation Plan (P-DIAGNOSTIC)"
+id: dataplane-diagnostic-plan
+status: Draft
+triage_note: "unexecuted since 2026-06-14 (no selfCidPresent / provideLoopEnabled on P2PStatusInfo)"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Diagnostic Read-Model End-to-End Wiring — Implementation Plan (P-DIAGNOSTIC)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

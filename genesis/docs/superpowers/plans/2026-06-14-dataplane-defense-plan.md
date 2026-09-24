@@ -1,3 +1,13 @@
+---
+title: "Dataplane Defense — Fix-Patterns Over Already-Built (Implementation Plan)"
+id: dataplane-defense-plan
+status: Draft
+triage_note: "unexecuted as a plan since 2026-06-14; some jitter/backoff exists independently — re-verify against the tree before pickup"
+triaged: 2026-09-24
+cites:
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:3813e34470d5df1d | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
+---
+
 # Dataplane Defense — Fix-Patterns Over Already-Built (Implementation Plan)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax. Working draft — NOT cite-sealed.

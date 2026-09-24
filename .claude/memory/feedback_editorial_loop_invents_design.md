@@ -9,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 5c45be19-a450-4d6a-b68d-bb9c809bb2f1
   modified: 2026-09-23T10:36:55.336Z
+cites:
+  - genesis/docs/content/elohim-protocol/.epr-meta
+  - .epr-meta/elohim/packages/agents/blind-reader.json
 ---
 
 **What happened (2026-09-23 editorial pass on README + protocol-specification, shefa, constitution,

@@ -1,3 +1,13 @@
+---
+title: "Deploy Coherence — Atomic A+B Rollout + Genesis-Pair Partition Guard — Implementation Plan (F-DEPLOY)"
+id: federation-deploy-plan
+status: Draft
+triage_note: "unexecuted since 2026-06-14 (no deploy-pair barrier in elohim/holochain/Jenkinsfile or scripts/ci)"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Deploy Coherence — Atomic A+B Rollout + Genesis-Pair Partition Guard — Implementation Plan (F-DEPLOY)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

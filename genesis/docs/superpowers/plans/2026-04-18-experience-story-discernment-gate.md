@@ -1,3 +1,14 @@
+---
+title: "Experience-Story Discernment Gate — Implementation Plan"
+id: experience-story-discernment-gate-2
+status: superseded
+superseded_by: "elohim/elohim-agent (Rust discernment gate)"
+triage_note: "self-declared SUPERSEDED 2026-04-18 — discernment moved into @elohim/elohim-agent; the TS module was reverted (dfadce0b)"
+triaged: 2026-09-24
+cites:
+  - elohim/elohim-agent/elohim-agent-service/src/service.rs
+---
+
 # Experience-Story Discernment Gate — Implementation Plan
 
 > **⚠️ SUPERSEDED (2026-04-18) — architectural reframe.** The original plan below proposed a TypeScript pure function in `elohim-library`. During Batch F execution the user course-corrected: **discernment is a first-class primitive of `@elohim/elohim-agent`, not an app concern.** The `.ts` surface is legitimately the "sense-and-respond" layer (gathering context, rendering results), but the gate itself — its evaluation, its registry, its constitutional-reasoning coupling — lives as a Rust `Gate` trait in `elohim-agent-service`, invoked by the SDK. The specific ruleset for a given contentType (the 7 valences for experience-story, or future gates for journal drafting, comment reach, imagination bounds) is declared **in the app manifest** as an emergent app-domain dimension that builds on a protocol-core gate-interface.

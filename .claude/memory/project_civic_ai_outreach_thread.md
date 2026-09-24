@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: dd92ea53-45bb-4dba-bf69-b4b5b86362dd
+cites:
+  - "contributor-presence-bootstrap-whoswho-design | the who's-who contributor-presence graph this outreach thread feeds for follow-up and peer routing | sha256:0b72f9cec8821810 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
 ---
 
 # civic.ai outreach thread (Audrey Tang + Caroline Green)

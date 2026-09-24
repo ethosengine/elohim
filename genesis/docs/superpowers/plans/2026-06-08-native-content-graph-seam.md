@@ -1,5 +1,9 @@
 ---
 id: native-content-graph-seam
+status: landed
+landed_commit: 76023987e
+triage_note: "implemented 2026-06-08/09 (9817cff31..76023987e); checkboxes never ticked"
+triaged: 2026-09-24
 cites:
   - native-content-graph-seam-design | The approved design spec this plan implements task-by-task — the trait seam, two-pass resolver, ts-rs view promotion, shared sidebar, and seeded witness | sha256:d03683cd30aef91c | path: genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md
 ---

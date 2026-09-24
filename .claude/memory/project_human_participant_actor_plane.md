@@ -8,6 +8,9 @@ metadata:
   type: project
   originSessionId: fa35e94d-33e3-4301-a1ba-263d90ff52da
   modified: 2026-09-23T16:55:25.867Z
+cites:
+  - "human-participant-actor-plane-design | the gate-output spec (six stations) this decision is recorded in; re-read it before restating the attribution bounds | sha256:ae3f433a8039bba7 | path: genesis/docs/superpowers/specs/2026-09-23-human-participant-actor-plane-design.md"
+  - .epr-meta/acts-attributed-to-participants.habit.md
 ---
 
 **Decision (operator, 2026-09-23).** The eprfs actor plane admits the human as a participant kind

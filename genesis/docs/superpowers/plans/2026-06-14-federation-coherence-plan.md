@@ -1,3 +1,14 @@
+---
+title: "Cross-Edge EPR/Projection Coherence — Divergence Detection (F-COHERENCE)"
+id: federation-coherence-plan
+status: landed
+landed_commit: c16864bbc
+triage_note: "F-COHERENCE: cross-edge probe + CID self-fingerprint route, doorway/doorway-service/src/routes/coherence.rs (33f4e318c..c16864bbc)"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Cross-Edge EPR/Projection Coherence — Divergence Detection (F-COHERENCE)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

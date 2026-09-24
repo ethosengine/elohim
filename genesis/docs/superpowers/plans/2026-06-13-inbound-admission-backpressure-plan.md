@@ -1,3 +1,14 @@
+---
+title: "Inbound Admission & Propagated Backpressure — Implementation Plan"
+id: inbound-admission-backpressure-plan
+status: landed
+landed_commit: db68a809a
+triage_note: "Plan B: doorway inbound admission (8083cc056) + storage per-request shed (59b42d4c4), merged in db68a809a"
+triaged: 2026-09-24
+cites:
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Inbound Admission & Propagated Backpressure — Implementation Plan
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

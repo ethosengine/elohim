@@ -1,3 +1,14 @@
+---
+title: "substrate_signal Migration (Cluster #3, Slice 1) Implementation Plan"
+id: cluster3-substrate-signal-migration-plan
+status: landed
+landed_commit: 000e144f7
+triage_note: "substrate_signal field + validator wall + write/view path landed 2026-06-09 (b7d0e501b..000e144f7)"
+triaged: 2026-09-24
+cites:
+  - "cluster3-substrate-signal-migration-governance-signal-flow-design | substrate_signal Migration & Self-Referential Governance Signal-Flow | sha256:b758c9c0959c0fef | path: genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md"
+---
+
 # substrate_signal Migration (Cluster #3, Slice 1) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended)

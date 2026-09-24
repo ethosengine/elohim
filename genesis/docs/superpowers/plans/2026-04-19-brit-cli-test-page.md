@@ -1,3 +1,15 @@
+---
+title: "Brit CLI Test Page Implementation Plan"
+id: brit-cli-test-page
+status: landed
+landed_commit: 4db33bc104
+landed_in: elohim/brit
+triage_note: "cli-journey + cli-test-page crates and tests/baseline.md live in the elohim/brit submodule (176783aab8, 2026-04-19; standalone CI green 4db33bc104)"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-04-19-brit-cli-test-page-design.md
+---
+
 # Brit CLI Test Page Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

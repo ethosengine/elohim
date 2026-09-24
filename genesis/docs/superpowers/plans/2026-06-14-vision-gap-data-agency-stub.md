@@ -1,3 +1,13 @@
+---
+title: "Vision-Gap Plan-STUB — O5: Human-Actuatable Data Agency"
+id: vision-gap-data-agency-stub
+status: proposal
+triage_note: "vision-gap stub (sibling stubs carry GREENLIGHT-TO-EXPAND); awaiting an operator expand/decline"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-06-14-elohim-substrate-passes/VISION-DESIGN-data-agency-2026-06-14.md
+---
+
 # Vision-Gap Plan-STUB — O5: Human-Actuatable Data Agency
 
 > **GREENLIGHT-TO-EXPAND.** This is a scoping stub, not an implementation plan.

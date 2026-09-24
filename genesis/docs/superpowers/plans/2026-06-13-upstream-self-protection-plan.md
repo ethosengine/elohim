@@ -1,3 +1,14 @@
+---
+title: "Upstream Self-Protection — Implementation Plan"
+id: upstream-self-protection-plan
+status: landed
+landed_commit: db68a809a
+triage_note: "Plan A: CircuitBreaker in elohim/elohim-compute (b7998c1f3), merged db68a809a; hardened since (f2bc9d90c)"
+triaged: 2026-09-24
+cites:
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Upstream Self-Protection — Implementation Plan
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

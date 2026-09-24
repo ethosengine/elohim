@@ -1,5 +1,9 @@
 ---
 id: native-content-graph-seam-design
+status: landed
+landed_commit: 76023987e
+triage_note: "ContentGraphResolver seam in elohim/elohim-storage/src/graph_engine.rs, landed 2026-06-08/09 (9817cff31..76023987e)"
+triaged: 2026-09-24
 cites:
   - "confession | Settled-theology doctrinal doc, seeded as the primary markdown EPR witness whose cites-mesh edges plus a computed tag-neighbor prove the resolver end-to-end | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "theology | Disputation doctrinal doc, seeded as a markdown EPR witness for the shared exploration sidebar and the explicit-vs-discovered rendering | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"

@@ -1,3 +1,13 @@
+---
+title: "Auto-Config Resource Probe — Implementation Plan"
+id: auto-config-resource-probe-plan
+status: Draft
+triage_note: "partly overtaken: auto_preset surfaced via /admin/self-healing (Plan C); elohim-compute limits.rs derive() never landed, and doorway worker_threads is now deliberately explicit, never CPU-derived (doorway main.rs) — reconcile before pickup"
+triaged: 2026-09-24
+cites:
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Auto-Config Resource Probe — Implementation Plan
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.
 

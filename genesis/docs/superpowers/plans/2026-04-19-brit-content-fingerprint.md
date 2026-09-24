@@ -1,3 +1,15 @@
+---
+title: "Brit Content Fingerprint Implementation Plan"
+id: brit-content-fingerprint
+status: landed
+landed_commit: 0d5bd7ba63
+landed_in: elohim/brit
+triage_note: "ContentFingerprint::from_repo_globs in brit-graph/src/repo_fingerprint.rs (951dfcccf4) wired into brit-cli plan (0d5bd7ba63), elohim/brit submodule"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-04-19-brit-graph-rakia-mvp-design.md
+---
+
 # Brit Content Fingerprint Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

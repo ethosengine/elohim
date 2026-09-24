@@ -1,3 +1,14 @@
+---
+title: "Bootstrap Store Islanding — per-pod in-memory → shared/coherent (F-BOOTSTRAP)"
+id: federation-bootstrap-plan
+status: landed
+landed_commit: 8bec96208
+triage_note: "F-BOOTSTRAP: MongoK2Store shared bootstrap table (4d9442772), env-selected via BOOTSTRAP_MONGODB_DB (8bec96208), cross-pod proof test 4122b23fc (#[ignore])"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Bootstrap Store Islanding — per-pod in-memory → shared/coherent (F-BOOTSTRAP)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

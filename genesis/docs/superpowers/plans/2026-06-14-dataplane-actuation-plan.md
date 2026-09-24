@@ -1,3 +1,13 @@
+---
+title: "Dataplane Actuation — Canonical Contract & Arc-As-Instance (P-ACTUATION)"
+id: dataplane-actuation-plan
+status: Draft
+triage_note: "S1 canonical trait Governor lifted into elohim/elohim-compute/src/actuation.rs (5ba4dcb02); the arc-as-instance tasks remain open"
+triaged: 2026-09-24
+cites:
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:3813e34470d5df1d | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
+---
+
 # Dataplane Actuation — Canonical Contract & Arc-As-Instance (P-ACTUATION)
 
 > Working draft. NOT cite-sealed. For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

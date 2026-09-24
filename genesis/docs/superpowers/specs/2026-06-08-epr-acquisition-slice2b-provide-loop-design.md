@@ -1,3 +1,14 @@
+---
+title: "EPR Acquisition Slice 2b — The User-Facing Provide Loop (provide-reconciler design)"
+id: epr-acquisition-slice2b-provide-loop-design
+status: landed
+landed_commit: 31c4dad37
+triage_note: "provide reconciler + replicates-commons commitments on dev 2026-06-08/09 (026269753..31c4dad37); code on disk under elohim/elohim-storage/src"
+triaged: 2026-09-24
+cites:
+  - "epr-acquisition-pull-queue-design | EPR Acquisition Family | sha256:24aad9240361c0a4 | path: genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md"
+---
+
 # EPR Acquisition Slice 2b — The User-Facing Provide Loop (provide-reconciler design)
 
 _Author: Claude Opus · Date: 2026-06-08 · Status: design (brainstorm-approved shape, adversarially reviewed) · Branch context: composes on the Slice 2a REA compute-bounds rail landed on `dev` (`9e7ba313e`, CI-verified DNA-green via `elohim-holochain/dev #1314`)._

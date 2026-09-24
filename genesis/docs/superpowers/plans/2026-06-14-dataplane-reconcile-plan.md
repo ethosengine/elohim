@@ -1,3 +1,13 @@
+---
+title: "Sweep Registry & Cadence Reconcile — Implementation Plan (P-RECONCILE)"
+id: dataplane-reconcile-plan
+status: Draft
+triage_note: "unexecuted since 2026-06-14 (no Sweep trait / SweepRegistrySnapshot in tree)"
+triaged: 2026-09-24
+cites:
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:3813e34470d5df1d | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
+---
+
 # Sweep Registry & Cadence Reconcile — Implementation Plan (P-RECONCILE)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax. TDD: every task writes the failing test BEFORE the implementation.

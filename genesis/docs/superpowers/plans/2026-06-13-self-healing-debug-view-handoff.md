@@ -1,3 +1,15 @@
+---
+title: "Self-Healing Debug View — Plan C Frontend Handoff"
+id: self-healing-debug-view-handoff
+status: superseded
+superseded_by: protocol-debug-surface
+triage_note: "the view shipped as the StabilityLens of the /debug shell (0efc4e8a9) under the protocol-debug-surface plan, not as the separate self-healing component this handoff proposed"
+triaged: 2026-09-24
+cites:
+  - "protocol-debug-surface | Protocol Debug Surface Implementation Plan | sha256:39c56caddb95ed79 | path: genesis/docs/superpowers/plans/2026-06-13-protocol-debug-surface.md"
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Self-Healing Debug View — Plan C Frontend Handoff
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

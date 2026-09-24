@@ -1,3 +1,14 @@
+---
+title: "Protocol Debug Surface Implementation Plan"
+id: protocol-debug-surface
+status: landed
+landed_commit: 7d241a66f
+triage_note: "/debug shell + lenses under app/elohim-app/src/app/debug landed 2026-06-13 (58f0d146f..7d241a66f)"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md
+---
+
 # Protocol Debug Surface Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -1,3 +1,15 @@
+---
+title: "Rakia Describable via CLI + Schema-as-IoC Implementation Plan"
+id: rakia-describable-cli-and-schema-ioc
+status: landed
+landed_commit: c4a1f21
+landed_in: elohim/rakia
+triage_note: "rakia schemas/v1 (build-manifest, build-plan) + describable brit/rakia CLI, elohim/rakia submodule 2026-04-19"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-04-19-rakia-describable-cli-and-schema-ioc.md
+---
+
 # Rakia Describable via CLI + Schema-as-IoC Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -7,6 +7,9 @@ description: "Operator 2026-09-23: participants (human or agent) act; the harnes
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - .epr-meta/acts-attributed-to-participants.habit.md
+  - .claude/hooks/valueflow-observer.py
 ---
 
 Operator, 2026-09-23: taking part in the Elohim protocol should be a **passive experience most of the time**,

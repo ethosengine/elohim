@@ -9,6 +9,8 @@ metadata:
   title: Brynjolfsson / We Must Act Now outreach thread
   type: project
   originSessionId: 3edd70f8-1472-4447-ac3c-1076bc571fbe
+cites:
+  - "contributor-presence-bootstrap-whoswho-design | the who's-who contributor-presence graph this outreach thread feeds for follow-up and peer routing | sha256:0b72f9cec8821810 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
 ---
 
 Cold email sent 2026-07-17 to info@brynjolfsson.com + wemustactnow@stanford.edu, after Matthew heard Brynjolfsson on the Hard Fork podcast that morning and read the We Must Act Now statement (wemustactnow.ai — ~200 economists incl. ten Nobel laureates, calling to "build the incentives, guardrails, and institutions" so AI "complements human workers").

@@ -1,3 +1,14 @@
+---
+title: "Genesis Artifact System & Compute Capacity Ledger — SUPERSEDED"
+id: genesis-artifact-system-limitarianism
+status: superseded
+superseded_by: genesis/data/rakia/compute-capacity.json
+triage_note: "self-declared SUPERSEDED — the slim ledger landed in ed384b72..50436877"
+triaged: 2026-09-24
+cites:
+  - genesis/data/rakia/compute-capacity.json
+---
+
 # Genesis Artifact System & Compute Capacity Ledger — SUPERSEDED
 
 > **Status:** This plan was authored by Haiku 4.5 (auto-mode disabled) and contained

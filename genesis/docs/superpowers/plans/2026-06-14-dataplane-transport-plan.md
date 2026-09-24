@@ -1,3 +1,13 @@
+---
+title: "Dataplane — Transport (libp2p no-overwhelm floor + iroh cutover decision) — Implementation Plan"
+id: dataplane-transport-plan
+status: Draft
+triage_note: "unexecuted since 2026-06-14 (libp2p connection_limits still not enabled in either swarm)"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Dataplane — Transport (libp2p no-overwhelm floor + iroh cutover decision) — Implementation Plan
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax. Working draft — NOT cite-sealed.

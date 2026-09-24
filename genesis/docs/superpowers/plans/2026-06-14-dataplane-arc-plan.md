@@ -1,3 +1,13 @@
+---
+title: "Dataplane — Arc & Conductor-Memory Topology Plan (P-ARC)"
+id: dataplane-arc-plan
+status: Draft
+triage_note: "unexecuted since 2026-06-14 (no StaggerGate / may_arc_restart in tree); operator decision memo still open"
+triaged: 2026-09-24
+cites:
+  - "conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:338a9bdb0a460bea | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md"
+---
+
 # Dataplane — Arc & Conductor-Memory Topology Plan (P-ARC)
 
 > ## ⚠ LEAK-GATE RESOLVED — 2026-06-19 (the {0,1} actuation work + corpus-scaling design STAND)

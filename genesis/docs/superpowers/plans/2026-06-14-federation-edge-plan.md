@@ -1,3 +1,13 @@
+---
+title: "Federation Edge — Server / Load-Balancing / Absorption / CDN — Implementation Plan (F-EDGE)"
+id: federation-edge-plan
+status: Draft
+triage_note: "Wave F1 Task 1 landed (honest /p2p-peers connectedPeerCount, b407bf740); the other two edge defects are unexecuted since 2026-06-18"
+triaged: 2026-09-24
+cites:
+  - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:fe1a426dc6e6b6e8 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+---
+
 # Federation Edge — Server / Load-Balancing / Absorption / CDN — Implementation Plan (F-EDGE)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

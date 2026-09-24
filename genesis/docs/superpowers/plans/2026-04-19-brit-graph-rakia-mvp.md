@@ -1,3 +1,15 @@
+---
+title: "Brit Graph + Rakia MVP Implementation Plan"
+id: brit-graph-rakia-mvp
+status: landed
+landed_commit: 310e554355
+landed_in: elohim/brit
+triage_note: "brit-graph crate in the elohim/brit submodule (310e554355, 2026-04-19) with rakia constellation on top"
+triaged: 2026-09-24
+cites:
+  - genesis/docs/superpowers/specs/2026-04-19-brit-graph-rakia-mvp-design.md
+---
+
 # Brit Graph + Rakia MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

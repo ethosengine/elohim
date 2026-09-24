@@ -1,5 +1,6 @@
 ---
 id: lamad-deleted-concepts-2024
+status: Accepted
 tier: history
 layer: history record at the lamad reference-client locus (app/lamad). Assumes the lamad
   subject home (elohim/sdk/domains/lamad/ — lamad-domain-gospel) and the bundle gospel
@@ -10,7 +11,7 @@ derived_from:
 cites:
   - app/lamad/src/app/claude.md
   - app/lamad/src/app/lamad.routes.ts
-  - "lamad-domain-gospel | CLAUDE | sha256:0c7e351784c6df66 | status: stale — target content moved on; re-verify | path: elohim/sdk/domains/lamad/CLAUDE.md"
+  - "lamad-domain-gospel | CLAUDE | sha256:8671bbc2873bca32 | path: elohim/sdk/domains/lamad/CLAUDE.md"
   - "subject-routing-locus-graph-design | 2026-06-11-subject-routing-locus-graph-design | sha256:a884cdf639a04699 | path: genesis/docs/superpowers/specs/2026-06-11-subject-routing-locus-graph-design.md"
 ---
 

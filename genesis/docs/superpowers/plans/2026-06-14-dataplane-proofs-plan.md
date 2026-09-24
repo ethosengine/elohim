@@ -1,3 +1,13 @@
+---
+title: "Dataplane Resilience Proofs + CI P2P-sim — Implementation Plan (P-PROOFS)"
+id: dataplane-proofs-plan
+status: Draft
+triage_note: "the deterministic-floor layer the 2026-06-29 validation-suite plan composes; its own soak/proof tasks are unexecuted"
+triaged: 2026-09-24
+cites:
+  - "plan-p2p-dataplane-validation-suite | P2P Dataplane Validation Suite | sha256:324c406ddde2d88e | path: genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md"
+---
+
 # Dataplane Resilience Proofs + CI P2P-sim — Implementation Plan (P-PROOFS)
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax. TDD throughout: write the failing test, run-expect-FAIL, write minimal code, run-expect-PASS, commit.

@@ -1,3 +1,14 @@
+---
+title: "Stability Surface — Unified Self-Healing Read Model — Implementation Plan"
+id: stability-surface-read-model-plan
+status: landed
+landed_commit: 82edc611e
+triage_note: "Plan C: GET /admin/self-healing in doorway/doorway-service/src/routes/self_healing.rs (82edc611e, merged db68a809a)"
+triaged: 2026-09-24
+cites:
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Stability Surface — Unified Self-Healing Read Model — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

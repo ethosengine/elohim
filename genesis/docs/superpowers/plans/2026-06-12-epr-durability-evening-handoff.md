@@ -1,3 +1,14 @@
+---
+title: "EPR Durability Arc — evening 2026-06-12 handoff (signal-leg trace)"
+id: epr-durability-evening-handoff
+status: superseded
+superseded_by: epr-durability-replication-arc-plan
+triage_note: "session dispatch prompt; the handoff skill was retired 2026-06-11 and the arc plan is the living home"
+triaged: 2026-09-24
+cites:
+  - "epr-durability-replication-arc-plan | EPR Content Durability Arc | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md"
+---
+
 # EPR Durability Arc — evening 2026-06-12 handoff (signal-leg trace)
 
 Continuation of `2026-06-12-epr-durability-overnight-handoff.md`. The custody-convergence

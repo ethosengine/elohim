@@ -1,3 +1,14 @@
+---
+title: "EPR Acquisition Slice 2b — Provide Loop Implementation Plan"
+id: epr-acquisition-slice2b-provide-loop-plan
+status: landed
+landed_commit: 31c4dad37
+triage_note: "implemented task-by-task 2026-06-08/09 (026269753..31c4dad37); checkboxes were never ticked, so its gap-items are phantom OPEN"
+triaged: 2026-09-24
+cites:
+  - "epr-acquisition-slice2b-provide-loop-design | EPR Acquisition Slice 2b | sha256:c4bd89eff3a1d374 | path: genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md"
+---
+
 # EPR Acquisition Slice 2b — Provide Loop Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

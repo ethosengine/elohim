@@ -1,3 +1,14 @@
+---
+title: "Elevate Arm — Runtime Harvest Poller — Implementation Plan"
+id: elevate-arm-runtime-harvest-plan
+status: landed
+landed_commit: 3c6d9f0b9
+triage_note: "Plan D Tasks 1-7: runtime-harvest pure core (502e4c516) + I/O shell and runtime-triage agent (1bdbab4a8) + self-report boundary doc (3c6d9f0b9); re-verify Tasks 8-9 before retiring"
+triaged: 2026-09-24
+cites:
+  - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:9774ad662ef97ecf | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
+---
+
 # Elevate Arm — Runtime Harvest Poller — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

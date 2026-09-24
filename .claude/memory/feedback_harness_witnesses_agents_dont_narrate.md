@@ -8,6 +8,9 @@ metadata:
   type: feedback
   originSessionId: fa35e94d-33e3-4301-a1ba-263d90ff52da
   modified: 2026-09-23T16:56:02.526Z
+cites:
+  - .epr-meta/acts-attributed-to-participants.habit.md
+  - .claude/hooks/valueflow-observer.py
 ---
 
 An agent acting in the workspace should carry no mental load for provenance. When it changes a file,
