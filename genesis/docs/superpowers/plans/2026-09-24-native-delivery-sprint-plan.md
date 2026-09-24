@@ -5,7 +5,7 @@ status: Draft
 class: process-meta
 process_subdomain: ci
 sprint: native-delivery-2026-09-24
-serves: [push-delivers-within-budget, dataplane-convergence, pin-attestation]
+serves: [push-delivers-within-budget, dataplane-convergence, pin-attestation, idle-is-free]
 cites:
   - "evidence-ladder-push-left | the evidence ladder spec; its §8 prices the App-delivery incident (#1719–#1725) this plan drains | sha256:c8bdfe8ba6c28790 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md"
   - "algedonic-slice1-delivery-flow | algedonic slice-1 plan: concern-addressed findings this plan composes with (Lane D4), never forks | sha256:66054e651d33f3a4 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md"
@@ -407,6 +407,9 @@ clean, ~20× synthetic).
    `conductor app is RUNNING again` − restart, as the arc doc's cycle-time row.
 4. Structural follow-ups (don't hold `running_cells` hostage to join; one read per sector) stay
    in the arc as rung-3 items — captured, not planned here.
+5. (added 2026-09-24, Lane H3) the same fork branch carries a second commit: WAL checkpointing
+   + O(1) `storage_info`; the PR body names both findings and the three-run restart measurement
+   that splits WAL recovery from the DHT-model rebuild.
 
 Operator ruling 2026-09-24: **included, operator-gated** — agents prepare the fork PR, the pin
 move commit and the receipt script; the operator triggers the fork push, `[build:conductor]` and
@@ -521,6 +524,62 @@ carrying the class is deployed (C10 ordering).
 Verify (N): `cargo test -p elohim-storage release_adoption::` (shape/envelope/boots/vehicle/held
 predicate); household feature 6/6 twice; fleet `verify-app-adoption.sh` green; `federation-deploy`
 scenario 2 still green with the crutch deleted.
+
+---
+
+## Lane H — The store that grows (writer bounded at the writer; ruling 2026-09-24)
+
+Surfaced by the operator from another session's report
+(`genesis/docs/content/elohim-protocol/architecture/2026-09-24-conductor-store-growth-report.md`,
+sniffer `app/elohim-app/scripts/conductor-store-sniff.py`): matthew's household conductor holds
+2.3 GB after 42 hours; 27,317 of 30,787 lamad entries are `attestation:device-health` nodes
+written by the three storage agents' doorway heartbeat (every doorway ever registered, every 150 s,
+never deregistered; 179 subjects, 25,973 "unreachable" about doorways that lived four minutes);
+the lamad WAL is 1.4 GB and never checkpoints. This is **causally upstream of the two-hour
+window**: the restart rebuild's cost is (reads × ChainOp rows), and this writer is what inflates
+the rows; WAL replay on restart is another slice of the same window. Serves `idle-is-free`
+(its invariant verbatim: "work done on behalf of nobody is a defect") and, through Lane K,
+`push-delivers-within-budget`.
+
+**P2P design gate ruling.** A peer-health *sample* is **Ephemeral (C)**: it lives in the peer-meta
+store / a storage-side table with a retention window and is never a notarized Content node. A
+*state transition* (reachable↔unreachable, registered↔expired) is the only notarized event
+(A), one per transition. Registrations expire: a doorway whose `active|<ts>` link is older than
+N heartbeats leaves the probe roster. The report's option (c), with option (a) as its first step;
+option (b) (update chains) is rejected because it still writes per probe. The content-type index
+link per attestation is removed (a hot anchor that grows with time). This is a coordinator-only
+change — DNA hash unmoved — plus doorway/storage code.
+
+- **H0** commit the two files as they stand (pathspec; review the sniffer's key handling: it
+  derives the db key from the passphrase like the fork does and must never print it).
+- **H1 stop the bleed (immediate):** doorway heartbeat probes only the live roster (expire by
+  `active|<ts>` age); the a2o serving receipt's scenario doorways deregister on teardown
+  (`OwnedDoorwayPair` fixture); tests on both.
+- **H2 the writer, redesigned:** samples → peer-meta/storage table with retention; notarize only
+  transitions via the existing attestation coordinator; drop the per-attestation type-index link;
+  a household-at-rest reading (`idle-is-free` check) before/after shows the idle create rate fall
+  from ~648/h toward the ceiling.
+- **H3 the fork (rides Lane K's branch as a second commit):** `PRAGMA wal_checkpoint(PASSIVE)` after
+  each integration batch, `TRUNCATE` at idle/shutdown, `journal_size_limit`; `storage_info` reads
+  `page_count × page_size` + WAL size (O(1)) instead of walking `dbstat` twice per DNA per minute.
+- **H4 the sensor (algedonic-designer, real firing):** per-DNA growth budget as declared measures
+  (`dna-actions-per-day@1`, `wal-main-ratio@1`, `idle-writes-per-hour@1`) with the sniffer `--json`
+  as the household probe and conductor metrics as the fleet probe; bounds from the report
+  (lamad ≤ 5k actions/day/peer idle; WAL/main ≤ 1; ≤ 100 links per subject anchor); concern
+  address `idle-is-free`; reader = habits-status + headline. A limit raise is a design signal,
+  never a capacity ask.
+
+Write-set: `doorway/doorway-service/src/services/federation.rs` (+ hosts), the attestation
+coordinator in `elohim/holochain/dna/elohim/zomes/content_store/src/attestation.rs`,
+`elohim/elohim-storage/src/services/attestation_projector.rs`, the a2o `OwnedDoorwayPair`
+fixture, the conductor fork branch (H3), `measures.yaml`/`policies.yaml` (H4, append-only).
+Overlaps: Lane N's soak attestations reuse `attestation:device-health` — bounded (1–3 per release)
+and unaffected, but N must not add the type-index link H2 removes. Lane K's PR body gains the WAL
+finding and H3's commit.
+
+Verify (H): `cargo test -p doorway-service federation::` + the a2o receipt teardown test; the
+sniffer on a stopped household after one idle hour shows lamad actions/day within the ceiling
+and WAL/main ≤ 1 after H3; `idle-is-free` gains a dated delta with both readings.
 
 ---
 
