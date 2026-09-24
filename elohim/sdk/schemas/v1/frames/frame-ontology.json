@@ -1,0 +1,48 @@
+{
+  "id": "frame-ontology",
+  "version": 1,
+  "cites": [
+    "frame-sovereignty-apex@1",
+    "frame-ownership-inalienable@1"
+  ],
+  "normalization": {
+    "nfkc": true,
+    "lowercase": true,
+    "confusables": {
+      "\u0430": "a",
+      "\u0435": "e",
+      "\u043e": "o",
+      "\u0440": "p",
+      "\u0441": "c",
+      "\u0443": "y",
+      "\u0445": "x",
+      "\u0456": "i",
+      "\u0455": "s",
+      "\u0458": "j",
+      "\u04bb": "h",
+      "\u0501": "d",
+      "\u051b": "q",
+      "\u051d": "w",
+      "\u04cf": "l",
+      "\u03bf": "o",
+      "\u03b1": "a",
+      "\u03b9": "i",
+      "\u03ba": "k",
+      "\u03bd": "v",
+      "\u03c1": "p",
+      "\u03c5": "u",
+      "\u0131": "i",
+      "\u2010": "-",
+      "\u2011": "-",
+      "\u2012": "-",
+      "\u2013": "-",
+      "\u2212": "-"
+    }
+  },
+  "testimony_exempt": {
+    "path_prefixes": [
+      "genesis/docs/content/elohim-protocol/public_observer/"
+    ],
+    "frontmatter_key": "testimony"
+  }
+}

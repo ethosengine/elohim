@@ -1,0 +1,61 @@
+{
+  "id": "frame-ownership-inalienable",
+  "version": 1,
+  "validator": "epr:validator-ownership-ontology-guard",
+  "apex_concept": "ownership-as-enclosure",
+  "family": "defeater",
+  "polarity": "incriminating",
+  "cost_class": "high-fp-cost",
+  "binding": "binding-local",
+  "linguistic_definition": "Apex ownership framing asserts ownership as the right relationship to a resource, collapsing rights (primaryAccountable) into custody (custodianScope): the enclosure a holon commits when it owns the commons it stewards. The discriminator is property versus responsibility; accountability idioms such as taking ownership of a bug are not members. The exception is inalienable: a person's absolute claim over their own body, likeness, voice, medical record, private communications or intimate images, where custody transfer is prohibited rather than gated.",
+  "rubric": {
+    "question": "Does the net-new passage assert ownership as the right relationship to a resource, or does it name ownership inside one of the legitimate frames?",
+    "legitimate_frames": [
+      {
+        "id": "adversary",
+        "description": "Naming what is resisted: enclosure, platform data-ownership claims, rent extraction."
+      },
+      {
+        "id": "bounded",
+        "description": "Ownership within a commons that retains the rights."
+      },
+      {
+        "id": "external-legibility",
+        "description": "Describing an outside legal system's ownership on its own terms: a title, a co-op share, a jurisdiction's property register."
+      },
+      {
+        "id": "inalienable",
+        "description": "A person's absolute claim over their own body, likeness, voice, medical record, private communications or intimate images; custody transfer is prohibited, not gated."
+      }
+    ],
+    "apex_answer": "apex"
+  },
+  "recall_signal": {
+    "phrases": [
+      "data ownership",
+      "own your data",
+      "owns their data",
+      "owns your data",
+      "true ownership",
+      "outright ownership",
+      "ownership rights",
+      "ownership of the commons",
+      "owns the commons"
+    ],
+    "markers": [
+      "stewardship-frame:",
+      "sovereignty-frame:"
+    ],
+    "min_net_new": 1,
+    "scan_cap_bytes": 262144,
+    "cosine_floor": 0.35,
+    "probe_min_net_new_bytes": 400
+  },
+  "cites": [
+    "genesis/docs/architecture/stewardship-over-sovereignty.md",
+    "genesis/docs/content/elohim-protocol/hardware-providence-commons.md",
+    "genesis/docs/superpowers/specs/2026-08-05-digital-memory-standing-ontology-design.md",
+    "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md"
+  ],
+  "established_by": "deliberated-2026-08-16-operator+agents"
+}

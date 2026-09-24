@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:frame",
+  "title": "FrameAtom",
+  "description": "One frame atom: the content-addressable vocabulary a values guard classifies a write against. Runtime-read S2 data (both governance hosts load it; no codegen projection). The atom names the validator ref it binds because a validator receives only the write, never its registry row's parameters. Lifecycle (status, contentHash, supersession) lives on the policy registry row that declares `frame:` / `frame-ref:`, never inside the atom; the atom's identity is the registry-row CID recipe over its canonical body. Source of truth: this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "validator",
+    "apex_concept",
+    "family",
+    "polarity",
+    "cost_class",
+    "binding",
+    "linguistic_definition",
+    "rubric",
+    "recall_signal",
+    "cites",
+    "established_by"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^frame-[a-z][a-z0-9-]*$",
+      "description": "Atom id; equals the filename stem."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "validator": {
+      "type": "string",
+      "pattern": "^epr:validator-[a-z][a-z0-9-]*$",
+      "description": "The governance-validators.json ref this atom supplies vocabulary to."
+    },
+    "apex_concept": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The concept whose assertion as the protocol's own apex value the frame detects."
+    },
+    "family": {
+      "const": "defeater",
+      "description": "A defeater frame: its presence defeats a claim of alignment unless a legitimate frame is declared."
+    },
+    "polarity": {
+      "const": "incriminating"
+    },
+    "cost_class": {
+      "const": "high-fp-cost",
+      "description": "A false positive accuses a correct author; verdicts stay advisory and a keyword-silent semantic catch is abstain."
+    },
+    "binding": {
+      "const": "binding-local"
+    },
+    "linguistic_definition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question",
+        "legitimate_frames",
+        "apex_answer"
+      ],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legitimate_frames": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "apex_answer": {
+          "const": "apex",
+          "description": "The rubric answer that names drift; every other answer is a legitimate frame id."
+        }
+      }
+    },
+    "recall_signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phrases",
+        "markers",
+        "min_net_new",
+        "scan_cap_bytes",
+        "cosine_floor",
+        "probe_min_net_new_bytes"
+      ],
+      "properties": {
+        "phrases": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^A-Z]+$"
+          },
+          "description": "Lowercase apex phrases matched against the folded shadow of the write."
+        },
+        "markers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z-]*:$"
+          },
+          "description": "In-content frame declarations; any one present marks the frame adjudicated for the surface."
+        },
+        "min_net_new": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Post-write hits must exceed prior hits by at least this many to fire (cleaning never fires)."
+        },
+        "scan_cap_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Beyond this many bytes the fold is skipped: substring-only scan, `unscanned-tail` recorded."
+        },
+        "cosine_floor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Semantic shadow-probe floor; a hit at or above it is recorded as abstain, never an accusation."
+        },
+        "probe_min_net_new_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Net-new bytes a keyword-silent write needs before the shadow probe runs."
+        }
+      }
+    },
+    "cites": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Repo-relative canon documents the frame's rubric answers to."
+    },
+    "established_by": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "frame-sovereignty-apex",
+  "version": 1,
+  "validator": "epr:validator-sovereignty-ontology-guard",
+  "apex_concept": "self-sovereignty",
+  "family": "defeater",
+  "polarity": "incriminating",
+  "cost_class": "high-fp-cost",
+  "binding": "binding-local",
+  "linguistic_definition": "Apex sovereignty framing names self-sovereignty as the protocol's own top identity or agency value, or celebrates true, full or digital data sovereignty as an implementation goal. The protocol does not consider sovereignty itself the right framing: agency is imago-dei and community-backstopped, exercised with and through others, so sovereignty is not forbidden but made mechanically expensive.",
+  "rubric": {
+    "question": "Does the net-new passage assert sovereignty as the protocol's own apex identity or agency value, or does it name sovereignty inside one of the legitimate frames?",
+    "legitimate_frames": [
+      {
+        "id": "adversary",
+        "description": "Naming what is resisted or an external actor, e.g. nation-states near-sovereign yet subject to the protocol."
+      },
+      {
+        "id": "bounded",
+        "description": "Sovereign within higher bounds: the collective human floor sovereign over the machine."
+      },
+      {
+        "id": "bridge-legibility",
+        "description": "A self-sovereign wallet making a participant legible to external sovereigns (a credit union, a mutual), while authority, head and ceiling still flow from the commons governance pool."
+      }
+    ],
+    "apex_answer": "apex"
+  },
+  "recall_signal": {
+    "phrases": [
+      "self-sovereign",
+      "self sovereign",
+      "self-sovereignty",
+      "self sovereignty",
+      "true data sovereignty",
+      "full data sovereignty",
+      "sovereign identity",
+      "digital sovereignty",
+      "fully sovereign"
+    ],
+    "markers": [
+      "sovereignty-frame:"
+    ],
+    "min_net_new": 1,
+    "scan_cap_bytes": 262144,
+    "cosine_floor": 0.35,
+    "probe_min_net_new_bytes": 400
+  },
+  "cites": [
+    "genesis/docs/architecture/stewardship-over-sovereignty.md",
+    "genesis/docs/content/elohim-protocol/values-forward.md",
+    "genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  ],
+  "established_by": "deliberated-2026-08-16-operator+agents"
+}
