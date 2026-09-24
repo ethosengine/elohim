@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: low
-fingerprints: ["f484d562d2b3", "712613235841", "535658148aaf", "0abbd0ab4e34", "0a652fe0dc60"]
+fingerprints: ["f484d562d2b3", "712613235841", "535658148aaf", "0abbd0ab4e34", "0a652fe0dc60", "af0d9dff7ab1"]
 relatedNodeIds: []
 tags: [deprecation, typescript, angular, elohim-service, lamad, LocalSourceChainService, M-AGGR-2]
 cites:
@@ -72,6 +72,17 @@ annotation itself (0abbd0ab4e34). The last two are sentinel self-captures of
 agent scope passes (`cat`/`grep`) over the intentional `@deprecated` marker, not
 new build-tool warnings — folded here so the sentinel cites this blocked
 decision deterministically rather than re-dispatching.
+
+2026-09-24: `af0d9dff7ab1` folded in — the identical ESLint `no-deprecated`
+banner (`56:41  warning  \`LocalSourceChainService\` is deprecated. M-AGGR-2: …`)
+re-minted under a fresh `grep -n` line-number prefix (`56:41` vs `712613235841`'s
+`11:10`) from a `cat` of a gate-run scratch log. This is the documented Class 3
+(`grep -n` prefix instability) from
+`genesis/data/timeline/backlog/deprecation-sentinel-redundant-capture-surfaces.md`
+— no new usage, no new consumer, nothing to re-scope. Folded here rather than
+left `open` so the sentinel cites this blocked decision on the next re-encounter
+instead of dispatching another triage run for a warning already fully
+documented above.
 
 ## Migration path
 

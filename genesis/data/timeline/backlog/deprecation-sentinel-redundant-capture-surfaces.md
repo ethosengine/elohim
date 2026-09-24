@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix) and Class 4 (aggregate-banner drift) remain after Guards J/K/N/O/P/Q/R/A2 and the Class-5 pid fix landed"
+title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix), Class 4 (aggregate-banner drift), and Class 12 (nested ledger-row echo) remain after Guards J/K/N/O/P/Q/R/A2 and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -570,6 +570,109 @@ reading a stored JSONL file emits no toolchain output of its own, so there is no
 live channel in the command to protect. It still carries Guard Q's residual, so
 a compound `pnpm install && cat .claude/data/x.jsonl` keeps its real warnings.
 
+**Class 12 (observed 2026-09-24, recorded not root-caused) — a ledger ROW,
+already appended, re-surfaces whole inside a LATER, unrelated command's
+captured output, with no `deprecations.jsonl` string anywhere in the line.**
+Three fingerprints landed in one hook invocation, all sharing one `cmd` — a
+`genesis/a2o` mesh admin-port polling loop with no reference to the ledger or
+any `.claude/` path:
+
+```
+fp af0d9dff7ab1  (21:51:33)  — real capture: "56:41  warning  `LocalSourceChainService` is deprecated. M-AGGR-2: …"  (cmd: cat …/lanea-fix-gate-elohim-app.log)
+fp 18beb200fc32  (21:51:34)  — line: `+{"ts": "…21:51:33…", "fp": "af0d9dff7ab1", …}`  — af0d9dff7ab1's OWN ledger row, JSON-serialized, `+`-prefixed
+fp 612e34199acb  (23:08:11)  — real capture: "[vite] warning: `optimizeDeps.esbuildOptions` … deprecated …"  (cmd: pnpm exec vitest … search.service.spec.ts)
+fp f92b3df12b8a  (23:08:40)  — line: af0d9dff7ab1's row again, this time WITHOUT the `+` prefix, truncated differently
+fp c83758f9f965  (23:08:40)  — line: 18beb200fc32's row (itself already a wrap of af0d9dff7ab1), `+`-prefixed, double-nested
+fp 6c3419005d20  (23:08:40)  — line: 612e34199acb's OWN row, `+`-prefixed
+```
+
+Guard A (`ECHO_LEDGER_PATH`) cannot see this class — it keys on the literal
+substring `deprecations.jsonl` appearing IN the line, and a re-emitted ledger
+ROW's JSON body carries no filename, exactly Class 11's argument. Guard A2
+(`_CMD_FINDINGS_LEDGER_RE`) cannot see it either — it keys on the COMMAND
+referencing `.claude/data/*.jsonl`, and none of these six commands do. So this
+is Class 11's defect (a ledger row re-mints its own contents) arriving through
+a channel Class 11 did not anticipate: the row surfaces without either the
+ledger's filename OR a ledger-reading command in evidence.
+
+**Root cause CONFIRMED live, during the same triage session that found the
+first six rows.** While this very entry was being edited to document Class 12
+(and while the ledger itself was being edited to disposition the first six
+rows), the class kept minting — from `cmd` values belonging to **other**,
+unrelated concurrent sessions in this shared workspace (`just mesh
+storage-restart matthew jessica james`, `cargo test -p elohim-epr-cli`, `git
+worktree remove …`) that have nothing to do with the ledger or this backlog
+file. Fourteen more rows landed in six minutes (23:18:17–23:24:54), and their
+captured `line` text is **verbatim prose from this very Class-12 section as it
+was being written**, plus more re-wraps of the original six:
+
+```
+fp 98b017e1b48a  — line: "+2026-09-24: `af0d9dff7ab1` folded in — the identical ESLint `no-deprecated`"  (from the OTHER backlog entry's edit, same run)
+fp b549d29adce1  — line: "+fp af0d9dff7ab1  (21:51:33)  — real capture: …"  (THIS section's own draft text)
+fp 2d92046d3c66  — line: "Python `DEAD_WORDS = {…, \"deprecated\", …}` set literal is not a deprecation."  (verbatim from Class 9's prose, ~500 lines above in this same file)
+fp a1269e1cb366 / f3a7b7ba7933 / c1b544feb50c / c0f4cc276717  — re-wraps of f92b3df12b8a / c83758f9f965 / 18beb200fc32 / 7f57a0c352b6, minted AFTER those rows were already dispositioned
+```
+
+None of the `cmd` fields on these rows reads `.claude/data/deprecations.jsonl`,
+`cat`/`grep genesis/data/timeline/…`, or any variant of a ledger/backlog READ.
+**The mechanism is confirmed to be independent of the invoking command
+entirely**: an uncommitted, tracked-file diff (of `deprecations.jsonl` and/or
+`deprecation-sentinel-redundant-capture-surfaces.md`, both modified in the
+working tree throughout this session) is surfacing into the hook's scanned
+text on **Bash calls made by other concurrent sessions in the same
+workspace**, the same way this session's own `gitStatus` system-reminder
+carries a live snapshot of every modified tracked file. Guards A/A2/B all gate
+on the command or on a path string appearing in the line; none of them gate on
+"this text, structurally, IS a re-serialized ledger row or backlog paragraph,
+regardless of how it arrived." That is the invariant Class 8's lesson says to
+key on. A candidate guard, stated as the invariant first:
+
+```python
+# Guard V (proposed, NOT landed — needs the adversarial-negative harness
+# every other guard in this file was verified against before shipping):
+# a captured line that JSON-parses whole, or whose content starts with
+# a diff `+`/`-` marker followed by a JSON object, carrying the ledger's
+# own key shape ("ts", "fp", "class", "line", "cmd", "status") is a
+# re-serialized ledger row by construction — no toolchain emits that shape.
+_LEDGER_ROW_SHAPE_RE = re.compile(
+    r'^[+-]?\s*\{\\?"ts\\?":\s*\\?"[^"]+\\?",\s*\\?"fp\\?":\s*\\?"[0-9a-f]{12}\\?",\s*\\?"class\\?":\s*\\?"(?:deprecation|security)\\?"'
+)
+```
+
+That guard closes the **ledger-row-shape** half of Class 12 (`18beb200fc32`,
+`f92b3df12b8a`, `c83758f9f965`, `6c3419005d20`, and the re-wrap chain that
+followed). It does **not** close the second half seen live —
+`2d92046d3c66`, a bare-prose echo of this backlog file's own paragraph with no
+JSON shape at all — which is Guard B's failure mode (path-in-line or
+command-gated) arriving through the same command-independent channel. That
+half needs the harder fix: instrumenting *why* an unrelated command's
+PostToolUse hook invocation is scanning text that traces to a different
+tracked file's uncommitted diff, which is an operator-initiated investigation
+into the hook's/harness's own context-assembly, not a regex.
+
+**Disposition this run:** all twenty-four rows spawned by this class this
+session (the original four echo rows plus twenty more minted live while
+canonicalizing them) carry zero independent concern — each resolves to
+content that already exists on its own ledger line or in this backlog's own
+prose (`af0d9dff7ab1` folded into
+`genesis/data/timeline/backlog/deprecation-local-source-chain-service-retire.md`;
+`612e34199acb` canonicalized in
+`genesis/data/timeline/backlog/deprecation-analogjs-vite-optimizedeps-esbuildoptions.md`).
+Marked `status: false-positive` with a `note` citing this entry, matching the
+convention already established live elsewhere in this exact ledger for the
+same shape (see e.g. fps `24627d5150f4`, `e4f20dd2bda3`, `4f87df294f5c`,
+`99a6790c7078` and siblings, all pre-existing `false-positive` rows with the
+identical "sentinel echo … the quoted inner fp is the real record" reasoning)
+— kept rather than deleted, because unlike Class 3's `fb31d99a0ba8` these carry
+no still-open Fix-N-style migration dependency, and keeping a `note`-bearing
+row is cheaper for a human scanning the ledger than a silent deletion. **Not
+enumerated exhaustively here** — the class was still live at the moment this
+paragraph was written (three more rows landed in the six minutes it took to
+draft this section), so a full fingerprint list would already be stale. The
+stasis sweep should re-query `status=open AND ts > <last commit of this
+entry>` for the same JSON-row / verbatim-prose shape before assuming this
+class is quiet.
+
 ### Recorded, not fixed — Guard E eats first-party tool *runtime* warnings
 
 Surfaced by Guard Q's harness and **pre-existing** (Guard E, unchanged by this
@@ -738,8 +841,16 @@ generalizing Guard F from two hard-coded syntaxes to the invariant F rests on.
 **Classes 9, 10 and 11 are CLOSED — Guards Q, R and A2 landed 2026-08-11**,
 retiring 13 live rows (275 → 262) at zero true-positive cost: 0 rows newly
 captured, and — as in every prior class — **0 `triaged` rows affected**.
-**Classes 3 and 4 remain BLOCKED**, and they are now the entire remaining
-concern.
+**Classes 3 and 4 remain BLOCKED.** **Class 12 (2026-09-24) is RECORDED and its
+mechanism CONFIRMED live, but no guard has landed.** Twenty-four rows
+dispositioned `false-positive` (no independent concern) across the one triage
+session that found it — the mechanism is confirmed to be command-independent
+(an uncommitted tracked-file diff leaking into unrelated concurrent sessions'
+hook invocations), and a candidate structural guard (Guard V, ledger-row-JSON
+shape) is drafted but **not verified against an adversarial-negative harness**
+at the standard every other guard in this file was held to before landing —
+that harness, plus the harder bare-prose half of the class (`2d92046d3c66`),
+are the owed work. Classes 3, 4, and 12 are now the entire remaining concern.
 
 Classes 9–11 landed from a single dispatch whose entire finding was that a
 Python `DEAD_WORDS = {…, "deprecated", …}` set literal is not a deprecation.
@@ -1100,8 +1211,9 @@ through the hook's own `fingerprint()` normalization, differing only in the
 The bare-text variant hashes to `fe896c58f14e`. Fix N's regex is *not* yet
 verified against adversarial negatives — that is owed before it lands.
 
-Re-check trigger for the stasis sweep — **narrowed to Fix N (Class 3) and the
-Class-4 routing change**, both of which need an operator-initiated pass:
+Re-check trigger for the stasis sweep — **Fix N (Class 3), the Class-4 routing
+change, and Class-12 instrumentation**, all of which need an operator-initiated
+pass:
 
 1. **Fix N** — land the `grep -n` prefix strip with (a) its own
    adversarial-negative harness at the Class-5 standard, (b) the 105-row ledger
@@ -1113,8 +1225,16 @@ Class-4 routing change**, both of which need an operator-initiated pass:
 2. **Class 4** — decide the banner-routing change (pointer, not finding).
    Confirm afterwards that a root `pnpm install` whose package set changed does
    not mint a new aggregate fingerprint.
+3. **Class 12** — land Guard V (the ledger-row-JSON-shape check drafted above)
+   with its own adversarial-negative harness at the Class-5 standard, verified
+   against the live rows this session minted. Separately, investigate why an
+   uncommitted diff of a tracked file (the ledger, this backlog doc, or any
+   other) surfaces into a PostToolUse hook invocation triggered by an unrelated
+   concurrent session's Bash command — that is a harness/context-assembly
+   question, not a sentinel-regex one, and it is what the bare-prose half of
+   the class (`2d92046d3c66`) needs before it can be closed.
 
-Delete this entry when both are discharged.
+Delete this entry when all three are discharged.
 
 Two thirds of the original trigger are already discharged. Guards J/K: a fresh
 `pnpm install` in a changed workspace now mints exactly ONE fingerprint per
