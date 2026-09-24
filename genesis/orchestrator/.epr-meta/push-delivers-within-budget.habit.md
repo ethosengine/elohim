@@ -14,6 +14,7 @@ checks:
   - "measurement liveness: `bash scripts/ci/fleet-quiesce-gate.test.sh` checks that an oversized /metrics body is still measured, and that a broken evaluator ends as GATE-DEFECT instead of polling blind."
   - "no-op rolls: `node --test genesis/orchestrator/validate-only-pipeline.test.mjs` checks that an edge selection with only dataplane-validation stale dispatches validate-only."
   - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
+  - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
 refs:
   - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
   - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
@@ -24,6 +25,7 @@ retire-when: >
   no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
   and its wall clock stops being the delivery path this habit watches.
 ---
+DELTA 2026-09-24e (RED preserved): the 24d orphan is wired — checks names the a2o scenario app-delivery-refuses-fast.feature (@concern:push-delivers-within-budget); household run owed.
 DELTA 2026-09-24d (RED preserved): Lane G read it natively — `epr flow walk <this atom> --json` carries tier (no rung green; runnable from T2; T0/T1 unread) and cost (stage-wallclock 131.9 min vs 20, delivery-cost 16.5 pipeline-h vs 1, both failed), `epr flow report --headline` prints a sixth `cost:` line, and `pnpm reports:serve` /delivery draws the last 10 orchestrator runs and App builds with readiness as its own node (d964fbef2, 73580ac63). The walker's WARN orphan: app-delivery-refuses-fast.feature carries this @concern and no check here names it yet.
 DELTA 2026-09-24b (RED preserved): Lane A landed the readiness precondition + timed phases (b6f256b9a 5d44375b6; faces abd014123), Lane B run classes (58b6b5456 + rakia feat/step-class b081e9b, pin bump on pin/lane-B), B5 advisory guard (ac1e3a6cd), Lane D priced the stage: delivery-series --stages reads publish+verify p90 131.9 min against bound 20, 16.5 pipeline-h for 0 delivered (f8512d40f, NaN fix 9040b0eda); app #1726 failed like #1725. Live reading owed on the first push.
 DELTA 2026-09-24: ACTIVE for the native-delivery sprint (plan genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md) — app #1719–#1725 ≈12 pipeline-h, 0 delivered; the 7200 s readiness wait (a2d1d0975) is the app's cost; Lanes A/B/D/K serve this habit. Status stays RED until delivery-series reads within bounds.
