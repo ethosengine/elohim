@@ -3079,6 +3079,42 @@ habits:
       - "elohim/eprfs/epr-cli/src/flow/memory/import.rs — `acting_author` and the rewrite-on-change path"
       - "elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md — the sibling: this habit makes attribution REPRESENTABLE; that one makes it ADMISSIBLE for economic joins"
 
+  - id: guards-sense-frames
+    declared: .epr-meta/guards-sense-frames.habit.md
+    invariant: >
+      Every values-guard verdict names a content-addressed frame and carries a `FrameClassification`
+      with evidence spans in the original bytes, so a reader can see which frame judged the write and
+      exactly what it read. Verdicts are advisory: they never ask or deny until a human ratifies a
+      floor. A keyword-silent semantic catch is an abstain, never an accusation.
+    status: red
+    active: false
+    checks:
+      - "python3 .claude/scripts/_lib/__tests__/frame_classifier_parity_test.py (the native evaluator and the Python mirror agree on decision, rule_id, frameRef, verdict, spans and reason for a fixed probe write; every `frame-ref:` in policies.yaml equals the atom CID; MEASURED 2026-09-24: absent — `test -f` exits 1, the parity test does not exist yet)"
+      - "python3 -c \"import yaml,sys;p=yaml.safe_load(open('.claude/epr-meta/policies.yaml'))['policies'];r=[x for x in p if x.get('id') in ('sovereignty-ontology-guard','ownership-ontology-guard') and x.get('version')==4];sys.exit(0 if len(r)==2 and all(x.get('frame') and x.get('frame-ref') for x in r) else 1)\" (both @4 guard rows declare `frame:` and `frame-ref:`; MEASURED 2026-09-24: exit 1 — no @4 row exists, and `grep -cE '^\\s+frame:'` and `grep -cE '^\\s+frame-ref:'` over policies.yaml both count 0)"
+      - "cargo test -p elohim-epr-cli --lib frames::tests::golden_fixture_classification_cid (elohim/eprfs — the golden classification CID of a fixed write under a fixed frame atom is pinned; MEASURED 2026-09-24: absent — no `frames` module in elohim/eprfs/epr-cli/src and no elohim/sdk/schemas/v1/frames/ directory; not run, since there is nothing to run)"
+    evidence: >
+      2026-09-24: DECLARED red, `active: false` (the WIP fence holds two active habits). Declared by
+      task C0 of genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md
+      (Lane C, ruling R-C0). All three checks measured absent: no parity test, no @4 guard row carrying
+      `frame:`, no `frames` module or frame atoms. The primitive (`FrameClassification`) exists in
+      elohim-epr; the two live guards still judge with hand-rolled phrase lists.
+    first_move: >
+      Raise the registry byte cap in both hosts first (plan task C1): policies.yaml sits just under
+      the 65,536-byte cap that both hosts enforce, and one more row is a total governance outage.
+      Then the frame atoms under elohim/sdk/schemas/v1/frames/ (C2) and the opaque evidence channel
+      through eprfs-meta (C3), then the native classifier `frames.rs` that rebinds both guards (C4)
+      and its Python mirror (C5). The @4 rows keep `class: dispatch` with the deliberated sidecar.
+    retire-when: >
+      when escalations resolve at a peer-native elohim endpoint with witnessed provenance
+      (`ComputeSource::PeerNative`) under the human sortition floor — the frame is then judged by
+      the protocol's own governed compute, not by a repository hook.
+    refs:
+      - "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md — the classifier spec: frames, families, advisory posture"
+      - "genesis/docs/superpowers/specs/2026-07-15-frame-witness-primitive-architecture-design.md — the frame-witness primitive this habit makes live on the guards"
+      - "elohim/epr/src/witness.rs — `FrameClassification` with its content CID and `FrameEvidence` spans (the primitive exists; nothing produces it yet)"
+      - "elohim/eprfs/epr-cli/src/repository_validators.rs — `sovereignty_guard` / `ownership_guard` with hand-rolled PHRASES consts, the guards this rebinds"
+      - ".eprfs/status/gap-items/specs__2026-07-15-sense-respond-governance-classifier-design.json — the classifier spec's gap items, all OPEN at declaration"
+
   - id: recall-reaches-authority
     declared: .epr-meta/recall-reaches-authority.habit.md
     invariant: >
@@ -3756,6 +3792,38 @@ habits:
       same four terms in their own conductor — so no doorway sits between them and the record. At
       that point "served only under standing" is a statement about a component that is no longer in
       the path, and the fold has graduated from a projection surface to the person's own runtime.
+
+  - id: attention-witnessed-privately
+    declared: elohim/elohim-storage/.epr-meta/attention-witnessed-privately.habit.md
+    invariant: >
+      A person's attention on content is witnessed as an agent-private observation on their own node,
+      under a manifest-declared kind. It is never written as a lens preset, never gossiped, and never
+      joined by an outside observer. Every view over it is a recipe whose CID prints on the page.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-24: absent — the feature file does not exist)"
+      - "cargo test --lib -- observation::gossip_gate (elohim/elohim-storage — an agent-private kind yields no cursor announcement on the real write path; MEASURED 2026-09-24: absent — no `gossip_gate` anywhere in elohim/elohim-storage/src; not run, since there is nothing to run)"
+      - "test $(grep -c \"trackContentLeave\\|trackContentView\" app/lamad/src/app/components/content-viewer/content-viewer.component.ts) -eq 0 (the content viewer no longer writes dwell as an AttentionTending lens record; MEASURED 2026-09-24: 3 — the viewer still tends on leave and on view)"
+    evidence: >
+      DELTA 2026-09-24 (BORN red, `active: false`; declared by task A0 of the post-station-4 plan).
+      All three checks measured: the feature file is absent, the gossip-gate test is absent, and the
+      content viewer still makes 3 tending calls. GROUNDING: the observation routes are shadowed on the
+      live server. `elohim/elohim-storage/src/http.rs:2531` matches every path starting
+      `/api/v1/observations` and sends it to the observation-sessions handler (`/begin`,
+      `/{id}/entries`, `/{id}/report`) before the `/api/v1/` catch-all can reach
+      `api/observations.rs`, so the existing GET routes have never served. The tending route
+      `/api/v1/attention/tending` is undeclared at the doorway: `build_manifest()` declares only the
+      three session routes for observations and nothing for attention, so a browser-path tending write
+      has no route through the doorway (Tauri-direct only).
+    refs:
+      - "plan: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md (Lane A, rulings R-A0..R-A5, tasks A0..A10)"
+      - "spec: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md (the observation layer this habit makes live; §4 gate answers, §8.2 summary graduation)"
+      - "manifest kind: elohim/sdk/domains/lamad/manifest/observation-kinds.json (`lamad:content-viewed` with `dwell_ms` and `scroll_depth_pct`)"
+      - "routes today: elohim/elohim-storage/src/http.rs (the observation-sessions arm and `build_manifest()`), elohim/elohim-storage/src/api/observations.rs (GET routes that never serve)"
+    retire-when: >
+      when the attention log is a signed, persisted, agent-private-encrypted iroh log with the
+      graduation evaluator — privacy is then a property of the log itself, not a practice under watch.
 
   - id: idle-is-free
     declared: elohim/elohim-storage/.epr-meta/idle-is-free.habit.md
