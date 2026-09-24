@@ -223,3 +223,66 @@ describe('manifest-driven local gate registry', () => {
     assert.doesNotMatch(seedRecipe, /--validate-only|--dry-run/);
   });
 });
+
+describe('selection oracle — shadow, rakia, path', () => {
+  const stale = new Map([
+    ['elohim-sophia:build-sophia-umd', ['source: sophia']],
+    ['elohim:build-angular', ['upstream: elohim-sophia:build-sophia-umd']],
+  ]);
+  const withOracle = () => stale;
+  const noOracle = () => null;
+
+  test('path mode ignores the oracle entirely', () => {
+    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'path', rakia: withOracle, log: () => {} }).map(p => p.name);
+    assert.ok(names.includes('sophia'));
+    assert.ok(!names.includes('elohim-app'), 'path-only never propagates');
+  });
+
+  test('shadow mode selects by path and prints one oracle-diff line when the sets differ', () => {
+    const lines = [];
+    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'shadow', rakia: withOracle, log: l => lines.push(l) }).map(p => p.name);
+    assert.ok(!names.includes('elohim-app'), 'shadow mode does not change selection');
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^\[gate\] oracle-diff: \+elohim-app/);
+  });
+
+  test('shadow mode is silent when the sets agree', () => {
+    const lines = [];
+    // A documentation-only change selects nothing by path (proven below by the names-only CLI
+    // case); an oracle that also finds nothing stale must not print a diff.
+    const selected = projectsForChanges(ROOT, ['genesis/data/timeline/backlog/CLUSTERS.md'], { oracle: 'shadow', rakia: () => new Map(), log: l => lines.push(l) });
+    assert.deepEqual(selected, []);
+    assert.deepEqual(lines, []);
+  });
+
+  test('rakia mode selects the direct component and its one-hop consumer with the upstream reason', () => {
+    const projects = projectsForChanges(ROOT, ['sophia'], { oracle: 'rakia', rakia: withOracle, log: () => {} });
+    const app = projects.find(p => p.name === 'elohim-app');
+    assert.ok(app, 'elohim-app is a depth-one consumer of the sophia pin');
+    assert.deepEqual(app.reasons, ['upstream: elohim-sophia:build-sophia-umd']);
+    assert.ok(projects.some(p => p.name === 'sophia'));
+  });
+
+  test('rakia mode falls back to path selection and says so when the oracle is unavailable', () => {
+    const lines = [];
+    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'rakia', rakia: noOracle, log: l => lines.push(l) }).map(p => p.name);
+    assert.ok(names.includes('sophia'));
+    assert.ok(!names.includes('elohim-app'));
+    assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
+  });
+
+  test('a gitlink path and files beneath it select the component once, reasons merged', () => {
+    const projects = projectsForChanges(ROOT, ['elohim/brit', 'elohim/brit/Cargo.toml'], { oracle: 'path', log: () => {} });
+    assert.equal(projects.filter(p => p.name === 'brit').length, 1);
+    const brit = projects.find(p => p.name === 'brit');
+    assert.ok(brit.reasons.some(r => r === 'source: elohim/brit'));
+  });
+
+  test('GATE_ROOT points the CLI at another repository', () => {
+    const out = spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--list'], {
+      cwd: ROOT, encoding: 'utf8', env: { ...process.env, GATE_ROOT: resolve(ROOT, 'genesis/a2o') },
+    });
+    assert.equal(out.status, 0);
+    assert.equal(out.stdout.trim(), '', 'a2o has no build-manifest.json, so the registry is empty');
+  });
+});

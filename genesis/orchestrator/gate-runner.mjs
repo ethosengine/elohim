@@ -8,11 +8,35 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { walkGraph } from './graph-walker.mjs';
+import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { recordCycle } from './gate-cycle.mjs';
+import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
+const ROOT = process.env.GATE_ROOT
+  ? resolve(process.env.GATE_ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** 'shadow' until the flip (spec §8 commit 4) — one line of evidence per differing push, no change in selection. */
+export function oracleMode(env = process.env) {
+  const declared = (env.GATE_ORACLE || '').trim();
+  return ['shadow', 'rakia', 'path'].includes(declared) ? declared : 'shadow';
+}
+
+function nameSet(projects) {
+  return new Set(projects.map(p => p.name));
+}
+
+function oracleDiffLine(pathProjects, oracleProjects) {
+  const a = nameSet(pathProjects);
+  const b = nameSet(oracleProjects);
+  const plus = [...b].filter(n => !a.has(n));
+  const minus = [...a].filter(n => !b.has(n));
+  if (plus.length === 0 && minus.length === 0) return null;
+  const parts = [...plus.map(n => `+${n}`), ...minus.map(n => `-${n}`)];
+  return `[gate] oracle-diff: ${parts.join(' ')}`;
+}
 
 export function selectGateProjects(registry, target) {
   if (registry.has(target)) return [registry.get(target)];
@@ -26,11 +50,34 @@ export function selectGateProjects(registry, target) {
   return matches.filter(project => project.dir.length === longest);
 }
 
-export function projectsForChanges(root, changedFiles) {
+export function projectsForChanges(root, changedFiles, opts = {}) {
+  const env = opts.env || process.env;
+  const mode = opts.oracle || oracleMode(env);
+  const log = opts.log || (line => process.stdout.write(`${line}\n`));
   const manifests = loadManifests(root);
   const registry = loadGateRegistry(root);
-  const result = walkGraph(manifests, filterChanged(changedFiles));
-  return result.projects.map(project => {
+  const files = filterChanged(changedFiles);
+
+  const byPath = walkGraph(manifests, files).projects;
+  let chosen = byPath;
+
+  if (mode !== 'path') {
+    const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env) }));
+    const stale = ask();
+    if (stale === null) {
+      if (mode === 'rakia') log('[gate] rakia unavailable — path-only selection');
+    } else {
+      const byOracle = projectsFromStale(manifests, stale, files);
+      if (mode === 'rakia') {
+        chosen = byOracle;
+      } else {
+        const diff = oracleDiffLine(byPath, byOracle);
+        if (diff) log(diff);
+      }
+    }
+  }
+
+  return chosen.map(project => {
     const registered = registry.get(project.name);
     if (!registered) throw new Error(`Detected unregistered gate project: ${project.name}`);
     return { ...registered, reasons: project.reasons };
@@ -140,7 +187,8 @@ function cargoEnvOf(childEnv) {
 }
 
 function usage() {
-  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print]');
+  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names]');
+  console.error('  env: GATE_ORACLE=shadow|rakia|path (default shadow) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
