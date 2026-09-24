@@ -65,6 +65,19 @@ if argv[:2] == ["flow"] and len(argv) == 1:
     print("usage: epr flow <project | note --on <x> --kind <k>" +
           (" --measure <id@version>" if has_measure else "") + ">")
     sys.exit(0)
+if argv[:1] == ["govern"]:
+    # `epr govern ... --content-stdin`: the landed bytes arrive on stdin. GOVERN_VERB=1 answers
+    # one frame-judged verdict (GOVERN_FRAME_REF / GOVERN_CID); anything else is "did not run".
+    sys.stdin.read()
+    if os.environ.get("GOVERN_VERB") != "1":
+        sys.exit(2)
+    evidence = {"frameRef": os.environ.get("GOVERN_FRAME_REF", ""),
+                "classificationCid": os.environ.get("GOVERN_CID", ""), "verdict": "abstain"}
+    print(json.dumps({"decision": "permit", "winningClass": "dispatch",
+                      "ruleId": "sovereignty-ontology-guard",
+                      "verdicts": [{"class": "dispatch", "ruleId": "sovereignty-ontology-guard",
+                                    "reason": "stub", "evidence": evidence}]}))
+    sys.exit(0)
 if argv[:2] == ["flow", "report"]:
     # Deliberately OPAQUE: this stub answers whether the hook CHOSE the native path, never
     # what a report line looks like. Report formats are asserted against the real binary in
@@ -399,6 +412,85 @@ class DriftObservationCase(unittest.TestCase):
         # ... and the jsonl landing ledger is untouched by this station
         self.assertTrue((self.project / ".claude/data/sovereignty-guard.jsonl").is_file())
 
+
+    # the sovereignty ledger row cites its frame and the native classification (plan task C8) ─
+    _STUB_CLASSIFICATION = "bafyreifhbla6a66gg7u34dbpodxcp4h6pcuqxtxv2jkvsynwfjgnicbpxi"
+
+    def _sov_frame_ref(self) -> str:
+        sys.path.insert(0, str(REPO / ".claude" / "scripts"))
+        from _lib import frame_atoms
+        return frame_atoms.load_frames()["epr:validator-sovereignty-ontology-guard"][1]
+
+    def _sov_rows(self) -> list[dict]:
+        led = self.project / ".claude/data/sovereignty-guard.jsonl"
+        if not led.is_file():
+            return []
+        return [json.loads(line) for line in led.read_text().splitlines() if line.strip()]
+
+    def _sov_write(self, text: str, **envextra) -> subprocess.CompletedProcess:
+        doc = self.project / "note.md"
+        doc.write_text(text)
+        return self.run_hook("sovereignty-guard-signal.py",
+                             {"tool_name": "Write", "session_id": "sov-sid",
+                              "tool_input": {"file_path": str(doc)}},
+                             MEASURE_VERB="1", **envextra)
+
+    def test_sovereignty_row_carries_frame_ref_and_native_classification_cid(self):
+        frame = self._sov_frame_ref()
+        r = self._sov_write("The learner is self-sovereign here.\n", GOVERN_VERB="1",
+                            GOVERN_FRAME_REF=frame, GOVERN_CID=self._STUB_CLASSIFICATION)
+        rows = self._sov_rows()
+        self.assertEqual(len(rows), 1, rows)
+        row = rows[0]
+        self.assertEqual(set(row), {"ts", "path", "tool", "net_new", "phrases", "frame_ref",
+                                    "classification_cid", "source", "verdict"})
+        self.assertTrue(row["frame_ref"].startswith("bafy"), row)
+        self.assertEqual(row["frame_ref"], frame)
+        self.assertEqual(row["classification_cid"], self._STUB_CLASSIFICATION)
+        self.assertEqual(row["source"], "native")
+        self.assertEqual(row["verdict"], "abstain")
+        govern = [c for c in self.stub_calls() if c[:1] == ["govern"]]
+        self.assertEqual(len(govern), 1, self.stub_calls())
+        self.assertIn("--content-stdin", govern[0])
+        self.assertEqual(govern[0][govern[0].index("--path") + 1], "note.md")
+        self.assertEqual(govern[0][govern[0].index("--session") + 1], "sov-sid")
+        self.assertIn(f"frame {frame[:8]}", r.stdout)
+        self.assertIn(f"classification {self._STUB_CLASSIFICATION[:8]}", r.stdout)
+        notes = [c for c in self.stub_calls() if c[:2] == ["flow", "note"] and "--help" not in c]
+        self.assertEqual(len(notes), 1, self.stub_calls())
+
+    def test_sovereignty_row_degrades_to_python_when_govern_does_not_run(self):
+        r = self._sov_write("The learner is self-sovereign here.\n")
+        rows = self._sov_rows()
+        self.assertEqual(len(rows), 1, rows)
+        self.assertTrue(rows[0]["frame_ref"].startswith("bafy"), rows)
+        self.assertIsNone(rows[0]["classification_cid"])
+        self.assertEqual(rows[0]["source"], "python-degraded")
+        self.assertIn("classification unminted", r.stdout)
+
+    def test_marker_declared_stays_silent_via_atom_markers(self):
+        r = self._sov_write("sovereignty-frame: bounded\nThe learner is self-sovereign here.\n",
+                            GOVERN_VERB="1")
+        self.assertEqual(self._sov_rows(), [])
+        self.assertEqual(r.stdout.strip(), "")
+        self.assertFalse([c for c in self.stub_calls() if c[:1] == ["govern"]])
+
+    def test_edit_reconstruction_net_new_uses_atom_phrases(self):
+        doc = self.project / "note.md"
+        doc.write_text("Old line: a self-sovereign wallet.\nWe want digital sovereignty.\n")
+        payload = {"tool_name": "Edit", "session_id": "sov-sid",
+                   "tool_input": {"file_path": str(doc), "old_string": "Z",
+                                  "new_string": "We want digital sovereignty."}}
+        self.run_hook("sovereignty-guard-signal.py", payload, MEASURE_VERB="1")
+        rows = self._sov_rows()
+        self.assertEqual(len(rows), 1, rows)
+        # only the edit's own line is net-new; the pre-existing self-sovereign line is maintenance
+        self.assertEqual(rows[0]["net_new"], 1)
+        self.assertEqual(rows[0]["phrases"], ["digital sovereignty"])
+        # a maintenance edit that introduces no atom phrase logs nothing
+        payload["tool_input"].update({"old_string": "stewardship", "new_string": "Old line"})
+        self.run_hook("sovereignty-guard-signal.py", payload, MEASURE_VERB="1")
+        self.assertEqual(len(self._sov_rows()), 1)
 
     # the bridge is gone ──────────────────────────────────────────────────────────────────
     def test_no_hook_path_runs_a_producer_bridge(self):

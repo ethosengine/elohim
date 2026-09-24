@@ -3,10 +3,11 @@
 Sovereignty ontology guard — dismissal-aggregation signal (the closed governance loop).
 
 PostToolUse hook (matcher: Edit|Write). The PRE half is the `.epr-meta` compose-gate: the
-sovereignty-ontology-guard policy (realized by epr:validator-sovereignty-ontology-guard) fires an
-`ask` when a write NET-NEW introduces apex-assertion sovereignty framing into a governed doc. That
-`ask` is a GUARD, not a ban — one keystroke proceeds. This hook is the POST half: when apex framing
-LANDS anyway (the guard was dismissed, or the doc sits outside the cascade), it logs the firing and
+sovereignty-ontology-guard policy (realized by epr:validator-sovereignty-ontology-guard) fires
+when a write NET-NEW introduces apex-assertion sovereignty framing into a governed doc — class
+`dispatch` since @3: advisory, a background storyteller review, never an ask or a deny. This hook
+is the POST half: when apex framing LANDS (the review is advisory, or the doc sits outside the
+cascade), it logs the firing and
 aggregates the landings, so the RULE itself surfaces for evaluation/drift-review. This is the
 flag→aggregate→surface loop the skill marks reserved in the engine (override-counting is not wired),
 built natively as a companion signal instead of faked against an unwired key. The protocol exercising
@@ -17,6 +18,13 @@ read) so the ledger and the gate can never disagree on what "apex" means. Net-ne
 delta (pre-edit reconstructed from old_string→new_string), so cleaning/maintenance is never logged.
 
 Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
+          {ts, path, tool, net_new, phrases, frame_ref, classification_cid, source, verdict}.
+          `frame_ref` is the frame atom's CID (stdlib, `frame_atoms`). `classification_cid` is
+          minted ONLY by the native evaluator (ruling R-C4: no second DAG-CBOR encoder in
+          Python): `epr govern --new --content-stdin` over the landed bytes. `--new` because the
+          native host reads the prior from disk, which post-landing IS the landed file, so the
+          classification is of the landed document against an empty prior. When the binary does
+          not run: `classification_cid: null`, `source: python-degraded`.
 Drift:    ONE thing — a fold via `epr flow note --kind observation --measure
           sovereignty-landings@1`. The private JSON tally this hook kept under
           `.claude/memory-kit/` was deleted with the kit at station six round (b)
@@ -40,6 +48,7 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
+from _lib import epr_client  # noqa: E402  (the native evaluator mints the classification CID)
 from _lib import frame_atoms  # noqa: E402  (shared classifier — the frame atom is the source of truth)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _observation as _obs  # noqa: E402  (structured-observation emitter; JSON fallback while absent)
@@ -79,6 +88,27 @@ _ESCALATE_AT = 3  # landings before the message asks for a rule/corpus drift rev
 _SOV_REF = "epr:validator-sovereignty-ontology-guard"
 
 
+def native_classification(repo: Path, rel: str, landed: str, frame_ref: str,
+                          session: str | None) -> tuple[str | None, str]:
+    """`(classification_cid, source)` from the native evaluator over the landed bytes.
+
+    Reuses `epr_client.govern` (the same invocation the PreToolUse resolver makes) and reads the
+    verdict whose opaque evidence names THIS frame. `source` is `native` whenever the evaluator
+    ran — the CID is then `None` only if no bound rule classified the write here (the guard is
+    bound per directory) — and `python-degraded` when it did not run at all.
+    """
+    payload = epr_client.govern(repo, rel, landed, True, False, session=session)
+    if payload is None:
+        return None, "python-degraded"
+    for verdict in payload.get("verdicts") or []:
+        evidence = verdict.get("evidence") if isinstance(verdict, dict) else None
+        if isinstance(evidence, dict) and evidence.get("frameRef") == frame_ref:
+            cid = evidence.get("classificationCid")
+            if isinstance(cid, str) and cid:
+                return cid, "native"
+    return None, "native"
+
+
 def main() -> int:
     try:
         data = json.load(sys.stdin)
@@ -114,10 +144,13 @@ def main() -> int:
     if found is None or found["verdict"] == "legitimate":
         return 0  # nothing net-new, or a frame adjudicated for this surface — consistent with the gate
     net_new = found["netNew"]
+    frame_ref = found["frameRef"]
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     phrases = [p for p in found["matchedRecallSignal"]
                if not p.endswith(":") and p != frame_atoms.UNSCANNED_TAIL]
+    classification_cid, source = native_classification(repo, rel, post, frame_ref,
+                                                       data.get("session_id"))
 
     # 1) append the landing to the ledger
     try:
@@ -125,7 +158,10 @@ def main() -> int:
         led.parent.mkdir(parents=True, exist_ok=True)
         with led.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"ts": ts, "path": rel, "tool": tool,
-                                 "net_new": net_new, "phrases": phrases}) + "\n")
+                                 "net_new": net_new, "phrases": phrases,
+                                 "frame_ref": frame_ref,
+                                 "classification_cid": classification_cid,
+                                 "source": source, "verdict": found["verdict"]}) + "\n")
     except OSError:
         pass
 
@@ -137,7 +173,7 @@ def main() -> int:
     rule_version = active_rule_version(repo, "sovereignty-ontology-guard")
     _obs.emit("sovereignty-landings@1", rel, net_new,
               reason="sovereignty guard: apex-sovereignty framing landed after the ask",
-              env={"rule": rule_version, "tool": tool}, root=str(repo))
+              env={"rule": rule_version, "tool": tool, "frame": frame_ref}, root=str(repo))
     # Read the accumulation back rather than keeping one. Paid per LANDING, not per edit —
     # this branch is only reached when apex-sovereignty framing actually landed. `None` means
     # the count could not be taken (no binary, no verb, a bad read); the message then reports
@@ -148,6 +184,8 @@ def main() -> int:
 
     # 3) surface it. Below threshold: a light note the landing was recorded. At/over: ask for review.
     ph = ", ".join(phrases) or "apex-sovereignty framing"
+    cites = (f"frame {frame_atoms.short_cid(frame_ref)} · classification "
+             f"{frame_atoms.short_cid(classification_cid) if classification_cid else frame_atoms.UNMINTED}")
     if total >= _ESCALATE_AT:
         msg = (f"[sovereignty-guard] apex-sovereignty framing landed in {rel} ({ph}). "
                f"{total} landing(s) now aggregated across {rel!s} and peers "
@@ -158,12 +196,13 @@ def main() -> int:
                f"rejects, or has the RULE itself drifted (a legitimate adversary/bounded/bridge frame it "
                f"keeps mis-flagging)? Canon: genesis/docs/architecture/stewardship-over-sovereignty.md; "
                f"values-forward.md Stance II.4. Reframe the bytes, or refine the rule "
-               f"(.claude/epr-meta/policies.yaml → sovereignty-ontology-guard).")
+               f"(.claude/epr-meta/policies.yaml → sovereignty-ontology-guard). {cites}.")
     else:
         msg = (f"[sovereignty-guard] logged: apex-sovereignty framing ({ph}) landed in {rel}. If this is "
                f"a legitimate frame (adversary / bounded / bridge-legibility), consider a `sovereignty-frame:` "
                f"marker so the guard stays quiet here; otherwise reframe toward stewardship (canon: "
-               f"genesis/docs/architecture/stewardship-over-sovereignty.md). Landing recorded for drift review.")
+               f"genesis/docs/architecture/stewardship-over-sovereignty.md). Landing recorded for drift review. "
+               f"{cites}.")
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
     return 0
 
