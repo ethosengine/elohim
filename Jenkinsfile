@@ -347,13 +347,20 @@ def authorHeadOnce(List<String> doorwayEprUrls, Map bundle, String adminKey, Map
     // error()).
     def verdictFile = "${env.WORKSPACE}/.ci-deliverability-${bundle.slug}-${kind}.txt"
     // Serving-first order (app #1725, 2026-09-23). stage-spa-blob.sh's readiness
-    // wait spends the run's ONE 7200 s deadline on whichever host is offered
-    // first, and this loop offered the hosts in a fixed order: #1725 waited on
-    // alpha (matthew, catching-up) from 21:40Z to ~23:42Z while elohim.host
-    // (adam) had logged "apps enabled" at 22:48Z — ~53 min on a host that could
-    // not author while another could. So ask each doorway's /health/serving NOW
-    // (one bounded GET each) and offer the head to the serving hosts first. Only
-    // the AUTHOR loop takes this order; the DECLARE_ONLY fan-out below and
+    // wait spends the run's ONE 7200 s deadline (stamped by the first not-ready
+    // answer, shared by every host and leg) on whichever host is offered first,
+    // and this loop offered the hosts in a fixed order: #1725 spent all of it on
+    // alpha (matthew, catching-up) from 21:40Z to ~23:42Z; elohim.host (adam)
+    // was offered the head only after the clock was gone, answered 503
+    // catching-up once (circuit closed, errorStreak 1 — the DEGRADING arm), and
+    // every bundle read NO doorway could author. Whether adam would have taken
+    // the PATCH earlier is unmeasured (its conductor had logged "apps enabled"
+    // at 22:48Z — a log line, not a serving reading); what is measured is that
+    // the other host was never asked while there was time. So ask each
+    // doorway's /health/serving NOW (one bounded GET each; HTTP 200 = the
+    // doorway's own five-arm verdict, plus the two body fields the author leg
+    // needs) and offer the head to the serving hosts first. Only the AUTHOR
+    // loop takes this order; the DECLARE_ONLY fan-out below and
     // verifyProjectedHeads keep the canonical list. The script exits 0 always
     // and prints the same URLs re-ordered; anything else falls back to the
     // canonical order, so this can only ever change WHICH host waits first.
