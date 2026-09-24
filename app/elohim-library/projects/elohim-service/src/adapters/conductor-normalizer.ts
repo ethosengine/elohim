@@ -105,6 +105,9 @@ export function normalizeConductorContent(raw: ConductorContentResponse): Conten
     reach: raw.reach as Reach,
     validationStatus: 'valid' as ValidationStatus,
     trust: 'unconfirmed',
+    // The conductor record carries its tags; ContentView requires them (an
+    // empty array is the honest "no tags").
+    tags: raw.tags ?? [],
     createdBy: undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,

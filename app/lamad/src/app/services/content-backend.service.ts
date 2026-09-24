@@ -175,6 +175,12 @@ interface RawContentData {
   /** Alias for authorId — projection cache may use 'author' instead */
   author?: string;
   reach?: string;
+  /**
+   * REQ-F10 trust legibility label served by `/db/content`:
+   * 'notarized' | 'published' | 'unconfirmed'. The wire carries no numeric trust;
+   * `transformContent` maps this label to `trustScore`.
+   */
+  trust?: string;
   trustScore?: number;
   estimatedMinutes?: number;
   thumbnailUrl?: string | null;
@@ -186,6 +192,20 @@ interface RawContentData {
    * Optional — pre-distribution content lacks a blob_hash and therefore lacks a summary.
    */
   distribution?: import('../models/content-node.model').DistributionSummary;
+}
+
+/**
+ * Map the REQ-F10 trust label to the client's numeric trust score. The server
+ * never invents a number; an absent or unknown label leaves the score unknown.
+ */
+const TRUST_LABEL_SCORE: ReadonlyMap<string, number> = new Map([
+  ['notarized', 1],
+  ['published', 0.5],
+  ['unconfirmed', 0],
+]);
+
+function trustScoreFromLabel(label: string | undefined): number | undefined {
+  return label === undefined ? undefined : TRUST_LABEL_SCORE.get(label);
 }
 
 /** Raw path step from storage/API */
@@ -750,7 +770,8 @@ export class ContentBackendService {
       metadata,
       authorId: data.authorId ?? data.author,
       reach: data.reach ?? 'commons',
-      trustScore: data.trustScore,
+      // A numeric trustScore on the row overrides; otherwise the served label decides.
+      trustScore: data.trustScore ?? trustScoreFromLabel(data.trust),
       // Intentionally untyped: pre-narrowing access — metadata is generic Record here,
       // typed at consumption via isConceptNode()/isPathNode() type guards
       thumbnailUrl: this.resolveBlobUrl(

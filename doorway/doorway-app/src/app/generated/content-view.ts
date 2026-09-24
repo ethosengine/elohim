@@ -120,6 +120,10 @@ export interface ContentView {
    */
   trust: string;
   /**
+   * The content row's tags (content_tags projection). Always present; an empty array is the honest 'no tags' answer.
+   */
+  tags: string[];
+  /**
    * Liveness of dhtAnchorHash against the serving node's CURRENT conductor incarnation: 'live' | 'dead' | 'unverified'. dhtAnchorHash answers 'was this ever authored?'; this answers 'can anybody still produce the action behind it?' — they diverge after a conductor re-key, where the hash survives in the kept projection but the chain that signed it does not. OPTIONAL: absent/null means a serving node that predates the liveness projection; consumers MUST read that as 'unverified', never as 'dead'.
    */
   dhtAnchorState?: string | null;

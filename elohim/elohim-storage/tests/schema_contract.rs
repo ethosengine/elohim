@@ -1695,6 +1695,7 @@ fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::Conten
         trust: "unconfirmed".into(),
         // No anchor on this fixture → nothing to judge for liveness.
         dht_anchor_state: Some("unverified".into()),
+        tags: vec![],
     }
 }
 
@@ -6485,4 +6486,40 @@ fn epr_head_view_matches_schema() {
         &load_schema("views/epr-head-view.schema.json"),
         "epr-head-view.schema.json",
     );
+}
+
+/// `/db/content` rows carry their tags (plan Lane S, ruling R-S5). Before this
+/// the list route converted `ContentWithTags -> ContentView` by dropping the
+/// tags, so lamad's tag scoring and tag facets ran on empty arrays. The field is
+/// REQUIRED in the schema (an empty array is the honest "no tags"), and since
+/// `content-view.schema.json` is `additionalProperties: false`, conforming here
+/// also proves the schema declares it.
+#[test]
+fn content_view_carries_tags_and_conforms() {
+    let mut v = sample_content_view(None);
+    v.tags = vec!["governance".into(), "stewardship".into()];
+    let json = serde_json::to_value(&v).unwrap();
+    assert_eq!(
+        json.get("tags"),
+        Some(&serde_json::json!(["governance", "stewardship"])),
+        "tags must surface on the wire as a string array under `tags`"
+    );
+    validate_against_schema("views/content-view.schema.json", &json);
+
+    let schema = load_schema("views/content-view.schema.json");
+    let required: Vec<&str> = schema["required"]
+        .as_array()
+        .expect("content-view schema declares `required`")
+        .iter()
+        .filter_map(|r| r.as_str())
+        .collect();
+    assert!(
+        required.contains(&"tags"),
+        "tags must be REQUIRED — an absent key would read as 'this server drops tags'"
+    );
+
+    // An untagged row still conforms: the empty array is the no-tags answer.
+    let untagged = serde_json::to_value(sample_content_view(None)).unwrap();
+    assert_eq!(untagged.get("tags"), Some(&serde_json::json!([])));
+    validate_against_schema("views/content-view.schema.json", &untagged);
 }

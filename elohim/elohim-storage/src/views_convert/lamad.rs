@@ -79,6 +79,9 @@ impl From<Content> for ContentView {
             // as "an older server" and a reader asking "can you prove this?"
             // deserves "I have not checked" instead.
             dht_anchor_state: Some(anchor_state.as_wire().to_string()),
+            // A bare `Content` row carries no tags; `From<ContentWithTags>`
+            // fills them from the content_tags projection.
+            tags: Vec::new(),
         }
     }
 }
@@ -97,10 +100,12 @@ fn trust_label(has_dht_anchor: bool, has_p2p_published: bool) -> String {
     }
 }
 
-/// Convert ContentWithTags → ContentView (strips tags, for backward compat)
+/// Convert ContentWithTags → ContentView, keeping the row's tags.
 impl From<ContentWithTags> for ContentView {
     fn from(c: ContentWithTags) -> Self {
-        c.content.into()
+        let mut view: ContentView = c.content.into();
+        view.tags = c.tags;
+        view
     }
 }
 
@@ -155,6 +160,8 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
         // asked — `None` (rather than a fabricated verdict) is the honest
         // answer, and consumers read it as unverified.
         dht_anchor_state: None,
+        // The head's own lamad context carries the tags.
+        tags: head.lamad.tags.clone(),
     }
 }
 

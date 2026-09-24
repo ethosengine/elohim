@@ -87,3 +87,38 @@ describe('ContentBackendService SSR stability', () => {
     }
   );
 });
+
+describe('ContentBackendService transformContent', () => {
+  it('transformContent_maps_trust_label_to_trustScore', async () => {
+    const rows = [
+      { id: 'n', title: 'Notarized', trust: 'notarized', tags: ['a', 'b'] },
+      { id: 'p', title: 'Published', trust: 'published' },
+      { id: 'u', title: 'Unconfirmed', trust: 'unconfirmed' },
+      { id: 'x', title: 'No label' },
+      // A numeric trustScore on the row stays an override of the label.
+      { id: 'o', title: 'Override', trust: 'notarized', trustScore: 0.25 },
+    ];
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        { provide: ELOHIM_CLIENT, useValue: { query: vi.fn().mockResolvedValue(rows) } },
+        { provide: BLOB_FETCHER, useValue: {} },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: {} },
+      ],
+    });
+
+    const nodes = await firstValueFrom(
+      TestBed.inject(ContentBackendService).queryContent({ limit: 10 })
+    );
+    const byId = new Map(nodes.map(n => [n.id, n]));
+
+    expect(byId.get('n')?.trustScore).toBe(1);
+    expect(byId.get('p')?.trustScore).toBe(0.5);
+    expect(byId.get('u')?.trustScore).toBe(0);
+    expect(byId.get('x')?.trustScore).toBeUndefined();
+    expect(byId.get('o')?.trustScore).toBe(0.25);
+    // Tags served by /db/content reach the node untouched.
+    expect(byId.get('n')?.tags).toEqual(['a', 'b']);
+  });
+});

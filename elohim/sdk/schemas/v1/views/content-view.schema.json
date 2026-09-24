@@ -4,7 +4,7 @@
   "title": "ContentView",
   "description": "Content record as returned by the storage API. Source of truth: DHT (Notarized, Category A).",
   "type": "object",
-  "required": ["id", "hAppId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt", "trust"],
+  "required": ["id", "hAppId", "title", "contentType", "contentFormat", "reach", "validationStatus", "createdAt", "updatedAt", "trust", "tags"],
   "properties": {
     "id": { "type": "string" },
     "hAppId": { "type": "string" },
@@ -27,6 +27,11 @@
     "trust": {
       "type": "string",
       "description": "REQ-F10 trust legibility label: 'notarized' (green/DHT-notarized) | 'published' (peer-attested) | 'unconfirmed' (amber/CRDT-converged-only or all-null). Never an authority/attribution source. A set dhtAnchorHash is not sufficient for 'notarized' — see dhtAnchorState: a known-dead anchor stops counting as a notarization."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The content row's tags (content_tags projection). Always present; an empty array is the honest 'no tags' answer."
     },
     "dhtAnchorState": {
       "type": ["string", "null"],

@@ -445,6 +445,43 @@ describe('SearchService', () => {
         });
       }));
 
+    it('computeFacets_yields_non_empty_byTag_when_backend_rows_carry_tags', () =>
+      new Promise<void>(done => {
+        // Rows as /db/content now serves them (tags per row), after the
+        // content-index projection; no paths, so every tag count is content-borne.
+        dataLoaderSpy.getContentIndex.mockReturnValue(
+          of({
+            nodes: [
+              {
+                id: 'r1',
+                title: 'Soil',
+                description: '',
+                contentType: 'concept',
+                tags: ['a', 'b'],
+                reach: 'commons',
+                trustScore: 1,
+              },
+              {
+                id: 'r2',
+                title: 'Seed',
+                description: '',
+                contentType: 'concept',
+                tags: ['b'],
+                reach: 'commons',
+                trustScore: 0.5,
+              },
+            ],
+          })
+        );
+        dataLoaderSpy.getPathIndex.mockReturnValue(of({ paths: [] }));
+
+        service.search({ text: '' }).subscribe(results => {
+          const byTag = Object.fromEntries(results.facets.byTag.map(f => [f.value, f.count]));
+          expect(byTag).toEqual({ a: 1, b: 2 });
+          done();
+        });
+      }));
+
     it('should mark selected facet values', () =>
       new Promise<void>(done => {
         service.search({ text: '', contentTypes: ['epic'] }).subscribe(results => {

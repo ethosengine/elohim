@@ -72,6 +72,12 @@ pub struct ContentView {
     /// as "dead".
     #[ts(optional)]
     pub dht_anchor_state: Option<String>,
+    /// The row's tags (the `content_tags` projection). Always present on the
+    /// wire; an empty array is the honest "no tags" answer. The `/db/content`
+    /// list used to drop them, so lamad's tag scoring and tag facets ran on
+    /// empty arrays (plan Lane S, ruling R-S5).
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// The notary-declared HEAD of a content id's version DAG (HEAD-election, Plan

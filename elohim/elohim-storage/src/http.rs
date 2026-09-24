@@ -7465,6 +7465,129 @@ impl HttpServer {
             .await
     }
 
+    /// `GET /db/content` — the external, trust-gated and reach-enforced listing.
+    ///
+    /// `requester_idv` is the EXPLICIT `X-Agent-Cid` header value only (never
+    /// the ambient local-session fallback). Split out of
+    /// `handle_db_content_list` so an integration test can drive the route's
+    /// production path without constructing a hyper `Incoming` body.
+    fn list_db_content_views(
+        &self,
+        query: &ContentQuery,
+        requester_idv: Option<String>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // External read: bypass ContentService::list and call the gated
+        // diesel helper directly with require_provenance=true so
+        // unpublished rows never leak to external clients.
+        let pool = self
+            .db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+        let app_ctx = db::AppContext::default_lamad();
+        match db::content_diesel::list_content(
+            &mut conn,
+            &app_ctx,
+            query,
+            db::content_diesel::MinTrust::Amber,
+        ) {
+            Ok(items) => {
+                // REACH ENFORCEMENT (2026-08-20). Authorization here is
+                // UNCONDITIONAL at every posture. What a declared dev stage may
+                // cheapen is the DEPTH at which a requester's identity and
+                // relationships are verified — never WHETHER the decision is made,
+                // and never in the open direction.
+                //
+                // What this replaced was not a lenient policy, it was the absence
+                // of one: `has_auth = headers.get(AUTHORIZATION).is_some()` treated
+                // header PRESENCE as authorization, so any caller sending
+                // `Authorization: Bearer <anything>` received every restricted row
+                // WITH its content body. Measured live on doorway-alpha
+                // 2026-08-20: anonymous → 90 rows (all commons); the identical
+                // request with the literal token `bogus` → 1000 rows
+                // (familiar 906, private 3, intimate 1). `X-Agent-Id` is
+                // self-asserted, so no token was needed at all.
+                //
+                // The single-item route already did this correctly; this is the
+                // same resolve-then-authorize path applied per row.
+                // EXPLICIT header only — never the ambient local-session
+                // fallback. A hosted pod mints an active session for its
+                // own human and the doorway omits `X-Agent-Cid` for an
+                // unverified caller, so the cascade form would resolve an
+                // ANONYMOUS request as the node's human and serve that
+                // human's reach. See `extract_agent_cid_explicit`.
+                let requester = requester_idv.and_then(|idv| {
+                    crate::db::humans::get_human_by_id(&mut conn, &idv)
+                        .ok()
+                        .flatten()
+                        .or_else(|| {
+                            crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
+                                .ok()
+                                .flatten()
+                        })
+                });
+                let community_idx = crate::epr_service::reach_level_index("community");
+                let reach_gate = crate::epr_service::EprService::new(
+                    None,
+                    None,
+                    None,
+                    crate::p2p::trust_cache::PeerTrustCache::new(),
+                )
+                .with_memo_store(self.memo_store.clone());
+                let mut refused: usize = 0;
+                let views: Vec<ContentView> = items
+                    .into_iter()
+                    .map(Into::into)
+                    .filter(|v: &ContentView| {
+                        let idx = crate::epr_service::reach_level_index(&v.reach);
+                        // commons/public: no identity needed.
+                        if idx == 0 {
+                            return true;
+                        }
+                        // Every restricted tier needs a RESOLVED requester.
+                        // Deny-by-default when the caller cannot be resolved —
+                        // this is the fail-closed half header-presence skipped.
+                        let Some(ref human) = requester else {
+                            refused += 1;
+                            return false;
+                        };
+                        // community: a resolved identity IS the gate (mirrors the
+                        // single-item route, which authorizes only above community).
+                        if idx <= community_idx {
+                            return true;
+                        }
+                        match reach_gate.authorize_reach_for_human_with_own_trust(
+                            &mut conn, &app_ctx, &v.reach, human, &v.id,
+                        ) {
+                            Ok(()) => true,
+                            Err(_) => {
+                                refused += 1;
+                                false
+                            }
+                        }
+                    })
+                    .collect();
+                if refused > 0 {
+                    tracing::debug!(
+                        refused,
+                        resolved_requester = requester.is_some(),
+                        "reach enforcement filtered rows from /db/content listing"
+                    );
+                }
+                let body = serde_json::json!({
+                    "items": views,
+                    "count": views.len(),
+                    "limit": query.limit,
+                    "offset": query.offset,
+                });
+                Ok(response::ok(&body))
+            }
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
     /// GET /db/content - List content, POST /db/content - Create content
     async fn handle_db_content_list(
         &self,
@@ -7485,117 +7608,9 @@ impl HttpServer {
 
         match method {
             Method::GET => {
-                // External read: bypass ContentService::list and call the gated
-                // diesel helper directly with require_provenance=true so
-                // unpublished rows never leak to external clients.
-                let pool = self
-                    .db_pool
-                    .as_ref()
-                    .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
-                let mut conn = pool.get().map_err(|e| {
-                    StorageError::Internal(format!("Failed to get connection: {}", e))
-                })?;
-                let app_ctx = db::AppContext::default_lamad();
-                match db::content_diesel::list_content(
-                    &mut conn,
-                    &app_ctx,
-                    &query,
-                    db::content_diesel::MinTrust::Amber,
-                ) {
-                    Ok(items) => {
-                        // REACH ENFORCEMENT (2026-08-20). Authorization here is
-                        // UNCONDITIONAL at every posture. What a declared dev stage may
-                        // cheapen is the DEPTH at which a requester's identity and
-                        // relationships are verified — never WHETHER the decision is made,
-                        // and never in the open direction.
-                        //
-                        // What this replaced was not a lenient policy, it was the absence
-                        // of one: `has_auth = headers.get(AUTHORIZATION).is_some()` treated
-                        // header PRESENCE as authorization, so any caller sending
-                        // `Authorization: Bearer <anything>` received every restricted row
-                        // WITH its content body. Measured live on doorway-alpha
-                        // 2026-08-20: anonymous → 90 rows (all commons); the identical
-                        // request with the literal token `bogus` → 1000 rows
-                        // (familiar 906, private 3, intimate 1). `X-Agent-Id` is
-                        // self-asserted, so no token was needed at all.
-                        //
-                        // The single-item route already did this correctly; this is the
-                        // same resolve-then-authorize path applied per row.
-                        // EXPLICIT header only — never the ambient local-session
-                        // fallback. A hosted pod mints an active session for its
-                        // own human and the doorway omits `X-Agent-Cid` for an
-                        // unverified caller, so the cascade form would resolve an
-                        // ANONYMOUS request as the node's human and serve that
-                        // human's reach. See `extract_agent_cid_explicit`.
-                        let requester = crate::api::account::extract_agent_cid_explicit(&req)
-                            .and_then(|idv| {
-                                crate::db::humans::get_human_by_id(&mut conn, &idv)
-                                    .ok()
-                                    .flatten()
-                                    .or_else(|| {
-                                        crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
-                                            .ok()
-                                            .flatten()
-                                    })
-                            });
-                        let community_idx = crate::epr_service::reach_level_index("community");
-                        let reach_gate = crate::epr_service::EprService::new(
-                            None,
-                            None,
-                            None,
-                            crate::p2p::trust_cache::PeerTrustCache::new(),
-                        )
-                        .with_memo_store(self.memo_store.clone());
-                        let mut refused: usize = 0;
-                        let views: Vec<ContentView> = items
-                            .into_iter()
-                            .map(Into::into)
-                            .filter(|v: &ContentView| {
-                                let idx = crate::epr_service::reach_level_index(&v.reach);
-                                // commons/public: no identity needed.
-                                if idx == 0 {
-                                    return true;
-                                }
-                                // Every restricted tier needs a RESOLVED requester.
-                                // Deny-by-default when the caller cannot be resolved —
-                                // this is the fail-closed half header-presence skipped.
-                                let Some(ref human) = requester else {
-                                    refused += 1;
-                                    return false;
-                                };
-                                // community: a resolved identity IS the gate (mirrors the
-                                // single-item route, which authorizes only above community).
-                                if idx <= community_idx {
-                                    return true;
-                                }
-                                match reach_gate.authorize_reach_for_human_with_own_trust(
-                                    &mut conn, &app_ctx, &v.reach, human, &v.id,
-                                ) {
-                                    Ok(()) => true,
-                                    Err(_) => {
-                                        refused += 1;
-                                        false
-                                    }
-                                }
-                            })
-                            .collect();
-                        if refused > 0 {
-                            tracing::debug!(
-                                refused,
-                                resolved_requester = requester.is_some(),
-                                "reach enforcement filtered rows from /db/content listing"
-                            );
-                        }
-                        let body = serde_json::json!({
-                            "items": views,
-                            "count": views.len(),
-                            "limit": query.limit,
-                            "offset": query.offset,
-                        });
-                        Ok(response::ok(&body))
-                    }
-                    Err(e) => Ok(response::error_response(e)),
-                }
+                // EXPLICIT `X-Agent-Cid` only — see `list_db_content_views`.
+                let requester_idv = crate::api::account::extract_agent_cid_explicit(&req);
+                self.list_db_content_views(&query, requester_idv)
             }
             Method::POST => {
                 // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
@@ -14722,6 +14737,31 @@ impl HttpServer {
             .put_blob_bytes(data, sha256, mime_type, "did:elohim:test")
             .await
         {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Drive `GET /db/content?{query_str}` through the route's production path
+    /// (trust floor + reach enforcement) without an HTTP server bind.
+    /// `agent_cid` stands in for the explicit `X-Agent-Cid` header.
+    pub async fn test_list_db_content(
+        &self,
+        query_str: &str,
+        agent_cid: Option<&str>,
+    ) -> HttpTestResponse {
+        let query: ContentQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
+        match self.list_db_content_views(&query, agent_cid.map(str::to_string)) {
             Ok(resp) => {
                 let status = resp.status().as_u16();
                 let body = http_body_util::BodyExt::collect(resp.into_body())
