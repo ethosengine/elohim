@@ -68,7 +68,7 @@ import type {
   MechanismSelection,
 } from 'elohim-core';
 import { GovernanceApiService, claimsFromDeclaration, epr } from '@elohim/service';
-import { AttentionTrackerService, EventService } from '@elohim/rea-runtime';
+import { EventService, ObservationEmitterService, scrollDepthPct } from '@elohim/rea-runtime';
 
 import { LAMAD_ROUTE_CLAIMS } from '../../generated/route-claims';
 
@@ -273,7 +273,8 @@ export class ContentViewerComponent
   private readonly docSyncSvc = inject(ContentDocSyncService);
   private readonly injector = inject(Injector);
   private readonly householdResilienceService = inject(HouseholdResilienceService);
-  private readonly attentionTracker = inject(AttentionTrackerService);
+  /** Witnesses dwell + scroll depth as a lamad:content-viewed observation (R-A1/R-A3). */
+  private readonly observationEmitter = inject(ObservationEmitterService);
   private readonly eprResolver: ILamadEprResolver = inject(LAMAD_EPR_RESOLVER);
   private readonly eprNav: ILamadEprNav = inject(LAMAD_EPR_NAV);
   private readonly eventService = inject(EventService);
@@ -314,13 +315,17 @@ export class ContentViewerComponent
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
 
   ngOnInit(): void {
+    // The viewer owns scroll depth for the witnessed view (renderer listeners
+    // are renderer-scoped). Passive: it never blocks scrolling.
+    this.document.defaultView?.addEventListener('scroll', this.onWindowScroll, { passive: true });
+
     // Handle direct content access: /lamad/resource/:resourceId
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const resourceId = params['resourceId'] as string;
       if (resourceId) {
-        // Leave previous content if navigating within the viewer
+        // Leaving the previous node closes its witnessed view
         if (this.nodeId && this.nodeId !== resourceId) {
-          this.attentionTracker.trackContentLeave(this.nodeId);
+          this.observationEmitter.end(this.nodeId);
         }
         this.nodeId = resourceId;
         this.nodeId$.next(resourceId);
@@ -357,13 +362,24 @@ export class ContentViewerComponent
     });
   }
 
+  /** Report the deepest point the window has reached on this page. */
+  private readonly onWindowScroll = (): void => {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const root = this.document.documentElement;
+    this.observationEmitter.noteScroll(
+      scrollDepthPct(win.scrollY || root.scrollTop, win.innerHeight, root.scrollHeight)
+    );
+  };
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyRenderer();
-    // Stop attention tracking for current content
+    this.document.defaultView?.removeEventListener('scroll', this.onWindowScroll);
+    // Close the witnessed view of the current node
     if (this.nodeId) {
-      this.attentionTracker.trackContentLeave(this.nodeId);
+      this.observationEmitter.end(this.nodeId);
     }
     // Clean up focused view mode if active
     this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
@@ -548,8 +564,8 @@ export class ContentViewerComponent
           // Auto-track view (increment if first time)
           this.affinityService.trackView(nodeId);
 
-          // Record attention event (dwell-qualified, deduplicated)
-          this.attentionTracker.trackContentView(nodeId);
+          // Open the witnessed view: dwell + scroll depth, posted on leave
+          this.observationEmitter.begin(nodeId);
 
           // Manifest-driven attention signal (onConsume economic event)
           void this.signalHarness.onRendererComplete(contentNode, {

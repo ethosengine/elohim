@@ -39,7 +39,13 @@ import { ResilienceService } from '../../services/resilience.service';
 import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from '../../interfaces/storage.interface';
 import { vi, Mock } from 'vitest';
-import { AttentionTrackerService, EVENT_API, AGENT_CONTEXT } from '@elohim/rea-runtime';
+import {
+  AttentionTrackerService,
+  EVENT_API,
+  AGENT_CONTEXT,
+  ObservationEmitterService,
+  scrollDepthPct,
+} from '@elohim/rea-runtime';
 import { GovernanceApiService, ContentDocSyncService, type ContentDocFields } from '@elohim/service';
 import { EPR_RESOLUTION_PROVIDER } from '@app/elohim/providers/epr-resolution.provider';
 
@@ -355,6 +361,7 @@ describe('ContentViewerComponent', () => {
         { provide: LibResilienceService, useValue: libResilienceSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
         { provide: AttentionTrackerService, useValue: { trackContentView: vi.fn(), trackContentLeave: vi.fn(), getSessionViewedIds: vi.fn().mockReturnValue(new Set()) } },
+        { provide: ObservationEmitterService, useValue: { begin: vi.fn(), noteScroll: vi.fn(), end: vi.fn() } },
         { provide: GovernanceApiService, useValue: governanceApiSpyObj },
         { provide: EVENT_API, useValue: { createEconomicEvent: vi.fn().mockReturnValue(of(null)), getEconomicEvents: vi.fn().mockReturnValue(of([])) } },
         { provide: AGENT_CONTEXT, useValue: { getCurrentAgentId: vi.fn().mockReturnValue('test-agent-id') } },
@@ -893,6 +900,113 @@ describe('ContentViewerComponent', () => {
 
       // Should not throw errors
       expect(true).toBe(true);
+    }));
+  });
+
+  // Ruling R-A1/R-A3: the viewer witnesses dwell and scroll depth as a
+  // lamad:content-viewed observation (ObservationEmitterService) and no longer
+  // writes an AttentionTending on leave. The tracker mock stays to prove the
+  // negative; the signal harness's EconomicEvent view emit stays this sprint.
+  describe('attention witnessed as an observation', () => {
+    let emitter: { begin: Mock; noteScroll: Mock; end: Mock };
+    let tracker: { trackContentView: Mock; trackContentLeave: Mock };
+    let params$: Subject<Record<string, string>>;
+
+    const geometry = (scrollTop: number, viewport: number, documentHeight: number): void => {
+      Object.defineProperty(window, 'scrollY', { value: scrollTop, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: viewport, configurable: true });
+      Object.defineProperty(document.documentElement, 'scrollHeight', {
+        value: documentHeight,
+        configurable: true,
+      });
+    };
+
+    beforeEach(() => {
+      emitter = TestBed.inject(ObservationEmitterService) as unknown as typeof emitter;
+      tracker = TestBed.inject(AttentionTrackerService) as unknown as typeof tracker;
+      // Drive route changes: the component reads route.params in ngOnInit,
+      // which has not run yet (no detectChanges), so swapping the stream works.
+      params$ = new Subject();
+      (TestBed.inject(ActivatedRoute) as unknown as { params: unknown }).params = params$;
+    });
+
+    it('emits_begin_on_load_and_end_on_navigate_and_destroy', fakeAsync(() => {
+      fixture.detectChanges();
+      params$.next({ resourceId: 'test-content-1' });
+      tick();
+      expect(emitter.begin).toHaveBeenCalledWith('test-content-1');
+      expect(emitter.end).not.toHaveBeenCalled();
+
+      params$.next({ resourceId: 'related-1' });
+      tick();
+      expect(emitter.end).toHaveBeenCalledWith('test-content-1');
+      expect(emitter.begin).toHaveBeenLastCalledWith('related-1');
+      // end for the previous node precedes begin for the next
+      expect(emitter.end.mock.invocationCallOrder[0]).toBeLessThan(
+        emitter.begin.mock.invocationCallOrder[1]
+      );
+
+      fixture.destroy();
+      expect(emitter.end).toHaveBeenLastCalledWith('related-1');
+      expect(emitter.end).toHaveBeenCalledTimes(2);
+    }));
+
+    it('does_not_call_attention_tending_on_leave', fakeAsync(() => {
+      fixture.detectChanges();
+      params$.next({ resourceId: 'test-content-1' });
+      tick();
+      params$.next({ resourceId: 'related-1' });
+      tick();
+      fixture.destroy();
+
+      expect(tracker.trackContentView).not.toHaveBeenCalled();
+      expect(tracker.trackContentLeave).not.toHaveBeenCalled();
+    }));
+
+    it('scroll_reports_max_depth_pct', fakeAsync(() => {
+      const saved = {
+        scrollY: Object.getOwnPropertyDescriptor(window, 'scrollY'),
+        innerHeight: Object.getOwnPropertyDescriptor(window, 'innerHeight'),
+      };
+      try {
+        fixture.detectChanges();
+        params$.next({ resourceId: 'test-content-1' });
+        tick();
+
+        geometry(600, 400, 2000);
+        window.dispatchEvent(new Event('scroll'));
+        expect(emitter.noteScroll).toHaveBeenLastCalledWith(scrollDepthPct(600, 400, 2000));
+        expect(emitter.noteScroll).toHaveBeenLastCalledWith(50);
+
+        geometry(1600, 400, 2000);
+        window.dispatchEvent(new Event('scroll'));
+        expect(emitter.noteScroll).toHaveBeenLastCalledWith(100);
+
+        // The listener is removed on destroy: no report after the viewer is gone.
+        fixture.destroy();
+        const reports = emitter.noteScroll.mock.calls.length;
+        window.dispatchEvent(new Event('scroll'));
+        expect(emitter.noteScroll).toHaveBeenCalledTimes(reports);
+      } finally {
+        if (saved.scrollY) Object.defineProperty(window, 'scrollY', saved.scrollY);
+        if (saved.innerHeight) Object.defineProperty(window, 'innerHeight', saved.innerHeight);
+        delete (document.documentElement as unknown as Record<string, unknown>)['scrollHeight'];
+      }
+    }));
+
+    it('signal_harness_view_emit_still_fires', fakeAsync(() => {
+      const harness = TestBed.inject(SignalHarnessService) as unknown as {
+        onRendererComplete: Mock;
+      };
+      fixture.detectChanges();
+      params$.next({ resourceId: 'test-content-1' });
+      tick();
+
+      expect(harness.onRendererComplete).toHaveBeenCalledWith(mockContentNode, {
+        type: 'view',
+        passed: false,
+        score: 0,
+      });
     }));
   });
 
