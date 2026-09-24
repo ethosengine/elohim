@@ -10,6 +10,7 @@ import { resolve, dirname } from 'path';
 import picomatch from 'picomatch';
 import { loadManifests, resolveStep } from './manifest-utils.mjs';
 import { filterChanged } from './ci-ignore.mjs';
+import { stepClass, deriveRunClass } from './pipeline-registry.mjs';
 
 /**
  * Topologically sort steps using Kahn's algorithm.
@@ -82,7 +83,8 @@ function matchInputs(inputs, changedFiles) {
  * @param {Array<{path: string, content: object}>} manifests - Loaded manifests
  * @param {string[]} changedFiles - List of changed file paths (relative to repo root)
  * @returns {{ projects: Array<{name: string, dir: string, reasons: string[]}>,
- *             pipelines: Array<{name: string, reasons: string[]}> }}
+ *             pipelines: Array<{name: string, reasons: string[],
+ *               steps: Array<{name: string, class: string}>, runClass: string}> }}
  *   `projects` = local gate projects (what the pre-push hook builds).
  *   `pipelines` = pipelines with stale steps (what Jenkins dispatches). These
  *   are NOT the same set — see Phase 5.
@@ -167,13 +169,24 @@ export function walkGraph(manifests, changedFiles) {
   // conductor image (elohim-conductor) is built in another repo and has no
   // local gate at all. Without this phase, preview.mjs reports "nothing will
   // build" for a conductor bump that CI does in fact build.
+  //
+  // Each pipeline also carries its stale steps with their declared class and
+  // the run class those derive (the max; absent class = build) — the same
+  // derivation build-graph.groovy sends downstream as RUN_CLASS.
   const pipelineMap = new Map();
   for (const [qualified, reasons] of stale) {
-    const pipeline = stepIndex.get(qualified).pipeline;
-    if (!pipelineMap.has(pipeline)) pipelineMap.set(pipeline, []);
-    pipelineMap.get(pipeline).push(...reasons);
+    const { pipeline, step } = stepIndex.get(qualified);
+    if (!pipelineMap.has(pipeline)) pipelineMap.set(pipeline, { reasons: [], steps: [] });
+    const entry = pipelineMap.get(pipeline);
+    entry.reasons.push(...reasons);
+    entry.steps.push({ name: qualified.slice(pipeline.length + 1), class: stepClass(step) });
   }
-  const pipelines = [...pipelineMap.entries()].map(([name, reasons]) => ({ name, reasons }));
+  const pipelines = [...pipelineMap.entries()].map(([name, { reasons, steps }]) => ({
+    name,
+    reasons,
+    steps,
+    runClass: deriveRunClass(steps.map((s) => s.class)),
+  }));
 
   return { projects, pipelines };
 }

@@ -1958,12 +1958,18 @@ def shouldRunStep(String stepName) {
 // stashes the result in env.EDGE_VALIDATE_ONLY for every later `when` to read
 // via isValidateOnly() below — kept as top-level defs so the per-stage cost
 // added to the CPS stages-model is just a function call, not inline logic.
+// RUN_CLASS (steps[].class, sent by the orchestrator): verify is validate-only.
+// measure/profile also never build or roll — they have no stage of their own
+// here yet (the mesh-quiesce measure rides Build Edge Node Image), so they run
+// the same read-only set rather than a full build.
 def computeValidateOnly() {
     def commitMsg = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
+    String runClass = params.RUN_CLASS ?: 'build'
     env.EDGE_VALIDATE_ONLY = ((params.VALIDATE_ONLY ?: false) ||
+        runClass == 'verify' || runClass == 'measure' || runClass == 'profile' ||
         commitMsg.contains('[edge:validate-only]')) ? 'true' : 'false'
     if (env.EDGE_VALIDATE_ONLY == 'true') {
-        echo "VALIDATE_ONLY — skipping build/deploy stages; running Dataplane Validation only"
+        echo "VALIDATE_ONLY (RUN_CLASS=${runClass}) — skipping build/deploy stages; running Dataplane Validation only"
     }
 }
 
@@ -2140,6 +2146,11 @@ spec:
             name: 'VALIDATE_ONLY',
             defaultValue: false,
             description: 'Skip build/deploy; run only Dataplane Validation against the deployed alpha cluster. Decouples validation timing from deploy-restart windows. Also settable via [edge:validate-only] commit tag.'
+        )
+        string(
+            name: 'RUN_CLASS',
+            defaultValue: 'build',
+            description: 'build|deploy|verify|measure|profile (orchestrator-derived). Below deploy = validate-only.'
         )
     }
 

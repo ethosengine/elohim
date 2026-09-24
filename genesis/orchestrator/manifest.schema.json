@@ -216,6 +216,12 @@
               "description": "Jenkinsfile helper function name (null if inline stage)"
             }
           }
+        },
+        "class": {
+          "type": "string",
+          "enum": ["build", "deploy", "verify", "measure", "profile"],
+          "default": "build",
+          "description": "Run class (mirror of rakia steps[].class), ordered build > deploy > verify > measure > profile. A dispatch's class is the highest class among its stale steps; a class executes only the steps at or below it. Absent means build."
         }
       }
     }

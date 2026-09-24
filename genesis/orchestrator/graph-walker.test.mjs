@@ -317,3 +317,39 @@ describe('projectsFromStale — an external oracle can supply the stale set', ()
     assert.deepEqual(walkGraph(manifests, ['x/a.ts']).projects, projectsFromStale(manifests, new Map([['x:s', ['source: x/a.ts']]]), ['x/a.ts']));
   });
 });
+
+describe('run classes — the walker exposes each stale step\'s class and the pipeline\'s run class', () => {
+  const withClass = (step, cls) => ({ ...step, class: cls });
+  const manifests = () => [
+    makeManifest('edge', {
+      build: makeStep(['edge/src/**']),
+      deploy: withClass(makeStep(['edge/manifests/**'], ['build']), 'deploy'),
+      validate: withClass(makeStep(['a2o/**']), 'verify'),
+      quiesce: withClass(makeStep(['a2o/quiesce/**']), 'measure'),
+    }),
+  ];
+
+  it('a verify-only change runs at verify', () => {
+    const [edge] = walkGraph(manifests(), ['a2o/features/x.feature']).pipelines;
+    assert.equal(edge.name, 'edge');
+    assert.deepEqual(edge.steps, [{ name: 'validate', class: 'verify' }]);
+    assert.equal(edge.runClass, 'verify');
+  });
+
+  it('the class is the max over stale steps (verify + measure → verify; + build → build)', () => {
+    assert.equal(walkGraph(manifests(), ['a2o/quiesce/q.sh']).pipelines[0].runClass, 'verify');
+    assert.equal(walkGraph(manifests(), ['a2o/quiesce/q.sh', 'edge/src/main.rs']).pipelines[0].runClass, 'build');
+  });
+
+  it('a step without a class reads as build', () => {
+    const [edge] = walkGraph(manifests(), ['edge/src/main.rs']).pipelines;
+    assert.deepEqual(edge.steps, [{ name: 'build', class: 'build' }]);
+    assert.equal(edge.runClass, 'build');
+  });
+
+  it('keeps the pipeline reasons it always reported', () => {
+    const [edge] = walkGraph(manifests(), ['edge/manifests/a.yaml']).pipelines;
+    assert.deepEqual(edge.reasons, ['source: edge/manifests/a.yaml']);
+    assert.equal(edge.runClass, 'deploy');
+  });
+});

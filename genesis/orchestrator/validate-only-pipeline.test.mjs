@@ -165,12 +165,18 @@ describe("orchestrator validate-only dispatch", () => {
   });
 
   test("sends an explicit safe parameter set to the edge job", () => {
+    // The tag is the edge-scoped verify class; the booleans derive from the
+    // run class (run-class.test.mjs pins the class contract itself).
     assert.match(
       orchestrator,
-      /validateOnlyDownstream = name == 'elohim-edge'/,
+      /if \(name == 'elohim-edge' && env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'\) runClass = 'verify'/,
     );
-    assert.match(orchestrator, /FORCE_BUILD', value: !validateOnlyDownstream/);
-    assert.match(orchestrator, /FORCE_DEPLOY', value: !validateOnlyDownstream/);
+    assert.match(
+      orchestrator,
+      /validateOnlyDownstream = name == 'elohim-edge' && belowDeploy/,
+    );
+    assert.match(orchestrator, /FORCE_BUILD', value: !belowDeploy/);
+    assert.match(orchestrator, /FORCE_DEPLOY', value: !belowDeploy/);
     assert.match(orchestrator, /VALIDATE_ONLY', value: validateOnlyDownstream/);
   });
 });
@@ -195,22 +201,25 @@ describe("orchestrator graph-derived validate-only (a2o-only change)", () => {
     }
   });
 
-  test("an edge selection with only dataplane-validation stale dispatches validate-only", () => {
+  test("an edge selection whose stale steps are all below deploy dispatches validate-only", () => {
+    // Class rule: the edge's run class is the max steps[].class of its stale
+    // steps; below deploy (verify/measure/profile) it dispatches validate-only.
     const rule = orchestrator.match(
-      /edgeStaleSteps\.every \{ it == 'dataplane-validation' \} && !edgeForced\) \{\s*env\.EDGE_VALIDATE_ONLY_FROM_GRAPH = 'true'/,
+      /if \(edgeStaleSteps && runClassBelowDeploy\(runClasses\['elohim-edge'\] \?: 'build'\) && !edgeForced\) \{\s*echo "🧪 elohim-edge: stale steps are all class/,
     );
     assert.ok(rule, "graph-derived validate-only rule is missing");
-    assert.match(orchestrator, /\(env\.FORCE_BUILD_PIPELINES \?: ''\)\.split\(','\)\.findAll \{ it \}\.contains\('elohim-edge'\)/);
+    assert.match(orchestrator, /def forcedPipelines = \(env\.FORCE_BUILD_PIPELINES \?: ''\)\.split\(','\)\.findAll \{ it \}/);
+    assert.match(orchestrator, /boolean edgeForced = forcedPipelines\.contains\('elohim-edge'\)/);
     assert.match(
       orchestrator,
-      /validateOnlyDownstream = name == 'elohim-edge' &&\s*\(env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' \|\| env\.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true'\)/,
+      /validateOnlyDownstream = name == 'elohim-edge' && belowDeploy/,
     );
   });
 
   test("a validate-only edge never pulls Genesis in", () => {
     assert.match(
       orchestrator,
-      /triggersGenesis && !\(it == 'elohim-edge' && env\.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true'\)/,
+      /triggersGenesis && !runClassBelowDeploy\(runClasses\[it\] \?: 'build'\)/,
     );
   });
 });

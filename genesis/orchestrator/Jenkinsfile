@@ -120,6 +120,7 @@ def getPipelineMetadata(String name) {
         dependsOn:       m.dependsOn ?: [],
         longRunning:     m.longRunning == true,
         deploymentCheck: deploymentCheck,
+        stepClasses:     runClassesOfSteps(m.steps),
     ]
 }
 
@@ -578,6 +579,40 @@ def parseBuildTagTokens(String commitMsg) {
 }
 
 /**
+ * Run classes (build > deploy > verify > measure > profile) — declared per step
+ * as steps[].class; policy home is pipeline-registry.mjs, pinned by
+ * run-class.test.mjs. `[run:verify|measure|profile]` caps a dispatch below
+ * deploy; build is [build:*]'s and deploy is [deploy-only]'s. @NonCPS for the
+ * same Matcher reason as parseBuildTagTokens. Returns '' when absent.
+ */
+@NonCPS
+def parseRunClassTag(String commitMsg) {
+    def m = ((commitMsg ?: '') =~ /(?i)\[run:(verify|measure|profile)\]/)
+    return m.find() ? m.group(1).toLowerCase() : ''
+}
+
+/** A pipeline's class from the "name=class,…" plan; absent reads as build. */
+@NonCPS
+def runClassFor(String name, String encoded) {
+    def hit = (encoded ?: '').split(',').find { it.startsWith(name + '=') }
+    return hit ? hit.substring(name.length() + 1) : 'build'
+}
+
+/** verify / measure / profile build nothing, deploy nothing, roll nothing. */
+@NonCPS
+def runClassBelowDeploy(String cls) {
+    return ['verify', 'measure', 'profile'].contains(cls)
+}
+
+/** step → class for the pre-graph metadata fallback; absent reads as build. */
+@NonCPS
+def runClassesOfSteps(Map steps) {
+    def out = [:]
+    (steps ?: [:]).each { name, stepDef -> out[name.toString()] = (stepDef['class'] ?: 'build').toString() }
+    return out
+}
+
+/**
  * Parse the [conductor:…] commit tag — variant, feature set, canary, fork
  * branches for the custom-conductor image build — and stash it for dispatch.
  *
@@ -755,7 +790,14 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     // A cross-repo pipeline pins its own job name and branch (see getPipelineMetadata).
     String jobName = config.jenkinsJob ?: name
     String jobBranch = config.jenkinsBranch ?: branch
-    echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}]..."
+    // The run class (steps[].class, derived in applyBuildGraphRouting) is the
+    // dispatch contract; the force/validate booleans are derived from it so a
+    // downstream that has not yet declared RUN_CLASS still never rolls on a
+    // sub-deploy class. [edge:validate-only] is the edge-scoped verify.
+    String runClass = runClassFor(name, env.PIPELINE_RUN_CLASSES)
+    if (name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') runClass = 'verify'
+    boolean belowDeploy = runClassBelowDeploy(runClass)
+    echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}] RUN_CLASS=${runClass}..."
 
     try {
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
@@ -766,8 +808,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // tag directly, but the explicit parameter makes the dispatch contract
         // visible in Jenkins and keeps the guarantee independent of checkout
         // history depth.
-        boolean validateOnlyDownstream = name == 'elohim-edge' &&
-            (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
+        boolean validateOnlyDownstream = name == 'elohim-edge' && belowDeploy
         // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
         // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
         // of them produces undefined-parameter warnings and no behaviour. They get
@@ -786,9 +827,10 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
             }
             return dispatchResult(result, shouldWait || detachedBarrier)
         }
-        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !validateOnlyDownstream)]
+        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !belowDeploy)]
+        buildParams.add(stringParam(name: 'RUN_CLASS', value: runClass))
         if (config.deploymentCheck) {
-            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !validateOnlyDownstream))
+            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !belowDeploy))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
         // their build stages and go straight to deploy. Safe to send to all
@@ -1308,6 +1350,7 @@ def applyAlreadyBuiltFilter(graphPipelines) {
  */
 def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipelines) {
     def graphPipelines
+    def runClasses = [:]
     if (mode in ['auto', 'status']) {
         echo '\n=== Build Graph (Primary) ==='
         def graphResult = runBuildGraph(changedFiles)
@@ -1318,11 +1361,22 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // script): dispatch it validate-only instead of rebuilding and rolling
         // all seven alpha peers (orchestrator #1726 → edge #1383 rolled the fleet
         // for a step-definition edit). [build:edge] still forces a full run.
+        //
+        // Run classes: each pipeline's class is the highest steps[].class among
+        // its stale steps (build > deploy > verify > measure > profile; absent =
+        // build); RUN_CLASS carries it to the downstream.
+        runClasses.putAll(graphResult.runClasses ?: [:])
+        def forcedPipelines = (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it }
         def edgeStaleSteps = graphResult.pipelineSteps['elohim-edge'] ?: []
-        boolean edgeForced = (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it }.contains('elohim-edge')
+        boolean edgeForced = forcedPipelines.contains('elohim-edge')
+        // TRANSITIONAL until the rakia pin carries steps[].class and the edge
+        // manifest declares dataplane-validation: verify — the class rule below
+        // then subsumes this literal one (removed in the pin-bump commit).
         if (edgeStaleSteps && edgeStaleSteps.every { it == 'dataplane-validation' } && !edgeForced) {
-            env.EDGE_VALIDATE_ONLY_FROM_GRAPH = 'true'
-            echo '🧪 elohim-edge: only dataplane-validation is stale — dispatching validate-only (no build, no fleet roll)'
+            runClasses['elohim-edge'] = 'verify'
+        }
+        if (edgeStaleSteps && runClassBelowDeploy(runClasses['elohim-edge'] ?: 'build') && !edgeForced) {
+            echo "🧪 elohim-edge: stale steps are all class ${runClasses['elohim-edge']} — dispatching validate-only (no build, no fleet roll)"
         }
 
         // Filter to dispatchable pipelines (have jenkinsPath in their manifest).
@@ -1347,13 +1401,27 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // dropped (and so an emptied plan stays empty, skipping Execute Builds
         // entirely while the Gate #6 parity stage still runs).
         graphPipelines = applyAlreadyBuiltFilter(graphPipelines)
+        forcedPipelines.each { runClasses[it] = 'build' }
+
+        // [run:verify|measure|profile] — generalizes [edge:validate-only]: the
+        // dispatch set becomes every pipeline declaring a step at or below the
+        // tagged class (plus [build:*] force-includes, which stay build).
+        if (env.RUN_CLASS_FROM_TAG) {
+            String tag = env.RUN_CLASS_FROM_TAG
+            def selected = (graphResult.runClassSelections ?: [:])[tag] ?: []
+            graphPipelines = (selected.findAll { getPipelineMetadata(it).jenkinsPath } + forcedPipelines.findAll { graphPipelines.contains(it) }).unique()
+            runClasses = [:]
+            graphPipelines.each { runClasses[it] = forcedPipelines.contains(it) ? 'build' : tag }
+            echo "🧪 [run:${tag}] — dispatching ${graphPipelines ? graphPipelines.join(', ') : 'nothing'} (pipelines declaring a step at or below ${tag})"
+        }
 
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
             def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-            // A validate-only edge deploys nothing, so it never pulls Genesis in.
+            // A pipeline below deploy (verify/measure/profile) deploys nothing, so
+            // it never pulls Genesis in.
             def triggeringPipeline = graphPipelines.find {
-                getPipelineMetadata(it).triggersGenesis && !(it == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
+                getPipelineMetadata(it).triggersGenesis && !runClassBelowDeploy(runClasses[it] ?: 'build')
             }
             if (triggeringPipeline && isDevBranch) {
                 graphPipelines.add('elohim-genesis')
@@ -1378,6 +1446,10 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         graphPipelines = graphPipelines.findAll { name -> name != selfProject }
         echo "🛡️  self-dispatch guard: removed ${selfProject} from the dispatch set (a build never triggers itself)"
     }
+    // Stashed as "name=class,…" for triggerPipeline (runClassFor); a pipeline
+    // absent from it (manual mode, [deploy-only]) reads as build.
+    env.PIPELINE_RUN_CLASSES = graphPipelines.collect { "${it}=${runClasses[it] ?: 'build'}" }.join(',')
+    graphPipelines.each { echo "RUN_CLASS=${runClasses[it] ?: 'build'} ${it}" }
     return graphPipelines
 }
 
@@ -2060,6 +2132,7 @@ spec:
                             env.EDGE_VALIDATE_ONLY_FROM_TAG = 'true'
                             echo "🧪 [edge:validate-only] detected — isolating dispatch to edge Dataplane Validation"
                         }
+                        env.RUN_CLASS_FROM_TAG = parseRunClassTag(commitMsg)
 
                         // [deploy-only] — DELIBERATELY webhook-gated. This tag tells the orchestrator
                         // to bypass changeset analysis and redeploy existing Harbor tags. It is only

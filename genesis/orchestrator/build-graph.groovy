@@ -92,7 +92,11 @@ def composeGraph(List manifests) {
                     (dep.contains(':') ? dep : "${pipeline}:${dep}").toString()
                 },
                 executor: stepDef.executor,
-                manualOnly: manifest.manualOnly ?: false
+                manualOnly: manifest.manualOnly ?: false,
+                // steps[].class (rakia schema); absent reads as build. Bracket
+                // access on purpose: `stepDef.class` on a Map is a key lookup
+                // today, but reads as getClass() to every reviewer.
+                runClass: (stepDef['class'] ?: 'build').toString()
             ]
         }
     }
@@ -433,6 +437,66 @@ def groupByPipeline(Set staleSteps, Map graph) {
 }
 
 // ============================================================
+// RUN CLASSES
+// ============================================================
+//
+// Mirror of pipeline-registry.mjs (RUN_CLASSES / deriveRunClass /
+// planRunClasses), pinned by run-class.test.mjs. Highest first: a dispatch's
+// class is the highest class among its stale steps, and a class executes only
+// the steps at or below it.
+
+@NonCPS
+def runClassRank(String cls) {
+    def RUN_CLASS_ORDER = ['build', 'deploy', 'verify', 'measure', 'profile']
+    int i = RUN_CLASS_ORDER.indexOf(cls ?: 'build')
+    return RUN_CLASS_ORDER.size() - 1 - (i < 0 ? 0 : i)
+}
+
+/** pipeline → the highest class among its stale steps. */
+@NonCPS
+def deriveRunClasses(Map pipelineSteps, Map graph) {
+    def out = [:]
+    pipelineSteps.each { pipeline, localNames ->
+        String best = null
+        localNames.each { localName ->
+            String cls = graph.steps["${pipeline}:${localName}".toString()]?.runClass ?: 'build'
+            if (best == null || runClassRank(cls) > runClassRank(best)) best = cls
+        }
+        out[pipeline.toString()] = best ?: 'build'
+    }
+    return out
+}
+
+/**
+ * [run:<cls>] tag → the non-manual pipelines declaring at least one step at or
+ * below <cls>. Only the three sub-deploy classes are run tags.
+ */
+@NonCPS
+def runClassSelections(Map graph) {
+    def out = [:]
+    ['verify', 'measure', 'profile'].each { tag ->
+        def pipelines = [] as LinkedHashSet
+        graph.steps.each { name, step ->
+            if (!step.manualOnly && runClassRank(step.runClass) <= runClassRank(tag)) {
+                pipelines.add(step.pipeline.toString())
+            }
+        }
+        out[tag] = pipelines.toList()
+    }
+    return out
+}
+
+/** step → class for one manifest's steps map; absent reads as build. */
+@NonCPS
+def stepClassesOf(Map steps) {
+    def out = [:]
+    (steps ?: [:]).each { name, stepDef ->
+        out[name.toString()] = (stepDef['class'] ?: 'build').toString()
+    }
+    return out
+}
+
+// ============================================================
 // DECISION MATRIX
 // ============================================================
 
@@ -763,6 +827,7 @@ def walkBuildGraph(List changedFiles) {
             dependsOn: manifest.dependsOn ?: [],
             longRunning: manifest.longRunning == true,
             deploymentCheck: deploymentCheck,
+            stepClasses: stepClassesOf(manifest.steps),
         ]
     }
 
@@ -772,6 +837,8 @@ def walkBuildGraph(List changedFiles) {
         staleSteps: staleSteps,
         levels: levels,
         pipelineSteps: pipelineSteps,
+        runClasses: deriveRunClasses(pipelineSteps, graph),
+        runClassSelections: runClassSelections(graph),
         buildProcessHashes: buildProcessHashes,
         previousState: buildState,
         pipelineRegistry: pipelineRegistry
