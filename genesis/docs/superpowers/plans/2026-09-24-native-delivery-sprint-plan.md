@@ -707,8 +707,8 @@ visible as its own node.
 
 **Tasks**
 
-- [ ] **G1 — epr flow walk/status --json gains tier and cost per commitment; the cost: headline slot** (serves push-delivers-within-budget)
-- [ ] **G2 — reports:serve page renders the pipeline graph with per-node tier and cost** (serves push-delivers-within-budget)
+- [x] **G1 — epr flow walk/status --json gains tier and cost per commitment; the cost: headline slot** (serves push-delivers-within-budget) — d964fbef2
+- [x] **G2 — reports:serve page renders the pipeline graph with per-node tier and cost** (serves push-delivers-within-budget) — 73580ac63
 
 ---
 
