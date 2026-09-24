@@ -11,12 +11,21 @@
 //! [`FlowError::Unavailable`] (`unavailable: <reason>`) — a route that cannot run here, not a
 //! fault in the question. A caller's own misuse (a batch over its budget) is a refusal.
 //!
-//! **Two budgets, both declared.** [`EmbedBudget::query`] is the provider envelope for embedding
-//! one question on the query path (`provider_bytes`/`provider_seconds`); [`EmbedBudget::fold`] is
+//! **Two budgets, both declared.** [`query_budget`] is the provider envelope for embedding
+//! one question on the query path (`provider_bytes`/`provider_seconds`); [`fold_budget`] is
 //! the fold procedure's own envelope off the query path (`fold_procedure_bytes`,
 //! `fold_procedure_seconds`, `fold_batch_texts`). A 32-text batch of 384-float vectors is ~130 KB
 //! of JSON and cannot fit the query envelope, so the fold never borrows it.
+//!
+//! The trait, the budget, the reply and the fixture live in `elohim_epr_index::embedder` since the
+//! post-station-4 sprint lifted them (ruling R-S1); the budgets are read from the contract here,
+//! and the pinned procedure stays here, because it runs a process from this repository's tree.
 use super::*;
+use elohim_epr_index::embedder::within_batch;
+pub use elohim_epr_index::embedder::{
+    EmbedBudget, Embedder, Embedding, Fixture, FIXTURE_DIMS, FIXTURE_FITNESS,
+};
+use elohim_epr_index::IndexError;
 use serde::Deserialize;
 
 /// The governed model manifest the semantic measure's `ModelPin` names.
@@ -29,84 +38,28 @@ pub const PROCEDURE_REL: &str = "elohim/eprfs/epr-cli/embedder/embed.py";
 /// An operator override naming the interpreter that runs the procedure (default `python3`).
 pub const INTERPRETER_ENV: &str = "EPR_EMBED_PYTHON";
 
-/// The fixture embedder's width — the pinned model's, so fixture folds interchange with live ones.
-pub const FIXTURE_DIMS: usize = 384;
-
-/// What a fixture embedding may claim, declared like the `fixture` provider's own line.
-pub const FIXTURE_FITNESS: &str =
-    "fixture embedder only; test interchange, no live provider fitness established";
-
 /// `embed.py`'s exit codes (its module doc is the other half of this contract).
 const EXIT_BAD_REQUEST: i32 = 2;
 const EXIT_PIN_MISMATCH: i32 = 3;
 
-/// One reply: a unit-length vector per text, in order, and what the vectors may claim.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Embedding {
-    pub dims: usize,
-    pub vectors: Vec<Vec<f32>>,
-    pub fitness: String,
-    /// How many texts of this reply were longer than the model's token window and embedded from
-    /// their head only; `None` when the procedure does not count (unknown — never a guessed 0).
-    pub truncated: Option<usize>,
+/// Embedding one question on the query path: the provider envelope.
+pub fn query_budget(contract: &Contract) -> FlowResult<EmbedBudget> {
+    Ok(EmbedBudget {
+        bytes: contract.positive_limit("provider_bytes")? as usize,
+        seconds: contract.positive_limit("provider_seconds")?,
+        texts: 1,
+    })
 }
 
-/// The envelope one `embed` call runs under — resolved from the pinned contract by the caller.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct EmbedBudget {
-    pub bytes: usize,
-    pub seconds: f64,
-    /// The most texts one call may carry.
-    pub texts: usize,
-}
-
-impl EmbedBudget {
-    /// Embedding one question on the query path: the provider envelope.
-    pub fn query(contract: &Contract) -> FlowResult<Self> {
-        Ok(Self {
-            bytes: contract.positive_limit("provider_bytes")? as usize,
-            seconds: contract.positive_limit("provider_seconds")?,
-            texts: 1,
-        })
-    }
-
-    /// One fold batch, off the query path: the fold procedure's own declared envelope. These
-    /// budgets are not required of every contract, so they are checked here, at the point of use,
-    /// by the same reader `Contract::validate` applies to the required ones.
-    pub fn fold(contract: &Contract) -> FlowResult<Self> {
-        Ok(Self {
-            bytes: contract.positive_limit("fold_procedure_bytes")? as usize,
-            seconds: contract.positive_limit("fold_procedure_seconds")?,
-            texts: contract.positive_limit("fold_batch_texts")? as usize,
-        })
-    }
-}
-
-/// Texts in, one vector per text out, under the budget the caller resolved from the contract.
-pub trait Embedder {
-    fn embed(&self, texts: &[String], budget: EmbedBudget) -> FlowResult<Embedding>;
-
-    /// `embed`, also saying whether an embedding PROCESS actually ran — the metering fact a
-    /// caller charges on (a process that ran and then failed still cost its seconds; a call
-    /// refused before any spawn cost nothing). An in-process embedder spawns nothing.
-    fn embed_metered(
-        &self,
-        texts: &[String],
-        budget: EmbedBudget,
-    ) -> (FlowResult<Embedding>, bool) {
-        (self.embed(texts, budget), false)
-    }
-}
-
-fn within_batch(texts: &[String], budget: EmbedBudget) -> FlowResult<()> {
-    if texts.len() > budget.texts {
-        return Err(refused(format!(
-            "{} texts exceed the embedding budget's batch of {}",
-            texts.len(),
-            budget.texts
-        )));
-    }
-    Ok(())
+/// One fold batch, off the query path: the fold procedure's own declared envelope. These
+/// budgets are not required of every contract, so they are checked here, at the point of use,
+/// by the same reader `Contract::validate` applies to the required ones.
+pub fn fold_budget(contract: &Contract) -> FlowResult<EmbedBudget> {
+    Ok(EmbedBudget {
+        bytes: contract.positive_limit("fold_procedure_bytes")? as usize,
+        seconds: contract.positive_limit("fold_procedure_seconds")?,
+        texts: contract.positive_limit("fold_batch_texts")? as usize,
+    })
 }
 
 fn unavailable(reason: impl Into<String>) -> FlowError {
@@ -283,7 +236,7 @@ pub fn interpreter_from(configured: Option<String>) -> String {
 }
 
 impl Embedder for PinnedProcedure {
-    fn embed(&self, texts: &[String], budget: EmbedBudget) -> FlowResult<Embedding> {
+    fn embed(&self, texts: &[String], budget: EmbedBudget) -> elohim_epr_index::Result<Embedding> {
         self.embed_metered(texts, budget).0
     }
 
@@ -291,9 +244,11 @@ impl Embedder for PinnedProcedure {
         &self,
         texts: &[String],
         budget: EmbedBudget,
-    ) -> (FlowResult<Embedding>, bool) {
+    ) -> (elohim_epr_index::Result<Embedding>, bool) {
         let mut spawned = false;
-        let result = self.run(texts, budget, &mut spawned);
+        let result = self
+            .run(texts, budget, &mut spawned)
+            .map_err(IndexError::from);
         (result, spawned)
     }
 }
@@ -372,55 +327,6 @@ impl PinnedProcedure {
                 "embedding procedure ended by a signal: {said}"
             ))),
         }
-    }
-}
-
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-// Fixture — deterministic hashed bag-of-words; test interchange only, never live fitness
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-
-/// Each lower-cased alphanumeric word adds ±1 at a sha256-chosen coordinate of a 384-wide vector,
-/// then the vector is L2-normalised. Texts sharing words land near each other, which is all a
-/// test of the fold or the ranking needs; it knows nothing a model knows.
-pub struct Fixture;
-
-impl Fixture {
-    pub fn vector(text: &str) -> Vec<f32> {
-        fn add(vector: &mut [f32], token: &[u8]) {
-            let digest = Sha256::digest(token);
-            let mut index = [0u8; 8];
-            index.copy_from_slice(&digest[..8]);
-            let slot = (u64::from_le_bytes(index) % FIXTURE_DIMS as u64) as usize;
-            vector[slot] += if digest[8] & 1 == 0 { 1.0 } else { -1.0 };
-        }
-        let mut vector = vec![0f32; FIXTURE_DIMS];
-        let lower = text.to_lowercase();
-        for word in lower.split(|c: char| !c.is_alphanumeric()) {
-            if !word.is_empty() {
-                add(&mut vector, word.as_bytes());
-            }
-        }
-        // No words, or words that cancelled out: the whole text is one token, so every text
-        // still has a unit vector.
-        if vector.iter().all(|x| *x == 0.0) {
-            add(&mut vector, text.as_bytes());
-        }
-        let norm = vector.iter().map(|x| x * x).sum::<f32>().sqrt();
-        vector.iter_mut().for_each(|x| *x /= norm);
-        vector
-    }
-}
-
-impl Embedder for Fixture {
-    fn embed(&self, texts: &[String], budget: EmbedBudget) -> FlowResult<Embedding> {
-        within_batch(texts, budget)?;
-        Ok(Embedding {
-            dims: FIXTURE_DIMS,
-            vectors: texts.iter().map(|text| Fixture::vector(text)).collect(),
-            fitness: FIXTURE_FITNESS.to_string(),
-            // A bag of words has no token window: nothing is ever cut.
-            truncated: Some(0),
-        })
     }
 }
 

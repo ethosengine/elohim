@@ -24,202 +24,32 @@
 //! part of the screen, charged as `first_screen_<producer>_calls`, never as the packet's
 //! `search_queries`. The lens cut and the content floor apply after fusion, in `render.rs`:
 //! fusion orders; the lens chooses how many.
-use elohim_epr_rea::atom_cid;
-
 use super::discovery::{
     frontmatter_header, frontmatter_value, offered_on_first_screen, trim_to_character_boundary,
 };
 use super::providers::{providers_for, ProviderResult};
 use super::*;
+// The recipe, its CID and the pure `fuse` live in `elohim_epr_index::fuse` (post-station-4 sprint,
+// ruling R-S1), beside the `rrf-v2` recipe the storage peer declares; this executor runs `rrf-v1`.
+use elohim_epr_index::fuse::{fuse, Recipe, LOCAL, RRF_V1};
 
 /// Where the pinned contract declares the first screen's fusion recipe.
 pub(super) const RECIPE_POINTER: &str = "/discovery/first_screen_fusion";
 
-/// The one fusion recipe this executor runs.
-pub(super) const RRF_V1: &str = "rrf-v1";
-
-/// The producer whose order is the first screen's own lexical order.
-pub(super) const LOCAL: &str = "local";
-
-/// The declared fusion recipe, read and checked.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct Recipe {
-    pub name: String,
-    pub k: u64,
-    pub producers: Vec<String>,
-    /// `atom_cid` of the declared object — the method every fused screen names.
-    pub cid: String,
-}
-
-impl Recipe {
-    /// `None` when the contract declares no fusion (the screen is the lexical screen, as before
-    /// this task); `Some(Err(reason))` when it declares one this executor does not run.
-    pub(super) fn declared(contract: &Contract) -> Option<Result<Self, String>> {
-        let object = contract.value.pointer(RECIPE_POINTER)?;
-        Some(Self::from_declared(object))
+/// The declared first-screen recipe: `None` when the contract declares no fusion (the screen is
+/// the lexical screen, as before station 4, task 4.5); `Some(Err(reason))` when it declares one
+/// this executor does not run. The executor runs `rrf-v1` only — its screen's own `local` order
+/// is the first producer — so a recipe of any other name is refused here, in this executor's own
+/// words, before the crate reads it.
+pub(super) fn declared(contract: &Contract) -> Option<Result<Recipe, String>> {
+    let object = contract.value.pointer(RECIPE_POINTER)?;
+    let name = object["recipe"].as_str().unwrap_or_default();
+    if name != RRF_V1 {
+        return Some(Err(format!(
+            "fusion: the recipe declares `{name}`; this executor runs {RRF_V1} only"
+        )));
     }
-
-    fn from_declared(object: &Value) -> Result<Self, String> {
-        let name = object["recipe"].as_str().unwrap_or_default();
-        if name != RRF_V1 {
-            return Err(format!(
-                "fusion: the recipe declares `{name}`; this executor runs {RRF_V1} only"
-            ));
-        }
-        if object["order_only"].as_bool() != Some(true) {
-            return Err(
-                "fusion: the recipe is not order_only; fusion here orders, it never sums a \
-                 producer's score"
-                    .to_string(),
-            );
-        }
-        let k = object["k"]
-            .as_u64()
-            .filter(|k| *k > 0)
-            .ok_or("fusion: the recipe's k must be a positive integer")?;
-        let producers: Vec<String> = object["producers"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(str::to_string)
-            .collect();
-        if producers.first().map(String::as_str) != Some(LOCAL) || producers.len() < 2 {
-            return Err(format!(
-                "fusion: the recipe's producers must begin with `{LOCAL}` (the screen's own \
-                 order) and name another"
-            ));
-        }
-        let cid = atom_cid(object)
-            .map_err(|error| format!("fusion: the recipe has no canonical address: {error}"))?;
-        Ok(Self {
-            name: name.to_string(),
-            k,
-            producers,
-            cid: cid.to_string(),
-        })
-    }
-}
-
-/// One fused candidate: its path, its reciprocal-rank score, and its rank in each producer's
-/// order (`None` where that producer did not return it), in the recipe's producer order.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct Fused {
-    pub path: String,
-    pub score: f64,
-    pub ranks: Vec<(String, Option<usize>)>,
-    /// The candidate as its first returning producer (in recipe order) shaped it, with `ranks`
-    /// and, for every later producer that also returned it, that producer's own fields under
-    /// `native.<producer>`. Its `best_section` — the passage its linked read lands on — is the one
-    /// the best-ranked producer located (ties → the earlier producer, `local` first), named by
-    /// `passage_by`; a displaced passage is kept under `native.<producer>.best_section`.
-    pub candidate: Value,
-}
-
-/// Reciprocal-rank fusion of `producers` (each an id and its candidates in its own order), for
-/// order only: a path's score is Σ 1/(k + rank) over the producers that returned it, rank
-/// 1-based among that producer's distinct paths; higher first, ties by path. Only each
-/// candidate's `path` and its position are read for ORDER — no field a candidate carries can move
-/// it. The PASSAGE follows the ranking: the fused candidate reads the section the producer that
-/// ranked it best located (ties → earlier in recipe order, so `local`), and says which in
-/// `passage_by` — the linked read lands where the ranking producer matched (station 4
-/// integration, the q-hook-binary seam).
-pub(super) fn fuse(producers: &[(String, Vec<Value>)], k: u64) -> Vec<Fused> {
-    struct Entry {
-        score: f64,
-        ranks: Vec<Option<usize>>,
-        /// Each producer's own candidate for this path, in recipe order.
-        own: Vec<Option<Value>>,
-    }
-    let mut entries: BTreeMap<String, Entry> = BTreeMap::new();
-    for (index, (_, candidates)) in producers.iter().enumerate() {
-        let mut seen: BTreeSet<&str> = BTreeSet::new();
-        for candidate in candidates {
-            let Some(path) = candidate["path"].as_str() else {
-                continue;
-            };
-            if !seen.insert(path) {
-                continue;
-            }
-            let rank = seen.len();
-            let entry = entries.entry(path.to_string()).or_insert_with(|| Entry {
-                score: 0.0,
-                ranks: vec![None; producers.len()],
-                own: vec![None; producers.len()],
-            });
-            entry.score += 1.0 / (k as f64 + rank as f64);
-            entry.ranks[index] = Some(rank);
-            entry.own[index] = Some(candidate.clone());
-        }
-    }
-    let mut fused: Vec<Fused> = entries
-        .into_iter()
-        .map(|(path, entry)| {
-            let ids: Vec<&String> = producers.iter().map(|(producer, _)| producer).collect();
-            // The producer whose located passage the candidate reads: the best rank among those
-            // that located one; `min_by_key` keeps the first of equals, so a tie goes to the
-            // earlier producer in recipe order.
-            let passage = (0..ids.len())
-                .filter(|&i| {
-                    entry.own[i]
-                        .as_ref()
-                        .is_some_and(|own| !own["best_section"].is_null())
-                })
-                .min_by_key(|&i| entry.ranks[i].unwrap_or(usize::MAX));
-            let shaper = entry.own.iter().position(Option::is_some);
-            let mut candidate = json!({"path": path});
-            let mut native = Map::new();
-            for (i, own) in entry.own.into_iter().enumerate() {
-                let Some(mut own) = own else {
-                    continue;
-                };
-                if Some(i) == shaper {
-                    candidate = own;
-                } else if let Some(fields) = own.as_object_mut() {
-                    fields.remove("path");
-                    native.insert(ids[i].clone(), own);
-                }
-            }
-            if let (Some(chosen), Some(shaper)) = (passage, shaper) {
-                if chosen != shaper {
-                    let section = native
-                        .get(ids[chosen].as_str())
-                        .map_or(Value::Null, |own| own["best_section"].clone());
-                    let displaced = std::mem::replace(&mut candidate["best_section"], section);
-                    if !displaced.is_null() {
-                        let own = native
-                            .entry(ids[shaper].clone())
-                            .or_insert_with(|| json!({}));
-                        own["best_section"] = displaced;
-                    }
-                }
-                candidate["passage_by"] = json!(ids[chosen]);
-            }
-            let ranks: Vec<(String, Option<usize>)> =
-                ids.into_iter().cloned().zip(entry.ranks).collect();
-            candidate["ranks"] = Value::Object(
-                ranks
-                    .iter()
-                    .map(|(producer, rank)| (producer.clone(), json!(rank)))
-                    .collect(),
-            );
-            if !native.is_empty() {
-                candidate["native"] = Value::Object(native);
-            }
-            Fused {
-                path,
-                score: entry.score,
-                ranks,
-                candidate,
-            }
-        })
-        .collect();
-    fused.sort_by(|a, b| {
-        b.score
-            .total_cmp(&a.score)
-            .then_with(|| a.path.cmp(&b.path))
-    });
-    fused
+    Some(Recipe::from_declared(object))
 }
 
 /// Fuse `screen`'s lexical candidates with the recipe's other producers, in place, asking each
@@ -236,7 +66,7 @@ pub(super) fn fuse_screen(
     terms: &[String],
     usage: &mut Value,
 ) {
-    let recipe = match Recipe::declared(contract) {
+    let recipe = match declared(contract) {
         None => return,
         Some(Ok(recipe)) => recipe,
         Some(Err(reason)) => {
@@ -444,6 +274,8 @@ fn push_omission(screen: &mut Value, line: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elohim_epr_index::fuse::Fused;
+    use elohim_epr_rea::atom_cid;
 
     fn candidate(path: &str) -> Value {
         json!({"path": path})
@@ -744,9 +576,7 @@ mod tests {
                             "order_only": true});
         value["discovery"]["first_screen_fusion"] = object.clone();
         let contract = Contract::from_value(value.clone()).unwrap();
-        let recipe = Recipe::declared(&contract)
-            .expect("declared")
-            .expect("runs");
+        let recipe = declared(&contract).expect("declared").expect("runs");
         assert_eq!(recipe.name, RRF_V1);
         assert_eq!(recipe.k, 60);
         assert_eq!(recipe.producers, vec!["local", "semantic"]);
@@ -776,7 +606,7 @@ mod tests {
         ] {
             value["discovery"]["first_screen_fusion"] = bad;
             let contract = Contract::from_value(value.clone()).unwrap();
-            let refused = Recipe::declared(&contract).expect("declared").unwrap_err();
+            let refused = declared(&contract).expect("declared").unwrap_err();
             assert!(refused.contains(why), "{refused}");
         }
         value["discovery"]
@@ -784,6 +614,6 @@ mod tests {
             .unwrap()
             .remove("first_screen_fusion");
         let contract = Contract::from_value(value).unwrap();
-        assert!(Recipe::declared(&contract).is_none());
+        assert!(declared(&contract).is_none());
     }
 }

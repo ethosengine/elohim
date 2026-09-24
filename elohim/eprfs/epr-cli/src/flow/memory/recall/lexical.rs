@@ -34,12 +34,16 @@
 //! false` — through `retrieve()` and the `Provider` seam alike. A stale fold answers and says how
 //! stale (`fold N files behind`). This route never spawns an embedding process: BM25 reads the
 //! chunk text, which is the same whichever embedder folded it.
-use super::discovery::{offered_on_first_screen, question_terms, stem};
+use super::discovery::{offered_on_first_screen, question_terms};
 use super::embedder::FIXTURE_FITNESS;
 use super::index::{Absent, EmbedderChoice, FoldReader, LexicalMeasure, SemanticFold};
 use super::providers::{lines, scope_string, Provider, ProviderId, ProviderResult};
-use super::semantic::{in_scope, locate, rounded, BestPerFile};
+use super::semantic::{in_scope, locate};
 use super::*;
+use elohim_epr_index::rank::{rounded, BestPerUnit};
+// The match expression lives in `elohim_epr_index::terms` (post-station-4 sprint, ruling R-S1):
+// the storage peer quotes a question for FTS5 by the same rule.
+use elohim_epr_index::terms::match_expression;
 
 /// Every candidate's and every answer's `producer`.
 pub(super) const PRODUCER: &str = "lexical";
@@ -55,51 +59,10 @@ pub(super) const NO_TERMS: &str =
     "lexical: the question carries no term to match; name --query or --need with words of four \
      or more characters";
 
-/// The shortest last token a prefix match extends: `stem`'s own floor, so a short declared term
-/// (`top`, `red`) never matches a longer word that merely begins with it.
-const PREFIX_FLOOR: usize = 4;
-
 const SELECTION: &str = "FTS5 bm25() over every live chunk in the shared fold, each question term \
                          stemmed and quoted (a prefix from four characters, short terms \
                          exact); each file's best chunk; top \
                          limits.search_results files, ties by path; score = -bm25(); not authority";
-
-/// The FTS5 match expression for `terms`: each term with at least one letter or digit, its last
-/// token stemmed, quoted as an FTS5 string (an inner `"` doubled), OR-joined. `None` when no term is left.
-/// Quoting is what makes question text inert: inside a string, FTS5 reads only the tokenizer's
-/// tokens — never an operator, a column filter or a `NEAR` group. The string is a prefix (`*`,
-/// which applies to its last token) only when that last token has at least [`PREFIX_FLOOR`]
-/// characters: a declared short term and a phrase of them match exactly.
-pub(super) fn match_expression(terms: &[String]) -> Option<String> {
-    let mut parts: Vec<String> = Vec::new();
-    for term in terms {
-        if !term.chars().any(char::is_alphanumeric) {
-            continue;
-        }
-        // FTS5's `*` extends the string's LAST token, and a phrase's other tokens must match
-        // exactly — so only the last token is stemmed (`top red` stays `top red`; stemming the
-        // whole phrase would cut `red` to `r`). The tokenizer splits on everything that is not a
-        // letter or digit, so trailing punctuation is no token and is dropped.
-        let body = term.trim_end_matches(|c: char| !c.is_alphanumeric());
-        let split = body
-            .char_indices()
-            .rev()
-            .find(|(_, c)| !c.is_alphanumeric())
-            .map_or(0, |(at, c)| at + c.len_utf8());
-        let last = stem(&body[split..]);
-        let prefix = if last.chars().count() >= PREFIX_FLOOR {
-            "*"
-        } else {
-            ""
-        };
-        let text = format!("{}{last}", &body[..split]);
-        let quoted = format!("\"{}\"{prefix}", text.replace('"', "\"\""));
-        if !parts.contains(&quoted) {
-            parts.push(quoted);
-        }
-    }
-    (!parts.is_empty()).then(|| parts.join(" OR "))
-}
 
 fn absent(why: Absent) -> String {
     match why {
@@ -214,7 +177,7 @@ fn answer_into(
     // BM25 over every live matching chunk; each file keeps its best (bm25 is lower-is-better, so
     // the kept score is its negation).
     let query_began = Instant::now();
-    let mut best = BestPerFile::default();
+    let mut best = BestPerUnit::default();
     let mut in_view = 0usize;
     let matched = reader
         .lexical(&expression, |id, path, rank| {
@@ -245,15 +208,15 @@ fn answer_into(
         }
         // The question bank and the generated register are never an answer, on any screen a
         // provider feeds (the first-screen offer rule, one predicate for every route).
-        if !offered_on_first_screen(contract, &hit.path) {
+        if !offered_on_first_screen(contract, &hit.unit_id) {
             withheld += 1;
             continue;
         }
-        if !root.join(&hit.path).is_file() {
-            omissions.push(format!("{}: folded file no longer present", hit.path));
+        if !root.join(&hit.unit_id).is_file() {
+            omissions.push(format!("{}: folded file no longer present", hit.unit_id));
             continue;
         }
-        if contained(root, &hit.path, &roots).is_err() {
+        if contained(root, &hit.unit_id, &roots).is_err() {
             outside += 1;
             continue;
         }
@@ -261,7 +224,7 @@ fn answer_into(
             .chunk(hit.id)
             .map_err(|error| format!("lexical: the fold could not be read: {error}"))?;
         let mut candidate = json!({
-            "path": hit.path,
+            "path": hit.unit_id,
             "score": rounded(hit.score),
             "producer": PRODUCER,
             "method": method,
@@ -270,7 +233,7 @@ fn answer_into(
         if let Some(section) = locate(
             root,
             contract,
-            &hit.path,
+            &hit.unit_id,
             &section,
             &text,
             terms,

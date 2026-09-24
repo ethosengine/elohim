@@ -520,7 +520,7 @@ _gate-elohim-compute:
     cd elohim/elohim-compute && cargo fmt --check && cargo clippy -- -D warnings && cargo test
 
 _gate-elohim-epr:
-    cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea --all-targets
+    cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
 
 _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets

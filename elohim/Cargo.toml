@@ -15,6 +15,7 @@ members = [
     "elohim-token",
     "epr",
     "epr-rea",
+    "epr-index",
     "ark/core",
     "ark/supervisor",
     "ark/cli",

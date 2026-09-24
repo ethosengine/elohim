@@ -25,6 +25,11 @@ elohim-epr-rea = { path = "../../epr-rea" }
 # The canonical CID codec. `canon_lift` mints every atom through `elohim_epr::cid::compute_cid`
 # — the same function the P0.4 liftability gate proved — never a second implementation.
 elohim-epr = { path = "../../epr" }
+# The pure parts of an index — chunk rule, terms, ranking, fusion, the embedder boundary, fold
+# attestation and (S3) the fold store — shared with elohim-storage, which may not depend on any
+# eprfs crate (post-station-4 sprint, ruling R-S1). It names rusqlite without features; this
+# crate's `bundled` below is the one SQLite the `epr` binary links.
+elohim-epr-index = { path = "../../epr-index" }
 # The device key's public name (`device_key::DeviceKey::did_key`). The one `did:key` codec in the
 # repository — `core32_to_did_key` / `did_key_to_core32` — consumed exactly as doorway and
 # elohim-storage consume it, so a device's did:key here and a did:key those services resolve can

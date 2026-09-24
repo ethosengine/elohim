@@ -12,8 +12,8 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use elohim_epr_cli::flow::memory::recall::embedder::{
-    EmbedBudget, Embedder, Fixture, ModelManifest, PinnedProcedure, FIXTURE_FITNESS,
-    MODEL_MANIFEST_REL, PROCEDURE_REL,
+    Embedder, Fixture, ModelManifest, PinnedProcedure, FIXTURE_FITNESS, MODEL_MANIFEST_REL,
+    PROCEDURE_REL,
 };
 use elohim_epr_cli::flow::memory::recall::{self, Contract};
 use elohim_epr_cli::flow::FlowError;
@@ -60,7 +60,7 @@ fn unavailable_reason(error: FlowError) -> String {
 /// test interchange rather than a claim of fitness.
 #[test]
 fn the_fixture_embedder_is_deterministic_and_normalised() {
-    let budget = EmbedBudget::fold(&contract()).expect("fold budget declared");
+    let budget = recall::embedder::fold_budget(&contract()).expect("fold budget declared");
     let batch = texts(&[
         "which command rebuilds the stale index",
         "which command rebuilds the stale index",
@@ -95,11 +95,11 @@ fn the_fixture_embedder_is_deterministic_and_normalised() {
 fn both_embedding_budgets_are_declared_by_the_contract() {
     let contract = contract();
     let limits = &contract.value["limits"];
-    let query = EmbedBudget::query(&contract).expect("query budget declared");
+    let query = recall::embedder::query_budget(&contract).expect("query budget declared");
     assert_eq!(Some(query.bytes as u64), limits["provider_bytes"].as_u64());
     assert_eq!(Some(query.seconds), limits["provider_seconds"].as_f64());
     assert_eq!(query.texts, 1, "the query budget embeds one question");
-    let fold = EmbedBudget::fold(&contract).expect("fold budget declared");
+    let fold = recall::embedder::fold_budget(&contract).expect("fold budget declared");
     assert_eq!(
         Some(fold.bytes as u64),
         limits["fold_procedure_bytes"].as_u64()
@@ -116,7 +116,8 @@ fn both_embedding_budgets_are_declared_by_the_contract() {
         .expect("limits")
         .remove("fold_batch_texts");
     let undeclared = Contract::from_value(undeclared).expect("still a valid contract");
-    let refused = EmbedBudget::fold(&undeclared).expect_err("an undeclared budget is refused");
+    let refused =
+        recall::embedder::fold_budget(&undeclared).expect_err("an undeclared budget is refused");
     assert!(
         refused
             .to_string()
@@ -129,7 +130,8 @@ fn both_embedding_budgets_are_declared_by_the_contract() {
     let mut fractional = contract.value.clone();
     fractional["limits"]["fold_batch_texts"] = serde_json::json!(1.5);
     let fractional = Contract::from_value(fractional).expect("still a valid contract");
-    let refused = EmbedBudget::fold(&fractional).expect_err("a fractional count is refused");
+    let refused =
+        recall::embedder::fold_budget(&fractional).expect_err("a fractional count is refused");
     assert!(
         refused
             .to_string()
@@ -139,16 +141,21 @@ fn both_embedding_budgets_are_declared_by_the_contract() {
     let mut seconds = contract.value.clone();
     seconds["limits"]["fold_procedure_seconds"] = serde_json::json!(0.5);
     let seconds = Contract::from_value(seconds).expect("still a valid contract");
-    assert_eq!(EmbedBudget::fold(&seconds).unwrap().seconds, 0.5);
+    assert_eq!(
+        recall::embedder::fold_budget(&seconds).unwrap().seconds,
+        0.5
+    );
 }
 
 /// A batch larger than the budget allows is the caller's error, refused before anything runs.
 #[test]
 fn a_batch_over_the_budget_is_refused_before_anything_runs() {
-    let query = EmbedBudget::query(&contract()).expect("query budget");
-    let error = Fixture
-        .embed(&texts(&["one", "two"]), query)
-        .expect_err("two texts exceed a one-question budget");
+    let query = recall::embedder::query_budget(&contract()).expect("query budget");
+    let error = FlowError::from(
+        Fixture
+            .embed(&texts(&["one", "two"]), query)
+            .expect_err("two texts exceed a one-question budget"),
+    );
     assert!(matches!(error, FlowError::InvalidArguments(_)), "{error}");
 }
 
@@ -164,8 +171,8 @@ fn procedure_bytes_off_the_pin_are_refused() {
         procedure: procedure_path(),
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let error = embedder.embed(&texts(&["x"]), budget).expect_err("refused");
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let error = FlowError::from(embedder.embed(&texts(&["x"]), budget).expect_err("refused"));
     assert_eq!(
         unavailable_reason(error),
         "procedure bytes do not match the pin"
@@ -184,8 +191,8 @@ fn a_model_dir_with_wrong_bytes_reports_the_pin_refusal() {
         procedure: procedure_path(),
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let error = embedder.embed(&texts(&["x"]), budget).expect_err("refused");
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let error = FlowError::from(embedder.embed(&texts(&["x"]), budget).expect_err("refused"));
     let rendered = error.to_string();
     assert!(
         rendered.starts_with("unavailable: model bytes do not match the pin ("),
@@ -207,8 +214,10 @@ fn a_model_dir_missing_its_model_says_so() {
         procedure: procedure_path(),
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let reason = unavailable_reason(FlowError::from(
+        embedder.embed(&texts(&["x"]), budget).unwrap_err(),
+    ));
     assert!(
         reason.starts_with("model bytes do not match the pin (model.onnx unreadable"),
         "{reason}"
@@ -230,8 +239,10 @@ fn an_unexpected_procedure_failure_reports_its_last_stderr_line() {
         procedure: stub,
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let reason = unavailable_reason(FlowError::from(
+        embedder.embed(&texts(&["x"]), budget).unwrap_err(),
+    ));
     assert!(
         reason.ends_with("RuntimeError: the session could not load"),
         "{reason}"
@@ -248,8 +259,10 @@ fn no_resolvable_model_directory_reports_unavailable() {
         procedure: procedure_path(),
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let reason = unavailable_reason(FlowError::from(
+        embedder.embed(&texts(&["x"]), budget).unwrap_err(),
+    ));
     assert!(reason.contains("no model directory resolves"), "{reason}");
 }
 
@@ -263,8 +276,10 @@ fn a_missing_interpreter_reports_unavailable() {
         procedure: procedure_path(),
         interpreter: "/nonexistent".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let reason = unavailable_reason(FlowError::from(
+        embedder.embed(&texts(&["x"]), budget).unwrap_err(),
+    ));
     assert!(reason.contains("/nonexistent"), "{reason}");
 }
 
@@ -283,8 +298,8 @@ fn a_missing_python_module_reports_unavailable() {
         procedure: stub,
         interpreter: "python3".to_string(),
     };
-    let budget = EmbedBudget::query(&contract()).unwrap();
-    let error = embedder.embed(&texts(&["x"]), budget).unwrap_err();
+    let budget = recall::embedder::query_budget(&contract()).unwrap();
+    let error = FlowError::from(embedder.embed(&texts(&["x"]), budget).unwrap_err());
     assert_eq!(
         error.to_string(),
         "unavailable: python module 'onnxruntime' is not importable"
@@ -320,12 +335,12 @@ fn missing_runtime_module(interpreter: &str) -> Result<Option<&'static str>, Str
 #[test]
 fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
     let embedder = PinnedProcedure::declared(&common::repo_root()).expect("manifest loads");
-    let budget = EmbedBudget::fold(&contract()).unwrap();
+    let budget = recall::embedder::fold_budget(&contract()).unwrap();
     let batch = texts(&[
         "which command rebuilds the stale index",
         "a household stewards its shared garden",
     ]);
-    let answer = embedder.embed(&batch, budget);
+    let answer = embedder.embed(&batch, budget).map_err(FlowError::from);
     let Some(dir) = embedder.manifest.resolve_model_dir() else {
         let reason = unavailable_reason(answer.expect_err("no model resolves"));
         assert!(reason.contains("no model directory resolves"), "{reason}");
@@ -391,7 +406,10 @@ fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
             // One question fits the query-time provider envelope (8192 bytes, 15 s): the reply
             // is ~4 KB of 6-significant-digit floats.
             let question = embedder
-                .embed(&batch[..1], EmbedBudget::query(&contract()).unwrap())
+                .embed(
+                    &batch[..1],
+                    recall::embedder::query_budget(&contract()).unwrap(),
+                )
                 .expect("one question embeds within the query budget");
             assert_eq!(question.vectors.len(), 1);
             assert!(
@@ -413,7 +431,7 @@ fn the_live_model_embeds_a_two_text_batch_or_says_why_not() {
 /// embedder never truncates.
 #[test]
 fn a_reply_carries_the_procedures_truncation_count_or_none() {
-    let budget = EmbedBudget::fold(&contract()).unwrap();
+    let budget = recall::embedder::fold_budget(&contract()).unwrap();
     assert_eq!(
         Fixture
             .embed(&texts(&["a", "b"]), budget)

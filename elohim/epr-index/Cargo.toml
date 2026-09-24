@@ -1,0 +1,28 @@
+[package]
+name = "elohim-epr-index"
+version = "0.1.0"
+edition = "2021"
+description = "The pure parts of an EPR index — the declared chunk rule, terms and match expression, ranking, rank fusion, the embedder boundary, fold attestation and the fold store — shared by the recall executor and the storage peer"
+license = "CAL-1.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "epr", "index", "fts5", "p2p"]
+categories = ["data-structures"]
+publish = ["elohim"]
+
+# A leaf crate (post-station-4 sprint, ruling R-S1): no filesystem walk, no git, no ts-rs.
+# `rusqlite` carries NO features here: each binary picks its own SQLite (the recall executor
+# links the bundled one, elohim-storage the one lair's SQLCipher build already carries), and
+# `bundled` in a normal dependency would link a second SQLite into a binary that has one.
+# Only this crate's own tests pull `bundled` (below), so they have FTS5 to run against.
+[dependencies]
+elohim-epr = { path = "../epr" }
+elohim-epr-rea = { path = "../epr-rea", default-features = false }
+rusqlite = "0.37"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
+tempfile.workspace = true

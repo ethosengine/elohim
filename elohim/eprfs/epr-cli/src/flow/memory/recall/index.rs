@@ -22,10 +22,13 @@
 use std::time::Duration;
 
 use super::chunk::ChunkRule;
-use super::embedder::{EmbedBudget, Embedder, Fixture, PinnedProcedure};
+use super::embedder::{fold_budget, Embedder, Fixture, PinnedProcedure};
 use super::surface::{self, Listing, Surface};
 use super::*;
 use cid::Cid;
+use elohim_epr_index::attest::{next_retry, record, LATEST_FILE};
+use elohim_epr_index::rank::encode as vector_blob;
+use elohim_epr_index::IndexError;
 use elohim_epr_rea::{
     atom_cid, AgentRef, FoldAttestation, FoldState, IndexMeasure, RankingMethod, ShardManifest,
 };
@@ -43,8 +46,6 @@ pub const UNCLAIMED: &str = "(unclaimed)";
 pub const BUSY: &str = "busy: another fold holds the store";
 
 const STORE_FILE: &str = "fold.sqlite";
-const LATEST_FILE: &str = "attestation.json";
-const LOG_FILE: &str = "attestations.jsonl";
 const LOCK_FILE: &str = "fold.lock";
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 const CHUNK_RULE_MISMATCH: &str = "chunk rule on disk does not hash to the measure";
@@ -113,6 +114,41 @@ CREATE TRIGGER files_never_deleted BEFORE DELETE ON files BEGIN
   SELECT RAISE(ABORT, 'demotion, never deletion');
 END;
 ";
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The crate boundary: `elohim_epr_index` errors are this executor's errors, one to one
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Every index error as the executor's own error for the same fault, rendering byte-identically
+/// (the pure parts moved into `elohim_epr_index`, their messages did not).
+impl From<IndexError> for FlowError {
+    fn from(error: IndexError) -> Self {
+        match error {
+            IndexError::Refused(message) => FlowError::InvalidArguments(message),
+            IndexError::Unavailable(reason) => FlowError::Unavailable(reason),
+            IndexError::Io(error) => FlowError::Io(error),
+            IndexError::Json(error) => FlowError::Json(error),
+            IndexError::Fabric(error) => FlowError::Fabric(error),
+            IndexError::Store(error) => db(error),
+        }
+    }
+}
+
+/// The way back, for an [`Embedder`] this executor implements (the pinned procedure): the
+/// variants that procedure raises map one to one. `Read`, `Yaml` and `UnknownResource` are never
+/// raised on that path; were one to be, it would carry its full message as an I/O error.
+impl From<FlowError> for IndexError {
+    fn from(error: FlowError) -> Self {
+        match error {
+            FlowError::InvalidArguments(message) => IndexError::Refused(message),
+            FlowError::Unavailable(reason) => IndexError::Unavailable(reason),
+            FlowError::Io(error) => IndexError::Io(error),
+            FlowError::Json(error) => IndexError::Json(error),
+            FlowError::Fabric(error) => IndexError::Fabric(error),
+            other => IndexError::Io(std::io::Error::other(other.to_string())),
+        }
+    }
+}
 
 fn index_refused(message: impl Into<String>) -> FlowError {
     FlowError::InvalidArguments(format!("semantic index: {}", message.into()))
@@ -661,34 +697,6 @@ fn lock(dir: &Path) -> FlowResult<Option<File>> {
     }
 }
 
-/// The previous attestation's state decides `retried`: a degraded run following a degraded run
-/// is the next retry of the same backlog.
-fn next_retry(dir: &Path) -> u32 {
-    std::fs::read(dir.join(LATEST_FILE))
-        .ok()
-        .and_then(|raw| serde_json::from_slice::<FoldAttestation>(&raw).ok())
-        .map_or(0, |last| match last.state {
-            FoldState::Degraded { retried } => retried + 1,
-            _ => 0,
-        })
-}
-
-/// Append the act, then rename the latest snapshot into place — the log is never behind the
-/// snapshot.
-fn record(dir: &Path, attestation: &FoldAttestation) -> FlowResult<String> {
-    std::fs::create_dir_all(dir)?;
-    let cid = attestation.cid()?.to_string();
-    let mut log = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(dir.join(LOG_FILE))?;
-    writeln!(log, "{}", serde_json::to_string(attestation)?)?;
-    let staged = dir.join(format!("{LATEST_FILE}.tmp"));
-    std::fs::write(&staged, serde_json::to_string_pretty(attestation)? + "\n")?;
-    std::fs::rename(&staged, dir.join(LATEST_FILE))?;
-    Ok(cid)
-}
-
 fn attest(dir: &Path, report: &mut FoldReport, state: FoldState) -> FlowResult<()> {
     report.attestation.state = state;
     report.attestation.at = now();
@@ -804,10 +812,6 @@ struct FoldedFile {
     skipped: Option<&'static str>,
 }
 
-fn vector_blob(vector: &[f32]) -> Vec<u8> {
-    vector.iter().flat_map(|x| x.to_le_bytes()).collect()
-}
-
 /// Read a file and the stat of the very handle it was read through (the stat first, so a write
 /// racing the read moves the mtime past what is recorded and the next plan re-hashes).
 fn read_with_stat(path: &Path) -> std::io::Result<(Vec<u8>, u64, i64)> {
@@ -910,7 +914,7 @@ impl Run<'_> {
         // Embed in declared batches; a refusal anywhere is the fold's failure, and nothing is
         // written.
         let dims = declared.dims();
-        let embedded = EmbedBudget::fold(&declared.contract).and_then(|budget| {
+        let embedded = fold_budget(&declared.contract).and_then(|budget| {
             let mut vectors = Vec::with_capacity(pending.len());
             // Known only while every batch counted.
             let mut truncated = Some(0usize);

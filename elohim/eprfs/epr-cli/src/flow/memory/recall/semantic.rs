@@ -9,7 +9,8 @@
 //!    provider envelope (`EmbedBudget::query`) — not the lexical term list, which is the local
 //!    route's shape;
 //! 2. the cosine of it against every live (non-demoted) chunk vector in the store, each file
-//!    keeping its best chunk ([`BestPerFile`]); cosine only — no standing, no behaviour signal;
+//!    keeping its best chunk (`elohim_epr_index::rank::BestPerUnit`); cosine only — no standing,
+//!    no behaviour signal;
 //! 3. the top `limits.search_results` files inside the search scope and the declared source
 //!    roots, ties broken by path — `search`'s window is `search_results` for every route (parity
 //!    with the local route); the lens's `choice_count` cut belongs to the first screen, not to a
@@ -33,12 +34,15 @@
 //! and says how stale (`fold N files behind`). The private chain never reaches this file: the
 //! fold excluded it, and this route reads nothing but the store and the outline of a candidate.
 use super::discovery::{offered_on_first_screen, question_terms};
-use super::embedder::{EmbedBudget, ModelManifest, FIXTURE_FITNESS, MODEL_MANIFEST_REL};
+use super::embedder::{query_budget, ModelManifest, FIXTURE_FITNESS, MODEL_MANIFEST_REL};
 use super::index::{Absent, EmbedderChoice, FoldReader, SemanticFold};
 use super::passage::{outline_at, section_link};
 use super::providers::lines;
 use super::providers::{Provider, ProviderId, ProviderResult};
 use super::*;
+// Cosine, the printed score, each file's best chunk and the stored vector's decoding live in
+// `elohim_epr_index::rank` (post-station-4 sprint, ruling R-S1).
+use elohim_epr_index::rank::{cosine, decode, rounded, BestPerUnit};
 
 /// Every candidate's and every answer's `producer`.
 pub(super) const PRODUCER: &str = "semantic";
@@ -54,93 +58,8 @@ const SELECTION: &str = "cosine of the embedded question against every live chun
                          path; not authority";
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-// Ranking — cosine and best chunk per file, pure
+// Scope
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-
-/// The cosine of two vectors; 0 when either has no length or their widths differ.
-pub(super) fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() {
-        return 0.0;
-    }
-    let (mut dot, mut na, mut nb) = (0f32, 0f32, 0f32);
-    for (x, y) in a.iter().zip(b) {
-        dot += x * y;
-        na += x * x;
-        nb += y * y;
-    }
-    if na == 0.0 || nb == 0.0 {
-        0.0
-    } else {
-        dot / (na.sqrt() * nb.sqrt())
-    }
-}
-
-/// A score at the 4 decimals every candidate prints (the lexical route prints its own at the same
-/// precision).
-pub(super) fn rounded(score: f64) -> f64 {
-    (score * 10_000.0).round() / 10_000.0
-}
-
-/// One file's best chunk.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct Hit {
-    pub path: String,
-    pub id: i64,
-    pub score: f64,
-}
-
-/// Each file's best chunk, offered one chunk at a time. Within a file the higher score (a cosine
-/// here, a negated `bm25()` on the lexical route) wins and
-/// the earlier chunk (lower id) breaks a tie; across files [`BestPerFile::ranked`] orders by the
-/// printed (4-decimal) score, then by path, so two runs over one store print one order.
-#[derive(Default)]
-pub(super) struct BestPerFile {
-    best: BTreeMap<String, (f64, i64)>,
-}
-
-impl BestPerFile {
-    pub(super) fn offer(&mut self, id: i64, path: &str, score: f64) {
-        match self.best.get_mut(path) {
-            Some((kept, kept_id)) => {
-                if score > *kept || (score == *kept && id < *kept_id) {
-                    *kept = score;
-                    *kept_id = id;
-                }
-            }
-            None => {
-                self.best.insert(path.to_string(), (score, id));
-            }
-        }
-    }
-
-    pub(super) fn ranked(self) -> Vec<Hit> {
-        let mut hits: Vec<Hit> = self
-            .best
-            .into_iter()
-            .map(|(path, (score, id))| Hit { path, id, score })
-            .collect();
-        hits.sort_by(|a, b| {
-            rounded(b.score)
-                .total_cmp(&rounded(a.score))
-                .then_with(|| a.path.cmp(&b.path))
-        });
-        hits
-    }
-}
-
-/// A stored vector (little-endian `f32` × `dims`), or `None` when its width is not the measure's.
-fn decode(blob: &[u8], dims: usize) -> Option<Vec<f32>> {
-    if dims == 0 || blob.len() != dims * 4 {
-        return None;
-    }
-    Some(
-        blob.as_chunks::<4>()
-            .0
-            .iter()
-            .map(|b| f32::from_le_bytes(*b))
-            .collect(),
-    )
-}
 
 /// Whether `path` lies in the search scope (`.` or empty is the whole fold).
 pub(super) fn in_scope(path: &str, scope: &str) -> bool {
@@ -354,7 +273,7 @@ fn answer_into(
 
     // The embedder whose store this is — proven by its label BEFORE it runs, so a store folded by
     // another procedure never spawns one.
-    let budget = EmbedBudget::query(contract).map_err(unavailable)?;
+    let budget = query_budget(contract).map_err(unavailable)?;
     let (embedder, label) = fold.embedder(root).map_err(unavailable)?;
     if reader.built_by() != label {
         return Err(OTHER_METHOD.to_string());
@@ -366,7 +285,7 @@ fn answer_into(
         // A process ran: its cost is metered whether or not it answered.
         answer["usage"]["embedding_processes"] = json!(1);
     }
-    let embedding = embedding.map_err(unavailable);
+    let embedding = embedding.map_err(|error| unavailable(error.into()));
     answer["usage"]["provider_seconds"] =
         json!((embedding_began.elapsed().as_secs_f64() * 1e6).round() / 1e6);
     let question = embedding?
@@ -403,7 +322,7 @@ fn answer_into(
     answer["fold_lag"] = lag.clone();
 
     // Cosine over every live chunk; each file keeps its best.
-    let mut best = BestPerFile::default();
+    let mut best = BestPerUnit::default();
     let (mut malformed, mut in_view) = (0usize, 0usize);
     let scanned = reader
         .scan(|id, path, blob| {
@@ -446,15 +365,15 @@ fn answer_into(
         }
         // The question bank and the generated register are never an answer, on any screen a
         // provider feeds (the first-screen offer rule, one predicate for every route).
-        if !offered_on_first_screen(contract, &hit.path) {
+        if !offered_on_first_screen(contract, &hit.unit_id) {
             withheld += 1;
             continue;
         }
-        if !root.join(&hit.path).is_file() {
-            omissions.push(format!("{}: folded file no longer present", hit.path));
+        if !root.join(&hit.unit_id).is_file() {
+            omissions.push(format!("{}: folded file no longer present", hit.unit_id));
             continue;
         }
-        if contained(root, &hit.path, &roots).is_err() {
+        if contained(root, &hit.unit_id, &roots).is_err() {
             outside += 1;
             continue;
         }
@@ -462,7 +381,7 @@ fn answer_into(
             .chunk(hit.id)
             .map_err(|error| format!("semantic: the fold could not be read: {error}"))?;
         let mut candidate = json!({
-            "path": hit.path,
+            "path": hit.unit_id,
             "score": rounded(hit.score),
             "producer": PRODUCER,
             "method": method,
@@ -472,7 +391,7 @@ fn answer_into(
         if let Some(section) = locate(
             root,
             contract,
-            &hit.path,
+            &hit.unit_id,
             &section,
             &text,
             &terms,
@@ -558,7 +477,7 @@ mod tests {
     #[test]
     fn each_file_keeps_its_best_chunk_and_ties_break_by_path() {
         let question = [1.0f32, 0.0];
-        let mut best = BestPerFile::default();
+        let mut best = BestPerUnit::default();
         for (id, path, vector) in [
             (1, "b.md", [0.0f32, 1.0]),
             (2, "b.md", [1.0, 0.0]),
@@ -569,7 +488,7 @@ mod tests {
             best.offer(id, path, f64::from(cosine(&question, &vector)));
         }
         let ranked = best.ranked();
-        let order: Vec<(&str, i64)> = ranked.iter().map(|h| (h.path.as_str(), h.id)).collect();
+        let order: Vec<(&str, i64)> = ranked.iter().map(|h| (h.unit_id.as_str(), h.id)).collect();
         // a.md and b.md tie at 1.0: path decides; within a.md the earlier chunk (id 3) is kept;
         // b.md's best is its second chunk.
         assert_eq!(order, vec![("a.md", 3), ("b.md", 2), ("c.md", 4)]);

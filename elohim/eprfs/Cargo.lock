@@ -439,6 +439,7 @@ dependencies = [
  "cid",
  "did-bridge",
  "elohim-epr",
+ "elohim-epr-index",
  "elohim-epr-rea",
  "eprfs-agent",
  "eprfs-core",
@@ -455,6 +456,19 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "unicode-normalization",
+]
+
+[[package]]
+name = "elohim-epr-index"
+version = "0.1.0"
+dependencies = [
+ "elohim-epr",
+ "elohim-epr-rea",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

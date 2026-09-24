@@ -38,37 +38,10 @@ pub fn discover(
     )
 }
 
-/// Lower-level text with `_` and `-` read as word breaks and runs of whitespace collapsed, so a
-/// phrase and an identifier spelling of the same words compare equal.
-pub(super) fn identifier_words(text: &str) -> String {
-    text.replace(['_', '-'], " ")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Suffixes light stemming strips, longest first (`discovery.stemming = "suffix-strip-v1"`) —
-/// tried in this order so an `"ings"`-shaped tail strips as `"ing"`, not as the plain `"s"` that
-/// would leave a spurious trailing `"g"`.
-const STEM_SUFFIXES: [&str; 4] = ["ing", "es", "ed", "s"];
-
-/// The stem of `term` when stripping the first matching [`STEM_SUFFIXES`] entry leaves at least
-/// four characters, else `term` itself. `"habits"` -> `"habit"` (kept: 5 chars); `"stamps"` ->
-/// `"stamp"` (kept: 5 chars); `"cid"` (no matching suffix) -> `"cid"` unchanged; `"mined"` ->
-/// `"min"` is BELOW the four-character floor, so it is left unstemmed rather than reduced to a
-/// fragment common enough to match nearly everything. A literal suffix strip, not a lexical
-/// dictionary — it will miss irregular inflections (`"prove"`/`"proof"`) it was never asked to
-/// know, and that is the declared, modest shape of it.
-pub(super) fn stem(term: &str) -> &str {
-    for suffix in STEM_SUFFIXES {
-        if let Some(stripped) = term.strip_suffix(suffix) {
-            if stripped.chars().count() >= 4 {
-                return stripped;
-            }
-        }
-    }
-    term
-}
+// The identifier spelling and the light suffix stem (`discovery.stemming = "suffix-strip-v1"`)
+// live in `elohim_epr_index::terms`, lifted with the FTS5 match expression they feed (post-station-4
+// sprint, ruling R-S1).
+pub(super) use elohim_epr_index::terms::{identifier_words, stem};
 
 /// The same bounded traversal, ranked by how many of `terms` a row's declared metadata carries.
 ///
@@ -625,15 +598,6 @@ pub(super) fn offered_on_first_screen(contract: &Contract, path: &str) -> bool {
     path != HABITS_REL && bank != Some(path.trim_start_matches("./"))
 }
 
-/// Words that carry no area, so they never select a habit or a source.
-const STOPWORDS: [&str; 49] = [
-    "about", "after", "again", "against", "because", "before", "being", "between", "could", "does",
-    "doing", "down", "from", "have", "here", "how", "into", "just", "like", "make", "more", "most",
-    "much", "must", "only", "other", "over", "same", "should", "some", "such", "than", "that",
-    "their", "them", "then", "there", "they", "this", "were", "what", "when", "where", "which",
-    "while", "will", "with", "would", "your",
-];
-
 /// The contract's declared vocabulary of short (<4 char) tokens worth keeping as terms
 /// (`discovery.short_terms`) — undeclared short tokens stay noise (a bare `ci` or `pr` loose in
 /// ordinary prose would otherwise flood matching). Absent on an older contract reads as empty, so
@@ -661,50 +625,7 @@ fn short_terms(contract: &Contract) -> BTreeSet<String> {
 /// an additional term, matched as a phrase by the ordinary substring matching every other term
 /// already uses — no separate phrase-matching code path.
 pub(super) fn question_terms(contract: &Contract, need: &str) -> Vec<String> {
-    let allowed_short = short_terms(contract);
-    let is_kept_short = |term: &str| -> bool {
-        !term.is_empty()
-            && term.len() < 4
-            && allowed_short.contains(term)
-            && !STOPWORDS.contains(&term)
-    };
-    let raw_tokens: Vec<String> = need
-        .split(|c: char| {
-            !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/' || c == '.')
-        })
-        .map(|raw| {
-            raw.trim_matches(|c| c == '.' || c == '/')
-                .to_ascii_lowercase()
-        })
-        .collect();
-
-    let mut seen: Vec<String> = Vec::new();
-    for (index, term) in raw_tokens.iter().enumerate() {
-        if term.is_empty() || STOPWORDS.contains(&term.as_str()) || seen.contains(term) {
-            continue;
-        }
-        let keep = term.len() >= 4 || allowed_short.contains(term.as_str());
-        if keep {
-            seen.push(term.clone());
-            if seen.len() >= 12 {
-                break;
-            }
-        }
-        if is_kept_short(term) {
-            if let Some(next) = raw_tokens.get(index + 1) {
-                if is_kept_short(next) {
-                    let phrase = format!("{term} {next}");
-                    if !seen.contains(&phrase) {
-                        seen.push(phrase);
-                        if seen.len() >= 12 {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    seen
+    elohim_epr_index::terms::question_terms(&short_terms(contract), need)
 }
 
 /// `DELTA 2026-09-11 (…)` / `GREEN 2026-09-11 (…)` / `RED WRITTEN 2026-09-11 (…)` / `RED
