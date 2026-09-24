@@ -139,6 +139,7 @@ just mesh storage-restart <peer…> | conductors-restart   # restart arms (expor
 just mesh join-peer <fresh-name>  # stage an organic late joiner on the RUNNING mesh (no incumbent restart; receipt: genesis/a2o/scripts/late-joiner-receipt.ts)
 MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
 MESH_CONDUCTOR_LAUNCH=ark just mesh start  # conductors run as children of an `ark` (tevah envelope; ARK_BIN = the elohim pool debug slot) — readiness checks the running executable; failed readiness and SIGKILL leave death witnesses in <peer>/ark/ (ark witness ls --berth <peer>/ark/berth.json)
+MESH_CONDUCTOR_LAUNCH=direct just mesh start  # one conductor PROCESS per peer; only this and `ark` export HOLOCHAIN_PROMETHEUS_LISTEN=127.0.0.1:946<4+i> (matthew 9464, jessica 9465, james 9466) so `curl :9464/metrics` reads the conductor's own hc_* series (fork pin >= 61565f320 lineage) — the default `hc sandbox run` supervisor runs every conductor from one environment and exposes none
 MESH_PORTAL=0 just mesh start  # skip the doorway sign-in portal (default: served on THRESHOLD_PORT 8081)
 MESH_DOORWAY_GAMMA=0 just mesh start  # skip the third doorway, gamma (:8890, health :8099) — a second holder of a public name, so a non-holder doorway has two holders to choose between; it adds no conductor or storage peer (primary storage james, extras matthew+jessica) and is restartable with `doorway-restart c`
 just mesh portal-restart       # reap + relaunch the sign-in portal (a supervised `ng serve` on THRESHOLD_PORT — no supervisor of its own, so the workspace RAM guard can shed it silently) and block for first paint (MESH_PORTAL_WAIT, default 180s); `just test mesh-browser` REFUSES before launch when `<doorway>/threshold/login` isn't 200, naming this arm instead of a scenario timing out mid-lane
@@ -181,16 +182,26 @@ execution. Both `just gate` and pre-push use
 `genesis/orchestrator/gate-runner.mjs`; do not add a grep detector or a second
 project-name command switch. Native gates resolve explicit cargo-pool slots and
 crate-specific `RUSTFLAGS`. A per-project cargo resource cap (`CARGO_BUILD_JOBS`,
-`RUST_TEST_THREADS`) lives today in `genesis/agentic/pool-policy.json`'s
-`cargo_env_overrides` — the gate-runner's `run.cargo.env` manifest key (and its
-`manifest.schema.json` mirror) is the schema-gated future home, live again once the
-operator widens the rakia-validated SOURCE schema (pinned `elohim/rakia` submodule)
-to accept it; until then the runner merges manifest `run.cargo.env` ∪ pool-policy
-`cargo_env_overrides`, manifest winning on conflict. `elohim-storage` is capped at
-`CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
+`RUST_TEST_THREADS`) declares on the gate project's own `run.cargo.env` in its
+`build-manifest.json` (the rakia-validated schema accepts it since rakia 2b2cedb,
+2026-09-23); `genesis/agentic/pool-policy.json`'s `cargo_env_overrides` only fills a
+cap a manifest has not declared, manifest winning on conflict. `elohim-storage`
+declares `CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
 cargo's default parallelism and is shed by the workspace RAM guard; at one job it
 peaks at 5.4 GB for ~12% wall-clock. DNA/WASM workspaces remain plain Cargo because
 Holochain packing requires their in-tree `./target`.
+
+**Submodule pins are attested, not re-tested.** A gate project whose `run.kind` is
+`attested` (brit, rakia, sophia — each declares itself in its own repo's manifest with
+the gitlink path as the step input) runs no local recipe: `gate-runner.mjs` dispatches it
+to `gate-attest.mjs`, which reads the pinned commit's named CI check on the upstream
+repo. A green check passes; red, cancelled, still-running, absent, or a commit the forge
+has never seen refuses; an unreachable read passes and prints `attested: claimed`.
+Selection asks `rakia affected` (`GATE_ORACLE=rakia` default; `shadow` prints a diff
+line, `path` ignores it) and keeps one hop, so a pin move re-selects the pin's direct
+consumers. Diagnostics go to stderr; the hook parses stdout as project names. Spec:
+`genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md`;
+habit `pin-attestation` in `genesis/orchestrator/.epr-meta/`.
 
 Focused escape hatches:
 

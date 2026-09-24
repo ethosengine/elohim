@@ -665,6 +665,19 @@ SIGTERM the `ark-*` pids (each stops its conductor with SIGINT + grace), then
 `MESH_CONDUCTOR_LAUNCH=ark just mesh conductors-restart`; afterwards `just mesh storage-restart <peer>`
 for any storage peer the restart flags with a stale app-interface token.
 
+## Conductor metrics per process (`direct` and `ark` modes, 2026-09-23)
+
+A fork conductor from the `61565f320` lineage serves its own OpenTelemetry instruments as
+Prometheus text at `GET /metrics` when `HOLOCHAIN_PROMETHEUS_LISTEN=host:port` is set
+(`hc_conductor_workflow_{duration,run_total,in_flight}`, `hc_db_connections_use_time`,
+`hc_holochain_p2p_request_duration`, `hc_ribosome_zome_call_duration`, …). The mesh exports it
+only from the per-process launch modes: `direct` and `ark` give each conductor
+`127.0.0.1:$(conductor_metrics_port <index>)` = 9464 matthew, 9465 jessica, 9466 james, and the
+preflight/join-peer port checks include those ports in exactly those modes. The default
+`hc sandbox run` supervisor launches every conductor from one environment, so it exposes none —
+`curl -s localhost:9464/metrics | grep hc_` returning nothing under the default mode is expected,
+not a broken exporter. An older fork binary ignores the variable.
+
 ## Per-peer runtime-config (rung 4 — armed from boot, 2026-09-03)
 
 Every storage peer starts with `ELOHIM_RUNTIME_CONFIG_PATH=<mesh>/<peer>/runtime-config.toml`
