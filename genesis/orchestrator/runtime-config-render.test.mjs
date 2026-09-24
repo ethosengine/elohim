@@ -39,6 +39,30 @@ const PLACEHOLDER = "RUNTIME_CONFIG_BODY_PLACEHOLDER";
 // own $releaseChannelIdComment is the human-readable mint record.
 const WORKSPACE_CHANNEL_ID = "runtime:coordinators:elohim:workspace";
 
+// The app-bundle channel the alpha serving pair follows (native-delivery
+// sprint Lane N, elected-content spec §12.8 slice 2). Enrolled at =observe:
+// an app-bundle head MOVES serving rows, so canary/apply on the fleet waits
+// until the storage binary carrying the class is deployed and the household
+// proof is green (C10 ordering) — a later data change, not minted here.
+const APP_BUNDLE_CHANNEL_ID = "runtime:app-bundle:alpha:dev";
+
+// `ELOHIM_RELEASE_CHANNELS` is a LIST (`release_adoption::state::
+// parse_followed_channels` splits on `,` `;` and newlines): one
+// `<channelId>=<mode>` entry per followed channel.
+const CHANNEL_ENTRY = /^runtime:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*=(observe|canary|apply)$/;
+
+function followedChannels(value) {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => {
+      assert.match(entry, CHANNEL_ENTRY, `entry "${entry}" is <runtime channel id>=<mode>`);
+      const [channelId, mode] = entry.split("=");
+      return { channelId, mode };
+    });
+}
+
 // The documented rule, mirrored (see runtimeConfigSedExpr).
 function sedExprFor(runtimeConfig) {
   if (!runtimeConfig || Object.keys(runtimeConfig).length === 0) {
@@ -134,18 +158,26 @@ function humanNamed(name) {
   return human;
 }
 
-test("every declared ELOHIM_RELEASE_CHANNELS follows the one workspace channel id", () => {
+test("every declared ELOHIM_RELEASE_CHANNELS is a list that follows the one workspace channel id", () => {
   const withChannel = deployments.humans.filter(
     (h) => h.runtimeConfig?.ELOHIM_RELEASE_CHANNELS !== undefined,
   );
   assert.ok(withChannel.length > 0, "at least one alpha human declares the channel");
   for (const human of withChannel) {
-    const value = human.runtimeConfig.ELOHIM_RELEASE_CHANNELS;
-    assert.match(
-      value,
-      new RegExp(`^${WORKSPACE_CHANNEL_ID.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=(observe|canary|apply)$`),
-      `${human.name}: ELOHIM_RELEASE_CHANNELS must be the single workspace channel id at a valid mode`,
+    const channels = followedChannels(human.runtimeConfig.ELOHIM_RELEASE_CHANNELS);
+    const ids = channels.map((c) => c.channelId);
+    assert.equal(new Set(ids).size, ids.length, `${human.name}: no channel is followed twice`);
+    assert.equal(
+      ids.filter((id) => id === WORKSPACE_CHANNEL_ID).length,
+      1,
+      `${human.name}: the workspace coordinator channel is followed exactly once`,
     );
+    for (const { channelId } of channels) {
+      assert.ok(
+        channelId === WORKSPACE_CHANNEL_ID || channelId === APP_BUNDLE_CHANNEL_ID,
+        `${human.name}: ${channelId} is one of the minted channel ids`,
+      );
+    }
   }
 });
 
@@ -169,17 +201,20 @@ test("alpha humans WITH the field render the real workspace channel line at thei
   // (james to canary, then matthew/jessica to apply on the bootstrap pair) is
   // a later data change the operator flips after Task 4's first
   // workspace->alpha receipt, not minted here.
-  for (const [name, mode] of [
-    ["james", "canary"],
-    ["matthew", "observe"],
-    ["jessica", "observe"],
-    ["adam", "observe"],
-    ["gertrude", "observe"],
-    ["susan", "observe"],
-    ["eve", "observe"],
+  // The alpha serving pair (doorway A → matthew, doorway B → jessica) also
+  // follows the app-bundle channel, at =observe until C10 is met.
+  const appBundle = `,${APP_BUNDLE_CHANNEL_ID}=observe`;
+  for (const [name, mode, extra] of [
+    ["james", "canary", ""],
+    ["matthew", "observe", appBundle],
+    ["jessica", "observe", appBundle],
+    ["adam", "observe", ""],
+    ["gertrude", "observe", ""],
+    ["susan", "observe", ""],
+    ["eve", "observe", ""],
   ]) {
     const human = humanNamed(name);
-    const expectedValue = `${WORKSPACE_CHANNEL_ID}=${mode}`;
+    const expectedValue = `${WORKSPACE_CHANNEL_ID}=${mode}${extra}`;
     assert.equal(
       human.runtimeConfig?.ELOHIM_RELEASE_CHANNELS,
       expectedValue,
