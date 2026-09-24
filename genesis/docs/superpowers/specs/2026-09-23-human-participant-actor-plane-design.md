@@ -123,6 +123,20 @@ asking an agent to do the hook's job by hand.
   stays the one slot: its doc already says the canonical identity is the `uhCAk…` key; both
   `agent:` and `human:` are repo-node rehearsals filling that slot until the household mesh mints
   the key.
+- **Witness leg (operator ruling 2026-09-24)**: the human's standing identity at the repo node may
+  be established by a witness act of a present agent:
+  `ActorRecord::Witness { subject: human:<handle>, witness: agent:<role>@<model>, session, basis, claimed_at }`,
+  signed with the stewarded device's key (the witness signs from the device it acts on). This is
+  the DHT's `HumanityWitness` / `attestation:humanness` pattern, where humanity is attested by
+  others, rehearsed at the repo node. When the handle has no roster yet, the witness row is the
+  genesis row of the handle's roster (`.eprfs/status/participants/<handle>.jsonl`, public material
+  only; `chain_root` = that device's `did:key`). A witness is a participant taking responsibility
+  for what it states. Its `basis` names what the agent actually knows, and it is contestable by
+  adverse attestation (in-flight claims spec §2.3). It is never an inference from git, from an
+  email or from the Che namespace. The human keeps the right to claim for themselves
+  (`epr actor claim --as human:<handle>`) and to contest a witness; both rows sit in the same
+  roster. Witnessing is deliberate and happens once per device. No hook or harness ever witnesses
+  automatically.
 - **Binding to other namespaces is a consent act** (boundary 5). A `human:` claim may carry
   `bindings: [{namespace: "git", ref: "<display name as committed>"}]` written by the human's own
   claim. The substrate never infers the binding from `git log`, never writes the email into it, and
@@ -319,7 +333,7 @@ first test in §5 exists and fails, green when all three pass and the migration 
 ## §5.1 — Stations (the projector reads these; each flips one check in the habit atom)
 
 - [ ] Station 1 — grammar: `parse_participant_ref` accepts `human:<handle>` beside `agent:<role>@<model>`; `definition_cid` optional and absent for a human; test `participant_ref` born with it; `epr actor claim --as human:<handle>` works
-- [ ] Station 2 — the human claims once: a `human:<handle>` claim is **standing per workspace** (agents claim per session; a human is not a run), registered by the operator one time and read by the harness thereafter; the first act under the new grammar is theirs (recorded as an observation note on this spec's commitment)
+- [ ] Station 2 — the human is witnessed once per device by a present agent (`epr actor witness`), or claims for themselves; the claim is **standing per device** (agents claim per session; a human is not a run), read by the harness thereafter; the first act under the new grammar is theirs (recorded as an observation note on this spec's commitment)
 - [ ] Station 3 — derive-and-freeze author + `<id>.acts.jsonl` projection, written by the **harness** (the PostToolUse observer on a memory-entry write, and `memory import` when the harness runs it); no agent runs an import to be attributed; test `memory_import_freezes_author`
 - [ ] Station 4 — `IndependentReview` predicate replaces the single-field check in `graduate`; row in `elohim/eprfs/epr-cli/seam-registry.yaml`; test `graduate_refuses_shaping_actor`
 - [ ] Station 5 — identity-reserve migration: `imported.gitAuthor` → `imported.gitName`, `steward:` slot names the collective id, the 250 tracked files rewritten by one attributed act; the habit's email check goes green

@@ -20,7 +20,8 @@ first_move: >
   `parse_participant_ref` accepting `human:<handle>` beside `agent:<role>@<model>`, born with the
   test `participant_ref` (accepts both; refuses `agent:<person>@human`, an email, and any
   substrate-minted form); `ActorClaim.definition_cid` becomes optional and is absent for a human.
-  Then the human claims: `epr actor claim --as human:<handle> --session <id>`. The later stations
+  Then the human is witnessed once per device by a present agent (`epr actor witness`), or
+  claims for themselves (`epr actor claim --as human:<handle>`). The later stations
   each arrive with their own test and replace a grep check above with it: derive-and-freeze author
   + `<id>.acts.jsonl` projection (`memory_import_freezes_author`: re-import under a different
   session leaves `author` byte-identical and appends exactly one act; an identical re-run appends
@@ -63,3 +64,5 @@ projection) still fail — stations 3 and 5. Next: station 2, the operator claim
 `human:<handle>` once, standing per workspace.
 
 DELTA 2026-09-24 (iterated in flight during governed-discovery station 4; STAYS RED; check 1 of 3 green). Every act of the station carried a participant who claimed for themselves: the orchestrator seat was claimed as `agent:orchestrator@claude-fable-5-1`, re-claimed as `@claude-opus-5-5` when the operator switched the session model and back again — attribution follows the model actually running, never a uniform line; implementers signed their own trailers; eight intents claimed and fulfilled under that seat; the new `FoldAttestation.attested_by` carries the sidecar's participant ref or the honest literal `(unclaimed)` (never inferred, never an email) and is APPENDED to `attestations.jsonl` — a new act-shaped surface born under this habit's rule. Observed on every one of those acts: the claim/fulfil/note records still print the operator's EMAIL in the steward slot — check 2 (identity-reserve migration) is visible on each, the next station's work. Station 2 (the human's own `human:<handle>` claim) remains the operator's act.
+
+2026-09-24: operator ruling — the elohim witness the human (R-P9 of the 2026-09-25 plan); station 2 becomes a witness act.
