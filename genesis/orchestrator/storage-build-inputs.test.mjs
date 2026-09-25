@@ -89,3 +89,27 @@ test('every source the storage Dockerfile copies re-triggers the edge build', ()
     `copied into the storage image but absent from cargo-build-storage sources — a change there ships a stale binary: ${unwatched.join(', ')}`,
   );
 });
+
+// The Dockerfile builds storage from /app with every sibling crate COPY'd flat beside it, so each
+// of storage's own relative path deps is re-rooted by a `sed 's|path = "<rel>"|…|'` line. A COPY
+// without its rewrite still fails the image: cargo looks for /<crate>/Cargo.toml (edge #1484,
+// elohim-epr-index at ../epr-index — COPY'd, never re-rooted, invisible to the native gates).
+test("every direct path dep of storage is re-rooted by the Dockerfile's sed rewrites", () => {
+  const cargo = readFileSync(join(root, STORAGE, 'Cargo.toml'), 'utf8');
+  const docker = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
+  const copyDests = [...docker.matchAll(/^COPY\s+(?!--from)\S+\s+(\/\S+?)\/?$/gm)].map(m => m[1]);
+  const unrooted = [...cargo.matchAll(/\bpath\s*=\s*"(\.\.\/[^"]+)"/g)]
+    .map(m => m[1])
+    .filter(rel => existsSync(join(root, STORAGE, rel, 'Cargo.toml')))
+    .filter(rel => !docker.includes(`s|path = "${rel}"|`))
+    // …or COPY'd to the absolute place the unrewritten path resolves to from /app (/sdk, /vendor).
+    .filter(rel => {
+      const abs = resolve('/app', rel);
+      return !copyDests.some(d => abs === d || abs.startsWith(`${d}/`));
+    });
+  assert.deepEqual(
+    unrooted,
+    [],
+    `storage path deps with no Dockerfile path rewrite (cargo resolves them outside /app): ${unrooted.join(', ')}`,
+  );
+});

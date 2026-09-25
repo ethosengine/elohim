@@ -189,6 +189,8 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-render"|path = "elohim-render"|' Cargo.toml && \
     sed -i 's|path = "../elohim-chrome-asset"|path = "elohim-chrome-asset"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml && \
+    sed -i 's|path = "../epr-rea"|path = "epr-rea"|' Cargo.toml && \
+    sed -i 's|path = "../epr-index"|path = "epr-index"|' Cargo.toml && \
     sed -i 's|path = "../ark/core"|path = "ark/core"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-bridge"|path = "bridges/valueflows/valueflows-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
