@@ -438,6 +438,43 @@ pub const IMAGODEI_ROLE: &str = "imagodei";
 /// The `mishpat` role's name, as the installed hApp spells it.
 pub const MISHPAT_ROLE: &str = "mishpat";
 
+/// Does a failed call's text belong in the health verdict of the mint that is
+/// CURRENT now?
+///
+/// A transport-closed failure describes ONE socket. When the call rode mint
+/// `call_generation` and the handle has since adopted a newer mint, that socket
+/// is the corpse the re-mint replaced: folding its death into the verdict would
+/// mark the fresh, answering mint dead until something else happened to speak
+/// over it. Every other failure (a domain refusal, `CellDisabled`, a shed) is a
+/// statement about the conductor or the cell, not the socket, and always folds.
+pub(crate) fn failure_describes_current_mint(
+    msg: &str,
+    call_generation: u64,
+    current_generation: u64,
+) -> bool {
+    !(crate::conductor_bridge_health::is_transport_dead(msg)
+        && call_generation < current_generation)
+}
+
+/// Whose TRANSPORT verdict one answered `app_info` probe on `probing_role`'s
+/// client vouches for.
+///
+/// The probe's own role, always. And, when the prober is the
+/// [`crate::hc_client_registry::CROSS_CELL_DRIVER_ROLE`], every cross-cell role
+/// too: `mishpat` has no socket of its own — its calls ride a supervised role's
+/// app websocket, so a transport failure filed against it was that socket's
+/// failure, and it has no probe of its own to cancel it. Nobody else vouches
+/// for a role that HAS its own supervisor: two probers answering for one role
+/// over two sockets would alternate its verdict, the flap class the per-role
+/// observer exists to remove.
+pub(crate) fn roles_a_probe_vouches_for(probing_role: &str) -> Vec<&str> {
+    let mut roles = vec![probing_role];
+    if probing_role == crate::hc_client_registry::CROSS_CELL_DRIVER_ROLE {
+        roles.extend(crate::hc_client_registry::CROSS_CELL_ROLES);
+    }
+    roles
+}
+
 /// Which ROLE a zome call against `target` is an observation ABOUT.
 ///
 /// THE WHOLE OF F4's FIX, as a pure function. Every observation — a success, a
@@ -629,7 +666,11 @@ impl HcClient {
         e: impl std::fmt::Display,
     ) -> StorageError {
         let msg = format!("Zome call failed: {}", e);
-        observe_role_zome_error(self.target_role_of(cell_id), &msg);
+        // A socket the re-mint already replaced says nothing about the mint
+        // callers dial now (see [`failure_describes_current_mint`]).
+        if failure_describes_current_mint(&msg, generation, self.connection_generation()) {
+            observe_role_zome_error(self.target_role_of(cell_id), &msg);
+        }
         heal_stale_signing_credentials(cell_id, &msg);
         if crate::conductor_bridge_health::is_transport_dead(&msg) {
             crate::hc_client_registry::note_transport_closed(self.role_key(), generation);
@@ -1702,6 +1743,16 @@ impl HcClient {
         if answered.is_ok() {
             // Bytes crossed this mint's app websocket: it is not closed.
             crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
+            // AND THE VERDICT HEARS IT. A failed ping files a transport failure;
+            // an answered one must be able to cancel it, or a role whose only
+            // failure predates a conductor restart stays `Dead` — latching
+            // `/health/serving` 503 — until incidental traffic happens to reach
+            // it (2026-09-25: a quiet imagodei held every household node dead).
+            // Transport evidence only: it lifts `Dead`, never a not-running
+            // episode; the status half below keeps its own asymmetry.
+            for role in roles_a_probe_vouches_for(self.role_key()) {
+                crate::conductor_bridge_health::record_role_responsive(role);
+            }
         }
         match answered {
             // THE STATUS IS THE ANSWER. `app_info()` succeeds on a DISABLED app
@@ -1741,7 +1792,13 @@ impl HcClient {
             }
             Err(e) => {
                 let msg = format!("Conductor ping failed: {}", e);
-                observe_role_zome_error(self.role_key(), &msg);
+                if failure_describes_current_mint(
+                    &msg,
+                    conn.generation,
+                    self.connection_generation(),
+                ) {
+                    observe_role_zome_error(self.role_key(), &msg);
+                }
                 if crate::conductor_bridge_health::is_transport_dead(&msg) {
                     crate::hc_client_registry::note_transport_closed(
                         self.role_key(),
@@ -2199,5 +2256,190 @@ mod connection_adoption_tests {
             .expect("boundary");
         assert!(failed.contains("is_transport_dead(&msg)"));
         assert!(failed.contains("note_transport_closed(self.role_key(), generation)"));
+    }
+}
+
+/// Station "restarting every conductor opens a window … closes on its own"
+/// (app-delivery-refuses-fast, household 2026-09-25 14:00Z). After the
+/// re-mint every role answered its probe on the fresh mint, yet a QUIET role
+/// — imagodei on every peer — kept the transport failure it collected before
+/// the restart, so the node read `dead` until incidental traffic reached it.
+/// These pin the cure at the seam the ping and the zome-call mapper share,
+/// against an isolated observer (never the process-wide one).
+#[cfg(test)]
+mod probe_liveness_tests {
+    use super::*;
+    use crate::conductor_bridge_health::{RoleBridgeHealth, ZomePathStatus};
+
+    const CLOSED: &str = "Zome call failed: Websocket closed: No connection";
+    const MINT_N: u64 = 7;
+    const MINT_N1: u64 = 8;
+
+    /// What `zome_call_failed_on` / the ping's `Err` arm do with one failure.
+    fn fail(roles: &RoleBridgeHealth, role: &str, call_mint: u64, current_mint: u64) {
+        if failure_describes_current_mint(CLOSED, call_mint, current_mint) {
+            roles.for_role(role).observe_zome_error(CLOSED);
+        }
+    }
+
+    /// What the ping's answered arm does.
+    fn probe_answers(roles: &RoleBridgeHealth, probing_role: &str) {
+        for role in roles_a_probe_vouches_for(probing_role) {
+            roles.for_role(role).record_responsive();
+        }
+    }
+
+    fn status(roles: &RoleBridgeHealth, role: &str) -> ZomePathStatus {
+        roles.for_role(role).snapshot().status
+    }
+
+    #[test]
+    fn failed_on_mint_n_and_answered_on_mint_n_plus_1_reads_serving() {
+        let roles = RoleBridgeHealth::new();
+        fail(&roles, "imagodei", MINT_N, MINT_N);
+        assert_eq!(status(&roles, "imagodei"), ZomePathStatus::Dead);
+        assert!(!roles.for_role("imagodei").snapshot().serving_ok());
+
+        // The re-mint adopts N+1; its probe answers. No zome call reaches the
+        // role — it is quiet — and it must still read serving.
+        probe_answers(&roles, "imagodei");
+        assert_eq!(status(&roles, "imagodei"), ZomePathStatus::Live);
+        assert!(roles.for_role("imagodei").snapshot().serving_ok());
+    }
+
+    #[test]
+    fn a_probe_that_fails_on_the_new_mint_keeps_the_role_dead() {
+        let roles = RoleBridgeHealth::new();
+        fail(&roles, "node_registry", MINT_N, MINT_N);
+        // The fresh mint's own probe fails: that IS the current socket.
+        fail(&roles, "node_registry", MINT_N1, MINT_N1);
+        assert_eq!(status(&roles, "node_registry"), ZomePathStatus::Dead);
+        assert!(!roles.for_role("node_registry").snapshot().serving_ok());
+    }
+
+    #[test]
+    fn a_late_failure_from_the_replaced_mint_does_not_reopen_dead() {
+        let roles = RoleBridgeHealth::new();
+        fail(&roles, "lamad", MINT_N, MINT_N);
+        probe_answers(&roles, "lamad");
+        // A call that rode the corpse lands its failure after the adoption.
+        fail(&roles, "lamad", MINT_N, MINT_N1);
+        assert_eq!(status(&roles, "lamad"), ZomePathStatus::Live);
+    }
+
+    #[test]
+    fn only_transport_failures_are_scoped_to_their_mint() {
+        assert!(!failure_describes_current_mint(CLOSED, MINT_N, MINT_N1));
+        assert!(failure_describes_current_mint(CLOSED, MINT_N1, MINT_N1));
+        // A cell refusal or a domain error is about the conductor, not the
+        // socket, and folds whichever mint carried it.
+        assert!(failure_describes_current_mint(
+            "Zome call failed: CellDisabled",
+            MINT_N,
+            MINT_N1
+        ));
+        assert!(failure_describes_current_mint(
+            "Zome call failed: ZomeNotFound",
+            MINT_N,
+            MINT_N1
+        ));
+    }
+
+    #[test]
+    fn a_probe_answer_never_ends_a_not_running_episode() {
+        let roles = RoleBridgeHealth::new();
+        roles
+            .for_role("imagodei")
+            .record_app_disabled("CellDisabled: this cell is not running");
+        probe_answers(&roles, "imagodei");
+        assert_eq!(status(&roles, "imagodei"), ZomePathStatus::AppDisabled);
+        assert!(!roles.for_role("imagodei").snapshot().serving_ok());
+    }
+
+    #[test]
+    fn the_node_verdict_flips_only_when_every_role_is_proven() {
+        let observed = crate::hc_client_registry::OBSERVED_ROLES;
+        let roles = RoleBridgeHealth::new();
+        for role in observed {
+            fail(&roles, role, MINT_N, MINT_N);
+        }
+        assert_eq!(
+            roles.derive_supervised_status(&observed),
+            ZomePathStatus::Dead
+        );
+        // Every supervised role but the quiet one answers. `mishpat` has no
+        // probe of its own; the driver's answer vouches for it.
+        for role in crate::hc_client_registry::SUPERVISED_ROLES {
+            if role != "imagodei" {
+                probe_answers(&roles, role);
+            }
+        }
+        assert_eq!(status(&roles, MISHPAT_ROLE), ZomePathStatus::Live);
+        assert_eq!(
+            roles.derive_supervised_status(&observed),
+            ZomePathStatus::Dead,
+            "one unproven role keeps the node dead"
+        );
+        probe_answers(&roles, "imagodei");
+        assert_eq!(
+            roles.derive_supervised_status(&observed),
+            ZomePathStatus::Live
+        );
+    }
+
+    #[test]
+    fn only_the_driver_vouches_for_cross_cell_roles() {
+        let driver = roles_a_probe_vouches_for(crate::hc_client_registry::CROSS_CELL_DRIVER_ROLE);
+        for cross in crate::hc_client_registry::CROSS_CELL_ROLES {
+            assert!(driver.contains(&cross));
+        }
+        // A role with its own supervisor is vouched for by its own probe only,
+        // so two sockets never alternate one verdict.
+        for role in crate::hc_client_registry::SUPERVISED_ROLES {
+            let vouched = roles_a_probe_vouches_for(role);
+            assert_eq!(vouched[0], role);
+            for other in crate::hc_client_registry::SUPERVISED_ROLES {
+                if other != role {
+                    assert!(!vouched.contains(&other), "{role} vouches for {other}");
+                }
+            }
+        }
+    }
+
+    /// The wiring: the pure decisions above are what the ping and the mapper
+    /// actually call.
+    #[test]
+    fn the_ping_and_the_mapper_use_the_mint_scoped_decisions() {
+        let source = include_str!("hc_client.rs");
+        let ping = source
+            .split("pub async fn ping(&self)")
+            .nth(1)
+            .expect("ping exists")
+            .split("/// What one [`HcClient::ping`] observed")
+            .next()
+            .expect("ping boundary");
+        let answered = ping
+            .split("if answered.is_ok() {")
+            .nth(1)
+            .expect("answered arm")
+            .split("match answered {")
+            .next()
+            .expect("answered arm boundary");
+        assert!(answered.contains("roles_a_probe_vouches_for(self.role_key())"));
+        assert!(answered.contains("record_role_responsive(role)"));
+        let squashed: String = ping.split_whitespace().collect();
+        assert!(squashed.contains(
+            "failure_describes_current_mint(&msg,conn.generation,self.connection_generation()"
+        ));
+        let failed = source
+            .split("fn zome_call_failed_on(")
+            .nth(1)
+            .expect("mapper")
+            .split("fn connection(&self)")
+            .next()
+            .expect("boundary");
+        assert!(failed.contains(
+            "failure_describes_current_mint(&msg, generation, self.connection_generation())"
+        ));
     }
 }
