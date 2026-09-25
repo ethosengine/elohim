@@ -353,22 +353,81 @@ export class PlaywrightDevice extends Device {
 
   /**
    * Inject auth state into the browser context so the Angular app
-   * recognizes the session. Uses localStorage which the app reads on init.
+   * recognizes the session. Writes exactly what a real sign-in persists
+   * (see `signedInSessionEntries`), which the app's `restoreSession()` reads
+   * on init.
    */
   private async injectAuth(auth: AuthResponse): Promise<void> {
+    // Refuse before navigating: a login answer that cannot name its expiry
+    // must fail here, not as a signed-out page several steps later.
+    const entries = signedInSessionEntries(auth);
+
     // Navigate to the app origin first so we can set localStorage
     if (!this._page?.url().startsWith(this.appUrl)) {
       await this.page.goto(this.appUrl, { waitUntil: 'domcontentloaded' });
     }
 
-    await this.page.evaluate(
-      (authData: { token: string; agentPubKey: string; humanId: string }) => {
-        // Keys must match elohim-app/src/app/imagodei/models/auth.model.ts
-        localStorage.setItem('elohim-auth-token', authData.token);
-        localStorage.setItem('elohim-auth-agent-pub-key', authData.agentPubKey);
-        localStorage.setItem('elohim-auth-human-id', authData.humanId);
-      },
-      auth
-    );
+    await this.page.evaluate((session: Record<string, string>) => {
+      for (const [key, value] of Object.entries(session)) localStorage.setItem(key, value);
+    }, entries);
+  }
+}
+
+/**
+ * The localStorage entries a real password sign-in persists for this login
+ * answer (ruling R-A14) — the same keys and value formats the shell's
+ * `BrowserSessionTokenStore.set` and `setProviderType` write
+ * (app/elohim-app/src/app/imagodei/services/browser-session-token.store.ts,
+ * keys in app/elohim-app/src/app/imagodei/models/auth.model.ts):
+ *
+ * - token, expiry (unix seconds as a string) and identifier always;
+ * - human id, agent key and installed-app id only when the answer carries
+ *   them (the store leaves an absent value unwritten);
+ * - the provider type, `password`, which `AuthService.restoreSession()`
+ *   requires alongside an expiry after now.
+ *
+ * Fewer keys and the shell clears the session at boot (a missing expiry reads
+ * as expired); more keys would let a fixture mask an app regression. The
+ * expiry is the answer's `expiresAt`; failing that, the token's own `exp`
+ * claim; failing both, this refuses rather than inventing one.
+ */
+export function signedInSessionEntries(auth: AuthResponse): Record<string, string> {
+  const entries: Record<string, string> = {
+    'elohim-auth-token': auth.token,
+    'elohim-auth-expiry': String(sessionExpirySeconds(auth)),
+    'elohim-auth-identifier': auth.identifier,
+    'elohim-auth-provider': 'password',
+  };
+  if (auth.humanId) entries['elohim-auth-human-id'] = auth.humanId;
+  if (auth.agentPubKey) entries['elohim-auth-agent-pub-key'] = auth.agentPubKey;
+  if (auth.installedAppId) entries['elohim-installed-app-id'] = auth.installedAppId;
+  return entries;
+}
+
+/** The session's expiry in unix seconds: the answer's `expiresAt`, else the token's `exp` claim. */
+function sessionExpirySeconds(auth: AuthResponse): number {
+  const carried = (auth as Partial<AuthResponse>).expiresAt;
+  if (typeof carried === 'number' && Number.isFinite(carried) && carried > 0) return carried;
+  const exp = jwtExpClaim(auth.token);
+  if (exp !== undefined) return exp;
+  throw new Error(
+    'the login answer carries no expiresAt and its token has no exp claim — refusing to ' +
+      'invent a session expiry for the injected sign-in (ruling R-A14)'
+  );
+}
+
+/** The `exp` claim of a JWT's payload, when it has a positive numeric one. */
+function jwtExpClaim(token: string): number | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      exp?: unknown;
+    };
+    return typeof claims.exp === 'number' && Number.isFinite(claims.exp) && claims.exp > 0
+      ? claims.exp
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
