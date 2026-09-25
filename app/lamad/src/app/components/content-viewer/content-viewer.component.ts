@@ -14,6 +14,7 @@ import {
   ViewChild,
   ViewContainerRef,
   inject,
+  signal,
 } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -222,8 +223,15 @@ export class ContentViewerComponent
   private rendererRef: ComponentRef<ContentRenderer> | null = null;
   private rendererSubscription: Subscription | null = null;
 
-  /** Whether we have a registered renderer for the current content format */
-  hasRegisteredRenderer = false;
+  /**
+   * Whether a registered renderer handles the current node's format. Decided
+   * when the node arrives, before the view that shows it is checked, so the
+   * raw-source fallback never renders for a format that has a renderer. A
+   * signal, because loadRenderer() re-asserts it from ngAfterViewChecked: a
+   * plain field written there changed a checked binding (NG0100 on
+   * /resource/:id), where a signal write re-runs the reading view instead.
+   */
+  readonly hasRegisteredRenderer = signal(false);
 
   /** Flag to trigger renderer loading in AfterViewChecked */
   private pendingRendererLoad = false;
@@ -522,12 +530,10 @@ export class ContentViewerComponent
     // Get the renderer component for this content format
     const rendererComponent = this.rendererRegistry.getRenderer(this.node);
 
+    this.hasRegisteredRenderer.set(rendererComponent !== null);
     if (!rendererComponent) {
-      this.hasRegisteredRenderer = false;
       return;
     }
-
-    this.hasRegisteredRenderer = true;
 
     // Create the renderer component
     this.rendererRef = this.rendererHost.createComponent(rendererComponent);
@@ -609,8 +615,10 @@ export class ContentViewerComponent
             return;
           }
 
-          // Set ContentNode
+          // Set ContentNode, and decide renderer-vs-fallback with it: the
+          // renderer itself is created once the host exists (AfterViewChecked).
           this.node = contentNode;
+          this.hasRegisteredRenderer.set(this.rendererRegistry.getRenderer(contentNode) !== null);
 
           // Check if content is editable
           this.canEditContent = this.editorService.canEdit(contentNode);

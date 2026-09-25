@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import {
   ChangeDetectionStrategy,
   Component,
+  ErrorHandler,
   EventEmitter,
   Input,
   NgZone,
@@ -90,6 +91,22 @@ class MockExplorationSidebarComponent {
   @Input() graphHeight = 180;
   @Output() exploreContent = new EventEmitter<string>();
   @Output() exploreInGraph = new EventEmitter<void>();
+}
+
+/**
+ * Stand-in renderer for the NG0100 regression below: the registry resolves
+ * markdown to this component, so the viewer takes its registered-renderer path.
+ */
+@Component({
+  selector: 'app-stub-markdown-renderer',
+  standalone: true,
+  // The shipped markdown renderer is Eager (CheckAlways); a CheckAlways child
+  // created in a hook is what leaves the viewer's section un-refreshed.
+  changeDetection: ChangeDetectionStrategy.Eager,
+  template: '<p class="stub-renderer">rendered by the registered renderer</p>',
+})
+class StubMarkdownRendererComponent {
+  @Input() node: ContentNode | null = null;
 }
 
 /**
@@ -1822,6 +1839,98 @@ describe('ContentViewerComponent', () => {
       expect(host.querySelector('.content')).not.toBeNull();
       expect(host.textContent).toContain('Test Content');
       expect(host.textContent).not.toContain('Loading content');
+
+      asyncFixture.destroy();
+    });
+  });
+
+  // =========================================================================
+  // NG0100 on a resource page (the a2o clean-console hook refused a passing
+  // attention scenario on it). The fallback `<pre>` bindings read
+  // `hasRegisteredRenderer`; it used to flip false -> true inside
+  // ngAfterViewChecked (loadRenderer), AFTER the view was checked, so the
+  // dev-mode checkNoChanges pass threw
+  //   NG0100 ... Previous value: 'true'. Current value: 'false'.
+  // for every node whose format has a registered renderer. The registry here
+  // knows markdown when the node arrives, exactly as the manifest-driven
+  // initializer leaves it in the browser.
+  // =========================================================================
+
+  describe('a node with a registered renderer arrives without NG0100', () => {
+    it('renders through the registered renderer with no dev-mode check error', async () => {
+      TestBed.resetTestingModule();
+      const content$ = new Subject<ContentNode>();
+      const errors: unknown[] = [];
+      const registry = new RendererRegistryService();
+
+      TestBed.configureTestingModule({
+        imports: [EagerHostForRegression],
+        providers: [
+          provideZoneChangeDetection(),
+          ...baseProviders,
+          { provide: RendererRegistryService, useValue: registry },
+          { provide: ErrorHandler, useValue: { handleError: (e: unknown) => errors.push(e) } },
+        ],
+      })
+        .overrideComponent(ExplorationSidebarComponent, { set: { template: '', imports: [] } })
+        .overrideProvider(DataLoaderService, {
+          useValue: {
+            getContent: vi.fn().mockReturnValue(content$.asObservable()),
+            getGovernanceState: vi.fn().mockReturnValue(of(null)),
+          },
+        });
+
+      const asyncFixture = TestBed.createComponent(EagerHostForRegression);
+      asyncFixture.autoDetectChanges(true);
+      const host = asyncFixture.nativeElement as HTMLElement;
+      expect(host.textContent).toContain('Loading content');
+
+      // Rendered with no renderer for markdown; the renderer registers before
+      // the node arrives (the initializer registers the manifest map).
+      registry.register(['markdown'], StubMarkdownRendererComponent, 10);
+
+      // Any insertion of the raw-source fallback is recorded, even one a later
+      // refresh removes again: a fallback that rendered in the pass whose
+      // ngAfterViewChecked then found the renderer is the NG0100 precondition
+      // (and a visible flash of raw markdown). The test harness's own refresh
+      // loop can re-run the section and hide the error itself; the browser's
+      // does not, so the observable contract is the insertion.
+      const fallbackInsertions: Node[] = [];
+      const collect = (records: MutationRecord[]): void => {
+        for (const r of records) {
+          for (const n of Array.from(r.addedNodes)) {
+            if (n instanceof HTMLElement && n.classList.contains('fallback-content')) {
+              fallbackInsertions.push(n);
+            }
+          }
+        }
+      };
+      const observer = new MutationObserver(collect);
+      observer.observe(host, { childList: true, subtree: true });
+
+      let thrown: unknown = null;
+      try {
+        TestBed.inject(NgZone).run(() => {
+          content$.next(mockContentNode);
+          content$.complete();
+        });
+        await asyncFixture.whenStable();
+        asyncFixture.detectChanges(); // runs checkNoChanges in dev mode
+      } catch (e) {
+        thrown = e;
+      }
+
+      collect(observer.takeRecords());
+      observer.disconnect();
+
+      const ng0100 = [thrown, ...errors].filter(e => String(e).includes('NG0100'));
+      expect(ng0100).toEqual([]);
+      expect(thrown).toBeNull();
+      expect(host.querySelector('.stub-renderer')).not.toBeNull();
+      // The raw-source fallback never shows for a format that has a renderer —
+      // not at the end, and not for one pass on the way there.
+      expect(host.querySelector('.fallback-content')).toBeNull();
+      expect(fallbackInsertions).toEqual([]);
 
       asyncFixture.destroy();
     });

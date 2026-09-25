@@ -282,7 +282,7 @@
 
           <!-- Fallback: Plain text content (when no renderer registered) -->
           <div
-            *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
+            *ngIf="!hasRegisteredRenderer() && node.contentFormat === 'plaintext'"
             class="plaintext-content"
           >
             <pre>{{ getStringContent(node.content) }}</pre>
@@ -290,7 +290,7 @@
 
           <!-- Fallback: HTML content (when no renderer registered) -->
           <div
-            *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
+            *ngIf="!hasRegisteredRenderer() && node.contentFormat === 'html'"
             class="html-content"
             [innerHTML]="node.content"
           ></div>
@@ -298,7 +298,7 @@
           <!-- Fallback: Unknown format -->
           <div
             *ngIf="
-              !hasRegisteredRenderer &&
+              !hasRegisteredRenderer() &&
               node.contentFormat !== 'plaintext' &&
               node.contentFormat !== 'html'
             "
