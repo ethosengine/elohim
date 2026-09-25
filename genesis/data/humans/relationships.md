@@ -110,6 +110,14 @@ relationships:
     target: "human-pete-pastor"
     relationshipType: "congregation-member"
     intimacyLevel: "trusted"
+  # The genesis pair across two fixture households (Dowell ↔ Eden): the relationship behind
+  # adam's measure-stage compute grants to matthew (compute-agreements sprint, 2026-09-25).
+  # Declared here, where relationships live; no verification pricing is derived from it.
+  # (`business-partner`: the seeder enum has no `trusted-friend`; the DHT enum does — drift noted.)
+  - source: "human-matthew-manager"
+    target: "human-adam-firstman"
+    relationshipType: "business-partner"
+    intimacyLevel: "trusted"
 ---
 
 # Human Relationships

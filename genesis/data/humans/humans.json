@@ -1120,7 +1120,7 @@
     {
       "source": "human-matthew-manager",
       "target": "human-adam-firstman",
-      "relationshipType": "trusted-friend",
+      "relationshipType": "business-partner",
       "intimacyLevel": "trusted"
     }
   ]
