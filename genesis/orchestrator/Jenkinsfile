@@ -920,6 +920,30 @@ def awaitDetachedBuild(String jobName, String jobBranch, List buildParams) {
  * with waitForStart, then waits by run ID with propagateAbort:false. This
  * preserves abortPrevious isolation while enforcing a selected dependency.
  */
+// The changed-path list crosses stages in a workspace file, never env: Linux caps one
+// env string at 128KiB (MAX_ARG_STRLEN) and every later `sh` then fails to exec —
+// durable-task reports "process apparently never started" (orchestrator #1904/#1905,
+// 2185 paths = 138KB). The same cap binds the CHANGED_PATHS build parameter downstream.
+@Field String CHANGED_PATHS_FILE = '.orch-changed-paths.txt'
+@Field int CHANGED_PATHS_PARAM_MAX = 64 * 1024
+
+def stashChangedPaths(List changedFiles) {
+    writeFile file: CHANGED_PATHS_FILE, text: changedFiles.join('\n')
+}
+
+def loadChangedPaths() {
+    fileExists(CHANGED_PATHS_FILE) ? readFile(CHANGED_PATHS_FILE).split('\n').findAll { it } : []
+}
+
+// Empty is every consumer's declared full-suite fallback, and a list this large already
+// crosses shared paths (the DNA harvester widens to the full suite on any non-DNA path).
+String changedPathsParam(List changedFiles) {
+    String joined = changedFiles.join('\n')
+    if (joined.length() <= CHANGED_PATHS_PARAM_MAX) { return joined }
+    echo "ℹ️  CHANGED_PATHS ${joined.length()}B > ${CHANGED_PATHS_PARAM_MAX}B — sending empty (full-suite fallback)"
+    return ''
+}
+
 def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = [], boolean dependencyBarrier = false) {
     def config = getPipelineMetadata(name)
     if (!config.jenkinsPath) {
@@ -993,7 +1017,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // sweettest stage harvester for nextest binary filter, W3 of the
         // 2026-05-24 stage efficiency design) read this. Empty value →
         // full-suite fallback (manual / [build:X] tag / force builds).
-        buildParams.add(stringParam(name: 'CHANGED_PATHS', value: changedFiles.join('\n')))
+        buildParams.add(stringParam(name: 'CHANGED_PATHS', value: changedPathsParam(changedFiles)))
 
         // RESET_STORAGE — only elohim-genesis declares + consumes it (wipe content.db +
         // fresh reseed). Two activation paths: operator param OR [reseed] commit tag
@@ -2401,12 +2425,8 @@ spec:
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
-                        // Bridge changedFiles across CPS stage boundaries (def-scoped
-                        // locals don't survive into the next stage's script{} block).
-                        // Execute Builds reads CHANGED_PATHS_PASSTHROUGH and passes
-                        // it as the 4th arg to triggerPipeline so downstream pipelines
-                        // see CHANGED_PATHS for per-path / per-DNA selectivity.
-                        env.CHANGED_PATHS_PASSTHROUGH = changedFiles.join('\n')
+                        // Bridge changedFiles to Execute Builds (file, not env: stashChangedPaths).
+                        stashChangedPaths(changedFiles)
 
                         // Build + write the predicted-build-graph artifact.
                         def predictedLevels = groupByDependencyLevel(graphPipelines)
@@ -2490,9 +2510,9 @@ spec:
                 }
             }
             steps {
-                // Advisory means advisory: a durable-task launch flake here (`process apparently
-                // never started`, exit -2 — orchestrator #1904) marks this stage UNSTABLE and
-                // leaves the build result alone, so dispatch still runs.
+                // Advisory means advisory: a launch failure here (`process apparently never
+                // started`, exit -2 — #1904, an oversized env string: CHANGED_PATHS_FILE) marks
+                // this stage UNSTABLE and leaves the build result alone, so dispatch still runs.
                 catchError(buildResult: null, stageResult: 'UNSTABLE') {
                     container('builder') {
                         script {
@@ -2532,9 +2552,7 @@ spec:
                     catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
                         def pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
-                        // Recover changedFiles from env-bridge (see Determine Build Plan).
-                        // def-scoped locals don't cross CPS stage boundaries.
-                        def changedFiles = (env.CHANGED_PATHS_PASSTHROUGH ?: '').split('\n').findAll { it }
+                        def changedFiles = loadChangedPaths()
                         def results = [:]
                         def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
 

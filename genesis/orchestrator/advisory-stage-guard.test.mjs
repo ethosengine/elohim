@@ -1,8 +1,8 @@
 /**
  * Static contract: the orchestrator's advisory stages cannot abort dispatch.
  *
- * Orchestrator #1904: a durable-task launch flake (`process apparently never
- * started`, exit -2) inside `Brit Plan (advisory)` cascaded to FAILURE and
+ * Orchestrator #1904: a durable-task launch failure (`process apparently never
+ * started`, exit -2 — an oversized env string; changed-paths-env-cap.test.mjs) inside `Brit Plan (advisory)` cascaded to FAILURE and
  * aborted the run before `Execute Builds` dispatched anything (7 pipelines
  * never started). Advisory means advisory: the stage's whole `steps {}` body
  * sits inside `catchError(buildResult: null, stageResult: 'UNSTABLE')`, so a
