@@ -917,7 +917,7 @@ policies:
 
   - id: destructive-git-requires-tier
     version: 1
-    contentHash: sha256:673a7d147114ac4edb21fcee6d5a030044aa8a5b98f802e332ce7362035e306f
+    contentHash: sha256:86fe423b56c621999bf45c5601d81da4603a457958f47ef3527660f0e9f87504
     title: Destructive git requires a declared tier or a team check
     binding: constitutional
     class: deny
@@ -996,7 +996,7 @@ policies:
         - { sub: symbolic-ref, any_flags: ["-d", "--delete"] }
       rm-force-recursive-targets: [".", "./", "..", "*", "~", "/"]
       tier-floor: claude-opus-5
-      tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol, human]
+      tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-opus-5-5, claude-fable-5-1, gpt-5.6-sol, human]
       unknown-tier: deny
       remedy: "check with the team first: ask the controller/operator to run this"
     status: active
