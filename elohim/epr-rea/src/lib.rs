@@ -77,6 +77,7 @@ pub use actor::SidecarActorStore;
 pub use actor::{
     parse_agent_ref, parse_participant_ref, record_signing_message, ActorClaim, ActorRecord,
     ActorStore, ActorWitness, MemoryActorStore, ParticipantRef, RecordSignature, SignatureVerifier,
+    ROOT_COLLECTIVE_DECLARATION,
 };
 pub use epistemic::{
     cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,

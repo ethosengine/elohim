@@ -50,6 +50,9 @@ const HUMAN_PREFIX: &str = "human:";
 /// [`parse_agent_ref`] itself, so every caller that validates the agent shape refuses it too.
 const RESERVED_MODEL: &str = "human";
 
+/// The repository-root collective's declaration: what an unbound claim is bound to.
+pub const ROOT_COLLECTIVE_DECLARATION: &str = ".epr-meta/collective.json";
+
 /// The declared content-address scheme for [`ActorClaim::definition_cid`].
 const DEFINITION_CID_PREFIX: &str = "sha256:";
 
@@ -80,9 +83,49 @@ pub struct ActorClaim {
     /// additive discipline as [`crate::model::Bound::sense`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub definition_cid: Option<String>,
+    /// The collective of record this session acts in: the repository-relative path of its
+    /// `.epr-meta/collective.json` declaration.
+    ///
+    /// `None` is an unbound claim, which its readers take as bound to the repository-root
+    /// collective. Same additive discipline as `definition_cid`: an unbound claim encodes
+    /// byte-identically to one made before this field existed, so no claim is re-addressed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collective: Option<String>,
 }
 
 impl ActorClaim {
+    /// Bind this claim to a collective of record by its declaration path.
+    ///
+    /// The path's SHAPE is the caller's to resolve (only a caller that can read the tree knows
+    /// which declaration is nearest); refused here is only what can never be a declaration path.
+    pub fn bound_to(mut self, declaration: &str) -> Result<Self> {
+        let declaration = declaration.trim();
+        if declaration.is_empty()
+            || declaration.starts_with('/')
+            || !declaration.ends_with(".epr-meta/collective.json")
+            || declaration
+                .split('/')
+                .any(|part| part == ".." || part == ".")
+        {
+            return Err(FabricError::Decode(format!(
+                "actor claim collective `{declaration}` is not a repository-relative \
+                 `.epr-meta/collective.json` declaration path"
+            )));
+        }
+        // One meaning, one encoding: an unbound claim already MEANS the root collective, so an
+        // explicit root binding normalizes to `None` rather than minting a second address for it.
+        self.collective =
+            (declaration != ROOT_COLLECTIVE_DECLARATION).then(|| declaration.to_string());
+        Ok(self)
+    }
+
+    /// The declaration path of this claim's collective of record, the root when unbound.
+    pub fn collective_of_record(&self) -> &str {
+        self.collective
+            .as_deref()
+            .unwrap_or(ROOT_COLLECTIVE_DECLARATION)
+    }
+
     /// The sole constructor. Every refusal below is a shape that would read as evidence and is
     /// not: an unparseable identity, an unscoped claim, an undated claim, or a definition
     /// address that is not an address.
@@ -138,6 +181,7 @@ impl ActorClaim {
             session: session.to_string(),
             claimed_at: claimed_at.to_string(),
             definition_cid,
+            collective: None,
         })
     }
 
@@ -1018,11 +1062,45 @@ mod tests {
                 "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                     .to_string(),
             ),
+            collective: None,
         };
         let cid = atom_cid(&claim).expect("cid");
         assert_eq!(
             cid.to_string(),
             "bafyreib3xfuy6hchjcbtrjktxfho52oqbs5pbu2e5depagycipxx4jnvpi"
         );
+    }
+
+    /// The collective binding is additive: an unbound claim keeps its pre-field address, an
+    /// explicit ROOT binding normalizes to unbound (one meaning, one encoding), and a child
+    /// binding is a distinct address. Malformed declaration paths are refused.
+    #[test]
+    fn collective_binding_is_additive_and_normalizes_the_root() {
+        let base = claim("agent:scribe@opus-5", "s1");
+        let unbound = atom_cid(&base).expect("cid");
+        let root = base
+            .clone()
+            .bound_to(ROOT_COLLECTIVE_DECLARATION)
+            .expect("root");
+        assert_eq!(root.collective, None);
+        assert_eq!(atom_cid(&root).expect("cid"), unbound);
+        assert_eq!(root.collective_of_record(), ROOT_COLLECTIVE_DECLARATION);
+        let child = base
+            .clone()
+            .bound_to("genesis/concern/.epr-meta/collective.json")
+            .expect("child");
+        assert_ne!(atom_cid(&child).expect("cid"), unbound);
+        assert_eq!(
+            child.collective_of_record(),
+            "genesis/concern/.epr-meta/collective.json"
+        );
+        for bad in [
+            "",
+            "/abs/.epr-meta/collective.json",
+            "genesis/../.epr-meta/collective.json",
+            "genesis/collective.json",
+        ] {
+            assert!(base.clone().bound_to(bad).is_err(), "{bad} must be refused");
+        }
     }
 }
