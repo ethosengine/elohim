@@ -37,19 +37,47 @@ refuse() { printf 'STAGE-PRECONDITION-UNMET: %s\n' "$1" >&2; exit 2; }
 [ -r "$REPO/genesis/a2o/$FEATURE" ] || refuse "feature unreadable: $REPO/genesis/a2o/$FEATURE"
 have="$(sha256sum "$REPO/genesis/a2o/$FEATURE" | cut -d' ' -f1)"
 [ "$have" = "$FEATURE_SHA256" ] || refuse "feature drifted: $have != $FEATURE_SHA256"
+# The guest UID almost never owns $REPO (a root/other-owned checkout): git refuses every
+# call with "detected dubious ownership" unless told otherwise, and — since createSutProbe's
+# git() swallows every failure to null (by design, so a component with no answer falls into
+# `unknown` rather than throwing) — a probe run under a hostile git config does not crash; it
+# silently resolves EVERY component to null and reports the hash of the empty tuple
+# (sha256:e3b0c44298fc1c14, sha256("") truncated) as if it were a real, drifted answer.
+# guestEnvironment (worker.mjs) strips everything but PATH/LD_LIBRARY_PATH/
+# COMPUTE_RUNTIME_IMAGE/TMPDIR, so these must be set here, not inherited:
+#   - GIT_CONFIG_* exempts $REPO from the ownership check without a writable HOME/global config.
+#   - GIT_CONFIG_NOSYSTEM skips /etc/gitconfig, which on a mode-0640 group-owned system config
+#     the guest UID cannot even read — git aborts the whole command on that alone, dubious
+#     ownership or not (verified 2026-09-25 via setpriv reproduction as the guest UID).
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=safe.directory
+export GIT_CONFIG_VALUE_0="$REPO"
+export GIT_CONFIG_NOSYSTEM=1
+
 # S3.0 — the honest artifact: recompute the same source-under-test the requester computed
 # (lib/sut.ts, the household receipt's own identity) against THIS checkout, right now. A
 # provider running a different tree than the one the requester pinned proves nothing about
 # it — refuse before running anything rather than reporting a green that measured the wrong
 # source. `node -e` with a dynamic import() so the absolute module path is built from $REPO
-# at runtime (a static import specifier cannot be interpolated).
+# at runtime (a static import specifier cannot be interpolated). Fail loud: a rejected probe
+# prints its stack to stderr and exits 1 rather than leaving stdout — and this refusal —
+# empty; the printed value is then asserted against the schema's own sut shape before it is
+# ever compared, so a swallowed git failure (a valid-shaped hash of nothing, not a crash) is
+# caught here too, not just an outright process failure.
+sut_stderr="$(mktemp "$SCRATCH/sut-probe-stderr.XXXXXX")"
 have_sut="$("$NODE_BIN" -e '
 const repo = process.argv[1];
 import("file://" + repo + "/genesis/a2o/scripts/lib/sut.ts").then(({ createSutProbe, computeSut }) => {
   const probe = createSutProbe(repo);
   process.stdout.write(computeSut(probe).sut);
-}).catch((e) => { process.stderr.write(String((e && e.stack) || e) + "\n"); process.exit(1); });
-' "$REPO")" || refuse "sut probe failed"
+}).catch((e) => { console.error(String((e && e.stack) || e)); process.exit(1); });
+' "$REPO" 2>"$sut_stderr")"
+sut_rc=$?
+sut_err_tail="$(tail -c 500 "$sut_stderr" 2>/dev/null | tr '\n' ' ')"
+rm -f "$sut_stderr"
+if [ "$sut_rc" -ne 0 ] || ! printf '%s' "$have_sut" | grep -Eq '^sha256:[0-9a-f]{16}$'; then
+  refuse "sut probe failed: ${sut_err_tail:-no stderr captured}"
+fi
 [ "$have_sut" = "$SUT_EXPECTED" ] || refuse "sut drifted: $have_sut != $SUT_EXPECTED"
 # The pinned copy travels in the dna slot; when the executor exposes it, cross-check.
 if [ -n "${SWEETTEST_DNA_DIR:-}" ] && [ -r "$SWEETTEST_DNA_DIR/lamad.dna" ]; then

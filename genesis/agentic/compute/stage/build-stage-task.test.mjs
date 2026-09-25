@@ -11,6 +11,7 @@ import {
   buildStageTask,
   parseFeatureConcern,
   parseScenarioNames,
+  probeRunParser,
   slugify,
 } from "./build-stage-task.mjs";
 
@@ -81,6 +82,53 @@ test("build-stage-task builds a valid single-scenario stage envelope", async (t)
   // not fail with `unknown field` or `unsupported task`.
   assert.equal(result.probe.ok, true);
   assert.match(result.probe.message, /runtime image identity unavailable or mismatched/);
+});
+
+test("probeRunParser accepts the image gate AND the rebuilt executor's artifact-mismatch gate as past-parsing verdicts", async () => {
+  const runProbe = async (message) =>
+    probeRunParser({
+      taskPath: "/tmp/whatever-task.json",
+      executor: "fake-executor",
+      execute: async () => {
+        throw new Error(message);
+      },
+    });
+
+  const image = await runProbe("runtime image identity unavailable or mismatched");
+  assert.equal(image.ok, true);
+  assert.match(image.message, /runtime image identity unavailable or mismatched/);
+
+  // The executor rebuilt from the rakia stash checks quota, then artifact identity, BEFORE
+  // the runtime-image gate — a throwaway probe binary/dna now fails there first, but that is
+  // still evidence the envelope parsed as a well-formed Task, not an envelope rejection.
+  const artifact = await runProbe("artifact mismatch");
+  assert.equal(artifact.ok, true);
+  assert.match(artifact.message, /artifact mismatch/);
+});
+
+test("probeRunParser still rejects envelope-parsing failures and real resource refusals", async () => {
+  const runProbe = async (message) =>
+    probeRunParser({
+      taskPath: "/tmp/whatever-task.json",
+      executor: "fake-executor",
+      execute: async () => {
+        throw new Error(message);
+      },
+    });
+
+  await assert.rejects(
+    runProbe("unknown field `bogus`"),
+    /envelope rejected before reaching the runtime-image gate/,
+  );
+  await assert.rejects(
+    runProbe("unsupported task kind"),
+    /envelope rejected before reaching the runtime-image gate/,
+  );
+  // A real resource refusal — never accepted as a past-parsing verdict, artifact-mismatch or not.
+  await assert.rejects(
+    runProbe("actual cgroup ceiling exceeds offered task bound"),
+    /unexpected compute-executor run probe result/,
+  );
 });
 
 test("slugify matches the verbatim §3 D6 expression on the pinned scenario name", () => {
@@ -198,6 +246,55 @@ test("defaultWritablePaths derives from MESH_DIR, never the retired /tmp/elohim-
     withoutMeshDir.some((p) =>
       p === "/repo/genesis/local-dev/household-dowell/matthew/runtime-config.toml",
     ),
+  );
+});
+
+test("the git safe.directory export precedes the guest recompute (and the inner just test mesh), and an empty recompute refuses loudly rather than comparing against nothing", async (t) => {
+  const out = await mkdtemp(join(tmpdir(), "stage-build-guest-sut-"));
+  t.after(() => rm(out, { recursive: true, force: true }));
+  const binDir = await mkdtemp(join(tmpdir(), "stage-build-guest-bin-"));
+  t.after(() => rm(binDir, { recursive: true, force: true }));
+
+  // A stub `node` on PATH standing in for a guest whose recompute prints nothing at all (the
+  // shape a swallowed git failure — or any other silent probe failure — takes): the runner
+  // must refuse loudly rather than comparing an empty string against SUT_EXPECTED and reading
+  // it as "drifted".
+  const fakeNode = join(binDir, "node");
+  await writeFile(fakeNode, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+  const result = await buildStageTask({
+    feature: FEATURE,
+    requester: REQUESTER,
+    provider: PROVIDER,
+    out,
+    execute: stubExecute(),
+    runtimeImage: "sha256:" + "0".repeat(64),
+    nodeBin: fakeNode,
+    justBin: "/bin/true",
+    writablePaths: [join(out, "writable-marker")],
+  });
+
+  const runner = await readFile(result.runnerPath, "utf8");
+  const safeDirIndex = runner.indexOf("GIT_CONFIG_KEY_0=safe.directory");
+  const recomputeIndex = runner.indexOf("have_sut=");
+  const justTestIndex = runner.indexOf('"$JUST_BIN" test mesh');
+  assert.ok(safeDirIndex > 0, "the safe.directory export must be rendered");
+  assert.ok(
+    recomputeIndex > safeDirIndex,
+    "the git safe.directory export must land before the sut recompute",
+  );
+  assert.ok(
+    justTestIndex > safeDirIndex,
+    "the git safe.directory export must also precede the inner just test mesh call",
+  );
+
+  await assert.rejects(
+    execFileP(result.runnerPath, [], { timeout: 60000 }),
+    (error) => {
+      assert.equal(error.code, 2);
+      assert.match(error.stderr, /STAGE-PRECONDITION-UNMET: sut probe failed/);
+      return true;
+    },
   );
 });
 

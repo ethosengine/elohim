@@ -436,10 +436,10 @@ test("a receipt claiming success with a report showing a failed step is a fail, 
   assert.equal(calls.putAttestation[0].attestation.result, "fail");
 });
 
-test("STAGE-PRECONDITION-UNMET in stderr.log yields a skip verdict and writes no attestation", async (t) => {
+test("STAGE-PRECONDITION-UNMET in stderr.log yields a skip verdict, writes no attestation, but IS durable evidence", async (t) => {
   const cwd = await mkdtemp(join(tmpdir(), "collect-stage-cwd-"));
   t.after(() => rm(cwd, { recursive: true, force: true }));
-  const { entry, status } = await makeStageFixture(t, { preconditionUnmet: true });
+  const { stage, entry, status } = await makeStageFixture(t, { preconditionUnmet: true });
   const { runners, calls } = fakeStageRunners();
 
   const evidence = await collectStageEvidence({ entry, status, root: cwd, cwd, runners });
@@ -447,6 +447,22 @@ test("STAGE-PRECONDITION-UNMET in stderr.log yields a skip verdict and writes no
   assert.match(evidence.reason, /STAGE-PRECONDITION-UNMET/);
   assert.equal(calls.putAttestation.length, 0);
   assert.equal(calls.deliverStageResult.length, 0);
+
+  // A refusal is evidence too: the durable copy under genesis/a2o/reports/peer-stage/ must
+  // exist even though this verdict never reaches the brit put / gap fulfil / DELTA.
+  assert.ok(evidence.durable, "evidence.durable must name the durable dir");
+  const durable = join(cwd, evidence.report);
+  assert.equal(evidence.durable, durable);
+  const statusJson = await readJson(join(durable, "status.json"));
+  assert.deepEqual(statusJson, status);
+  const receiptJson = await readJson(join(durable, "receipt.json"));
+  assert.deepEqual(receiptJson, status.completion.receipt);
+  const stageJson = await readJson(join(durable, "stage.json"));
+  assert.deepEqual(stageJson, stage);
+  const stderrLog = await readFile(join(durable, "stderr.log"), "utf8");
+  assert.match(stderrLog, /STAGE-PRECONDITION-UNMET/);
+  // No cucumber report was ever decoded on this refusal path — nothing to copy.
+  await assert.rejects(readFile(join(durable, "cucumber.json")));
 });
 
 test("collectStageEvidence is idempotent across restarts: a second call does nothing further", async (t) => {

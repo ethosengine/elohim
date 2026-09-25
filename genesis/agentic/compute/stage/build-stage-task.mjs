@@ -300,7 +300,16 @@ export function expectedTestsFor(testPrefix, scenarioSlugs) {
 // `run`'s typed contract::Task would refuse. Validating with `cid` alone would let a broken
 // envelope pass this builder and fail only later, at launch, on the provider. This probe
 // invokes `run` with throwaway binary/dna/root/ark/action values so parsing is exercised
-// without needing a live provider; a well-formed envelope reaches the runtime-image check.
+// without needing a live provider; a well-formed envelope reaches PAST task parsing.
+//
+// The rebuilt executor (compute-executor, runtime.rs) checks quota, then artifact identity,
+// THEN the runtime-image gate — so a throwaway probe binary/dna/root now normally fails on
+// `artifact mismatch` (its /bin/true and /dev/null throwaways don't match the envelope's own
+// descriptors) before ever reaching the image check. That is still evidence the envelope
+// parsed and was accepted as a well-formed Task — the same past-parsing verdict the older
+// image-only message used to carry — so it is accepted here too, alongside the image message
+// for an executor build where the image gate runs first. `actual cgroup ceiling exceeds
+// offered task bound` is a REAL resource refusal, not a parsing artifact, and stays rejected.
 export async function probeRunParser({ taskPath, executor, execute = run }) {
   try {
     await execute(executor, [
@@ -330,10 +339,10 @@ export async function probeRunParser({ taskPath, executor, execute = run }) {
         `envelope rejected before reaching the runtime-image gate: ${message}`,
       );
     }
-    if (!/runtime image identity unavailable or mismatched/.test(message)) {
-      throw new Error(`unexpected compute-executor run probe result: ${message}`);
+    if (/runtime image identity unavailable or mismatched|artifact mismatch/.test(message)) {
+      return { ok: true, message };
     }
-    return { ok: true, message };
+    throw new Error(`unexpected compute-executor run probe result: ${message}`);
   }
 }
 

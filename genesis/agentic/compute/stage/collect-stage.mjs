@@ -171,27 +171,14 @@ export async function collectStageEvidence({
   const stdoutPath = logPaths.find((p) => p.endsWith("stdout.log"));
   const stderrPath = logPaths.find((p) => p.endsWith("stderr.log"));
 
-  if (!stdoutPath) {
-    entry.evidence = { done: true, verdict: "skip", reason: "stdout.log was not materialized" };
-    return entry.evidence;
-  }
-  let stdoutBuf;
-  try {
-    stdoutBuf = await readFile(stdoutPath);
-  } catch (error) {
-    entry.evidence = { done: true, verdict: "skip", reason: `cannot read stdout.log: ${error.message}` };
-    return entry.evidence;
-  }
-  const declaredSha = logsByName["stdout.log"]?.sha256;
-  const actualSha = createHash("sha256").update(stdoutBuf).digest("hex");
-  if (!declaredSha || actualSha !== declaredSha) {
-    entry.evidence = {
-      done: true,
-      verdict: "fail",
-      reason: `stdout.log digest ${actualSha} does not match the receipt's declared ${declaredSha ?? "(absent)"}`,
-    };
-    return entry.evidence;
-  }
+  // The durable target — computed once, ahead of every terminal (skip/fail/pass) return below,
+  // not just the pass path: a refusal is evidence too. `genesis/a2o/reports/peer-stage/<date>/
+  // <key(ref)>/`.
+  const ref = status.requestActionHash || entry.requestActionHash || "";
+  const refKey = key(ref);
+  const dateStr = now().toISOString().slice(0, 10);
+  const reportRelDir = join("genesis", "a2o", "reports", "peer-stage", dateStr, refKey);
+  const durableDir = join(cwd, reportRelDir);
 
   let stderrText = "";
   if (stderrPath) {
@@ -201,20 +188,88 @@ export async function collectStageEvidence({
       /* an absent/unreadable stderr.log is not itself a failure */
     }
   }
+
+  // Writes whatever pieces of evidence are available at the call site — cucumber.json only
+  // once the framed report has decoded, stdout.log only once fetched — so an early refusal (a
+  // missing artifact, a digest mismatch, STAGE-PRECONDITION-UNMET) still leaves a durable
+  // trail under genesis/a2o/reports/peer-stage/ instead of only the ephemeral build dir.
+  const writeDurable = async ({ framed = null, stdoutBuf = null } = {}) => {
+    await mkdir(durableDir, { recursive: true, mode: 0o700 });
+    if (framed) await writeFile(join(durableDir, "cucumber.json"), framed.buffer);
+    await writeFile(
+      join(durableDir, "receipt.json"),
+      JSON.stringify(receipt ?? null, null, 2) + "\n",
+    );
+    await writeFile(join(durableDir, "status.json"), JSON.stringify(status, null, 2) + "\n");
+    await writeFile(join(durableDir, "stage.json"), JSON.stringify(stage, null, 2) + "\n");
+    if (stdoutBuf) await writeFile(join(durableDir, "stdout.log"), stdoutBuf);
+    if (stderrText) await writeFile(join(durableDir, "stderr.log"), stderrText);
+    return durableDir;
+  };
+
+  if (!stdoutPath) {
+    await writeDurable();
+    entry.evidence = {
+      done: true,
+      verdict: "skip",
+      reason: "stdout.log was not materialized",
+      report: reportRelDir,
+      durable: durableDir,
+    };
+    return entry.evidence;
+  }
+  let stdoutBuf;
+  try {
+    stdoutBuf = await readFile(stdoutPath);
+  } catch (error) {
+    await writeDurable();
+    entry.evidence = {
+      done: true,
+      verdict: "skip",
+      reason: `cannot read stdout.log: ${error.message}`,
+      report: reportRelDir,
+      durable: durableDir,
+    };
+    return entry.evidence;
+  }
+  const declaredSha = logsByName["stdout.log"]?.sha256;
+  const actualSha = createHash("sha256").update(stdoutBuf).digest("hex");
+  if (!declaredSha || actualSha !== declaredSha) {
+    await writeDurable({ stdoutBuf });
+    entry.evidence = {
+      done: true,
+      verdict: "fail",
+      reason: `stdout.log digest ${actualSha} does not match the receipt's declared ${declaredSha ?? "(absent)"}`,
+      report: reportRelDir,
+      durable: durableDir,
+    };
+    return entry.evidence;
+  }
+
   const preconditionLine = stderrText
     .split("\n")
     .find((line) => line.includes("STAGE-PRECONDITION-UNMET"));
   if (preconditionLine) {
-    entry.evidence = { done: true, verdict: "skip", reason: preconditionLine.trim() };
+    await writeDurable({ stdoutBuf });
+    entry.evidence = {
+      done: true,
+      verdict: "skip",
+      reason: preconditionLine.trim(),
+      report: reportRelDir,
+      durable: durableDir,
+    };
     return entry.evidence;
   }
 
   const framed = decodeFramedReport(stdoutBuf.toString("utf8"));
   if (!framed) {
+    await writeDurable({ stdoutBuf });
     entry.evidence = {
       done: true,
       verdict: "fail",
       reason: "stdout.log did not carry a framed ELOHIM STAGE REPORT",
+      report: reportRelDir,
+      durable: durableDir,
     };
     return entry.evidence;
   }
@@ -223,20 +278,10 @@ export async function collectStageEvidence({
   // (3) the verdict — reads the decoded report, never receipt.status.
   const { verdict, scenarios, reason: verdictReason } = stageVerdict(framed.doc, stage);
 
-  // (4) durable copy: genesis/a2o/reports/peer-stage/<date>/<key(ref)>/
-  const ref = status.requestActionHash || entry.requestActionHash || "";
-  const refKey = key(ref);
-  const dateStr = now().toISOString().slice(0, 10);
-  const reportRelDir = join("genesis", "a2o", "reports", "peer-stage", dateStr, refKey);
-  const durableDir = join(cwd, reportRelDir);
-  await mkdir(durableDir, { recursive: true, mode: 0o700 });
-  await writeFile(join(durableDir, "cucumber.json"), framed.buffer);
-  await writeFile(
-    join(durableDir, "receipt.json"),
-    JSON.stringify(receipt ?? null, null, 2) + "\n",
-  );
-  await writeFile(join(durableDir, "status.json"), JSON.stringify(status, null, 2) + "\n");
-  await writeFile(join(durableDir, "stage.json"), JSON.stringify(stage, null, 2) + "\n");
+  // (4) durable copy: genesis/a2o/reports/peer-stage/<date>/<key(ref)>/ — every terminal
+  // verdict (skip/fail/pass alike) leaves one here; only the brit put, the gap fulfil and the
+  // DELTA below stay gated on how `deliverStageResult` itself reads `verdict`.
+  await writeDurable({ framed, stdoutBuf });
 
   // (5) ONE brit put per stage.
   const rung = entry.rung === "A" ? "A" : "H";
@@ -326,6 +371,7 @@ export async function collectStageEvidence({
     verdict,
     verdictReason,
     report: reportRelDir,
+    durable: durableDir,
     attestation: attestationOutcome,
     ...delivery,
   };
