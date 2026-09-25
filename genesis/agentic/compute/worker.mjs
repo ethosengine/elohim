@@ -74,6 +74,27 @@ export async function executeTask({
     throw new Error("Task already accepted by another durable attempt");
   }
   const task = status.envelope;
+  // S4a3 — the k8s-rendered sibling container's slice is a hard ceiling on what this
+  // worker may accept, independent of the grant's own bounds. Unset env = no ceiling
+  // (household/dev worker runs, or a not-yet-declared slice — S4a2).
+  const sliceCpuMillis = env.COMPUTE_SLICE_CPU_MILLIS;
+  const sliceMemoryBytes = env.COMPUTE_SLICE_MEMORY_BYTES;
+  if (
+    sliceCpuMillis !== undefined &&
+    task.resources?.cpuMillis > Number(sliceCpuMillis)
+  ) {
+    throw new Error(
+      `capacity ceiling: task asks ${task.resources.cpuMillis}m cpu over slice ${sliceCpuMillis}m`,
+    );
+  }
+  if (
+    sliceMemoryBytes !== undefined &&
+    task.resources?.memoryBytes > Number(sliceMemoryBytes)
+  ) {
+    throw new Error(
+      `capacity ceiling: task asks ${task.resources.memoryBytes} bytes memory over slice ${sliceMemoryBytes} bytes`,
+    );
+  }
   const taskFile = join(dir, "task.json");
   const runtimeArgs = [
     "run",

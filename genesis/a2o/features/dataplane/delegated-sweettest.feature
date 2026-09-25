@@ -1,4 +1,4 @@
-@e2e @dataplane @concern:operator-runtime-surface @requires:shem
+@e2e @dataplane @concern:operator-runtime-surface @requires:shem @requires:local-conductor
 Feature: A developer delegates a sweettest while continuing other work
   A sweettest runs the Holochain feedback suite against a packed DNA bundle.
   The developer selects exact, content-addressed artifacts so Adam runs the same

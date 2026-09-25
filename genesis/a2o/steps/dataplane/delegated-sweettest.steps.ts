@@ -93,6 +93,21 @@ async function waitFor(state: State, predicate: (value: Status) => boolean) {
 }
 
 Given("a configured native compute workspace and Adam's dedicated test worker", async function () {
+  // S4b — honest pending: a repo-declared fact (never a live probe) gates this Background.
+  // adam-compute-worker.json is the single source for whether Adam's k8s-sibling worker is
+  // wired at all; when it is not, naming COMPUTE_A2O_CONFIG's absence would mislead (that
+  // env var is the NEXT gap, not this one).
+  const workerConfigPath = resolve('../orchestrator/data/adam-compute-worker.json');
+  const workerConfig = JSON.parse(await readFile(workerConfigPath, 'utf8')) as {
+    enabled?: boolean;
+  };
+  if (workerConfig.enabled !== true) {
+    this.attach(
+      "adam's compute worker is not enabled in adam-compute-worker.json",
+      'text/plain'
+    );
+    return 'pending';
+  }
   const file = process.env.COMPUTE_A2O_CONFIG;
   if (!file) return 'pending';
   const config = JSON.parse(await readFile(file, 'utf8')) as Fixture;
