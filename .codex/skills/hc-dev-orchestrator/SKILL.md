@@ -526,6 +526,54 @@ its port, capture environ+exe to EOF, SIGTERM→SIGKILL, re-exec the same argv/e
 `src/framework/fixtures/process-control.ts`; a custody provider matches a peer by libp2p peerId OR
 the fixture's `agentPubKey` (reconcile/custody.rs accepts either namespace).
 
+## The household lease: class, TTL, fence, and where measure-class runs go (2026-09-25)
+
+`just test mesh` and `just mesh start|stop` claim the household lease through `berth` before
+touching the mesh — the mesh is one per workspace, so this is the router, not an add-on.
+`BERTH_CLASS=verify|measure` (default `verify`), `BERTH_TTL` (default 1800 s; `verify`'s max is
+3600 s — a longer hold is a measure and is refused as one). A live holder in another session
+refuses in under a second (exit 3), naming the holder. Exit 4 (no session resolvable — a mooring
+carries the Claude pid and its start time, and a claim resolves by process ancestry; from a
+non-Claude shell pass `--session` or `BERTH_SESSION`) is the ONLY exit code a caller proceeds
+past unleased; every other failure propagates.
+
+A `verify` lane is fenced by `timeout` at its TTL: the lane re-enters under `timeout --signal=INT
+--kill-after=30`, so past the lease it is killed (INT, then KILL 30 s later) and the recipe ends
+`BUDGET-EXCEEDED: <class> lane ran past its <ttl>s lease`, exit 3. Scope the lane down, or send it
+through `just measure` instead of raising the TTL.
+
+`--class measure` is refused on the dev berth (`just test mesh BERTH_CLASS=measure` and `just
+mesh matrix|recovery|recovery-matrix` all claim `mesh --class measure` first) and the refusal
+names `just measure <scope>`. `MEASURE_ON_DEV_BERTH=1` is the declared override: it claims (ttl
+`BERTH_TTL`, default 3600 s for this class), writes a `kind: override` row to the berth ledger,
+and emits `dev-berth-held-by-measure@1` immediately — that measure renders on the
+`push-delivers-within-budget` headline line. `matrix`, `recovery`, and `recovery-matrix` are
+measure-class for exactly this reason: windows, restarts, and repeated shapes are what the dev
+berth was never meant to hold.
+
+`just mesh start` holds the daemon `mesh` class instead — no TTL, taken over only when the
+holder's mooring is dead. A session holding it runs its own `just test mesh` lanes as already
+covered (a renew, not a new claim). `just mesh stop` refuses under another live holder (`owner-check`,
+exit 3, holder named); `MESH_STOP_FORCE=1` overrides, on the record.
+
+`just measure <feature-path> [--on jessica|adam] [--gap <id>]`
+(`genesis/agentic/compute/measure.sh`) is the developer verb that leaves the dev berth entirely:
+it authors ONE feature path (a tag expression is refused; v1 is one path) as a peer-executed
+stage, submits it to the provider that holds the stores, and returns immediately. Sub-verbs:
+`grant --on jessica|adam`, `worker --on jessica|adam`, `status`, `poll`, `fixture --on
+jessica|adam <feature-path>`. It refuses before launch, naming the fix, rather than failing
+mid-run — missing `compute-executor`/`ark` binaries, an unresolved provider. `MEASURE_DRY_RUN=1`
+prints the resolved env and the exact command(s) without running them. `--on adam` refuses today,
+by name, listing the operator items still open (adam is a k8s pod on shem, provisioned by the
+cluster operator) — only `jessica` is a live provider. The listener writes the brit validate ref,
+`sprint-report-peer-stage-*.json`, the gap fulfil, and the habit delta when the stage's completion
+arrives; a rung-H (household stand-in) result is labelled as such — it never claims offload that
+wasn't proven.
+
+`berth status` shows every lease with its class, held-for duration, and holder, and marks an
+unclaimed-but-expired lease `EXPIRED`. `berth say [--to SESSION] TEXT` is the cross-session
+channel for asking a holder for a window instead of guessing or forcing.
+
 ## Build and gate
 
 ```bash
