@@ -21,12 +21,12 @@ purpose: >
   redefining (a second identical registration would make cucumber's step matching ambiguous).
 cites:
   - genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md
-  - genesis/a2o/features/dataplane/delegated-sweettest.feature
+  - genesis/a2o/held/features/dataplane/delegated-sweettest.feature
 ---
 # compute/ — peer-executed CI stage a2o bindings
 
 Two feature files. `peer-executed-stage.feature` exercises the same delegated-compute
-substrate `dataplane/delegated-sweettest.feature` measures, shaped as a CI stage (§3 D1-D2
+substrate `held/features/dataplane/delegated-sweettest.feature` measures (held until `local-conductor` is available), shaped as a CI stage (§3 D1-D2
 of the design doc) rather than a Holochain feedback sweettest — the `feedback_signal::`
 namespace token in the envelope's `expectedTests` is a pinned-executor requirement, not a
 claim about what kind of test this is (see design §3 D6). `measure-on-a-peer.feature` proves

@@ -131,7 +131,8 @@ project and task kind; signed request references break completion-time ties.
 Cleanup is evaluated between runs and on idle polls.
 
 The live acceptance probe is
-`genesis/a2o/features/dataplane/delegated-sweettest.feature`.
+`genesis/a2o/held/features/dataplane/delegated-sweettest.feature` — held by the scope
+reconciler while `local-conductor` is unavailable; it returns to the plate when the cap does.
 Set `COMPUTE_A2O_CONFIG` to a private JSON file with `task`, `binary`, `dna`
 paths and an `env` map containing the workspace variables above. Optional
 `unauthorizedTask`/`unauthorizedEnv` supply the refusal fixture;
