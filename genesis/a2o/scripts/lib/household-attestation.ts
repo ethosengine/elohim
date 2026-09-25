@@ -57,7 +57,58 @@ export interface ReceiptSummary {
   reach: 'trusted';
   moored: Mooring | null;
   scenarios: ReceiptScenario[];
+  /**
+   * Present only when the stage ran on a peer: the DHT chain this workspace verified before it
+   * signed. The reader re-verifies it against the requester's own task record
+   * (`GET /api/v1/compute/tasks/<requestActionHash>`); the brit signature vouches only that this
+   * workspace verified the chain and decoded the report, never for the provider.
+   */
+  peer?: PeerStage;
 }
+
+/**
+ * A peer-executed stage's receipt chain. Every key here is a Holochain identity or a content
+ * digest the provider's completion carries; none is ever compared to a brit key.
+ */
+export interface PeerStage {
+  /** H = household stand-in (jessica); A = a real peer (adam). */
+  rung: 'H' | 'A';
+  provider: string;
+  requester: string;
+  grantActionHash: string;
+  grantCid: string;
+  scope: string;
+  requestActionHash: string;
+  completionActionHash: string;
+  receiptCid: string;
+  taskCid: string;
+  featureSha256: string;
+  reportSha256: string;
+}
+
+/** The requester storage's task record (`GET /api/v1/compute/tasks/<requestActionHash>`). */
+export interface PeerTaskStatus {
+  state?: string;
+  requester?: string;
+  provider?: string;
+  grantActionHash?: string;
+  envelope?: { project?: string; dna?: { sha256?: string } };
+  completion?: { actionHash?: string; receiptCid?: string } | null;
+  refusal?: unknown;
+  observed?: {
+    verified?: boolean;
+    grantCid?: string;
+    scope?: string;
+    grantProvider?: string;
+    grantRecipient?: string;
+    fulfilledEventId?: string;
+    refused?: string;
+  } | null;
+}
+
+/** The grant scope a measure stage runs under (the event class, never the project prefix). */
+export const PEER_STAGE_SCOPE = 'measure-stage';
+export const PEER_STAGE_PROJECT_PREFIX = 'a2o-stage:';
 
 export interface ConcernAttestation {
   check: string;
@@ -257,6 +308,42 @@ const defaultRunner: Runner = (cmd, args, cwd) => {
 };
 
 /**
+ * One `brit-build-ref validate put` of `attestation` under the workspace key of `workspace` (the
+ * directory holding the `.git` common dir). `cwd` defaults to the workspace; the household writer
+ * runs it from its repo root. Returns the runner's result; never throws on a non-zero exit.
+ */
+export function putAttestation(
+  brit: string,
+  workspace: string,
+  attestation: ConcernAttestation,
+  run: Runner = defaultRunner,
+  cwd: string = workspace
+): ReturnType<Runner> {
+  return run(
+    brit,
+    [
+      '--repo',
+      workspace,
+      'validate',
+      'put',
+      '--step',
+      ATTESTATION_STEP,
+      '--check',
+      attestation.check,
+      '--artifact',
+      attestation.artifact,
+      '--result',
+      attestation.result,
+      '--summary',
+      JSON.stringify(attestation.summary),
+      '--validator-version',
+      VALIDATOR_VERSION,
+    ],
+    cwd
+  );
+}
+
+/**
  * After a household report is written: `epr flow fulfill <report>` (when `epr` exists) and one
  * `brit-build-ref validate put` per concern (when brit-build-ref exists). Never throws and never
  * changes the run's verdict — the report on disk is the evidence; these are its projections.
@@ -314,28 +401,7 @@ export function publishHouseholdEvidence(opts: {
   }
   let written = 0;
   for (const a of attestations) {
-    const r = run(
-      brit,
-      [
-        '--repo',
-        workspace,
-        'validate',
-        'put',
-        '--step',
-        ATTESTATION_STEP,
-        '--check',
-        a.check,
-        '--artifact',
-        a.artifact,
-        '--result',
-        a.result,
-        '--summary',
-        JSON.stringify(a.summary),
-        '--validator-version',
-        VALIDATOR_VERSION,
-      ],
-      repoRoot
-    );
+    const r = putAttestation(brit, workspace, a, run, repoRoot);
     if (r.status === 0) written += 1;
     else log(`validation attestation FAILED for ${a.check} (exit ${r.status}): ${r.stderr.trim()}`);
   }
@@ -516,16 +582,101 @@ export function readHouseholdAttestations(
 
 export type Admission = { ok: true; summary: ReceiptSummary } | { ok: false; reason: string };
 
+export type PeerVerdict = { ok: true } | { ok: false; reason: string };
+
+const PEER_KEYS: (keyof PeerStage)[] = [
+  'provider',
+  'requester',
+  'grantActionHash',
+  'grantCid',
+  'scope',
+  'requestActionHash',
+  'completionActionHash',
+  'receiptCid',
+  'taskCid',
+  'featureSha256',
+  'reportSha256',
+];
+
+/**
+ * Whether the requester's own task record carries the chain a peer summary claims. Every
+ * comparison is Holochain-to-Holochain or digest-to-digest: the provider's claims are signatures
+ * the requester's storage verified (the completion is authored by `task.provider`; `observed`
+ * re-reads the grant with its author pinned to that provider). Pure — the caller fetches.
+ */
+export function peerChainVerdict(peer: PeerStage, status: PeerTaskStatus | undefined): PeerVerdict {
+  if (
+    !peer ||
+    typeof peer !== 'object' ||
+    (peer.rung !== 'H' && peer.rung !== 'A') ||
+    !PEER_KEYS.every(k => typeof peer[k] === 'string' && peer[k] !== '')
+  ) {
+    return { ok: false, reason: 'peer block is malformed' };
+  }
+  if (!status || typeof status !== 'object') {
+    return { ok: false, reason: 'peer chain unverifiable (requester storage unreachable)' };
+  }
+  if (status.state !== 'completed') {
+    return { ok: false, reason: `peer task is ${status.state ?? 'in no state'}, not completed` };
+  }
+  if (status.completion?.actionHash !== peer.completionActionHash) {
+    return { ok: false, reason: 'peer completion is not the one the task record carries' };
+  }
+  if (status.completion?.receiptCid !== peer.receiptCid) {
+    return { ok: false, reason: 'peer receipt CID is not the completion receipt' };
+  }
+  if (status.provider !== peer.provider) {
+    return { ok: false, reason: 'peer provider is not the task provider' };
+  }
+  if (status.requester !== peer.requester) {
+    return { ok: false, reason: 'peer requester is not the task requester' };
+  }
+  if (status.grantActionHash !== peer.grantActionHash) {
+    return { ok: false, reason: 'peer grant is not the task grant' };
+  }
+  const observed = status.observed;
+  if (!observed) return { ok: false, reason: 'peer grant not observed by requester storage' };
+  if (observed.verified !== true) {
+    const why = observed.refused ? ': ' + observed.refused : '';
+    return { ok: false, reason: 'peer grant not verified by requester storage' + why };
+  }
+  if (observed.scope !== PEER_STAGE_SCOPE || peer.scope !== PEER_STAGE_SCOPE) {
+    return {
+      ok: false,
+      reason: `peer grant scope is ${observed.scope ?? 'absent'}, not ${PEER_STAGE_SCOPE}`,
+    };
+  }
+  if (observed.grantCid !== peer.grantCid) {
+    return { ok: false, reason: 'peer grant CID is not the observed grant' };
+  }
+  if (observed.grantProvider !== peer.provider) {
+    return { ok: false, reason: 'peer provider is not the grant provider' };
+  }
+  if (observed.grantRecipient !== peer.requester) {
+    return { ok: false, reason: 'peer requester is not the grant recipient' };
+  }
+  if (!status.envelope?.project?.startsWith(PEER_STAGE_PROJECT_PREFIX)) {
+    return { ok: false, reason: `peer task is not an ${PEER_STAGE_PROJECT_PREFIX} stage` };
+  }
+  if (status.envelope.dna?.sha256 !== peer.featureSha256) {
+    return { ok: false, reason: 'peer feature digest is not the task payload' };
+  }
+  return { ok: true };
+}
+
 /**
  * Structural admission of one attestation as a household receipt: signed by the workspace key,
  * a pass, keyed by a source identity that re-derives from the parts it carries, and whose
- * artifact CID is that identity. Whether those parts equal the CURRENT tree, and whether every
- * station passed, is the caller's receipt rule.
+ * artifact CID is that identity. A summary carrying `peer` is admitted only when
+ * `peerStatus(peer.requestActionHash)` — the requester's own task record — verifies the chain
+ * (`peerChainVerdict`); the artifact stays the SUT either way. Whether the parts equal the
+ * CURRENT tree, and whether every station passed, is the caller's receipt rule.
  */
 export function admitAttestation(
   node: ValidationNodeJson,
   concern: string,
-  workspaceId: string | null
+  workspaceId: string | null,
+  peerStatus?: (requestActionHash: string) => PeerTaskStatus | undefined
 ): Admission {
   if (!workspaceId) return { ok: false, reason: 'no workspace key' };
   if (node.validatorId !== workspaceId) return { ok: false, reason: 'not the workspace key' };
@@ -548,6 +699,15 @@ export function admitAttestation(
   }
   if (node.checkName !== checkNameFor(concern, summary.sut)) {
     return { ok: false, reason: 'check name is not keyed by the sut' };
+  }
+  if (summary.peer !== undefined) {
+    const peer = summary.peer;
+    const hash = peer && typeof peer === 'object' ? peer.requestActionHash : undefined;
+    const verdict = peerChainVerdict(
+      peer,
+      typeof hash === 'string' && hash ? peerStatus?.(hash) : undefined
+    );
+    if (!verdict.ok) return verdict;
   }
   return { ok: true, summary };
 }

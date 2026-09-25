@@ -31,6 +31,8 @@ import {
   validateReceipt,
   checkReports,
   requiredReceipts,
+  peerRequestsOf,
+  prefetchPeerStatuses,
   RECEIPT_STORIES,
 } from "./scripts/serving-receipt.mjs";
 
@@ -670,10 +672,11 @@ function withFixture(fn) {
   }
 }
 
-function check(root, reports, paths) {
+function check(root, reports, paths, peerStatuses) {
   const out = [];
   const ok = checkReports(root, reports, paths, {
     attestations: true,
+    peerStatuses,
     log: (l) => out.push(l),
     warn: (l) => out.push(l),
   });
@@ -909,5 +912,182 @@ test("a changed path under .epr-meta is not a serving path, and the bash leg agr
       /\[pre-push\]\s+elohim\/elohim-render\/src\/lib\.rs/,
     );
     assert.doesNotMatch(mixed.stderr, /\.epr-meta/);
+  });
+});
+
+// ── Lane S2: a peer-executed stage is admitted by its verified DHT chain ─────────
+const PEER = {
+  rung: "H",
+  provider: "uhCAk-jessica-provider",
+  requester: "uhCAk-matthew-requester",
+  grantActionHash: "uhCkk-grant",
+  grantCid: "bafy-grant",
+  scope: "measure-stage",
+  requestActionHash: "uhCkk-request",
+  completionActionHash: "uhCkk-completion-action",
+  receiptCid: "bafy-receipt",
+  taskCid: "bafy-task",
+  featureSha256: "f".repeat(64),
+  reportSha256: "e".repeat(64),
+};
+const verifiedTask = () => ({
+  state: "completed",
+  requester: PEER.requester,
+  provider: PEER.provider,
+  grantActionHash: PEER.grantActionHash,
+  envelope: { project: "a2o-stage:x", dna: { sha256: PEER.featureSha256 } },
+  completion: {
+    actionHash: PEER.completionActionHash,
+    receiptCid: PEER.receiptCid,
+  },
+  observed: {
+    verified: true,
+    grantCid: PEER.grantCid,
+    scope: "measure-stage",
+    grantProvider: PEER.provider,
+    grantRecipient: PEER.requester,
+    fulfilledEventId: `compute-fulfilled:${PEER.requestActionHash}`,
+  },
+});
+
+test("a current-source peer-stage attestation is admitted when the requester's task record verifies its chain", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const node = householdNode(root, story, { peer: PEER });
+    putRef(root, story.concern, JSON.parse(node.resultSummary).sut, node);
+    assert.deepEqual(peerRequestsOf(root), [PEER.requestActionHash]);
+    const { ok, out } = check(
+      root,
+      reports,
+      ["scripts/ci/fleet-write-readiness.sh"],
+      new Map([[PEER.requestActionHash, verifiedTask()]]),
+    );
+    assert.equal(ok, true, out);
+    assert.match(
+      out,
+      /brit validation attestation push-delivers-within-budget\/sha256:[0-9a-f]{16} \(reach trusted; signed by workspace [0-9a-f]{12}…\); stage ran on peer uhCAk-jessic… \(rung H\), completion uhCkk-comple… verified/,
+    );
+  });
+});
+
+test("without verified task records a peer-stage attestation is refused and the reader falls back to report files", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const node = householdNode(root, story, { peer: PEER });
+    putRef(root, story.concern, JSON.parse(node.resultSummary).sut, node);
+    const paths = ["scripts/ci/fleet-write-readiness.sh"];
+    for (const statuses of [
+      undefined,
+      new Map(),
+      new Map([
+        [
+          PEER.requestActionHash,
+          { ...verifiedTask(), observed: { verified: false, refused: "x" } },
+        ],
+      ]),
+    ])
+      assert.equal(check(root, reports, paths, statuses).ok, false);
+    writeFileSync(
+      join(reports, "sprint-report-household-z.json"),
+      JSON.stringify(storyReport(root, story)),
+    );
+    const { ok, out } = check(root, reports, paths, new Map());
+    assert.equal(ok, true, out);
+    assert.match(out, /T2 serving receipt: sprint-report-household-z\.json/);
+    assert.doesNotMatch(out, /brit validation attestation/);
+  });
+});
+
+test("the prefetch reads task records only through the loopback compute API, and says why when it cannot", async () => {
+  const none = await prefetchPeerStatuses([], {});
+  assert.equal(none.statuses.size, 0);
+  assert.equal(none.skipped, null);
+  const noEnv = await prefetchPeerStatuses([PEER.requestActionHash], {
+    COMPUTE_API_URL: "http://127.0.0.1:8090",
+  });
+  assert.equal(noEnv.statuses.size, 0);
+  assert.match(noEnv.skipped, /^peer attestation skipped: no loopback env/);
+  const env = {
+    COMPUTE_API_URL: "http://127.0.0.1:8090",
+    COMPUTE_PERFORMER: "uhCAk-matthew-requester",
+    ELOHIM_COMPUTE_LOCAL_TOKEN: "tok",
+  };
+  const seen = [];
+  const fetcher = async (url, init) => {
+    seen.push({ url: String(url), init });
+    return String(url).endsWith("uhCkk-request")
+      ? { ok: true, json: async () => verifiedTask() }
+      : { ok: false, status: 403, json: async () => ({}) };
+  };
+  const got = await prefetchPeerStatuses(
+    [PEER.requestActionHash, "uhCkk-missing"],
+    env,
+    { fetcher },
+  );
+  assert.deepEqual(got.statuses.get(PEER.requestActionHash), verifiedTask());
+  assert.equal(got.statuses.has("uhCkk-missing"), false);
+  assert.match(got.skipped, /1\/2 task record\(s\) unreadable .*403/);
+  assert.equal(
+    seen[0].url,
+    "http://127.0.0.1:8090/api/v1/compute/tasks/uhCkk-request",
+  );
+  assert.equal(seen[0].init.method, "GET");
+  assert.equal(seen[0].init.headers["x-elohim-compute-token"], "tok");
+  assert.equal(
+    seen[0].init.headers["x-elohim-verified-performer"],
+    env.COMPUTE_PERFORMER,
+  );
+  const remote = await prefetchPeerStatuses([PEER.requestActionHash], {
+    ...env,
+    COMPUTE_API_URL: "http://doorway.example:8090",
+  });
+  assert.equal(remote.statuses.size, 0);
+  assert.match(remote.skipped, /loopback storage/);
+});
+
+test("the CLI names why a peer-stage attestation was skipped and still reads report files", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const node = householdNode(root, story, { peer: PEER });
+    putRef(root, story.concern, JSON.parse(node.resultSummary).sut, node);
+    const changed = join(reports, "changed.txt");
+    writeFileSync(changed, "scripts/ci/fleet-write-readiness.sh\n");
+    const env = Object.fromEntries(
+      Object.entries(NO_GIT_ENV).filter(
+        ([k]) =>
+          ![
+            "COMPUTE_API_URL",
+            "COMPUTE_PERFORMER",
+            "ELOHIM_COMPUTE_LOCAL_TOKEN",
+            "SERVING_RECEIPT_ATTESTATIONS",
+          ].includes(k),
+      ),
+    );
+    const cli = (extra = {}) =>
+      spawnSync(
+        process.execPath,
+        [
+          join(root, "genesis/orchestrator/scripts/serving-receipt.mjs"),
+          root,
+          reports,
+          changed,
+        ],
+        { cwd: root, encoding: "utf8", env: { ...env, ...extra } },
+      );
+    let result = cli();
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /\[pre-push\] peer attestation skipped: no loopback env/,
+    );
+    writeFileSync(
+      join(reports, "sprint-report-household-z.json"),
+      JSON.stringify(storyReport(root, story)),
+    );
+    result = cli();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /sprint-report-household-z\.json/);
+    result = cli({ SERVING_RECEIPT_ATTESTATIONS: "0" });
+    assert.doesNotMatch(result.stderr, /peer attestation/);
   });
 });

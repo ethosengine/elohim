@@ -7,6 +7,10 @@
 //      (reach trusted: verified on the household) — written by build-sprint-report.ts;
 //   2. a sprint-report-household-*.json file with the same content.
 // Both must name every station of the story, each passed, on source parts equal to the tree.
+// An attestation whose summary carries `peer` (a stage a peer executed) is admitted only when the
+// requester's own storage task record re-verifies its DHT chain; `main` prefetches those records
+// over the loopback compute API (COMPUTE_API_URL + COMPUTE_PERFORMER + ELOHIM_COMPUTE_LOCAL_TOKEN)
+// and, without that env, refuses them and falls through to report files.
 // Governance metadata is not source-under-test: a `.epr-meta` path is never a serving change, and
 // a component's identity leaves its `.epr-meta` entries out (sut.ts owns that one definition).
 //
@@ -121,6 +125,7 @@ export function findAttestationReceipt(
   expected,
   names,
   normalize,
+  peerStatuses = new Map(),
 ) {
   const common = gitCommonDir(root);
   const workspaceId = common ? workspaceAgentId(common) : null;
@@ -130,7 +135,9 @@ export function findAttestationReceipt(
       String(b.node.validatedAt).localeCompare(String(a.node.validatedAt)),
   );
   for (const { ref, node } of candidates) {
-    const verdict = admitAttestation(node, story.concern, workspaceId);
+    const verdict = admitAttestation(node, story.concern, workspaceId, (hash) =>
+      peerStatuses.get(hash),
+    );
     if (!verdict.ok) continue;
     const s = verdict.summary;
     const asReport = {
@@ -170,6 +177,7 @@ export function checkReports(root, reports, paths, options = {}) {
   const warn = options.warn ?? console.error;
   const attestations =
     options.attestations ?? process.env.SERVING_RECEIPT_ATTESTATIONS !== "0";
+  const peerStatuses = options.peerStatuses ?? new Map();
   const probe = createSutProbe(root, {}); // Environment overrides cannot claim matching source.
   const expected = Object.fromEntries(
     DEFAULT_SUT_COMPONENTS.filter((c) => c.path).map((c) => [
@@ -202,9 +210,14 @@ export function checkReports(root, reports, paths, options = {}) {
             expected,
             names,
             normalize,
+            peerStatuses,
           );
           if (hit) {
-            found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…); every ${feature} station passed on current source.`;
+            const peer = hit.summary.peer;
+            const ran = peer
+              ? ` stage ran on peer ${peer.provider.slice(0, 12)}… (rung ${peer.rung}), completion ${peer.completionActionHash.slice(0, 12)}… verified on the requester's task record;`
+              : "";
+            found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…);${ran} every ${feature} station passed on current source.`;
           }
         } else {
           const hit = findReportReceipt(
@@ -239,14 +252,95 @@ export function checkReports(root, reports, paths, options = {}) {
   return all;
 }
 
+/**
+ * The request action hashes named by `summary.peer` on this workspace's candidate attestations
+ * for `stories` — the task records the reader must fetch before it can admit a peer stage.
+ */
+export function peerRequestsOf(root, stories = Object.values(RECEIPT_STORIES)) {
+  const common = gitCommonDir(root);
+  const workspaceId = common ? workspaceAgentId(common) : null;
+  if (!workspaceId) return [];
+  const hashes = new Set();
+  for (const story of stories)
+    for (const { node } of readHouseholdAttestations(root, story.concern)) {
+      if (node.validatorId !== workspaceId) continue;
+      try {
+        const hash = JSON.parse(node.resultSummary)?.peer?.requestActionHash;
+        if (typeof hash === "string" && hash) hashes.add(hash);
+      } catch {
+        /* an unreadable summary names no peer chain */
+      }
+    }
+  return [...hashes];
+}
+
+/**
+ * Fetch each task record from this workspace's own loopback storage. Returns the statuses it read
+ * and, when it could not read them all, one line saying why. Never throws.
+ */
+export async function prefetchPeerStatuses(
+  hashes,
+  env = process.env,
+  options = {},
+) {
+  const statuses = new Map();
+  if (hashes.length === 0) return { statuses, skipped: null };
+  const base = env.COMPUTE_API_URL;
+  const performer = env.COMPUTE_PERFORMER;
+  const token = env.ELOHIM_COMPUTE_LOCAL_TOKEN;
+  const refused = `${hashes.length} peer-stage attestation(s) refused; reading report files`;
+  if (!base || !performer || !token)
+    return {
+      statuses,
+      skipped: `peer attestation skipped: no loopback env (COMPUTE_API_URL, COMPUTE_PERFORMER, ELOHIM_COMPUTE_LOCAL_TOKEN) — ${refused}`,
+    };
+  let request;
+  try {
+    // Loaded only here: the reader runs without the compute adapter unless a peer chain needs it.
+    const { api } = options.api
+      ? { api: options.api }
+      : await import("../../agentic/compute/common.mjs");
+    request = api(base, performer, options.fetcher ?? fetch, token);
+  } catch (error) {
+    return {
+      statuses,
+      skipped: `peer attestation skipped: ${error.message} — ${refused}`,
+    };
+  }
+  const failures = [];
+  for (const hash of hashes) {
+    try {
+      statuses.set(
+        hash,
+        await request(`/api/v1/compute/tasks/${encodeURIComponent(hash)}`),
+      );
+    } catch (error) {
+      failures.push(`${hash.slice(0, 12)}…: ${error.message}`);
+    }
+  }
+  return {
+    statuses,
+    skipped: failures.length
+      ? `peer attestation skipped: ${failures.length}/${hashes.length} task record(s) unreadable from ${base} (${failures[0]})`
+      : null,
+  };
+}
+
+async function main() {
+  const [root, reports, list] = process.argv.slice(2);
+  const paths = list ? readFileSync(list, "utf8").split("\n") : undefined;
+  let peerStatuses = new Map();
+  if (process.env.SERVING_RECEIPT_ATTESTATIONS !== "0") {
+    const prefetched = await prefetchPeerStatuses(peerRequestsOf(root));
+    peerStatuses = prefetched.statuses;
+    if (prefetched.skipped) console.error(`[pre-push] ${prefetched.skipped}`);
+  }
+  return checkReports(root, reports, paths, { peerStatuses });
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    const paths = process.argv[4]
-      ? readFileSync(process.argv[4], "utf8").split("\n")
-      : undefined;
-    process.exitCode = checkReports(process.argv[2], process.argv[3], paths)
-      ? 0
-      : 1;
+    process.exitCode = (await main()) ? 0 : 1;
   } catch (error) {
     console.error(`[pre-push] serving receipt unavailable: ${error.message}`);
     process.exitCode = 1;

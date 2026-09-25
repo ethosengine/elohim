@@ -18,7 +18,9 @@ import {
   cidShortFingerprint,
   cidToString,
   encodeValidationNode,
+  peerChainVerdict,
   publishHouseholdEvidence,
+  putAttestation,
   readHouseholdAttestations,
   resolveMooring,
   sutArtifactCidBytes,
@@ -28,7 +30,12 @@ import {
 } from '../lib/household-attestation.js';
 import { hashSutParts } from '../lib/sut.js';
 
-import type { Runner, ValidationNodeJson } from '../lib/household-attestation.js';
+import type {
+  PeerStage,
+  PeerTaskStatus,
+  Runner,
+  ValidationNodeJson,
+} from '../lib/household-attestation.js';
 
 /** A real `brit-build-ref validate put` output (throwaway key) — the cross-implementation vector. */
 const VECTOR = JSON.parse(
@@ -352,5 +359,230 @@ describe('readHouseholdAttestations', () => {
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
+
+describe('putAttestation: the one brit put the household writer and the peer collector share', () => {
+  it('runs the exact argv the household writer always ran', () => {
+    const calls: { cmd: string; args: string[]; cwd: string }[] = [];
+    const run: Runner = (cmd, args, cwd) => {
+      calls.push({ cmd, args, cwd });
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const [a] = attestationsFromReport(householdReport({ a2o: 'tree:1' }), 'r.json', null).filter(
+      x => x.summary.concern === CONCERN
+    );
+    const r = putAttestation('/bin/brit-build-ref', '/ws', a, run);
+    assert.equal(r.status, 0);
+    putAttestation('/bin/brit-build-ref', '/ws', a, run, '/ws/worktree');
+    const sut = hashSutParts({ a2o: 'tree:1' });
+    const argv = [
+      '--repo',
+      '/ws',
+      'validate',
+      'put',
+      '--step',
+      'a2o-household',
+      '--check',
+      `${CONCERN}/${sut}`,
+      '--artifact',
+      cidToString(sutArtifactCidBytes({ a2o: 'tree:1' })),
+      '--result',
+      'pass',
+      '--summary',
+      JSON.stringify(a.summary),
+      '--validator-version',
+      'a2o/build-sprint-report@1',
+    ];
+    assert.deepEqual(calls, [
+      { cmd: '/bin/brit-build-ref', args: argv, cwd: '/ws' },
+      { cmd: '/bin/brit-build-ref', args: argv, cwd: '/ws/worktree' },
+    ]);
+  });
+});
+
+describe('a peer-executed stage is admitted by its verified DHT chain, never by a key join', () => {
+  const id = VECTOR.node.validatorId;
+  const base = JSON.parse(VECTOR.node.resultSummary);
+  const PEER: PeerStage = {
+    rung: 'H',
+    provider: 'uhCAk-jessica',
+    requester: 'uhCAk-matthew',
+    grantActionHash: 'uhCkk-grant',
+    grantCid: 'bafy-grant',
+    scope: 'measure-stage',
+    requestActionHash: 'uhCkk-request',
+    completionActionHash: 'uhCkk-completion',
+    receiptCid: 'bafy-receipt',
+    taskCid: 'bafy-task',
+    featureSha256: 'f'.repeat(64),
+    reportSha256: 'e'.repeat(64),
+  };
+  function verified(): PeerTaskStatus {
+    return {
+      state: 'completed',
+      requester: PEER.requester,
+      provider: PEER.provider,
+      grantActionHash: PEER.grantActionHash,
+      envelope: { project: 'a2o-stage:peer-executed-stage', dna: { sha256: PEER.featureSha256 } },
+      completion: { actionHash: PEER.completionActionHash, receiptCid: PEER.receiptCid },
+      observed: {
+        verified: true,
+        grantCid: PEER.grantCid,
+        scope: 'measure-stage',
+        grantProvider: PEER.provider,
+        grantRecipient: PEER.requester,
+        fulfilledEventId: `compute-fulfilled:${PEER.requestActionHash}`,
+      },
+    };
+  }
+  const peerNode = (
+    peer: PeerStage = PEER,
+    seedHex?: string,
+    over: Partial<ValidationNodeJson> = {}
+  ) =>
+    resign({ ...VECTOR.node, ...over, resultSummary: JSON.stringify({ ...base, peer }) }, seedHex);
+  const lookup = (status: PeerTaskStatus | undefined) => (hash: string) =>
+    hash === PEER.requestActionHash ? status : undefined;
+  const refusal = (node: ValidationNodeJson, status: PeerTaskStatus | undefined) => {
+    const verdict = admitAttestation(node, CONCERN, id, lookup(status));
+    return verdict.ok ? 'admitted' : verdict.reason;
+  };
+
+  it('admits a peer summary whose chain the requester task record verifies; the artifact stays the SUT', () => {
+    const verdict = admitAttestation(peerNode(), CONCERN, id, lookup(verified()));
+    assert.equal(verdict.ok, true);
+    assert.deepEqual(verdict.ok && verdict.summary.peer, PEER);
+    assert.equal(cidShortFingerprint(peerNode().artifactCid), base.sut);
+    // Keying the attestation by the receipt instead of the tree it verified is refused.
+    const byReceipt = peerNode(PEER, undefined, {
+      artifactCid: [...sutArtifactCidBytes({ receipt: PEER.receiptCid })],
+    });
+    assert.equal(refusal(byReceipt, verified()), 'artifact CID is not the sut');
+  });
+
+  it('refuses a peer summary signed by a NON-workspace key even when its chain verifies', () => {
+    const seed = '22'.repeat(32);
+    const common = mkdtempSync(join(tmpdir(), 'brit-peer-'));
+    try {
+      mkdirSync(join(common, 'brit'));
+      writeFileSync(join(common, 'brit', 'agent-key'), Buffer.from(seed, 'hex'));
+      const foreignId = workspaceAgentId(common) ?? '';
+      const foreign = peerNode(PEER, seed, { validatorId: foreignId });
+      assert.equal(verifyValidationNode(foreign), true, 'validly signed by its own key');
+      assert.equal(peerChainVerdict(PEER, verified()).ok, true, 'and its chain verifies');
+      assert.equal(refusal(foreign, verified()), 'not the workspace key');
+    } finally {
+      rmSync(common, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an unreachable chain; a household summary needs no chain at all', () => {
+    const reason = 'peer chain unverifiable (requester storage unreachable)';
+    assert.equal(refusal(peerNode(), undefined), reason);
+    assert.equal(
+      (admitAttestation(peerNode(), CONCERN, id) as { reason: string }).reason,
+      reason,
+      'no lookup at all'
+    );
+    assert.equal(admitAttestation(VECTOR.node, CONCERN, id, () => undefined).ok, true);
+    assert.equal(admitAttestation(VECTOR.node, CONCERN, id).ok, true);
+  });
+
+  it('refuses each broken link with its own reason', () => {
+    const cases: [string, PeerTaskStatus, string][] = [
+      [
+        'receipt',
+        {
+          ...verified(),
+          completion: { actionHash: PEER.completionActionHash, receiptCid: 'bafy-other' },
+        },
+        'peer receipt CID is not the completion receipt',
+      ],
+      [
+        'scope',
+        { ...verified(), observed: { ...verified().observed, scope: 'sweettest-feedback' } },
+        'peer grant scope is sweettest-feedback, not measure-stage',
+      ],
+      [
+        'grant provider',
+        { ...verified(), observed: { ...verified().observed, grantProvider: 'uhCAk-mallory' } },
+        'peer provider is not the grant provider',
+      ],
+      [
+        'unobserved',
+        { ...verified(), observed: undefined },
+        'peer grant not observed by requester storage',
+      ],
+      [
+        'observation refused',
+        {
+          ...verified(),
+          observed: { verified: false, refused: 'signed grant party or scope mismatch' },
+        },
+        'peer grant not verified by requester storage: signed grant party or scope mismatch',
+      ],
+      [
+        'not completed',
+        { ...verified(), state: 'accepted' },
+        'peer task is accepted, not completed',
+      ],
+      [
+        'completion',
+        { ...verified(), completion: { actionHash: 'uhCkk-other', receiptCid: PEER.receiptCid } },
+        'peer completion is not the one the task record carries',
+      ],
+      [
+        'task provider',
+        { ...verified(), provider: 'uhCAk-mallory' },
+        'peer provider is not the task provider',
+      ],
+      [
+        'requester',
+        { ...verified(), requester: 'uhCAk-mallory' },
+        'peer requester is not the task requester',
+      ],
+      [
+        'grant',
+        { ...verified(), grantActionHash: 'uhCkk-other' },
+        'peer grant is not the task grant',
+      ],
+      [
+        'grant cid',
+        { ...verified(), observed: { ...verified().observed, grantCid: 'bafy-other' } },
+        'peer grant CID is not the observed grant',
+      ],
+      [
+        'recipient',
+        { ...verified(), observed: { ...verified().observed, grantRecipient: 'uhCAk-mallory' } },
+        'peer requester is not the grant recipient',
+      ],
+      [
+        'project',
+        {
+          ...verified(),
+          envelope: { project: 'sweettest:x', dna: { sha256: PEER.featureSha256 } },
+        },
+        'peer task is not an a2o-stage: stage',
+      ],
+      [
+        'feature',
+        { ...verified(), envelope: { project: 'a2o-stage:x', dna: { sha256: '0'.repeat(64) } } },
+        'peer feature digest is not the task payload',
+      ],
+    ];
+    for (const [label, status, reason] of cases) {
+      assert.equal(refusal(peerNode(), status), reason, label);
+    }
+  });
+
+  it('refuses a malformed peer block', () => {
+    const partial: Partial<PeerStage> = { ...PEER };
+    delete partial.receiptCid;
+    assert.equal(refusal(peerNode(partial as PeerStage), verified()), 'peer block is malformed');
+    assert.equal(
+      refusal(peerNode({ ...PEER, rung: 'Z' } as unknown as PeerStage), verified()),
+      'peer block is malformed'
+    );
   });
 });
