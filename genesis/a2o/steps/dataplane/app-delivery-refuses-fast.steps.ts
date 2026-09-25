@@ -472,9 +472,11 @@ async function stopSampler(world: E2EWorld): Promise<ReadinessAnswer[]> {
 Then(
   'while the window was open the probe answered not-ready at least once, naming the face {string}, {string} or {string}',
   { timeout: 60_000 },
-  async function (this: E2EWorld, ...named: string[]) {
+  async function (this: E2EWorld, first: string, second: string, third: string) {
     // A conductor restart wears only these (controller ruling 2026-09-25): each name the
-    // feature gives must be one of them, and each is in the vocabulary file.
+    // feature gives must be one of them, and each is in the vocabulary file. Cucumber checks
+    // the arity of this function, so the three names are declared, not rest parameters.
+    const named = [first, second, third];
     for (const face of named) requireFace(face, CONDUCTOR_RESTART_FACES);
     const answers = await stopSampler(this);
     this.attach(
