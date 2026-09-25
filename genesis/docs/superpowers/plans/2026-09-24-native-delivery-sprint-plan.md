@@ -499,8 +499,8 @@ the roll. Everything in Lane A is correct either way; K is what makes the wait v
 **Tasks**
 
 - [ ] **K0 — measure before moving: bisect the pin on the batch-C tree and measure the post-restart window for both pins** (serves push-delivers-within-budget)
-- [ ] **K1 — publish the fork: fast-forward elohim-0.7, push perf/k2-dht-model-sargable-arc, open its PR (operator pushes)** (serves push-delivers-within-budget)
-- [ ] **K2 — move the conductor gitlink to e0bfc6c7a and [build:conductor]** (serves push-delivers-within-budget) — prepared on pin/lane-K 62ffcfb2f (branch; dev holds 25dd2d0be)
+- [x] **K1 — publish the fork: fast-forward elohim-0.7, push perf/k2-dht-model-sargable-arc, open its PR (operator pushes)** (serves push-delivers-within-budget) — both refs on ethosengine/holochain (elohim-0.7 7e553f9c3, perf/k2-dht-model-sargable-arc e0bfc6c7a), verified by ls-remote 2026-09-25; PR not checked
+- [x] **K2 — move the conductor gitlink to e0bfc6c7a and [build:conductor]** (serves push-delivers-within-budget) — ee8c7a78b on dev (operator instruction 2026-09-25; household deliverability 5/5 ran on e0bfc6c7a, 8891b05be)
 - [ ] **K3 — one staggered roll with a per-pod restart-to-RUNNING cycle-time row** (serves push-delivers-within-budget) — receipt script 088ab0b6c prepared; roll is the operator's
 
 ---

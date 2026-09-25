@@ -22,7 +22,7 @@ informed-by:
   - genesis/docs/superpowers/specs/2026-08-05-digital-memory-standing-ontology-design.md
 cites:
   - "governed-discovery-station-4-native-semantic-provider-plan | governed-discovery station 4 plan (landed 2026-09-24): the native semantic route, fold-as-IndexMeasure and rank fusion this sprint follows; Lane S lifts its index into a leaf crate for storage | sha256:43bd1e1184ab8d27 | path: genesis/docs/superpowers/plans/2026-09-23-governed-discovery-station-4-native-semantic-provider-plan.md"
-  - "native-delivery-sprint-plan | native-delivery sprint plan: the sprint running beside this one on dev, whose landing shape (sealed cites, agent-decomposed gap items) this plan follows | sha256:5bd76754826decd2 | path: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md"
+  - "native-delivery-sprint-plan | native-delivery sprint plan: the sprint running beside this one on dev, whose landing shape (sealed cites, agent-decomposed gap items) this plan follows | sha256:8a08fcde0dec6869 | path: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md"
   - .epr-meta/acts-attributed-to-participants.habit.md
   - .epr-meta/recall-reaches-authority.habit.md
   - elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md
