@@ -106,7 +106,11 @@ fn busy_actor_store_does_not_block_governance_or_fabricate_a_claim() {
         ],
     )
     .unwrap();
-    assert!(started.elapsed() < Duration::from_secs(2));
+    // The store's read path is try_lock_shared, which never waits, and the holder releases only
+    // after this assertion: a decision that blocked would never return. The bound separates
+    // "blocked" from "slow" — 2 s measured evaluate()'s speed and failed on a loaded CI runner
+    // at 2.19 s (elohim-eprfs #37), with the lock semantics unchanged.
+    assert!(started.elapsed() < Duration::from_secs(30));
     assert_eq!(decision["actor"]["source"], "unclaimed");
     assert!(decision["actor"]["claimCid"].is_null());
     fs::write(root.join("release"), "release").unwrap();
