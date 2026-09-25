@@ -446,8 +446,8 @@
       "head": {
         "registry": "policies.yaml",
         "version": 1,
-        "cid": "bafyreidhhj6ri4iuvrhnwip45zwvuayaisviuw4y7abogmwoonragxrqn4",
-        "sha256Pin": "sha256:673a7d147114ac4edb21fcee6d5a030044aa8a5b98f802e332ce7362035e306f"
+        "cid": "bafyreieg7zbdwvwgegmzx5c4kya5qhnema5ek6ky6r7pgutwmdyot6dvaq",
+        "sha256Pin": "sha256:86fe423b56c621999bf45c5601d81da4603a457958f47ef3527660f0e9f87504"
       },
       "tipBasis": "sole-active",
       "competing": false,
@@ -456,7 +456,7 @@
           "registry": "policies.yaml",
           "version": 1,
           "status": "active",
-          "cid": "bafyreidhhj6ri4iuvrhnwip45zwvuayaisviuw4y7abogmwoonragxrqn4",
+          "cid": "bafyreieg7zbdwvwgegmzx5c4kya5qhnema5ek6ky6r7pgutwmdyot6dvaq",
           "supersededBy": null
         }
       ]
