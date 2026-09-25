@@ -291,10 +291,12 @@ fn refuse_write_on_closed_chain(
 #[allow(dead_code)]
 pub struct HcClient {
     config: HcClientConfig,
-    /// Admin websocket connection
-    admin_ws: AdminWebsocket,
-    /// App websocket connection with signing
-    app_ws: AppWebsocket,
+    /// The admin + app websockets and the signer ONE mint produced — held
+    /// behind a swappable slot, never as plain fields. See [`HcConnection`]:
+    /// a conductor restart kills these sockets, and the registry's re-mint
+    /// must be able to replace them under every `Arc<HcClient>` already
+    /// handed out, not only under its own slot.
+    conn: ConnectionSlot<HcConnection>,
     /// The cell ID for zome calls
     cell_id: CellId,
     /// The mishpat role's cell, when the installed happ provisions one.
@@ -316,8 +318,101 @@ pub struct HcClient {
     /// the signer is per-cell. `call_zome_imagodei` is the correct route.
     /// `None` when the happ has no imagodei role (minimal local-dev bundles).
     imagodei_cell_id: Option<CellId>,
-    /// Signing credentials
+}
+
+/// The part of an [`HcClient`] that one MINT produces and one conductor
+/// restart destroys: both websockets and the signer whose credentials the app
+/// websocket was authenticated with.
+///
+/// WHY THIS IS SEPARATE FROM THE CLIENT (2026-09-25). `HcClient` is handed out
+/// as `Arc<HcClient>`, and most long-lived consumers — the feedback projector,
+/// head adoption, reanchor backfill, projection reconcile, provide — clone that
+/// `Arc` ONCE at boot and keep it for the life of the process. The bridge
+/// supervisor's re-mint used to build a brand-new `HcClient` and store it in
+/// the registry slot only, so after `just mesh conductors-restart` the
+/// supervisor logged "RE-MINTED … zome path live" about ITS handle while every
+/// boot-captured clone went on dialing the closed socket — 292 consecutive
+/// `Websocket closed: No connection` failures on jessica, 376 on james, until
+/// storage itself was restarted. Keeping the sockets in a slot lets the re-mint
+/// swap them in place under every holder at once.
+///
+/// `generation` names the mint. A transport failure is reported against the
+/// generation that produced it, so a failure from a socket that has already
+/// been replaced can never re-arm a re-mint of its successor.
+#[derive(Clone)]
+pub(crate) struct HcConnection {
+    admin_ws: AdminWebsocket,
+    app_ws: AppWebsocket,
+    /// Held so the credentials outlive every clone of the app websocket that
+    /// signs with them.
+    #[allow(dead_code)]
     signer: Arc<ClientAgentSigner>,
+    generation: u64,
+}
+
+/// Process-wide source of [`HcConnection::generation`]. Monotonic, so "older
+/// than the current mint" is a plain comparison.
+static NEXT_CONNECTION_GENERATION: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
+fn next_connection_generation() -> u64 {
+    NEXT_CONNECTION_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// A value every holder of the enclosing `Arc` reads fresh on each use, and
+/// that one writer can replace for all of them at once.
+///
+/// Reads CLONE out and release the lock immediately, so no guard is ever held
+/// across an `.await` and a swap never waits on an in-flight zome call (that
+/// call finishes — or fails — on the socket it started on).
+pub(crate) struct ConnectionSlot<T: Clone> {
+    inner: std::sync::RwLock<T>,
+}
+
+impl<T: Clone> ConnectionSlot<T> {
+    pub(crate) fn new(value: T) -> Self {
+        Self {
+            inner: std::sync::RwLock::new(value),
+        }
+    }
+
+    /// The current value, cloned out.
+    pub(crate) fn current(&self) -> T {
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// Replace the value for every holder.
+    pub(crate) fn replace(&self, value: T) {
+        *self.inner.write().unwrap_or_else(|e| e.into_inner()) = value;
+    }
+}
+
+/// Why a freshly minted connection may NOT be adopted by an existing client,
+/// or `None` when it may.
+///
+/// Adoption swaps SOCKETS, never cell identity: every holder of the old client
+/// keeps using its `cell_id`, `mishpat_cell_id` and `imagodei_cell_id`, and the
+/// fresh signer only carries credentials for the fresh client's cells. So the
+/// two must name the same app and exactly the same cells. A reinstall that
+/// minted a new DNA hash or agent key is refused here, and the registry falls
+/// back to storing the fresh client as a separate handle.
+pub(crate) fn adoption_refusal(
+    old: (&str, &CellId, Option<&CellId>, Option<&CellId>),
+    new: (&str, &CellId, Option<&CellId>, Option<&CellId>),
+) -> Option<String> {
+    if old.0 != new.0 {
+        return Some(format!("app id changed ({} -> {})", old.0, new.0));
+    }
+    if old.1 != new.1 {
+        return Some(format!("role cell changed ({} -> {})", old.1, new.1));
+    }
+    if old.2 != new.2 {
+        return Some("mishpat cell changed".to_string());
+    }
+    if old.3 != new.3 {
+        return Some("imagodei cell changed".to_string());
+    }
+    None
 }
 
 /// The one door to the admission gate for a zome call: acquire the permit, then
@@ -509,8 +604,8 @@ impl HcClient {
     /// Classification (transport-dead vs the conductor answering "no" vs an
     /// admission shed that never left this process) lives in
     /// [`crate::conductor_bridge_health::classify_zome_error`], NOT here.
-    fn zome_call_failed(&self, e: impl std::fmt::Display) -> StorageError {
-        self.zome_call_failed_on(&self.cell_id, e)
+    fn zome_call_failed(&self, generation: u64, e: impl std::fmt::Display) -> StorageError {
+        self.zome_call_failed_on(&self.cell_id, generation, e)
     }
 
     /// [`Self::zome_call_failed`] for a call that targeted a cell OTHER than the
@@ -521,11 +616,61 @@ impl HcClient {
     /// deliberately: every call path already hands this the cell it targeted, so
     /// deriving here means no call site can forget to name the target and none
     /// of them has to change to get the attribution right.
-    fn zome_call_failed_on(&self, cell_id: &CellId, e: impl std::fmt::Display) -> StorageError {
+    ///
+    /// `generation` is the mint whose socket carried the call. A transport-dead
+    /// failure is reported to the bridge supervisor against THIS CLIENT's role
+    /// (the socket is the client's, whichever cell the call targeted), so the
+    /// supervisor re-mints on zome-call evidence instead of waiting for its own
+    /// next ping — and a failure from an already-replaced socket is ignored.
+    fn zome_call_failed_on(
+        &self,
+        cell_id: &CellId,
+        generation: u64,
+        e: impl std::fmt::Display,
+    ) -> StorageError {
         let msg = format!("Zome call failed: {}", e);
         observe_role_zome_error(self.target_role_of(cell_id), &msg);
         heal_stale_signing_credentials(cell_id, &msg);
+        if crate::conductor_bridge_health::is_transport_dead(&msg) {
+            crate::hc_client_registry::note_transport_closed(self.role_key(), generation);
+        }
         StorageError::Conductor(msg)
+    }
+
+    /// The sockets this call should use, read fresh — see [`HcConnection`].
+    fn connection(&self) -> HcConnection {
+        self.conn.current()
+    }
+
+    /// Which mint this client's sockets currently come from.
+    pub(crate) fn connection_generation(&self) -> u64 {
+        self.conn.current().generation
+    }
+
+    /// Take over `fresh`'s sockets IN PLACE, so every `Arc` of `self` already
+    /// handed out dials them from its next call on. Returns the adopted
+    /// generation, or why adoption is refused (see [`adoption_refusal`]).
+    pub(crate) fn adopt_connection_from(&self, fresh: &HcClient) -> Result<u64, String> {
+        if let Some(why) = adoption_refusal(
+            (
+                &self.config.app_id,
+                &self.cell_id,
+                self.mishpat_cell_id.as_ref(),
+                self.imagodei_cell_id.as_ref(),
+            ),
+            (
+                &fresh.config.app_id,
+                &fresh.cell_id,
+                fresh.mishpat_cell_id.as_ref(),
+                fresh.imagodei_cell_id.as_ref(),
+            ),
+        ) {
+            return Err(why);
+        }
+        let adopted = fresh.connection();
+        let generation = adopted.generation;
+        self.conn.replace(adopted);
+        Ok(generation)
     }
 
     /// Strip ws:// or wss:// prefix from URL to get socket address
@@ -714,12 +859,15 @@ impl HcClient {
 
         Ok(Self {
             config,
-            admin_ws,
-            app_ws,
+            conn: ConnectionSlot::new(HcConnection {
+                admin_ws,
+                app_ws,
+                signer: signer_arc,
+                generation: next_connection_generation(),
+            }),
             cell_id,
             mishpat_cell_id,
             imagodei_cell_id,
-            signer: signer_arc,
         })
     }
 
@@ -769,11 +917,12 @@ impl HcClient {
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
+                    let conn = self.connection();
                     observe_conductor_attempt(
                         zome_name,
                         fn_name,
                         AdmissionClass::Interactive.label(),
-                        self.app_ws.call_zome(
+                        conn.app_ws.call_zome(
                             ZomeCallTarget::CellId(target),
                             zome_name.into(),
                             fn_name.into(),
@@ -781,7 +930,13 @@ impl HcClient {
                         ),
                     )
                     .await
-                    .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                    .inspect(|_| {
+                        crate::hc_client_registry::note_transport_ok(
+                            self.role_key(),
+                            conn.generation,
+                        )
+                    })
+                    .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
                 }
             })
             .await?;
@@ -836,11 +991,12 @@ impl HcClient {
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
+                    let conn = self.connection();
                     observe_conductor_attempt(
                         zome_name,
                         fn_name,
                         AdmissionClass::Interactive.label(),
-                        self.app_ws.call_zome(
+                        conn.app_ws.call_zome(
                             ZomeCallTarget::CellId(target),
                             zome_name.into(),
                             fn_name.into(),
@@ -848,7 +1004,13 @@ impl HcClient {
                         ),
                     )
                     .await
-                    .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                    .inspect(|_| {
+                        crate::hc_client_registry::note_transport_ok(
+                            self.role_key(),
+                            conn.generation,
+                        )
+                    })
+                    .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
                 }
             })
             .await?;
@@ -950,11 +1112,12 @@ impl HcClient {
                         "head-record conductor phase"
                     );
                 }
+                let conn = self.connection();
                 let result = observe_conductor_attempt(
                     zome_name,
                     fn_name,
                     class.label(),
-                    self.app_ws.call_zome(
+                    conn.app_ws.call_zome(
                         ZomeCallTarget::CellId(target),
                         zome_name.into(),
                         fn_name.into(),
@@ -962,7 +1125,10 @@ impl HcClient {
                     ),
                 )
                 .await;
-                let result = result.map_err(|e| self.zome_call_failed(e));
+                if result.is_ok() {
+                    crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
+                }
+                let result = result.map_err(|e| self.zome_call_failed(conn.generation, e));
                 // Held across the whole call on purpose: the permit models
                 // capacity the conductor is still spending, and releasing it
                 // early would understate occupancy by exactly the interval that
@@ -1053,7 +1219,7 @@ impl HcClient {
     /// conductor (`--admin-url` mode), where no embedded-conductor admin
     /// handle exists but every registry role already holds one.
     pub fn admin_websocket(&self) -> AdminWebsocket {
-        self.admin_ws.clone()
+        self.connection().admin_ws
     }
 
     /// Get DNA hash bytes
@@ -1094,7 +1260,7 @@ impl HcClient {
         };
 
         // Fetch storage info
-        match self.admin_ws.storage_info().await {
+        match self.admin_websocket().storage_info().await {
             Ok(storage_info) => {
                 // Convert to JSON for inspection
                 let json = serde_json::to_string_pretty(&storage_info)
@@ -1128,7 +1294,7 @@ impl HcClient {
         }
 
         // Fetch network stats
-        match self.admin_ws.dump_network_stats().await {
+        match self.admin_websocket().dump_network_stats().await {
             Ok(network_stats) => {
                 let json = serde_json::to_string_pretty(&network_stats)
                     .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e));
@@ -1162,7 +1328,11 @@ impl HcClient {
 
         // Fetch network metrics (more detailed DHT info)
         // dump_network_metrics takes optional DNA hash filter and DHT summary flag
-        match self.admin_ws.dump_network_metrics(None, true).await {
+        match self
+            .admin_websocket()
+            .dump_network_metrics(None, true)
+            .await
+        {
             Ok(network_metrics) => {
                 let json = serde_json::to_string_pretty(&network_metrics)
                     .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e));
@@ -1197,7 +1367,8 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.app_ws
+        self.connection()
+            .app_ws
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
@@ -1274,7 +1445,8 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.app_ws
+        self.connection()
+            .app_ws
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
@@ -1348,7 +1520,8 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.app_ws
+        self.connection()
+            .app_ws
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
@@ -1441,7 +1614,8 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.app_ws
+        self.connection()
+            .app_ws
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
@@ -1522,7 +1696,14 @@ impl HcClient {
         // Observe the typed transport response, not application health: both
         // `Some(disabled)` and `None` are successful websocket completions.
         // The match below retains the existing health classification.
-        match observe_conductor_attempt("-", "app_info", "ungated", self.app_ws.app_info()).await {
+        let conn = self.connection();
+        let answered =
+            observe_conductor_attempt("-", "app_info", "ungated", conn.app_ws.app_info()).await;
+        if answered.is_ok() {
+            // Bytes crossed this mint's app websocket: it is not closed.
+            crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
+        }
+        match answered {
             // THE STATUS IS THE ANSWER. `app_info()` succeeds on a DISABLED app
             // — that is precisely how the 2026-09-18 incident hid for 38 hours
             // behind a probe that only asked `is_ok()` and threw the payload
@@ -1561,6 +1742,12 @@ impl HcClient {
             Err(e) => {
                 let msg = format!("Conductor ping failed: {}", e);
                 observe_role_zome_error(self.role_key(), &msg);
+                if crate::conductor_bridge_health::is_transport_dead(&msg) {
+                    crate::hc_client_registry::note_transport_closed(
+                        self.role_key(),
+                        conn.generation,
+                    );
+                }
                 Err(StorageError::Connection(msg))
             }
         }
@@ -1779,7 +1966,8 @@ mod attribution_tests {
             .next()
             .expect("ping boundary");
         assert_eq!(ping.matches("observe_conductor_attempt(").count(), 1);
-        assert_eq!(ping.matches("self.app_ws.app_info()").count(), 1);
+        assert_eq!(ping.matches("conn.app_ws.app_info()").count(), 1);
+        assert!(ping.contains("match answered {"));
         assert!(ping.contains("\"app_info\""));
         assert!(ping.contains("\"ungated\""));
         assert!(ping.contains("Ok(Some(info))"));
@@ -1914,5 +2102,102 @@ mod attribution_tests {
         );
 
         assert!(is_websocket_timeout(&error));
+    }
+}
+
+/// The re-mint must heal every `Arc<HcClient>` already handed out. These pin
+/// the two pieces that make that true without a live conductor: the slot the
+/// sockets live in is shared by every clone, and adoption refuses a mint whose
+/// cells differ (a swap of sockets under an unchanged `cell_id` would sign for
+/// cells the fresh signer holds no credentials for).
+#[cfg(test)]
+mod connection_adoption_tests {
+    use super::*;
+    use holochain_types::prelude::{AgentPubKey, DnaHash};
+
+    fn cell(seed: u8) -> CellId {
+        CellId::new(
+            DnaHash::from_raw_32(vec![seed; 32]),
+            AgentPubKey::from_raw_32(vec![seed.wrapping_add(3); 32]),
+        )
+    }
+
+    /// Stands in for `HcClient`: immutable identity plus a swappable slot.
+    struct Holder {
+        conn: ConnectionSlot<(u64, &'static str)>,
+    }
+
+    #[test]
+    fn a_boot_captured_clone_sees_the_replacement() {
+        let registry_handle = Arc::new(Holder {
+            conn: ConnectionSlot::new((1, "socket-before-restart")),
+        });
+        // A long-lived consumer clones the handle ONCE at boot and keeps it.
+        let boot_captured = Arc::clone(&registry_handle);
+        registry_handle.conn.replace((2, "socket-after-remint"));
+        assert_eq!(boot_captured.conn.current(), (2, "socket-after-remint"));
+    }
+
+    #[test]
+    fn generations_are_unique_and_increasing() {
+        let a = next_connection_generation();
+        let b = next_connection_generation();
+        assert!(b > a);
+    }
+
+    #[test]
+    fn the_same_cells_may_adopt() {
+        let (c, m, i) = (cell(1), cell(2), cell(3));
+        assert_eq!(
+            adoption_refusal(
+                ("elohim", &c, Some(&m), Some(&i)),
+                ("elohim", &c, Some(&m), Some(&i))
+            ),
+            None
+        );
+        assert_eq!(
+            adoption_refusal(("elohim", &c, None, None), ("elohim", &c, None, None)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_changed_identity_refuses_adoption() {
+        let (c, m, i) = (cell(1), cell(2), cell(3));
+        let old = ("elohim", &c, Some(&m), Some(&i));
+        let reinstalled = cell(9);
+        assert!(adoption_refusal(old, ("elohim", &reinstalled, Some(&m), Some(&i))).is_some());
+        assert!(adoption_refusal(old, ("elohim@abc", &c, Some(&m), Some(&i))).is_some());
+        assert!(adoption_refusal(old, ("elohim", &c, None, Some(&i))).is_some());
+        assert!(adoption_refusal(old, ("elohim", &c, Some(&m), Some(&reinstalled))).is_some());
+    }
+
+    /// Every zome-call arm and the ping report transport evidence against the
+    /// generation of the socket they actually used.
+    #[test]
+    fn every_dispatch_reports_transport_evidence_by_generation() {
+        let source = include_str!("hc_client.rs");
+        for name in ["call_zome_imagodei", "call_zome_mishpat", "call_zome_timed"] {
+            let body = source
+                .split(&format!("pub async fn {name}("))
+                .nth(1)
+                .unwrap_or_else(|| panic!("{name} exists"))
+                .split("pub ")
+                .next()
+                .expect("boundary");
+            assert!(body.contains("let conn = self.connection();"), "{name}");
+            assert!(body.contains("conn.app_ws.call_zome("), "{name}");
+            assert!(body.contains("note_transport_ok("), "{name}");
+            assert!(body.contains("conn.generation, e)"), "{name}");
+        }
+        let failed = source
+            .split("fn zome_call_failed_on(")
+            .nth(1)
+            .expect("mapper")
+            .split("fn connection(&self)")
+            .next()
+            .expect("boundary");
+        assert!(failed.contains("is_transport_dead(&msg)"));
+        assert!(failed.contains("note_transport_closed(self.role_key(), generation)"));
     }
 }

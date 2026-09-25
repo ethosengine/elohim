@@ -55,6 +55,134 @@ pub fn should_warn_still_down(attempt: u32) -> bool {
 /// throwaway reproduction measured end-to-end.
 pub const BRIDGE_PROBE_INTERVAL: Duration = Duration::from_secs(20);
 
+/// How many CONSECUTIVE transport-closed zome-call failures on one mint's app
+/// websocket re-mint the role's bridge without asking `ping` first.
+///
+/// A `Websocket closed: No connection` is not an opinion about the conductor;
+/// it says the socket this process holds is gone. Before 2026-09-25 nothing on
+/// the zome-call path told the supervisor so — only its own 20s ping could,
+/// and its ping ran over a DIFFERENT handle than the one the failing callers
+/// held — so a streak sat at 292 (jessica) and 376 (james) with no re-mint.
+/// Small on purpose: three in a row on one generation is past any doubt.
+pub const TRANSPORT_CLOSED_REMINT_BOUND: u32 = 3;
+
+/// One role's transport-closed streak, scoped to the mint that produced it.
+#[derive(Debug, Default)]
+struct RoleTransport {
+    generation: u64,
+    streak: u32,
+    wake: Arc<tokio::sync::Notify>,
+}
+
+/// Process-wide record of transport-closed evidence from the zome-call path,
+/// per role, keyed by connection generation
+/// ([`crate::hc_client::HcClient::connection_generation`]).
+///
+/// It carries the one fact the supervisor could not see for itself: that the
+/// socket callers are USING has closed. Reports against an older generation
+/// than the one on record come from a socket already replaced and are dropped,
+/// so a burst of stale failures can never re-arm a re-mint of a healthy
+/// successor.
+#[derive(Debug, Default)]
+pub struct TransportLedger {
+    roles: std::sync::Mutex<std::collections::HashMap<String, RoleTransport>>,
+}
+
+impl TransportLedger {
+    fn with_role<R>(&self, role: &str, f: impl FnOnce(&mut RoleTransport) -> R) -> R {
+        let mut roles = self.roles.lock().unwrap_or_else(|e| e.into_inner());
+        f(roles.entry(role.to_string()).or_default())
+    }
+
+    /// Record one transport-closed failure on `generation`'s socket; returns
+    /// the streak on that generation (0 for a stale report, which is dropped).
+    ///
+    /// Wakes the role's supervisor on the FIRST failure of a generation (so a
+    /// dead socket is pinged now rather than up to 20s from now) and again when
+    /// the streak reaches [`TRANSPORT_CLOSED_REMINT_BOUND`] (so a socket that
+    /// somehow still answers `ping` is re-minted anyway). Two wakes per
+    /// generation at most: a flood of failures cannot spin the supervisor.
+    pub fn note_closed(&self, role: &str, generation: u64) -> u32 {
+        self.with_role(role, |r| {
+            if generation < r.generation {
+                return 0;
+            }
+            if generation > r.generation {
+                r.generation = generation;
+                r.streak = 0;
+            }
+            r.streak = r.streak.saturating_add(1);
+            if r.streak == 1 || r.streak == TRANSPORT_CLOSED_REMINT_BOUND {
+                r.wake.notify_one();
+            }
+            r.streak
+        })
+    }
+
+    /// Bytes crossed `generation`'s socket: its closed-streak is over.
+    pub fn note_ok(&self, role: &str, generation: u64) {
+        self.with_role(role, |r| {
+            if generation >= r.generation {
+                r.generation = generation;
+                r.streak = 0;
+            }
+        })
+    }
+
+    /// The current closed-streak for `generation` (0 for any other).
+    pub fn streak(&self, role: &str, generation: u64) -> u32 {
+        self.with_role(role, |r| {
+            if r.generation == generation {
+                r.streak
+            } else {
+                0
+            }
+        })
+    }
+
+    /// The handle a role's supervisor waits on between ticks.
+    pub fn wake(&self, role: &str) -> Arc<tokio::sync::Notify> {
+        self.with_role(role, |r| Arc::clone(&r.wake))
+    }
+}
+
+/// The process-wide [`TransportLedger`].
+pub fn transport_ledger() -> &'static TransportLedger {
+    static LEDGER: std::sync::OnceLock<TransportLedger> = std::sync::OnceLock::new();
+    LEDGER.get_or_init(TransportLedger::default)
+}
+
+/// A zome call (or ping) on `role`'s client failed transport-closed on the
+/// socket minted as `generation`.
+pub fn note_transport_closed(role: &str, generation: u64) {
+    transport_ledger().note_closed(role, generation);
+}
+
+/// A zome call (or ping) on `role`'s client got an answer over `generation`.
+pub fn note_transport_ok(role: &str, generation: u64) {
+    transport_ledger().note_ok(role, generation);
+}
+
+/// Does this closed-streak re-mint the bridge without a ping?
+pub fn remint_without_ping(streak: u32) -> bool {
+    streak >= TRANSPORT_CLOSED_REMINT_BOUND
+}
+
+/// The minimum spacing before the next re-mint after `consecutive` re-mints
+/// that no healthy probe has since vindicated.
+///
+/// Zero for the first: a conductor restart is cured in one step. After that,
+/// the same 2s → 60s ramp as [`reconnect_backoff`], so a conductor that
+/// accepts a connection and drops it at once is not re-minted in a tight loop
+/// (each re-mint re-authorizes signing credentials).
+pub fn remint_spacing(consecutive: u32) -> Duration {
+    if consecutive == 0 {
+        Duration::ZERO
+    } else {
+        reconnect_backoff(consecutive)
+    }
+}
+
 /// Role-keyed registry of HcClient connections. Every slot holds `None` when
 /// the role is not currently connected — at startup, or after the supervisor
 /// observed its bridge die — and downstream code returns 503 if the role is
@@ -1056,9 +1184,17 @@ impl HcClientRegistry {
             let mut shutdown_rx = shutdown.subscribe();
             let reconnect_shutdown = shutdown.clone();
             tokio::spawn(async move {
+                // Woken early by the zome-call path when the socket callers are
+                // using reports closed (see `TransportLedger::note_closed`).
+                let wake = transport_ledger().wake(role);
+                // Re-mints since a healthy probe last vindicated the bridge,
+                // and when the last one landed: the pacing in `remint_spacing`.
+                let mut consecutive_remints: u32 = 0;
+                let mut last_remint: Option<tokio::time::Instant> = None;
                 loop {
                     tokio::select! {
                         _ = tokio::time::sleep(BRIDGE_PROBE_INTERVAL) => {}
+                        _ = wake.notified() => {}
                         _ = shutdown_rx.recv() => {
                             info!(role, "bridge supervisor exiting (shutdown)");
                             return;
@@ -1111,62 +1247,94 @@ impl HcClientRegistry {
                         }
                     }
 
-                    // `ping` crosses the authenticated APP websocket used by
-                    // zome calls (not merely the independently-live admin
-                    // websocket) and folds its result into the zome-path
-                    // observer, so a node with zero zome traffic still reports
-                    // honestly and an app-only death triggers a full re-mint.
-                    //
-                    // Three outcomes, three cures. `is_ok()` used to collapse
-                    // the first two — which is how a DISABLED app read as a
-                    // healthy bridge for 38 hours on 2026-09-18.
-                    match hc.ping().await {
-                        Ok(BridgeProbe::Running) => {
-                            // The conductor says the APP is enabled. It does
-                            // NOT say its cells are running, and on 2026-09-20
-                            // the household answered exactly this while every
-                            // zome call on the same role answered CellDisabled
-                            // for eleven minutes. So the ladder is NOT reset
-                            // here — only a successful zome call resets it
-                            // (`conductor_bridge_health::record_role_success`).
-                            //
-                            // If this node's own observations still say the
-                            // role refuses calls, the episode is not over: keep
-                            // asking, on the SAME bounded ladder (60s doubling
-                            // to a 1h cap) that `try_enable_disabled_app` owns.
-                            if crate::conductor_bridge_health::role_is_not_running(role) {
-                                Self::try_enable_disabled_app(
-                                    &inputs,
-                                    role,
-                                    &hc,
-                                    "the conductor reports this app ENABLED while zome calls on \
-                                     the role are refused — its cells are not running",
-                                )
-                                .await;
+                    // THE ZOME-CALL PATH'S OWN EVIDENCE FIRST. A streak of
+                    // transport-closed failures on the socket callers are using
+                    // is proof enough; it re-mints without spending a ping.
+                    let generation = hc.connection_generation();
+                    let streak = transport_ledger().streak(role, generation);
+                    if remint_without_ping(streak) {
+                        warn!(
+                            role,
+                            streak,
+                            generation,
+                            "conductor bridge is DEAD — {streak} consecutive zome calls on this \
+                             role's app websocket answered transport-closed; re-minting without \
+                             waiting on a ping"
+                        );
+                    } else {
+                        // `ping` crosses the authenticated APP websocket used by
+                        // zome calls (not merely the independently-live admin
+                        // websocket) and folds its result into the zome-path
+                        // observer, so a node with zero zome traffic still reports
+                        // honestly and an app-only death triggers a full re-mint.
+                        //
+                        // Three outcomes, three cures. `is_ok()` used to collapse
+                        // the first two — which is how a DISABLED app read as a
+                        // healthy bridge for 38 hours on 2026-09-18.
+                        match hc.ping().await {
+                            Ok(BridgeProbe::Running) => {
+                                // The conductor says the APP is enabled. It does
+                                // NOT say its cells are running, and on 2026-09-20
+                                // the household answered exactly this while every
+                                // zome call on the same role answered CellDisabled
+                                // for eleven minutes. So the ladder is NOT reset
+                                // here — only a successful zome call resets it
+                                // (`conductor_bridge_health::record_role_success`).
+                                //
+                                // If this node's own observations still say the
+                                // role refuses calls, the episode is not over: keep
+                                // asking, on the SAME bounded ladder (60s doubling
+                                // to a 1h cap) that `try_enable_disabled_app` owns.
+                                if crate::conductor_bridge_health::role_is_not_running(role) {
+                                    Self::try_enable_disabled_app(
+                                        &inputs,
+                                        role,
+                                        &hc,
+                                        "the conductor reports this app ENABLED while zome calls on \
+                                         the role are refused — its cells are not running",
+                                    )
+                                    .await;
+                                }
+                                consecutive_remints = 0;
+                                continue;
                             }
-                            continue;
+                            Ok(BridgeProbe::NotRunning { reason }) => {
+                                // The WEBSOCKET IS FINE. Re-minting the bridge
+                                // would be pure churn against a conductor that is
+                                // answering perfectly well; the cure for this state
+                                // is `enable_app`, on a bounded ladder.
+                                consecutive_remints = 0;
+                                Self::try_enable_disabled_app(&inputs, role, &hc, &reason).await;
+                                continue;
+                            }
+                            Err(_) => {}
                         }
-                        Ok(BridgeProbe::NotRunning { reason }) => {
-                            // The WEBSOCKET IS FINE. Re-minting the bridge
-                            // would be pure churn against a conductor that is
-                            // answering perfectly well; the cure for this state
-                            // is `enable_app`, on a bounded ladder.
-                            Self::try_enable_disabled_app(&inputs, role, &hc, &reason).await;
-                            continue;
-                        }
-                        Err(_) => {}
+                        warn!(
+                            role,
+                            "conductor bridge is DEAD (ping failed) — clearing the handle and \
+                             re-minting the app auth token; zome routes answer 503 until it lands"
+                        );
                     }
 
-                    warn!(
-                        role,
-                        "conductor bridge is DEAD (ping failed) — clearing the handle and \
-                         re-minting the app auth token; zome routes answer 503 until it lands"
-                    );
-                    // Drop the dead handle FIRST. Anything holding an Arc clone
-                    // keeps failing until it re-reads, but nothing NEW picks up
-                    // a corpse, and `/health` stops advertising its DNA hashes.
+                    // PACE a re-mint that follows another with no healthy probe
+                    // between them (the first after a restart is immediate).
+                    if let Some(at) = last_remint {
+                        let ready = at + remint_spacing(consecutive_remints);
+                        tokio::select! {
+                            _ = tokio::time::sleep_until(ready) => {}
+                            _ = shutdown_rx.recv() => {
+                                info!(role, "bridge supervisor exiting (shutdown)");
+                                return;
+                            }
+                        }
+                    }
+
+                    // Clear the slot FIRST, so nothing NEW picks up the dead
+                    // handle and `/health` stops advertising its DNA hashes.
+                    // `hc` itself is KEPT: it is the handle every long-lived
+                    // consumer cloned at boot, and it is what the fresh sockets
+                    // are about to be adopted into.
                     registry.set_client(role, None);
-                    drop(hc);
                     crate::conductor_bridge_health::record_role_reconnect(role);
                     // REVOKE the membership answer with the bridge that produced
                     // it. The process on the far side may be a different one, and
@@ -1177,19 +1345,65 @@ impl HcClientRegistry {
                     crate::services::cell_membership::membership()
                         .invalidate(&format!("the {role} bridge died and is being re-minted"));
 
-                    if let Some(fresh) =
+                    let Some(fresh) =
                         Self::connect_role_forever(&inputs, role, reconnect_shutdown.subscribe())
                             .await
-                    {
-                        registry.set_client(role, Some(fresh));
-                        info!(
-                            role,
-                            "conductor bridge RE-MINTED after a conductor restart — fresh app \
-                             auth token, signing credentials re-authorized, zome path live"
-                        );
-                    } else {
+                    else {
                         // Only `None` on shutdown.
                         return;
+                    };
+                    consecutive_remints = consecutive_remints.saturating_add(1);
+                    last_remint = Some(tokio::time::Instant::now());
+
+                    // ADOPT, DON'T REPLACE. Swapping the fresh sockets into the
+                    // handle already held heals every `Arc` clone of it at once
+                    // — the boot-captured ones included. Storing `fresh` in the
+                    // slot alone is the 2026-09-25 defect: the registry's handle
+                    // lived while every long-lived consumer kept the corpse.
+                    let serving = match hc.adopt_connection_from(&fresh) {
+                        Ok(adopted) => {
+                            info!(
+                                role,
+                                generation = adopted,
+                                "conductor bridge sockets ADOPTED in place — every holder of this \
+                                 role's handle now dials the fresh app websocket"
+                            );
+                            hc
+                        }
+                        Err(why) => {
+                            warn!(
+                                role,
+                                why = %why,
+                                "fresh bridge cannot be adopted by the existing handle (cell \
+                                 identity changed) — storing it as a NEW handle; consumers that \
+                                 cloned the old one keep failing until they re-read the registry"
+                            );
+                            fresh
+                        }
+                    };
+                    registry.set_client(role, Some(Arc::clone(&serving)));
+
+                    // "Live" is said about the socket zome calls will use, and
+                    // only after it has answered.
+                    match serving.ping().await {
+                        Ok(BridgeProbe::Running) => info!(
+                            role,
+                            "conductor bridge RE-MINTED after a conductor restart — fresh app \
+                             auth token, signing credentials re-authorized, app websocket \
+                             answered over the adopted handle"
+                        ),
+                        Ok(BridgeProbe::NotRunning { reason }) => info!(
+                            role,
+                            reason = %reason,
+                            "conductor bridge RE-MINTED — the app websocket answers but the app \
+                             is NOT running; the enable ladder owns it from the next tick"
+                        ),
+                        Err(e) => warn!(
+                            role,
+                            error = %e,
+                            "conductor bridge RE-MINTED but the fresh app websocket failed its \
+                             first probe — the next tick re-mints (paced)"
+                        ),
                     }
                 }
             });
@@ -2320,6 +2534,153 @@ mod supervised_slot_tests {
         assert!(
             !health::role_bridge_health().for_role(ROLE).has_cell_state(),
             "and nothing was latched, so no transition line promising a probe was written"
+        );
+    }
+}
+
+/// The 2026-09-25 household defect: after `just mesh conductors-restart` the
+/// supervisor re-minted its own handle and logged "zome path live" while every
+/// boot-captured consumer kept dialing the closed socket (292 / 376 consecutive
+/// `Websocket closed: No connection` failures, no re-mint). These pin the two
+/// halves of the cure that do not need a live conductor: the zome-call path's
+/// transport evidence reaches the supervisor, and the re-mint adopts the fresh
+/// sockets into the handle consumers already hold.
+#[cfg(test)]
+mod transport_remint_tests {
+    use super::*;
+
+    /// Verbatim from jessica's storage log at 12:46Z.
+    const INCIDENT: &str = "Zome call failed: Websocket error: Websocket closed: No connection";
+
+    #[test]
+    fn the_incident_error_is_transport_dead() {
+        assert!(crate::conductor_bridge_health::is_transport_dead(INCIDENT));
+    }
+
+    #[test]
+    fn a_closed_streak_reaches_the_remint_bound_long_before_292() {
+        let ledger = TransportLedger::default();
+        let mut streak = 0;
+        for _ in 0..292 {
+            streak = ledger.note_closed("lamad", 7);
+        }
+        assert_eq!(streak, 292);
+        assert!(remint_without_ping(ledger.streak("lamad", 7)));
+        // The bound is crossed on the third failure, not the 292nd.
+        let fresh = TransportLedger::default();
+        assert!(!remint_without_ping(fresh.note_closed("lamad", 1)));
+        assert!(!remint_without_ping(fresh.note_closed("lamad", 1)));
+        assert!(remint_without_ping(fresh.note_closed("lamad", 1)));
+        assert_eq!(TRANSPORT_CLOSED_REMINT_BOUND, 3);
+    }
+
+    #[test]
+    fn a_stale_generation_can_never_rearm_a_remint_of_its_successor() {
+        let ledger = TransportLedger::default();
+        for _ in 0..5 {
+            ledger.note_closed("lamad", 1);
+        }
+        // Re-minted: the successor answers.
+        ledger.note_ok("lamad", 2);
+        // In-flight calls that started on the OLD socket fail late.
+        for _ in 0..10 {
+            assert_eq!(ledger.note_closed("lamad", 1), 0, "stale report dropped");
+        }
+        assert_eq!(ledger.streak("lamad", 2), 0);
+        assert!(!remint_without_ping(ledger.streak("lamad", 2)));
+    }
+
+    #[test]
+    fn an_answer_on_the_current_socket_ends_its_streak() {
+        let ledger = TransportLedger::default();
+        ledger.note_closed("imagodei", 4);
+        ledger.note_closed("imagodei", 4);
+        ledger.note_ok("imagodei", 4);
+        assert_eq!(ledger.streak("imagodei", 4), 0);
+        assert_eq!(ledger.note_closed("imagodei", 4), 1);
+    }
+
+    #[test]
+    fn roles_keep_separate_streaks() {
+        let ledger = TransportLedger::default();
+        for _ in 0..3 {
+            ledger.note_closed("lamad", 9);
+        }
+        assert_eq!(ledger.streak("lamad", 9), 3);
+        assert_eq!(ledger.streak("infrastructure", 9), 0);
+    }
+
+    #[tokio::test]
+    async fn the_first_closed_failure_wakes_the_supervisor_without_waiting_a_tick() {
+        let ledger = TransportLedger::default();
+        let wake = ledger.wake("lamad");
+        ledger.note_closed("lamad", 3);
+        tokio::time::timeout(Duration::from_millis(200), wake.notified())
+            .await
+            .expect("a transport-closed zome call must wake the role's supervisor now, not in 20s");
+    }
+
+    #[tokio::test]
+    async fn a_flood_of_failures_wakes_the_supervisor_a_bounded_number_of_times() {
+        let ledger = TransportLedger::default();
+        let wake = ledger.wake("lamad");
+        for _ in 0..500 {
+            ledger.note_closed("lamad", 3);
+        }
+        // `notify_one` stores at most ONE permit, and the ledger only notifies on
+        // streak 1 and on the bound — so one wake is pending, never a queue.
+        tokio::time::timeout(Duration::from_millis(200), wake.notified())
+            .await
+            .expect("pending wake");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), wake.notified())
+                .await
+                .is_err(),
+            "no second permit queued behind the first"
+        );
+    }
+
+    #[test]
+    fn the_first_remint_is_immediate_and_repeats_are_paced() {
+        assert_eq!(remint_spacing(0), Duration::ZERO);
+        assert_eq!(remint_spacing(1), Duration::from_secs(2));
+        assert_eq!(remint_spacing(2), Duration::from_secs(4));
+        assert_eq!(remint_spacing(50), Duration::from_secs(60));
+    }
+
+    /// The supervisor's re-mint ADOPTS the fresh sockets into the handle it
+    /// already holds and stores THAT handle back — it must never again store
+    /// only the fresh client and leave every boot-captured clone on a corpse.
+    /// Source-shape, because the loop needs a live conductor to drive.
+    #[test]
+    fn the_remint_adopts_into_the_held_handle_and_consults_the_zome_path_first() {
+        let source = include_str!("hc_client_registry.rs");
+        let body = source
+            .split("pub fn spawn_bridge_supervisor(")
+            .nth(1)
+            .expect("supervisor exists")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("supervisor boundary");
+        let adopt = body
+            .find("hc.adopt_connection_from(&fresh)")
+            .expect("re-mint adopts into the held handle");
+        let store = body
+            .find("registry.set_client(role, Some(Arc::clone(&serving)))")
+            .expect("the adopted handle goes back in the slot");
+        assert!(adopt < store);
+        let streak = body
+            .find("remint_without_ping(streak)")
+            .expect("the zome-path streak is consulted");
+        let ping = body.find("match hc.ping().await").expect("ping");
+        assert!(streak < ping, "zome-path evidence is read before the ping");
+        assert!(
+            body.contains("wake.notified()"),
+            "the tick can be woken early"
+        );
+        assert!(
+            !body.contains("zome path live"),
+            "live is not declared about a socket nothing has asked"
         );
     }
 }
