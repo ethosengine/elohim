@@ -104,17 +104,16 @@ test("a nonexistent feature path refuses exit 2 before printing anything else", 
 });
 
 // The guest capacity grant is more than the reports_dir + three runtime-config.toml
-// (D2-follow-up, live rung H run 2 2026-09-25): the household `test mesh` lane's inner run
-// REWRITES pre-existing, root-owned files under genesis/a2o/reports/ every pass —
-// cucumber-mesh-scoped.mjs is one of them (justfile's scoped-run arm, always hit since the
-// guest always passes exactly one feature). A world-writable reports_dir does not make an
-// existing file inside it writable; MEASURE_REPORTS_DIR lets this test point the check at a
-// disposable temp dir instead of the real repo's reports_dir.
-test("a pre-existing root-owned-shaped 0644 cucumber-mesh-scoped.mjs is named in the capacity grant and refuses until writable", () => {
+// (D2-follow-up, live rung H runs 2 & 3, 2026-09-25): the household `test mesh` lane's inner
+// run REWRITES pre-existing, root-owned files under genesis/a2o/reports/ every pass. A
+// world-writable reports_dir does not make an existing file inside it writable — opening an
+// existing file for write needs the write bit on the FILE itself. MEASURE_REPORTS_DIR lets
+// this test point the check at a disposable temp dir instead of the real repo's reports_dir.
+function assertCapacityGrantCoversRewrittenFile(filename) {
   const tempReports = mkdtempSync(join(tmpdir(), "measure-reports-"));
   chmodSync(tempReports, 0o777);
-  const blockedPath = join(tempReports, "cucumber-mesh-scoped.mjs");
-  writeFileSync(blockedPath, "// stand-in for a root-owned file the lane regenerates\n", {
+  const blockedPath = join(tempReports, filename);
+  writeFileSync(blockedPath, "// stand-in for a root-owned file the lane rewrites\n", {
     mode: 0o644,
   });
   const chmodLine = new RegExp(`chmod o\\+w ${blockedPath.replace(/[.]/g, "\\.")}\\b`);
@@ -137,6 +136,18 @@ test("a pre-existing root-owned-shaped 0644 cucumber-mesh-scoped.mjs is named in
   } finally {
     rmSync(tempReports, { recursive: true, force: true });
   }
+}
+
+test("a pre-existing root-owned-shaped 0644 cucumber-mesh-scoped.mjs is named in the capacity grant and refuses until writable", () => {
+  assertCapacityGrantCoversRewrittenFile("cucumber-mesh-scoped.mjs");
+});
+
+// live rung H run 3: cucumber.mjs's htmlReportPath default (reports/cucumber-report.html) has
+// no env override anywhere in the justfile or stage-runner.template.sh, so the html formatter
+// rewrites this exact path every run — a root-owned 0644 copy threw EACCES there and the run
+// came back with an empty scenario selection.
+test("a pre-existing root-owned-shaped 0644 cucumber-report.html is named in the capacity grant and refuses until writable", () => {
+  assertCapacityGrantCoversRewrittenFile("cucumber-report.html");
 });
 
 test("--on adam still refuses (unprovisioned) and now names COMPUTE_SLICE_* as where its bound would come from", () => {

@@ -330,9 +330,16 @@ cmd_worker() {
 # whenever a scope is passed (justfile:~228, always true here since the guest always passes one
 # feature); `reports/console/` is written directly by genesis/a2o/steps/common.steps.ts (hardcoded,
 # not the lane's own `--console-dir` override — justfile:283-287); `reports/coverage-gap.json` is
-# build-sprint-report.ts's own default when a caller doesn't override `--coverage-gap`. Any
-# `sprint-report-*` output is a NEW file each run (run-id-suffixed), so the reports_dir grant
-# alone covers it — nothing to enumerate there.
+# build-sprint-report.ts's own default when a caller doesn't override `--coverage-gap`.
+# `reports/cucumber-report.html` (live rung H run 3) is cucumber.mjs's own `htmlReportPath`
+# default — unlike `jsonReportPath`, there is no `CUCUMBER_HTML_REPORT` override anywhere in the
+# justfile or stage-runner.template.sh, so the html formatter rewrites this exact path every
+# single run, unconditionally (a root-owned 0644 copy throws EACCES there and the run comes back
+# with an empty scenario selection). `reports/cucumber-report.json` is NOT enumerated: the guest's
+# inner run always sets `CUCUMBER_JSON_REPORT` to a scratch path
+# (stage-runner.template.sh:103), so cucumber.mjs's own json default is never reached in this
+# lane. Any `sprint-report-*` output is a NEW file each run (run-id-suffixed), so the reports_dir
+# grant alone covers it — nothing to enumerate there.
 MEASURE_REPORTS_DIR="${MEASURE_REPORTS_DIR:-$ROOT/genesis/a2o/reports}"
 
 # Tests writability the way UID 65534 actually experiences it — NOT `[ -w path ]` run as this
@@ -362,6 +369,7 @@ check_writable_or_refuse() {
   local -a targets=(
     "$reports_dir" 0
     "$reports_dir/cucumber-mesh-scoped.mjs" 0
+    "$reports_dir/cucumber-report.html" 0
     "$reports_dir/console" 1
     "$reports_dir/coverage-gap.json" 0
   )
