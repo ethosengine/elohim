@@ -167,7 +167,7 @@ chain contains no `ephemeral` layer and its `provenance` chain does; a `Feedback
 recorded against a tuning head is found by walking any session chained on it, and one
 recorded against an ephemeral head is not found from a sibling session.
 
-- [ ] `.epr-meta/collective.json` declares no `steward`; stewards derive from affiliation records shaped one to one as the Qahal Membership pre-image; a directory may declare a child collective whose `parent` pins the enclosing one; a session's actor claim binds its collective of record; source rules speak locality, not reach; `graduate` requires an approving verdict from a Steward affiliate who is not the contribution's author.
+- [x] `.epr-meta/collective.json` declares no `steward`; stewards derive from affiliation records shaped one to one as the Qahal Membership pre-image; a directory may declare a child collective whose `parent` pins the enclosing one; a session's actor claim binds its collective of record; source rules speak locality, not reach; `graduate` requires an approving verdict from a Steward affiliate who is not the contribution's author.
 
 Native owner: in `elohim/eprfs/eprfs-agent/src/memory.rs` remove `Collective.steward`,
 add `parent: Option<FileRef>`, rename `Reach { Private, Workspace, Repository }` to
@@ -203,6 +203,21 @@ a claim bound to a different collective than the source path's is refused naming
 graduate approved by the author's own persona is refused; graduate approved by a
 Contributor is refused; graduate approved by a distinct Steward passes; `maxReach` in a
 declaration is refused with the rename named in the message.
+
+Landed 2026-09-25 with the operator's amendments of that date. Identity, never email: the
+seed names `human:matthew` (Person, Steward) and every agent package `agent:<role>`
+(ElohimAgent, Contributor, `actsFor: human:matthew`); no identity field carries an `@`.
+Fixture standing: `Affiliation.standing: Standing | Fixture` (no Membership counterpart,
+local-only like `version` and `acts_for`), and `human:adam` co-stewards as `Fixture` at
+Bootstrap stakes; every approval resting on him reports `validatedAt: bootstrap (fixture
+co-steward)`, and `requires_non_fixture_stewards(n)` (tested, not yet called) is the future
+settlement and external-offer gate. Affiliations match their collective by declaration path;
+a claim binds its collective with `epr actor claim --under <path>` (unbound means the root);
+registry terms are reported, not enforced, by `epr flow memory collective`. The memory-kit
+script named above no longer exists (retired 2026-09-11). Evidence: tests in
+`elohim/eprfs/epr-cli/tests/flow_memory_affiliations.rs` (17) plus `flow_memory.rs`,
+`flow_memory_import.rs` and the `eprfs-agent` and `elohim-epr-rea` unit tests; the
+`collective-memory` story passes 4/4; `just codegen agents verify` 2108/0.
 
 - [ ] The crossing story is written and held: a signed local contribution graduates into a wider space with its CID unchanged and its holders changed, the elohim witness is recorded, and the DID document for the contributing identity head resolves with its steward as controller; the equilibrium habit carries one evidence delta and remains RED.
 
