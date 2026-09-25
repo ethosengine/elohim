@@ -38,7 +38,7 @@ use std::{
 use ark_core::{
     berth::Berth,
     lifecycle::{step, Action, ChildState, Event, IncidentCloseKind},
-    manifest::{ChildSpec, ManifestError, Probe, RuntimeManifest},
+    manifest::{ChildSpec, ManifestError, Probe, ProcessKind, RuntimeManifest},
     rea::ReaProjectionError,
     BoundedBy, Clock, DeathRecord, DeathTally, DeathWitness, ExitClass, GiveUpReason, Incident,
     IncidentClose, Intent, IntentAction, Passport, ProcessPassport, ProcessSample, RestartContext,
@@ -231,6 +231,9 @@ impl Supervisor {
         }
 
         for process in &manifest.processes {
+            if process.kind == ProcessKind::Delegated {
+                continue;
+            }
             if !berth.artifacts.contains_key(&process.name) {
                 return Err(SupervisorError::ArtifactNotPlaced {
                     process: process.name.clone(),
@@ -307,6 +310,13 @@ impl Supervisor {
 
         let mut threads = Vec::with_capacity(self.manifest.processes.len());
         for spec in &self.manifest.processes {
+            if spec.kind == ProcessKind::Delegated {
+                eprintln!(
+                    "ark: delegated child {} is owned by another runtime; skipping local start",
+                    spec.name
+                );
+                continue;
+            }
             let mut worker = Worker {
                 spec: spec.clone(),
                 berth: self.berth.clone(),

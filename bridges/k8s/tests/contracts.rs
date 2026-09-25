@@ -1,7 +1,14 @@
-use ark_core::manifest::RuntimeManifest;
-use k8s_bridge::{drift_verdict, quantity, render_envelope, verify, DriftVerdict};
+use ark_core::manifest::{ProcessKind, RuntimeManifest};
+use k8s_bridge::{drift_verdict, quantity, render_envelope, verify, DriftVerdict, RenderError};
 use serde_json::{json, Value};
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::PathBuf,
+    process::Command,
+};
+
+const GIB: u64 = 1024 * 1024 * 1024;
 
 fn repo() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -13,6 +20,12 @@ fn manifest(name: &str) -> RuntimeManifest {
     RuntimeManifest::from_json(
         &fs::read_to_string(runtime().join(format!("{name}.manifest.json"))).unwrap(),
     )
+    .unwrap()
+}
+fn delegated_manifest() -> RuntimeManifest {
+    RuntimeManifest::from_json(include_str!(
+        "fixtures/delegated-compute-worker.manifest.json"
+    ))
     .unwrap()
 }
 fn deployments() -> Value {
@@ -309,4 +322,102 @@ fn cli_missing_pin_refuses() {
     assert!(String::from_utf8(output.stdout)
         .unwrap()
         .contains("Unpinned"));
+}
+
+#[test]
+fn every_current_runtime_render_is_byte_identical_to_the_pre_change_snapshot() {
+    let golden: BTreeMap<String, String> =
+        serde_json::from_str(include_str!("runtime-envelope-golden.json")).unwrap();
+    let mut rendered_names = BTreeSet::new();
+
+    for entry in fs::read_dir(runtime()).unwrap() {
+        let path = entry.unwrap().path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !name.ends_with(".manifest.json") {
+            continue;
+        }
+        let manifest = RuntimeManifest::from_json(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(manifest
+            .processes
+            .iter()
+            .all(|child| child.kind != ProcessKind::Delegated));
+        let actual = serde_json::to_string(&render_envelope(&manifest).unwrap()).unwrap();
+        assert_eq!(actual, golden[name], "{name}");
+        rendered_names.insert(name.to_string());
+    }
+
+    assert_eq!(
+        rendered_names,
+        golden.keys().cloned().collect::<BTreeSet<_>>()
+    );
+}
+
+#[test]
+fn delegated_slice_is_exposed_and_subtracted_before_the_split() {
+    let manifest = delegated_manifest();
+    let rendered = render_envelope(&manifest).unwrap();
+
+    assert_eq!(rendered.edgenode_memory_limit, "8192Mi");
+    assert_eq!(rendered.edgenode_cpu_limit, "8000m");
+    assert_eq!(rendered.conductor_memory_limit, "3840Mi");
+    assert_eq!(rendered.storage_memory_limit, "2304Mi");
+    assert_eq!(rendered.conductor_cpu_limit, "3000m");
+    assert_eq!(rendered.storage_cpu_limit, "3000m");
+    assert_eq!(rendered.delegated.len(), 1);
+    assert_eq!(rendered.delegated[0].name, "compute-worker");
+    assert_eq!(rendered.delegated[0].memory_bytes, 2 * GIB);
+    assert_eq!(rendered.delegated[0].cpu_millis, 2_000);
+}
+
+#[test]
+fn nine_gib_delegated_child_is_refused_by_core_and_bridge() {
+    let mut manifest = delegated_manifest();
+    manifest.processes[1]
+        .quota
+        .as_mut()
+        .unwrap()
+        .memory_max_bytes = Some(9 * GIB);
+
+    let error = render_envelope(&manifest).unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<RenderError>(),
+        Some(&RenderError::DelegatedMemoryExceedsBound {
+            sum: u128::from(9 * GIB),
+            bound: 8 * GIB,
+        })
+    );
+    let core_error = RuntimeManifest::from_json(&serde_json::to_string(&manifest).unwrap())
+        .unwrap_err()
+        .to_string();
+    assert!(core_error.contains("9663676416 + headroom 0 = 9663676416"));
+    assert!(core_error.contains("root memory 8589934592"));
+}
+
+#[test]
+fn delegated_cpu_over_bound_and_missing_quota_are_typed_refusals() {
+    let mut manifest = delegated_manifest();
+    manifest.processes[1]
+        .quota
+        .as_mut()
+        .unwrap()
+        .cpu_share_millis = Some(9_000);
+    let error = render_envelope(&manifest).unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<RenderError>(),
+        Some(&RenderError::DelegatedCpuExceedsBound {
+            sum: 9_000,
+            bound: 8_000,
+        })
+    );
+
+    manifest.processes[1].quota = None;
+    let error = render_envelope(&manifest).unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<RenderError>(),
+        Some(&RenderError::DelegatedQuotaMissing {
+            child: "compute-worker".into(),
+        })
+    );
 }

@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "runtime-manifest",
+  "reach": "trusted",
+  "processes": [
+    {
+      "name": "conductor",
+      "kind": "native",
+      "artifact": {
+        "pinned": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "argv": ["{artifact}"]
+    },
+    {
+      "name": "compute-worker",
+      "kind": "delegated",
+      "artifact": {
+        "pinned": {
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "argv": ["{artifact}"],
+      "quota": {
+        "memory_max_bytes": 2147483648,
+        "cpu_share_millis": 2000
+      }
+    }
+  ],
+  "archetype": "device-family-node-base",
+  "envelope": {
+    "bound": {
+      "memory_bytes": 8589934592,
+      "cpu_millis": 8000
+    },
+    "headroom_bytes": 0,
+    "measure": "committed",
+    "protected": ["conductor"],
+    "shed_order": []
+  }
+}

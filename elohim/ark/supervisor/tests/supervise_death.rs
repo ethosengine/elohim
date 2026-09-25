@@ -722,6 +722,34 @@ fn a_berth_that_does_not_match_its_manifest_is_refused_before_anything_runs() {
 }
 
 #[test]
+fn delegated_child_needs_no_local_artifact_and_is_never_started() {
+    let data_root = tempfile::tempdir().unwrap();
+    let mut delegated = child("compute-worker", "exit 99", Vec::new(), policy(0, 100));
+    delegated.kind = ProcessKind::Delegated;
+    let manifest = RuntimeManifest {
+        processes: vec![delegated],
+        ..RuntimeManifest::default()
+    };
+    let berth = berth_for(&manifest, data_root.path().into(), &[]);
+    let outcome = supervisor_with_driver(
+        &manifest,
+        &berth,
+        Box::new(PanickingDriver {
+            inner: NativeDriver,
+            panic_on: "compute-worker".into(),
+        }),
+    )
+    .run()
+    .unwrap();
+
+    assert_eq!(outcome.exit_code, 0);
+    assert_eq!(outcome.passport.processes.len(), 1);
+    assert_eq!(outcome.passport.processes[0].name, "compute-worker");
+    assert_eq!(outcome.passport.processes[0].pid, None);
+    assert!(!outcome.passport.processes[0].ready);
+}
+
+#[test]
 fn executable_identity_rung_accepts_the_pinned_running_binary() {
     let root = tempfile::tempdir().unwrap();
     let executable = PathBuf::from(SHELL);

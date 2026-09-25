@@ -577,6 +577,26 @@ impl RuntimeManifest {
                     )));
                 }
             }
+            if let Some(root) = envelope.bound.cpu_millis {
+                // Delegated shares are sibling-runtime reservations inside this bound.
+                let delegated: u128 = self
+                    .processes
+                    .iter()
+                    .filter(|child| child.kind == ProcessKind::Delegated)
+                    .filter_map(|child| {
+                        child
+                            .quota
+                            .as_ref()
+                            .and_then(|quota| quota.cpu_share_millis)
+                    })
+                    .map(u128::from)
+                    .sum();
+                if delegated > u128::from(root) {
+                    return Err(ManifestError::Invalid(format!(
+                        "delegated child CPU total {delegated} exceeds root CPU {root}"
+                    )));
+                }
+            }
         }
 
         Ok(())
@@ -739,6 +759,48 @@ mod tests {
         second.quota.as_mut().unwrap().memory_max_bytes = Some(30);
         manifest.processes.push(second);
         assert_eq!(manifest.validate(), Ok(()));
+    }
+
+    #[test]
+    fn delegated_quota_counts_toward_memory_and_cpu_roots() {
+        const GIB: u64 = 1024 * 1024 * 1024;
+        let mut manifest = quota_manifest(Some(8 * GIB), 2 * GIB, 0);
+        manifest.processes[0].kind = ProcessKind::Delegated;
+        manifest.processes[0]
+            .quota
+            .as_mut()
+            .unwrap()
+            .cpu_share_millis = Some(2_000);
+        manifest.envelope.as_mut().unwrap().bound.cpu_millis = Some(8_000);
+        assert_eq!(manifest.validate(), Ok(()));
+
+        manifest.processes[0]
+            .quota
+            .as_mut()
+            .unwrap()
+            .memory_max_bytes = Some(9 * GIB);
+        assert!(manifest
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("9663676416 + headroom 0 = 9663676416 exceeds root memory 8589934592"));
+
+        manifest.processes[0]
+            .quota
+            .as_mut()
+            .unwrap()
+            .memory_max_bytes = Some(2 * GIB);
+        manifest.processes[0]
+            .quota
+            .as_mut()
+            .unwrap()
+            .cpu_share_millis = Some(9_000);
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::Invalid(
+                "delegated child CPU total 9000 exceeds root CPU 8000".into()
+            ))
+        );
     }
 
     #[test]

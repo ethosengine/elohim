@@ -1,10 +1,10 @@
 //! Pure outward resource projection consumed by the orchestrator through this crate's CLI.
 //! Manifest identity always comes from ark-core; this bridge neither anchors nor enforces it.
 
-use ark_core::manifest::RuntimeManifest;
+use ark_core::manifest::{ProcessKind, RuntimeManifest};
 use serde::Serialize;
 use serde_json::Value;
-use std::{fs, path::Path};
+use std::{fmt, fs, path::Path};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -39,6 +39,66 @@ pub struct RenderedEnvelope {
     pub conductor_cpu_limit: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub storage_cpu_limit: String,
+    /// Quota slices provisioned by a sibling runtime, inside the root bound.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub delegated: Vec<DelegatedSlice>,
+}
+
+/// One delegated child's share of the root runtime envelope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DelegatedSlice {
+    pub name: String,
+    pub memory_bytes: u64,
+    pub cpu_millis: u32,
+}
+
+/// Typed refusal at the delegated-child boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenderError {
+    DelegatedQuotaMissing { child: String },
+    DelegatedMemoryExceedsBound { sum: u128, bound: u64 },
+    DelegatedCpuExceedsBound { sum: u128, bound: u32 },
+}
+
+impl fmt::Display for RenderError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DelegatedQuotaMissing { child } => {
+                write!(formatter, "delegated child {child} has no quota")
+            }
+            Self::DelegatedMemoryExceedsBound { sum, bound } => write!(
+                formatter,
+                "delegated memory Σ {sum} exceeds envelope bound {bound}"
+            ),
+            Self::DelegatedCpuExceedsBound { sum, bound } => write!(
+                formatter,
+                "delegated CPU Σ {sum} exceeds envelope bound {bound}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RenderError {}
+
+fn delegated_slices(manifest: &RuntimeManifest) -> Result<Vec<DelegatedSlice>> {
+    manifest
+        .processes
+        .iter()
+        .filter(|child| child.kind == ProcessKind::Delegated)
+        .map(|child| {
+            let quota = child.quota.as_ref().ok_or_else(|| {
+                Box::<dyn std::error::Error>::from(RenderError::DelegatedQuotaMissing {
+                    child: child.name.clone(),
+                })
+            })?;
+            Ok(DelegatedSlice {
+                name: child.name.clone(),
+                memory_bytes: quota.memory_max_bytes.unwrap_or(0),
+                cpu_millis: quota.cpu_share_millis.unwrap_or(0),
+            })
+        })
+        .collect()
 }
 
 /// Evidence only: no verdict rewrites a deployment or changes its declared head.
@@ -116,6 +176,41 @@ fn share(value: Option<u64>, numerator: u64, denominator: u64, unit: &str) -> (S
 /// Render limits from the root bound, requests from the archetype floor (or a pinned
 /// override), and the exact 5/8 memory, 1/2 CPU split with the remainder to storage.
 pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
+    let delegated = delegated_slices(manifest)?;
+    let delegated_memory: u128 = delegated
+        .iter()
+        .map(|slice| u128::from(slice.memory_bytes))
+        .sum();
+    let delegated_cpu: u128 = delegated
+        .iter()
+        .map(|slice| u128::from(slice.cpu_millis))
+        .sum();
+    if let Some(bound) = manifest
+        .envelope
+        .as_ref()
+        .and_then(|envelope| envelope.bound.memory_bytes)
+    {
+        if delegated_memory > u128::from(bound) {
+            return Err(RenderError::DelegatedMemoryExceedsBound {
+                sum: delegated_memory,
+                bound,
+            }
+            .into());
+        }
+    }
+    if let Some(bound) = manifest
+        .envelope
+        .as_ref()
+        .and_then(|envelope| envelope.bound.cpu_millis)
+    {
+        if delegated_cpu > u128::from(bound) {
+            return Err(RenderError::DelegatedCpuExceedsBound {
+                sum: delegated_cpu,
+                bound,
+            }
+            .into());
+        }
+    }
     RuntimeManifest::from_json(&serde_json::to_string(manifest)?)?;
     let Some(envelope) = &manifest.envelope else {
         return Ok(RenderedEnvelope::default());
@@ -151,28 +246,32 @@ pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
     if memory < floor_memory || cpu < floor_cpu {
         return Err("request override is below archetype floor".into());
     }
-    if envelope
+    let remaining_memory_bound = envelope
         .bound
         .memory_bytes
-        .is_some_and(|limit| memory > limit)
-        || envelope
-            .bound
-            .cpu_millis
-            .is_some_and(|limit| cpu > u64::from(limit))
+        .map(|bound| (u128::from(bound) - delegated_memory) as u64);
+    let remaining_cpu_bound = envelope
+        .bound
+        .cpu_millis
+        .map(|bound| (u128::from(bound) - delegated_cpu) as u64);
+    if remaining_memory_bound.is_some_and(|limit| memory > limit)
+        || remaining_cpu_bound.is_some_and(|limit| cpu > limit)
     {
         return Err("request exceeds declared limit".into());
     }
-    let memory_limit = envelope.bound.memory_bytes.map(|v| v / MIB);
-    let cpu_limit = envelope.bound.cpu_millis.map(u64::from);
+    let memory_limit = remaining_memory_bound.map(|bound| bound / MIB);
+    let cpu_limit = remaining_cpu_bound;
+    let root_memory_limit = envelope.bound.memory_bytes.map(|bound| bound / MIB);
+    let root_cpu_limit = envelope.bound.cpu_millis.map(u64::from);
     let (cmr, smr) = share(Some(memory / MIB), 5, 8, "Mi");
     let (cml, sml) = share(memory_limit, 5, 8, "Mi");
     let (ccr, scr) = share(Some(cpu), 1, 2, "m");
     let (ccl, scl) = share(cpu_limit, 1, 2, "m");
     Ok(RenderedEnvelope {
         edgenode_memory_request: format!("{}Mi", memory / MIB),
-        edgenode_memory_limit: memory_limit.map_or(String::new(), |v| format!("{v}Mi")),
+        edgenode_memory_limit: root_memory_limit.map_or(String::new(), |v| format!("{v}Mi")),
         edgenode_cpu_request: format!("{cpu}m"),
-        edgenode_cpu_limit: cpu_limit.map_or(String::new(), |v| format!("{v}m")),
+        edgenode_cpu_limit: root_cpu_limit.map_or(String::new(), |v| format!("{v}m")),
         conductor_memory_request: cmr,
         storage_memory_request: smr,
         conductor_memory_limit: cml,
@@ -181,6 +280,7 @@ pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
         storage_cpu_request: scr,
         conductor_cpu_limit: ccl,
         storage_cpu_limit: scl,
+        delegated,
     })
 }
 
