@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1",
+  "executedAt": "2026-09-24T14:19:26Z",
+  "commitSha": "ed1d7a9b5cf880cde59e5f7f78f13e2472a46fdb",
+  "branch": "dev",
+  "buildNumber": "1903",
+  "executionOrder":   [
+    "elohim",
+    "elohim-edge",
+    "elohim-holochain",
+    "elohim-genesis"
+  ],
+  "results":   {
+    "elohim-holochain":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 2593486,
+      "url": "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/1460/",
+      "buildNumber": 1460,
+      "level": 0
+    },
+    "elohim-edge":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 8678501,
+      "url": "https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1483/",
+      "buildNumber": 1483,
+      "level": 1
+    },
+    "elohim":     {
+      "success": false,
+      "unstable": false,
+      "wasted": false,
+      "result": "FAILURE",
+      "duration": 7769903,
+      "url": "https://jenkins.ethosengine.com/job/elohim/job/dev/1726/",
+      "buildNumber": 1726,
+      "level": 2
+    }
+  },
+  "abortedBeforeStart": ["elohim-genesis"]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1",
+  "executedAt": "2026-09-25T18:49:58Z",
+  "commitSha": "c84af3f27b555bde3bcc870fe4eb6e1f6e240175",
+  "branch": "dev",
+  "buildNumber": "1906",
+  "executionOrder":   [
+    "elohim",
+    "elohim-edge",
+    "elohim-genesis"
+  ],
+  "results": {"elohim-edge":   {
+    "success": false,
+    "unstable": false,
+    "wasted": false,
+    "result": "FAILURE",
+    "duration": 1869242,
+    "url": "https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1484/",
+    "buildNumber": 1484,
+    "level": 0
+  }},
+  "abortedBeforeStart":   [
+    "elohim",
+    "elohim-genesis"
+  ]
+}

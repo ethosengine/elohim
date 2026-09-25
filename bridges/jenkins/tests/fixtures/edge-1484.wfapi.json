@@ -1,0 +1,343 @@
+{
+  "_links": {
+    "self": {
+      "href": "/job/elohim-edge/job/dev/1484/wfapi/describe"
+    },
+    "changesets": {
+      "href": "/job/elohim-edge/job/dev/1484/wfapi/changesets"
+    },
+    "artifacts": {
+      "href": "/job/elohim-edge/job/dev/1484/wfapi/artifacts"
+    }
+  },
+  "id": "1484",
+  "name": "#1484",
+  "status": "FAILED",
+  "startTimeMillis": 1790360327904,
+  "endTimeMillis": 1790362197146,
+  "durationMillis": 1869242,
+  "queueDurationMillis": 2,
+  "pauseDurationMillis": 0,
+  "stages": [
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/14/wfapi/describe"
+        }
+      },
+      "id": "14",
+      "name": "Check Trigger",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790360338618,
+      "durationMillis": 131,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/23/wfapi/describe"
+        }
+      },
+      "id": "23",
+      "name": "Checkout",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790360338771,
+      "durationMillis": 18465,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/46/wfapi/describe"
+        }
+      },
+      "id": "46",
+      "name": "Setup Version",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790360357252,
+      "durationMillis": 1518,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/71/wfapi/describe"
+        }
+      },
+      "id": "71",
+      "name": "Setup Nix Cache",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790360358790,
+      "durationMillis": 754,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/85/wfapi/describe"
+        }
+      },
+      "id": "85",
+      "name": "Quality Gate: Doorway",
+      "execNode": "",
+      "status": "UNSTABLE",
+      "startTimeMillis": 1790360359560,
+      "durationMillis": 1192872,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/112/wfapi/describe"
+        }
+      },
+      "id": "112",
+      "name": "Build Doorway",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790361552498,
+      "durationMillis": 151341,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/133/wfapi/describe"
+        }
+      },
+      "id": "133",
+      "name": "Quality Gate: Doorway App",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790361703856,
+      "durationMillis": 20159,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/150/wfapi/describe"
+        }
+      },
+      "id": "150",
+      "name": "Build Doorway App",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790361724031,
+      "durationMillis": 14923,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/171/wfapi/describe"
+        }
+      },
+      "id": "171",
+      "name": "Build Agent SDK",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790361738975,
+      "durationMillis": 165029,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/202/wfapi/describe"
+        }
+      },
+      "id": "202",
+      "name": "Build Storage",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790361904020,
+      "durationMillis": 291830,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/228/wfapi/describe"
+        }
+      },
+      "id": "228",
+      "name": "P2P Simulation Test",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362195871,
+      "durationMillis": 60,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/233/wfapi/describe"
+        }
+      },
+      "id": "233",
+      "name": "Build Edge Node Image",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362195948,
+      "durationMillis": 65,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/238/wfapi/describe"
+        }
+      },
+      "id": "238",
+      "name": "Build hApp Installer",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196035,
+      "durationMillis": 59,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/243/wfapi/describe"
+        }
+      },
+      "id": "243",
+      "name": "Push to Harbor",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196112,
+      "durationMillis": 56,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/248/wfapi/describe"
+        }
+      },
+      "id": "248",
+      "name": "Deploy Edge Node - Alpha",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196189,
+      "durationMillis": 55,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/253/wfapi/describe"
+        }
+      },
+      "id": "253",
+      "name": "Dataplane Validation",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196266,
+      "durationMillis": 59,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/258/wfapi/describe"
+        }
+      },
+      "id": "258",
+      "name": "Deploy Edge Node - Staging",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196343,
+      "durationMillis": 60,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/263/wfapi/describe"
+        }
+      },
+      "id": "263",
+      "name": "Deploy Edge Node - Prod",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196421,
+      "durationMillis": 55,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/268/wfapi/describe"
+        }
+      },
+      "id": "268",
+      "name": "Cleanup",
+      "execNode": "",
+      "status": "FAILED",
+      "error": {
+        "message": "script returned exit code 1",
+        "type": "hudson.AbortException"
+      },
+      "startTimeMillis": 1790362196497,
+      "durationMillis": 70,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1484/execution/node/273/wfapi/describe"
+        }
+      },
+      "id": "273",
+      "name": "Declarative: Post Actions",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790362196594,
+      "durationMillis": 283,
+      "pauseDurationMillis": 0
+    }
+  ]
+}

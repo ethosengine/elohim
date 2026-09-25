@@ -1,0 +1,16 @@
+# Invoked through the manifest gate runner, which resolves the native pool slot.
+gate:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    CARGO_BUILD_JOBS=2 cargo fmt --all -- --check
+    result=$?
+    echo EXIT=$result
+    [ "$result" -eq 0 ] || exit "$result"
+    CARGO_BUILD_JOBS=2 cargo clippy --workspace --all-targets --locked -- -D warnings
+    result=$?
+    echo EXIT=$result
+    [ "$result" -eq 0 ] || exit "$result"
+    CARGO_BUILD_JOBS=2 cargo test --workspace --locked
+    result=$?
+    echo EXIT=$result
+    exit "$result"

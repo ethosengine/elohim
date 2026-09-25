@@ -1,0 +1,300 @@
+{
+  "_links": {
+    "self": {
+      "href": "/job/elohim-edge/job/dev/1483/wfapi/describe"
+    },
+    "artifacts": {
+      "href": "/job/elohim-edge/job/dev/1483/wfapi/artifacts"
+    }
+  },
+  "id": "1483",
+  "name": "#1483",
+  "status": "SUCCESS",
+  "startTimeMillis": 1790243105066,
+  "endTimeMillis": 1790251783567,
+  "durationMillis": 8678501,
+  "queueDurationMillis": 3,
+  "pauseDurationMillis": 0,
+  "stages": [
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/14/wfapi/describe"
+        }
+      },
+      "id": "14",
+      "name": "Check Trigger",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790243114119,
+      "durationMillis": 162,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/23/wfapi/describe"
+        }
+      },
+      "id": "23",
+      "name": "Checkout",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790243114302,
+      "durationMillis": 18212,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/46/wfapi/describe"
+        }
+      },
+      "id": "46",
+      "name": "Setup Version",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790243132533,
+      "durationMillis": 2257,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/71/wfapi/describe"
+        }
+      },
+      "id": "71",
+      "name": "Setup Nix Cache",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790243134813,
+      "durationMillis": 752,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/85/wfapi/describe"
+        }
+      },
+      "id": "85",
+      "name": "Quality Gate: Doorway",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790243135586,
+      "durationMillis": 1166992,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/98/wfapi/describe"
+        }
+      },
+      "id": "98",
+      "name": "Build Doorway",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790244302613,
+      "durationMillis": 142517,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/119/wfapi/describe"
+        }
+      },
+      "id": "119",
+      "name": "Quality Gate: Doorway App",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790244445159,
+      "durationMillis": 18209,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/136/wfapi/describe"
+        }
+      },
+      "id": "136",
+      "name": "Build Doorway App",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790244463391,
+      "durationMillis": 15482,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/157/wfapi/describe"
+        }
+      },
+      "id": "157",
+      "name": "Build Agent SDK",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790244478893,
+      "durationMillis": 164746,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/188/wfapi/describe"
+        }
+      },
+      "id": "188",
+      "name": "Build Storage",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790244643666,
+      "durationMillis": 1999773,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/219/wfapi/describe"
+        }
+      },
+      "id": "219",
+      "name": "P2P Simulation Test",
+      "execNode": "",
+      "status": "UNSTABLE",
+      "startTimeMillis": 1790246643467,
+      "durationMillis": 1281,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/242/wfapi/describe"
+        }
+      },
+      "id": "242",
+      "name": "Build Edge Node Image",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790246644773,
+      "durationMillis": 28140,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/283/wfapi/describe"
+        }
+      },
+      "id": "283",
+      "name": "Build hApp Installer",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790246672936,
+      "durationMillis": 12192,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/317/wfapi/describe"
+        }
+      },
+      "id": "317",
+      "name": "Push to Harbor",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790246685156,
+      "durationMillis": 166608,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/352/wfapi/describe"
+        }
+      },
+      "id": "352",
+      "name": "Deploy Edge Node - Alpha",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790246851783,
+      "durationMillis": 4436880,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/895/wfapi/describe"
+        }
+      },
+      "id": "895",
+      "name": "Dataplane Validation",
+      "execNode": "",
+      "status": "UNSTABLE",
+      "startTimeMillis": 1790251288685,
+      "durationMillis": 468844,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/926/wfapi/describe"
+        }
+      },
+      "id": "926",
+      "name": "Deploy Edge Node - Staging",
+      "execNode": "",
+      "status": "NOT_EXECUTED",
+      "startTimeMillis": 1790251757553,
+      "durationMillis": 89,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/931/wfapi/describe"
+        }
+      },
+      "id": "931",
+      "name": "Deploy Edge Node - Prod",
+      "execNode": "",
+      "status": "NOT_EXECUTED",
+      "startTimeMillis": 1790251757668,
+      "durationMillis": 65,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/936/wfapi/describe"
+        }
+      },
+      "id": "936",
+      "name": "Cleanup",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790251757754,
+      "durationMillis": 25076,
+      "pauseDurationMillis": 0
+    },
+    {
+      "_links": {
+        "self": {
+          "href": "/job/elohim-edge/job/dev/1483/execution/node/956/wfapi/describe"
+        }
+      },
+      "id": "956",
+      "name": "Declarative: Post Actions",
+      "execNode": "",
+      "status": "SUCCESS",
+      "startTimeMillis": 1790251782863,
+      "durationMillis": 344,
+      "pauseDurationMillis": 0
+    }
+  ]
+}

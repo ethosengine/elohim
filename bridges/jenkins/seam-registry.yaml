@@ -1,0 +1,234 @@
+# bridges/jenkins/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. Registered at birth
+# (Slice 1, consuming-app bridge). The governed-offer verdict itself lives in epr-cli
+# (flow::memory::offer::offer_standing); require_active is this crate's gate over it.
+seamRegistryVersion: 1
+crate: jenkins-bridge
+crateRoot: bridges/jenkins
+seamLocus: 'S3.6 consuming-app bridge: Jenkins (a non-native consumer) served by the network; external claims flow
+  in as observations, gifts flow out under a governed offer.'
+decisionPoints:
+- name: translate
+  kind: boundary-answer-type
+  sourceLocation:
+    file: src/translate.rs
+    modulePath: jenkins_bridge::translate
+  summary: Jenkins wfapi + orchestrator graph -> Observation (Process | Event only), each event carrying the external-claim
+    envelope scoped to the offer CID.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Observation plane of the flow sidecar only; Process + FlowEvent, never Commitment/Spec/Intent/Edge
+      (the Observation enum has two variants).
+  - id: C1
+    status: answered
+    justification: The provider is service:jenkins, which parse_acting_participant refuses as an actor; no record
+      elects or approves anything.
+  - id: C2
+    status: n-a
+    justification: No head moves; events append and discharge nothing (fulfills/satisfies empty).
+  - id: C3
+    status: answered
+    justification: Refusals name the malformed field; the operator re-runs over the corrected archive.
+  - id: C4
+    status: answered
+    justification: NOT_EXECUTED emits no event (honest absence); a wfapi-only run omits the sha slot and says basis
+      wfapi-only.
+  - id: C5
+    status: answered
+    justification: 'Evidence never grants authority: every claim enters at Reach::Private, signature unattested,
+      in_scope_of the offer CID.'
+  - id: C6a
+    status: partial
+    justification: One build per call; stage count and archive size have no admission ceiling.
+  - id: C6b
+    status: answered
+    justification: Identity is the atom CID of each record; re-observing the same archive appends nothing.
+  - id: C7
+    status: n-a
+    justification: No advertised capability or served route.
+  - id: C8
+    status: answered
+    justification: Every event carries provenance, build, url and (with a graph) sha and orchestrator-run slots.
+  - id: C9
+    status: n-a
+    justification: No agent keys, control binding, recovery or identity lineage is created; service:jenkins is provenance
+      with no key.
+  - id: C10
+    status: answered
+    justification: New slots are additive; the classified_as convention (tag first, subject second, prefixed extras)
+      is unchanged.
+  - id: C11
+    status: n-a
+    justification: 'No remote receiver, retry or timeout: the CLI reads Jenkins'' archive from files the operator
+      supplies.'
+  - id: C12
+    status: answered
+    justification: Appends only while a distinct Steward's approval of the offer stands (require_active).
+  - id: C13
+    status: answered
+    justification: 'Standing is never carried in: external claims are evaluated on entry, at the lowest reach.'
+  - id: C14
+    status: partial
+    justification: Refusals are textual (BridgeError variants with exit codes); no typed reason taxonomy or witness
+      record.
+  contractTests:
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: translate_output_can_only_express_observations
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: observe_appends_idempotently_and_walk_renders_each_stage_with_its_duration
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: malformed_or_foreign_input_refuses_with_the_sidecar_byte_identical
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: wfapi_alone_translates_and_says_so
+    kind: integration
+  - path: bridges/jenkins/src/claim.rs
+    testName: only_a_service_can_be_an_external_claim_source
+    kind: unit
+- name: drift
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/drift.rs
+    modulePath: jenkins_bridge::drift
+  summary: 'Declared recipe (with exercises: binding) vs observed stages vs disclosed heldCapabilities -> extra/missing/reordered/undisclosed-capability
+    findings.'
+  concernIds:
+  - id: C0
+    status: answered
+    justification: A read-only gift computed by the network; nothing is written.
+  - id: C1
+    status: n-a
+    justification: No approval or election.
+  - id: C2
+    status: n-a
+    justification: No state moves.
+  - id: C3
+    status: answered
+    justification: Every finding names the stage or capability to reconcile; Jenkins may ignore it for free.
+  - id: C4
+    status: answered
+    justification: A skipped stage is information (not executed), never drift; a disclosed capability nobody exercised
+      is listed, not hidden.
+  - id: C5
+    status: answered
+    justification: 'Self-report is a claim: the disclosure is compared with the recipe''s exercises binding, and
+      masking is named as undisclosed capability.'
+  - id: C6a
+    status: answered
+    justification: Linear in declared + observed stages.
+  - id: C6b
+    status: answered
+    justification: Pure function of its inputs.
+  - id: C7
+    status: n-a
+    justification: No advertised capability.
+  - id: C8
+    status: answered
+    justification: Each finding is one printed line and a JSON object.
+  - id: C9
+    status: n-a
+    justification: No agent keys, control binding, recovery or identity lineage is created; service:jenkins is provenance
+      with no key.
+  - id: C10
+    status: answered
+    justification: 'exercises: is binding excluded from the hashed ProcessSpec (registry test exercises_and_paths_do_not_move_the_recipe_cid).'
+  - id: C11
+    status: n-a
+    justification: 'No remote receiver, retry or timeout: the CLI reads Jenkins'' archive from files the operator
+      supplies.'
+  - id: C12
+    status: answered
+    justification: The CLI reads drift only while the offer is active.
+  - id: C13
+    status: n-a
+    justification: Drift grants nothing.
+  - id: C14
+    status: n-a
+    justification: Findings are the witnessed residual.
+  contractTests:
+  - path: bridges/jenkins/src/drift.rs
+    testName: names_extra_missing_reordered_and_masked_capabilities
+    kind: unit
+  - path: bridges/jenkins/src/drift.rs
+    testName: a_skipped_stage_is_information_not_drift
+    kind: unit
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: drift_over_the_real_builds_is_clean_and_names_skips_and_unexercised_disclosures
+    kind: integration
+- name: require_active
+  kind: verdict-fn
+  sourceLocation:
+    file: src/observe.rs
+    modulePath: jenkins_bridge::observe
+  summary: Refuse (exit 3) unless the governed offer is minted and Active on a distinct Steward's verdict (epr-cli
+    flow::memory::offer::offer_standing); fixture approvals read bootstrap.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Governance plane read through Slice 0's affiliations and verdict notes; the bridge mints no verdict.
+  - id: C1
+    status: answered
+    justification: 'Anti-self-election via steward_approval: the author''s own approval is ignored and listed.'
+  - id: C2
+    status: answered
+    justification: A later Steward changes-requested verdict withdraws; latest effective verdict in append order
+      wins.
+  - id: C3
+    status: answered
+    justification: The refusal names the exact approving command for a distinct Steward.
+  - id: C4
+    status: answered
+    justification: An unminted offer is its own state, not an error or a proposal.
+  - id: C5
+    status: answered
+    justification: A fixture co-steward's approval reads validated-at bootstrap (fixture co-steward) on every surface.
+  - id: C6a
+    status: partial
+    justification: Reads the whole flow sidecar (bounded by epr-cli's 32MiB read budget).
+  - id: C6b
+    status: answered
+    justification: Read-only.
+  - id: C7
+    status: n-a
+    justification: No advertised capability.
+  - id: C8
+    status: answered
+    justification: offer status/card print the standing, approver, affiliation CID and ignored verdicts.
+  - id: C9
+    status: n-a
+    justification: No agent keys, control binding, recovery or identity lineage is created; service:jenkins is provenance
+      with no key.
+  - id: C10
+    status: answered
+    justification: 'The offer''s Intent is scoped to the offer text''s body CID: an edit re-addresses it and needs
+      a fresh approval.'
+  - id: C11
+    status: n-a
+    justification: 'No remote receiver, retry or timeout: the CLI reads Jenkins'' archive from files the operator
+      supplies.'
+  - id: C12
+    status: answered
+    justification: This is the consent gate for every append.
+  - id: C13
+    status: answered
+    justification: crossesNetwork offers need two distinct non-fixture Stewards (requires_non_fixture_stewards).
+  - id: C14
+    status: partial
+    justification: Ignored verdicts are listed as text; no typed reason record.
+  contractTests:
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: observe_refuses_with_exit_3_while_the_offer_is_unminted_or_proposed_and_writes_nothing
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: the_author_cannot_approve_its_own_offer_and_a_fixture_approval_reads_bootstrap
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: a_stewards_contrary_verdict_withdraws_and_observe_refuses_again
+    kind: integration
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: a_network_crossing_offer_refuses_a_fixture_approval
+    kind: integration

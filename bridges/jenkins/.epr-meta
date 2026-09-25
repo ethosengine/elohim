@@ -1,0 +1,27 @@
+---
+epr-meta-version: 1
+id: jenkins-consuming-app-bridge
+purpose: >
+  Jenkins as a non-native consumer, served by the network and never in control of it. Gifts flow
+  out under a governed offer (bridges/.epr-meta/offers/jenkins-edge-pipeline.offer.md); Jenkins'
+  own archive flows in only as external-claim observations (Process + FlowEvent, provider
+  service:jenkins, in_scope_of the offer CID).
+rules:
+  - id: observation-plane-only
+    class: inject
+    when: { write: "*.rs", contains-any: ["FlowRecord::Commitment", "FlowRecord::Intent", "FlowRecord::Spec", "FlowRecord::Edge", "Observation::"] }
+    dedupe-of: "bridges/jenkins/tests/bridge.rs::translate_output_can_only_express_observations"
+    why: >
+      translate's Observation admits only Process and Event, and every event discharges nothing.
+      The one Intent this crate writes is the collective's offer (mint_offer), never an
+      observation. The offer activates only on a distinct Steward's verdict read through
+      epr-cli's offer_standing; never add a path that writes a verdict, a grant or a head.
+validators: []
+---
+
+# bridges/jenkins — the consuming-app bridge
+
+The consumer is the operator running the `jenkins-bridge` CLI over Jenkins' archive (edge
+`wfapi/describe` plus the dispatching orchestrator run's `actual-build-graph.json`). Jenkins
+itself calls nothing here, and nothing here waits on Jenkins. Exit 3 is a governance refusal and
+65 a malformed input. Both write nothing.

@@ -1,0 +1,52 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "jenkins-bridge",
+  "description": "Consuming-app bridge: Jenkins edge builds as external-claim observations under a governed offer",
+  "steps": {
+    "gate-jenkins-bridge": {
+      "description": "fmt, clippy, tests",
+      "inputs": {
+        "sources": [
+          "bridges/jenkins/**",
+          "bridges/.epr-meta/offers/**",
+          ".claude/epr-meta/recipes.yaml",
+          ".epr-meta/collective.json",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/eprfs/**",
+          "bridges/did/did-bridge/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate Jenkins Bridge",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "jenkins-bridge": {
+        "dir": "bridges/jenkins",
+        "steps": [
+          "gate-jenkins-bridge"
+        ],
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "jenkins-bridge",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      }
+    }
+  },
+  "deployment": {}
+}

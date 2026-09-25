@@ -187,3 +187,94 @@ recipes:
       - { from: plan, to: intent, meaningful: true, validators: [decompose] }
       - { from: plan, to: scenario, meaningful: true, validators: [a2o-parse] }
       - { from: scenario, to: validation, meaningful: true, validators: [a2o-run] }
+
+  - id: edge-pipeline
+    version: 1
+    description: >
+      The edge pipeline as a valueflow, declared by the network and MEASURED against the
+      consumer that runs it (elohim/holochain/Jenkinsfile, job elohim-edge). Jenkins is a
+      non-native consumer: it may read this recipe and its drift as gifts, and what it did
+      enters only as external-claim observations (Process + FlowEvent, provider
+      service:jenkins) scoped to the governing offer,
+      bridges/.epr-meta/offers/jenkins-edge-pipeline.offer.md. Stage names are the
+      Jenkinsfile's own display names so drift can compare them verbatim; Jenkins'
+      synthetic "Declarative: Post Actions" is machinery, not a stage of this chain.
+      Edges carry the declarative pipeline's real sequential order; meaningful joints are
+      where an artifact changes hands (image to registry, registry to fleet, fleet to
+      validation, environment to environment). `exercises:` is BINDING, never recipe
+      semantics — it names the capability a stage exercises when run, is compared with
+      the offer's disclosed heldCapabilities (an exercised capability nobody disclosed
+      reads `undisclosed capability`), and is excluded from the hashed ProcessSpec like
+      `paths:`. Nothing here enforces order in v1 (honest-about-inert); the bridge's
+      drift reads it.
+    stages:
+      - name: "Check Trigger"
+        artifactKind: "ci:gate"
+      - name: "Checkout"
+        artifactKind: "scm:checkout"
+        exercises: ["scm:github-token"]
+      - name: "Setup Version"
+        artifactKind: "ci:version"
+      - name: "Setup Nix Cache"
+        artifactKind: "ci:cache"
+      - name: "Quality Gate: Doorway"
+        artifactKind: "ci:gate"
+      - name: "Build Doorway"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket"]
+      - name: "Quality Gate: Doorway App"
+        artifactKind: "ci:gate"
+      - name: "Build Doorway App"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket"]
+      - name: "Build Agent SDK"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket"]
+      - name: "Build Storage"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket"]
+      - name: "P2P Simulation Test"
+        artifactKind: "ci:gate"
+      - name: "Build Edge Node Image"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket"]
+      - name: "Build hApp Installer"
+        artifactKind: "oci:image"
+        exercises: ["node:containerd-socket", "registry:harbor-pull"]
+      - name: "Push to Harbor"
+        artifactKind: "oci:registry-push"
+        exercises: ["registry:harbor-push"]
+      - name: "Deploy Edge Node - Alpha"
+        artifactKind: "deploy:rollout"
+        exercises: ["deploy:kube-credentials", "registry:harbor-pull"]
+      - name: "Dataplane Validation"
+        artifactKind: "a2o:verdict"
+        exercises: ["fleet:probe"]
+      - name: "Deploy Edge Node - Staging"
+        artifactKind: "deploy:rollout"
+        exercises: ["deploy:kube-credentials", "registry:harbor-pull"]
+      - name: "Deploy Edge Node - Prod"
+        artifactKind: "deploy:rollout"
+        exercises: ["deploy:kube-credentials", "registry:harbor-pull"]
+      - name: "Cleanup"
+        artifactKind: "ci:cleanup"
+        exercises: ["node:containerd-socket"]
+    edges:
+      - { from: "Check Trigger", to: "Checkout", meaningful: false, validators: [] }
+      - { from: "Checkout", to: "Setup Version", meaningful: false, validators: [] }
+      - { from: "Setup Version", to: "Setup Nix Cache", meaningful: false, validators: [] }
+      - { from: "Setup Nix Cache", to: "Quality Gate: Doorway", meaningful: false, validators: [] }
+      - { from: "Quality Gate: Doorway", to: "Build Doorway", meaningful: true, validators: [quality-gate] }
+      - { from: "Build Doorway", to: "Quality Gate: Doorway App", meaningful: false, validators: [] }
+      - { from: "Quality Gate: Doorway App", to: "Build Doorway App", meaningful: true, validators: [quality-gate] }
+      - { from: "Build Doorway App", to: "Build Agent SDK", meaningful: false, validators: [] }
+      - { from: "Build Agent SDK", to: "Build Storage", meaningful: false, validators: [] }
+      - { from: "Build Storage", to: "P2P Simulation Test", meaningful: false, validators: [] }
+      - { from: "P2P Simulation Test", to: "Build Edge Node Image", meaningful: false, validators: [] }
+      - { from: "Build Edge Node Image", to: "Build hApp Installer", meaningful: false, validators: [] }
+      - { from: "Build hApp Installer", to: "Push to Harbor", meaningful: true, validators: [image-built] }
+      - { from: "Push to Harbor", to: "Deploy Edge Node - Alpha", meaningful: true, validators: [harbor-manifest-present] }
+      - { from: "Deploy Edge Node - Alpha", to: "Dataplane Validation", meaningful: true, validators: [rollout-status] }
+      - { from: "Dataplane Validation", to: "Deploy Edge Node - Staging", meaningful: true, validators: [a2o-run] }
+      - { from: "Deploy Edge Node - Staging", to: "Deploy Edge Node - Prod", meaningful: true, validators: [rollout-status] }
+      - { from: "Deploy Edge Node - Prod", to: "Cleanup", meaningful: false, validators: [] }
