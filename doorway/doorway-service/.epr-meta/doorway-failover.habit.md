@@ -31,6 +31,8 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-25 (peer-stage rung H, household stand-in, no offload proven, provider uhCAknbv, run peer-4e7a496d, completion uhCkkA8y): doorway-failover passed=2 failed=0 — report genesis/a2o/reports/sprint-report-peer-stage-peer-4e7a496d.json; receipt genesis/a2o/reports/peer-stage/2026-09-25/4e7a496d418c2dfc5335874284fa1f58cf411ba7611ff503879f5d60b0537b14/receipt.json
+
 DELTA 2026-09-11c (SERVING RECEIPT on current source; habit RED preserved by rule): epr-app-deliverability.feature
 **5/5 scenarios, 102/102 steps** on a fresh household mesh (run 20260911T081627Z-62fb8fb6, doorway eff30a245 build,
 storage fb4d10c7d build); serving-receipt validator EXIT=0; the pre-push gate accepted it and 105 commits landed on

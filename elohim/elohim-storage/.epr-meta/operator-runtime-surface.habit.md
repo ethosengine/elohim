@@ -22,6 +22,8 @@ retire-when: >
   settings surface on a released steward build, with no developer-shaped tool in the path.
   The habit then describes a product, not a practice.
 ---
+DELTA 2026-09-25 (delegated compute via just measure, rung H — household stand-in, no offload proven): the compute-agreement chain ran end to end on the household under the sprint's code, six times, by the developer verb: measure-stage grant on jessica (uhCkk5djd…), work request, accept, execute under the ark envelope as UID 65534, complete with a CID-bound receipt, requester-side verification of the grant window + activation at startedAt and a minted compute-fulfilled event (observed.verified: true). Run 5 (04-doorway-serves, request uhCkka-xfWbXI3fMDOn0Ea6vVhBz4bsj-3xjoAt3gE_FQKV8d0uyx, receiptCid bafyreigeomsyi2hm2lww55w7vd5nz63ygffllfyfwmxwc6qjdymd4zyn2i) and run 6 (doorway-fixture-readiness, request uhCkkIbIARyZIZHRvEQeRfLtyUEcxlN_JleGU1cBfhpCXmMqkKZUF) PASSED with framed reports, durable copies and sprint-report-peer-stage-*.json; run 6's DELTA was written by the listener onto doorway-failover. Records: genesis/a2o/reports/compute-agreements-2026-09-25/rung-H-20260925T154700Z-run1.md, rung-H-20260925T155800Z-runs2-5.md. Skipped honestly: the brit validate ref (no brit-build-ref on this host) and the T2 admission leg. Status unchanged (green).
+
 DELTA 2026-09-11 (correction to the 2026-09-10 delta below; no status change): the SUBSCRIBERS-0 cause named
 there (`main.rs:~1221`, DEV_MODE without --dev-signal-subscriber) is cured — f64d8c5bf keys the conductor
 signal subscriber on `projection_writer` alone (`should_subscribe_to_signals`, main.rs:79, seam-registry row,

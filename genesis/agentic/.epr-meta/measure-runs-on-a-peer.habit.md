@@ -28,6 +28,8 @@ refs:
 retire-when: >
   when measure-class runs have no dev-berth path at all.
 ---
+DELTA 2026-09-25 (rung H — household stand-in, no offload proven; status stays RED): first evidence: a claimed measure-class run was executed, stored (durable copy + receipt) and its completion verified by the requester on a peer (jessica) within its declared envelope (task bound derived from the real cgroup ceiling; timeout 1500 s; ark death-witness recorded) — run 5 request uhCkka-xfWbXI3fMDOn0Ea6vVhBz4bsj-3xjoAt3gE_FQKV8d0uyx pass, run 6 request uhCkkIbIARyZIZHRvEQeRfLtyUEcxlN_JleGU1cBfhpCXmMqkKZUF pass with the listener-written DELTA on doorway-failover. The invariant's second clause (the dev berth is never held by a measure) is NOT proven: same host, one mesh, the orchestrator session held the verify lease throughout; berth refuses --class measure on the dev berth (45f0e6a9c) but offload needs rung A. The attestation leg is not exercised (no brit-build-ref here). The a2o scenarios of this habit are still pending stubs. Status stays red per R5/R8.
+
 DELTA 2026-09-25: born RED by design — both `checks:` are nameable but neither is green yet.
 The a2o concern's steps in `genesis/a2o/steps/compute/measure-on-a-peer.steps.ts` are `pending`-
 returning stubs so the feature compiles without claiming evidence it does not have; `--class` on
