@@ -271,6 +271,10 @@ def getGitCommitHashFull() {
     return sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 }
 
+boolean commitPresent(String sha) {
+    sh(script: "git cat-file -t ${sha} 2>/dev/null || echo missing", returnStdout: true).trim() == 'commit'
+}
+
 /**
  * Analyze the changeset to determine which files changed.
  *
@@ -315,20 +319,26 @@ def analyzeChangeset(storedGlobalBaseline = null) {
     if (baseCommit) {
         echo "Comparing HEAD against: ${baseCommit}"
 
-        // Verify commit exists (handles force-push/rebase scenarios)
-        def commitExists = sh(
-            script: "git cat-file -t ${baseCommit} 2>/dev/null || echo 'missing'",
-            returnStdout: true
-        ).trim()
+        // The job clones at --depth=200, so a batch longer than that leaves the
+        // baseline outside the clone (#1906: a 242-commit push fell back to HEAD~1
+        // and dispatched 7 files' worth). Fetch the baseline itself, then the full
+        // history, before concluding it is gone (force-push/rebase).
+        if (!commitPresent(baseCommit)) {
+            sh "git fetch --no-tags --quiet --depth=1 origin ${baseCommit} || true"
+        }
+        if (!commitPresent(baseCommit)) {
+            sh 'git fetch --no-tags --quiet --unshallow origin || true'
+        }
 
-        if (commitExists == 'commit') {
+        if (commitPresent(baseCommit)) {
             return sh(
                 script: "git diff --name-only ${baseCommit}..HEAD",
                 returnStdout: true
             ).trim().split('\n').findAll { it }
         }
 
-        echo "WARNING: Commit ${baseCommit} not found in repo"
+        echo "WARNING: Commit ${baseCommit} not found in repo or on origin"
+        unstable("Baseline ${baseCommit.take(8)} unreachable — dispatch covers HEAD~1 only")
     }
 
     // 4. Fallback: diff against previous commit only
