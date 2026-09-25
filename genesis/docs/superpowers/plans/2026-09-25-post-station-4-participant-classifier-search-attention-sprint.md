@@ -1,7 +1,7 @@
 ---
 title: Post-station-4 sprint — a portable participant, the classifier's first nerve, search at the peer, and the attention stream
 id: post-station-4-participant-classifier-search-attention-sprint
-status: Draft
+status: Landed
 class: protocol-canonical
 domain: D2
 sprint: living-memory-2026-09-25
@@ -365,3 +365,11 @@ Rows under `genesis/data/timeline/backlog/`, each linked to its domain and habit
 1. **The handle:** `human:matthew` is assumed for the witness in P6; say otherwise. The witness itself is the agents' act (R-P9); yours is the right to contest it or to add a self-claim beside it.
 2. **S10:** whether the household mesh boots an extra fold-disabled storage peer so the fold-absent scenario runs live; without it the scenario stays held by `@requires:unfolded-peer`.
 3. **Frame rows `dispatch` vs `inject`:** kept `dispatch` (the deliberated sidecar); flip is one token + re-pin if you want the sidecar gone.
+
+## Close (2026-09-25)
+
+Landed on `dev`, not pushed by this sprint (R-X4: the checkout carries the native-delivery sprint's held push; these commits ride the next batch). Result artifact: `genesis/a2o/reports/post-station-4-2026-09-25/sprint-result.md`; rulings ledger beside it (R-P1..R-P21, R-C0..R-C14, R-S1..R-S13, R-A0..R-A16, R-X1..R-X6). Every task above P0–P6, C0–C10, S0–S9, A0–A10 is fulfilled through `epr flow claim`/`fulfill` naming its commits; S10 is recorded as held by ruling R-S9 (scenario 3 stays `@requires:unfolded-peer`; the fold-absent answer is pinned by storage's `unfolded_store_answers_fold_absent`).
+
+Habits: `guards-sense-frames` green; `attention-witnessed-privately` green (household receipts `…T135856Z-46883085` and `…T135922Z-46883085`, no bypass); `recall-reaches-authority`'s content-search check green twice (`…T131537Z-a2846c53`, `…T131624Z-a2846c53`), the habit's other checks unchanged; `acts-attributed-to-participants` check 2 green, check 3 red (station 3, not this sprint). The operator was witnessed from this device (`017dd2b39`).
+
+What the household proof added beyond the plan: the browser write and stream read carried no session bearer (R-A12/R-A13), the a2o injected sign-in persisted three of five session keys (R-A14), rows written through the doorway had no creator (R-S12/R-S13), a change-detection error in the content viewer and a storage peer launched with a relative manifest path (R-A15/R-A16). Decision 1 stands as ruled (R-P9); decision 2 was taken as R-S9; decision 3 stays open for the operator.
