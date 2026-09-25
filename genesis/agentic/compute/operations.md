@@ -310,3 +310,24 @@ The stage builder is `genesis/agentic/compute/stage/build-stage-task.mjs` (templ
 `PEER_STAGE_A2O_CONFIG`, mirroring `COMPUTE_A2O_CONFIG` above but never sharing state with
 it). A run's receipt lands under `genesis/a2o/reports/peer-stage/<date>/` (gitignored,
 durable), parallel to `genesis/a2o/reports/compute/`.
+
+## The developer verb: `just measure`
+
+`just measure <feature-path> [--on jessica|adam] [--gap <id>]` is the one command that sends a
+measure-class run to a peer and returns immediately (`genesis/agentic/compute/measure.sh`). It
+refuses before launch, naming the fix, when the provider's grant file, the executor, or a live
+worker is absent; it takes ONE feature path (a tag expression is refused: one stage = one feature,
+tags reserved); it prints the chmod capacity grant a shared-host provider needs and refuses until
+the paths are writable; then it builds the stage (`stage.json` carries the requester's SUT so the
+provider's runner refuses on a drifted tree), submits with `--rung H`, starts the detached listener,
+and prints the request action hash, task CID and inbox path. `just measure grant --on jessica`
+issues the `measure-stage` grant on jessica's own loopback; `just measure worker --on jessica` starts
+her worker; `just measure status | poll` read the inbox; `just measure fixture --on jessica <feature>`
+writes the `PEER_STAGE_A2O_CONFIG` JSON the a2o steps expect. `--on adam` refuses today, naming the
+operator items (image digest, performer key, Secret, the declared worker slice — the pod already
+renders over its envelope bound — and a checkout + mesh on adam's berth). When the listener recovers
+a completion it verifies the chain on the requester's own task record (`observed.verified`, scope
+`measure-stage`), decodes the report, writes one brit validate ref keyed by the SUT with the peer
+chain in `summary.peer`, a `sprint-report-peer-stage-*.json`, fulfils the gap, and appends the DELTA
+to the habit that owns the feature's `@concern:` — labelled `rung H (household stand-in, no offload
+proven)` when the provider is a household peer. `MEASURE_DRY_RUN=1` prints everything and runs nothing.

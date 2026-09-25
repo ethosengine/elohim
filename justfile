@@ -736,3 +736,13 @@ _gate-pipeline-list-fresh:
 _gate-epr-app-package:
     node --test "{{ root }}/elohim/sdk/scripts/package-app.test.mjs"
     bash "{{ root }}/scripts/ci/stage-spa-blob.test.sh"
+
+# Measure-class work leaves the dev berth: author ONE feature path as a peer-executed stage,
+# submit it to the provider that holds the stores, detach, and read the receipt back into the
+# ledger. Wraps genesis/agentic/compute/measure.sh (grant | worker | <feature-path> | status |
+# poll | fixture). The dev berth refuses `berth claim mesh --class measure`; this is the verb the
+# refusal names. MEASURE_DRY_RUN=1 prints the env block and the commands without running them.
+measure *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    exec bash "{{ justfile_directory() }}/genesis/agentic/compute/measure.sh" {{ args }}
