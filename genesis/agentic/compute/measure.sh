@@ -42,6 +42,14 @@ grant refuses to reissue while a stored grant file is already on record for
 the provider — pass --renew to replace it deliberately. The validity window
 always equals the rotation lifetime (MEASURE_GRANT_DAYS, default 1 day) —
 never wider, or elohim-storage's compute_grants API refuses the grant.
+
+<feature-path> accepts either grammar: relative to genesis/a2o (e.g.
+'features/dataplane/x.feature', the `just test mesh` form) or prefixed with
+genesis/a2o/ or the repo root (the form a mesh scope is usually copied from);
+it refuses (exit 2) before printing anything else when the resolved file
+doesn't exist. The task's cpu/memory/timeout bound defaults to this pod's own
+cgroup ceiling (/proc/self/cgroup + cpu.max/memory.max) — override with
+MEASURE_CPU_MILLIS / MEASURE_MEMORY_BYTES / MEASURE_TIMEOUT_SECONDS.
 USAGE
 }
 
@@ -65,7 +73,11 @@ provider_field() { # <name> <field> -> value on stdout, exit 1 if absent/null
 }
 
 refuse_adam_not_provisioned() { # <verb>
-  refuse 2 "--on adam refuses: adam's $1 is an operator item — a k8s pod on shem provisioned by the cluster operator (adam-compute-worker.json 'enabled', agent key, worker image digest, Secret token; see the sprint plan's Operator items table and operations.md). Nothing here can act on adam's behalf."
+  local verb="$1" extra=""
+  if [ "$verb" = "a measure run" ]; then
+    extra=" On adam the task's resource bound comes from adam's declared slice (COMPUTE_SLICE_CPU_MILLIS / COMPUTE_SLICE_MEMORY_BYTES), never this pod's own cgroup ceiling."
+  fi
+  refuse 2 "--on adam refuses: adam's $verb is an operator item — a k8s pod on shem provisioned by the cluster operator (adam-compute-worker.json 'enabled', agent key, worker image digest, Secret token; see the sprint plan's Operator items table and operations.md). Nothing here can act on adam's behalf.$extra"
 }
 
 require_known_provider() { # <name> <verb>
@@ -120,6 +132,67 @@ resolve_ark() {
   else
     refuse 2 "no ark binary found (checked $PINNED_ARK, \$COMPUTE_ARK, then PATH)"
   fi
+}
+
+# ---- the honest resource bound — build-stage-task.mjs defaults to 2000m/2GiB/1800s, and
+# compute-executor's own run-probe REFUSES a declared bound that understates the guest's real
+# cgroup ceiling (no enforcement tier here to cap it down to the declared number). On the
+# household stand-in (`--on jessica`, same host) the real ceiling is THIS pod's own cgroup —
+# read it rather than guess it. --on adam is a different rung entirely (see
+# refuse_adam_not_provisioned): its bound is adam's declared COMPUTE_SLICE_*, never this cgroup.
+cgroup_path_for_self() {
+  awk -F: '$1 == "0" { print $3; exit }' /proc/self/cgroup
+}
+
+derive_cpu_millis() {
+  local cg cpu_max quota period
+  cg="$(cgroup_path_for_self)"
+  cpu_max="/sys/fs/cgroup${cg}/cpu.max"
+  [ -r "$cpu_max" ] || return 1
+  read -r quota period < "$cpu_max"
+  if [ "$quota" = "max" ]; then
+    echo "$(( $(nproc) * 1000 ))"
+  else
+    echo "$(( quota * 1000 / period ))"
+  fi
+}
+
+derive_memory_bytes() {
+  local cg mem_max value
+  cg="$(cgroup_path_for_self)"
+  mem_max="/sys/fs/cgroup${cg}/memory.max"
+  [ -r "$mem_max" ] || return 1
+  value="$(cat "$mem_max")"
+  if [ "$value" = "max" ]; then
+    awk '/^MemTotal:/ { printf "%d\n", $2 * 1024 }' /proc/meminfo
+  else
+    echo "$value"
+  fi
+}
+
+# Sets MEASURE_CPU_MILLIS / MEASURE_MEMORY_BYTES / MEASURE_TIMEOUT_SECONDS (default 1500s —
+# inside the 1800s verify lease with headroom for the fence) from the cgroup unless the caller
+# already set them, and the matching *_SOURCE ("cgroup" | "env") for the dry-run block.
+resolve_task_bounds() {
+  if [ -n "${MEASURE_CPU_MILLIS:-}" ]; then
+    CPU_MILLIS_SOURCE="env"
+  else
+    MEASURE_CPU_MILLIS="$(derive_cpu_millis)" || refuse 2 "could not derive a cpu bound from /proc/self/cgroup + cpu.max — set MEASURE_CPU_MILLIS explicitly"
+    CPU_MILLIS_SOURCE="cgroup"
+  fi
+  if [ -n "${MEASURE_MEMORY_BYTES:-}" ]; then
+    MEMORY_BYTES_SOURCE="env"
+  else
+    MEASURE_MEMORY_BYTES="$(derive_memory_bytes)" || refuse 2 "could not derive a memory bound from /proc/self/cgroup + memory.max — set MEASURE_MEMORY_BYTES explicitly"
+    MEMORY_BYTES_SOURCE="cgroup"
+  fi
+  if [ -n "${MEASURE_TIMEOUT_SECONDS:-}" ]; then
+    TIMEOUT_SECONDS_SOURCE="env"
+  else
+    MEASURE_TIMEOUT_SECONDS=1500
+    TIMEOUT_SECONDS_SOURCE="cgroup"
+  fi
+  export MEASURE_CPU_MILLIS MEASURE_MEMORY_BYTES MEASURE_TIMEOUT_SECONDS
 }
 
 dry_run() { [ "${MEASURE_DRY_RUN:-0}" = "1" ]; }
@@ -262,6 +335,34 @@ check_writable_or_refuse() {
   [ "$missing" -eq 0 ] || refuse 2 "run the chmod lines above, then retry"
 }
 
+# ---- feature-path grammar — accept BOTH the `just measure` (repo-relative-ish) form and the
+# `just test mesh` (genesis/a2o-relative) form, since a caller reasonably copies a scope
+# straight out of a mesh run. build-stage-task.mjs's --feature resolves against genesis/a2o
+# (D6), so an a2o-relative path is what it actually wants; this normalizes to that before the
+# builder ever sees it. Refuses (exit 2, naming the resolved path) before any capacity-grant
+# printing when the resolved file doesn't exist, so a typo never reaches the chmod lines.
+resolve_feature_arg() { # <feature-arg> -> a2o-relative (or absolute passthrough) path on stdout
+  local input="$1" resolved=""
+  case "$input" in
+    genesis/a2o/*)
+      resolved="${input#genesis/a2o/}"
+      ;;
+    "$ROOT"/genesis/a2o/*)
+      resolved="${input#"$ROOT"/genesis/a2o/}"
+      ;;
+    *)
+      resolved="$input"
+      ;;
+  esac
+  local check_path
+  case "$resolved" in
+    /*) check_path="$resolved" ;;
+    *) check_path="$ROOT/genesis/a2o/$resolved" ;;
+  esac
+  [ -f "$check_path" ] || refuse 2 "feature path does not exist: $check_path (from '$input')"
+  printf '%s' "$resolved"
+}
+
 # ---- <feature-path> [--on jessica|adam] [--gap <id>] -----------------------------------------
 cmd_run_feature() {
   local feature="$1"; shift
@@ -282,6 +383,7 @@ cmd_run_feature() {
       ;;
   esac
   [ -n "$feature" ] || refuse 2 "usage: measure.sh <feature-path> [--on jessica|adam] [--gap <id>]"
+  feature="$(resolve_feature_arg "$feature")"
 
   resolve_executor
 
@@ -306,12 +408,15 @@ cmd_run_feature() {
   date_str="$(date -u +%Y-%m-%d)"
   out_dir="$ROOT/genesis/a2o/reports/peer-stage/$date_str/$feature_slug"
 
-  local build_cmd=(node "$BUILD_STAGE_MJS" --feature "$feature" --requester "$COMPUTE_PERFORMER" --provider "$jessica_performer" --out "$out_dir" --executor "$COMPUTE_EXECUTOR" --repo-root "$ROOT")
+  resolve_task_bounds
+
+  local build_cmd=(node "$BUILD_STAGE_MJS" --feature "$feature" --requester "$COMPUTE_PERFORMER" --provider "$jessica_performer" --out "$out_dir" --executor "$COMPUTE_EXECUTOR" --repo-root "$ROOT" --cpu-millis "$MEASURE_CPU_MILLIS" --memory-bytes "$MEASURE_MEMORY_BYTES" --timeout-seconds "$MEASURE_TIMEOUT_SECONDS")
   local submit_args=(submit "$out_dir/task.json" "$out_dir/stage-runner.sh" "$out_dir/$feature_file" --rung H)
   [ -n "$gap" ] && submit_args+=(--on "$gap")
 
   if dry_run; then
     print_env_block
+    echo "[dry-run] task bound: cpu-millis=$MEASURE_CPU_MILLIS ($CPU_MILLIS_SOURCE) memory-bytes=$MEASURE_MEMORY_BYTES ($MEMORY_BYTES_SOURCE) timeout-seconds=$MEASURE_TIMEOUT_SECONDS ($TIMEOUT_SECONDS_SOURCE)"
     echo "[dry-run] ${build_cmd[*]}"
     echo "[dry-run] node $WORKSPACE_MJS ${submit_args[*]}"
     echo "[dry-run] node $WORKSPACE_MJS start"
@@ -357,6 +462,7 @@ cmd_fixture() {
   done
   [ -n "$on" ] || refuse 2 "usage: measure.sh fixture --on jessica|adam <feature-path>"
   [ -n "$feature" ] || refuse 2 "usage: measure.sh fixture --on jessica|adam <feature-path>"
+  feature="$(resolve_feature_arg "$feature")"
   require_known_provider "$on" "a fixture"
   resolve_executor
 

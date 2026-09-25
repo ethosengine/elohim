@@ -317,10 +317,16 @@ durable), parallel to `genesis/a2o/reports/compute/`.
 measure-class run to a peer and returns immediately (`genesis/agentic/compute/measure.sh`). It
 refuses before launch, naming the fix, when the provider's grant file, the executor, or a live
 worker is absent; it takes ONE feature path (a tag expression is refused: one stage = one feature,
-tags reserved); it prints the chmod capacity grant a shared-host provider needs and refuses until
-the paths are writable; then it builds the stage (`stage.json` carries the requester's SUT so the
-provider's runner refuses on a drifted tree), submits with `--rung H`, starts the detached listener,
-and prints the request action hash, task CID and inbox path. `just measure grant --on jessica`
+tags reserved), accepting either the `just test mesh` grammar (relative to `genesis/a2o`) or a
+`genesis/a2o/`- or repo-root-prefixed path, refusing (exit 2, naming the resolved path) before
+anything else prints when the file doesn't exist; it derives the task's cpu/memory/timeout bound
+from this pod's own cgroup ceiling (`/proc/self/cgroup` + `cpu.max`/`memory.max`) rather than the
+stage builder's understating defaults, unless `MEASURE_CPU_MILLIS`/`MEASURE_MEMORY_BYTES`/
+`MEASURE_TIMEOUT_SECONDS` are set; it prints the chmod capacity grant a shared-host provider needs
+and refuses until the paths are writable; then it builds the stage (`stage.json` carries the
+requester's SUT so the provider's runner refuses on a drifted tree), submits with `--rung H`,
+starts the detached listener, and prints the request action hash, task CID and inbox path. `just
+measure grant --on jessica`
 issues the `measure-stage` grant on jessica's own loopback; `just measure worker --on jessica` starts
 her worker; `just measure status | poll` read the inbox; `just measure fixture --on jessica <feature>`
 writes the `PEER_STAGE_A2O_CONFIG` JSON the a2o steps expect. `--on adam` refuses today, naming the
