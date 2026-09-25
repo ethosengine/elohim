@@ -60,3 +60,49 @@ to `0..=now+300`, the POST body capped at 16 KiB, `subjectCid` required to equal
 `ref_cid`, the lifestream's title lookup filtered to commons/public reach, the stream window
 pushed into SQL with the out-of-window rows counted there, and the in-memory log reduced to its
 hasher, offset and a bounded tail. Check (1) is unchanged: the household mesh run is still owed.
+
+DELTA 2026-09-25 (first household mesh run of check (1); status STAYS red — the scenario is RED on a
+named doorway gap, not on the scenario). Receipt
+`genesis/a2o/reports/sprint-report-household-20260925T014102Z-5c2b52f1.{json,md}`
+(`just test mesh-browser '@concern:attention-witnessed-privately'`, household-dowell, transport dual,
+3 peers, processControl true, sut sha256:1c42aeb8f1a6c599): 1 scenario, 14 steps — 8 passed, 1 FAILED,
+5 skipped. The failing step is `And Jessica waits until her storage peer replies to her app that it
+has kept her note on the "manifesto" page` (steps/lamad/attention-witnessed.steps.ts:352):
+`POST /api/v1/observations answered 500: Error: Authentication error: POST /api/v1/observations
+requires the X-Agent-Cid header: an observation is written only by the person it belongs to`.
+CAUSE, read at the doorway: the browser path has no identity injection for this route —
+`doorway/doorway-service/src` mentions only `/api/v1/observations/{}/entries`
+(server/http.rs:9354, the session route) and carries NO route entry for `POST /api/v1/observations`,
+so the doorway forwards the write without resolving the bearer into `X-Agent-Cid` (the injection
+apparatus exists and is tested for the routes that declare it — routes/identity.rs:482-621) and
+storage correctly refuses a write whose observer it cannot attribute. This is the same seam this
+habit's BORN delta named for `/api/v1/attention/tending`: the A-lane landed the storage handler
+(R-A6) and the emitter (R-A8/R-A11), and the doorway declaration for the browser write path did not
+land with them. Everything before the ack passed: Jessica signed in, opened the manifesto in the
+shell viewer, the page grew taller than the window, she dwelled >3 s, the WINDOW scrolled (scrollY>0,
+so the viewer's own listener could witness depth), and the in-app leave routed to `/`. So the
+observation is emitted and refused at the doorway, not lost in the page.
+BYPASS, stated so the receipt is honest: the run set `MESH_ALLOW_NO_PROLOGUE=1`, which skips the
+lane's shared lamad zome-call readiness rail. That rail was refusing on a peer this scenario does not
+measure — `jessica:8091` answers `/db/content/elohim-host-landing/head-record` with 404
+`head-record-empty` (she holds no head she authored; the prologue's `propagate-landing-to-B` legs are
+DECLARE_ONLY and point at matthew's action, which her cell cannot retrieve) and later times out past
+30 s under sustained SQLite lock contention (`apply_delta: database is locked`,
+`Update anchor failed: database is locked`). The doorway this scenario measures is alpha, backed by
+matthew, which served the same head-record in 1.6 s; the cast was seeded green twice by
+`just mesh prologue` this session. The readiness rail is a launch precondition against opaque 401s,
+not part of the assertion — the 16 fixture sign-ins all succeeded.
+Checks (2) and (3) are unchanged and green, as re-measured in the 2026-09-24 A1-A9 delta and quoted
+here verbatim: (2) "`cargo test --lib -- gossip_gate` (CARGO_BUILD_JOBS=1, pool target) ran
+`agent_private_kind_yields_no_announcement` ok and `non_private_kind_yields_announcement` ok,
+2 passed, EXIT=0"; (3) "the grep on content-viewer.component.ts = 0". Check (1) stays red until the
+doorway declares the observation write route and the scenario is green twice.
+Substrate conditions recorded while measuring, each a separate concern from this habit: the
+household's conductors carry a MUTUAL per-DNA BlockSpan on `infrastructure`
+(`uhC0kYVFIpz1CIpaXG_YotfH3n4l-DALhSa2EGUB7He_uBWTvoNga`; matthew 85 incoming blocked from one peer,
+jessica 38 incoming / 18 outgoing) while `lamad` is unblocked; jessica additionally held a
+`CellDisabled` role that did not self-heal across ~90 min after the conductor roll; and the cure for
+`propagate-landing-to-B` after a roll is the CARRIED RECORD — a hash-only declare is refused
+`declare_canonical_head: target action … is not retrievable`, while the same declare with the
+5120-b64-char record fetched from doorway A's `/head-record` answered
+`✓ canonical head propagated` on attempt 1.

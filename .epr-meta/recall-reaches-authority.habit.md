@@ -221,3 +221,48 @@ stays in a Gherkin comment rather than in a step, and `@requires:unfolded-peer` 
 one hop from the step's plain "holds no index". The loop's shape is the known one — each fresh
 reader mints new marginal findings — so it was closed on R6's two self-answered items rather than
 run to an empty round.
+
+DELTA 2026-09-25 (first household mesh runs of the content-search check; NO status change — the habit
+stays red on its window, and this check is now PARTLY measured rather than "not yet run"). Two runs of
+`just test mesh features/content/content-search.feature` on household-dowell (transport dual, 3 peers,
+processControl true, sut sha256:1c42aeb8f1a6c599). Receipts:
+`genesis/a2o/reports/sprint-report-household-20260925T013829Z-5c2b52f1.{json,md}` (run 1) and
+`genesis/a2o/reports/sprint-report-household-20260925T014248Z-5c2b52f1.{json,md}` (run 2). Both runs
+read identically: 3 scenarios, 24 steps — 1 passed, 1 FAILED, 1 pending; 15 steps passed, 1 failed,
+1 pending, 7 skipped.
+GREEN TWICE — scenario 1, "Matthew finds the note he just wrote, under a ranking whose rules the
+answer names": the peer's own `GET /db/content/search` put the run's fresh item first, said its ranking
+was known, named the recipe with a content address, and named the SAME address when asked again. Read
+live at the route, the answer carries `rankingKnown: true` and
+`recipe: {name: "rrf-v2", cid: bafyreiedggzebsgekiw26kdkcdot6rxqpwsvbozpozmdwmig2mhhba4x3q,
+k: 60, orderOnly: true, producers: [{id: "lexical", method: bafyreifa7afnbfcrvx4u3dilv77xdbnkaigl5lsakyo46xst7tqbdat6gi}]}`
+plus a declared `lens` CID. That is this habit's reach widening past the agent's own entry, measured:
+a PERSON's search over their household library names the method and prints the recipe.
+RED TWICE — scenario 2, "Matthew's private note is absent from Susan's results and from her tallies",
+fails at its own NON-VACUITY CONTROL, before Susan is ever asked. Failing step: `Then the first result
+is that content` (steps/content/content-search.steps.ts:265), byte-identical on both runs:
+`AssertionError [ERR_ASSERTION]: the run's own item is not first for its own title: first was
+"Heal target (drill fixture)" (heal-target) of 1 admitted`. The holder searched for the exact unique
+title of the item he had just written with `reach "private"` and the peer admitted ONE candidate, an
+unrelated drill fixture — his own private note was not among them. This is NOT fold lag: scenario 1
+writes an item of the same freshness with the household's DEFAULT reach and finds it first in the same
+run, twice. The only difference between the two items is `reach: private`, so the reading is that a
+private-reach row does not enter the lexical fold at all, and therefore is unfindable by the one person
+whose item it is. The scenario's second promise (withheld from a non-holder's results AND from the
+tally by reach) is consequently UNMEASURED — the control has to hold before Susan's empty hands mean
+"withheld" rather than "there was nothing there". The storage-side admission rule for reach in the fold
+is where this resolves; it is not a defect in the story or its steps.
+HELD — scenario 3, "A peer that holds no index says so instead of answering with an empty list", read
+`pending` on both runs, as designed by R-S9: `E2E_STORAGE_UNFOLDED` was deliberately NOT set, so the
+`@requires:unfolded-peer` steps return PENDING rather than failing on a peer that does not exist. The
+same assertion stays pinned by storage's `unfolded_store_answers_fold_absent`.
+BYPASS, stated so the receipt is honest: both runs set `MESH_ALLOW_NO_PROLOGUE=1`, which skips the
+lane's shared lamad zome-call readiness rail. The rail was refusing on a peer this story does not
+measure — `jessica:8091` answers `/db/content/elohim-host-landing/head-record` 404
+`head-record-empty` and later times out past 30 s under sustained SQLite lock contention
+(`apply_delta: database is locked`). The peer this story DOES measure is the one behind doorway alpha
+(matthew), which served that same head-record in 1.6 s and answered every search in the run; the cast
+was seeded green by `just mesh prologue` and all fixture sign-ins succeeded. The readiness rail is a
+launch precondition against opaque 401s, not part of the assertion.
+The check line stays red: scenario 1 is green twice, scenario 2 is red twice on a named storage-side
+cause, scenario 3 is held.
