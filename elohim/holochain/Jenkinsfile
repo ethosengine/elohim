@@ -241,6 +241,35 @@ def runStorageQualityGate() {
 }
 
 /**
+ * Quality Gate: Doorway — fmt/clippy/test inside doorway-service's Dockerfile
+ * `check` target. Non-blocking (unstable).
+ */
+def runDoorwayQualityGate() {
+    try {
+        sh "bash '${env.WORKSPACE}/scripts/ci/doorway-quality-gate.sh'"
+    } catch (Exception e) {
+        echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
+        unstable('Doorway quality gate has warnings')
+    }
+}
+
+/**
+ * The doorway and storage check targets are independent Dockerfiles on one
+ * BuildKit daemon, so they solve concurrently: edge #1483 ran them back to back
+ * (19.4 + 21.4 min). The storage gate runs here only when Build Storage would
+ * have run it, and Build Storage then skips it (STORAGE_GATE_DONE). Both stay
+ * non-blocking; the storage gate keeps its own timeout.
+ */
+def runQualityGates() {
+    def gates = [doorway: { runDoorwayQualityGate() }]
+    if (shouldRunStep('cargo-build-storage')) {
+        gates.storage = { runStorageQualityGate() }
+        env.STORAGE_GATE_DONE = 'true'
+    }
+    parallel gates
+}
+
+/**
  * Direct feature-matrix gate for the standalone Rust SDK crate. Keep the Bash
  * body out of this file: the pipeline's declarative stages method is already
  * close to the JVM bytecode ceiling.
@@ -264,7 +293,7 @@ def runStorageStageBody() {
         runElohimSdkFeatureMatrix()
     }
     if (shouldRunStep('cargo-build-storage')) {
-        runStorageQualityGate()
+        if (env.STORAGE_GATE_DONE != 'true') { runStorageQualityGate() }
         buildStorageImage()
     }
 }
@@ -2377,26 +2406,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 expression { !skipBuildStage() }
             }}
             steps {
-                container('builder') {
-                    script {
-                        try {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                                # Run fmt/clippy/test inside the Dockerfile's 'check' target
-                                # Reuses BuildKit dep cache — no Rust needed in CI builder image
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    --target check \\
-                                    -f doorway/doorway-service/Dockerfile .
-                            """
-                        } catch (Exception e) {
-                            echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
-                            unstable('Doorway quality gate has warnings')
-                        }
-                    }
-                }
+                container('builder') { script { runQualityGates() } }
             }
         }
 
