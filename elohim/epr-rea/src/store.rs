@@ -420,6 +420,7 @@ mod tests {
                 in_scope_of: atom_cid(&"epic".to_string()).unwrap(),
                 inputs: vec![],
                 outputs: vec![],
+                classified_as: vec![],
             }))
             .unwrap();
 

@@ -15,17 +15,22 @@
 //!   fixture co-steward's approval reads `bootstrap (fixture co-steward)` wherever it is shown.
 //!
 //! An offer creates no claim and implies no settlement; its standing is a read, never a grant.
+//!
+//! The offer's DECLARATION (terms, the two-sided disclosure) and the external-claim envelope it
+//! governs are shared, pure shapes in [`elohim_epr_rea::external`]; this module adds only what
+//! needs the repository: reading an offer document off disk ([`load_offer`]), addressing it by its
+//! body ([`offer_intent`], [`offer_cid`]) and deriving its standing from the verdicts on record.
 
 use std::path::Path;
 
 use cid::Cid;
-use elohim_epr_rea::FlowRecord;
+use elohim_epr_rea::{atom_cid, FlowRecord, Intent, OfferDeclaration, OfferDocument};
 use eprfs_agent::memory::{requires_non_fixture_stewards, Affiliation, AffiliationStanding};
 use serde::Serialize;
 
 use super::validation::{validated_at, Reader};
 use super::{refused, steward_approval};
-use crate::flow::FlowResult;
+use crate::flow::{FlowError, FlowResult};
 
 /// Where an offer stands, derived from the verdicts on record — never stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -102,20 +107,59 @@ fn slot(classified_as: &[String], value: &str) -> bool {
     classified_as.iter().any(|v| v == value)
 }
 
-/// Read the standing of the offer whose Intent CID is `offer`, authored by `author`, under the
-/// collective declared at `declaration` (a repository-relative `.epr-meta/collective.json`).
+/// Parse an offer document: its frontmatter decoded as an [`OfferDeclaration`] (serde-strict, so
+/// an unknown term refuses) and validated — a claim, a settlement or a payee never parses.
+pub fn parse_offer(path: &str, text: &str) -> FlowResult<OfferDocument> {
+    let front = OfferDocument::frontmatter(path, text)?;
+    let declaration: OfferDeclaration = serde_yaml::from_str(front).map_err(|e| {
+        FlowError::InvalidArguments(format!("{path}: offer declaration is malformed: {e}"))
+    })?;
+    Ok(OfferDocument::new(path, text, declaration)?)
+}
+
+/// Read and parse the offer document at `path` (repository-relative) under `root`.
+pub fn load_offer(root: &Path, path: &str) -> FlowResult<OfferDocument> {
+    let file = root.join(path);
+    let text = std::fs::read_to_string(&file).map_err(|source| FlowError::Read {
+        path: file.clone(),
+        source,
+    })?;
+    parse_offer(path, &text)
+}
+
+/// The Intent an offer document mints, scoped to its own body CID: an approval is an approval of
+/// the exact text a Steward read, and an edit re-addresses the offer.
+pub fn offer_intent(doc: &OfferDocument) -> Intent {
+    doc.declaration().intent(crate::flow::body_cid(doc.text()))
+}
+
+/// The offer's address — its Intent's atom CID, the value every claim it admits is scoped to.
+pub fn offer_cid(doc: &OfferDocument) -> FlowResult<Cid> {
+    Ok(atom_cid(&offer_intent(doc))?)
+}
+
+/// Read the standing of `offer` (its declaration) minted at Intent CID `cid`, under the
+/// collective its declaration names (a repository-relative `.epr-meta/collective.json`).
 ///
-/// `crosses_network` is true for an offer to a consumer the collective does not own: it then needs
-/// two distinct non-fixture Stewards, and a fixture approval can never activate it.
+/// The approving Steward must not be the offer's `author`. An offer that `crossesNetwork` (a
+/// consumer the collective does not own) needs two distinct non-fixture Stewards, and a fixture
+/// approval can never activate it. An offer whose `provider` is not that collective is refused.
 pub fn offer_standing(
     root: &Path,
-    declaration: &str,
-    offer: &Cid,
-    author: &str,
-    crosses_network: bool,
+    offer_declaration: &OfferDeclaration,
+    cid: &Cid,
 ) -> FlowResult<OfferStanding> {
+    let offer = cid;
+    let author = offer_declaration.author.as_str();
+    let crosses_network = offer_declaration.crosses_network;
     let mut reader = Reader::new(root)?;
-    let governance = reader.governance(declaration)?;
+    let governance = reader.governance(&offer_declaration.collective)?;
+    if offer_declaration.provider != governance.declaration.id {
+        return Err(refused(format!(
+            "the offer's provider {} is not the governing collective {}",
+            offer_declaration.provider, governance.declaration.id
+        )));
+    }
     let records = reader.records()?.to_vec();
     if !records
         .iter()

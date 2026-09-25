@@ -20,7 +20,7 @@ pub struct LastObserved<'a> {
 
 /// Render the card. `stewards` is the collective's steward report (`epr flow memory collective`).
 pub fn render(ctx: &Context, stewards: Value, last: Option<LastObserved<'_>>) -> Result<Value> {
-    let offer = &ctx.offer.offer;
+    let offer = ctx.offer.declaration();
     let cid = ctx.offer_cid()?.to_string();
     let standing = ctx.standing()?;
     let (state, validated_at, approval, missing) = match &standing {
@@ -72,8 +72,8 @@ pub fn render(ctx: &Context, stewards: Value, last: Option<LastObserved<'_>>) ->
     });
     let mut verify = vec![
         format!("epr flow walk {cid}"),
-        format!("epr flow walk {}", ctx.offer.path),
-        format!("epr flow memory collective --input {}", ctx.offer.path),
+        format!("epr flow walk {}", ctx.offer.path()),
+        format!("epr flow memory collective --input {}", ctx.offer.path()),
     ];
     if let Some(l) = &last {
         verify.push(format!("epr flow walk {}", l.translation.process_cid));
@@ -96,7 +96,7 @@ pub fn render(ctx: &Context, stewards: Value, last: Option<LastObserved<'_>>) ->
         "offer": {
             "id": offer.id,
             "cid": cid,
-            "path": ctx.offer.path,
+            "path": ctx.offer.path(),
             "provider": offer.provider,
             "receiver": offer.receiver,
             "author": offer.author,

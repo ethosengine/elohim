@@ -22,6 +22,12 @@ pub enum FabricError {
 
     #[error("invalid scope relation: {0}")]
     InvalidScopeRelation(String),
+
+    #[error("invalid external claim: {0}")]
+    InvalidExternalClaim(String),
+
+    #[error("invalid offer: {0}")]
+    InvalidOffer(String),
 }
 
 pub type Result<T> = std::result::Result<T, FabricError>;

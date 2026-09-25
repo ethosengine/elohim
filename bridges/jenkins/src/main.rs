@@ -159,7 +159,7 @@ fn run(args: &[String]) -> Result<u8, BridgeError> {
             let stewards = elohim_epr_cli::flow::memory::execute(
                 &ctx.root,
                 "collective",
-                Some(&ctx.offer.offer.collective),
+                Some(&ctx.offer.declaration().collective),
                 None,
             )
             .map(|v| v["stewards"].clone())

@@ -12,14 +12,21 @@
 //! sidecar through this module. Events never discharge anything (`fulfills`/`satisfies` empty)
 //! and follow ark's shape: `process: None` on the event, the Process listing the event CIDs as its
 //! outputs (no CID cycle).
+//!
+//! **The Process carries its own envelope.** Both record kinds classify the same way — tag first,
+//! subject second, then the [`ExternalClaim`] slots, then the build's own (`job:`, `build:`,
+//! `url:`, `sha:`, `orchestrator-run:`) — so the run reads as a claim without walking its events:
+//! the Process is tagged with the BUILD's result and names `elohim-edge#<n>` as its subject, each
+//! event with its STAGE's result and the stage name.
 
 use std::collections::BTreeMap;
 
 use cid::Cid;
-use elohim_epr_rea::{AgentRef, FlowEvent, FlowRecord, Magnitude, PinnedRef, Process, ReaVerb};
+use elohim_epr_rea::{
+    AgentRef, ExternalClaim, FlowEvent, FlowRecord, Magnitude, PinnedRef, Process, ReaVerb,
+    SignatureStatus,
+};
 use serde::{Deserialize, Serialize};
-
-use crate::claim::{ExternalClaim, SignatureStatus};
 
 /// The provenance participant every record from this bridge names.
 pub const SOURCE: &str = "service:jenkins";
@@ -117,6 +124,7 @@ pub fn parse_wfapi(text: &str) -> Result<WfapiRun, Refusal> {
             run.id, run.status
         )));
     }
+    StageResult::parse(&run.status).map_err(|e| refuse(format!("build #{}: {}", run.id, e.0)))?;
     for stage in &run.stages {
         if stage.name.trim().is_empty() || stage.start_time_millis < 0 || stage.duration_millis < 0
         {
@@ -329,9 +337,21 @@ pub fn translate(
             )
         }
     };
-    let claim =
-        ExternalClaim::new(SOURCE, &url, SignatureStatus::Unattested, offer).map_err(Refusal)?;
+    let claim = ExternalClaim::new(SOURCE, &url, SignatureStatus::Unattested, offer)
+        .map_err(|e| refuse(e.to_string()))?;
     let observed = observed_stages(run);
+    // The build's own slots, after the envelope — on every event and on the Process alike.
+    let mut build_slots = vec![
+        format!("job:{EDGE_JOB}"),
+        format!("build:{build}"),
+        format!("url:{url}"),
+    ];
+    if let Some(sha) = &sha {
+        build_slots.push(format!("sha:{sha}"));
+    }
+    if let Some(run) = &orchestrator_run {
+        build_slots.push(format!("orchestrator-run:{run}"));
+    }
 
     let mut observations = Vec::new();
     let mut outputs = Vec::new();
@@ -352,20 +372,11 @@ pub fn translate(
             &serde_ipld_dagcbor::to_vec(&body).map_err(|e| refuse(e.to_string()))?,
         );
         // Tag first, subject second, then the envelope and the build's own slots, prefixed.
-        let mut classified_as = vec![
+        let classified_as = claim.classify(
             format!("result:{}", stage.result.word()),
             stage.name.clone(),
-        ];
-        classified_as.extend(claim.slots());
-        classified_as.push(format!("job:{EDGE_JOB}"));
-        classified_as.push(format!("build:{build}"));
-        classified_as.push(format!("url:{url}"));
-        if let Some(sha) = &sha {
-            classified_as.push(format!("sha:{sha}"));
-        }
-        if let Some(run) = &orchestrator_run {
-            classified_as.push(format!("orchestrator-run:{run}"));
-        }
+            build_slots.iter().cloned(),
+        );
         let event = FlowEvent {
             action,
             provider: AgentRef(SOURCE.to_string()),
@@ -391,6 +402,11 @@ pub fn translate(
         in_scope_of: offer,
         inputs: Vec::new(),
         outputs,
+        classified_as: claim.classify(
+            format!("result:{}", StageResult::parse(&run.status)?.word()),
+            format!("{EDGE_JOB}#{build}"),
+            build_slots,
+        ),
     });
     let process_cid = process.cid()?;
     observations.push(process);

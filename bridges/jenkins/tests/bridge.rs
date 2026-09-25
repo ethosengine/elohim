@@ -13,7 +13,7 @@ use elohim_epr_rea::{FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
 use eprfs_agent::memory::{Affiliation, AffiliationStanding, FileRef, MemberKind, MembershipRole};
 use jenkins_bridge::{
     card, drift::Finding, observe, observe::DEFAULT_OFFER, observe::DEFAULT_RECIPES, BridgeError,
-    BuildInputs, Context, Observation, Standing,
+    BuildInputs, Context, ExternalClaim, Observation, SignatureStatus, Standing,
 };
 
 const COLLECTIVE: &str = include_str!("../../../.epr-meta/collective.json");
@@ -341,6 +341,70 @@ fn translate_output_can_only_express_observations() {
                 "never a Commitment, Spec, Intent or Edge"
             );
         }
+    }
+}
+
+/// The Process carries the build's slots and its own external-claim envelope, readable back with
+/// the shared reader — while every stage EVENT keeps the exact address it had before the Process
+/// grew a classification (goldens from dev 914e8aa87: the first stage event of #1483 and the last
+/// of #1484; all 17+19+19 event records were diffed byte-identical when the envelope moved).
+#[test]
+fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address() {
+    let (dir, _) = active();
+    let c = ctx(dir.path());
+    let offer = c.offer_cid().unwrap();
+    for (stages, graph, build, result, event_golden) in [
+        (
+            W1483,
+            G1903,
+            1483,
+            "result:success",
+            "bafyreifp33g3ipkquuzvhrz36seu4falt6bltk3vkkgigzcqfypbanlyni",
+        ),
+        (
+            W1484,
+            G1906,
+            1484,
+            "result:failure",
+            "bafyreibhom3jg3njjjgylnc43si633n2ga4s5ny2vnlp33ayqtrcfptm5y",
+        ),
+    ] {
+        let t = c.translate(&inputs(stages, Some(graph))).unwrap();
+        let Some(Observation::Process(process)) = t.observations.last() else {
+            panic!("the Process is appended last");
+        };
+        let slots = &process.classified_as;
+        assert_eq!(slots[0], result);
+        assert_eq!(slots[1], format!("elohim-edge#{build}"));
+        let claim = ExternalClaim::read(slots)
+            .unwrap()
+            .expect("the Process is an external claim");
+        assert_eq!(claim.source(), "service:jenkins");
+        assert_eq!(claim.in_scope_of(), offer);
+        assert_eq!(claim.signature(), &SignatureStatus::Unattested);
+        assert_eq!(claim.provenance(), t.url);
+        for slot in [
+            format!("build:{build}"),
+            format!("url:{}", t.url),
+            format!("sha:{}", t.sha.as_deref().unwrap()),
+        ] {
+            assert!(slots.contains(&slot), "{slot} on the Process");
+        }
+        let events: Vec<String> = t
+            .observations
+            .iter()
+            .filter(|o| matches!(o, Observation::Event(_)))
+            .map(|o| o.cid().unwrap().to_string())
+            .collect();
+        assert!(
+            events.contains(&event_golden.to_string()),
+            "stage events of #{build} moved address"
+        );
+        assert_eq!(
+            process.outputs.len(),
+            events.len(),
+            "the Process groups every event"
+        );
     }
 }
 

@@ -529,6 +529,7 @@ fn derive_process_doc(
         in_scope_of,
         inputs,
         outputs: vec![own_cid],
+        classified_as: Vec::new(),
     };
     let process_cid = atom_cid(&process)?;
     deriv.stage_record(

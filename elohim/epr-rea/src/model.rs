@@ -421,6 +421,23 @@ pub struct Process {
     pub in_scope_of: Cid,
     pub inputs: Vec<Cid>,
     pub outputs: Vec<Cid>,
+    /// What this run IS, when the pinned recipe alone cannot say — the same carrier and the
+    /// same slot convention as [`FlowEvent::classified_as`] (tag first, subject second, prefixed
+    /// slots after).
+    ///
+    /// A run observed from OUTSIDE the network (a CI build, a Requests & Offers exchange) has
+    /// identity of its own — a build number, a URL, a commit — and arrives under an
+    /// external-claim envelope ([`crate::external::ExternalClaim::slots`]). Without this field
+    /// those lived only on the run's events, so the Process that groups them could not be read
+    /// as a claim at all.
+    ///
+    /// Skipped when empty so that declaring it moved no existing Process's CID — every Process
+    /// `epr flow project` and ark's spool already appended re-verifies its stored CID on read,
+    /// pinned by `an_unclassified_process_keeps_its_pre_classified_cid` (a golden computed
+    /// against the pre-`classified_as` struct). One meaning, one encoding: an absent
+    /// classification and an empty one are the same bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub classified_as: Vec<String>,
 }
 
 /// The conformance mechanism a [`DepEdge`] carries — exactly one per edge (spec §2). Every
@@ -786,6 +803,70 @@ mod tests {
         assert_ne!(
             atom_cid(&unclassified_event()).unwrap(),
             atom_cid(&classified).unwrap()
+        );
+    }
+
+    // ── Process classification, and the address-stability it must not cost ───────
+
+    /// The fixture whose CID the golden below pins — a Process carrying NO classification,
+    /// shaped like one `epr flow project` / ark spool mints (a pinned recipe, one input, two
+    /// outputs).
+    fn unclassified_process() -> Process {
+        Process {
+            spec: PinnedRef {
+                id: "golden-recipe".into(),
+                version: 3,
+            },
+            in_scope_of: upstream_cid("epic"),
+            inputs: vec![upstream_cid("golden-input")],
+            outputs: vec![upstream_cid("golden-out-a"), upstream_cid("golden-out-b")],
+            classified_as: vec![],
+        }
+    }
+
+    /// Declaring `classified_as` on `Process` must not have moved any existing run: the field is
+    /// skipped when empty, so an unclassified Process's canonical bytes are unchanged. The golden
+    /// was computed against the pre-`classified_as` `Process` struct (dev 914e8aa87) — the
+    /// sibling of `an_unclassified_event_keeps_its_pre_classified_cid`, and the reason every
+    /// Process already in `.eprfs/status/flows.jsonl` and ark's spool still re-verifies on read.
+    #[test]
+    fn an_unclassified_process_keeps_its_pre_classified_cid() {
+        let cid = atom_cid(&unclassified_process()).expect("cid");
+        assert_eq!(
+            cid.to_string(),
+            "bafyreiawlzrvqol3j2eh3padrh6wtnji2gtjz5yrvwoong6q3lrhnwt57a"
+        );
+        let bytes = canonical_bytes(&unclassified_process()).expect("encodes");
+        assert!(
+            !bytes.windows(12).any(|w| w == b"classifiedAs"),
+            "an empty classification must not appear in the canonical bytes at all"
+        );
+        // A line written before the field existed still decodes, to the same address.
+        let legacy = serde_json::to_value(unclassified_process()).expect("json");
+        assert!(legacy.get("classifiedAs").is_none());
+        let decoded: Process = serde_json::from_value(legacy).expect("pre-field line decodes");
+        assert_eq!(atom_cid(&decoded).unwrap(), cid);
+    }
+
+    /// …and a classified Process round-trips its slots through JSON and re-addresses, so two
+    /// runs of one recipe that differ only in what they are remain two records.
+    #[test]
+    fn a_classified_process_round_trips_and_changes_its_cid() {
+        let mut classified = unclassified_process();
+        classified.classified_as = vec![
+            "run:ci-build".into(),
+            "elohim-edge#1483".into(),
+            "build:1483".into(),
+            "sha:0123456789abcdef0123456789abcdef01234567".into(),
+        ];
+        let json = serde_json::to_string(&classified).expect("json");
+        assert!(json.contains("\"classifiedAs\":[\"run:ci-build\""));
+        let back: Process = serde_json::from_str(&json).expect("decodes");
+        assert_eq!(back, classified);
+        assert_eq!(atom_cid(&back).unwrap(), atom_cid(&classified).unwrap());
+        assert_ne!(
+            atom_cid(&classified).unwrap(),
+            atom_cid(&unclassified_process()).unwrap()
         );
     }
 

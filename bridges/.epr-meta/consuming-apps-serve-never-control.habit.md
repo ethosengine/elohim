@@ -44,3 +44,13 @@ Receipt over the real archives (orchestrator #1903â†’edge #1483 SUCCESS, #1906â†
 
 Checks 1 and 2 are green by their gates. Check 3 waits on the operator's approving verdict, which
 is not minted by any agent. Status stays red until the offer is active and drift runs against it.
+
+DELTA 2026-09-25: guard risk (2) closed before a second consumer arrived. The external-claim
+envelope and the offer declaration now live in `elohim_epr_rea::external` (pure; offer standing
+stays in epr-cli), and `jenkins-bridge` and `epr flow`'s offer standing import them with no copy
+left. `Process` gained `classified_as` (skipped when empty; golden
+`an_unclassified_process_keeps_its_pre_classified_cid` holds the pre-change CID), and each observed
+build's Process carries its envelope and build slots. Receipt over #1483/#1484 (graph basis, plus
+#1484 wfapi-only): all 17+19+19 event records are byte-identical to before; only the 3 Process
+CIDs moved, because they now carry slots.
+Status stays red on check 3.

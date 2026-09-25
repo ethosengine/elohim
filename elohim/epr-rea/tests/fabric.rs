@@ -469,6 +469,7 @@ fn build_mini_chain() -> MiniChain {
         in_scope_of: epic,
         inputs: vec![epic],
         outputs: vec![spec_doc],
+        classified_as: vec![],
     };
     let _p1_cid = store.append(FlowRecord::Process(p1.clone())).unwrap();
     let p1_cid = atom_cid(&p1).unwrap();
@@ -494,6 +495,7 @@ fn build_mini_chain() -> MiniChain {
         in_scope_of: spec_doc,
         inputs: vec![spec_doc],
         outputs: vec![scenario],
+        classified_as: vec![],
     };
     let p2_cid = atom_cid(&p2).unwrap();
     store.append(FlowRecord::Process(p2)).unwrap();

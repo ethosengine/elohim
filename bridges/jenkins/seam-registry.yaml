@@ -2,7 +2,9 @@
 #
 # Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json. Registered at birth
 # (Slice 1, consuming-app bridge). The governed-offer verdict itself lives in epr-cli
-# (flow::memory::offer::offer_standing); require_active is this crate's gate over it.
+# (flow::memory::offer::offer_standing); require_active is this crate's gate over it. The
+# external-claim envelope and the offer declaration's validation are shared decision points
+# registered in elohim/epr-rea/seam-registry.yaml (elohim_epr_rea::external).
 seamRegistryVersion: 1
 crate: jenkins-bridge
 crateRoot: bridges/jenkins
@@ -14,8 +16,8 @@ decisionPoints:
   sourceLocation:
     file: src/translate.rs
     modulePath: jenkins_bridge::translate
-  summary: Jenkins wfapi + orchestrator graph -> Observation (Process | Event only), each event carrying the external-claim
-    envelope scoped to the offer CID.
+  summary: Jenkins wfapi + orchestrator graph -> Observation (Process | Event only), each event AND the Process carrying
+    the shared external-claim envelope (elohim_epr_rea::external) scoped to the offer CID.
   concernIds:
   - id: C0
     status: answered
@@ -50,7 +52,8 @@ decisionPoints:
     justification: No advertised capability or served route.
   - id: C8
     status: answered
-    justification: Every event carries provenance, build, url and (with a graph) sha and orchestrator-run slots.
+    justification: Every event and the Process carry provenance, build, url and (with a graph) sha and orchestrator-run
+      slots; the Process reads back as a claim via ExternalClaim::read without walking its events.
   - id: C9
     status: n-a
     justification: No agent keys, control binding, recovery or identity lineage is created; service:jenkins is provenance
@@ -58,7 +61,8 @@ decisionPoints:
   - id: C10
     status: answered
     justification: New slots are additive; the classified_as convention (tag first, subject second, prefixed extras)
-      is unchanged.
+      is unchanged. Process.classified_as is skipped when empty, so no existing Process moved (golden in epr-rea
+      model.rs); only this bridge's Processes re-address, because they now carry their slots.
   - id: C11
     status: n-a
     justification: 'No remote receiver, retry or timeout: the CLI reads Jenkins'' archive from files the operator
@@ -86,7 +90,10 @@ decisionPoints:
   - path: bridges/jenkins/tests/bridge.rs
     testName: wfapi_alone_translates_and_says_so
     kind: integration
-  - path: bridges/jenkins/src/claim.rs
+  - path: bridges/jenkins/tests/bridge.rs
+    testName: the_process_carries_the_build_and_its_envelope_and_events_keep_their_address
+    kind: integration
+  - path: elohim/epr-rea/src/external.rs
     testName: only_a_service_can_be_an_external_claim_source
     kind: unit
 - name: drift

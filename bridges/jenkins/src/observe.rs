@@ -12,13 +12,14 @@
 use std::path::{Path, PathBuf};
 
 use cid::Cid;
-use elohim_epr_cli::flow::memory::offer::{offer_standing, OfferStanding};
+use elohim_epr_cli::flow::memory::offer::{
+    load_offer, offer_cid, offer_intent, offer_standing, OfferStanding,
+};
 use elohim_epr_cli::flow::registry::{Recipe, Registry};
-use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
+use elohim_epr_rea::{FlowRecord, FlowStore, OfferDocument, SidecarFlowStore};
 use serde::Serialize;
 
 use crate::drift::{drift, DeclaredStage, DriftReport};
-use crate::offer::OfferDoc;
 use crate::translate::{parse_graph, parse_wfapi, translate, Translation};
 
 pub const DEFAULT_OFFER: &str = "bridges/.epr-meta/offers/jenkins-edge-pipeline.offer.md";
@@ -71,7 +72,7 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 #[derive(Debug, Clone)]
 pub struct Context {
     pub root: PathBuf,
-    pub offer: OfferDoc,
+    pub offer: OfferDocument,
     pub recipe: Recipe,
 }
 
@@ -106,10 +107,11 @@ impl Standing {
 
 impl Context {
     pub fn load(root: &Path, offer_path: &str, recipes_path: &str) -> Result<Self> {
-        let offer = OfferDoc::read(root, offer_path)?;
+        let offer =
+            load_offer(root, offer_path).map_err(|e| BridgeError::Malformed(e.to_string()))?;
         let registry = Registry::load(&root.join(recipes_path))
             .map_err(|e| BridgeError::Malformed(e.to_string()))?;
-        let pin = &offer.offer.recipe;
+        let pin = &offer.declaration().recipe;
         let recipe = registry
             .recipes
             .into_iter()
@@ -128,7 +130,7 @@ impl Context {
     }
 
     pub fn offer_cid(&self) -> Result<Cid> {
-        Ok(self.offer.cid()?)
+        offer_cid(&self.offer).map_err(|e| BridgeError::Malformed(e.to_string()))
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
@@ -163,21 +165,8 @@ impl Context {
                 offer: cid.to_string(),
             });
         }
-        let o = &self.offer.offer;
-        let standing = offer_standing(
-            &self.root,
-            &o.collective,
-            &cid,
-            &o.author,
-            o.crosses_network,
-        )
-        .map_err(|e| BridgeError::Governance(e.to_string()))?;
-        if standing.collective != o.provider {
-            return Err(BridgeError::Governance(format!(
-                "the offer's provider {} is not the governing collective {}",
-                o.provider, standing.collective
-            )));
-        }
+        let standing = offer_standing(&self.root, self.offer.declaration(), &cid)
+            .map_err(|e| BridgeError::Governance(e.to_string()))?;
         Ok(Standing::Minted(standing))
     }
 
@@ -225,14 +214,18 @@ impl Context {
         Ok(translate(
             &run,
             graph.as_ref(),
-            &self.offer.spec(),
+            &self.offer.declaration().spec(),
             self.offer_cid()?,
             &inputs.jenkins_base,
         )?)
     }
 
     pub fn drift_of(&self, translation: &Translation) -> DriftReport {
-        drift(&self.declared(), &translation.observed, &self.offer.held())
+        drift(
+            &self.declared(),
+            &translation.observed,
+            &self.offer.declaration().held(),
+        )
     }
 }
 
@@ -291,7 +284,7 @@ pub fn observe(ctx: &Context, inputs: &BuildInputs) -> Result<ObserveOutcome> {
 
 /// Mint (propose) the offer's Intent. Idempotent; activation is a Steward's verdict, never this.
 pub fn mint_offer(ctx: &Context) -> Result<(Cid, bool)> {
-    let intent = ctx.offer.intent();
+    let intent = offer_intent(&ctx.offer);
     let cid = ctx.offer_cid()?;
     let store = SidecarFlowStore::open(&ctx.root).map_err(|e| BridgeError::Io(e.to_string()))?;
     let mut tx = store

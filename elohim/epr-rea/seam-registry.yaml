@@ -29,6 +29,84 @@ seamLocus: >
   plant, both in this crate.
 
 decisionPoints:
+  - name: ExternalClaim::new / ExternalClaim::read
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/external.rs
+      modulePath: elohim_epr_rea::external::ExternalClaim
+    summary: >
+      Decides whether an observation from OUTSIDE the network may enter as an external claim, and
+      reads the envelope back off a record's classified_as: source must be a `service:<name>`
+      (provenance, never an actor), provenance non-empty, a signer a DID, reach the lowest, scope
+      the governing offer's Intent CID. Shared by every consuming app (Jenkins today; Requests &
+      Offers and off-runtime agent authorship use the same envelope).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A human or agent source is refused: acting from outside is an authored act under its own
+          claim, not this envelope. The source can never be read back as an actor or payee.
+      - id: C5
+        status: answered
+        justification: >
+          Evidence never grants authority: `read` refuses any reach slot but the lowest, so a
+          record cannot claim to have entered at a raised reach.
+      - id: C10
+        status: answered
+        justification: >
+          The envelope rides after the tag-then-subject pair and `read` never looks at those two
+          positions, so no positional reader moves and a subject that happens to look like a slot
+          is not mistaken for one.
+      - id: C13
+        status: answered
+        justification: >
+          Standing is never carried in; the claim is evaluated on entry and a participant with
+          standing must bring it forward.
+    contractTests:
+      - path: elohim/epr-rea/src/external.rs
+        testName: only_a_service_can_be_an_external_claim_source
+        kind: unit
+      - path: elohim/epr-rea/src/external.rs
+        testName: the_envelope_reads_back_off_classified_as_and_refuses_a_raised_reach
+        kind: unit
+      - path: bridges/jenkins/tests/bridge.rs
+        testName: the_process_carries_the_build_and_its_envelope_and_events_keep_their_address
+        kind: integration
+
+  - name: OfferDeclaration::validate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/external.rs
+      modulePath: elohim_epr_rea::external::OfferDeclaration
+    summary: >
+      Decides whether an offer declaration is a gift the network may make: provider a collective,
+      receiver a service, author an acting participant, terms optional/withdrawable/non-exclusive
+      with claims and settlement `none`, every inflow an unclaimed `presence:` (never a payee),
+      every held capability a `<kind>:<name>` id. Serde-strict, so an unknown term refuses.
+      Whether the offer is ACTIVE is not decided here (epr-cli `offer_standing`).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A service cannot author an offer (parse_acting_participant), and the approving Steward's
+          distinctness from the author is enforced where standing is read.
+      - id: C4
+        status: answered
+        justification: >
+          An offer that implied a claim, a settlement or a payee would be a different act (a
+          settlement Agreement under its own verdict); the predicate refuses rather than admitting
+          it silently.
+    contractTests:
+      - path: elohim/epr-rea/src/external.rs
+        testName: an_offer_refuses_a_claim_a_settlement_or_a_payee
+        kind: unit
+      - path: elohim/epr-rea/src/external.rs
+        testName: an_unknown_term_is_refused_and_the_intent_is_scoped_to_the_body
+        kind: unit
+      - path: bridges/jenkins/src/offer.rs
+        testName: terms_that_imply_a_claim_or_settlement_or_a_payee_are_refused
+        kind: unit
+
   - name: SidecarFlowTransaction::append / SidecarActorTransaction::append
     kind: state-transition
     sourceLocation:

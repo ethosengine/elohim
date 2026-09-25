@@ -289,6 +289,7 @@ impl Incident {
             in_scope_of: scope.scope,
             inputs,
             outputs,
+            classified_as: Vec::new(),
         })
     }
 }

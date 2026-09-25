@@ -27,6 +27,11 @@
 //! stock is never stored, so two peers folding the same events mint the same stock with no
 //! shared clock.
 //!
+//! **What enters from outside** ([`external`]) is the external-claim envelope a consuming app's
+//! observation carries onto the observation plane (source as provenance, signature status, the
+//! lowest reach, the governing offer's CID), and the offer declaration that governs it — pure
+//! shapes; the offer's standing is read by `epr flow` from Steward verdicts.
+//!
 //! **Who is acting** ([`actor`]) is a fourth, orthogonal record: an [`actor::ActorClaim`] is an
 //! honor-system identity an agent registers *for itself, in flight*, session-scoped, superseded
 //! by appending rather than by mutation. It is deliberately not a field on the records above —
@@ -61,6 +66,7 @@
 pub mod actor;
 pub mod epistemic;
 pub mod error;
+pub mod external;
 pub mod fold;
 pub mod index;
 pub mod model;
@@ -84,6 +90,10 @@ pub use epistemic::{
     EpistemicThresholds, ReviewEvent,
 };
 pub use error::{FabricError, Result};
+pub use external::{
+    Disclosure, ExternalClaim, Externalities, HeldCapability, Inflow, OfferDeclaration,
+    OfferDocument, RecipePin, SignatureStatus, Terms,
+};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
 pub use index::{
     ArcRange, FoldAttestation, FoldState, IndexError, IndexMeasure, ModelPin, RankingMethod,
