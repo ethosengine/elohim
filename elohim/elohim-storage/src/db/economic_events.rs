@@ -599,34 +599,54 @@ pub fn record_affinity_transfer(
 /// the originating `delegates-compute` commitment; the event itself is never a
 /// substitute for the commitment.
 ///
-/// # Producer status (correct-but-dormant)
+/// # Producer: the requester's verified completion read
 ///
-/// As of Wave 4.3 NOTHING observes real compute fulfillment, so this emitter has
-/// no production trigger — wiring a runtime/operator observer is downstream work
-/// (operator-owned per the charter §"Non-goals"). The fn is built + tested
-/// correct so the REA facing's observed-`mutual_compute` lights up the moment a
-/// real fulfillment observer lands; it is deliberately NOT wired into any hot
-/// path that would be structurally empty today.
+/// The one production trigger is
+/// `api::compute_tasks::observe_requester_completion`, reached on the
+/// REQUESTER's `GET /api/v1/compute/tasks/<requestActionHash>` once the
+/// provider's signed completion is present. It records
+/// `compute-fulfilled:<requestActionHash>` on the requester's node only: the
+/// provider's `DieselRateHistory` counts every `bounded_by` row against the
+/// grant, so recording there would halve the granted rate, and a self-grant
+/// (requester == provider) is never observed. Post-commit signals are
+/// author-local, so each node sees one direction; observed *mutual* reciprocity
+/// stays honestly empty until observations cross nodes.
 ///
 /// # HELD security boundary — forgeable-without-attestation (red-team 2026-06-22)
 ///
-/// This fn takes bare `provider`/`receiver`/`commitment_cid` strings and performs
-/// NO authorization: it never checks that `provider`/`receiver` match the
-/// `bounded_by` commitment's parties, nor that `commitment_cid` is a real
-/// `mishpat_commitments` `entry_hash` that resolves. Today that is safe ONLY
-/// because there is no producer (dormant, above). But it means observed
-/// reciprocity (`services::rea_observed_compute::observed_mutual_compute`) is
-/// **unilaterally forgeable by construction**: one party could write both
-/// `compute-fulfilled` rows (`bounded_by` the A→B cid and the B→A cid) and fake
-/// both-directions-observed with no counterparty action.
+/// This fn itself takes bare `provider`/`receiver`/`commitment_cid` strings and
+/// performs NO authorization: it never checks that `provider`/`receiver` match
+/// the `bounded_by` commitment's parties, nor that `commitment_cid` is a real
+/// `mishpat_commitments` `entry_hash` that resolves. Any caller other than the
+/// producer above inherits that gap. Observed reciprocity
+/// (`services::rea_observed_compute::observed_mutual_compute`) is therefore
+/// only as trustworthy as the producer feeding it: one party writing both
+/// `compute-fulfilled` rows could still fake both-directions-observed.
 ///
-/// DO NOT wire this into any economic-consequence path until the live producer
-/// adds: (1) a trigger gated on a REAL fulfillment observation (not
-/// commitment-landing); (2) counterparty cross-signature/attestation on the event
-/// (mirror the `AgentPeerBinding` unsigned-binding rule — crate CLAUDE.md
-/// "Identity & Transport-Identity Coherence"); (3) validation that the event's
-/// parties match the `bounded_by` commitment's parties; (4) that `commitment_cid`
-/// is the commitment `entry_hash` (NOT `action_hash`) and resolves to a live row.
+/// The conditions a producer must meet, and how the one above meets them:
+/// (1) a trigger gated on a REAL fulfillment observation, not commitment-landing
+/// — MET: it fires only on a provider-signed completion whose receipt CID and
+/// six envelope pins `verify_status` re-derived, with the receipt's own
+/// `completedAt` as `has_point_in_time` (never `now()`);
+/// (2) counterparty cross-signature/attestation on the event (mirror the
+/// `AgentPeerBinding` unsigned-binding rule — crate CLAUDE.md "Identity &
+/// Transport-Identity Coherence") — only PARTLY met: the provider's side is its
+/// conductor-signed completion plus a grant Record authenticated with the author
+/// pinned to the provider, but this row is still the requester's own unsigned
+/// local record, not a cross-signed event;
+/// (3) the event's parties match the `bounded_by` commitment's parties — MET:
+/// the grant policy must name `task.provider` as provider, `task.requester` as
+/// recipient and the task's required scope, and an existing row that disagrees
+/// is refused, never overwritten;
+/// (4) `commitment_cid` is the commitment `entry_hash` (NOT `action_hash`) and
+/// resolves to a live row — MET: it is the authenticated Record's entry hash,
+/// the grant is projected into `mishpat_commitments` in the same step, and a
+/// provider-authored `active` link is required with no withdrawal at or before
+/// launch.
+///
+/// Because (2) is only partly met, consumption stays observe + audit: DO NOT
+/// drive any economic consequence (pricing, standing, placement) off
+/// `compute-fulfilled` rows until the counterparty attestation lands.
 ///
 /// `dht_anchor_hash` is `None` (this is a local projection, not a notarized DHT
 /// event); `state = "recorded"`.

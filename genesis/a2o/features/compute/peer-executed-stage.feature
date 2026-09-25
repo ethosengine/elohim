@@ -43,6 +43,7 @@ Feature: A peer runs one of the household's CI stages and the household can chec
     And the returned report names the pinned feature file and every declared scenario
     And every declared scenario passed in the report, not merely in the receipt
     And the completion is attested by an economic event naming the grant
+    And the requester's own record shows the neighbour's grant behind the completion
     When the requester submits the identical stage a second time
     Then the same request is recovered and the provider runs nothing new
     And exactly one admission event exists for that stage

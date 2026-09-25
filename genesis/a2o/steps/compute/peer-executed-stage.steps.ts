@@ -75,6 +75,15 @@ interface Status {
   acceptance?: { actionHash: string };
   completion?: { actionHash: string; receipt: Receipt };
   refusal?: { reason: string };
+  observed?: {
+    verified: boolean;
+    refused?: string;
+    grantCid?: string;
+    scope?: string;
+    grantProvider?: string;
+    grantRecipient?: string;
+    fulfilledEventId?: string;
+  };
 }
 interface Fixture {
   stageDir: string;
@@ -393,7 +402,8 @@ Then('the completion is attested by an economic event naming the grant', async f
     receiver: string;
   };
   assert.equal(event.id, admissionId);
-  assert.equal(event.action, 'sweettest-feedback');
+  // A stage spends the measure-stage event class, never the sweettest lane.
+  assert.equal(event.action, 'measure-stage');
   // DISCREPANCY (recorded, not fixed — boundary forbids a schema/view change here):
   // the design's §7.2/§10 wording says this event "names the grant" via its bounded_by
   // column equal to the grant commitment cid. The HTTP view actually returned here
@@ -411,6 +421,41 @@ Then('the completion is attested by an economic event naming the grant', async f
     'admission event must name both the requester and the provider'
   );
 });
+
+Then(
+  "the requester's own record shows the neighbour's grant behind the completion",
+  async function () {
+    const state = states.get(this)!;
+    // The requester's storage re-authenticates the grant the request pinned, signed by the
+    // provider, and records the realized flow bounded by it — the read carries that proof.
+    const status = await localRead(
+      state.config.requesterApi,
+      state.config.requesterKey,
+      state.env.ELOHIM_COMPUTE_LOCAL_TOKEN ?? '',
+      state.reference
+    );
+    const observed = status.observed;
+    assert(observed, 'the requester read must carry an observation of the completion');
+    assert.equal(observed.verified, true, `observation refused: ${observed.refused ?? '?'}`);
+    assert(observed.grantCid, 'the observation must name the grant commitment cid');
+    assert.equal(observed.scope, 'measure-stage');
+    assert.equal(observed.grantProvider, state.config.providerKey);
+    assert.equal(observed.grantRecipient, state.config.requesterKey);
+    assert.equal(observed.fulfilledEventId, `compute-fulfilled:${state.reference}`);
+
+    const response = await fetch(
+      new URL(
+        `/api/v1/economic-events/${encodeURIComponent(observed.fulfilledEventId)}`,
+        state.config.requesterApi
+      )
+    );
+    assert.equal(response.status, 200, `fulfilment event read returned ${response.status}`);
+    const event = (await response.json()) as { action: string; provider: string; receiver: string };
+    assert.equal(event.action, 'compute-fulfilled');
+    assert.equal(event.provider, state.config.providerKey);
+    assert.equal(event.receiver, state.config.requesterKey);
+  }
+);
 
 When(
   'the requester submits the identical stage a second time',
@@ -465,7 +510,7 @@ Then('exactly one admission event exists for that stage', async function () {
 
   const listed = await fetch(
     new URL(
-      `/api/v1/economic-events?action=sweettest-feedback&provider=${encodeURIComponent(state.config.requesterKey)}&limit=500`,
+      `/api/v1/economic-events?action=measure-stage&provider=${encodeURIComponent(state.config.requesterKey)}&limit=500`,
       state.config.providerApi
     )
   );

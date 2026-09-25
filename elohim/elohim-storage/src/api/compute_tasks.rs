@@ -49,7 +49,42 @@ impl crate::services::commitment_fetcher::CommitmentFetcher for VerifiedGrant {
     }
 }
 
-const CAPABILITY: &str = "sweettest-feedback";
+/// The event class a delegated Holochain feedback sweettest spends — the
+/// historical (and default) grant scope.
+const FEEDBACK_SCOPE: &str = "sweettest-feedback";
+/// The envelope `project` prefix that marks a peer-executed a2o stage
+/// (2026-09-08 stage design: `project = "a2o-stage:<name>[@after=<cid>]"`).
+const STAGE_PROJECT_PREFIX: &str = "a2o-stage:";
+
+/// The grant scope a task must be launched under.
+///
+/// Pure and one-way: the requester-supplied `project` string only SELECTS which
+/// storage-owned scope is required; it never becomes the scope. A stage task
+/// (`project` starts `a2o-stage:`) spends `measure-stage`; everything else stays
+/// the historical `sweettest-feedback` lane. The envelope is the content-addressed
+/// one (`verify_status` re-derives the task CID before any caller reads it).
+fn required_scope(task: &Value) -> &'static str {
+    match task["envelope"]["project"].as_str() {
+        Some(project) if project.starts_with(STAGE_PROJECT_PREFIX) => {
+            super::compute_grants::MEASURE_STAGE_SCOPE
+        }
+        _ => FEEDBACK_SCOPE,
+    }
+}
+
+/// Does an AUTHENTICATED grant policy name this task's parties and the scope
+/// the task requires? Pure. Both parties must be present strings — two absent
+/// fields never "match". One home for the provider-side launch check
+/// ([`authorize`]) and the requester-side completion observation
+/// ([`observe_requester_completion`]).
+fn grant_policy_matches(policy: &Value, task: &Value, scope: &str) -> bool {
+    task["provider"].is_string()
+        && task["requester"].is_string()
+        && policy["provider"] == task["provider"]
+        && policy["recipient"] == task["requester"]
+        && policy["scope"].as_str() == Some(scope)
+}
+
 static MUTATIONS: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 fn content_cid(value: &Value) -> Result<String, StorageError> {
@@ -167,25 +202,35 @@ fn same_actor(performer: Option<&str>, local: &str) -> bool {
     performer.is_some_and(|p| !p.is_empty() && p == local)
 }
 
-/// Checks the exact notarized grant and current provider-authored lifecycle.
-/// The requester consumes the grant; Adam is its resource provider, not an
-/// identity inferred from a hostname or transport ID.
-async fn authorize(
-    hc: &Arc<HcClient>,
-    pool: &DbPool,
-    task: &Value,
-) -> Result<String, StorageError> {
-    let requester = task["requester"]
-        .as_str()
-        .ok_or_else(|| StorageError::InvalidInput("requester missing".into()))?;
+/// A `delegates-compute` grant whose signed Record was fetched by its exact
+/// action hash and verified against pinned author, action and entry hashes.
+struct AuthenticatedGrant {
+    /// The commitment's `entry_hash` — its CID, the `bounded_by` join key.
+    cid: String,
+    /// The notarizing action — the projection's `dht_anchor_hash` only.
+    action_hash: String,
+    action: String,
+    payload_json: String,
+    policy: Value,
+}
+
+/// Fetch the grant the immutable request pins, and authenticate it as authored
+/// by `author`. The launch check pins `author` to this cell (the provider is
+/// the local agent); the requester-side observer pins it to the task's
+/// provider — the same verification, a different expected signer.
+async fn fetch_authenticated_grant(
+    hc: &HcClient,
+    grant_action_hash: &str,
+    author: holochain_types::prelude::AgentPubKey,
+) -> Result<AuthenticatedGrant, StorageError> {
     // The immutable request pins the exact grant action. That signed action
     // binds its entry hash; a mutable projection or first Create lookup must
     // neither select another grant nor erase a still-valid native activation.
     use crate::services::commitment_record::{
         verify_commitment_record, CommitmentRecordPins, MAX_COMMITMENT_RECORD_BYTES,
     };
-    use holochain_types::prelude::{ActionHash, AgentPubKey, Record};
-    let action_hash = ActionHash::try_from(task["grantActionHash"].as_str().unwrap_or(""))
+    use holochain_types::prelude::{ActionHash, Record};
+    let action_hash = ActionHash::try_from(grant_action_hash)
         .map_err(|_| StorageError::InvalidInput("invalid grant action reference".into()))?;
     let request = rmp_serde::to_vec_named(&action_hash)
         .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -207,19 +252,49 @@ async fn authorize(
     let authenticated = verify_commitment_record(
         &bytes,
         CommitmentRecordPins {
-            action_hash,
+            action_hash: action_hash.clone(),
             entry_hash,
-            author: AgentPubKey::from_raw_39(hc.agent_pub_key()),
+            author,
         },
     )?
     .ok_or_else(|| StorageError::InvalidInput("signed grant unavailable".into()))?;
-    let cid = authenticated.entry_hash().to_string();
-    let policy: Value = serde_json::from_str(&authenticated.content().payload_json)?;
-    if authenticated.content().action != "delegates-compute"
-        || policy["provider"] != task["provider"]
-        || policy["recipient"] != task["requester"]
-        || policy["scope"] != CAPABILITY
-    {
+    let content = authenticated.content();
+    if content.action != "delegates-compute" {
+        return Err(StorageError::InvalidInput(
+            "signed commitment is not a compute grant".into(),
+        ));
+    }
+    Ok(AuthenticatedGrant {
+        cid: authenticated.entry_hash().to_string(),
+        action_hash: action_hash.to_string(),
+        action: content.action.clone(),
+        payload_json: content.payload_json.clone(),
+        policy: serde_json::from_str(&content.payload_json)?,
+    })
+}
+
+/// Checks the exact notarized grant and current provider-authored lifecycle.
+/// The requester consumes the grant; Adam is its resource provider, not an
+/// identity inferred from a hostname or transport ID.
+async fn authorize(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    task: &Value,
+) -> Result<String, StorageError> {
+    let requester = task["requester"]
+        .as_str()
+        .ok_or_else(|| StorageError::InvalidInput("requester missing".into()))?;
+    use holochain_types::prelude::AgentPubKey;
+    let grant = fetch_authenticated_grant(
+        hc,
+        task["grantActionHash"].as_str().unwrap_or(""),
+        AgentPubKey::from_raw_39(hc.agent_pub_key()),
+    )
+    .await?;
+    let cid = grant.cid;
+    let policy = grant.policy;
+    let scope = required_scope(task);
+    if !grant_policy_matches(&policy, task, scope) {
         return Err(StorageError::InvalidInput(
             "signed grant party or scope mismatch".into(),
         ));
@@ -230,7 +305,7 @@ async fn authorize(
     let fetcher = VerifiedGrant(CommitmentRecord {
         cid: cid.clone(),
         action: "delegates-compute".into(),
-        scope: CAPABILITY.into(),
+        scope: scope.into(),
         provider: hc.agent_key_uhcak(),
         recipient: requester.to_owned(),
         bounds: policy["bounds"].clone(),
@@ -240,7 +315,7 @@ async fn authorize(
     });
     crate::services::bounds_validator::validate(
         &crate::services::bounds_validator::EventForValidation {
-            action: CAPABILITY.into(),
+            action: scope.into(),
             performer: requester.to_owned(),
             bounded_by: cid.clone(),
             target_epr_id: task["taskCid"].as_str().unwrap_or("").to_owned(),
@@ -268,6 +343,208 @@ fn grant_links_allow(
     authored().any(|state| state.state == "active")
         && !authored()
             .any(|state| matches!(state.state.as_str(), "revoked" | "cancelled" | "sunset"))
+}
+
+/// Should this read carry the requester-side observation? Pure.
+///
+/// Only the REQUESTER's node observes (post-commit signals are author-local, so
+/// the provider's projection never holds the requester's view and vice versa),
+/// only once the provider's signed completion exists, and never for a
+/// self-grant: the provider's `DieselRateHistory` counts every `bounded_by` row
+/// against the grant, so a node that is both parties must not also spend here.
+fn observes_requester_completion(task: &Value, local: &str) -> bool {
+    task["requester"].as_str() == Some(local)
+        && !task["completion"].is_null()
+        && task["provider"]
+            .as_str()
+            .is_some_and(|provider| !provider.is_empty() && provider != local)
+}
+
+/// A receipt instant (`startedAt` / `completedAt`, epoch seconds per
+/// `compute-receipt.schema.json`). Absent, non-integer or < 1 is no instant.
+fn receipt_instant(receipt: &Value, field: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    receipt[field]
+        .as_i64()
+        .filter(|secs| *secs >= 1)
+        .and_then(|secs| chrono::DateTime::from_timestamp(secs, 0))
+}
+
+/// What the provider-authored lifecycle links say about a run launched at
+/// `started_at` (epoch seconds). Pure.
+///
+/// - an `active` link authored by the provider must exist — anyone else's
+///   activation is not the provider's consent;
+/// - a provider withdrawal (`revoked`/`cancelled`/`sunset`) at or before the
+///   launch second refuses: the run was not authorized when it started. The
+///   receipt's `startedAt` is second-truncated, so a withdrawal inside the
+///   launch second is read as preceding it (fail-closed);
+/// - a withdrawal strictly after launch does NOT erase an earned observation;
+///   its earliest signed time is returned so the projection carries it.
+///
+/// Links authored by anyone other than the provider are ignored entirely.
+fn observation_lifecycle(
+    states: &[crate::services::conductor_writes::CommitmentStateLink],
+    provider: &str,
+    started_at: i64,
+) -> Result<Option<String>, &'static str> {
+    let authored = || states.iter().filter(|state| state.author == provider);
+    if !authored().any(|state| state.state == "active") {
+        return Err("no provider-authored activation");
+    }
+    let mut earliest: Option<(i64, &str)> = None;
+    for state in authored()
+        .filter(|state| matches!(state.state.as_str(), "revoked" | "cancelled" | "sunset"))
+    {
+        let at = chrono::DateTime::parse_from_rfc3339(&state.signed_at)
+            .map_err(|_| "provider withdrawal time unreadable")?
+            .timestamp();
+        if at <= started_at {
+            return Err("grant withdrawn before launch");
+        }
+        if earliest.is_none_or(|(seen, _)| at < seen) {
+            earliest = Some((at, state.signed_at.as_str()));
+        }
+    }
+    Ok(earliest.map(|(_, signed_at)| signed_at.to_owned()))
+}
+
+/// Project a VERIFIED foreign grant into the requester's storage and record the
+/// requester's observation of its fulfilment, bounded by the grant's entry hash.
+///
+/// Idempotent: the grant upsert keys on `cid`, and the `compute-fulfilled` row is
+/// written only when its id is absent. An existing row that disagrees with this
+/// observation (other grant, other parties) is refused, never overwritten.
+/// Withdrawal is monotonic here: a `revoked_at` already projected is never
+/// cleared by a later view that lacks the link.
+///
+/// `h_app_id`: the row is written under `AppContext::default()` — the same
+/// partition the launch-admission row uses and the economic-events route reads.
+fn record_requester_observation(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    mut grant_row: crate::db::models::NewMishpatCommitment,
+    withdrawn_at: Option<String>,
+    event_id: &str,
+    completed_at: &str,
+) -> Result<(), StorageError> {
+    use crate::db::{economic_events, mishpat_commitments};
+    let db = |e: diesel::result::Error| StorageError::Database(e.to_string());
+    let cid = grant_row.cid.clone();
+    let provider = grant_row.provider.clone();
+    let receiver = grant_row.recipient.clone();
+    let prior = mishpat_commitments::get_by_cid(conn, &cid).map_err(db)?;
+    grant_row.state = "active".into();
+    grant_row.revoked_at = withdrawn_at.or_else(|| prior.and_then(|row| row.revoked_at));
+    mishpat_commitments::upsert_with_anchor(conn, grant_row).map_err(db)?;
+    let ctx = AppContext::default();
+    match economic_events::get_economic_event(conn, &ctx, event_id)? {
+        Some(existing) => {
+            if existing.action != "compute-fulfilled"
+                || existing.bounded_by.as_deref() != Some(cid.as_str())
+                || existing.provider != provider
+                || existing.receiver != receiver
+            {
+                return Err(StorageError::InvalidInput(
+                    "existing fulfilment record disagrees with the verified grant".into(),
+                ));
+            }
+        }
+        None => {
+            economic_events::record_compute_fulfilled_event(
+                conn,
+                &ctx,
+                event_id,
+                &provider,
+                &receiver,
+                &cid,
+                completed_at,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// The requester-side producer of `compute-fulfilled` (the dormant observer in
+/// `services::rea_observed_compute` lights from this).
+///
+/// Runs on the requester's single-task read once the provider's completion is
+/// verified by [`call`] (task CID, receipt CID and six envelope pins). It then
+/// (1) authenticates the grant the request pins with the author pinned to the
+/// task's PROVIDER, (2) requires the policy to name these parties and the scope
+/// the task requires, (3) reads the provider-authored lifecycle, (4) projects
+/// the foreign grant exactly as the provider's own issue does, and (5) records
+/// `compute-fulfilled:<request>` bounded by the grant entry hash at the
+/// receipt's `completedAt` — deterministic, never `now()`.
+///
+/// NEVER fails the read: any refusal is reported as `observed.refused` and
+/// writes nothing it has not verified.
+async fn observe_requester_completion(hc: &Arc<HcClient>, pool: &DbPool, task: &Value) -> Value {
+    match observe(hc, pool, task).await {
+        Ok(observed) => observed,
+        Err(reason) => {
+            tracing::warn!(%reason, "requester compute observation refused");
+            json!({"verified": false, "refused": reason})
+        }
+    }
+}
+
+async fn observe(hc: &Arc<HcClient>, pool: &DbPool, task: &Value) -> Result<Value, String> {
+    use holochain_types::prelude::AgentPubKey;
+    let provider = task["provider"].as_str().ok_or("provider missing")?;
+    let reference = task["requestActionHash"]
+        .as_str()
+        .filter(|r| !r.is_empty())
+        .ok_or("request reference missing")?;
+    let author = AgentPubKey::try_from(provider).map_err(|_| "provider is not an agent key")?;
+    let grant =
+        fetch_authenticated_grant(hc, task["grantActionHash"].as_str().unwrap_or(""), author)
+            .await
+            .map_err(|e| e.to_string())?;
+    let scope = required_scope(task);
+    if !grant_policy_matches(&grant.policy, task, scope) {
+        return Err("signed grant party or scope mismatch".into());
+    }
+    let receipt = &task["completion"]["receipt"];
+    let started = receipt_instant(receipt, "startedAt").ok_or("receipt startedAt missing")?;
+    let completed = receipt_instant(receipt, "completedAt").ok_or("receipt completedAt missing")?;
+    let states = crate::services::conductor_writes::get_commitment_authority_links(hc, &grant.cid)
+        .await
+        .map_err(|e| e.to_string())?;
+    let withdrawn_at = observation_lifecycle(&states, provider, started.timestamp())?;
+    let row = match crate::mishpat_projection::parse_commitment_payload(
+        &grant.action,
+        &grant.payload_json,
+        &grant.cid,
+        &grant.action_hash,
+    )? {
+        crate::mishpat_projection::CommitmentProjection::Upsert(row) => row,
+        _ => return Err("grant projection mismatch".into()),
+    };
+    let event_id = format!("compute-fulfilled:{reference}");
+    {
+        // bounded-work: the same single local-mutation lane as admission, so the
+        // absent-then-insert below cannot race another write on this node.
+        let _guard = MUTATIONS
+            .get_or_init(|| tokio::sync::Mutex::new(()))
+            .lock()
+            .await;
+        let mut conn = pool.get().map_err(|e| e.to_string())?;
+        record_requester_observation(
+            &mut conn,
+            row,
+            withdrawn_at,
+            &event_id,
+            &completed.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(json!({
+        "verified": true,
+        "grantCid": grant.cid,
+        "scope": scope,
+        "grantProvider": grant.policy["provider"],
+        "grantRecipient": grant.policy["recipient"],
+        "fulfilledEventId": event_id,
+    }))
 }
 
 fn launchable(task: &Value, attempt: &Value) -> bool {
@@ -329,7 +606,11 @@ pub async fn handle(
         } else {
             return Ok(response::not_found("unknown compute read"));
         };
-        return call(&hc, &input).await.map(|v| response::ok(&v));
+        let mut result = call(&hc, &input).await?;
+        if !path.is_empty() && observes_requester_completion(&result, &hc.agent_key_uhcak()) {
+            result["observed"] = observe_requester_completion(&hc, pool, &result).await;
+        }
+        return Ok(response::ok(&result));
     }
     if method != Method::POST {
         return Ok(response::method_not_allowed());
@@ -420,7 +701,7 @@ pub async fn handle(
                     &mut conn,
                     &AppContext::default(),
                     &format!("compute-admission:{reference}"),
-                    CAPABILITY,
+                    required_scope(&task),
                     task["requester"].as_str().unwrap_or(""),
                     &hc.agent_key_uhcak(),
                     &cid,
@@ -473,6 +754,334 @@ mod tests {
                 &[link("adam", "active"), link("adam", withdrawal)],
                 "adam"
             ));
+        }
+    }
+    #[test]
+    fn stage_tasks_require_the_measure_scope_and_feedback_tasks_the_feedback_scope() {
+        let task = |project: Value| {
+            json!({"requester":"matthew","provider":"adam",
+                "envelope":{"project":project,"taskKind":"feedback_signal"}})
+        };
+        let grant = |scope: &str| json!({"provider":"adam","recipient":"matthew","scope":scope,"bounds":{}});
+        let admits =
+            |task: &Value, policy: &Value| grant_policy_matches(policy, task, required_scope(task));
+        let stage = task(json!("a2o-stage:federation-convergence"));
+        let feedback = task(json!("elohim-feedback-sweettest"));
+        // 1. a stage task under a measure-stage grant is admitted
+        assert_eq!(required_scope(&stage), "measure-stage");
+        assert!(admits(&stage, &grant("measure-stage")));
+        // 2. a stage task under a feedback grant is refused (compute-grant-refused)
+        assert!(!admits(&stage, &grant("sweettest-feedback")));
+        // 3. a feedback task under a feedback grant is admitted, as before
+        assert_eq!(required_scope(&feedback), "sweettest-feedback");
+        assert!(admits(&feedback, &grant("sweettest-feedback")));
+        // 4. a feedback task under a measure-stage grant is refused: a measure
+        //    grant does not widen into the sweettest lane
+        assert!(!admits(&feedback, &grant("measure-stage")));
+        // 5. only the exact prefix selects the measure scope; lookalikes, a
+        //    missing or non-string project stay feedback, and a hosted-cell grant
+        //    admits neither class
+        for lookalike in [
+            json!("a2o-stagex:federation"),
+            json!("A2O-STAGE:federation"),
+            json!(" a2o-stage:federation"),
+            json!("measure-stage"),
+            json!(["a2o-stage:federation"]),
+            Value::Null,
+        ] {
+            let t = task(lookalike.clone());
+            assert_eq!(required_scope(&t), "sweettest-feedback", "{lookalike}");
+            assert!(!admits(&t, &grant("measure-stage")), "{lookalike}");
+        }
+        for t in [&stage, &feedback] {
+            assert!(!admits(t, &grant("hosted-cell")));
+        }
+        // parties still bind: the right scope with the wrong provider or recipient,
+        // or absent parties on both sides, is never a match
+        let mut wrong = grant("measure-stage");
+        wrong["provider"] = json!("mallory");
+        assert!(!admits(&stage, &wrong));
+        let mut wrong = grant("measure-stage");
+        wrong["recipient"] = json!("mallory");
+        assert!(!admits(&stage, &wrong));
+        let partyless = json!({"envelope":{"project":"a2o-stage:x"}});
+        assert!(!grant_policy_matches(
+            &json!({"scope":"measure-stage"}),
+            &partyless,
+            required_scope(&partyless)
+        ));
+    }
+    fn state_link(
+        author: &str,
+        state: &str,
+        signed_at: &str,
+    ) -> crate::services::conductor_writes::CommitmentStateLink {
+        crate::services::conductor_writes::CommitmentStateLink {
+            author: author.into(),
+            state: state.into(),
+            signed_at: signed_at.into(),
+            event_hash: String::new(),
+        }
+    }
+    // 2026-09-25T10:00:00Z
+    const LAUNCH: i64 = 1_790_330_400;
+    #[test]
+    fn requester_observation_requires_provider_authored_activation() {
+        assert_eq!(
+            observation_lifecycle(&[], "adam", LAUNCH),
+            Err("no provider-authored activation")
+        );
+        // an activation authored by anyone else is not the provider's consent
+        assert!(observation_lifecycle(
+            &[state_link("mallory", "active", "2026-09-25T09:00:00Z")],
+            "adam",
+            LAUNCH
+        )
+        .is_err());
+        assert_eq!(
+            observation_lifecycle(
+                &[
+                    state_link("adam", "active", "2026-09-25T09:00:00Z"),
+                    // a bystander's "withdrawal" before launch is not the provider's
+                    state_link("mallory", "revoked", "2026-09-25T09:30:00Z"),
+                ],
+                "adam",
+                LAUNCH
+            ),
+            Ok(None)
+        );
+    }
+    #[test]
+    fn observation_refuses_launch_after_withdrawal() {
+        let active = state_link("adam", "active", "2026-09-25T09:00:00Z");
+        for withdrawal in ["revoked", "cancelled", "sunset"] {
+            assert_eq!(
+                observation_lifecycle(
+                    &[
+                        active.clone(),
+                        state_link("adam", withdrawal, "2026-09-25T09:59:00Z")
+                    ],
+                    "adam",
+                    LAUNCH
+                ),
+                Err("grant withdrawn before launch"),
+                "{withdrawal}"
+            );
+        }
+        // startedAt is second-truncated: a withdrawal inside the launch second is
+        // read as preceding the launch (fail-closed)
+        assert!(observation_lifecycle(
+            &[
+                active.clone(),
+                state_link("adam", "revoked", "2026-09-25T10:00:00.400Z")
+            ],
+            "adam",
+            LAUNCH
+        )
+        .is_err());
+        // an unreadable withdrawal time is never read as "after"
+        assert_eq!(
+            observation_lifecycle(
+                &[active.clone(), state_link("adam", "revoked", "yesterday")],
+                "adam",
+                LAUNCH
+            ),
+            Err("provider withdrawal time unreadable")
+        );
+        // a withdrawal after launch does not erase the earned observation; the
+        // earliest withdrawal is carried for the projection
+        assert_eq!(
+            observation_lifecycle(
+                &[
+                    active,
+                    state_link("adam", "sunset", "2026-09-25T12:00:00Z"),
+                    state_link("adam", "revoked", "2026-09-25T11:00:00Z"),
+                ],
+                "adam",
+                LAUNCH
+            ),
+            Ok(Some("2026-09-25T11:00:00Z".into()))
+        );
+    }
+    #[test]
+    fn self_grant_is_never_observed() {
+        let done = json!({"actionHash":"completion"});
+        let task = |requester: &str, provider: &str, completion: &Value| json!({"requester":requester,"provider":provider,"completion":completion});
+        assert!(observes_requester_completion(
+            &task("matthew", "adam", &done),
+            "matthew"
+        ));
+        // a node that is both parties never records a fulfilment against itself
+        assert!(!observes_requester_completion(
+            &task("matthew", "matthew", &done),
+            "matthew"
+        ));
+        // only the requester observes; the provider's node never does
+        assert!(!observes_requester_completion(
+            &task("matthew", "adam", &done),
+            "adam"
+        ));
+        // nothing to observe before the provider's signed completion
+        assert!(!observes_requester_completion(
+            &task("matthew", "adam", &Value::Null),
+            "matthew"
+        ));
+        assert!(!observes_requester_completion(
+            &json!({"requester":"matthew","completion":done}),
+            "matthew"
+        ));
+    }
+    #[test]
+    fn receipt_instants_are_epoch_seconds_and_absent_is_refused() {
+        let receipt = json!({"startedAt":LAUNCH,"completedAt":"1790330400","zero":0});
+        assert_eq!(
+            receipt_instant(&receipt, "startedAt")
+                .unwrap()
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            "2026-09-25T10:00:00Z"
+        );
+        assert!(receipt_instant(&receipt, "completedAt").is_none());
+        assert!(receipt_instant(&receipt, "zero").is_none());
+        assert!(receipt_instant(&receipt, "absent").is_none());
+    }
+    mod observation_projection {
+        use super::super::record_requester_observation;
+        use crate::db::{economic_events, mishpat_commitments, AppContext};
+        use crate::mishpat_projection::{parse_commitment_payload, CommitmentProjection};
+        use crate::services::rea_observed_compute::{fulfilled_cids_from_events, retain_fulfilled};
+        use diesel::prelude::*;
+        use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+        use elohim_facings::folds::rea::CommitmentRow;
+        use serde_json::json;
+
+        const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+        const ENTRY_HASH: &str = "uhCEk-grant-entry";
+        const ACTION_HASH: &str = "uhCkk-grant-action";
+
+        fn test_conn() -> SqliteConnection {
+            let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+            conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+            conn
+        }
+        fn foreign_grant() -> crate::db::models::NewMishpatCommitment {
+            let payload = json!({"action":"delegates-compute","scope":"measure-stage",
+                "provider":"uhCAk-jessica","recipient":"uhCAk-matthew",
+                "bounds":{"epr_scope":["*"],"reach_ceiling":"commons","rate_per_hour":2,"rotation_ttl_days":5},
+                "valid_from":"2026-09-25T00:00:00+00:00","valid_until":"2026-09-30T00:00:00+00:00"});
+            match parse_commitment_payload(
+                "delegates-compute",
+                &payload.to_string(),
+                ENTRY_HASH,
+                ACTION_HASH,
+            )
+            .expect("parses")
+            {
+                CommitmentProjection::Upsert(row) => row,
+                _ => panic!("delegates-compute projects as an upsert"),
+            }
+        }
+
+        #[test]
+        fn compute_fulfilled_observation_is_idempotent_and_bounded_by_grant_entry_hash() {
+            let mut conn = test_conn();
+            let id = "compute-fulfilled:uhCkk-request";
+            for _ in 0..2 {
+                record_requester_observation(
+                    &mut conn,
+                    foreign_grant(),
+                    None,
+                    id,
+                    "2026-09-25T10:05:00Z",
+                )
+                .expect("observation records");
+            }
+            let ctx = AppContext::default();
+            let events = economic_events::list_compute_fulfilled_events(&mut conn, &ctx)
+                .expect("list fulfilled");
+            assert_eq!(events.len(), 1, "a re-read records nothing new");
+            let event = &events[0];
+            assert_eq!(event.id, id);
+            assert_eq!(event.provider, "uhCAk-jessica");
+            assert_eq!(event.receiver, "uhCAk-matthew");
+            assert_eq!(event.has_point_in_time, "2026-09-25T10:05:00Z");
+            assert_eq!(
+                event.bounded_by.as_deref(),
+                Some(ENTRY_HASH),
+                "bounded_by is the grant entry hash, never its action hash"
+            );
+
+            // the foreign grant is projected active, anchored on its action hash
+            let row = mishpat_commitments::get_by_cid(&mut conn, ENTRY_HASH)
+                .expect("read")
+                .expect("projected");
+            assert_eq!(row.state, "active");
+            assert_eq!(row.scope, "measure-stage");
+            assert_eq!(row.dht_anchor_hash.as_deref(), Some(ACTION_HASH));
+            assert!(row.revoked_at.is_none());
+
+            // and the observed side keeps exactly that row
+            let rows = vec![CommitmentRow {
+                cid: row.cid.clone(),
+                action: row.action.clone(),
+                scope: row.scope.clone(),
+                provider: row.provider.clone(),
+                recipient: row.recipient.clone(),
+                resource_classified_as: vec![],
+                household_id: None,
+                valid_from: row.valid_from.clone(),
+                valid_until: row.valid_until.clone(),
+                bounds_json: row.bounds_json.clone(),
+                state: row.state.clone(),
+            }];
+            let kept = retain_fulfilled(&rows, &fulfilled_cids_from_events(&events));
+            assert_eq!(
+                kept.len(),
+                1,
+                "retain_fulfilled keeps the projected grant row"
+            );
+            assert_eq!(kept[0].cid, ENTRY_HASH);
+
+            // a withdrawal seen after completion is carried, and a later view
+            // lacking it never clears it; the observation stays
+            record_requester_observation(
+                &mut conn,
+                foreign_grant(),
+                Some("2026-09-25T11:00:00Z".into()),
+                id,
+                "2026-09-25T10:05:00Z",
+            )
+            .expect("re-observe after withdrawal");
+            record_requester_observation(
+                &mut conn,
+                foreign_grant(),
+                None,
+                id,
+                "2026-09-25T10:05:00Z",
+            )
+            .expect("re-observe without the link");
+            let row = mishpat_commitments::get_by_cid(&mut conn, ENTRY_HASH)
+                .unwrap()
+                .unwrap();
+            assert_eq!(row.revoked_at.as_deref(), Some("2026-09-25T11:00:00Z"));
+            assert_eq!(
+                economic_events::list_compute_fulfilled_events(&mut conn, &ctx)
+                    .unwrap()
+                    .len(),
+                1
+            );
+
+            // an existing row for the same id that names another grant is refused,
+            // never overwritten
+            let mut other = foreign_grant();
+            other.cid = "uhCEk-other-grant".into();
+            assert!(record_requester_observation(
+                &mut conn,
+                other,
+                None,
+                id,
+                "2026-09-25T10:05:00Z"
+            )
+            .is_err());
         }
     }
     #[test]

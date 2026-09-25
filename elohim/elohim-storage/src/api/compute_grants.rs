@@ -40,7 +40,17 @@ fn stamp(input: &Value, field: &str) -> Result<DateTime<Utc>, StorageError> {
 /// Extending the protocol's social vocabulary is an entry in this list plus its
 /// consumer, never a new entry type — the commitment stays the existing
 /// `delegates-compute` Mishpat entry and the DNA hash does not move.
-const GRANT_SCOPES: [&str; 2] = ["sweettest-feedback", "hosted-cell"];
+///
+/// Index 0 is the historical default a scope-less request notarizes; new
+/// scopes append so no existing caller's notarized bytes change.
+const GRANT_SCOPES: [&str; 3] = ["sweettest-feedback", "hosted-cell", MEASURE_STAGE_SCOPE];
+
+/// The event class a peer-executed a2o stage spends: a measure-class run on a
+/// neighbour's capacity. It is an EVENT class, never the envelope's
+/// `a2o-stage:` project prefix — the task adapter maps that requester-supplied
+/// prefix one-way onto this required scope (`compute_tasks::required_scope`),
+/// so granted authority is never derived from the requester's own bytes.
+pub(crate) const MEASURE_STAGE_SCOPE: &str = "measure-stage";
 
 /// The scope a grant request names, or the historical default.
 ///
@@ -583,6 +593,19 @@ mod tests {
         let grant = grant_input("provider", &input(), now()).expect("accepted");
         let payload: Value = serde_json::from_str(&grant.payload_json).unwrap();
         assert_eq!(payload["scope"], "sweettest-feedback");
+    }
+
+    #[test]
+    fn the_measure_stage_scope_is_named_without_moving_the_default() {
+        assert_eq!(GRANT_SCOPES[0], "sweettest-feedback");
+        let mut raw = input();
+        raw["scope"] = json!(MEASURE_STAGE_SCOPE);
+        let grant = grant_input("provider", &raw, now()).expect("accepted");
+        let payload: Value = serde_json::from_str(&grant.payload_json).unwrap();
+        assert_eq!(payload["scope"], "measure-stage");
+        // the task-side prefix is not a grant scope: authority is named, not derived
+        raw["scope"] = json!("a2o-stage");
+        assert!(grant_input("provider", &raw, now()).is_err());
     }
 
     #[test]

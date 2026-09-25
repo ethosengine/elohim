@@ -546,7 +546,7 @@ order:
 | `:288`, `:21-36` | `x-elohim-compute-token` matches, constant-time over SHA-256, secret ≥32 bytes |
 | `:310`, `:166-168` | `x-elohim-verified-performer` **equals this cell's own agent key** — a transport id or another agent's key is refused (`:500-505`) |
 | `:379` | `task.provider == this cell's agent key`, else 403 `selected-runner-required` — only the selected runner may accept/complete/decline |
-| `:391-400` → `:173-261` | the exact `grantActionHash` Record is fetched from mishpat (`:190-201`), its signature/author/entry-hash pins verified (`:207-215`), `action == "delegates-compute"`, `policy.provider == task.provider`, `policy.recipient == task.requester`, `policy.scope == "sweettest-feedback"` (`:218-226`), the shared bounds validator re-run on the *authenticated* payload with `DieselRateHistory` (`:241-254`), and provider-authored lifecycle links required `active` with no `revoked`/`cancelled`/`sunset` (`:256-259`, `:263-271`) |
+| `:391-400` → `:173-261` | the exact `grantActionHash` Record is fetched from mishpat (`:190-201`), its signature/author/entry-hash pins verified (`:207-215`), `action == "delegates-compute"`, `policy.provider == task.provider`, `policy.recipient == task.requester`, `policy.scope == required_scope(task)` — `"measure-stage"` when the envelope `project` starts `a2o-stage:`, `"sweettest-feedback"` otherwise (`:218-226`; amended 2026-09-25, S1), the shared bounds validator re-run on the *authenticated* payload with `DieselRateHistory` (`:241-254`), and provider-authored lifecycle links required `active` with no `revoked`/`cancelled`/`sunset` (`:256-259`, `:263-271`) |
 | `:402`, `:273-278` | launch requires an accepted, attempt-matching, non-terminal request |
 | `:412-421` | one-use launch admission recorded as an `economic_events` row `bounded_by` the grant cid |
 | `:385` → `:62-131` | on complete: `receiptCid == content_cid(receipt)`; receipt binds taskCid / requestAction / grantAction / requester / provider; `status` ∈ six values; **a `passed` receipt requires non-empty `expectedTests == observedTests` and `exitCode == 0`** (`:91-107`); `binary`, `dna`, `runtimeImage`, `expectedTests`, `project`, `taskKind` byte-equal the immutable envelope (`:108-121`); `retention` equal (`:122-130`) |
@@ -659,7 +659,7 @@ GET http://127.0.0.1:8091/api/v1/economic-events/compute-admission%3A<REF>
 ```
 
 (route `/api/v1/economic-events/{id}`, `http.rs:15303`, handler
-`api/economic_events.rs:82`). The row carries `action: "sweettest-feedback"`,
+`api/economic_events.rs:82`). The row carries `action: "measure-stage"` (the stage's event class; a feedback sweettest's admission row carries `sweettest-feedback`),
 `provider` = jessica's agent key, `receiver` = matthew's agent key, and
 `bounded_by` = the grant **commitment CID (entry hash)** — the column the rate window
 reads (`db/economic_events.rs:782-784`).
@@ -1001,7 +1001,7 @@ Eleven steps. Every one needs a new definition in
 | `Then the requester recovers the provider's signed completion for the pinned stage` | polls until `.completion`; runs `workspace.mjs poll`; asserts `.taskCid == C1`, `receipt.binary`/`receipt.dna` deep-equal the envelope's, `receipt.provider == providerKey` | `:157-182` |
 | `Then the returned report names the pinned feature file and every declared scenario` | decodes the framed base64 from the materialized `stdout.log`; asserts report `uri` ends with the pinned feature path and the slug set equals `expectedTests`' suffixes | new |
 | `Then every declared scenario passed in the report, not merely in the receipt` | asserts every step of every scenario is `passed` in the decoded report — the D9 assertion | new |
-| `Then the completion is attested by an economic event naming the grant` | asserts `.completion.actionHash` non-empty; reads `GET /api/v1/economic-events/compute-admission%3A<R1>` on the provider and asserts `bounded_by` equals the grant commitment cid and `action == "sweettest-feedback"` | new |
+| `Then the completion is attested by an economic event naming the grant` | asserts `.completion.actionHash` non-empty; reads `GET /api/v1/economic-events/compute-admission%3A<R1>` on the provider and asserts `bounded_by` equals the grant commitment cid and `action == "measure-stage"` | new |
 | `When the requester submits the identical stage a second time` | re-runs submit with no flag; captures the second response | new |
 | `Then the same request is recovered and the provider runs nothing new` | asserts second `.requestActionHash == R1`, `.taskCid == C1`, `task.json.invocation == N1`, `.completion.actionHash` unchanged | new |
 | `Then exactly one admission event exists for that stage` | asserts the single admission row and that no second `compute-admission:` id resolves | new |

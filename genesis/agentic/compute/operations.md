@@ -19,7 +19,8 @@ workspace wrapper, together with `COMPUTE_PERFORMER` (its own conductor key),
 `COMPUTE_GRANT_ACTION`, and optionally `COMPUTE_EXECUTOR`. This is a local
 capability, not a cross-peer bearer credential. The Mishpat coordinator must include signed link authors in its lifecycle
 projection; an older coordinator fails closed for compute grants. The grant names Adam as provider,
-the requester as recipient, and `sweettest-feedback` as scope.
+the requester as recipient, and `sweettest-feedback` as scope (a peer-executed a2o stage
+needs `measure-stage` instead — see "The grant a stage spends" below).
 
 On Adam's own local adapter, his operator can explicitly issue the native
 grant with `node /opt/compute/workspace.mjs grant grant.json` (or the repository
@@ -227,6 +228,63 @@ operator-owned and unreadable here). The stage rides the fields that are already
   report names the pinned feature file, contains exactly the declared scenarios, and every
   one of them passed. The substrate makes a provider's claim attributable, immutable,
   bounded and revocable — it does not make it true.
+
+**The grant a stage spends: `scope: measure-stage`.** A stage is a measure-class run, a
+different event class from the Holochain feedback sweettest, so it needs its own grant.
+The provider's adapter derives the scope a task requires from the envelope, one way:
+`project` starting with `a2o-stage:` requires `measure-stage`; anything else requires
+`sweettest-feedback` (`required_scope`, `elohim/elohim-storage/src/api/compute_tasks.rs`).
+A stage submitted under a `sweettest-feedback` grant is refused at acceptance and at
+launch with `compute-grant-refused`, and a `measure-stage` grant never admits a feedback
+sweettest. The requester never names the scope on the task — it only names the project;
+the scope comes from the grant the provider signed. Issue it by adding the scope to the
+grant file shown above:
+
+```json
+{
+  "recipient": "REQUESTER_HOLOCHAIN_AGENT_KEY",
+  "scope": "measure-stage",
+  "validFrom": "2026-09-25T00:00:00Z",
+  "validUntil": "2026-09-30T00:00:00Z",
+  "bounds": {
+    "epr_scope": ["*"],
+    "reach_ceiling": "commons",
+    "rate_per_hour": 2,
+    "rotation_ttl_days": 5
+  }
+}
+```
+
+The launch-admission row the provider records (`compute-admission:<request>`) carries the
+same event class in its `action` column (`measure-stage` for a stage).
+
+**The in-kind price.** A stage is paid for in kind: no currency is issued, and the price
+is exactly what the two parties declared, each term in the one place that already
+enforces it. Nothing here is a Kubernetes object; the provider's host budget sits outside
+the task.
+
+| Term | Declared in | Enforced by |
+|---|---|---|
+| Event class | grant `scope: measure-stage` | provider adapter: the task's required scope must equal it |
+| Rate | grant `bounds.rate_per_hour` | shared bounds validator at acceptance and launch, counting the provider's admission rows bounded by the grant |
+| Which tasks | grant `bounds.epr_scope` (task CIDs, or `*`) | shared bounds validator |
+| Duration of the offer | grant `validFrom` / `validUntil`, `bounds.rotation_ttl_days` | shared bounds validator; a withdrawal is terminal |
+| CPU, memory, wall-clock | task envelope `resources{cpuMillis, memoryBytes, timeoutSeconds}` | the executor and `ark` on the provider |
+| Bytes returned and how long they are kept | task envelope `resources.maxPayloadBytes`, `retention{…}` | the executor; storage refuses a receipt whose retention differs from the task |
+| What the requester gives back | nothing in currency | the requester's own storage records the realized flow (below) |
+
+**The requester's record of the flow.** When the requester reads its own completed task
+(`GET /api/v1/compute/tasks/<requestActionHash>` on its loopback adapter), its storage
+re-authenticates the grant the request pinned — signed by the provider, naming these two
+parties and the required scope, activated by the provider and not withdrawn before the
+run started — projects that grant into its own commitment table, and records one
+`compute-fulfilled:<requestActionHash>` economic event bounded by the grant's entry hash
+at the receipt's `completedAt`. The read then carries
+`observed{verified, grantCid, scope, grantProvider, grantRecipient, fulfilledEventId}`; a
+check that fails reports `observed{verified:false, refused}` and never fails the read.
+Only the requester records this (the provider's rate window counts every row bounded by
+the grant), a self-grant is never recorded, and the record is observe-and-audit only:
+nothing prices, ranks or places on it.
 
 **The capacity grant a provider must make.** The guest runs as UID 65534 and can write
 only what the filesystem lets 65534 write. The stage declares exactly which paths it
