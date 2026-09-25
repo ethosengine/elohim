@@ -29,6 +29,7 @@ import { E2EWorld } from '../../src/framework/world.js';
 
 import {
   askFleetWriteReadiness,
+  CONDUCTOR_RESTART_FACES,
   FLEET_WRITE_READINESS,
   IN_FLIGHT_SLACK_SECS,
   namesDoorway,
@@ -469,11 +470,12 @@ async function stopSampler(world: E2EWorld): Promise<ReadinessAnswer[]> {
 }
 
 Then(
-  'while the window was open the probe answered not-ready at least once, naming the face {string} or {string}',
+  'while the window was open the probe answered not-ready at least once, naming the face {string}, {string} or {string}',
   { timeout: 60_000 },
-  async function (this: E2EWorld, first: string, second: string) {
-    requireFace(first);
-    requireFace(second);
+  async function (this: E2EWorld, ...named: string[]) {
+    // A conductor restart wears only these (controller ruling 2026-09-25): each name the
+    // feature gives must be one of them, and each is in the vocabulary file.
+    for (const face of named) requireFace(face, CONDUCTOR_RESTART_FACES);
     const answers = await stopSampler(this);
     this.attach(
       JSON.stringify(
@@ -494,12 +496,13 @@ Then(
         'cases this run has not proved that the window is reported.'
     );
     const faces = notReady.flatMap(a => a.notReady.map(line => line.face));
-    const unexpected = faces.filter(face => face !== first && face !== second);
+    const unexpected = faces.filter(face => !named.includes(face));
+    const quoted = named.map(face => JSON.stringify(face)).join(', ');
     assert.ok(faces.length > 0, 'a not-ready answer during the restart named no doorway');
     assert.deepEqual(
       unexpected,
       [],
-      `during a conductor restart the probe named faces other than "${first}" or "${second}": ` +
+      `during a conductor restart the probe named faces other than ${quoted}: ` +
         `${[...new Set(unexpected)].join(', ')} (known faces: ${READINESS_FACES.join(', ')})`
     );
   }

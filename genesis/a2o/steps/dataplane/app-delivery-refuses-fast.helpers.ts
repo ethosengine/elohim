@@ -71,6 +71,19 @@ export const PLAN_FACES: readonly string[] = FACE_ENTRIES.filter(entry => entry.
   entry => entry.face
 );
 
+/**
+ * The faces a conductor restart can wear, seen from a doorway (controller ruling 2026-09-25,
+ * extending "one face vocabulary shared by A and C"): cell-not-running when the conductor
+ * reports the cell disabled, catching-up when the projector lags, and storage-refused while the
+ * storage peer's bridge to its restarting conductor is dead, so it refuses to anchor a write.
+ * Every name must be in READINESS_FACES; the unit tests hold it to that.
+ */
+export const CONDUCTOR_RESTART_FACES: readonly string[] = [
+  'cell-not-running',
+  'catching-up',
+  'storage-refused',
+];
+
 export function isReadinessFace(face: string): boolean {
   return READINESS_FACES.includes(face);
 }

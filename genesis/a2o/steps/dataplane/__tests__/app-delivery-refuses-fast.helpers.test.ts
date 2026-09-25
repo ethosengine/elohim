@@ -13,6 +13,7 @@ import { after, describe, it } from 'node:test';
 
 import {
   askFleetWriteReadiness,
+  CONDUCTOR_RESTART_FACES,
   FLEET_WRITE_READINESS,
   isReadinessFace,
   namesDoorway,
@@ -227,11 +228,20 @@ void describe('one face vocabulary', () => {
       join(REPO_ROOT, 'genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature'),
       'utf8'
     );
-    const named = [...feature.matchAll(/face "([^"]+)"(?: or "([^"]+)")?/g)].flatMap(match =>
-      [match[1], match[2]].filter((face): face is string => typeof face === 'string')
+    const named = [...feature.matchAll(/face ("[^"]+"(?:(?:, | or )"[^"]+")*)/g)].flatMap(match =>
+      [...match[1].matchAll(/"([^"]+)"/g)].map(quoted => quoted[1])
     );
     assert.ok(named.length >= 3, `found only ${named.length} named faces in the feature`);
     for (const face of named) assert.ok(isReadinessFace(face), face);
+  });
+
+  void it('lists the faces a conductor restart can wear, each one in the vocabulary', () => {
+    assert.deepEqual(sorted(CONDUCTOR_RESTART_FACES), [
+      'catching-up',
+      'cell-not-running',
+      'storage-refused',
+    ]);
+    for (const face of CONDUCTOR_RESTART_FACES) assert.ok(isReadinessFace(face), face);
   });
 
   void it('refuses a name that is not in the vocabulary, including the retired conductor-blind', () => {

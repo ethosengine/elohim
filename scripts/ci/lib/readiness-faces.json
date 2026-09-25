@@ -8,7 +8,7 @@
     { "face": "storage-forward-timeout", "plan": true, "meaning": "the doorway could not forward the probe blob to its storage peer: the forward timed out" },
     { "face": "shedding", "plan": false, "meaning": "/health/serving says shedding" },
     { "face": "degrading", "plan": false, "meaning": "/health/serving says degrading" },
-    { "face": "storage-refused", "plan": false, "meaning": "/health/serving storageServing.status is refused" },
+    { "face": "storage-refused", "plan": false, "meaning": "/health/serving storageServing.status is refused. It is also the face a doorway wears while its storage peer's conductor bridge is dead during a conductor restart: storage cannot reach the conductor to anchor a write, so it refuses the write rather than start one it cannot anchor. cell-not-running is kept for a conductor that reports the cell disabled, catching-up for a lagging projector (controller ruling 2026-09-25)" },
     { "face": "storage-unreachable", "plan": false, "meaning": "/health/serving storageServing.status is unreachable" },
     { "face": "warmup-empty", "plan": false, "meaning": "/health/serving warmupEmpty is true" },
     { "face": "not-serving", "plan": false, "meaning": "/health/serving answered 503 for a reason not named above" },

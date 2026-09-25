@@ -42,8 +42,8 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   when every file its index page names is inside it. Every bundle below is coherent, so a
   page that fails to appear is never the bundle's fault. A DEPLOY does two
   things. First it hands the bundle's bytes to every doorway. Then it declares the new
-  head exactly once, through one doorway. Only the second act needs a running cell, so
-  it is the act a not-ready doorway refuses.
+  head exactly once, through one doorway. Only the declaration needs a running cell, so
+  it is what a not-ready doorway refuses.
 
   Two actors appear in the steps. THIS RUN is the test itself, standing where the
   steward's pipeline stands: it builds the bundles, and it deploys them with the same
@@ -54,12 +54,17 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
 
   A doorway is NOT READY while it answers requests but cannot take a write. The period
   after a restart during which that is true is the NOT-READY WINDOW. Every not-ready
-  answer names one of three causes, called FACES:
-    cell-not-running          the conductor behind the doorway has no running cell
-                              for this write yet;
+  answer names its cause, called its FACE. Four faces matter to this story:
+    cell-not-running          the conductor behind the doorway reports the cell for
+                              this write as not running;
     catching-up               the doorway reports that it is behind and is turning
                               work away;
-    storage-forward-timeout   passing the bytes on to the storage peer timed out.
+    storage-forward-timeout   passing the bytes on to the storage peer timed out
+                              (the deploy waits on it too, but no scenario here
+                              provokes it);
+    storage-refused           the storage peer cannot reach its conductor, so it
+                              refuses a write it could not anchor, as it does while
+                              that conductor restarts.
   SHEDDING is how the catching-up face looks on the wire. The doorway answers HTTP 503
   with a RETRY-AFTER header ("come back in N seconds") instead of doing the work. Its
   health and administration routes keep answering while it sheds. The household can make
@@ -146,7 +151,8 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   # every few seconds for the whole window, and each answer is recorded with how long it
   # took. The window counts as a window rather than a failure only if the probe reported
   # it by name while it was open, never failed or hung while answering, and it closed with
-  # nobody intervening.
+  # nobody intervening. A conductor restart can wear any of three faces, depending on which
+  # part notices first: the conductor, the doorway, or the storage peer.
   @requires:owned-substrate
   Scenario: restarting every conductor opens a window the probe names, and the window closes on its own
     Given the fleet write-readiness probe is part of this checkout
@@ -154,7 +160,7 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
     When the household restarts every conductor while the probe keeps asking every 3 seconds
     Then within 600 seconds both doorways report they have caught up
     And the fleet write-readiness probe answers ready within 30 seconds
-    And while the window was open the probe answered not-ready at least once, naming the face "cell-not-running" or "catching-up"
+    And while the window was open the probe answered not-ready at least once, naming the face "cell-not-running", "catching-up" or "storage-refused"
     And every answer the probe gave was ready or not-ready, and none took longer than 30 seconds
 
   # STATION 3 — a window shorter than the deploy's readiness budget: the same offer goes
