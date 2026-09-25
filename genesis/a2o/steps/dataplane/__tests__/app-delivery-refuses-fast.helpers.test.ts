@@ -16,14 +16,18 @@ import {
   CONDUCTOR_RESTART_FACES,
   FLEET_WRITE_READINESS,
   isReadinessFace,
+  lastFace,
   namesDoorway,
   parseNotReadyLines,
   parseTimingLines,
   PLAN_FACES,
+  pollReadiness,
   READINESS_FACES,
   READINESS_FACES_FILE,
   timingViolations,
   withEnv,
+  type PollClock,
+  type ReadinessAnswer,
 } from '../app-delivery-refuses-fast.helpers.js';
 import { REPO_ROOT } from '../epr-app-deliverability.helpers.js';
 
@@ -185,6 +189,134 @@ void describe('askFleetWriteReadiness', () => {
     assert.equal(answer.timedOut, true);
     assert.equal(answer.code, null);
     assert.ok(Date.now() - started < 10_000, 'the caller itself waited on a hung probe');
+  });
+});
+
+void describe('pollReadiness', () => {
+  // A clock the test drives: sleeping advances it, and each ask costs `askMs`, so the loop's
+  // arithmetic is exercised without waiting in real time.
+  function fakeClock(askMs = 1_000): { clock: PollClock; tick: () => void; slept: number[] } {
+    let now = 0;
+    const slept: number[] = [];
+    return {
+      clock: {
+        now: () => now,
+        sleep: async ms => {
+          slept.push(ms);
+          now += ms;
+          return Promise.resolve();
+        },
+      },
+      tick: () => {
+        now += askMs;
+      },
+      slept,
+    };
+  }
+
+  function answer(code: number | null, output = ''): ReadinessAnswer {
+    return {
+      code,
+      timedOut: code === null,
+      output,
+      startedAt: 0,
+      elapsedMs: 1_000,
+      notReady: parseNotReadyLines(output),
+    };
+  }
+
+  const NOT_READY = answer(
+    3,
+    'FLEET-NOT-READY http://localhost:8889 face=storage-refused retryAfter=20'
+  );
+
+  void it('keeps asking every interval until ready, and measures the time it took', async () => {
+    const { clock, tick, slept } = fakeClock();
+    const script = [NOT_READY, NOT_READY, answer(0)];
+    const poll = await pollReadiness(
+      async () => {
+        tick();
+        return Promise.resolve(script.shift() ?? answer(0));
+      },
+      120_000,
+      5_000,
+      clock
+    );
+    assert.equal(poll.ready, true);
+    assert.equal(poll.answers.length, 3);
+    // three asks of 1s each and two 5s pauses between them
+    assert.equal(poll.timeToReadyMs, 13_000);
+    assert.deepEqual(slept, [5_000, 5_000]);
+    assert.equal(lastFace(poll.last), 'ready');
+  });
+
+  void it('answers at once, without sleeping, when the first ask is ready', async () => {
+    const { clock, tick, slept } = fakeClock();
+    const poll = await pollReadiness(
+      async () => {
+        tick();
+        return Promise.resolve(answer(0));
+      },
+      30_000,
+      5_000,
+      clock
+    );
+    assert.equal(poll.ready, true);
+    assert.equal(poll.answers.length, 1);
+    assert.deepEqual(slept, []);
+  });
+
+  void it('stops at the deadline with the last not-ready answer, asking once on the deadline itself', async () => {
+    const { clock, tick, slept } = fakeClock();
+    const poll = await pollReadiness(
+      async () => {
+        tick();
+        return Promise.resolve(NOT_READY);
+      },
+      12_000,
+      5_000,
+      clock
+    );
+    assert.equal(poll.ready, false);
+    assert.equal(poll.timeToReadyMs, null);
+    // 1s ask, 5s, 1s ask, 5s (t=12s), last ask lands past the deadline
+    assert.deepEqual(slept, [5_000, 5_000]);
+    assert.ok(poll.elapsedMs >= 12_000);
+    assert.equal(poll.last, NOT_READY);
+    assert.equal(lastFace(poll.last), 'storage-refused');
+  });
+
+  void it('shortens the last pause so an ask lands on the deadline, not past it', async () => {
+    const { clock, tick, slept } = fakeClock();
+    await pollReadiness(
+      async () => {
+        tick();
+        return Promise.resolve(NOT_READY);
+      },
+      8_000,
+      5_000,
+      clock
+    );
+    assert.deepEqual(slept, [5_000, 1_000]);
+  });
+
+  void it('keeps asking after an answer that hung or could not be judged', async () => {
+    const { clock, tick } = fakeClock();
+    const script = [answer(null), answer(2), answer(0)];
+    const poll = await pollReadiness(
+      async () => {
+        tick();
+        return Promise.resolve(script.shift() ?? answer(0));
+      },
+      60_000,
+      5_000,
+      clock
+    );
+    assert.equal(poll.ready, true);
+    assert.deepEqual(
+      poll.answers.map(a => lastFace(a)),
+      ['no-answer', 'exit-2', 'ready']
+    );
   });
 });
 

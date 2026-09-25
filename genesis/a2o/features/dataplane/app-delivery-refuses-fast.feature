@@ -34,7 +34,9 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   Behind every storage peer runs a CONDUCTOR: the peer-to-peer runtime that signs and
   witnesses every write. The part of a conductor that does this for one app is called a
   CELL. A write that reaches a doorway whose conductor has no running cell for it cannot
-  be taken, however healthy the doorway looks.
+  be taken, however healthy the doorway looks. The storage peer anchors every write it
+  keeps through its conductor, so while that conductor is unreachable the storage peer
+  itself refuses the write, even if the doorway in front of it would pass it on.
 
   An app is shipped as an EPR (Elohim Protocol Resource). An EPR has two parts. Its
   BUNDLE is a zip of the files a browser needs. Its EPR RECORD names one bundle, by
@@ -89,7 +91,9 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   A deploy is told two budgets. Its READINESS BUDGET is how long it may keep re-offering
   the same declaration while the doorway is not ready. The clock starts at the first
   not-ready answer. Its TRANSPORT BUDGET is how long it may keep retrying ordinary
-  failures such as a dropped connection. Re-offering sends the same bundle hash again,
+  failures such as a dropped connection. No scenario here provokes a transport failure;
+  the transport budget a deploy is told is still checked against its timing lines.
+  Re-offering sends the same bundle hash again,
   which is safe to repeat. A budget decides when a new attempt may START. An attempt
   already on the wire when the deadline passes is allowed to finish, within the GRACE
   named below. The deploy prints a TIMING LINE every time it waits, in the form
@@ -97,7 +101,12 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   the deploy obeyed what it was told.
 
   THE BOUNDS used below. Thirty seconds for any one answer from the readiness probe; a
-  probe that takes longer is waiting, which is the thing it must not do. Six hundred
+  probe that takes longer is waiting, which is the thing it must not do. "The probe
+  answers ready within N seconds" means this run asks it again every five seconds until
+  it answers ready, and fails only once N seconds have passed; it records how long that
+  took. "Answers not-ready" means asked once: an open window is named at once. One
+  hundred and twenty seconds, counted from both doorways reporting caught up, for the
+  window a conductor restart opens to close by itself. Six hundred
   seconds for the household to catch up after every conductor restarts. On the deployed
   fleet the same restart window has been measured at nearly an hour on one peer and six
   hours on another. The household holds far less, so a household still behind after ten
@@ -151,15 +160,19 @@ Feature: A deploy that meets a doorway not ready for it is answered in seconds, 
   # every few seconds for the whole window, and each answer is recorded with how long it
   # took. The window counts as a window rather than a failure only if the probe reported
   # it by name while it was open, never failed or hung while answering, and it closed with
-  # nobody intervening. A conductor restart can wear any of three faces, depending on which
-  # part notices first: the conductor, the doorway, or the storage peer.
+  # nobody intervening. Refusing is fast; closing is bounded, not instant: a doorway may
+  # report caught up before it can take a write again. The asking every 3 seconds that
+  # the When step starts keeps running, and is recorded, until the last step reads it; the
+  # "answers ready within 120 seconds" step asks the probe on its own besides. A conductor
+  # restart can wear any of three faces, depending on which part notices first: the
+  # conductor, the doorway, or the storage peer.
   @requires:owned-substrate
   Scenario: restarting every conductor opens a window the probe names, and the window closes on its own
     Given the fleet write-readiness probe is part of this checkout
     And the fleet write-readiness probe answers ready within 30 seconds
     When the household restarts every conductor while the probe keeps asking every 3 seconds
     Then within 600 seconds both doorways report they have caught up
-    And the fleet write-readiness probe answers ready within 30 seconds
+    And the fleet write-readiness probe answers ready within 120 seconds
     And while the window was open the probe answered not-ready at least once, naming the face "cell-not-running", "catching-up" or "storage-refused"
     And every answer the probe gave was ready or not-ready, and none took longer than 30 seconds
 

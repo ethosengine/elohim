@@ -4,7 +4,8 @@
  * Four jobs, and nothing else lives here:
  *   1. ask the fleet write-readiness probe (scripts/ci/fleet-write-readiness.sh) exactly the
  *      way a pipeline asks it, and bound how long the ASKER waits on it, so a probe that
- *      hangs is reported as hanging instead of hanging the story with it;
+ *      hangs is reported as hanging instead of hanging the story with it; and re-ask it on
+ *      a cadence, up to a declared deadline, when a step says "ready within N seconds";
  *   2. read its NOT-READY lines and match the host each one names to a doorway;
  *   3. read back the timing lines scripts/ci/stage-spa-blob.sh prints while it waits, and
  *      judge them against the budgets the story told it;
@@ -208,6 +209,68 @@ export async function askFleetWriteReadiness(
     });
     child.on('close', code => finish(code));
   });
+}
+
+export interface ReadinessPoll {
+  /** True when some answer inside the deadline was ready (exit 0). */
+  ready: boolean;
+  /** Milliseconds from the first ask until the ready answer came back, or null when none did. */
+  timeToReadyMs: number | null;
+  /** Milliseconds the poll ran in total. */
+  elapsedMs: number;
+  /** Every answer, in the order the probe gave them. */
+  answers: ReadinessAnswer[];
+  /** The last answer: the ready one, or the one standing at the deadline. */
+  last: ReadinessAnswer;
+}
+
+export interface PollClock {
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+}
+
+const REAL_CLOCK: PollClock = {
+  now: () => Date.now(),
+  sleep: async ms => new Promise(done => setTimeout(done, ms)),
+};
+
+/**
+ * Ask the probe until it answers ready or `deadlineMs` has passed since the first ask — what
+ * "answers ready within N seconds" means (controller ruling 2026-09-25: a step that says
+ * "within" and asks once is the defect). The probe still asks once per call and never waits;
+ * the waiting is the asker's, and it is bounded. An ask that starts before the deadline is
+ * allowed to finish (`run` holds each answer to its own bound), and one ask always lands on
+ * the deadline itself, so a window that closes just in time is seen closing.
+ */
+export async function pollReadiness(
+  run: () => Promise<ReadinessAnswer>,
+  deadlineMs: number,
+  intervalMs: number,
+  clock: PollClock = REAL_CLOCK
+): Promise<ReadinessPoll> {
+  const startedAt = clock.now();
+  const answers: ReadinessAnswer[] = [];
+  for (;;) {
+    const answer = await run();
+    answers.push(answer);
+    const elapsedMs = clock.now() - startedAt;
+    if (answer.code === READINESS_EXIT.ready) {
+      return { ready: true, timeToReadyMs: elapsedMs, elapsedMs, answers, last: answer };
+    }
+    const remainingMs = deadlineMs - elapsedMs;
+    if (remainingMs <= 0) {
+      return { ready: false, timeToReadyMs: null, elapsedMs, answers, last: answer };
+    }
+    await clock.sleep(Math.min(intervalMs, remainingMs));
+  }
+}
+
+/** The face a not-ready answer named last, `ready`, or why there was none. */
+export function lastFace(answer: ReadinessAnswer): string {
+  if (answer.code === READINESS_EXIT.ready) return 'ready';
+  if (answer.timedOut) return 'no-answer';
+  const faces = [...new Set(answer.notReady.map(line => line.face))];
+  return faces.length > 0 ? faces.join(',') : `exit-${answer.code}`;
 }
 
 export type TimingKind =

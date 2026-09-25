@@ -4,7 +4,8 @@
  *
  * What is NEW here is only what the deliverability story never needed:
  *   · asking the fleet write-readiness probe (scripts/ci/fleet-write-readiness.sh) and
- *     judging its answer and how long it took;
+ *     judging its answer and how long it took — once for "not-ready", and every 5 seconds up
+ *     to the declared bound for "ready", recording how long the window took to close;
  *   · shedding one doorway on purpose, and clearing it;
  *   · restarting every conductor while the probe is sampled throughout the window;
  *   · telling the deploy its budgets and reading its timing lines back.
@@ -32,9 +33,11 @@ import {
   CONDUCTOR_RESTART_FACES,
   FLEET_WRITE_READINESS,
   IN_FLIGHT_SLACK_SECS,
+  lastFace,
   namesDoorway,
   parseTimingLines,
   PLAN_FACES,
+  pollReadiness,
   probeShedding,
   putShed,
   READINESS_EXIT,
@@ -77,6 +80,11 @@ const TOLD_POLL_SECS = 5;
 const OFFER_STEP_TIMEOUT_MS = 300_000;
 /** The feature's per-answer bound for the probe; the sampler holds every answer to it. */
 const PROBE_ANSWER_BOUND_MS = 30_000;
+/** "answers ready within N seconds" re-asks the probe this often until it answers ready. */
+const READY_POLL_INTERVAL_MS = 5_000;
+/** The largest N the probe step accepts; its budget is N plus one last answer plus slack. */
+const PROBE_STEP_MAX_SECS = 150;
+const PROBE_STEP_TIMEOUT_MS = PROBE_STEP_MAX_SECS * 1000 + PROBE_ANSWER_BOUND_MS + 20_000;
 /** A sampler that nobody stopped (a crashed scenario) stops itself after this long. */
 const SAMPLER_MAX_LIFETIME_MS = 20 * 60_000;
 /** The plan's restart step budget: the mesh verb waits for its conductors, not the cells. */
@@ -225,14 +233,20 @@ Given('the fleet write-readiness probe is part of this checkout', function (this
 
 Then(
   'the fleet write-readiness probe answers {word} within {int} seconds',
-  { timeout: 120_000 },
+  { timeout: PROBE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld, expected: string, bound: number) {
     assert.ok(
       expected === 'ready' || expected === 'not-ready',
       `the probe answers "ready" or "not-ready", not "${expected}"`
     );
-    assert.ok(bound * 1000 <= 100_000, `a ${bound}s probe bound does not fit this step's budget`);
+    assert.ok(
+      bound <= PROBE_STEP_MAX_SECS,
+      `a ${bound}s probe bound does not fit this step's budget`
+    );
     if (!readinessProbePresent()) return pendingProbe(this);
+    if (expected === 'ready') return awaitReady(this, bound);
+    // not-ready keeps its one-shot meaning: the probe is asked once and must name the window
+    // at once. A not-ready answer claims the window is open now, not that it opens later.
     const answer = await askFleetWriteReadiness(allDoorwayUrls(this), bound * 1000);
     state(this).lastAnswer = answer;
     assert.ok(
@@ -240,27 +254,82 @@ Then(
       `the fleet write-readiness probe was still running after ${bound}s and was stopped. A ` +
         `readiness probe must answer, never wait: ${describeAnswer(answer)}`
     );
-    const want = expected === 'ready' ? READINESS_EXIT.ready : READINESS_EXIT.notReady;
     // assert.fail, not assert.equal: cucumber's error formatter replaces an equal()'s message
     // with an actual/expected diff (and cuts any message at "…: expected"), so a miss printed
     // "-3 +0" and never the FLEET-NOT-READY line that names the doorway and its face.
-    if (answer.code !== want) {
-      const named = answer.notReady.map(line => line.raw).join('\n') || '(no FLEET-NOT-READY line)';
+    if (answer.code !== READINESS_EXIT.notReady) {
       assert.fail(
-        `the probe was asked for ${expected} (exit ${want}) and answered otherwise.\n` +
-          `Named not ready:\n${named}\nFull answer, ${describeAnswer(answer)}`
+        `the probe was asked for not-ready (exit ${READINESS_EXIT.notReady}) and answered ` +
+          `otherwise. Full answer, ${describeAnswer(answer)}`
       );
     }
-    if (want === READINESS_EXIT.notReady) {
-      assert.ok(
-        answer.notReady.length > 0,
-        `the probe answered not-ready but named no doorway — its contract is one ` +
-          `FLEET-NOT-READY line per doorway that cannot take a write: ${describeAnswer(answer)}`
-      );
-    }
+    assert.ok(
+      answer.notReady.length > 0,
+      `the probe answered not-ready but named no doorway — its contract is one ` +
+        `FLEET-NOT-READY line per doorway that cannot take a write: ${describeAnswer(answer)}`
+    );
     return undefined;
   }
 );
+
+/**
+ * "answers ready within N seconds": re-ask the probe every READY_POLL_INTERVAL_MS until it
+ * answers ready or N seconds have passed (controller ruling 2026-09-25 — a step that says
+ * "within" and asks once is the defect). How long the window took to close, and the face it
+ * wore last, go into the scenario's report either way, so the window's length is data. The
+ * step fails only at the deadline, quoting the last FLEET-NOT-READY line it saw.
+ */
+async function awaitReady(world: E2EWorld, bound: number): Promise<undefined> {
+  const urls = allDoorwayUrls(world);
+  const poll = await pollReadiness(
+    async () => askFleetWriteReadiness(urls, PROBE_ANSWER_BOUND_MS),
+    bound * 1000,
+    READY_POLL_INTERVAL_MS
+  );
+  state(world).lastAnswer = poll.last;
+  const notReadyFaces = poll.answers
+    .filter(answer => answer.code !== READINESS_EXIT.ready)
+    .map(answer => lastFace(answer));
+  const lastNotReadyFace = notReadyFaces.at(-1) ?? null;
+  world.attach(
+    JSON.stringify({
+      measure: 'fleet-write-readiness-time-to-ready',
+      boundSecs: bound,
+      intervalMs: READY_POLL_INTERVAL_MS,
+      ready: poll.ready,
+      timeToReadyMs: poll.timeToReadyMs,
+      elapsedMs: poll.elapsedMs,
+      asks: poll.answers.length,
+      lastFace: lastFace(poll.last),
+      lastNotReadyFace,
+      answers: poll.answers.map(answer => ({
+        at: new Date(answer.startedAt).toISOString(),
+        code: answer.code,
+        ms: answer.elapsedMs,
+        notReady: answer.notReady.map(line => line.raw),
+      })),
+    }),
+    'application/json'
+  );
+  const asks = `${poll.answers.length} ask(s) every ${READY_POLL_INTERVAL_MS / 1000}s`;
+  world.log(
+    poll.ready
+      ? `fleet write-readiness: ready after ${poll.timeToReadyMs}ms (${asks}, bound ${bound}s, ` +
+          `last not-ready face ${lastNotReadyFace ?? 'none'})`
+      : `fleet write-readiness: not ready after ${poll.elapsedMs}ms (${asks}, bound ${bound}s, ` +
+          `last face ${lastFace(poll.last)})`
+  );
+  if (!poll.ready) {
+    const lastLine =
+      poll.answers.flatMap(answer => answer.notReady.map(line => line.raw)).at(-1) ??
+      '(no FLEET-NOT-READY line in any answer)';
+    assert.fail(
+      `the probe did not answer ready within ${bound}s (${asks}).\n` +
+        `Last FLEET-NOT-READY line:\n${lastLine}\nLast answer, ${describeAnswer(poll.last)}`
+    );
+  }
+  return undefined;
+}
 
 Then(
   'the probe names doorway {string} as not ready, with the face {string} and a retry-after no longer than the shed',
