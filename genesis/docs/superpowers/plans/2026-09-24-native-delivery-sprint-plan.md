@@ -810,6 +810,14 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
   checkpoints only in the first 90 s after boot (H3). The grown stores for reproducing both are archived
   at `/projects/.claude-config/k0-household-stores-20260925/`; the household was recast on e0bfc6c7a.
 - **Correction (2026-09-25, plan `we-ran-into-a-cryptic-robin` R4 re-ruled):** "until that peer exists, measure-class runs are queued, not run here" is superseded — a measure-class claim on the dev berth is *refused with a named alternative* (`just measure`) and a *declared override* (`MEASURE_ON_DEV_BERTH=1`) that emits pain (`dev-berth-held-by-measure@1`); nothing queues.
+- **An oversized batch dispatches full-suite downstream** (pipeline shift, 2026-09-25, cd9983f34). Orchestrator
+  #1904/#1905 were not launch flakes: `env.CHANGED_PATHS_PASSTHROUGH` held 2185 paths (138,512 B) over
+  Linux's 128 KiB `MAX_ARG_STRLEN`, so every `sh` after Determine Build Plan failed to exec
+  (`process apparently never started`, exit -2). Ruling: the changed-path list crosses stages in a workspace
+  file, never env, and the downstream `CHANGED_PATHS` parameter is capped at 64 KiB — over the cap it is sent
+  **empty**, every consumer's declared full-suite fallback. Selectivity is lost only when it is already moot
+  (the DNA harvester widens to the full suite on any non-DNA path); a batch that large is re-tested whole.
+  Guard: `genesis/orchestrator/changed-paths-env-cap.test.mjs`.
 
 ## Complementary work captured (backlog, not this sprint)
 
