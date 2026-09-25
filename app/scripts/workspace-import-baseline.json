@@ -67,7 +67,7 @@
       }
     },
     "lamad": {
-      "note": "lamad bundle -> shell pillars. Claimed to be composition-root-only; is not. Ratchet down only.",
+      "note": "lamad bundle -> shell pillars. Claimed to be composition-root-only; is not. Ratchet down only. 2026-09-25 (R-A12): +@app/imagodei/services/auth.service at the composition root — the attention emitter must write AS the signed-in person and neither bundle has an auth interceptor, so app.config provides OBSERVATION_BEARER from the live session. Chosen over hard-coding the shell's 'elohim-auth-token' localStorage key inside lamad, which would be the same contract UNCOUNTED. The edge is deleted again when the browser session bearer graduates to @elohim/identity (where StoredSession/SessionTokenStore already live).",
       "edges": {
         "@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component": 1,
         "@app/elohim/providers/elohim-client.provider": 1,
@@ -90,6 +90,7 @@
         "@app/elohim/services/storage-api.service": 1,
         "@app/elohim/services/storage-client.service": 1,
         "@app/generated/attestation-view": 1,
+        "@app/imagodei/services/auth.service": 1,
         "@app/imagodei/services/identity.service": 1,
         "@app/shefa/services/economic-events-api.service": 1
       }

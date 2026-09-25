@@ -136,7 +136,26 @@ pub struct DiversityQuery {
 // Route dispatcher
 // ---------------------------------------------------------------------------
 
+/// The status this module answers an error with: [`route_error`] maps every
+/// variant its handlers raise (`Auth` → 401, `Forbidden` → 403, `InvalidInput`
+/// → 400, `NotFound` → 404).
+///
+/// This exists as a named function because the router's last seam
+/// (`HttpServer::escaped_error_response`) turns EVERY escaping error into a bare
+/// 500 by design — a handler that did not choose its own status does not get one
+/// invented for it there. So an observation refused for want of an
+/// `X-Agent-Cid` reached the browser as `500 Authentication error: …`: the
+/// message said 401 and the status said the node had broken. A client cannot
+/// tell "sign in again" from "the node is down" on a 500, and the sprint's own
+/// mesh proof read it as a route that did not exist (ruling R-A12).
+pub fn route_error(err: StorageError) -> Response<Full<Bytes>> {
+    response::error_response(err)
+}
+
 /// Handle `/api/v1/observations*` requests.
+///
+/// Infallible on purpose: every handler's error is mapped by [`route_error`]
+/// here, so nothing from this module can escape to the router's blanket 500.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
@@ -144,10 +163,10 @@ pub async fn handle(
     pool: &DbPool,
     _ctx: &AppContext,
     manager: &Arc<ObservationManagerBackend>,
-) -> Result<Response<Full<Bytes>>, StorageError> {
+) -> Response<Full<Bytes>> {
     let path = resource_path.trim_start_matches('/');
 
-    match (&method, path) {
+    let answered = match (&method, path) {
         (&Method::POST, "") => handle_post(req, pool, manager).await,
         (&Method::GET, "stream") => handle_stream(req, pool),
         (&Method::GET, "by-subject") => handle_by_subject(req, pool, manager).await,
@@ -160,7 +179,9 @@ pub async fn handle(
             "Unknown observations route: /api/v1/observations/{}",
             path
         ))),
-    }
+    };
+
+    answered.unwrap_or_else(route_error)
 }
 
 // ---------------------------------------------------------------------------
@@ -168,8 +189,8 @@ pub async fn handle(
 // ---------------------------------------------------------------------------
 
 /// `POST /api/v1/observations` — read the explicit header and the body, then
-/// [`accept_observation`]. 201 with the ack; errors map through
-/// `response::error_response` (Auth → 401, Forbidden → 403, InvalidInput → 400).
+/// [`accept_observation`]. 201 with the ack; errors map through [`route_error`]
+/// at the dispatcher (Auth → 401, Forbidden → 403, InvalidInput → 400).
 async fn handle_post(
     req: Request<Incoming>,
     pool: &DbPool,

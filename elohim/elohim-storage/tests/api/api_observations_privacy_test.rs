@@ -11,18 +11,17 @@
 //!
 //! The handlers delegate to the `api::observations` functions these tests
 //! drive directly (no hyper harness; see `api_observations_write_test.rs`).
-//! Errors map through `services::response::error_response`, so the asserted
+//! Errors map through `api::observations::route_error` (R-A12), so the asserted
 //! status IS the status the route answers with.
 
 use diesel::prelude::*;
 use elohim_storage::api::observations::{
-    observation_diversity, observations_by_observer, observations_by_subject,
+    observation_diversity, observations_by_observer, observations_by_subject, route_error,
 };
 use elohim_storage::db::diesel_schema::observations;
 use elohim_storage::db::models::NewObservationRow;
 use elohim_storage::error::StorageError;
 use elohim_storage::services::observation_kinds::ObservationKindRegistry;
-use elohim_storage::services::response::error_response;
 use elohim_storage::test_util::test_pool;
 use hyper::StatusCode;
 
@@ -32,8 +31,13 @@ const VIEWED: &str = "lamad:content-viewed";
 const HEARTBEAT: &str = "infrastructure:doorway-heartbeat";
 const SUBJECT: &str = "bafy-shared-subject";
 
+/// The status the ROUTE answers with: `observations::handle` maps every
+/// handler error through this same `route_error`, so what these tests assert is
+/// what a caller receives. Before ruling R-A12 the errors escaped unmapped and
+/// every one of them reached the wire as a bare 500 — these assertions held
+/// while the route lied.
 fn status_of(err: StorageError) -> StatusCode {
-    error_response(err).status()
+    route_error(err).status()
 }
 
 fn registry() -> ObservationKindRegistry {

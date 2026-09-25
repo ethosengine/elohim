@@ -5,7 +5,8 @@
 //! then delegates to `api::observations::stream_observations`, which these
 //! tests drive directly (the codebase has no hyper test harness; see
 //! `api_observations_write_test.rs`). Each error is mapped through
-//! `services::response::error_response`, so the asserted status IS the status
+//! `api::observations::route_error` at the dispatcher (ruling R-A12), so the
+//! asserted status IS the status
 //! the route answers with.
 //!
 //! What the route promises:
@@ -18,12 +19,11 @@
 //!   the window, payloads that did not parse, the absent signature.
 
 use diesel::prelude::*;
-use elohim_storage::api::observations::stream_observations;
+use elohim_storage::api::observations::{route_error, stream_observations};
 use elohim_storage::db::diesel_schema::observations;
 use elohim_storage::db::models::NewObservationRow;
 use elohim_storage::error::StorageError;
 use elohim_storage::observation::recipe::recipe_cid;
-use elohim_storage::services::response::error_response;
 use elohim_storage::test_util::test_pool;
 use elohim_storage::views::ObservationStreamView;
 use hyper::StatusCode;
@@ -35,8 +35,13 @@ const DAY: i64 = 86_400;
 const JESSICA: &str = "human-jessica";
 const JAMES: &str = "human-james";
 
+/// The status the ROUTE answers with: `observations::handle` maps every
+/// handler error through this same `route_error`, so what these tests assert is
+/// what a caller receives. Before ruling R-A12 the errors escaped unmapped and
+/// every one of them reached the wire as a bare 500 — these assertions held
+/// while the route lied.
 fn status_of(err: StorageError) -> StatusCode {
-    error_response(err).status()
+    route_error(err).status()
 }
 
 fn payload(dwell_ms: u64, depth: u8) -> String {

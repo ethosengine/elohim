@@ -24,6 +24,7 @@ import {
   ECONOMIC_EVENT_FACTORY,
   EVENT_API,
   AGENT_CONTEXT,
+  OBSERVATION_BEARER,
   OBSERVATION_STORAGE_BASE_URL,
 } from '@elohim/rea-runtime';
 import {
@@ -63,6 +64,7 @@ import { StorageApiService } from './elohim/services/storage-api.service';
 import { StorageClientService } from './elohim/services/storage-client.service';
 import { resolveDoorwayUrl } from './elohim/utils/runtime-doorway';
 import { ELOHIM_OWNS_UNIVERSAL_ROUTE, ELOHIM_ROUTE_CLAIMS } from './generated/route-claims';
+import { AuthService } from './imagodei/services/auth.service';
 import { EconomicEventsApiService } from './shefa/services/economic-events-api.service';
 
 export const appConfig: ApplicationConfig = {
@@ -197,6 +199,17 @@ export const appConfig: ApplicationConfig = {
       provide: OBSERVATION_STORAGE_BASE_URL,
       useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
       deps: [StorageClientService],
+    },
+    // OBSERVATION_BEARER — the attention write is made AS the signed-in person
+    // (ruling R-A12). There is no auth interceptor on this bundle's HttpClient,
+    // so the emitter attaches the session bearer itself, from the same live
+    // AuthService signal every other doorway client reads. Signed out ⇒ null ⇒
+    // no write at all (the doorway resolves the caller only from a verified
+    // bearer, and the node refuses an observation naming nobody).
+    {
+      provide: OBSERVATION_BEARER,
+      useFactory: (auth: AuthService) => () => auth.token(),
+      deps: [AuthService],
     },
     // LAMAD_STORAGE_API — StewardshipAllocationService (injected by content-viewer).
     { provide: LAMAD_STORAGE_API, useExisting: StorageApiService },

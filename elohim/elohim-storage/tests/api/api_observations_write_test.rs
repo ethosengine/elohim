@@ -5,8 +5,9 @@
 //! delegates to `api::observations::accept_observation`, which these tests
 //! drive directly (the codebase has no hyper test harness; see
 //! `api_placement_gaps.rs`). Each error is mapped through
-//! `services::response::error_response`, so the asserted status IS the status
-//! the route answers with.
+//! `api::observations::route_error` at the dispatcher, so the asserted status IS
+//! the status the route answers with (ruling R-A12: before that mapping existed
+//! every one of these errors reached the wire as a bare 500).
 //!
 //! What the route promises:
 //! - the observer is the explicit header, verbatim: no header → 401, a body
@@ -19,13 +20,12 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use elohim_storage::api::observations::accept_observation;
+use elohim_storage::api::observations::{accept_observation, route_error};
 use elohim_storage::db::diesel_schema::observations;
 use elohim_storage::db::models::ObservationRow;
 use elohim_storage::error::StorageError;
 use elohim_storage::observation::manager::ObservationManagerBackend;
 use elohim_storage::services::observation_kinds::ObservationKindRegistry;
-use elohim_storage::services::response::error_response;
 use elohim_storage::test_util::test_pool;
 use hyper::StatusCode;
 use serde_json::json;
@@ -51,8 +51,13 @@ fn content_viewed(dwell_ms: u64, depth: u8) -> Vec<u8> {
     .unwrap()
 }
 
+/// The status the ROUTE answers with: `observations::handle` maps every
+/// handler error through this same `route_error`, so what these tests assert is
+/// what a caller receives. Before ruling R-A12 the errors escaped unmapped and
+/// every one of them reached the wire as a bare 500 — these assertions held
+/// while the route lied.
 fn status_of(err: StorageError) -> StatusCode {
-    error_response(err).status()
+    route_error(err).status()
 }
 
 #[tokio::test]

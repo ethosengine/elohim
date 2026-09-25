@@ -20,6 +20,7 @@ import {
   AGENT_CONTEXT,
   ECONOMIC_EVENT_FACTORY,
   EVENT_API,
+  OBSERVATION_BEARER,
   OBSERVATION_STORAGE_BASE_URL,
 } from '@elohim/rea-runtime';
 import { environment } from '../environments/environment';
@@ -63,6 +64,7 @@ import { ProfileService } from '@app/elohim/services/profile.service';
 import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 import { ContextAssemblyService } from '@app/elohim/services/context-assembly.service';
 import { LensRegistryService } from '@app/elohim/services/lens-registry.service';
+import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HeliaFetchService } from '@app/elohim/services/helia-fetch.service';
 import { EconomicEventsApiService } from '@app/shefa/services/economic-events-api.service';
@@ -185,6 +187,17 @@ export const appConfig: ApplicationConfig = {
       provide: OBSERVATION_STORAGE_BASE_URL,
       useFactory: (storage: StorageClientService) => () => storage.getStorageBaseUrl(),
       deps: [StorageClientService],
+    },
+    // OBSERVATION_BEARER — the attention write is made AS the signed-in person
+    // (ruling R-A12). This bundle has NO auth interceptor either, so the emitter
+    // attaches the session bearer itself. AuthService restores the session from
+    // the shared browser token store in its constructor, so the same person's
+    // token is read here as in the shell — one session, two bundles. Signed out
+    // ⇒ null ⇒ no write at all (the node refuses a write naming nobody).
+    {
+      provide: OBSERVATION_BEARER,
+      useFactory: (auth: AuthService) => () => auth.token(),
+      deps: [AuthService],
     },
     { provide: LAMAD_AGENT, useExisting: AgentService },
     // Cross-pillar P+inversion tokens — concrete classes stay in elohim-app due to

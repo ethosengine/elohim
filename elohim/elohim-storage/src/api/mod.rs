@@ -329,7 +329,10 @@ pub async fn handle_api_request(
         hazards::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("observations") {
         let resource_path = sub_path.strip_prefix("observations").unwrap_or("");
-        observations::handle(
+        // Infallible: `observations::handle` maps its own errors, so an
+        // observation refused for want of an `X-Agent-Cid` answers 401 rather
+        // than escaping to the router's blanket 500 (ruling R-A12).
+        Ok(observations::handle(
             req,
             method,
             resource_path,
@@ -337,7 +340,7 @@ pub async fn handle_api_request(
             &app_ctx,
             &observation_manager,
         )
-        .await
+        .await)
     } else if sub_path.starts_with("placement-gaps") {
         let resource_path = sub_path.strip_prefix("placement-gaps").unwrap_or("");
         placement_gaps::handle(req, method, resource_path, &pool, &app_ctx).await

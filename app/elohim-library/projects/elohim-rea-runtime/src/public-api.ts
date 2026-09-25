@@ -49,6 +49,7 @@ export type { AttentionTendingIntent, AttentionTendingAck } from './lib/attentio
 export {
   ObservationEmitterService,
   CONTENT_VIEWED_KIND,
+  OBSERVATION_BEARER,
   OBSERVATION_STORAGE_BASE_URL,
   scrollDepthPct,
 } from './lib/observation-emitter.service';

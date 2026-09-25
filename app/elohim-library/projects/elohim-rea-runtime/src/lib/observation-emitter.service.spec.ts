@@ -7,6 +7,13 @@
  * POST /api/v1/observations with the dwell (paused while the tab is hidden)
  * and the deepest scroll reached. No thresholds live here — the lifestream
  * recipe's lens table holds them.
+ *
+ * Ruling R-A12: the witness is written AS the signed-in person. Both paths
+ * carry the session bearer — the in-app post in its headers, the page-outliving
+ * flush through `fetch(…, {keepalive: true, headers: {Authorization}})`. There
+ * is no `sendBeacon` path: a beacon cannot carry a header, so its write reached
+ * the doorway anonymous and the node refused it (401). With no bearer the
+ * emitter posts nothing at all, silently: there is nobody to witness as.
  */
 
 import { TestBed } from '@angular/core/testing';
@@ -15,6 +22,7 @@ import { of, throwError } from 'rxjs';
 
 import {
   CONTENT_VIEWED_KIND,
+  OBSERVATION_BEARER,
   OBSERVATION_STORAGE_BASE_URL,
   ObservationEmitterService,
   scrollDepthPct,
@@ -24,6 +32,10 @@ describe('ObservationEmitterService', () => {
   let service: ObservationEmitterService;
   let httpMock: { post: ReturnType<typeof vi.fn> };
   let visibility: DocumentVisibilityState;
+
+  /** The session JWT the signed-in person's app holds. */
+  const BEARER = 'jwt-jessica';
+  let bearer: string | null;
 
   const ACK = {
     observerCid: 'human-jessica',
@@ -54,8 +66,13 @@ describe('ObservationEmitterService', () => {
     vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
 
     httpMock = { post: vi.fn().mockReturnValue(of(ACK)) };
+    bearer = BEARER;
     TestBed.configureTestingModule({
-      providers: [ObservationEmitterService, { provide: HttpClient, useValue: httpMock }],
+      providers: [
+        ObservationEmitterService,
+        { provide: HttpClient, useValue: httpMock },
+        { provide: OBSERVATION_BEARER, useValue: () => bearer },
+      ],
     });
     service = TestBed.inject(ObservationEmitterService);
   });
@@ -205,6 +222,7 @@ describe('ObservationEmitterService', () => {
       providers: [
         ObservationEmitterService,
         { provide: HttpClient, useValue: httpMock },
+        { provide: OBSERVATION_BEARER, useValue: () => bearer },
         { provide: OBSERVATION_STORAGE_BASE_URL, useValue: () => 'http://localhost:8090' },
       ],
     });
@@ -217,16 +235,52 @@ describe('ObservationEmitterService', () => {
     expect(httpMock.post.mock.calls[0][0]).toBe('http://localhost:8090/api/v1/observations');
   });
 
-  // Ruling R-A8: a hard leave (tab close, cross-bundle navigation) still
-  // witnesses the open view, through a request that outlives the page.
+  // Ruling R-A12: the witness names the person. The in-app post carries the
+  // session bearer; with no bearer there is nobody to witness as, so nothing is
+  // posted (the node refuses an anonymous write, so it never witnessed anything).
+  it('end_posts_with_session_bearer', () => {
+    service.begin('bafy-node-1');
+    vi.advanceTimersByTime(1200);
+    service.end('bafy-node-1');
+
+    expect(httpMock.post).toHaveBeenCalledOnce();
+    const options = httpMock.post.mock.calls[0][2] as { headers: Record<string, string> };
+    expect(options.headers['Authorization']).toBe(`Bearer ${BEARER}`);
+  });
+
+  it('end_without_bearer_posts_nothing', () => {
+    bearer = null;
+    service.begin('bafy-node-1');
+    vi.advanceTimersByTime(1200);
+    expect(() => service.end('bafy-node-1')).not.toThrow();
+    expect(httpMock.post).not.toHaveBeenCalled();
+
+    // The session arriving later does not resurrect the view that was left
+    // without one; the next read is witnessed normally.
+    bearer = BEARER;
+    service.begin('bafy-node-2');
+    service.end('bafy-node-2');
+    expect(httpMock.post).toHaveBeenCalledOnce();
+    expect(postedBody(0)['subjectCid']).toBe('bafy-node-2');
+  });
+
+  // Ruling R-A8, as R-A12 rules it: a hard leave (tab close, cross-bundle
+  // navigation) still witnesses the open view, through a keepalive fetch that
+  // outlives the page AND carries the bearer. `sendBeacon` cannot carry a
+  // header, so it is gone.
   describe('hard leave', () => {
     let fetchMock: ReturnType<typeof vi.fn>;
+    let beacon: ReturnType<typeof vi.fn>;
     let savedBeacon: PropertyDescriptor | undefined;
 
     beforeEach(() => {
       fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
       vi.stubGlobal('fetch', fetchMock);
       savedBeacon = Object.getOwnPropertyDescriptor(navigator, 'sendBeacon');
+      // A beacon that WOULD be accepted, so the assertion that it is never
+      // called cannot pass merely because the environment lacks one.
+      beacon = vi.fn().mockReturnValue(true);
+      Object.defineProperty(navigator, 'sendBeacon', { value: beacon, configurable: true });
     });
 
     afterEach(() => {
@@ -238,18 +292,7 @@ describe('ObservationEmitterService', () => {
       }
     });
 
-    function withoutBeacon(): void {
-      Object.defineProperty(navigator, 'sendBeacon', { value: undefined, configurable: true });
-    }
-
-    function withBeacon(accepted: boolean): ReturnType<typeof vi.fn> {
-      const beacon = vi.fn().mockReturnValue(accepted);
-      Object.defineProperty(navigator, 'sendBeacon', { value: beacon, configurable: true });
-      return beacon;
-    }
-
-    it('pagehide_flushes_open_observation_with_keepalive', async () => {
-      withoutBeacon();
+    it('pagehide_flush_uses_keepalive_fetch_with_bearer', () => {
       service.begin('bafy-node-1');
       vi.advanceTimersByTime(4000);
       service.noteScroll(40);
@@ -261,7 +304,9 @@ describe('ObservationEmitterService', () => {
       expect(url).toBe('/api/v1/observations');
       expect(init.method).toBe('POST');
       expect(init.keepalive).toBe(true);
-      expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+      const headers = init.headers as Record<string, string>;
+      expect(headers['Content-Type']).toBe('application/json');
+      expect(headers['Authorization']).toBe(`Bearer ${BEARER}`);
       const body = JSON.parse(init.body as string) as Record<string, unknown>;
       expect(body['observationKind']).toBe('lamad:content-viewed');
       expect(body['subjectCid']).toBe('bafy-node-1');
@@ -272,28 +317,29 @@ describe('ObservationEmitterService', () => {
       });
     });
 
-    it('pagehide_prefers_send_beacon_and_falls_back_when_refused', async () => {
-      const beacon = withBeacon(true);
+    it('pagehide_flush_without_bearer_sends_nothing', () => {
+      bearer = null;
+      service.begin('bafy-node-1');
+      vi.advanceTimersByTime(4000);
+      expect(() => window.dispatchEvent(new Event('pagehide'))).not.toThrow();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(httpMock.post).not.toHaveBeenCalled();
+    });
+
+    it('sendBeacon_is_never_called', () => {
       service.begin('bafy-node-1');
       window.dispatchEvent(new Event('pagehide'));
-      expect(beacon).toHaveBeenCalledOnce();
-      expect(beacon.mock.calls[0][0]).toBe('/api/v1/observations');
-      const blob = beacon.mock.calls[0][1] as Blob;
-      expect(blob.type).toBe('application/json');
-      expect(JSON.parse(await blob.text())['subjectCid']).toBe('bafy-node-1');
-      expect(fetchMock).not.toHaveBeenCalled();
-
-      // A beacon the browser refuses (queue full) falls back to keepalive fetch.
-      const refused = withBeacon(false);
-      service.begin('bafy-node-2');
-      window.dispatchEvent(new Event('pagehide'));
-      expect(refused).toHaveBeenCalledOnce();
+      expect(beacon).not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalledOnce();
-      expect((fetchMock.mock.calls[0][1] as RequestInit).keepalive).toBe(true);
+
+      // Nor on the visibility-hidden fallback path.
+      service.begin('bafy-node-2');
+      setVisibility('hidden');
+      expect(beacon).not.toHaveBeenCalled();
     });
 
     it('soft_leave_after_flush_does_not_double_post', () => {
-      withoutBeacon();
       service.begin('bafy-node-1');
       window.dispatchEvent(new Event('pagehide'));
       expect(fetchMock).toHaveBeenCalledOnce();
@@ -307,7 +353,6 @@ describe('ObservationEmitterService', () => {
 
     it('hidden_tab_does_not_flush_where_pagehide_exists', () => {
       // pagehide is the hard-leave signal; hiding a tab only pauses dwell.
-      withoutBeacon();
       service.begin('bafy-node-1');
       setVisibility('hidden');
       expect(fetchMock).not.toHaveBeenCalled();
@@ -317,7 +362,6 @@ describe('ObservationEmitterService', () => {
     });
 
     it('destroy_stops_listening_for_pagehide', () => {
-      withoutBeacon();
       service.begin('bafy-node-1');
       service.ngOnDestroy();
       window.dispatchEvent(new Event('pagehide'));

@@ -19,16 +19,27 @@
  * - No `session_id`: the app's session id is a random UUID, not a CID.
  * - The observer is never named in the body: the node takes it from the
  *   caller's `X-Agent-Cid` header, and a body naming anyone else is refused.
+ *   On the browser path the doorway injects that header from the VERIFIED
+ *   session bearer, so the write must carry one — see below.
  * - A failed post is swallowed — witnessing attention never breaks reading.
  * - The post goes to the storage base the host app resolves
  *   ({@link OBSERVATION_STORAGE_BASE_URL}, the same `getStorageBaseUrl()` the
  *   lifestream reads through), never a bare path on the serving origin (R-A11).
- * - A hard leave still witnesses (R-A8): on `pagehide` every open view is
- *   flushed with `navigator.sendBeacon`, or `fetch(…, {keepalive: true})` when
- *   there is no beacon or the browser refuses it. `visibilitychange` → hidden
- *   flushes only where `pagehide` does not exist; elsewhere hiding a tab just
- *   pauses dwell. A flushed view is closed, so the in-app `end` that may follow
- *   posts nothing more.
+ * - The witness is written AS the signed-in person (R-A12): every request
+ *   carries `Authorization: Bearer <session token>` from
+ *   {@link OBSERVATION_BEARER}. lamad has no HTTP interceptor that attaches a
+ *   bearer, so the emitter attaches its own — exactly as every other client of
+ *   the doorway does. With no bearer nothing is posted at all: the node refuses
+ *   an anonymous write (401), so an anonymous attempt never witnessed anything.
+ *   It is silent — no log, no throw — because reading while signed out is
+ *   ordinary, not an error.
+ * - A hard leave still witnesses (R-A8, as R-A12 rules it): on `pagehide` every
+ *   open view is flushed with `fetch(…, {keepalive: true})`, which outlives the
+ *   page AND carries the bearer header. `navigator.sendBeacon` is NOT used —
+ *   a beacon carries no headers, so its write arrived anonymous and was refused.
+ *   `visibilitychange` → hidden flushes only where `pagehide` does not exist;
+ *   elsewhere hiding a tab just pauses dwell. A flushed view is closed, so the
+ *   in-app `end` that may follow posts nothing more.
  */
 
 import { DOCUMENT } from '@angular/common';
@@ -52,6 +63,21 @@ export const OBSERVATION_STORAGE_BASE_URL = new InjectionToken<() => string>(
     factory: () => () => '',
   }
 );
+
+/**
+ * Resolves the session bearer the observation write is made under — the SAME
+ * token every other client of the doorway sends (`Authorization: Bearer …`).
+ * The host app provides its live session source (`() => authService.token()`);
+ * the default returns `null`, which means no observation is written at all.
+ *
+ * The doorway resolves the caller ONLY from the verified bearer and injects the
+ * `X-Agent-Cid` the node requires, so a write without one cannot be attributed
+ * to anybody and is refused (401). A witness that names nobody is not a witness.
+ */
+export const OBSERVATION_BEARER = new InjectionToken<() => string | null>('ObservationBearer', {
+  providedIn: 'root',
+  factory: () => () => null,
+});
 
 // ---------------------------------------------------------------------------
 // Wire types (aligned with inputs/observation-intent.schema.json and
@@ -137,6 +163,7 @@ export class ObservationEmitterService implements OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
   private readonly resolveBaseUrl = inject(OBSERVATION_STORAGE_BASE_URL);
+  private readonly resolveBearer = inject(OBSERVATION_BEARER);
 
   /** Open views keyed by the content's ref CID. */
   private readonly open = new Map<string, OpenView>();
@@ -210,11 +237,20 @@ export class ObservationEmitterService implements OnDestroy {
     if (!intent) {
       return;
     }
-    this.http.post<ObservationAck>(this.url(), intent).subscribe({
-      error: () => {
-        // Swallowed: a missed witness never interrupts reading.
-      },
-    });
+    const bearer = this.bearer();
+    if (!bearer) {
+      // Nobody to witness as: the node refuses an anonymous write, so this
+      // reading was never witnessed. Silent by design — reading while signed
+      // out is ordinary. The view is closed either way: the person did leave.
+      return;
+    }
+    this.http
+      .post<ObservationAck>(this.url(), intent, { headers: { Authorization: bearer } })
+      .subscribe({
+        error: () => {
+          // Swallowed: a missed witness never interrupts reading.
+        },
+      });
   }
 
   ngOnDestroy(): void {
@@ -226,6 +262,12 @@ export class ObservationEmitterService implements OnDestroy {
   /** The write URL on the host's storage base. */
   private url(): string {
     return `${this.resolveBaseUrl()}${OBSERVATIONS_PATH}`;
+  }
+
+  /** The `Authorization` value for this write, or null when nobody is signed in. */
+  private bearer(): string | null {
+    const token = this.resolveBearer();
+    return token ? `Bearer ${token}` : null;
   }
 
   /** Close `refCid`'s open view and shape its intent; null when none is open. */
@@ -263,27 +305,21 @@ export class ObservationEmitterService implements OnDestroy {
     }
   }
 
-  /** `sendBeacon` when the browser has and accepts it, else a keepalive fetch. */
+  /**
+   * A keepalive fetch: the one transport that both outlives the page and
+   * carries a header. `navigator.sendBeacon` is deliberately not used — it
+   * cannot carry `Authorization`, so its write reached the doorway anonymous
+   * and the node refused it (R-A12). No bearer ⇒ nothing is sent.
+   */
   private sendOutlivingPage(body: string): void {
-    const url = this.url();
-    const nav = this.document.defaultView?.navigator;
-    try {
-      if (
-        typeof nav?.sendBeacon === 'function' &&
-        nav.sendBeacon(url, new Blob([body], { type: 'application/json' }))
-      ) {
-        return;
-      }
-    } catch {
-      // A beacon the browser rejects outright falls through to fetch.
-    }
-    if (typeof fetch !== 'function') {
+    const bearer = this.bearer();
+    if (!bearer || typeof fetch !== 'function') {
       return;
     }
-    fetch(url, {
+    fetch(this.url(), {
       method: 'POST',
       keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: bearer },
       body,
     }).catch(() => {
       // Swallowed: a missed witness never interrupts leaving.
