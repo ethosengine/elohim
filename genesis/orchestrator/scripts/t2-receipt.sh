@@ -31,9 +31,14 @@ REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
 # report file; both must match the current source.
 DATAPLANE_RE='^(elohim/elohim-storage/src/(p2p|sync|reconcile|p2p_iroh)/|doorway/doorway-service/src/)'
 SERVING_RE='^(elohim/elohim-render/|app/scripts/lint-ssr-entry\.mjs|elohim/sdk/scripts/|scripts/ci/(stage-spa-blob|verify-served-shell|verify-projected-head|same-doorway-curl|fleet-write-readiness\.sh|lib/)|doorway/doorway-service/src/|elohim/elohim-storage/src/(services/content_service\.rs|services/head_adoption\.rs|services/release_adoption/|db/content|routes/apps|http|ssr|app_deliverability|sync/|p2p/(projection_reconcile|blob|view|content)|p2p_iroh/|reconcile/)|genesis/a2o/(features/dataplane/(epr-app-deliverability|served-shell-boots)|steps/dataplane/epr-app-deliverability|scripts/(browser-shell|verify-served-shell|lib/sut)|src/framework/served-shell-boot))'
-touched=$(grep -E "$DATAPLANE_RE|$SERVING_RE" "$CHANGED_FILE" || true)
+# Governance metadata is not source-under-test: a `.epr-meta` directory or manifest under any
+# component (habit atoms recording evidence) is never a dataplane or serving change. Mirrors
+# isGovernancePath in genesis/a2o/scripts/lib/sut.ts; serving-receipt.test.mjs pins the two.
+GOVERNANCE_RE='(^|/)\.epr-meta(/|$)'
+candidates=$(grep -vE "$GOVERNANCE_RE" "$CHANGED_FILE" || true)
+touched=$(printf '%s\n' "$candidates" | grep -E "$DATAPLANE_RE|$SERVING_RE" || true)
 [ -n "$touched" ] || exit 0
-serving_touched=$(grep -E "$SERVING_RE" "$CHANGED_FILE" || true)
+serving_touched=$(printf '%s\n' "$candidates" | grep -E "$SERVING_RE" || true)
 if [ -n "$serving_touched" ]; then
   serving_list=$(mktemp)
   printf '%s\n' "$serving_touched" > "$serving_list"

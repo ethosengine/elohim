@@ -9,15 +9,28 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { parseDeclaredConcerns, readDeclaredConcerns } from '../lib/declared-concerns.js';
 import { computeRunEnv, laneForProfile, resolveGitCommit } from '../lib/run-env.js';
-import { computeSut, hashSutParts, sha256Short } from '../lib/sut.js';
+import {
+  computeSut,
+  createSutProbe,
+  governanceFreeTree,
+  hashSutParts,
+  isGovernancePath,
+  normalizeSutIdentity,
+  resolveComponent,
+  sha256Short,
+} from '../lib/sut.js';
 
 import type { RunEnvProbe } from '../lib/run-env.js';
+import type { SutComponent } from '../lib/sut.js';
 
 const STORAGE = 'elohim/elohim-storage';
 const DOORWAY = 'doorway/doorway-service';
@@ -333,5 +346,98 @@ void describe('declared — the denominator, read from outside the run', () => {
     });
     assert.deepEqual(set.concerns, []);
     assert.match(set.source, /UNREADABLE/);
+  });
+});
+
+/**
+ * Governance metadata is not source-under-test. These run real git in a
+ * throwaway repository: the governance-free tree hash is computed in memory,
+ * and the only honest proof that it is a real git tree hash is git itself.
+ */
+void describe('sut — governance atoms are not source-under-test', () => {
+  const COMPONENT: SutComponent = { name: 'storage', path: 'svc' };
+  const HABIT = 'svc/.epr-meta/x.habit.md';
+  const MANIFEST = 'svc/src/deep/.epr-meta';
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  );
+  const run = (root: string, args: string[]): string =>
+    // eslint-disable-next-line sonarjs/no-os-command-from-path -- git is a standard system tool
+    execFileSync('git', args, { cwd: root, encoding: 'utf8', env: cleanEnv });
+  const write = (root: string, path: string, text: string): void => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  const commit = (root: string, message: string): void => {
+    run(root, ['add', '-A']);
+    run(root, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', message]);
+  };
+  const withRepo = (fn: (root: string) => void): void => {
+    const root = mkdtempSync(join(tmpdir(), 'sut-governance-'));
+    try {
+      run(root, ['init', '-q']);
+      write(root, 'svc/src/lib.rs', 'fn a() {}\n');
+      write(root, 'svc/src/deep/mod.rs', 'mod deep;\n');
+      write(root, HABIT, 'v1\n');
+      write(root, MANIFEST, 'rules: []\n');
+      write(root, 'svc/only-governed/.epr-meta/y.habit.md', 'v1\n');
+      commit(root, 'fixture');
+      fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  const identity = (root: string): string | null =>
+    resolveComponent(createSutProbe(root, {}), COMPONENT);
+
+  void it('hashes exactly the tree git would store without the governance entries', () => {
+    withRepo(root => {
+      const probe = createSutProbe(root, {});
+      const stripped = governanceFreeTree(probe, run(root, ['rev-parse', 'HEAD:svc']).trim());
+      run(root, ['rm', '-r', '-q', 'svc/.epr-meta', MANIFEST, 'svc/only-governed']);
+      commit(root, 'drop governance');
+      assert.equal(stripped, run(root, ['rev-parse', 'HEAD:svc']).trim());
+      // A tree with no governance entry keeps its oid: the pre-rule identity, unchanged.
+      assert.equal(governanceFreeTree(probe, stripped), stripped);
+      assert.equal(identity(root), `tree:${stripped}`);
+    });
+  });
+
+  void it('does not move for committed, modified or untracked governance edits', () => {
+    withRepo(root => {
+      const before = identity(root);
+      write(root, HABIT, 'v1\n- 2026-09-25 evidence delta\n');
+      commit(root, 'habit delta');
+      assert.equal(identity(root), before, 'a committed habit delta');
+      write(root, HABIT, 'v3\n');
+      write(root, MANIFEST, 'rules: [x]\n');
+      write(root, 'svc/.epr-meta/new.habit.md', 'fresh\n');
+      assert.equal(identity(root), before, 'uncommitted governance edits');
+    });
+  });
+
+  void it('still moves for a source edit, committed or not', () => {
+    withRepo(root => {
+      const before = identity(root);
+      write(root, 'svc/src/lib.rs', 'fn a() { 1; }\n');
+      const dirty = identity(root);
+      assert.notEqual(dirty, before);
+      assert.match(dirty ?? '', /^tree:[0-9a-f]{40}\+dirty:[0-9a-f]{16}$/);
+      commit(root, 'source');
+      assert.notEqual(identity(root), before);
+      assert.equal(isGovernancePath('svc/src/lib.epr-meta'), false);
+      assert.equal(isGovernancePath(HABIT), true);
+    });
+  });
+
+  void it('re-expresses a pre-rule raw tree identity in the governance-free form', () => {
+    withRepo(root => {
+      const raw = `tree:${run(root, ['rev-parse', 'HEAD:svc']).trim()}`;
+      const probe = createSutProbe(root, {});
+      assert.notEqual(raw, identity(root));
+      assert.equal(normalizeSutIdentity(probe, raw), identity(root));
+      assert.equal(normalizeSutIdentity(probe, 'declared:abc'), 'declared:abc');
+      assert.equal(normalizeSutIdentity(probe, `tree:${'0'.repeat(40)}`), `tree:${'0'.repeat(40)}`);
+    });
   });
 });

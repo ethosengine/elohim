@@ -7,6 +7,8 @@
 //      (reach trusted: verified on the household) — written by build-sprint-report.ts;
 //   2. a sprint-report-household-*.json file with the same content.
 // Both must name every station of the story, each passed, on source parts equal to the tree.
+// Governance metadata is not source-under-test: a `.epr-meta` path is never a serving change, and
+// a component's identity leaves its `.epr-meta` entries out (sut.ts owns that one definition).
 //
 // usage: serving-receipt.mjs <repo-root> <reports-dir> [<file: changed serving paths, one per line>]
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -15,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import {
   createSutProbe,
   resolveComponent,
+  normalizeSutIdentity,
+  isGovernancePath,
   DEFAULT_SUT_COMPONENTS,
 } from "../../a2o/scripts/lib/sut.ts";
 import {
@@ -52,7 +56,9 @@ const EITHER_STORY = /^scripts\/ci\/stage-spa-blob/;
 export function requiredReceipts(paths) {
   if (!paths) return [["deliverability"]];
   const groups = new Map();
-  for (const path of paths.map((p) => p.trim()).filter(Boolean)) {
+  for (const path of paths
+    .map((p) => p.trim())
+    .filter((p) => p && !isGovernancePath(p))) {
     const keys = REFUSES_FAST_ONLY.test(path)
       ? ["refusesFast"]
       : EITHER_STORY.test(path)
@@ -63,16 +69,23 @@ export function requiredReceipts(paths) {
   return [...groups.values()];
 }
 
+/**
+ * `normalize` maps a report's component identity onto today's form (a receipt minted before
+ * governance was excluded still counts `.epr-meta` in its tree term); identity by default.
+ */
 export function validateReceipt(
   report,
   expected,
   names,
   story = RECEIPT_STORIES.deliverability,
+  normalize = (identity) => identity,
 ) {
   if (report.env?.lane !== "household" || report.env?.processControl !== true)
     return false;
   for (const [name, identity] of Object.entries(expected)) {
-    if (!identity || report.env?.sutParts?.[name] !== identity) return false;
+    const reported = report.env?.sutParts?.[name];
+    if (!identity || typeof reported !== "string") return false;
+    if (reported !== identity && normalize(reported) !== identity) return false;
   }
   const surface = story.feature.replace(/^genesis\/a2o\//, "");
   const scenarios = report.summary?.byConcern?.[story.concern]?.scenarios ?? [];
@@ -102,7 +115,13 @@ function stationNames(root, story) {
 }
 
 /** The newest attestation that admits `story` on the current source, or null. */
-export function findAttestationReceipt(root, story, expected, names) {
+export function findAttestationReceipt(
+  root,
+  story,
+  expected,
+  names,
+  normalize,
+) {
   const common = gitCommonDir(root);
   const workspaceId = common ? workspaceAgentId(common) : null;
   if (!workspaceId) return null;
@@ -122,14 +141,14 @@ export function findAttestationReceipt(root, story, expected, names) {
       },
       summary: { byConcern: { [story.concern]: { scenarios: s.scenarios } } },
     };
-    if (validateReceipt(asReport, expected, names, story))
+    if (validateReceipt(asReport, expected, names, story, normalize))
       return { ref, node, summary: s };
   }
   return null;
 }
 
 /** The newest household report file that admits `story` on the current source, or null. */
-export function findReportReceipt(reports, story, expected, names) {
+export function findReportReceipt(reports, story, expected, names, normalize) {
   if (!existsSync(reports)) return null;
   for (const name of readdirSync(reports)
     .filter((n) => /^sprint-report-household-.*\.json$/.test(n))
@@ -137,7 +156,8 @@ export function findReportReceipt(reports, story, expected, names) {
     .reverse()) {
     try {
       const report = JSON.parse(readFileSync(join(reports, name), "utf8"));
-      if (validateReceipt(report, expected, names, story)) return name;
+      if (validateReceipt(report, expected, names, story, normalize))
+        return name;
     } catch {
       /* An incomplete report cannot be a receipt; inspect the remaining runs. */
     }
@@ -157,6 +177,12 @@ export function checkReports(root, reports, paths, options = {}) {
       resolveComponent(probe, c),
     ]),
   );
+  const normalized = new Map();
+  const normalize = (identity) => {
+    if (!normalized.has(identity))
+      normalized.set(identity, normalizeSutIdentity(probe, identity));
+    return normalized.get(identity);
+  };
   let all = true;
   const said = new Set();
   for (const alternatives of requiredReceipts(paths)) {
@@ -170,12 +196,24 @@ export function checkReports(root, reports, paths, options = {}) {
         const names = stationNames(root, story);
         const feature = story.feature.split("/").pop();
         if (source === "attestation") {
-          const hit = findAttestationReceipt(root, story, expected, names);
+          const hit = findAttestationReceipt(
+            root,
+            story,
+            expected,
+            names,
+            normalize,
+          );
           if (hit) {
             found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…); every ${feature} station passed on current source.`;
           }
         } else {
-          const hit = findReportReceipt(reports, story, expected, names);
+          const hit = findReportReceipt(
+            reports,
+            story,
+            expected,
+            names,
+            normalize,
+          );
           if (hit) {
             found = `${hit}; every ${feature} station passed on current source.`;
           }

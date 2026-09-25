@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import {
   createSutProbe,
   resolveComponent,
+  normalizeSutIdentity,
+  isGovernancePath,
   DEFAULT_SUT_COMPONENTS,
 } from "../a2o/scripts/lib/sut.ts";
 import {
@@ -748,5 +750,164 @@ test("an attestation that is tampered, foreign-keyed, failed, incomplete or stal
       out,
       /missing household receipt — produce it: just test mesh features\/dataplane\/app-delivery-refuses-fast\.feature/,
     );
+  });
+});
+
+// ── Governance atoms are not source-under-test ──────────────────────────────────
+// A habit atom recording evidence about the system must not invalidate the evidence: `.epr-meta`
+// entries leave every component identity and are never a serving change.
+function commitAll(root, message) {
+  assert.equal(git(root, ["add", "-A"]).status, 0);
+  const done = git(root, [
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@t",
+    "commit",
+    "-q",
+    "-m",
+    message,
+  ]);
+  assert.equal(done.status, 0, done.stderr);
+}
+
+function writeIn(root, path, text) {
+  mkdirSync(join(root, path, ".."), { recursive: true });
+  writeFileSync(join(root, path), text);
+}
+
+const STORAGE_HABIT = "elohim/elohim-storage/.epr-meta/x.habit.md";
+const DOORWAY_CHANGE = ["doorway/doorway-service/src/server/http.rs"];
+
+test("a receipt minted on tree T survives a commit that changes only a component's .epr-meta habit", () => {
+  withFixture((root, reports) => {
+    writeIn(root, STORAGE_HABIT, "---\nstatus: red\n---\n");
+    writeIn(root, "doorway/doorway-service/.epr-meta/.epr-meta", "rules: []\n");
+    commitAll(root, "governance package");
+    writeFileSync(
+      join(reports, "sprint-report-household-t.json"),
+      JSON.stringify(storyReport(root, RECEIPT_STORIES.deliverability)),
+    );
+    assert.equal(check(root, reports, DOORWAY_CHANGE).ok, true);
+
+    writeIn(root, STORAGE_HABIT, "---\nstatus: red\n---\n- 2026-09-25 delta\n");
+    commitAll(root, "habit delta");
+    let { ok, out } = check(root, reports, DOORWAY_CHANGE);
+    assert.equal(ok, true, out);
+    assert.match(
+      out,
+      /sprint-report-household-t\.json; every epr-app-deliverability/,
+    );
+
+    // Uncommitted governance edits (modified and untracked) do not move the identity either.
+    writeIn(root, STORAGE_HABIT, "---\nstatus: green\n---\n");
+    writeIn(root, "elohim/elohim-storage/.epr-meta/new.habit.md", "fresh\n");
+    ({ ok, out } = check(root, reports, DOORWAY_CHANGE));
+    assert.equal(ok, true, out);
+  });
+});
+
+test("a receipt minted before the rule (raw tree counting .epr-meta) is re-expressed, not staled", () => {
+  withFixture((root, reports) => {
+    writeIn(root, STORAGE_HABIT, "v1\n");
+    commitAll(root, "governance package");
+    const raw = git(root, [
+      "rev-parse",
+      "HEAD:elohim/elohim-storage",
+    ]).stdout.trim();
+    const parts = { ...currentParts(root), storage: `tree:${raw}` };
+    assert.notEqual(
+      parts.storage,
+      currentParts(root).storage,
+      "raw form differs",
+    );
+    assert.equal(
+      normalizeSutIdentity(createSutProbe(root, {}), parts.storage),
+      currentParts(root).storage,
+    );
+    writeFileSync(
+      join(reports, "sprint-report-household-legacy.json"),
+      JSON.stringify(storyReport(root, RECEIPT_STORIES.deliverability, parts)),
+    );
+    writeIn(root, STORAGE_HABIT, "v2\n");
+    commitAll(root, "habit delta");
+    const { ok, out } = check(root, reports, DOORWAY_CHANGE);
+    assert.equal(ok, true, out);
+  });
+});
+
+test("a source change under the same component still stales the receipt", () => {
+  withFixture((root, reports) => {
+    writeIn(root, STORAGE_HABIT, "v1\n");
+    commitAll(root, "governance package");
+    writeFileSync(
+      join(reports, "sprint-report-household-t.json"),
+      JSON.stringify(storyReport(root, RECEIPT_STORIES.deliverability)),
+    );
+    writeIn(root, "elohim/elohim-storage/src/x.rs", "fn x() {}\n");
+    commitAll(root, "source change");
+    const { ok, out } = check(root, reports, DOORWAY_CHANGE);
+    assert.equal(ok, false, out);
+    assert.match(
+      out,
+      /missing household receipt — produce it: just test mesh features\/dataplane\/epr-app-deliverability\.feature/,
+    );
+    // A file merely NAMED like governance is source.
+    assert.equal(
+      isGovernancePath("elohim/elohim-storage/src/x.epr-meta"),
+      false,
+    );
+  });
+});
+
+test("a changed path under .epr-meta is not a serving path, and the bash leg agrees with isGovernancePath", () => {
+  assert.deepEqual(
+    requiredReceipts([
+      "elohim/elohim-render/.epr-meta/x.habit.md",
+      "doorway/doorway-service/.epr-meta",
+      "elohim/elohim-storage/src/services/release_adoption/.epr-meta/y.habit.md",
+    ]),
+    [],
+  );
+  assert.deepEqual(
+    requiredReceipts([
+      "elohim/elohim-render/.epr-meta/x.habit.md",
+      "elohim/elohim-render/src/lib.rs",
+    ]),
+    [["deliverability"]],
+  );
+  withFixture((root, dir) => {
+    // Every sample sits under a serving prefix, so the script refuses exactly the non-governance ones.
+    const samples = {
+      ".epr-meta/x.habit.md": true,
+      ".epr-meta": true,
+      "src/.epr-meta/nested.habit.md": true,
+      "src/.epr-meta": true,
+      "src/lib.rs": false,
+      "src/x.epr-meta": false,
+      "src/.epr-metadata/z.rs": false,
+      "src/not.epr-meta/z.rs": false,
+    };
+    for (const [suffix, governance] of Object.entries(samples)) {
+      const path = `elohim/elohim-render/${suffix}`;
+      assert.equal(isGovernancePath(path), governance, `sut.ts: ${path}`);
+      const result = runT2(root, [path], dir);
+      assert.equal(result.status, governance ? 0 : 1, `t2-receipt.sh: ${path}`);
+      assert.equal(/NO-SERVING-RECEIPT/.test(result.stderr), !governance, path);
+    }
+    const mixed = runT2(
+      root,
+      [
+        "elohim/elohim-render/.epr-meta/x.habit.md",
+        "elohim/elohim-render/src/lib.rs",
+      ],
+      dir,
+    );
+    assert.equal(mixed.status, 1);
+    assert.match(
+      mixed.stderr,
+      /\[pre-push\]\s+elohim\/elohim-render\/src\/lib\.rs/,
+    );
+    assert.doesNotMatch(mixed.stderr, /\.epr-meta/);
   });
 });

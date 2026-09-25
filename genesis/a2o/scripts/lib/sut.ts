@@ -25,6 +25,12 @@
  *   4. nothing → the component's NAME goes in `unknown` and it is left out of
  *      the hash. Never silently hash a shorter tuple.
  *
+ * Governance metadata is not source-under-test: every `.epr-meta` entry under a
+ * component (the governance package — habit atoms, the manifest) is left out of
+ * (3), both the tree hash and the dirty digest. Recording evidence about the
+ * system must not invalidate the evidence. The pre-push receipt check imports
+ * this same definition (genesis/orchestrator/scripts/serving-receipt.mjs).
+ *
  * On (3) vs (1): a source edit moves the tree hash before the binary is
  * rebuilt, so the key can be fresher than the artifact. That direction is a
  * miss where a hit was possible — cheap. The opposite (a stale hit for an
@@ -101,6 +107,107 @@ function envVarName(prefix: string, name: string): string {
   return `${prefix}${name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase()}`;
 }
 
+/** The governance entry name: a directory package or a manifest file, at any depth. */
+export const GOVERNANCE_ENTRY = '.epr-meta';
+
+/**
+ * True when a repo-relative path is, or lies inside, a governance entry. The
+ * bash leg of the receipt (genesis/orchestrator/scripts/t2-receipt.sh) mirrors
+ * this as `GOVERNANCE_RE`; serving-receipt.test.mjs pins the two in agreement.
+ */
+export function isGovernancePath(path: string): boolean {
+  return /(^|\/)\.epr-meta(\/|$)/.test(path.trim());
+}
+
+/** Pathspecs that leave every governance entry out of a status / diff / ls-files. */
+export const GOVERNANCE_EXCLUDES: readonly string[] = [
+  `:(exclude,glob)**/${GOVERNANCE_ENTRY}`,
+  `:(exclude,glob)**/${GOVERNANCE_ENTRY}/**`,
+];
+
+interface TreeEntry {
+  mode: string;
+  type: string;
+  oid: string;
+  name: string;
+  path: string;
+}
+
+/**
+ * The oid tree `oid` would have with every governance entry removed (a
+ * directory left empty by the removal goes too, as git never stores one).
+ *
+ * Computed in memory in the repository's own object format — nothing is
+ * written to the object store — from one `ls-tree -r -t` listing, rebuilding
+ * only the directories on the way to a governance entry. A tree with no
+ * governance entry keeps its oid exactly, so for such a component the identity
+ * is still `git rev-parse HEAD:<path>`. Anything that is not a readable tree (a
+ * file component, a submodule gitlink) comes back unchanged.
+ */
+export function governanceFreeTree(probe: SutProbe, oid: string): string {
+  if (probe.git(['cat-file', '-t', oid])?.trim() !== 'tree') return oid;
+  const listing = probe.git(['ls-tree', '-r', '-t', '-z', oid]);
+  if (listing === null) return oid;
+
+  const children = new Map<string, TreeEntry[]>();
+  const governedDirs = new Set<string>();
+  for (const record of listing.split('\0')) {
+    const tab = record.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, type, entryOid] = record.slice(0, tab).split(' ');
+    const path = record.slice(tab + 1);
+    const slash = path.lastIndexOf('/');
+    const parent = slash < 0 ? '' : path.slice(0, slash);
+    const name = path.slice(slash + 1);
+    const siblings = children.get(parent) ?? [];
+    siblings.push({ mode, type, oid: entryOid, name, path });
+    children.set(parent, siblings);
+    if (name === GOVERNANCE_ENTRY) {
+      // Every ancestor of a governance entry must be rebuilt; nothing else is.
+      governedDirs.add('');
+      for (let i = parent.indexOf('/'); i >= 0; i = parent.indexOf('/', i + 1))
+        governedDirs.add(parent.slice(0, i));
+      if (parent) governedDirs.add(parent);
+    }
+  }
+  if (governedDirs.size === 0) return oid;
+
+  const algorithm = oid.length === 64 ? 'sha256' : 'sha1';
+  const hashTree = (body: Buffer): string =>
+    createHash(algorithm).update(`tree ${body.length}\0`).update(body).digest('hex');
+
+  // Entries keep the tree's stored order: removal never reorders the rest.
+  const rebuild = (dir: string, dirOid: string): string | null => {
+    if (!governedDirs.has(dir)) return dirOid;
+    const parts: Buffer[] = [];
+    for (const entry of children.get(dir) ?? []) {
+      if (entry.name === GOVERNANCE_ENTRY) continue;
+      const entryOid = entry.type === 'tree' ? rebuild(entry.path, entry.oid) : entry.oid;
+      if (entryOid === null) continue;
+      parts.push(
+        Buffer.from(`${entry.mode.replace(/^0+/, '')} ${entry.name}\0`, 'utf8'),
+        Buffer.from(entryOid, 'hex')
+      );
+    }
+    return parts.length === 0 && dir !== '' ? null : hashTree(Buffer.concat(parts));
+  };
+  return rebuild('', oid) ?? oid;
+}
+
+/**
+ * Re-express a component identity in today's governance-free form. A receipt
+ * minted before governance was excluded carries a raw `tree:<oid>` that still
+ * counted `.epr-meta`; this maps it onto the tree it would have had without it,
+ * so the receipt stays comparable. Only the tree term moves — a dirty digest
+ * cannot be recomputed and is kept verbatim — and an identity that is not
+ * tree-shaped, or names a tree this repository cannot read, is unchanged.
+ */
+export function normalizeSutIdentity(probe: SutProbe, identity: string): string {
+  const match = /^tree:([0-9a-f]{40}|[0-9a-f]{64})(\+dirty:.*)?$/.exec(identity);
+  if (!match) return identity;
+  return `tree:${governanceFreeTree(probe, match[1])}${match[2] ?? ''}`;
+}
+
 /**
  * A digest over the UNCOMMITTED state of `path`, or null when the tree is clean
  * (or when git cannot say).
@@ -112,11 +219,13 @@ function envVarName(prefix: string, name: string): string {
  * excluded by `--exclude-standard`, so this stays cheap.
  */
 export function dirtyDigest(probe: SutProbe, path: string): string | null {
-  const porcelain = probe.git(['status', '--porcelain', '--', path]);
+  const porcelain = probe.git(['status', '--porcelain', '--', ...GOVERNANCE_EXCLUDES, path]);
   if (porcelain === null || porcelain.trim() === '') return null;
 
-  const diff = probe.git(['diff', 'HEAD', '--', path]) ?? '';
-  const untracked = probe.git(['ls-files', '--others', '--exclude-standard', '--', path]) ?? '';
+  const diff = probe.git(['diff', 'HEAD', '--', ...GOVERNANCE_EXCLUDES, path]) ?? '';
+  const untracked =
+    probe.git(['ls-files', '--others', '--exclude-standard', '--', ...GOVERNANCE_EXCLUDES, path]) ??
+    '';
   const untrackedHashes = untracked.trim()
     ? (probe.git(['hash-object', '--stdin-paths'], untracked) ?? '')
     : '';
@@ -142,8 +251,9 @@ export function resolveComponent(probe: SutProbe, component: SutComponent): stri
   }
 
   if (component.path) {
-    const tree = probe.git(['rev-parse', `HEAD:${component.path}`])?.trim();
-    if (tree) {
+    const raw = probe.git(['rev-parse', `HEAD:${component.path}`])?.trim();
+    if (raw) {
+      const tree = governanceFreeTree(probe, raw);
       const dirty = dirtyDigest(probe, component.path);
       return dirty ? `tree:${tree}+dirty:${dirty}` : `tree:${tree}`;
     }
