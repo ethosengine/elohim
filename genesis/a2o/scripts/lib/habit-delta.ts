@@ -17,11 +17,28 @@
  * node builtins keeps that import free of a build step or a second toolchain.
  */
 
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Directory names never walked, wherever they occur in the tree. */
 const SKIP_DIRS = new Set(['node_modules', 'target', '.worktrees', '.git']);
+
+/**
+ * True when `dir` is itself the root of a git worktree checkout — `git worktree add` (and
+ * `.claude/worktrees/<slice>`, `.worktrees/<slice>`, or any other holding directory a worktree
+ * lands in) leaves a `.git` REGULAR FILE there (a `gitdir: <path>` pointer), never a directory.
+ * `SKIP_DIRS` alone only catches worktrees held directly under a name it knows (`.worktrees`);
+ * a worktree held under an unlisted parent directory name (e.g. `.claude/worktrees/<slice>`)
+ * still gets walked and its duplicate `.epr-meta/*.habit.md` atoms make `findHabitByConcern`
+ * "ambiguous" for a concern that has exactly one real declaration.
+ */
+function isGitWorktreeCheckout(dir: string): boolean {
+  try {
+    return statSync(join(dir, '.git')).isFile();
+  } catch {
+    return false;
+  }
+}
 
 /** `habits-status.py:273`'s own grammar — the line a written delta must satisfy. */
 export const DELTA_DATE_RE = /^\s*DELTA (20\d{2}-\d{2}-\d{2})/m;
@@ -52,6 +69,7 @@ export function walkHabitFiles(root: string): string[] {
         }
         continue;
       }
+      if (isGitWorktreeCheckout(full)) continue;
       stack.push(full);
     }
   }

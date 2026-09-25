@@ -61,6 +61,24 @@ test('findHabitByConcern resolves the one habit atom naming the tag', async t =>
   assert.equal(found.ok && found.path, path);
 });
 
+test('findHabitByConcern skips a nested git worktree checkout (dir with a .git FILE)', async t => {
+  const root = await makeRepo(t);
+  const real = await writeHabit(root, 'elohim/elohim-storage', 'operator-runtime-surface', 'operator-runtime-surface');
+
+  // A nested worktree checkout under an unlisted parent name (.claude/worktrees/<slice>, not
+  // the bare .worktrees SKIP_DIRS already knows) — the shape `git worktree add` produces: a
+  // `.git` REGULAR FILE (a gitdir pointer), never a directory. It carries a duplicate atom for
+  // the SAME concern; before the fix this made findHabitByConcern report "ambiguous".
+  const worktreeDir = join(root, '.claude', 'worktrees', 'fake-slice');
+  await mkdir(worktreeDir, { recursive: true });
+  await writeFile(join(worktreeDir, '.git'), 'gitdir: /projects/elohim/.git/worktrees/fake-slice\n');
+  await writeHabit(worktreeDir, 'elohim/elohim-storage', 'operator-runtime-surface', 'operator-runtime-surface');
+
+  const found = findHabitByConcern(root, 'operator-runtime-surface');
+  assert.equal(found.ok, true);
+  assert.equal(found.ok && found.path, real);
+});
+
 test('findHabitByConcern refuses when zero atoms name the tag', async t => {
   const root = await makeRepo(t);
   await writeHabit(root, 'elohim/elohim-storage', 'other-habit', 'some-other-concern');
