@@ -26,15 +26,21 @@
 //! `elohim-facings` DB-boundary discipline and the "consume, don't modify"
 //! contract for the 4.1 folds.
 //!
-//! ## Producer status (correct-but-dormant)
-//! As of Wave 4.3 nothing observes real compute fulfillment, so
-//! `fulfilled_cids` is empty in production today and `observed_mutual_compute`
-//! returns `{}` — honest and correct. It is deliberately NOT wired into a hot
-//! path that would be structurally empty (the inventory-≠-replication trap); it
-//! lights up the moment a real `compute-fulfilled` observer lands (operator-owned
-//! per the charter §"Non-goals"). See
-//! `db::economic_events::record_compute_fulfilled_event` /
-//! `list_compute_fulfilled_events` for the event side.
+//! ## Producer status (lit on the requester side, 2026-09-25)
+//! The producer is `api::compute_tasks::observe_requester_completion`: on the
+//! REQUESTER's single-task GET, once a provider-authored completion exists for a
+//! grant the requester holds (authenticated grant record, provider-authored
+//! `active` lifecycle link, `measure-stage` / feedback scope matched), storage
+//! projects the foreign grant into `mishpat_commitments` and records ONE
+//! `compute-fulfilled:<requestActionHash>` row `bounded_by` the grant entry hash
+//! with `has_point_in_time = receipt.completedAt` (never `now()`). It is never
+//! emitted on the provider's storage (the rate window counts every `bounded_by`
+//! row) and never for a self-grant. Consequence for this fold: `fulfilled_cids`
+//! is non-empty on a requester that has consumed a foreign grant, so
+//! `observed_mutual_compute` can show realized flow **in one direction per
+//! node**; a mutual pair still needs observations to cross nodes, so a
+//! both-directions reading stays honestly empty until then. See
+//! `db::economic_events::record_compute_fulfilled_event` for the event side.
 
 use std::collections::{BTreeSet, HashSet};
 
