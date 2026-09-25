@@ -1,3 +1,5 @@
+# @concern:operator-runtime-surface joins this proof to the habit register's checks: entry in
+# genesis/manifests/habits.yaml — the identifier CI, this feature, and the habit register share.
 @e2e @act:i @compute @concern:operator-runtime-surface @requires:household-nodes
 Feature: A peer runs one of the household's CI stages and the household can check its work
 
