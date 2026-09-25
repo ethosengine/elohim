@@ -369,11 +369,54 @@ fn receipt_instant(receipt: &Value, field: &str) -> Option<chrono::DateTime<chro
         .and_then(|secs| chrono::DateTime::from_timestamp(secs, 0))
 }
 
+/// Was the grant's declared validity window open for the WHOLE launch second,
+/// and is the receipt's chronology consistent? Pure.
+///
+/// The receipt's `startedAt` is second-truncated, so the launch instant lies in
+/// `[startedAt, startedAt + 1s)`. Fail-closed on both boundaries: the window
+/// (inclusive, as the shared bounds validator reads it) must contain that whole
+/// second — `valid_from <= startedAt` and `startedAt + 1s <= valid_until`. The
+/// window is checked at LAUNCH, never at observation time, so reading a
+/// completion after the grant expired does not refuse a run launched inside it.
+/// The rate window is the provider's concern at launch and is NOT re-derived
+/// here from the requester's history.
+fn observation_window(
+    policy: &Value,
+    started_at: i64,
+    completed_at: i64,
+) -> Result<(), &'static str> {
+    if completed_at < started_at {
+        return Err("receipt completion precedes its launch");
+    }
+    let stamp = |field: &str| {
+        policy[field]
+            .as_str()
+            .and_then(|raw| chrono::DateTime::parse_from_rfc3339(raw).ok())
+            .map(|t| t.with_timezone(&chrono::Utc))
+    };
+    let (Some(from), Some(until)) = (stamp("valid_from"), stamp("valid_until")) else {
+        return Err("grant validity window unreadable");
+    };
+    let launch =
+        chrono::DateTime::from_timestamp(started_at, 0).ok_or("receipt startedAt invalid")?;
+    if from > launch {
+        return Err("grant not yet valid at launch");
+    }
+    if until < launch + chrono::Duration::seconds(1) {
+        return Err("grant expired at launch");
+    }
+    Ok(())
+}
+
 /// What the provider-authored lifecycle links say about a run launched at
 /// `started_at` (epoch seconds). Pure.
 ///
 /// - an `active` link authored by the provider must exist — anyone else's
-///   activation is not the provider's consent;
+///   activation is not the provider's consent — and one of them must be
+///   signed at or before the launch. The launch may fall anywhere in the
+///   truncated `startedAt` second, so an activation inside that second (after
+///   `startedAt` exactly) is read as following the launch (fail-closed); an
+///   unreadable activation time is never read as "before";
 /// - a provider withdrawal (`revoked`/`cancelled`/`sunset`) at or before the
 ///   launch second refuses: the run was not authorized when it started. The
 ///   receipt's `startedAt` is second-truncated, so a withdrawal inside the
@@ -388,8 +431,17 @@ fn observation_lifecycle(
     started_at: i64,
 ) -> Result<Option<String>, &'static str> {
     let authored = || states.iter().filter(|state| state.author == provider);
-    if !authored().any(|state| state.state == "active") {
+    let activations = || authored().filter(|state| state.state == "active");
+    if activations().next().is_none() {
         return Err("no provider-authored activation");
+    }
+    let launch =
+        chrono::DateTime::from_timestamp(started_at, 0).ok_or("receipt startedAt invalid")?;
+    if !activations().any(|state| {
+        chrono::DateTime::parse_from_rfc3339(&state.signed_at)
+            .is_ok_and(|at| at.with_timezone(&chrono::Utc) <= launch)
+    }) {
+        return Err("grant activated after launch");
     }
     let mut earliest: Option<(i64, &str)> = None;
     for state in authored()
@@ -415,7 +467,11 @@ fn observation_lifecycle(
 /// written only when its id is absent. An existing row that disagrees with this
 /// observation (other grant, other parties) is refused, never overwritten.
 /// Withdrawal is monotonic here: a `revoked_at` already projected is never
-/// cleared by a later view that lacks the link.
+/// cleared by a later view that lacks the link. An identical observation is a
+/// no-op: when the projected grant fields (authenticated payload, anchor, state,
+/// `revoked_at`) already equal the row, nothing is written. The row's
+/// `created_at`/`updated_at` are local cache timestamps — when THIS node first
+/// or last wrote its copy — never evidence about the grant or the run.
 ///
 /// `h_app_id`: the row is written under `AppContext::default()` — the same
 /// partition the launch-admission row uses and the economic-events route reads.
@@ -433,8 +489,14 @@ fn record_requester_observation(
     let receiver = grant_row.recipient.clone();
     let prior = mishpat_commitments::get_by_cid(conn, &cid).map_err(db)?;
     grant_row.state = "active".into();
-    grant_row.revoked_at = withdrawn_at.or_else(|| prior.and_then(|row| row.revoked_at));
-    mishpat_commitments::upsert_with_anchor(conn, grant_row).map_err(db)?;
+    grant_row.revoked_at =
+        withdrawn_at.or_else(|| prior.as_ref().and_then(|row| row.revoked_at.clone()));
+    if !prior
+        .as_ref()
+        .is_some_and(|row| projection_unchanged(row, &grant_row))
+    {
+        mishpat_commitments::upsert_with_anchor(conn, grant_row).map_err(db)?;
+    }
     let ctx = AppContext::default();
     match economic_events::get_economic_event(conn, &ctx, event_id)? {
         Some(existing) => {
@@ -463,6 +525,24 @@ fn record_requester_observation(
     Ok(())
 }
 
+/// Does the stored grant projection already carry exactly these projected
+/// fields? Pure. Cache timestamps are deliberately not compared.
+fn projection_unchanged(
+    row: &crate::db::models::MishpatCommitment,
+    next: &crate::db::models::NewMishpatCommitment,
+) -> bool {
+    row.action == next.action
+        && row.scope == next.scope
+        && row.provider == next.provider
+        && row.recipient == next.recipient
+        && row.bounds_json == next.bounds_json
+        && row.valid_from == next.valid_from
+        && row.valid_until == next.valid_until
+        && row.revoked_at == next.revoked_at
+        && row.state == next.state
+        && row.dht_anchor_hash == next.dht_anchor_hash
+}
+
 /// The requester-side producer of `compute-fulfilled` (the dormant observer in
 /// `services::rea_observed_compute` lights from this).
 ///
@@ -470,7 +550,9 @@ fn record_requester_observation(
 /// verified by [`call`] (task CID, receipt CID and six envelope pins). It then
 /// (1) authenticates the grant the request pins with the author pinned to the
 /// task's PROVIDER, (2) requires the policy to name these parties and the scope
-/// the task requires, (3) reads the provider-authored lifecycle, (4) projects
+/// the task requires, (3) requires the grant's declared window open and a
+/// provider-authored activation signed at or before the receipt's `startedAt`,
+/// with no provider withdrawal before it, (4) projects
 /// the foreign grant exactly as the provider's own issue does, and (5) records
 /// `compute-fulfilled:<request>` bounded by the grant entry hash at the
 /// receipt's `completedAt` — deterministic, never `now()`.
@@ -506,6 +588,7 @@ async fn observe(hc: &Arc<HcClient>, pool: &DbPool, task: &Value) -> Result<Valu
     let receipt = &task["completion"]["receipt"];
     let started = receipt_instant(receipt, "startedAt").ok_or("receipt startedAt missing")?;
     let completed = receipt_instant(receipt, "completedAt").ok_or("receipt completedAt missing")?;
+    observation_window(&grant.policy, started.timestamp(), completed.timestamp())?;
     let states = crate::services::conductor_writes::get_commitment_authority_links(hc, &grant.cid)
         .await
         .map_err(|e| e.to_string())?;
@@ -904,6 +987,105 @@ mod tests {
         );
     }
     #[test]
+    fn observation_refuses_activation_after_launch() {
+        // signed after the launch second began — anywhere inside it may follow the launch
+        for late in ["2026-09-25T10:00:00.400Z", "2026-09-25T10:30:00Z"] {
+            assert_eq!(
+                observation_lifecycle(&[state_link("adam", "active", late)], "adam", LAUNCH),
+                Err("grant activated after launch"),
+                "{late}"
+            );
+        }
+        // an unreadable activation time is never read as "before"
+        assert_eq!(
+            observation_lifecycle(&[state_link("adam", "active", "earlier")], "adam", LAUNCH),
+            Err("grant activated after launch")
+        );
+        // one activation at or before the launch suffices, even beside a later re-activation
+        assert_eq!(
+            observation_lifecycle(
+                &[
+                    state_link("adam", "active", "2026-09-25T10:30:00Z"),
+                    state_link("adam", "active", "2026-09-25T10:00:00Z"),
+                ],
+                "adam",
+                LAUNCH
+            ),
+            Ok(None)
+        );
+    }
+    fn window(from: &str, until: &str) -> Value {
+        json!({"valid_from":from,"valid_until":until})
+    }
+    #[test]
+    fn observation_refuses_a_grant_expired_at_launch() {
+        // expired long before the launch
+        assert_eq!(
+            observation_window(
+                &window("2026-09-20T00:00:00Z", "2026-09-24T00:00:00Z"),
+                LAUNCH,
+                LAUNCH + 60
+            ),
+            Err("grant expired at launch")
+        );
+        // expiring inside the launch second: the launch may follow it (fail-closed)
+        assert_eq!(
+            observation_window(
+                &window("2026-09-20T00:00:00Z", "2026-09-25T10:00:00.500Z"),
+                LAUNCH,
+                LAUNCH + 60
+            ),
+            Err("grant expired at launch")
+        );
+        // the window is read at LAUNCH: a grant that expired after the launch
+        // second but before completion (or before this read) still observes
+        assert_eq!(
+            observation_window(
+                &window("2026-09-20T00:00:00Z", "2026-09-25T10:00:01Z"),
+                LAUNCH,
+                LAUNCH + 3600
+            ),
+            Ok(())
+        );
+    }
+    #[test]
+    fn observation_refuses_a_grant_not_yet_valid_at_launch() {
+        for from in ["2026-09-25T10:00:00.001Z", "2026-09-26T00:00:00Z"] {
+            assert_eq!(
+                observation_window(&window(from, "2026-09-30T00:00:00Z"), LAUNCH, LAUNCH + 60),
+                Err("grant not yet valid at launch"),
+                "{from}"
+            );
+        }
+        assert_eq!(
+            observation_window(
+                &window("2026-09-25T10:00:00Z", "2026-09-30T00:00:00Z"),
+                LAUNCH,
+                LAUNCH
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            observation_window(
+                &json!({"valid_from":"2026-09-20T00:00:00Z"}),
+                LAUNCH,
+                LAUNCH
+            ),
+            Err("grant validity window unreadable")
+        );
+    }
+    #[test]
+    fn observation_refuses_a_completion_before_its_launch() {
+        assert_eq!(
+            observation_window(
+                &window("2026-09-20T00:00:00Z", "2026-09-30T00:00:00Z"),
+                LAUNCH,
+                LAUNCH - 1
+            ),
+            Err("receipt completion precedes its launch")
+        );
+    }
+    #[test]
     fn self_grant_is_never_observed() {
         let done = json!({"actionHash":"completion"});
         let task = |requester: &str, provider: &str, completion: &Value| json!({"requester":requester,"provider":provider,"completion":completion});
@@ -1033,6 +1215,32 @@ mod tests {
                 bounds_json: row.bounds_json.clone(),
                 state: row.state.clone(),
             }];
+            // an identical re-observation is a no-op on the projected row: its
+            // local cache timestamps are left exactly as they were
+            {
+                use crate::db::diesel_schema::mishpat_commitments::dsl as mc;
+                diesel::update(mc::mishpat_commitments.filter(mc::cid.eq(ENTRY_HASH)))
+                    .set((
+                        mc::created_at.eq("2000-01-01T00:00:00Z"),
+                        mc::updated_at.eq("2000-01-01T00:00:00Z"),
+                    ))
+                    .execute(&mut conn)
+                    .expect("stamp sentinel");
+            }
+            record_requester_observation(
+                &mut conn,
+                foreign_grant(),
+                None,
+                id,
+                "2026-09-25T10:05:00Z",
+            )
+            .expect("identical re-observation");
+            let untouched = mishpat_commitments::get_by_cid(&mut conn, ENTRY_HASH)
+                .unwrap()
+                .unwrap();
+            assert_eq!(untouched.updated_at, "2000-01-01T00:00:00Z");
+            assert_eq!(untouched.created_at, "2000-01-01T00:00:00Z");
+
             let kept = retain_fulfilled(&rows, &fulfilled_cids_from_events(&events));
             assert_eq!(
                 kept.len(),
@@ -1063,6 +1271,10 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(row.revoked_at.as_deref(), Some("2026-09-25T11:00:00Z"));
+            assert_ne!(
+                row.updated_at, "2000-01-01T00:00:00Z",
+                "a changed projection (withdrawal carried) is written"
+            );
             assert_eq!(
                 economic_events::list_compute_fulfilled_events(&mut conn, &ctx)
                     .unwrap()
