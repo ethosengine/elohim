@@ -31,12 +31,17 @@ BUILD_STAGE_MJS="$HERE/stage/build-stage-task.mjs"
 
 usage() {
   cat >&2 <<'USAGE'
-usage: measure.sh grant  --on jessica|adam
+usage: measure.sh grant  --on jessica|adam [--renew]
        measure.sh worker --on jessica|adam
        measure.sh <feature-path> [--on jessica|adam] [--gap <id>]
        measure.sh status
        measure.sh poll
        measure.sh fixture --on jessica|adam <feature-path>
+
+grant refuses to reissue while a stored grant file is already on record for
+the provider — pass --renew to replace it deliberately. The validity window
+always equals the rotation lifetime (MEASURE_GRANT_DAYS, default 1 day) —
+never wider, or elohim-storage's compute_grants API refuses the grant.
 USAGE
 }
 
@@ -132,31 +137,40 @@ ENV
 }
 
 # ---- grant --------------------------------------------------------------------------------
+# The validity window MUST equal the rotation lifetime — elohim-storage/src/api/compute_grants.rs
+# refuses any window longer than `rotation_ttl_days * 86400`. Both are computed from one
+# variable (MEASURE_GRANT_DAYS, default 1) so they cannot drift apart again.
 cmd_grant() {
-  local on=""
+  local on="" renew=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --on) on="$2"; shift 2 ;;
+      --renew) renew=1; shift ;;
       *) refuse 2 "grant: unknown argument $1" ;;
     esac
   done
-  [ -n "$on" ] || refuse 2 "usage: measure.sh grant --on jessica|adam"
+  [ -n "$on" ] || refuse 2 "usage: measure.sh grant --on jessica|adam [--renew]"
   require_known_provider "$on" "grant issuance"
 
-  local api_port index grant_dir grant_file now_iso until_iso
+  local api_port index grant_dir grant_file grant_days now_iso until_iso
   api_port="$(provider_field jessica api)" || refuse 2 "providers.json has no jessica.api"
   index="$(provider_field jessica index)" || refuse 2 "providers.json has no jessica.index"
   grant_dir="$MESH_DIR/compute"
   grant_file="$grant_dir/grant-jessica.json"
+  grant_days="${MEASURE_GRANT_DAYS:-1}"
   now_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  until_iso="$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+7d +%Y-%m-%dT%H:%M:%SZ)"
+  until_iso="$(date -u -d "+${grant_days} days" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+"${grant_days}"d +%Y-%m-%dT%H:%M:%SZ)"
 
   if dry_run; then
     print_env_block
     echo "[dry-run] mkdir -p $grant_dir"
-    echo "[dry-run] write $grant_file: recipient=$COMPUTE_PERFORMER scope=measure-stage rate_per_hour=8 rotation_ttl_days=1 window=$now_iso..$until_iso"
+    echo "[dry-run] write $grant_file: recipient=$COMPUTE_PERFORMER scope=measure-stage rate_per_hour=8 rotation_ttl_days=$grant_days window=$now_iso..$until_iso"
     echo "[dry-run] COMPUTE_API_URL=http://127.0.0.1:$api_port COMPUTE_PERFORMER=\$(peer_agent_key $index jessica) node $WORKSPACE_MJS grant $grant_file"
     return 0
+  fi
+
+  if [ -f "$grant_file" ] && [ "$renew" -eq 0 ]; then
+    refuse 2 "a stored grant already exists for jessica at $grant_file — pass --renew to reissue it deliberately"
   fi
 
   mkdir -p "$grant_dir"
@@ -170,7 +184,7 @@ cmd_grant() {
     "epr_scope": ["*"],
     "reach_ceiling": "commons",
     "rate_per_hour": 8,
-    "rotation_ttl_days": 1
+    "rotation_ttl_days": $grant_days
   }
 }
 JSON
