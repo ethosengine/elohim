@@ -313,6 +313,27 @@ def berth_touch(session):
         pass
 
 
+def berth_overrun_check():
+    """Hand the mesh lease to `berth overrun-check` only when it is held past its ttl and its pain is
+    not yet on the record (emitted/<holder>-<claimed_at>): nothing overrun costs one small file read
+    and no subprocess. The check itself runs detached so an `epr` emit never delays the prompt."""
+    try:
+        bdir = os.environ.get("BERTH_DIR") or os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config"), "berth")
+        with open(os.path.join(bdir, "leases.json")) as f:
+            lease = (json.load(f) or {}).get("mesh")
+        if not isinstance(lease, dict) or lease.get("claimed_at") is None or not lease.get("ttl_s"):
+            return
+        if time.time() - lease["claimed_at"] <= lease["ttl_s"]:
+            return
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", str(lease.get("holder")))
+        if os.path.exists(os.path.join(bdir, "emitted", f"{safe}-{lease['claimed_at']}")):
+            return
+        subprocess.Popen([sys.executable, BERTH, "overrun-check", "mesh"], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except Exception:
+        pass
+
+
 def io_guard_and_berth_lines(session):
     """SessionStart: ensure io-guard (sibling daemon, write budget) and moor this session on the berth
     so the workspace knows who is here. Model/lab are unknown to a hook — the agent completes its own
@@ -364,6 +385,7 @@ def main(argv):
 
     if event == "prompt":
         berth_touch(session)
+        berth_overrun_check()
         text = prompt_banner(read_state(d), d, session)
         if text:
             print(text)  # UserPromptSubmit: plain stdout lands in context

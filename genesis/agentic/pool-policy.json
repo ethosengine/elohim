@@ -102,6 +102,14 @@
       "cargo": 2,
       "disk-heavy": 1
     },
-    "mooring_ttl_s": 10800
+    "mooring_ttl_s": 10800,
+    "classes": {
+      "_comment": "Lease classes per resource — the mesh lease is the dev berth's router (plan R4/R11). verify = a bounded lane (`just test mesh`), refused past max_ttl_s: a longer hold is a measure and must say so. measure = window/A-B/soak/proof runs, never on the dev berth: refused exit 3 naming the alternative; MEASURE_ON_DEV_BERTH=1 with --ttl is the declared override (ledger `kind: override` + dev-berth-held-by-measure@1 = ttl at once). mesh = the household itself (`just mesh start`). A resource with no table (cargo, disk-heavy) takes any class and gets no default ttl.",
+      "mesh": {
+        "verify": { "default_ttl_s": 1800, "max_ttl_s": 3600 },
+        "measure": { "allowed": false, "alternative": "just measure <scope>" },
+        "mesh": { "default_ttl_s": 1800 }
+      }
+    }
   }
 }

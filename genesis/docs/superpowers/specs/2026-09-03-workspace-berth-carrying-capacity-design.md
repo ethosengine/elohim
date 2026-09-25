@@ -155,9 +155,18 @@ disk whose full-stall share is above 10 % for twenty seconds is the discipline.
   session id, not a model id; `berth moor --model … --lab …` completes the record. Making the
   runtime assert it is the graduation step (the recipient identity in `delegates-compute` must be
   attested, not self-typed).
-- It does not gate. Nothing refuses a `just mesh start` or a `cargo test` that skipped `berth
-  claim`; io-guard measures what actually happens and attributes it to whoever holds the lease,
-  which is how a skipped claim becomes visible (`holder: null` on a shed row).
+- It gates the household, and only the household. Since 2026-09-25 the mesh lease is the dev
+  berth's router: `just test mesh` claims it as class `verify` with a ttl (default 1800 s, capped
+  at 3600 s), `just mesh start` claims it as class `mesh`, and a second live session is refused
+  (exit 3) with the holder named, never queued. A `measure`-class claim is refused with its
+  alternative (`just measure <scope>`, on a measurement peer); `MEASURE_ON_DEV_BERTH=1` is a
+  declared override that claims, writes a `kind: override` row and emits
+  `dev-berth-held-by-measure@1` the moment the hold starts, and `berth overrun-check` (ram-guard's
+  prompt event) emits it once for any lease held past its ttl. The classes live in
+  `pool-policy.json` `berth.classes`. Nothing gates `cargo` or `disk-heavy`: a `cargo test` that
+  skipped `berth claim` still runs, io-guard measures what actually happens and attributes it to
+  whoever holds the lease, which is how a skipped claim becomes visible (`holder: null` on a shed
+  row). A session with no id (exit 2) is not blocked from the mesh either.
 - It does not replace the messages. Sessions still talk; the berth is where the *decisions*
   those messages produce are recorded so the next session, and the guard, can read them.
 

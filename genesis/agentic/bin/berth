@@ -27,22 +27,42 @@ Commands:
                 [--writes a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
   berth touch   --session S                                        liveness heartbeat (hooks call it)
-  berth claim   RESOURCE --session S [--note TEXT] [--ttl SECONDS] take one unit; exit 3 if held
+  berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
+                                                                   take one unit; exit 3 if held or refused
   berth release RESOURCE --session S
   berth say     --session S [--to SESSION] TEXT                    a deliberation note, on the record
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity
   berth ledger  [-n 30]                                            the append-only record
+  berth overrun-check [RESOURCE]                                   emit dev-berth-held-by-measure@1 once
+                                                                   for a lease held past its ttl (hooks)
 
 Resources (capacity 1 unless pool-policy.json `berth.resources` says otherwise):
   mesh        the household mesh (start/stop/prologue/test mesh)
   cargo       one heavy cargo build/test/check per container (pool-policy io.max_concurrent_heavy)
   disk-heavy  any sustained-write job that is not cargo (prologue seed, pnpm install, blob sync)
 
+Lease classes (pool-policy.json `berth.classes.<resource>`; a resource with no table takes any class
+and gets no default ttl). The mesh lease is the dev berth's router:
+  verify   a bounded lane (`just test mesh`): default ttl 1800 s, a ttl above max_ttl_s (3600) is
+           refused — a longer hold is a measure, and says so
+  measure  a window/A-B/soak/proof run: REFUSED here (exit 3) with its alternative, `just measure
+           <scope>` on a measurement peer. MEASURE_ON_DEV_BERTH=1 with --ttl declares an override:
+           it claims, writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl at once
+  mesh     the household itself (`just mesh start`): default ttl 1800 s
+A lease carries class · ttl_s · claimed_at · holder · seat (the REA `use` commitment's fields).
+`claimed_at` is set once; a renew (the holder claiming again) resets `since` only, is on the record
+as a `renew` row carrying $BERTH_SEAT, and cannot carry the hold past the class's max_ttl_s without
+an explicit --ttl, which is itself capped.
+
 Session id resolution: --session, else $BERTH_SESSION, else $CLAUDE_SESSION_ID. A mooring expires
-`ttl` seconds after its last touch (default 3 h); an expired holder's lease can be taken over, and
-the takeover is on the record. Exit codes: 0 ok · 2 usage · 3 refused (held by a live mooring).
+`ttl` seconds after its last touch (pool-policy `berth.mooring_ttl_s`, default 3 h); a lease expires
+`ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
+record with `expired_after_s`. Exit codes: 0 ok · 2 usage / no session · 3 refused (held by a live
+mooring, a class this berth does not run, or a ttl past the class's cap).
 """
+import contextlib
+import fcntl
 import json
 import os
 import sys
@@ -53,56 +73,162 @@ PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
 POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json")
 DEFAULT_TTL_S = 3 * 3600
 DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
+DEFAULT_CLASS = "verify"
+OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
+# The measure emitter lives beside the hooks; bin/berth → genesis/agentic → genesis → repo root.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
+
+
+class BerthUsage(ValueError):
+    """A claim the caller mis-stated (unknown class, override without a ttl) — exit 2, no record."""
 
 
 def store_dir():
     return os.environ.get("BERTH_DIR") or os.path.join(CONFIG_DIR, "berth")
 
 
-def load_capacities(path=POLICY_FILE):
+def load_policy(path=POLICY_FILE):
+    """(capacities, mooring_ttl_s, classes) from pool-policy.json; defaults on any miss."""
     caps = dict(DEFAULT_RESOURCES)
+    mooring_ttl_s = DEFAULT_TTL_S
+    classes = {}
     try:
         with open(path) as f:
             pol = json.load(f)
         io_pol = pol.get("io") or {}
         if "max_concurrent_heavy" in io_pol:
             caps["cargo"] = int(io_pol["max_concurrent_heavy"])
-        for k, v in ((pol.get("berth") or {}).get("resources") or {}).items():
+        berth = pol.get("berth") or {}
+        for k, v in (berth.get("resources") or {}).items():
             caps[k] = int(v)
+        if berth.get("mooring_ttl_s"):
+            mooring_ttl_s = int(berth["mooring_ttl_s"])
+        classes = {k: v for k, v in (berth.get("classes") or {}).items() if isinstance(v, dict)}
     except Exception:
         pass
-    return caps
+    return caps, mooring_ttl_s, classes
+
+
+def load_capacities(path=POLICY_FILE):
+    return load_policy(path)[0]
+
+
+def _safe(name):
+    return "".join(c if c.isalnum() or c in "_.-" else "_" for c in str(name))
 
 
 class Berth:
-    def __init__(self, d=None, now=None):
+    def __init__(self, d=None, now=None, obs=None, policy_path=POLICY_FILE):
         self.dir = d or store_dir()
         self.moor_dir = os.path.join(self.dir, "moorings")
         os.makedirs(self.moor_dir, exist_ok=True)
         self.leases_path = os.path.join(self.dir, "leases.json")
         self.ledger_path = os.path.join(self.dir, "ledger.jsonl")
+        self.lock_path = os.path.join(self.dir, "berth.lock")
+        self.emitted_dir = os.path.join(self.dir, "emitted")
         self.now = now or time.time
-        self.capacities = load_capacities()
+        self.capacities, self.mooring_ttl_s, self.classes = load_policy(policy_path)
+        self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
+        self._lock_depth = 0
 
     # ------------------------------------------------------------ records
     def _moor_path(self, session):
-        safe = "".join(c if c.isalnum() or c in "_.-" else "_" for c in session)
-        return os.path.join(self.moor_dir, f"{safe}.json")
+        return os.path.join(self.moor_dir, f"{_safe(session)}.json")
+
+    @contextlib.contextmanager
+    def _locked(self):
+        """One writer at a time over the ledger append and the leases.json read-modify-write.
+        Re-entrant within this object (claim → record), because a second flock on a fresh open file
+        description in the same process would wait on itself."""
+        if self._lock_depth:
+            self._lock_depth += 1
+            try:
+                yield
+            finally:
+                self._lock_depth -= 1
+            return
+        fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            self._lock_depth = 1
+            try:
+                yield
+            finally:
+                self._lock_depth = 0
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
     def record(self, kind, **fields):
         ev = {"at": round(self.now(), 3), "kind": kind}
         ev.update(fields)
-        with open(self.ledger_path, "a") as f:
-            f.write(json.dumps(ev, sort_keys=True) + "\n")
+        line = (json.dumps(ev, sort_keys=True) + "\n").encode()
+        with self._locked():
+            fd = os.open(self.ledger_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+            try:
+                os.write(fd, line)
+            finally:
+                os.close(fd)
         return ev
 
     def ledger(self, n=30):
+        """The last n readable events. Per-line tolerant: a torn or NUL-padded line (a crash mid-append,
+        a restart that zero-filled the tail) costs that line, never the whole record."""
         try:
-            with open(self.ledger_path) as f:
-                lines = f.readlines()[-n:]
-            return [json.loads(l) for l in lines if l.strip()]
-        except Exception:
+            with open(self.ledger_path, encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except OSError:
             return []
+        out = []
+        for line in lines:
+            line = line.lstrip("\x00").strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(ev, dict):
+                out.append(ev)
+        return out[-n:] if n else out
+
+    # ------------------------------------------------------------ observation
+    def observation(self):
+        """The `_observation` emitter module, or None — fail-open: a missing emitter costs the pain
+        record, never the claim."""
+        if self._obs is None:
+            try:
+                if HOOKS_DIR not in sys.path:
+                    sys.path.insert(0, HOOKS_DIR)
+                import _observation  # noqa: E402
+                self._obs = _observation
+            except Exception:
+                self._obs = False
+        return self._obs or None
+
+    def _emit_pain(self, value, reason, **env):
+        obs = self.observation()
+        if obs is None:
+            return False
+        try:
+            if not obs.available():
+                return False
+            return bool(obs.emit(OVERRUN_MEASURE, ".", int(round(value)), reason=reason,
+                                 env={k: v for k, v in env.items() if v is not None}, root=REPO_ROOT))
+        except Exception:
+            return False
+
+    def _marker(self, lease):
+        return os.path.join(self.emitted_dir, f"{_safe(lease.get('holder'))}-{lease.get('claimed_at')}")
+
+    def _write_marker(self, lease):
+        try:
+            os.makedirs(self.emitted_dir, exist_ok=True)
+            with open(self._marker(lease), "w") as f:
+                f.write(str(round(self.now(), 3)))
+        except OSError:
+            pass
 
     # ------------------------------------------------------------ moorings
     def moorings(self):
@@ -132,7 +258,7 @@ class Berth:
                 return False
             except PermissionError:
                 pass
-        return (self.now() - m.get("last_seen", 0)) < m.get("ttl_s", DEFAULT_TTL_S)
+        return (self.now() - m.get("last_seen", 0)) < m.get("ttl_s", self.mooring_ttl_s)
 
     def moor(self, session, **fields):
         m = self.mooring(session) or {"session": session, "moored_at": round(self.now(), 3)}
@@ -147,8 +273,8 @@ class Berth:
         m.setdefault("bounds", {})
         if m.get("writes"):
             m["bounds"]["write_set"] = m["writes"]
-        m["bounds"]["ttl_s"] = m.get("ttl_s", DEFAULT_TTL_S)
-        m.setdefault("ttl_s", DEFAULT_TTL_S)
+        m["bounds"]["ttl_s"] = m.get("ttl_s", self.mooring_ttl_s)
+        m.setdefault("ttl_s", self.mooring_ttl_s)
         m["last_seen"] = round(self.now(), 3)
         tmp = self._moor_path(session) + ".tmp"
         with open(tmp, "w") as f:
@@ -193,7 +319,8 @@ class Berth:
     def holder_is_live(self, lease):
         if not lease:
             return False
-        if lease.get("ttl_s") and (self.now() - lease.get("since", 0)) > lease["ttl_s"]:
+        ttl = lease.get("ttl_s")
+        if ttl is not None and (self.now() - lease.get("since", 0)) > ttl:
             return False
         return self.is_live(self.mooring(lease.get("holder")))
 
@@ -202,9 +329,128 @@ class Berth:
         candidates = [leases.get(resource)] + leases.get(resource + "/slots", [])
         return [lease for lease in candidates if self.holder_is_live(lease)]
 
-    def claim(self, resource, session, note=None, ttl_s=None):
+    def raw_lease(self, resource):
+        """The single-slot lease record as stored, live or not (status renders an expired one)."""
+        lease = self.leases().get(resource)
+        return lease if isinstance(lease, dict) else None
+
+    def class_spec(self, resource, klass):
+        """The policy row for `klass` on `resource`, or None when the resource declares no classes."""
+        table = self.classes.get(resource)
+        if not table:
+            return None
+        if klass not in table:
+            raise BerthUsage(f"{resource} has no lease class {klass!r} "
+                             f"(pool-policy.json berth.classes.{resource}: {'|'.join(sorted(table))})")
+        spec = table[klass]
+        return spec if isinstance(spec, dict) else {}
+
+    def _expired_after(self, cur):
+        """Seconds the lapsed lease `cur` was held before it expired (ttl) or was abandoned (mooring)."""
+        start = cur.get("claimed_at", cur.get("since"))
+        if start is None:
+            return None
+        now = self.now()
+        ttl = cur.get("ttl_s")
+        end = cur.get("since", start) + ttl if ttl is not None else now
+        return round(max(0, min(end, now) - start))
+
+    def _renew(self, lease, ttl_s, note, seat, klass=None):
+        """Reset `since` (never `claimed_at`). Without an explicit ttl the hold stops at the class's
+        max_ttl_s counted from claimed_at; an explicit ttl is itself capped. Returns a refusal
+        reason, or None when renewed."""
+        now = round(self.now(), 3)
+        claimed = lease.get("claimed_at", lease.get("since", now))
+        lease_class = klass or lease.get("class")
+        spec = (self.classes.get(lease.get("resource")) or {}).get(lease_class) if lease_class else None
+        cap = int(spec["max_ttl_s"]) if isinstance(spec, dict) and spec.get("max_ttl_s") else None
+        if ttl_s is not None:
+            ttl = min(int(ttl_s), cap) if cap else int(ttl_s)
+        else:
+            ttl = lease.get("ttl_s")
+            if cap:
+                remaining = int(claimed + cap - now)
+                if remaining <= 0:
+                    self.record("refuse", resource=lease.get("resource"), session=lease.get("holder"),
+                                reason="max_ttl", max_ttl_s=cap, claimed_at=claimed, **{"class": lease_class})
+                    return (f"the {lease_class} hold reached its {cap}s cap (claimed {_age(now - claimed)} ago) — "
+                            f"release it, or renew with an explicit --ttl (capped at {cap}s)")
+                ttl = min(ttl, remaining) if ttl is not None else remaining
+        lease["since"] = now
+        lease["claimed_at"] = claimed
+        lease["ttl_s"] = ttl
+        lease["note"] = note or lease.get("note")
+        if lease_class:
+            lease["class"] = lease_class
+        if seat:
+            lease["seat"] = seat
+        self.record("renew", resource=lease.get("resource"), session=lease.get("holder"), ttl_s=ttl,
+                    claimed_at=claimed, seat=seat, note=note, **{"class": lease_class})
+        return None
+
+    def _new_lease(self, resource, session, note, ttl_s, klass, seat):
+        now = round(self.now(), 3)
+        lease = {"resource": resource, "holder": session, "since": now, "claimed_at": now,
+                 "note": note, "ttl_s": ttl_s, "class": klass, "action": "use"}
+        if seat:
+            lease["seat"] = seat
+        return lease
+
+    def claim(self, resource, session, note=None, ttl_s=None, klass=None, seat=None, override=False):
         """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
-        answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots."""
+        answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots.
+
+        The class table routes: a class the policy marks `allowed: false` is refused with its named
+        alternative unless `override` (MEASURE_ON_DEV_BERTH=1) declares the hold — then it claims,
+        writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl immediately.
+        Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
+        klass = klass or DEFAULT_CLASS
+        explicit_ttl = ttl_s is not None
+        if explicit_ttl:
+            ttl_s = int(ttl_s)
+            if ttl_s <= 0:
+                raise BerthUsage("--ttl must be a positive number of seconds")
+        spec = self.class_spec(resource, klass)
+        overriding = False
+        if spec is not None:
+            if spec.get("allowed") is False:
+                alt = spec.get("alternative") or "a measurement peer"
+                if not override:
+                    self.record("refuse", resource=resource, session=session, reason="class", alternative=alt,
+                                note=note, **{"class": klass})
+                    return False, None, (f"{klass}-class work does not run on the dev berth — author it with "
+                                         f"`{alt}` (rung H: --on jessica; rung A: --on adam)")
+                if not explicit_ttl:
+                    raise BerthUsage(f"a declared override declares its hold: MEASURE_ON_DEV_BERTH=1 berth claim "
+                                     f"{resource} --class {klass} --ttl SECONDS --note '<why>'")
+                overriding = True
+            if not explicit_ttl and spec.get("default_ttl_s"):
+                ttl_s = int(spec["default_ttl_s"])
+            cap = spec.get("max_ttl_s")
+            if cap and explicit_ttl and ttl_s > int(cap):
+                self.record("refuse", resource=resource, session=session, reason="ttl", ttl_s=ttl_s,
+                            max_ttl_s=int(cap), note=note, **{"class": klass})
+                return False, None, (f"a {klass} lease on {resource} holds at most {int(cap)}s and --ttl {ttl_s} is "
+                                     f"longer — declare it measure (`just measure <scope>`, or "
+                                     f"MEASURE_ON_DEV_BERTH=1 --class measure --ttl {ttl_s})")
+        with self._locked():
+            ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
+                                                   ttl_s, klass, seat, overriding)
+        if ok and overriding:
+            self.record("override", resource=resource, session=session, holder=session, ttl_s=lease.get("ttl_s"),
+                        claimed_at=lease.get("claimed_at"), reason=note, seat=seat, **{"class": klass})
+            landed = os.path.exists(self._marker(lease))
+            if not landed and self._emit_pain(
+                    lease.get("ttl_s") or 0, f"declared override: {resource} held by {session} as {klass} "
+                    f"for {lease.get('ttl_s')}s on the dev berth — {note or 'no reason given'}",
+                    resource=resource, kind="override", **{"class": klass}):
+                self._write_marker(lease)
+                landed = True
+            reason += (f"; declared override — {OVERRUN_MEASURE} = {lease.get('ttl_s')}s "
+                       + ("emitted" if landed else "NOT emitted (no `epr` emitter); the override row is the record"))
+        return ok, lease, reason
+
+    def _claim_locked(self, resource, session, note, explicit_ttl, ttl_s, klass, seat, overriding):
         if resource not in self.capacities:
             self.capacities[resource] = 1
         leases = self.leases()
@@ -213,64 +459,88 @@ class Berth:
         mine = [lease for lease in live if lease.get("holder") == session]
         if mine:
             for lease in mine:
-                lease["since"] = round(self.now(), 3)
-                lease["note"] = note or lease.get("note")
+                refused = self._renew(lease, explicit_ttl, note, seat, klass=klass if overriding else None)
+                if refused:
+                    return False, lease, refused
             self._write_leases(leases)
             return True, mine[0], "renewed"
         if len(live) >= cap:
             if cap == 1:
                 # One slot: the refusal names THE holder as a record (who/claim callers index it).
                 cur = live[0]
-                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur.get("since"))
+                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur.get("since"),
+                            reason="held", **{"class": klass})
                 return False, cur, f"held by {cur['holder']} since {time.strftime('%H:%M:%SZ', time.gmtime(cur['since']))}"
             holders = ",".join(lease["holder"] for lease in live)
-            self.record("refuse", resource=resource, session=session, holder=holders)
+            self.record("refuse", resource=resource, session=session, holder=holders, reason="held", **{"class": klass})
             return False, live, f"all {cap} slots held by {holders}"
-        slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)] if cap > 1 else None
         if cap == 1:
             cur = leases.get(resource)
-            if cur and cur.get("holder") == session:
-                cur["since"] = round(self.now(), 3)
-                cur["note"] = note or cur.get("note")
-                leases[resource] = cur
-                self._write_leases(leases)
-                return True, cur, "renewed"
             if cur and self.holder_is_live(cur):
-                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur["since"])
+                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur["since"],
+                            reason="held", **{"class": klass})
                 return False, cur, f"held by {cur['holder']} since {time.strftime('%H:%M:%SZ', time.gmtime(cur['since']))}"
-            takeover = cur["holder"] if cur else None
-            lease = {"resource": resource, "holder": session, "since": round(self.now(), 3),
-                     "note": note, "ttl_s": ttl_s, "action": "use"}
+            prior = cur["holder"] if cur else None
+            takeover = prior if prior and prior != session else None
+            lease = self._new_lease(resource, session, note, ttl_s, klass, seat)
             leases[resource] = lease
             self._write_leases(leases)
-            self.record("claim", resource=resource, session=session, note=note,
-                        took_over_from=takeover if takeover and takeover != session else None)
-            return True, lease, "taken over from a stale holder" if takeover and takeover != session else "claimed"
-        lease = {"resource": resource, "holder": session, "since": round(self.now(), 3),
-                 "note": note, "ttl_s": ttl_s, "action": "use"}
+            self.record("claim", resource=resource, session=session, note=note, ttl_s=ttl_s,
+                        claimed_at=lease["claimed_at"], seat=seat, took_over_from=takeover,
+                        expired_after_s=self._expired_after(cur) if cur else None, **{"class": klass})
+            if takeover:
+                return True, lease, "taken over from a stale holder"
+            return True, lease, "re-claimed after its own lease lapsed" if prior else "claimed"
+        slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)]
+        lease = self._new_lease(resource, session, note, ttl_s, klass, seat)
         slots.append(lease)
         leases[resource + "/slots"] = slots
         self._write_leases(leases)
-        self.record("claim", resource=resource, session=session, note=note)
+        self.record("claim", resource=resource, session=session, note=note, ttl_s=ttl_s,
+                    claimed_at=lease["claimed_at"], seat=seat, **{"class": klass})
         return True, lease, "claimed"
 
     def release(self, resource, session, reason=None):
-        leases = self.leases()
-        changed = False
-        cur = leases.get(resource)
-        if cur and cur.get("holder") == session:
-            del leases[resource]
-            changed = True
-        slots = leases.get(resource + "/slots")
-        if slots:
-            kept = [l for l in slots if l.get("holder") != session]
-            if len(kept) != len(slots):
-                leases[resource + "/slots"] = kept
+        with self._locked():
+            leases = self.leases()
+            changed = False
+            cur = leases.get(resource)
+            if cur and cur.get("holder") == session:
+                del leases[resource]
                 changed = True
-        if changed:
-            self._write_leases(leases)
-            self.record("release", resource=resource, session=session, reason=reason)
+            slots = leases.get(resource + "/slots")
+            if slots:
+                kept = [l for l in slots if l.get("holder") != session]
+                if len(kept) != len(slots):
+                    leases[resource + "/slots"] = kept
+                    changed = True
+            if changed:
+                self._write_leases(leases)
+                self.record("release", resource=resource, session=session, reason=reason)
         return changed
+
+    def overrun_check(self, resource="mesh"):
+        """Emit dev-berth-held-by-measure@1 (value = seconds held since claimed_at) ONCE for a lease
+        held past its ttl, marked under emitted/<holder>-<claimed_at>. Returns the seconds emitted, or
+        None. No marker without a landed emit, so an unavailable emitter retries on a later call."""
+        lease = self.raw_lease(resource)
+        if not lease:
+            return None
+        claimed, ttl = lease.get("claimed_at"), lease.get("ttl_s")
+        if claimed is None or not ttl:
+            return None
+        held = self.now() - claimed
+        if held <= ttl or os.path.exists(self._marker(lease)):
+            return None
+        klass = lease.get("class")
+        if not self._emit_pain(held, f"{resource} lease held by {lease.get('holder')} as {klass} for "
+                               f"{_age(held)} past a {_age(ttl)} ttl (claimed_at {claimed})",
+                               resource=resource, kind="overrun", **{"class": klass}):
+            return None
+        self._write_marker(lease)
+        self.record("overrun", resource=resource, holder=lease.get("holder"), ttl_s=ttl, claimed_at=claimed,
+                    held_s=round(held), measure=OVERRUN_MEASURE, **{"class": klass})
+        return round(held)
 
     def who(self, resource):
         leases = self.leases()
@@ -319,10 +589,23 @@ def render_status(b):
             desc = ", ".join(f"{l['holder']} ({_age(now - l['since'])})" for l in holder) or "free"
             lines.append(f"    {res:<11} {len(holder)}/{caps.get(res, 1)}  {desc}")
         elif holder:
-            lines.append(f"    {res:<11} held by {holder['holder']} for {_age(now - holder['since'])}"
+            terms = ", ".join(x for x in (holder.get("class"),
+                                          f"ttl {_age(holder['ttl_s'])}" if holder.get("ttl_s") else None) if x)
+            lines.append(f"    {res:<11} held by {holder['holder']} for {_age(now - holder.get('claimed_at', holder['since']))}"
+                         + (f" ({terms})" if terms else "")
                          + (f" — {holder['note']}" if holder.get('note') else ""))
         else:
-            lines.append(f"    {res:<11} free")
+            raw = b.raw_lease(res)
+            if raw and raw.get("holder"):
+                held = _age(now - raw.get("claimed_at", raw.get("since", now)))
+                if raw.get("ttl_s"):
+                    lines.append(f"    {res:<11} EXPIRED {raw['holder']} — held {held} of a {_age(raw['ttl_s'])} "
+                                 f"{raw.get('class') or 'unclassed'} ttl (takeover on next claim)")
+                else:
+                    lines.append(f"    {res:<11} EXPIRED {raw['holder']} — held {held}, mooring stale "
+                                 f"(takeover on next claim)")
+            else:
+                lines.append(f"    {res:<11} free")
     ram = _guard_state("ram-guard")
     io = _guard_state("io-guard")
     if ram:
@@ -338,11 +621,18 @@ def _fmt_ledger(ev):
     k = ev.get("kind")
     if k == "note":
         return f"{t} {ev.get('session')}→{ev.get('to') or 'all'}: {ev.get('text')}"
-    if k in ("claim", "release", "refuse"):
-        extra = f" (holder {ev.get('holder')})" if ev.get("holder") else ""
+    if k in ("claim", "release", "refuse", "renew", "override", "overrun"):
+        extra = f" [{ev['class']}{', ttl ' + _age(ev['ttl_s']) if ev.get('ttl_s') else ''}]" if ev.get("class") else ""
+        extra += f" (holder {ev.get('holder')})" if ev.get("holder") and k != "override" else ""
         extra += f" took over from {ev['took_over_from']}" if ev.get("took_over_from") else ""
+        extra += f" after {_age(ev['expired_after_s'])} expired" if ev.get("expired_after_s") is not None else ""
+        extra += f" refused: {ev['reason']}" if k == "refuse" and ev.get("reason") else ""
+        extra += f" → {ev['alternative']}" if ev.get("alternative") else ""
+        extra += f" held {_age(ev['held_s'])}" if ev.get("held_s") is not None else ""
+        extra += f" seat={ev['seat']}" if ev.get("seat") else ""
+        extra += f" — {ev['reason']}" if k == "override" and ev.get("reason") else ""
         extra += f" — {ev['note']}" if ev.get("note") else ""
-        return f"{t} {k:<7} {ev.get('resource')} by {ev.get('session')}{extra}"
+        return f"{t} {k:<7} {ev.get('resource')} by {ev.get('session') or ev.get('holder')}{extra}"
     if k == "moor":
         r = ev.get("recipient", {})
         return f"{t} moor    {ev.get('session')} {r.get('runtime', '?')} {r.get('model', '?')}@{r.get('lab', '?')} task={ev.get('task') or '-'}"
@@ -378,6 +668,15 @@ def main(argv):
         for ev in b.ledger(n):
             print(_fmt_ledger(ev))
         return 0
+    if cmd == "overrun-check":
+        # Hook-facing (ram-guard's prompt event): never fails the caller, prints only on an emit.
+        try:
+            held = b.overrun_check(argv[0] if argv else "mesh")
+        except Exception:
+            held = None
+        if held:
+            print(f"{argv[0] if argv else 'mesh'}: {OVERRUN_MEASURE} = {held}s emitted")
+        return 0
     if cmd == "who":
         if not argv:
             print("usage: berth who RESOURCE", file=sys.stderr)
@@ -404,18 +703,36 @@ def main(argv):
         print(f"unmoored {session}")
         return 0
     if cmd == "claim":
-        if not argv:
-            print("usage: berth claim RESOURCE --session S [--note TEXT] [--ttl SECONDS]", file=sys.stderr)
-            return 2
+        usage = "usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]"
         ttl = _opt(argv, "--ttl")
         note = _opt(argv, "--note")
+        klass = _opt(argv, "--class")
+        if not argv:
+            print(usage, file=sys.stderr)
+            return 2
         res = argv[0]
-        if not b.mooring(session):
+        try:
+            ttl_s = int(ttl) if ttl else None
+        except ValueError:
+            print(f"berth: --ttl {ttl!r} is not a number of seconds\n{usage}", file=sys.stderr)
+            return 2
+        # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
+        if not b.touch(session):
             b.moor(session)
-        ok, lease, reason = b.claim(res, session, note=note, ttl_s=int(ttl) if ttl else None)
+        try:
+            ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass,
+                                        seat=os.environ.get("BERTH_SEAT") or None,
+                                        override=os.environ.get("MEASURE_ON_DEV_BERTH") == "1")
+        except BerthUsage as e:
+            print(f"berth: {e}", file=sys.stderr)
+            return 2
         if ok:
-            print(f"{res}: {reason} by {session}")
+            head, _, tail = reason.partition("; ")
+            print(f"{res}: {head} by {session}" + (f"\n  {tail}" if tail else ""))
             return 0
+        if lease is None:
+            print(f"{res}: REFUSED — {reason}", file=sys.stderr)
+            return 3
         print(f"{res}: REFUSED — {reason}. Ask them, or wait; `berth say --to {getattr(lease, 'get', lambda k: None)('holder') if isinstance(lease, dict) else '<holder>'} …`",
               file=sys.stderr)
         return 3

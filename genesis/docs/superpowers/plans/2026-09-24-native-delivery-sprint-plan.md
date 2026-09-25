@@ -15,7 +15,7 @@ cites:
   - "submodule-pin-attestation-gate-design | pin-attestation gate spec: the rakia schema path, attested run kind and oracle Lanes B1/N1/F follow | sha256:79d9af05d5287df8 | path: genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md"
   - "runtime-artifacts-elected-content | elected-content spec; its §12.8 slice 2 is Lane N (app bundle as elected content) | sha256:eaa2716381075140 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - "workspace-berth-carrying-capacity-design | berth carrying-capacity spec: the workspace identity and lease discipline Lane F2's receipt attestation signs with | sha256:589932493289a667 | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
+  - "workspace-berth-carrying-capacity-design | berth carrying-capacity spec: the workspace identity and lease discipline Lane F2's receipt attestation signs with | sha256:6b649b3d1b6a961b | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
   - elohim/rakia/docs/specs/2026-04-12-rakia-design.md
   - genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
@@ -809,6 +809,7 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
   selector/COUNT(*)/ScheduledFunction cost (steady-state 230–414 % CPU per conductor) and the WAL that
   checkpoints only in the first 90 s after boot (H3). The grown stores for reproducing both are archived
   at `/projects/.claude-config/k0-household-stores-20260925/`; the household was recast on e0bfc6c7a.
+- **Correction (2026-09-25, plan `we-ran-into-a-cryptic-robin` R4 re-ruled):** "until that peer exists, measure-class runs are queued, not run here" is superseded — a measure-class claim on the dev berth is *refused with a named alternative* (`just measure`) and a *declared override* (`MEASURE_ON_DEV_BERTH=1`) that emits pain (`dev-berth-held-by-measure@1`); nothing queues.
 
 ## Complementary work captured (backlog, not this sprint)
 

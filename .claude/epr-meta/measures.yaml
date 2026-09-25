@@ -1048,6 +1048,28 @@ measures:
       ships nothing; cost per delivered bundle can. It is the number a push's author pays and the
       one the cost sentinel §8 names as never built.
 
+  # ── the dev berth held by a measure (plan we-ran-into-a-cryptic-robin R4, Lane D1) ──
+  - id: dev-berth-held-by-measure
+    version: 1
+    family: berth
+    unit: seconds
+    procedure: >
+      seconds a dev-berth mesh lease was held past its declared class budget, read from claimed_at.
+      Emitted by genesis/agentic/bin/berth, never by hand: `berth overrun-check` (called from
+      ram-guard's prompt event) folds now − claimed_at once per lease when that exceeds the lease's
+      ttl_s (marker emitted/<holder>-<claimed_at>); a declared override
+      (MEASURE_ON_DEV_BERTH=1 berth claim mesh --class measure --ttl N) folds value = N the moment
+      the hold starts. Subject `.`; env carries resource, class and kind (overrun | override).
+    provenance: "genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md rulings log wave 2 (the K0 A/B and household proof held this workspace's mesh lease 2026-09-24 20:16Z → 2026-09-25 ~13:00Z)"
+    default-authority: observation
+    status: active
+    established_by: native-delivery-sprint-2026-09-25
+    why: >
+      A measure-class run on the workspace a human develops in is measurement-by-blocking done to
+      ourselves, and nothing recorded it: the lease had no class and no budget, so a sixteen-hour
+      hold read the same as a ten-minute lane. The override count over the coming weeks is the
+      number that prices provisioning a measurement peer.
+
   # ── the store that grows (algedonic-designer, first real firing, 2026-09-24; plan Lane H4) ──
   # Named by the operator from the 2026-09-24 conductor-store-growth report before any channel
   # felt it: 2.3 GB in 42 hours, 27,317 of 30,787 lamad entries a doorway health probe writing on
@@ -1799,6 +1821,29 @@ lenses:
       At most one pipeline-hour per delivered bundle. A healthy App run is ~30 minutes end to end,
       so an hour absorbs one failed run per delivery; above it, the pipeline is spending more
       retrying than shipping.
+
+  - id: dev-berth-held-by-measure-ceiling
+    version: 1
+    headline: cost
+    binding: binding-local
+    class: measure
+    consumes: [dev-berth-held-by-measure@1]
+    subject: .
+    context: session-headline
+    hard: 1800
+    compare: above
+    concern: push-delivers-within-budget
+    retire-when: >
+      when measure-class runs have no dev-berth path at all (the measure-runs-on-a-peer habit's own
+      exit) — then no lease on this berth can be a measure, and there is nothing to hold past
+    status: active
+    established_by: native-delivery-sprint-2026-09-25
+    why: >
+      A dev-berth mesh hold of at most 1800 s — the verify class's default budget. Every reading this
+      sensor folds is a hold that already outran its declared ttl, or a declared override's whole
+      ttl, so a reading above 1800 is a push's berth spent on measuring; routed to the active
+      push-delivers-within-budget habit so the cost renders on the headline now, not when the
+      offload habit activates.
 
   # ── store-growth bounds (algedonic-designer, 2026-09-24; plan Lane H4) ──
   # Declared here rather than as policies.yaml rows for the reason the delivery-cost bounds above

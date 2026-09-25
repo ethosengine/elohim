@@ -51,6 +51,21 @@ test target="changed" scope="":
         # Env comes from the same two sources the CI mesh stage uses: hc-mesh.sh's `mesh_seed_env`
         # (seed/probe block) and hc-mesh-prologue.sh's "a2o env" block, so a local run and the
         # pipeline read the same names. Bring the mesh up first: `just mesh start && just mesh prologue`.
+        # THE BERTH LEASE IS THE ROUTER (plan R4): the household is one per workspace, so this lane
+        # claims it as `verify` for a bounded ttl before anything else runs — a second session is
+        # refused in under a second (exit 3) with the holder named, never queued. BERTH_CLASS=measure
+        # is refused too, naming `just measure <scope>`; MEASURE_ON_DEV_BERTH=1 declares an override
+        # that puts dev-berth-held-by-measure@1 on the record. Exit 2 (no session id, e.g. a bare
+        # shell) does not block. A renew — this session already holds the mesh, e.g. from
+        # `just mesh start` — keeps that hold, so only a claim this lane made is given back on exit.
+        berth="{{ root }}/genesis/agentic/bin/berth"
+        berth_rc=0
+        berth_out="$("$berth" claim mesh --class "${BERTH_CLASS:-verify}" --ttl "${BERTH_TTL:-1800}" --note "test {{ target }} {{ scope }}")" || berth_rc=$?
+        if [[ -n "$berth_out" ]]; then echo "$berth_out"; fi
+        if [[ "$berth_rc" -eq 3 ]]; then exit 3; fi
+        if [[ "$berth_rc" -eq 0 && "$berth_out" != *renewed* ]]; then
+          trap '"$berth" release mesh >/dev/null 2>&1 || true' EXIT
+        fi
         # `set +e` around the source because hc-mesh.sh is `set -u` only and its optional-binary
         # probes (mongod, the conductor fork) legitimately exit non-zero at load.
         set +e
@@ -115,7 +130,9 @@ test target="changed" scope="":
         fi
         wait_for_lamad_call_readiness 75
         export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE="{{ root }}/genesis/manifests/cluster-state.act1-household.yaml"
-        export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
+        # One home: the runtime signal is DERIVED from the lane's cluster-state (the household file
+        # declares no remote compute, so `unavailable`), never typed beside it; no `epr` reads unavailable.
+        eval "$(epr flow hold --scope --env --cluster-state "$ELOHIM_CLUSTER_STATE_PATH_OVERRIDE" 2>/dev/null || echo 'export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable')"
         # DURABLE TRACE. Reports live under the REPO (genesis/a2o/reports/, gitignored),
         # not under $MESH_DIR: /tmp is wiped on container restart, so every honest local
         # run's evidence died with the container and counted for nothing. See
@@ -338,7 +355,24 @@ mesh action="status" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
-      start|stop|status|probe|prologue) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
+      # start/stop hold the household's berth lease (class `mesh`, ttl BERTH_TTL, default 1800 s):
+      # a start while another live session holds the mesh is refused (exit 3) with the holder named;
+      # exit 2 (no session id) does not block. A failed start gives the lease back.
+      start)
+        berth="{{ root }}/genesis/agentic/bin/berth"
+        berth_rc=0
+        "$berth" claim mesh --class mesh --ttl "${BERTH_TTL:-1800}" --note "mesh start" || berth_rc=$?
+        if [[ "$berth_rc" -eq 3 ]]; then exit 3; fi
+        start_rc=0
+        "{{ app_dir }}/scripts/hc-mesh.sh" start || start_rc=$?
+        if [[ "$start_rc" -ne 0 && "$berth_rc" -eq 0 ]]; then "$berth" release mesh >/dev/null 2>&1 || true; fi
+        exit "$start_rc" ;;
+      stop)
+        stop_rc=0
+        "{{ app_dir }}/scripts/hc-mesh.sh" stop || stop_rc=$?
+        "{{ root }}/genesis/agentic/bin/berth" release mesh >/dev/null 2>&1 || true
+        exit "$stop_rc" ;;
+      status|probe|prologue) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
       # preflight/wait (sprint 2026-09-08, T1): `start` already runs preflight itself and
       # launches detached — these are for checking readiness/refusals independently (a fresh
       # shell polling a `start` someone else kicked off, or a dry-run binary/port check).
