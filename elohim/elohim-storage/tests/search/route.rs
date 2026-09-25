@@ -811,3 +811,184 @@ async fn reach_gate_is_prepared_once_per_request() {
         "the listing prepares one gate for the whole page"
     );
 }
+
+/// A private row is admitted to its OWN creator, under either namespace the doorway can name
+/// them by — and to nobody else (ruling R-S12).
+///
+/// The defect this pins was not in the fold and not in the gate: `POST /db/content` took
+/// `created_by` from the request BODY alone, and no doorway client sends one, so every row a
+/// person wrote through the doorway landed `created_by = NULL`. The `private`/`self` arm admits
+/// exactly the creator, so a NULL creator is a row NOBODY can be admitted to — the author's own
+/// search withheld their own note (household mesh 2026-09-25: `created_by: null` on the written
+/// row, and `1 ranked candidate withheld by the reach gate for this reader` on the author's own
+/// question).
+///
+/// So the row here is written the way the doorway writes one — through the real route, with the
+/// identity headers the doorway forwards after JWT validation and NO `createdBy` in the body —
+/// and then asked for under each namespace that names the same `humans` row.
+#[tokio::test]
+async fn private_row_is_admitted_to_its_creator_under_each_namespace() {
+    let peer = peer();
+    seed_human(&peer, "matthew");
+    seed_human(&peer, "susan");
+
+    let addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let blob_store = Arc::new(
+        elohim_storage::blob_store::BlobStore::new(peer.blobs.path().to_path_buf())
+            .await
+            .unwrap(),
+    );
+    let writer = Arc::new(
+        HttpServer::new(blob_store, addr)
+            .with_db_pool(peer.pool.clone())
+            .with_search_index(peer.index.clone())
+            .with_services(Arc::new(elohim_storage::services::Services::new(
+                peer.pool.clone(),
+            ))),
+    );
+    tokio::spawn(writer.run());
+
+    let client = reqwest::Client::new();
+    let base = format!("http://{addr}");
+    // The write, as the doorway sends it: no `createdBy` in the body.
+    let write = |id: &'static str, header: (&'static str, String)| {
+        let client = client.clone();
+        let base = base.clone();
+        async move {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                let sent = client
+                    .post(format!("{base}/db/content"))
+                    .header(header.0, header.1.clone())
+                    .json(&serde_json::json!({
+                        "id": id,
+                        "title": format!("What we still owe on the roof ({id})"),
+                        "contentType": "concept",
+                        "contentFormat": "markdown",
+                        "contentBody": "The roof note.",
+                        "reach": "private",
+                        // Above the serving floor, exactly as `seed` does — the trust floor is
+                        // not what this story is about.
+                        "dhtAnchorHash": format!("uhCkk-{id}-anchor"),
+                    }))
+                    .send()
+                    .await;
+                match sent {
+                    Ok(resp) => return resp.status().as_u16(),
+                    Err(_) if Instant::now() < deadline => {
+                        tokio::time::sleep(Duration::from_millis(50)).await
+                    }
+                    Err(e) => panic!("the bound server never answered the write: {e}"),
+                }
+            }
+        }
+    };
+
+    // `X-Agent-Cid` — what the general proxy forwards from `claims.human_id`.
+    assert_eq!(
+        write("roof-note-by-cid", ("X-Agent-Cid", "matthew".into())).await,
+        201
+    );
+    // `X-Agent-Id` — the agent-key namespace the doorway forwards alongside it.
+    assert_eq!(
+        write("roof-note-by-key", ("X-Agent-Id", "uhCAk-matthew".into())).await,
+        201
+    );
+    // An identity this peer cannot resolve invents no creator (deny-by-default).
+    assert_eq!(
+        write(
+            "roof-note-by-stranger",
+            ("X-Agent-Cid", "uhCAk-nobody".into())
+        )
+        .await,
+        201
+    );
+
+    let created_by = |id: &str| -> Option<String> {
+        let mut conn = peer.pool.get().unwrap();
+        elohim_storage::db::content_diesel::get_content_with_tags(
+            &mut conn,
+            &AppContext::default_lamad(),
+            id,
+            elohim_storage::db::content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap()
+        .content
+        .created_by
+    };
+    assert_eq!(
+        created_by("roof-note-by-cid").as_deref(),
+        Some("matthew"),
+        "the slug namespace stamps the canonical humans.id"
+    );
+    assert_eq!(
+        created_by("roof-note-by-key").as_deref(),
+        Some("matthew"),
+        "the agent-key namespace stamps the SAME canonical humans.id"
+    );
+    assert_eq!(
+        created_by("roof-note-by-stranger"),
+        None,
+        "an unresolvable identity is never turned into a creator"
+    );
+
+    fold(&peer);
+    let reader = server(&peer).await;
+
+    // Tolerant of an EMPTY answer: a reader admitted to nothing may carry no `facets.reach` at
+    // all, and "the tally names no private item" must read the same either way.
+    let reach_tally = |view: &Value| -> Vec<String> {
+        view["facets"]["reach"]
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|row| row["value"].as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    // The creator, named either way, is admitted to their own two notes and to nothing else.
+    for asked_as in ["matthew", "uhCAk-matthew"] {
+        let view = search(&reader, "q=roof", Some(asked_as)).await;
+        let mut hits = ids(&view);
+        hits.sort();
+        assert_eq!(
+            hits,
+            ["roof-note-by-cid", "roof-note-by-key"],
+            "asked as {asked_as}, the creator holds exactly their own private rows: {view}"
+        );
+        assert!(
+            reach_tally(&view).contains(&"private".to_string()),
+            "asked as {asked_as}, the creator's own tally counts them: {view}"
+        );
+    }
+
+    // A third human is admitted to none of it, and nothing about it leaks.
+    let view = search(&reader, "q=roof", Some("susan")).await;
+    assert!(
+        ids(&view).is_empty(),
+        "susan holds none of matthew's private notes: {view}"
+    );
+    assert!(
+        !reach_tally(&view).contains(&"private".to_string()),
+        "no private item is named in a non-holder's tally: {view}"
+    );
+    let body = view.to_string();
+    for leak in ["roof-note-by-cid", "roof-note-by-key", "The roof note"] {
+        assert!(
+            !body.contains(leak),
+            "susan sees no trace of {leak}: {body}"
+        );
+    }
+    // The stranger-written row has no creator, so it is nobody's — not even the stranger's.
+    let view = search(&reader, "q=roof", Some("uhCAk-nobody")).await;
+    assert!(
+        ids(&view).is_empty(),
+        "an unresolvable asker is admitted to nothing: {view}"
+    );
+}

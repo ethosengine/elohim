@@ -7758,6 +7758,28 @@ impl HttpServer {
                 self.list_db_content_views(&query, requester_idv)
             }
             Method::POST => {
+                // Who this row belongs to — resolved from THIS write's explicit identity headers
+                // before the body is consumed, and stamped below as the canonical `humans.id`
+                // (ruling R-S12).
+                //
+                // Until this landed, `created_by` came from the request BODY alone, and no
+                // doorway client sends one: every row written through the doorway landed
+                // `created_by = NULL`. A NULL creator is a row NOBODY can be admitted to — the
+                // `private`/`self` arm of the reach authorizer admits exactly the creator, so a
+                // private note was withheld from the person who wrote it. Measured on the
+                // household mesh 2026-09-25: a private row written through the doorway as
+                // Matthew came back `created_by: null`, and his OWN `GET /db/content/search`
+                // answered with the row ranked, admitted to nobody, and named only in the
+                // reach-refusal line — while the same question with a `created_by` present
+                // returned it first.
+                //
+                // A `created_by` the body DID declare still wins — the seeder and the import
+                // path name authors this peer does not host.
+                let writer_id = self.db_pool.as_ref().and_then(|pool| {
+                    let mut conn = pool.get().ok()?;
+                    resolve_writer(&mut conn, req.headers()).map(|human| human.id)
+                });
+
                 // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
                 // Currently null for direct storage writes. Backfill needed for pre-coherence data.
                 let body = req
@@ -7781,7 +7803,10 @@ impl HttpServer {
                         .unwrap_or_else(|| "commons".to_string()),
                 );
 
-                let input: db::content_diesel::CreateContentInput = input_view.into();
+                let mut input: db::content_diesel::CreateContentInput = input_view.into();
+                if input.created_by.is_none() {
+                    input.created_by = writer_id;
+                }
                 let result = services.content.create(input);
 
                 // EPR Head publishing is handled by the drain loop (p2p/mod.rs::drain_publish_queue),
@@ -18301,6 +18326,38 @@ pub fn resolve_requester(
                 .ok()
                 .flatten()
         })
+}
+
+/// The human a WRITE belongs to, resolved from that request's own EXPLICIT identity headers —
+/// the write-path twin of [`resolve_requester`] (ruling R-S12).
+///
+/// It reads the pair the doorway forwards after JWT validation, in the same order
+/// `api::account::resolve_account_caller` reads them: `X-Agent-Id` first (already an agent key,
+/// `claims.agent_pub_key`), then `X-Agent-Cid` (`claims.human_id` — an account id or a
+/// `human-<name>` slug, or a `uhCA…` key a Tauri-direct caller set itself). Either namespace
+/// lands on the SAME `humans` row, and the caller stamps that row's canonical `humans.id`, so
+/// nothing downstream has to match identities across namespaces.
+///
+/// `None` when the write asserted no identity this peer knows. The row then carries no creator,
+/// which is honest: inventing one from an unresolvable header is how a private ring would be
+/// handed to a stranger who merely echoed a value.
+pub fn resolve_writer(
+    conn: &mut diesel::SqliteConnection,
+    headers: &header::HeaderMap,
+) -> Option<crate::db::models::Human> {
+    let explicit = |name: &str| -> Option<String> {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string)
+    };
+    explicit("X-Agent-Id")
+        .and_then(|key| {
+            crate::db::humans::get_human_by_agent_key(conn, &key)
+                .ok()
+                .flatten()
+        })
+        .or_else(|| resolve_requester(conn, explicit("X-Agent-Cid").as_deref()))
 }
 
 /// The reach authorizer, built ONCE for a request and consulted per row (ruling R-S11, S1).
