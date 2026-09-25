@@ -862,6 +862,49 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
 - `attestation:build-provenance` DHT kind — after F3 evidence; moves the DNA hash.
 - The orchestrator Checkout `script{}` diet (10062/11000) — before any further tag parsing.
 
+## Next sprint captured — adam as the measurement peer: declared compute agreements on the social-compute substrate (operator, 2026-09-25)
+
+The wave-2 ruling above says measure-class runs leave the dev berth; the operator named where they
+go. This is the next sprint, not this one; it composes four Draft specs that already exist rather
+than minting a fifth — `2026-09-08-peer-executed-stage-design` (an a2o feature run as a delegated
+compute task, attested by the provider), `2026-09-02-compute-envelope-tevah-design` (the envelope
+under the runtime; death witness as first output), `2026-09-05-k8s-bridge-runtime-envelope-render-design`
+(the runtime manifest declares the envelope; deployments.json is its lockfile render; capacity is
+observed, never hand-promoted) and `2026-09-03-workspace-berth-carrying-capacity-design` (Active; the
+workspace as the local slice of tevah). Operator intent, verbatim in substance:
+
+1. **Overhead on shem for adam.** Raise adam's capacity on shem so arks and berths are provisioned
+   *within* adam's k8s-supplied compute budget — the k8s bridge render is the declared home; the
+   live cluster is the operator's (repo manifests are the cleanup surface).
+2. **The rakia job is a declared compute agreement** — an envelope/package that adam, as a peer whose
+   native runtime is k8s-aware, *accepts*, runs, and whose result it *stores* for the agreed retention
+   (what Jenkins does today), optionally minting attestations about the dev artifact (what this sprint
+   did by hand in the devspace: K0 A/B, household receipts). P2P design gate at brainstorm: the
+   agreement is an REA Commitment/Agreement inherited from `epr-rea`/`elohim-compute` (compute grants,
+   the peer-executed-stage spec's `compute-receipt.json`), never a new table; the receipt is a
+   `brit` attestation with `Reach` derived (F1); retention is a declared bound, not a cron.
+3. **Offload or run alongside.** These run classes must be non-blocking for collaborative development:
+   `measure`/`profile` claims travel to the peer that holds the stores; the developer keeps the dev
+   berth. This *extends the native developer's capacity across the social-compute substrate* — the
+   collective seam's first felt job.
+4. **Tame the runtime first, because limits are what make pods.** Find and bound what rips CPU and
+   RAM, then declare limits for arks and berths so peers get the "vm/pod" equivalent: install, run,
+   manage, scale or archive any epr-app under a declared envelope. Named targets already in evidence
+   (2026-09-25 household, record `genesis/a2o/reports/recovery/k0-window-e0bfc6c7a-vs-25dd2d0be.md`):
+   the per-hosted-agent publish selector + COUNT(*) + ScheduledFunction cleanup (230–414 % CPU per
+   conductor on 8 GB stores, 38–55 % on fresh ones — cost ∝ table size × hosted agents); the WAL that
+   checkpoints only in the first 90 s after boot (H3); the doorway heartbeat writer (H0–H2); ~786 MB
+   conductor heap per hosted human never freed; conductor RSS 1.3–2.4 GB per peer. Habit:
+   `idle-is-free` owns the first two; the ark limit declaration is a new habit born with its
+   `retire-when:`.
+
+Serves: `push-delivers-within-budget` (measure-class cost leaves the developer's clock),
+`idle-is-free`, `dev-system-equilibrium` (k8s-bridge spec), and a habit to be born for the
+agreement itself (a claimed measure-class run is executed, stored and attested by a peer within its
+declared envelope). Entry: brainstorm + spec composing the four drafts, then a plan with the same
+lane discipline as this one. Gate: the P2P design gate on the agreement and the receipt before any
+route. Operator-owned steps: the shem capacity change and the k8s bridge apply.
+
 ## Verification (sprint-level, the DoD)
 
 - `push-delivers-within-budget`: `delivery-series.mjs --window 10` reads ≥ 8/10 delivered, p90
