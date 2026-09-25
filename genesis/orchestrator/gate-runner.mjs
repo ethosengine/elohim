@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -135,6 +135,27 @@ export function gateChildEnv(project, baseEnv, root = ROOT) {
   return childEnv;
 }
 
+// A manifest's fixed `cargo.targetDir` (e.g. eprfs's /tmp/eprfs-gate-target) is the main
+// checkout's: hooks read the `epr` it builds by that exact path. Linked worktrees get their OWN
+// suffixed dir, so concurrent gates in two worktrees never rebuild the same binary under each
+// other (a sponsorship gate once tested a sibling worktree's `epr` mid-run, 2026-09-25).
+export function worktreeTargetDir(targetDir, root = ROOT, git = gitDirs) {
+  if (!targetDir) return targetDir;
+  const dirs = git(root);
+  if (!dirs || dirs.gitDir === dirs.commonDir) return targetDir;
+  return `${targetDir}-wt-${basename(root)}`;
+}
+
+function gitDirs(root) {
+  const read = arg => {
+    const r = spawnSync('git', ['rev-parse', '--path-format=absolute', arg], { cwd: root, encoding: 'utf8' });
+    return r.status === 0 ? r.stdout.trim() : null;
+  };
+  const gitDir = read('--git-dir');
+  const commonDir = read('--git-common-dir');
+  return gitDir && commonDir ? { gitDir, commonDir } : null;
+}
+
 function runProject(project, printOnly, namesOnly) {
   const cargo = project.run.cargo || {};
   const args = [
@@ -144,7 +165,7 @@ function runProject(project, printOnly, namesOnly) {
     project.run.kind,
     project.run.recipe,
     cargo.workspace || '',
-    cargo.targetDir || '',
+    worktreeTargetDir(cargo.targetDir || ''),
     cargo.profile || 'dev',
     Object.hasOwn(cargo, 'rustflags') ? cargo.rustflags : '__inherit__',
   ];

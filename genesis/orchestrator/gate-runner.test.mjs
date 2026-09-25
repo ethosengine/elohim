@@ -6,7 +6,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { loadManifests } from './manifest-utils.mjs';
-import { gateChildEnv, oracleMode, projectsForChanges, selectGateProjects } from './gate-runner.mjs';
+import { gateChildEnv, oracleMode, projectsForChanges, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
 import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -341,5 +341,26 @@ describe('the hook parses stdout as project names — diagnostics never ride on 
     const out = spawnSync(process.execPath, [cli, '--list'], { cwd: ROOT, encoding: 'utf8' });
     assert.match(out.stdout, /^brit\telohim\/brit\tattested:ethosengine\/brit#Tests pass$/m);
     assert.doesNotMatch(out.stdout, /undefined/);
+  });
+});
+
+describe('worktree-scoped cargo target', () => {
+  const main = () => ({ gitDir: '/r/.git', commonDir: '/r/.git' });
+  const linked = () => ({ gitDir: '/r/.git/worktrees/wt-a', commonDir: '/r/.git' });
+
+  test('the main checkout keeps the manifest path the hooks read', () => {
+    assert.equal(worktreeTargetDir('/tmp/eprfs-gate-target', '/r', main), '/tmp/eprfs-gate-target');
+  });
+
+  test('a linked worktree builds into its own suffixed dir', () => {
+    assert.equal(
+      worktreeTargetDir('/tmp/eprfs-gate-target', '/r/.claude/worktrees/wt-a', linked),
+      '/tmp/eprfs-gate-target-wt-wt-a',
+    );
+  });
+
+  test('an undeclared target stays undeclared, and an unreadable repo changes nothing', () => {
+    assert.equal(worktreeTargetDir('', '/r/.claude/worktrees/wt-a', linked), '');
+    assert.equal(worktreeTargetDir('/tmp/x', '/r', () => null), '/tmp/x');
   });
 });

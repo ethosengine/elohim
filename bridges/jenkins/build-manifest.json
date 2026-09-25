@@ -14,7 +14,12 @@
           "elohim/epr/**",
           "elohim/epr-rea/**",
           "elohim/eprfs/**",
-          "bridges/did/did-bridge/**"
+          "bridges/did/did-bridge/**",
+          "bridges/did/Cargo.toml",
+          "bridges/did/did-types/**",
+          "elohim/Cargo.toml",
+          "elohim/epr-index/**",
+          "elohim/sdk/domains/elohim-agent/adapter/**"
         ],
         "buildProcess": []
       },
