@@ -145,6 +145,14 @@ function setup(world: object): MemoryFixture {
     '.epr-meta/collective.json',
     JSON.parse(readFileSync(join(repository, '.epr-meta/collective.json'), 'utf8'))
   );
+  // A declaration names no steward: the collective's Stewards are affiliation records, and a
+  // collective with none on record is refused. The repository's own sidecar is copied verbatim
+  // (affiliations match their collective by declaration path).
+  write(
+    f,
+    '.eprfs/status/affiliations.jsonl',
+    readFileSync(join(repository, '.eprfs/status/affiliations.jsonl'), 'utf8')
+  );
   write(
     f,
     'contract.json',

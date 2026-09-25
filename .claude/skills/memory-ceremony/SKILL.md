@@ -16,7 +16,12 @@ The `memory-kit` skill was RETIRED on 2026-09-11 (station six of the memory-kit 
 and this ceremony is its only entry point. Shared knowledge belongs to the repository collective;
 files/docs/algorithms/code are EPRFS objects governed by `.epr-meta`. Inspect the
 static local relationship with `epr flow memory collective`, which carries the
-declaration and its native input guides. Live session attribution remains in the
+declaration, its Stewards on record and its native input guides. A declaration names no
+steward: Stewards are affiliation records in `.eprfs/status/affiliations.jsonl` (the
+local pre-image of Qahal Membership), a directory may declare a child collective whose
+`parent` pins the enclosing one, and a session's claim binds its collective of record
+(`epr actor claim --under <path>`; unbound means the root). Source rules speak
+locality (`maxLocality`), never reach. Live session attribution remains in the
 existing actor store. This is a local collaboration policy, not authentication or
 network membership.
 
@@ -28,7 +33,10 @@ assertions, exact evidence, selection and omissions, and declares itself ephemer
 save its exact output and pin the saved bytes with `epr flow memory pin` before any
 consequential use, because feedback names those pinned bytes as its target. A resumed
 investigation re-derives the projection from the same authored request rather than
-caching it. Graduation is a read-only repository-reach rehearsal; it never publishes.
+caching it. Graduation is a read-only repository-locality rehearsal; it never publishes, and it
+needs an approving verdict from a Steward who is not the contribution's author. An
+approval resting on a fixture co-steward is reported `validatedAt: bootstrap (fixture
+co-steward)` and is never peer validation.
 The legacy Claude memory symlink already points into tracked `.claude/memory`;
 private/native separation is not retroactively established.
 
