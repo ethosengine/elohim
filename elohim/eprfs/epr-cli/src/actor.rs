@@ -1002,6 +1002,13 @@ fn roster_handles(root: &Path) -> Vec<String> {
     handles
 }
 
+/// Whether the device `did` is enrolled for `handle`: a member of its tracked participant roster
+/// (the chain root, or a device bound by one). Honest absence — no roster, an unreadable one —
+/// is `false`, never an error. Read-only: never creates a roster or a pin.
+pub fn device_enrolled(root: &Path, handle: &str, did: &str) -> bool {
+    read_roster(root, handle).is_ok_and(|roster| roster.members(&verifier()).contains(did))
+}
+
 /// Read one handle's roster; an absent file is an empty roster (without creating it).
 fn read_roster(root: &Path, handle: &str) -> ActorResult<Roster> {
     if !roster_file(root, handle).is_file() {

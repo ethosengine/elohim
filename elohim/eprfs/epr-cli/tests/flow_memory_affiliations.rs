@@ -65,18 +65,19 @@ fn append(root: &Path, record: &Affiliation) {
         .unwrap();
     writeln!(file, "{}", memory::affiliation_line(record).unwrap()).unwrap();
 }
+/// A standing affiliation with the root collective: human:matthew's is the genesis Steward line;
+/// every other member is sponsored by him (the sponsorship chain, `flow_memory_sponsorship.rs`).
 fn affiliate(root: &Path, member: &str, kind: MemberKind, role: MembershipRole) {
-    append(
+    let mut record = affiliation(
         root,
-        &affiliation(
-            root,
-            ROOT,
-            member,
-            kind,
-            role,
-            AffiliationStanding::Standing,
-        ),
+        ROOT,
+        member,
+        kind,
+        role,
+        AffiliationStanding::Standing,
     );
+    record.sponsor = (member != "human:matthew").then(|| "human:matthew".to_string());
+    append(root, &record);
 }
 fn git(root: &Path, args: &[&str]) {
     let status = elohim_epr_cli::process::build_command("git", args, root, &[])
@@ -114,17 +115,16 @@ fn fixture() -> TempDir {
         MemberKind::Person,
         MembershipRole::Steward,
     );
-    append(
+    let mut adam = affiliation(
         root,
-        &affiliation(
-            root,
-            ROOT,
-            "human:adam",
-            MemberKind::Person,
-            MembershipRole::Steward,
-            AffiliationStanding::Fixture,
-        ),
+        ROOT,
+        "human:adam",
+        MemberKind::Person,
+        MembershipRole::Steward,
+        AffiliationStanding::Fixture,
     );
+    adam.sponsor = Some("human:matthew".into());
+    append(root, &adam);
     affiliate(
         root,
         "agent:investigator",
@@ -226,7 +226,7 @@ fn a_collective_with_no_steward_on_record_is_refused() {
         MembershipRole::Contributor,
     );
     assert!(collective_err(root).contains("has no Steward on record"));
-    // A Steward, then withdrawn by a later line: history stays, standing ends.
+    // A genesis Steward, then a second Steward it sponsors.
     affiliate(
         root,
         "human:matthew",
@@ -234,17 +234,35 @@ fn a_collective_with_no_steward_on_record_is_refused() {
         MembershipRole::Steward,
     );
     assert!(memory::execute(root, "collective", None, None).is_ok());
-    let mut withdrawn = affiliation(
+    affiliate(
         root,
-        ROOT,
-        "human:matthew",
+        "human:ruth",
         MemberKind::Person,
         MembershipRole::Steward,
-        AffiliationStanding::Standing,
     );
-    withdrawn.withdrawn = Some("2026-09-26T00:00:00Z".into());
-    append(root, &withdrawn);
-    assert!(collective_err(root).contains("has no Steward on record"));
+    let withdrawal = |sponsor: &str| {
+        let mut withdrawn = affiliation(
+            root,
+            ROOT,
+            "human:matthew",
+            MemberKind::Person,
+            MembershipRole::Steward,
+            AffiliationStanding::Standing,
+        );
+        withdrawn.sponsor = Some(sponsor.into());
+        withdrawn.withdrawn = Some("2026-09-26T00:00:00Z".into());
+        withdrawn
+    };
+    // A Steward cannot sponsor its own withdrawal: the line is refused, standing stays.
+    append(root, &withdrawal("human:matthew"));
+    let view = memory::execute(root, "collective", None, None).unwrap();
+    assert_eq!(view["stewards"].as_array().unwrap().len(), 2);
+    // Withdrawn by a later line another Steward sponsors: history stays, standing ends.
+    append(root, &withdrawal("human:ruth"));
+    let view = memory::execute(root, "collective", None, None).unwrap();
+    let stewards = view["stewards"].as_array().unwrap();
+    assert_eq!(stewards.len(), 1);
+    assert_eq!(stewards[0]["member"], "human:ruth");
 }
 
 #[test]
@@ -774,6 +792,12 @@ fn the_repository_seed_verifies_line_by_line_and_carries_no_email() {
         assert_eq!(agent.acts_for.as_deref(), Some("human:matthew"));
     }
     assert!(rows.iter().all(|a| a.collective.path == ROOT));
+    // The sponsorship chain: matthew's line is the genesis; every other line he sponsored.
+    assert!(matthew.sponsor.is_none());
+    assert!(rows
+        .iter()
+        .filter(|a| a.member != "human:matthew")
+        .all(|a| a.sponsor.as_deref() == Some("human:matthew")));
 }
 
 #[test]

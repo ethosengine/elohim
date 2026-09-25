@@ -1,5 +1,6 @@
 //! Bounded local collective-memory composition over governed source files and REA notes.
 //! No mutable memory index, latest-head selection, network membership or new EPR kind.
+mod affiliate;
 pub mod entries;
 pub mod footprint;
 mod guide;
@@ -23,7 +24,10 @@ use serde_json::{json, Value};
 
 use super::{body_cid, note, FlowError, FlowResult};
 pub(crate) use validation::COLLECTIVE_PATH;
-pub use validation::{affiliation_line, verify_affiliation_line, AFFILIATIONS_PATH};
+pub use validation::{
+    affiliation_line, affiliation_line_signed, affiliation_signing_message, parse_affiliation_line,
+    verify_affiliation_line, AffiliationLine, LineSignature, AFFILIATIONS_PATH,
+};
 use validation::{bounded_text, version, Reader};
 
 fn refused(message: impl Into<String>) -> FlowError {
@@ -58,11 +62,28 @@ pub struct Options<'a> {
     /// `migrate-identity-reserve --basis` — one line the executor stands behind (on whose behalf
     /// it runs), recorded verbatim in the act's reason. Refused by every other operation.
     pub basis: Option<&'a str>,
+    /// `affiliate --member` — the participant ref the affiliation line names.
+    pub member: Option<&'a str>,
+    /// `affiliate --kind person|collective|elohim-agent`.
+    pub kind: Option<&'a str>,
+    /// `affiliate --role steward|contributor|observer`.
+    pub role: Option<&'a str>,
+    /// `affiliate --standing fixture` — a test member at Bootstrap stakes. Absent: standing.
+    pub standing: Option<&'a str>,
+    /// `affiliate --acts-for <ref>` — on whose behalf the member acts (default: the member's
+    /// current line's, else the collective's default).
+    pub acts_for: Option<&'a str>,
+    /// `affiliate --withdraw` — end the member's current affiliation (sponsored, like any line).
+    pub withdraw: bool,
+    /// This device's key, loaded (never minted) for `affiliate` to sign with when it is enrolled
+    /// for the sponsor.
+    pub device: Option<&'a crate::device_key::DeviceKey>,
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
-const OPERATIONS: [&str; 10] = [
+const OPERATIONS: [&str; 11] = [
     "collective",
+    "affiliate",
     "pin",
     "contribute",
     "project",
@@ -80,6 +101,9 @@ pub fn usage() -> String {
         "usage: epr flow memory <{}> [--input FILE] [--session ID] [--json] [--root DIR]\n\n  \
          collective    read a declared collective, its Stewards and contracts (--input PATH: \
          the collective of record for PATH)\n  \
+         affiliate     add, change or withdraw one member, sponsored by the session's Steward\n                \
+                --member REF --kind person|collective|elohim-agent --role steward|contributor|observer\n                \
+                [--standing fixture] [--acts-for REF] [--withdraw] --session ID\n  \
          pin           pin one governed source file by reference\n  \
          contribute    file a governed contribution request\n  \
          project       project a contribution receipt, or --index the memory index\n  \
@@ -150,6 +174,11 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                 i += 1;
                 continue;
             }
+            "--withdraw" => {
+                opts.withdraw = true;
+                i += 1;
+                continue;
+            }
             _ => {}
         }
         let value = args
@@ -163,10 +192,21 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             "--budget" => opts.budget = Some(value.as_str()),
             "--out" => opts.out = Some(value.as_str()),
             "--basis" => opts.basis = Some(value.as_str()),
+            "--member" => opts.member = Some(value.as_str()),
+            "--kind" => opts.kind = Some(value.as_str()),
+            "--role" => opts.role = Some(value.as_str()),
+            "--standing" => opts.standing = Some(value.as_str()),
+            "--acts-for" => opts.acts_for = Some(value.as_str()),
             _ => return Err(refused(format!("unknown option {key}"))),
         }
         i += 2;
     }
+    // `affiliate` signs with this device's key when one already exists; it never mints one.
+    let device = (operation == "affiliate")
+        .then(|| crate::device_key::resolve_path().ok())
+        .flatten()
+        .and_then(|path| crate::device_key::DeviceKey::load(&path).ok());
+    opts.device = device.as_ref();
     let value = execute_with(&root, operation, &opts)?;
     if !json_output {
         println!("Collective memory — {operation}. Local scope; no network authority.");
@@ -211,6 +251,20 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
     if opts.basis.is_some() {
         return Err(refused("--basis belongs to migrate-identity-reserve alone"));
     }
+    let affiliate_only = opts.member.is_some()
+        || opts.kind.is_some()
+        || opts.role.is_some()
+        || opts.standing.is_some()
+        || opts.acts_for.is_some()
+        || opts.withdraw;
+    if operation == "affiliate" {
+        return affiliate::run(root, opts);
+    }
+    if affiliate_only {
+        return Err(refused(
+            "--member, --kind, --role, --standing, --acts-for and --withdraw belong to affiliate alone",
+        ));
+    }
     if operation == "import" {
         return import::run(root, opts);
     }
@@ -237,9 +291,9 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             json!({"operation":"collective", "resource":governance.reference, "declaration":governance.declaration,
             "inputGuide":guide::input_guide(&governance),
             "stewards":governance.steward_report(),
-            "affiliations":{"current":governance.affiliations.len(),"invalidLines":governance.invalid_lines,"sidecar":validation::AFFILIATIONS_PATH},
+            "affiliations":{"current":governance.affiliations.len(),"invalidLines":governance.invalid_lines,"refused":governance.refused,"sidecar":validation::AFFILIATIONS_PATH},
             "registry":registry,
-            "standing":"Declared local relationship. Stewards are affiliation records, the local pre-image of Qahal Membership; registered actor claims supply attribution, not authentication or network membership.","usage":reader.usage()}),
+            "standing":"Declared local relationship. Stewards are affiliation records, the local pre-image of Qahal Membership; every line after the genesis Steward is sponsored by an active Steward who is not its member (`affiliate`), and an unsponsored line does not stand. Registered actor claims supply attribution, not authentication or network membership.","usage":reader.usage()}),
         );
     }
     let input = input.ok_or_else(|| refused("operation needs --input"))?;
@@ -426,7 +480,8 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             };
             let mut out = json!({"operation":"graduate","resource":request.contribution,"review":request.review,
                 "audience":"repository","effectiveReach":"repository","allowed":true,
-                "approver":{"member":approver.member,"affiliation":affiliation_cid,"role":approver.role,"standing":approver.standing},
+                "approver":{"member":approver.member,"affiliation":affiliation_cid,"role":approver.role,"standing":approver.standing,
+                    "sponsor":approver.sponsor,"signature":governance.signature_report(affiliation_cid)["status"]},
                 "validatedAt":validation::validated_at(approver.standing),
                 "standing":standing,
                 "limitations":assertion.uncertainty,"contradictions":assertion.contradicts});

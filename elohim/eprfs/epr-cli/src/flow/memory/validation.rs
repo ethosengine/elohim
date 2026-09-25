@@ -43,10 +43,37 @@ pub struct ReadFile {
 pub struct Governance {
     pub reference: FileRef,
     pub declaration: Collective,
-    /// The current affiliation per member (the last sidecar line wins), with its line CID.
+    /// The current affiliation per member (the last ADMITTED sidecar line wins), with its CID.
     pub affiliations: Vec<(String, Affiliation)>,
-    /// Sidecar lines whose CID or shape did not verify. They count for nothing, anywhere.
+    /// Sidecar lines that count for nothing, anywhere: every entry of [`Self::refused`].
     pub invalid_lines: usize,
+    /// Every refused line, named: one whose CID, shape or signature did not verify, or one of
+    /// this collective's lines the sponsorship chain refused (see [`Fold::admit`]).
+    pub refused: Vec<RefusedLine>,
+    /// Every admitted line of this collective by CID: its sponsor's line and its signature.
+    pub admitted: BTreeMap<String, Admitted>,
+}
+
+/// One sidecar line that counts for nothing, and why — never silently dropped.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedLine {
+    /// 1-based line number in the sidecar.
+    pub line: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member: Option<String>,
+    pub reason: String,
+}
+
+/// One admitted line: the record, the admitted line its sponsor stood on (`None` = the genesis
+/// Steward), and how it is signed.
+#[derive(Clone, Debug)]
+pub struct Admitted {
+    pub record: Affiliation,
+    pub sponsor_line: Option<String>,
+    pub signature: LineSignature,
 }
 
 impl Governance {
@@ -109,18 +136,180 @@ impl Governance {
             })
     }
 
-    /// The Stewards on record, as a report: who, which affiliation line, and whether each stands
-    /// for real or is a fixture co-steward.
+    /// The Stewards on record, as a report: who, which affiliation line, whether each stands
+    /// for real or is a fixture co-steward, who sponsored it back to the genesis Steward, and
+    /// whether each line of that chain is `signed` or `unsigned`.
     pub fn steward_report(&self) -> Value {
         Value::Array(
             self.stewards()
                 .map(|(cid, a)| {
                     json!({"member":a.member,"memberKind":a.member_kind,"affiliation":cid,
                         "standing":a.standing,"actsFor":self.acts_for(a),
-                        "validatedAt":validated_at(a.standing)})
+                        "validatedAt":validated_at(a.standing),
+                        "sponsor":a.sponsor,
+                        "signature":self.signature_report(cid),
+                        "sponsorChain":self.sponsor_chain(cid)})
                 })
                 .collect(),
         )
+    }
+
+    /// `signed` (with its device) or the honest literal `unsigned`, for one admitted line.
+    pub fn signature_report(&self, cid: &str) -> Value {
+        match self.admitted.get(cid).map(|a| &a.signature) {
+            Some(LineSignature::Signed { signer, .. }) => {
+                json!({"status":"signed","signer":signer})
+            }
+            _ => json!({"status":"unsigned"}),
+        }
+    }
+
+    /// The sponsors of one admitted line, nearest first, ending at the genesis Steward: each hop
+    /// is the exact line the sponsor stood on when it sponsored, never its later record.
+    pub fn sponsor_chain(&self, cid: &str) -> Vec<Value> {
+        let mut chain = Vec::new();
+        let mut seen = BTreeSet::new();
+        let mut next = self.admitted.get(cid).and_then(|a| a.sponsor_line.clone());
+        while let Some(hop) = next {
+            if !seen.insert(hop.clone()) {
+                break;
+            }
+            let Some(line) = self.admitted.get(&hop) else {
+                break;
+            };
+            chain.push(json!({"member":line.record.member,"affiliation":hop,
+                "role":line.record.role,"standing":line.record.standing,
+                "genesis":line.sponsor_line.is_none(),
+                "signature":self.signature_report(&hop)["status"]}));
+            next = line.sponsor_line.clone();
+        }
+        chain
+    }
+}
+
+/// The sponsorship chain, folded in FILE ORDER over one collective's sidecar lines.
+///
+/// The first Steward line of a collective is its genesis and names no sponsor. Every later line
+/// — a new member, a role change, a withdrawal, a rejoin — names a `sponsor` who, at that point
+/// in the fold, is an ACTIVE Steward of the collective and is not the line's member (by
+/// [`Affiliation::same_author_as`], so a sibling build of the same agent role cannot sponsor it).
+/// A Fixture Steward may sponsor only a Fixture or a Contributor line: a fixture never mints real
+/// authority. Membership is the first place the anti-self-election rule holds: a Steward added by
+/// a raw file edit without a valid sponsor does not stand.
+#[derive(Default)]
+pub struct Fold {
+    order: Vec<String>,
+    current: BTreeMap<String, (String, Affiliation)>,
+    genesis: bool,
+    admitted: BTreeMap<String, Admitted>,
+}
+
+impl Fold {
+    /// The fold as it stands after a read collective: its current affiliations, past genesis
+    /// (a collective read at all has a Steward on record, so its genesis is behind it).
+    pub fn from_governance(governance: &Governance) -> Self {
+        let mut fold = Self {
+            genesis: true,
+            ..Self::default()
+        };
+        for (cid, affiliation) in &governance.affiliations {
+            fold.order.push(affiliation.member.clone());
+            fold.current.insert(
+                affiliation.member.clone(),
+                (cid.clone(), affiliation.clone()),
+            );
+        }
+        fold
+    }
+
+    /// Whether `line` may follow the fold so far: `Ok(sponsor's line CID)` (`None` for the
+    /// genesis), or the refusal naming why.
+    pub fn admit(&self, line: &Affiliation) -> Result<Option<String>, String> {
+        use eprfs_agent::memory::MembershipRole;
+        if !self.genesis
+            && line.role == MembershipRole::Steward
+            && line.withdrawn.is_none()
+            && line.sponsor.is_none()
+        {
+            return Ok(None);
+        }
+        let Some(sponsor) = line.sponsor.as_deref() else {
+            return Err(if self.genesis {
+                format!(
+                    "{} names no sponsor: every line after the genesis Steward needs an active                      Steward's sponsorship",
+                    line.member
+                )
+            } else {
+                format!(
+                    "{} precedes the collective's genesis Steward and names no sponsor",
+                    line.member
+                )
+            });
+        };
+        let Some((sponsor_line, steward)) = self.active_steward(sponsor) else {
+            let held = self
+                .current
+                .values()
+                .find(|(_, a)| a.member == sponsor)
+                .or_else(|| self.current.values().find(|(_, a)| a.names(sponsor)))
+                .map_or("no affiliation at all".to_string(), |(_, a)| {
+                    if a.withdrawn.is_some() {
+                        format!("a withdrawn {:?} affiliation", a.role)
+                    } else {
+                        format!("a {:?} affiliation", a.role)
+                    }
+                });
+            return Err(format!(
+                "sponsor {sponsor} is not an active Steward of this collective at this point in                  the fold ({held})"
+            ));
+        };
+        if steward.same_author_as(&line.member) {
+            return Err(format!(
+                "self-sponsorship: sponsor {sponsor} (Steward line {}) is the same author as the                  member {} (agent refs compare by role)",
+                steward.member, line.member
+            ));
+        }
+        if steward.standing == AffiliationStanding::Fixture
+            && line.standing != AffiliationStanding::Fixture
+            && line.role != MembershipRole::Contributor
+        {
+            return Err(format!(
+                "fixture Steward {sponsor} cannot sponsor a standing {:?} line for {}: a fixture                  may sponsor only a Fixture or Contributor line, never real authority",
+                line.role, line.member
+            ));
+        }
+        Ok(Some(sponsor_line.to_string()))
+    }
+
+    /// The active Steward `participant` stands as: the exact member, else a package-level agent
+    /// Steward naming the build (the same narrow lookup standing uses).
+    fn active_steward(&self, participant: &str) -> Option<(&str, &Affiliation)> {
+        let active = || self.current.values().filter(|(_, a)| a.is_active_steward());
+        active()
+            .find(|(_, a)| a.member == participant)
+            .or_else(|| active().find(|(_, a)| a.names(participant)))
+            .map(|(cid, a)| (cid.as_str(), a))
+    }
+
+    fn accept(&mut self, cid: String, line: Affiliation, admitted: Admitted) {
+        use eprfs_agent::memory::MembershipRole;
+        if admitted.sponsor_line.is_none() && line.role == MembershipRole::Steward {
+            self.genesis = true;
+        }
+        if !self.current.contains_key(&line.member) {
+            self.order.push(line.member.clone());
+        }
+        self.admitted.insert(cid.clone(), admitted);
+        self.current.insert(line.member.clone(), (cid, line));
+    }
+
+    fn finish(mut self) -> (Vec<(String, Affiliation)>, BTreeMap<String, Admitted>) {
+        let current = self
+            .order
+            .iter()
+            .filter_map(|member| self.current.remove(member))
+            .collect();
+        (current, self.admitted)
     }
 }
 
@@ -370,12 +559,14 @@ impl Reader {
             }
             (None, true) => {}
         }
-        let (affiliations, invalid_lines) = self.affiliations_for(&file.reference)?;
+        let (affiliations, admitted, refused_lines) = self.affiliations_for(&file.reference)?;
         let governance = Governance {
             reference: file.reference,
             declaration,
             affiliations,
-            invalid_lines,
+            invalid_lines: refused_lines.len(),
+            refused: refused_lines,
+            admitted,
         };
         if governance.stewards().next().is_none() {
             return Err(refused(format!(
@@ -387,41 +578,90 @@ impl Reader {
         Ok(governance)
     }
 
-    /// Every current affiliation with the collective whose declaration is at `reference.path`.
+    /// Every current affiliation with the collective whose declaration is at `reference.path`,
+    /// folded through the sponsorship chain ([`Fold`]), with the lines that count for nothing.
     ///
     /// Matched by declaration PATH: a charter amendment re-pins the declaration's CID, and a
     /// member's standing does not lapse because the text they affiliated under was amended — the
     /// CID each member affiliated under stays on their line as the record of it.
-    fn affiliations_for(
-        &self,
-        reference: &FileRef,
-    ) -> FlowResult<(Vec<(String, Affiliation)>, usize)> {
+    fn affiliations_for(&self, reference: &FileRef) -> FlowResult<AffiliationFold> {
         if !self.root.join(AFFILIATIONS_PATH).exists() {
-            return Ok((Vec::new(), 0));
+            return Ok((Vec::new(), BTreeMap::new(), Vec::new()));
         }
         self.sidecar(AFFILIATIONS_PATH)?;
         let text = std::fs::read_to_string(self.path(AFFILIATIONS_PATH)?)?;
-        let mut order: Vec<String> = Vec::new();
-        let mut current: BTreeMap<String, (String, Affiliation)> = BTreeMap::new();
-        let mut invalid = 0;
-        for line in text.lines().filter(|l| !l.trim().is_empty()) {
-            let Some((cid, affiliation)) = verify_affiliation_line(line) else {
-                invalid += 1;
+        let mut fold = Fold::default();
+        let mut refused = Vec::new();
+        for (index, line) in text.lines().enumerate() {
+            if line.trim().is_empty() {
                 continue;
+            }
+            let number = index + 1;
+            let parsed = match parse_affiliation_line(line) {
+                Ok(parsed) => parsed,
+                Err(reason) => {
+                    refused.push(RefusedLine {
+                        line: number,
+                        cid: None,
+                        member: None,
+                        reason,
+                    });
+                    continue;
+                }
             };
-            if affiliation.collective.path != reference.path {
+            if parsed.record.collective.path != reference.path {
                 continue;
             }
-            if !current.contains_key(&affiliation.member) {
-                order.push(affiliation.member.clone());
+            let verdict = fold.admit(&parsed.record).and_then(|sponsor_line| {
+                self.signer_enrolled(&parsed)?;
+                Ok(sponsor_line)
+            });
+            match verdict {
+                Ok(sponsor_line) => fold.accept(
+                    parsed.cid,
+                    parsed.record.clone(),
+                    Admitted {
+                        record: parsed.record,
+                        sponsor_line,
+                        signature: parsed.signature,
+                    },
+                ),
+                Err(reason) => refused.push(RefusedLine {
+                    line: number,
+                    cid: Some(parsed.cid),
+                    member: Some(parsed.record.member),
+                    reason,
+                }),
             }
-            current.insert(affiliation.member.clone(), (cid, affiliation));
         }
-        let affiliations = order
-            .into_iter()
-            .filter_map(|member| current.remove(&member))
-            .collect();
-        Ok((affiliations, invalid))
+        let (current, admitted) = fold.finish();
+        Ok((current, admitted, refused))
+    }
+
+    /// A signed line's signer must be a device enrolled for the party that signs it: the
+    /// sponsor, or the member of a genesis line. Only a human has a device roster.
+    fn signer_enrolled(&self, line: &AffiliationLine) -> Result<(), String> {
+        let LineSignature::Signed { signer, .. } = &line.signature else {
+            return Ok(());
+        };
+        let party = line
+            .record
+            .sponsor
+            .as_deref()
+            .unwrap_or(&line.record.member);
+        let enrolled = match parse_participant_ref(party) {
+            Ok(ParticipantRef::Human { handle }) => {
+                crate::actor::device_enrolled(&self.root, &handle, signer)
+            }
+            _ => false,
+        };
+        if enrolled {
+            Ok(())
+        } else {
+            Err(format!(
+                "signed by {signer}, a device not enrolled for {party} in its participant roster"
+            ))
+        }
     }
 
     /// A session's claim binds its collective of record; an unbound claim is bound to the root.
@@ -790,28 +1030,161 @@ fn is_plain_file(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_file())
 }
 
-/// One sidecar line, `{cid, record}`, verified: the record parses strictly, its member and
-/// parties are shaped as participants (never an email), and the CID re-derives from the record.
-/// `None` is a line that counts for nothing.
-pub fn verify_affiliation_line(line: &str) -> Option<(String, Affiliation)> {
-    let value: Value = serde_json::from_str(line).ok()?;
-    let object = value.as_object()?;
-    if object.len() != 2 {
-        return None;
-    }
-    let affiliation: Affiliation = serde_json::from_value(object.get("record")?.clone()).ok()?;
-    validate_affiliation(&affiliation).ok()?;
-    let cid = atom_cid(&affiliation).ok()?.to_string();
-    (object.get("cid")?.as_str()? == cid).then_some((cid, affiliation))
+/// What [`Reader::affiliations_for`] folds a sidecar into: the current affiliations, every
+/// admitted line by CID, and every refused line.
+type AffiliationFold = (
+    Vec<(String, Affiliation)>,
+    BTreeMap<String, Admitted>,
+    Vec<RefusedLine>,
+);
+
+/// How an affiliation line is signed: the honest literal `unsigned`, or a DETACHED device
+/// signature over the record's CID (a line field, never a record field, so the CID is unchanged).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LineSignature {
+    Unsigned,
+    Signed {
+        /// The signing device, `did:key:…` — public material only.
+        signer: String,
+        /// The 64-byte ed25519 signature over [`affiliation_signing_message`], lowercase hex.
+        signature: String,
+    },
 }
 
-/// The `{cid, record}` line an affiliation is appended as.
+impl LineSignature {
+    fn to_value(&self) -> Value {
+        match self {
+            LineSignature::Unsigned => json!("unsigned"),
+            LineSignature::Signed { signer, signature } => {
+                json!({"signer": signer, "signature": signature})
+            }
+        }
+    }
+}
+
+/// One verified `{cid, record, signature}` sidecar line.
+#[derive(Clone, Debug)]
+pub struct AffiliationLine {
+    pub cid: String,
+    pub record: Affiliation,
+    pub signature: LineSignature,
+}
+
+const AFFILIATION_SIGNING_DOMAIN: &str = "elohim:affiliation-sponsorship-signature:v1:";
+
+/// The bytes a sponsor's device signs for one affiliation line: a domain tag and the record CID.
+/// Its own domain, so an actor-record signature can never be replayed as a sponsorship.
+pub fn affiliation_signing_message(record_cid: &str) -> Vec<u8> {
+    format!("{AFFILIATION_SIGNING_DOMAIN}{record_cid}").into_bytes()
+}
+
+/// One sidecar line, `{cid, record, signature}`, verified: the record parses strictly, its
+/// member and parties are shaped as participants (never an email), the CID re-derives from the
+/// record, and a signature — when present — verifies as its signer's over that CID. The refusal
+/// names why the line counts for nothing. Roster enrolment of the signer needs the tree and is
+/// checked by the fold.
+pub fn parse_affiliation_line(line: &str) -> Result<AffiliationLine, String> {
+    let value: Value =
+        serde_json::from_str(line).map_err(|e| format!("not a JSON object line: {e}"))?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| "not a JSON object line".to_string())?;
+    let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    if keys != ["cid", "record", "signature"] {
+        return Err(format!(
+            "line keys are {keys:?}; an affiliation line is exactly {{cid, record, signature}}"
+        ));
+    }
+    let affiliation: Affiliation = serde_json::from_value(object["record"].clone())
+        .map_err(|e| format!("record does not parse: {e}"))?;
+    validate_affiliation(&affiliation).map_err(|e| e.to_string())?;
+    let cid = atom_cid(&affiliation)
+        .map_err(|e| e.to_string())?
+        .to_string();
+    if object["cid"].as_str() != Some(cid.as_str()) {
+        return Err(format!(
+            "line CID does not re-derive from its record (record is {cid})"
+        ));
+    }
+    let signature = match &object["signature"] {
+        Value::String(s) if s == "unsigned" => LineSignature::Unsigned,
+        Value::Object(sig) if sig.len() == 2 => {
+            let signer = sig
+                .get("signer")
+                .and_then(Value::as_str)
+                .ok_or("signature names no signer")?;
+            let hex = sig
+                .get("signature")
+                .and_then(Value::as_str)
+                .ok_or("signature carries no signature bytes")?;
+            let verified = hex_decode(hex).is_some_and(|bytes| {
+                crate::device_key::verify(signer, &affiliation_signing_message(&cid), &bytes)
+            });
+            if !verified {
+                return Err(format!(
+                    "signature does not verify as {signer}'s over {cid}"
+                ));
+            }
+            LineSignature::Signed {
+                signer: signer.to_string(),
+                signature: hex.to_string(),
+            }
+        }
+        _ => {
+            return Err(
+                "signature is neither the literal \"unsigned\" nor {signer, signature}".into(),
+            )
+        }
+    };
+    Ok(AffiliationLine {
+        cid,
+        record: affiliation,
+        signature,
+    })
+}
+
+/// [`parse_affiliation_line`], reduced to `(cid, record)`; `None` is a line that counts for
+/// nothing.
+pub fn verify_affiliation_line(line: &str) -> Option<(String, Affiliation)> {
+    parse_affiliation_line(line)
+        .ok()
+        .map(|parsed| (parsed.cid, parsed.record))
+}
+
+/// The UNSIGNED `{cid, record, signature}` line an affiliation is appended as.
 pub fn affiliation_line(affiliation: &Affiliation) -> FlowResult<String> {
+    affiliation_line_signed(affiliation, None)
+}
+
+/// The line an affiliation is appended as, signed by `device` over its record CID when given,
+/// else carrying the honest literal `unsigned`.
+pub fn affiliation_line_signed(
+    affiliation: &Affiliation,
+    device: Option<&crate::device_key::DeviceKey>,
+) -> FlowResult<String> {
     validate_affiliation(affiliation)?;
     let cid = atom_cid(affiliation)?.to_string();
+    let signature = match device {
+        Some(key) => LineSignature::Signed {
+            signer: key.did_key(),
+            signature: eprfs_meta::hex_lower(&key.sign(&affiliation_signing_message(&cid))),
+        },
+        None => LineSignature::Unsigned,
+    };
     Ok(serde_json::to_string(
-        &json!({"cid": cid, "record": affiliation}),
+        &json!({"cid": cid, "record": affiliation, "signature": signature.to_value()}),
     )?)
+}
+
+fn hex_decode(hex: &str) -> Option<Vec<u8>> {
+    if !hex.len().is_multiple_of(2) || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).ok())
+        .collect()
 }
 
 pub fn validate_affiliation(a: &Affiliation) -> FlowResult<()> {
@@ -855,9 +1228,15 @@ pub fn validate_affiliation(a: &Affiliation) -> FlowResult<()> {
             Some(("repo" | "collective", rest)) => is_path_slug(rest),
             _ => false,
         };
-        if !ok {
+        // A sponsor is whoever stood as an active Steward, and an agent build may be one.
+        let agent_sponsor = a.sponsor.as_deref() == Some(party.as_str())
+            && party
+                .strip_prefix("agent:")
+                .is_some_and(|rest| parse_agent_ref(party).is_ok() || is_slug(rest));
+        if !ok && !agent_sponsor {
             return Err(refused(format!(
-                "affiliation party `{party}` is not a human:, repo: or collective: ref"
+                "affiliation party `{party}` is not a human:, repo: or collective: ref (a \
+                 sponsor may also be an agent: ref)"
             )));
         }
     }

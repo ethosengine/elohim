@@ -18,7 +18,15 @@ files/docs/algorithms/code are EPRFS objects governed by `.epr-meta`. Inspect th
 static local relationship with `epr flow memory collective`, which carries the
 declaration, its Stewards on record and its native input guides. A declaration names no
 steward: Stewards are affiliation records in `.eprfs/status/affiliations.jsonl` (the
-local pre-image of Qahal Membership), a directory may declare a child collective whose
+local pre-image of Qahal Membership). Membership is decided collectively: a collective's
+first Steward line is its genesis, and every later line (a new member, a role change, a
+withdrawal, a rejoin) names a sponsor who is then an active Steward and not the member, and a
+fixture Steward sponsors only Fixture or Contributor lines. Add, change or withdraw a member
+only with `epr flow memory affiliate --member <ref> --kind person|collective|elohim-agent
+--role steward|contributor|observer [--standing fixture] [--withdraw] --session <id>`; the
+sponsor is that session's claimed participant, and the line is signed over its CID when this
+device is enrolled for the sponsor, else recorded `unsigned`. A line added by a raw edit
+without a valid sponsor is refused and named, never used. A directory may declare a child collective whose
 `parent` pins the enclosing one, and a session's claim binds its collective of record
 (`epr actor claim --under <path>`; unbound means the root). Source rules speak
 locality (`maxLocality`), never reach. Live session attribution remains in the

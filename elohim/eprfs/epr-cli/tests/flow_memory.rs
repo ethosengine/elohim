@@ -54,9 +54,11 @@ fn fixture() -> TempDir {
     ]
     .iter()
     .map(|(member, role)| {
+        // The reviewer's Steward line is the genesis; it sponsors the investigator's.
+        let sponsor = (*role == "Contributor").then_some("agent:reviewer");
         let record: eprfs_agent::memory::Affiliation = serde_json::from_value(json!({
             "version":1,"collective":collective,"member":member,"memberKind":"ElohimAgent",
-            "role":role,"standing":"Standing","since":"2026-09-25T00:00:00Z"}))
+            "role":role,"sponsor":sponsor,"standing":"Standing","since":"2026-09-25T00:00:00Z"}))
         .unwrap();
         memory::affiliation_line(&record).unwrap() + "\n"
     })
