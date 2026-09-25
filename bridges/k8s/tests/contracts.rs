@@ -359,8 +359,8 @@ fn delegated_slice_is_exposed_and_subtracted_before_the_split() {
     let manifest = delegated_manifest();
     let rendered = render_envelope(&manifest).unwrap();
 
-    assert_eq!(rendered.edgenode_memory_limit, "8192Mi");
-    assert_eq!(rendered.edgenode_cpu_limit, "8000m");
+    assert_eq!(rendered.edgenode_memory_limit, "6144Mi");
+    assert_eq!(rendered.edgenode_cpu_limit, "6000m");
     assert_eq!(rendered.conductor_memory_limit, "3840Mi");
     assert_eq!(rendered.storage_memory_limit, "2304Mi");
     assert_eq!(rendered.conductor_cpu_limit, "3000m");
@@ -369,6 +369,39 @@ fn delegated_slice_is_exposed_and_subtracted_before_the_split() {
     assert_eq!(rendered.delegated[0].name, "compute-worker");
     assert_eq!(rendered.delegated[0].memory_bytes, 2 * GIB);
     assert_eq!(rendered.delegated[0].cpu_millis, 2_000);
+
+    let edgenode_memory = quantity(&rendered.edgenode_memory_limit, true).unwrap();
+    let edgenode_cpu = quantity(&rendered.edgenode_cpu_limit, false).unwrap();
+    assert_eq!(
+        quantity(&rendered.conductor_memory_limit, true).unwrap()
+            + quantity(&rendered.storage_memory_limit, true).unwrap(),
+        edgenode_memory
+    );
+    assert_eq!(
+        quantity(&rendered.conductor_cpu_limit, false).unwrap()
+            + quantity(&rendered.storage_cpu_limit, false).unwrap(),
+        edgenode_cpu
+    );
+
+    let envelope = manifest.envelope.as_ref().unwrap();
+    assert_eq!(
+        edgenode_memory
+            + rendered
+                .delegated
+                .iter()
+                .map(|slice| slice.memory_bytes)
+                .sum::<u64>(),
+        envelope.bound.memory_bytes.unwrap()
+    );
+    assert_eq!(
+        edgenode_cpu
+            + rendered
+                .delegated
+                .iter()
+                .map(|slice| u64::from(slice.cpu_millis))
+                .sum::<u64>(),
+        u64::from(envelope.bound.cpu_millis.unwrap())
+    );
 }
 
 #[test]

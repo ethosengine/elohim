@@ -173,8 +173,9 @@ fn share(value: Option<u64>, numerator: u64, denominator: u64, unit: &str) -> (S
     }
 }
 
-/// Render limits from the root bound, requests from the archetype floor (or a pinned
-/// override), and the exact 5/8 memory, 1/2 CPU split with the remainder to storage.
+/// Render limits from the root bound after delegated slices, requests from the archetype
+/// floor (or a pinned override), and the exact 5/8 memory, 1/2 CPU split with the remainder
+/// to storage.
 pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
     let delegated = delegated_slices(manifest)?;
     let delegated_memory: u128 = delegated
@@ -261,17 +262,15 @@ pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
     }
     let memory_limit = remaining_memory_bound.map(|bound| bound / MIB);
     let cpu_limit = remaining_cpu_bound;
-    let root_memory_limit = envelope.bound.memory_bytes.map(|bound| bound / MIB);
-    let root_cpu_limit = envelope.bound.cpu_millis.map(u64::from);
     let (cmr, smr) = share(Some(memory / MIB), 5, 8, "Mi");
     let (cml, sml) = share(memory_limit, 5, 8, "Mi");
     let (ccr, scr) = share(Some(cpu), 1, 2, "m");
     let (ccl, scl) = share(cpu_limit, 1, 2, "m");
     Ok(RenderedEnvelope {
         edgenode_memory_request: format!("{}Mi", memory / MIB),
-        edgenode_memory_limit: root_memory_limit.map_or(String::new(), |v| format!("{v}Mi")),
+        edgenode_memory_limit: memory_limit.map_or(String::new(), |v| format!("{v}Mi")),
         edgenode_cpu_request: format!("{cpu}m"),
-        edgenode_cpu_limit: root_cpu_limit.map_or(String::new(), |v| format!("{v}m")),
+        edgenode_cpu_limit: cpu_limit.map_or(String::new(), |v| format!("{v}m")),
         conductor_memory_request: cmr,
         storage_memory_request: smr,
         conductor_memory_limit: cml,
