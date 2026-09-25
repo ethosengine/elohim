@@ -1,0 +1,11 @@
+{
+  "jessica": {
+    "api": 8091,
+    "index": 1
+  },
+  "adam": {
+    "agentKey": null,
+    "repoRoot": null,
+    "writable": []
+  }
+}

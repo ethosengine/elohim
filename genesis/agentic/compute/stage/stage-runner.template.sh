@@ -9,6 +9,7 @@ STAGE_NAME='@@STAGE_NAME@@'                 # federation-version-convergence
 REPO='@@REPO_ROOT@@'
 FEATURE='@@FEATURE_REL@@'                   # features/dataplane/federation-version-convergence.feature
 FEATURE_SHA256='@@FEATURE_SHA256@@'
+SUT_EXPECTED='@@SUT@@'                      # requester's computed source-under-test (lib/sut.ts)
 TEST_PREFIX='@@TEST_PREFIX@@'               # feedback_signal::a2o::dataplane::federation-version-convergence
 SCENARIOS=(@@SCENARIO_SLUGS@@)              # one quoted slug per declared scenario
 WRITABLE=(@@WRITABLE_PATHS@@)               # absolute paths the stage must be able to write
@@ -36,6 +37,20 @@ refuse() { printf 'STAGE-PRECONDITION-UNMET: %s\n' "$1" >&2; exit 2; }
 [ -r "$REPO/genesis/a2o/$FEATURE" ] || refuse "feature unreadable: $REPO/genesis/a2o/$FEATURE"
 have="$(sha256sum "$REPO/genesis/a2o/$FEATURE" | cut -d' ' -f1)"
 [ "$have" = "$FEATURE_SHA256" ] || refuse "feature drifted: $have != $FEATURE_SHA256"
+# S3.0 — the honest artifact: recompute the same source-under-test the requester computed
+# (lib/sut.ts, the household receipt's own identity) against THIS checkout, right now. A
+# provider running a different tree than the one the requester pinned proves nothing about
+# it — refuse before running anything rather than reporting a green that measured the wrong
+# source. `node -e` with a dynamic import() so the absolute module path is built from $REPO
+# at runtime (a static import specifier cannot be interpolated).
+have_sut="$("$NODE_BIN" -e '
+const repo = process.argv[1];
+import("file://" + repo + "/genesis/a2o/scripts/lib/sut.ts").then(({ createSutProbe, computeSut }) => {
+  const probe = createSutProbe(repo);
+  process.stdout.write(computeSut(probe).sut);
+}).catch((e) => { process.stderr.write(String((e && e.stack) || e) + "\n"); process.exit(1); });
+' "$REPO")" || refuse "sut probe failed"
+[ "$have_sut" = "$SUT_EXPECTED" ] || refuse "sut drifted: $have_sut != $SUT_EXPECTED"
 # The pinned copy travels in the dna slot; when the executor exposes it, cross-check.
 if [ -n "${SWEETTEST_DNA_DIR:-}" ] && [ -r "$SWEETTEST_DNA_DIR/lamad.dna" ]; then
   staged="$(sha256sum "$SWEETTEST_DNA_DIR/lamad.dna" | cut -d' ' -f1)"
@@ -48,6 +63,15 @@ REPORT="$SCRATCH/cucumber.json"
 rm -f "$REPORT"
 printf 'running %d test\n' "${#SCENARIOS[@]}"
 cd "$REPO" || refuse "cannot cd $REPO"
+# The guest's inner `just test mesh` must never publish household evidence on its own — the
+# requester's own collector (S3a) is the only writer of the peer-stage receipt, and a
+# household-lane sprint-report side effect here would carry the PROVIDER's workspace key, a
+# claim this run has no standing to make.
+export A2O_POST_REPORT=0
+# So the inner mesh berth claim is attributable to this stage, not to whatever ambient
+# session (or none) launched the guest process.
+export BERTH_SESSION="stage:$STAGE_NAME"
+export BERTH_CLASS="verify"
 CUCUMBER_JSON_REPORT="$REPORT" "$JUST_BIN" test mesh "$FEATURE"
 rc=$?
 [ -s "$REPORT" ] || { printf 'STAGE-NO-REPORT: just test mesh exited %d and wrote no report\n' "$rc" >&2; exit 101; }

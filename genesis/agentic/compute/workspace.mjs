@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readdir, mkdir, open, rm, readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -12,6 +12,7 @@ import {
   publishFile,
 } from "./payloads.mjs";
 import { cleanInbox } from "./retention.mjs";
+import { collectStageEvidence } from "./stage/collect-stage.mjs";
 
 export function reviewCommand(adapter) {
   if (adapter === "codex")
@@ -41,6 +42,7 @@ export async function pollInbox({
   adapters = ["codex"],
   cwd,
   payload,
+  stageRunners,
 }) {
   await mkdir(join(root, "inbox"), { recursive: true, mode: 0o700 });
   if (payload) await cleanInbox(root, payload);
@@ -89,6 +91,19 @@ export async function pollInbox({
         }
         await save(path, entry);
         if (!entry.logsFetched) continue; // Missing/syncing payloads retry before review delivery.
+      }
+      // S3a — a peer-executed stage collects its own evidence (sentinel decode, verdict,
+      // durable copy, brit attestation, sprint report, gap fulfil/note, habit delta) before
+      // review delivery; review still runs regardless of what this records or refuses.
+      if (entry.stage && status.completion && !entry.evidence?.done) {
+        await collectStageEvidence({
+          entry,
+          status,
+          root,
+          cwd,
+          runners: stageRunners,
+        });
+        await save(path, entry);
       }
       entry.reviews ??= {};
       for (const adapter of adapters) {
@@ -150,6 +165,11 @@ export async function issueGrant(file, request) {
   return request("/api/v1/compute/grants", input);
 }
 
+function flagValue(argv, name) {
+  const index = argv.indexOf(name);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const [verb, file] = argv;
   const root = resolve(
@@ -188,6 +208,22 @@ export async function main(argv = process.argv.slice(2)) {
     const envelope = await readJson(file);
     if (!envelope.invocation || argv.includes("--new-run"))
       envelope.invocation = randomUUID();
+    // S3a: a stage carries its own sidecar (build-stage-task.mjs's stage.json) beside its
+    // task.json — when present, it rides into the inbox entry so the collector (pollInbox)
+    // can act on it without re-deriving the stage's identity from the task envelope's
+    // free-form `project` string. `--on <gap>` names the developer's REA gap commitment this
+    // stage's result fulfils or notes; `--rung H|A` labels which offload property (or lack of
+    // one) the eventual habit delta claims — H (household stand-in) never claims offload.
+    let stageJson;
+    try {
+      stageJson = await readJson(join(dirname(resolve(file)), "stage.json"));
+    } catch {
+      stageJson = undefined; // an ordinary (non-stage) task has no sibling — not an error
+    }
+    const gap = flagValue(argv, "--on");
+    const rung = flagValue(argv, "--rung");
+    if (rung && rung !== "H" && rung !== "A")
+      throw new Error("--rung must be H or A");
     // Inputs enter this workspace's BlobStore. Adam retrieves through its own
     // BlobStore's P2P heal; no source-workspace address enters the task.
     const inputPaths = [argv[2], argv[3]];
@@ -233,16 +269,39 @@ export async function main(argv = process.argv.slice(2)) {
       grantActionHash: process.env.COMPUTE_GRANT_ACTION,
       envelope,
     });
-    await save(taskPath(root, status.requestActionHash), {
-      requestActionHash: status.requestActionHash,
-      status,
-    });
+    const entry = { requestActionHash: status.requestActionHash, status };
+    if (stageJson) entry.stage = stageJson;
+    if (gap) entry.gap = gap;
+    if (rung) entry.rung = rung;
+    await save(taskPath(root, status.requestActionHash), entry);
     console.log(JSON.stringify(status));
+    return;
+  }
+  if (verb === "status") {
+    await mkdir(join(root, "inbox"), { recursive: true, mode: 0o700 });
+    const entries = [];
+    for (const name of (await readdir(join(root, "inbox"))).filter((n) =>
+      n.endsWith(".json"),
+    )) {
+      const entry = await readJson(join(root, "inbox", name));
+      entries.push({
+        requestActionHash: entry.requestActionHash,
+        stage: entry.stage?.feature,
+        gap: entry.gap,
+        rung: entry.rung,
+        acceptance: Boolean(entry.status?.acceptance),
+        completion: Boolean(entry.status?.completion),
+        refusal: entry.status?.refusal ?? null,
+        lastError: entry.lastError ?? null,
+        evidence: entry.evidence ?? null,
+      });
+    }
+    console.log(JSON.stringify(entries, null, 2));
     return;
   }
   if (!["poll", "listen"].includes(verb))
     throw new Error(
-      "Usage: workspace.mjs submit TASK.json BINARY DNA | grant GRANT.json | poll | listen | start",
+      "Usage: workspace.mjs submit TASK.json BINARY DNA [--on GAP] [--rung H|A] | grant GRANT.json | status | poll | listen | start",
     );
   await mkdir(root, { recursive: true, mode: 0o700 });
   const lockPath = join(root, "listener.lock");

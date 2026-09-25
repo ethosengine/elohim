@@ -12,12 +12,19 @@
  * Usage:
  *   build-stage-task.mjs --feature <path-relative-to-genesis/a2o> --requester <key>
  *     --provider <key> --out <dir> [--runtime-image sha256:<64 hex>] [--executor <path>]
+ *     [--writable <path>]... [--repo-root <path>] [--cpu-millis N] [--memory-bytes N]
+ *     [--timeout-seconds N]
  */
 import { chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { run } from "../common.mjs";
+// S3.0 — the honest artifact: the requester's own SUT identity rides in the stage so the
+// provider can refuse a drifted tree before running anything. Import style mirrors
+// genesis/orchestrator/scripts/serving-receipt.mjs:17-23 (Node's native TS type-stripping,
+// no tsx needed).
+import { computeSut, createSutProbe } from "../../../a2o/scripts/lib/sut.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const A2O_DIR = resolve(HERE, "..", "..", "..", "a2o");
@@ -44,6 +51,20 @@ export function parseScenarioNames(featureText) {
   return names;
 }
 
+// The feature-level `@concern:<tag>` — scanned only in the tag lines above `Feature:` (the
+// same place a2o's own coverage tooling reads it). Not a Gherkin parser: a plain line scan,
+// same discipline as parseScenarioNames.
+export function parseFeatureConcern(featureText) {
+  for (const line of featureText.split("\n")) {
+    if (/^\s*Feature:/.test(line)) break;
+    const match = line.match(/@concern:([A-Za-z0-9_-]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Repeatable flags (e.g. `--writable a --writable b`) accumulate into an array; a flag seen
+// once stays a plain string, so every existing single-value caller is unaffected.
 export function parseArgs(argv) {
   const out = {};
   for (let index = 0; index < argv.length; index++) {
@@ -51,7 +72,11 @@ export function parseArgs(argv) {
     if (arg.startsWith("--")) {
       const name = arg.slice(2);
       const next = argv[index + 1];
-      out[name] = next;
+      if (name in out) {
+        out[name] = Array.isArray(out[name]) ? [...out[name], next] : [out[name], next];
+      } else {
+        out[name] = next;
+      }
       index++;
     }
   }
@@ -82,13 +107,17 @@ function shellQuote(value) {
 }
 
 // §5.3 the capacity grant — default paths for this household mesh. A caller may override
-// with `--writable <path>` (repeatable) to target a different provider layout.
-export function defaultWritablePaths(repoRoot) {
+// with `--writable <path>` (repeatable) to target a different provider layout. Derived from
+// MESH_DIR (hc-mesh.sh's own default), never the retired /tmp/elohim-local-mesh hardcode —
+// stage spec §5.3 amendment owed by this lane.
+export function defaultWritablePaths(repoRoot, env = process.env) {
+  const meshDir =
+    env.MESH_DIR || join(repoRoot, "genesis", "local-dev", "household-dowell");
   return [
     join(repoRoot, "genesis", "a2o", "reports"),
-    "/tmp/elohim-local-mesh/matthew/runtime-config.toml",
-    "/tmp/elohim-local-mesh/jessica/runtime-config.toml",
-    "/tmp/elohim-local-mesh/james/runtime-config.toml",
+    join(meshDir, "matthew", "runtime-config.toml"),
+    join(meshDir, "jessica", "runtime-config.toml"),
+    join(meshDir, "james", "runtime-config.toml"),
   ];
 }
 
@@ -108,6 +137,10 @@ export async function buildStageTask({
   nodeBin,
   justBin,
   writablePaths,
+  cpuMillis = 2000,
+  memoryBytes = 2147483648,
+  timeoutSeconds = 1800,
+  env = process.env,
   execute = run,
 }) {
   if (!feature || !requester || !provider || !out)
@@ -125,6 +158,18 @@ export async function buildStageTask({
     throw new Error(`no Scenario:/Scenario Outline: lines found in ${featureAbs}`);
   const scenarioSlugs = scenarioNames.map(slugify);
 
+  const concern = parseFeatureConcern(featureText);
+  if (!concern)
+    throw new Error(
+      `no @concern:<tag> found in the tag lines above Feature: in ${featureAbs}`,
+    );
+
+  // S3.0 — the honest artifact: this requester's own source-under-test identity, the same
+  // computation the household lane's receipts use (lib/sut.ts), embedded so the provider can
+  // refuse a drifted tree before it runs anything.
+  const sutProbe = createSutProbe(repoRoot, env);
+  const { sut, sutParts } = computeSut(sutProbe);
+
   // `feature` is relative to genesis/a2o (e.g. "features/dataplane/<name>.feature") — the
   // D6 grammar's <feature-dir> excludes the leading "features/" segment.
   const parts = feature.split("/");
@@ -141,7 +186,7 @@ export async function buildStageTask({
   // 3. render stage-runner.template.sh -> <out>/stage-runner.sh, mode 0755
   const resolvedNodeBin = nodeBin || (await which("node", "/usr/local/bin/node"));
   const resolvedJustBin = justBin || (await which("just", "/usr/local/bin/just"));
-  const writable = writablePaths || defaultWritablePaths(repoRoot);
+  const writable = writablePaths || defaultWritablePaths(repoRoot, env);
   const featureRel = feature; // already relative to genesis/a2o, as the runner expects
   const template = await readFile(TEMPLATE_PATH, "utf8");
   const rendered = template
@@ -149,6 +194,7 @@ export async function buildStageTask({
     .replaceAll("@@REPO_ROOT@@", repoRoot)
     .replaceAll("@@FEATURE_REL@@", featureRel)
     .replaceAll("@@FEATURE_SHA256@@", featureSha256)
+    .replaceAll("@@SUT@@", sut)
     .replaceAll("@@TEST_PREFIX@@", testPrefix)
     .replaceAll(
       "@@SCENARIO_SLUGS@@",
@@ -187,16 +233,37 @@ export async function buildStageTask({
     dna: dnaDescriptor,
     expectedTests,
     resources: {
-      cpuMillis: 8000,
-      memoryBytes: 8589934592,
+      // §5.1's original 8000m/8GiB/2400s defaults exceed any single-feature slice; a caller
+      // (`just measure`, D2) overrides via --cpu-millis/--memory-bytes/--timeout-seconds. The
+      // timeout default (1800 s) matches the mesh berth's `verify` class default_ttl_s so the
+      // first rung-H stage stays inside the verify budget rather than the retired measure one.
+      cpuMillis,
+      memoryBytes,
       maxPayloadBytes: 8388608,
-      timeoutSeconds: 2400,
+      timeoutSeconds,
     },
     // Never an explicit JSON null (§4 constraint 2) — compute-executor cid dies on Unit.
     retention: { maxAgeSeconds: 86400, maxRuns: 5, expireWhen: "either" },
   };
   const taskPath = join(out, "task.json");
   await writeFile(taskPath, JSON.stringify(envelope, null, 2) + "\n", {
+    mode: 0o600,
+  });
+
+  // S3.0 — the honest artifact: one JSON sidecar naming exactly what this stage claims to
+  // measure and on what source, so a collector (S3a) never has to re-derive it from the
+  // envelope's free-form `project` string.
+  const stagePath = join(out, "stage.json");
+  const stageMeta = {
+    feature: featureRel,
+    featureSha256,
+    concern,
+    sut,
+    sutParts,
+    testPrefix,
+    scenarioNames,
+  };
+  await writeFile(stagePath, JSON.stringify(stageMeta, null, 2) + "\n", {
     mode: 0o600,
   });
 
@@ -207,6 +274,8 @@ export async function buildStageTask({
   return {
     envelope,
     taskPath,
+    stagePath,
+    stage: stageMeta,
     runnerPath,
     dnaPath,
     featureSha256,
@@ -216,6 +285,9 @@ export async function buildStageTask({
     scenarioNames,
     scenarioSlugs,
     expectedTests,
+    concern,
+    sut,
+    sutParts,
     probe,
   };
 }
@@ -265,8 +337,19 @@ export async function probeRunParser({ taskPath, executor, execute = run }) {
   }
 }
 
+function intArg(value) {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
+  const writable = args.writable
+    ? Array.isArray(args.writable)
+      ? args.writable
+      : [args.writable]
+    : undefined;
   const result = await buildStageTask({
     feature: args.feature,
     requester: args.requester,
@@ -274,15 +357,23 @@ export async function main(argv = process.argv.slice(2)) {
     out: args.out ? resolve(args.out) : undefined,
     runtimeImage: args["runtime-image"],
     executor: args.executor || process.env.COMPUTE_EXECUTOR || "compute-executor",
+    repoRoot: args["repo-root"] ? resolve(args["repo-root"]) : undefined,
+    writablePaths: writable,
+    cpuMillis: intArg(args["cpu-millis"]),
+    memoryBytes: intArg(args["memory-bytes"]),
+    timeoutSeconds: intArg(args["timeout-seconds"]),
   });
   console.log(
     JSON.stringify(
       {
         taskPath: result.taskPath,
+        stagePath: result.stagePath,
         runnerPath: result.runnerPath,
         dnaPath: result.dnaPath,
         project: result.envelope.project,
         expectedTests: result.expectedTests,
+        concern: result.concern,
+        sut: result.sut,
         probe: result.probe,
       },
       null,
