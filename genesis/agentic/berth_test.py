@@ -8,6 +8,7 @@ import os
 import runpy
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -587,6 +588,64 @@ class ConcurrencyTest(unittest.TestCase):
             os.waitpid(kid, 0)
         with open(emits) as f:
             self.assertEqual(len(f.read().splitlines()), 1)
+
+
+class StoreUnavailableTest(unittest.TestCase):
+    """The berth store is the host session's organ, never a guest's: an invocation that cannot open
+    it exits 4 (the wrapper's proceed-unleased code) with one named line, never a traceback."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.store = os.path.join(self.directory.name, "berth")
+        os.makedirs(os.path.join(self.store, "moorings"))
+        lock = os.path.join(self.store, "berth.lock")
+        open(lock, "w").close()
+        os.chmod(lock, 0o644)
+        os.chmod(self.directory.name, 0o755)
+        os.chmod(self.store, 0o755)
+
+    def run_berth(self, *args, preexec=None, **env):
+        e = {k: v for k, v in os.environ.items() if k not in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        e.update(env)
+        return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=e,
+                              capture_output=True, text=True, timeout=30, preexec_fn=preexec, cwd="/")
+
+    @unittest.skipUnless(os.geteuid() == 0, "needs root to drop to the stage guest uid")
+    def test_guest_uid_meeting_the_hosts_root_owned_lock_exits_4_and_names_the_path(self):
+        def as_guest():
+            os.setgroups([])
+            os.setgid(65534)
+            os.setuid(65534)
+        r = self.run_berth("claim", "mesh", "--ttl", "60", "--note", "stage lane", preexec=as_guest,
+                           BERTH_DIR=self.store, BERTH_SESSION="stage:probe")
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertIn("berth: store unavailable (EACCES", r.stderr)
+        self.assertIn(os.path.join(self.store, "berth.lock"), r.stderr)
+        self.assertIn("lane proceeds unleased", r.stderr)
+
+    def test_a_store_that_cannot_be_created_exits_4(self):
+        missing = "/proc/berth-no-such-store"  # mkdir under /proc fails for every uid, root included
+        r = self.run_berth("claim", "mesh", "--ttl", "60", BERTH_DIR=missing, BERTH_SESSION="stage:probe")
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertIn(f"berth: store unavailable (", r.stderr)
+        self.assertIn(missing, r.stderr)
+
+    def test_an_unrelated_os_error_is_not_masked(self):
+        main = _NS["main"]
+        g = main.__globals__
+        saved = g["_main"]
+
+        def boom(argv):
+            raise PermissionError(13, "Permission denied", "/etc/somewhere-else")
+        g["_main"] = boom
+        try:
+            with self.assertRaises(PermissionError):
+                main(["berth", "claim", "mesh"])
+        finally:
+            g["_main"] = saved
 
 
 @unittest.skipUnless(shutil.which("just") and shutil.which("timeout"), "needs just + timeout")

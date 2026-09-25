@@ -67,9 +67,11 @@ process's nearest ancestor; claim rows record `session_source: flag|env|ancestry
 `ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
 record with `expired_after_s`. Exit codes: 0 ok · 2 usage · 3 refused (held by a live mooring, a class
 this berth does not run, a ttl past the class's cap, a class transition, an owner check) · 4 no session
-resolvable (or ambiguous) — the only code a wrapper may proceed past, unleased.
+resolvable (or ambiguous), or the store itself cannot be opened (a guest sandbox: EACCES/ENOENT on
+the lock or dir) — the only code a wrapper may proceed past, unleased.
 """
 import contextlib
+import errno
 import fcntl
 import json
 import os
@@ -827,7 +829,36 @@ def _opt(argv, name, default=None):
     return default
 
 
+_STORE_ERRNOS = {errno.EACCES, errno.EPERM, errno.ENOENT, errno.EROFS}
+
+
+def _store_unavailable(exc, store):
+    """An OSError on the berth store itself (its dir, lock, ledger, leases or moorings) — not one
+    raised anywhere else. The store is the host session's coordination organ, never a guest's."""
+    if not isinstance(exc, OSError) or exc.errno not in _STORE_ERRNOS:
+        return False
+    names = [n for n in (getattr(exc, "filename", None), getattr(exc, "filename2", None)) if n]
+    root = os.path.realpath(store)
+    return any(os.path.realpath(str(n)) == root or os.path.realpath(str(n)).startswith(root + os.sep)
+               for n in names)
+
+
 def main(argv):
+    """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
+    BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
+    so, rather than dying with a traceback the wrapper would propagate."""
+    store = store_dir()
+    try:
+        return _main(argv)
+    except OSError as e:
+        if not _store_unavailable(e, store):
+            raise
+        name = errno.errorcode.get(e.errno, str(e.errno))
+        print(f"berth: store unavailable ({name} {e.filename}) — lane proceeds unleased", file=sys.stderr)
+        return EXIT_NO_SESSION
+
+
+def _main(argv):
     argv = list(argv[1:])
     if not argv:
         argv = ["status"]
