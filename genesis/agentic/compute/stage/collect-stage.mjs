@@ -112,8 +112,17 @@ export function stageVerdict(reportDoc, stage) {
   return { verdict: failed ? "fail" : "pass", scenarios };
 }
 
-function defaultSyncRunner(cmd, args, cwd) {
-  const r = spawnSync(cmd, args, { cwd, encoding: "utf8", timeout: 120000 });
+// Accepts BOTH runner shapes in play: household-attestation's `Runner` passes `cwd` as a
+// string; deliver-stage-result's `exec` passes `{ cwd, env }` (rung H run 5 died here with
+// `options.cwd … Received an instance of Object` — the stage had PASSED on the provider).
+function defaultSyncRunner(cmd, args, cwdOrOpts) {
+  const opts = typeof cwdOrOpts === "string" ? { cwd: cwdOrOpts } : (cwdOrOpts ?? {});
+  const r = spawnSync(cmd, args, {
+    cwd: opts.cwd,
+    env: opts.env ?? process.env,
+    encoding: "utf8",
+    timeout: opts.timeout ?? 300000,
+  });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? String(r.error ?? "") };
 }
 
