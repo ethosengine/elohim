@@ -263,6 +263,12 @@ canonical home · the adjacent-seam confusion to avoid.**
   instance of native extension. Their integrity models *rhyme* (both untrusted edge code gated
   by the substrate — bridge: `qahal-authority`; plugin: hash-bound validator). The real
   discriminator is **direction + bind-time**, not "different things."
+- **Consuming apps** (a legacy *service* doing work, not a protocol — first case: Jenkins,
+  `bridges/jenkins/`): served, never in control. Gifts go out as governed offers approved by a
+  Steward who is not their author. Observations come in on the observation plane only, as
+  external-claim observations. Each offer is a two-sided disclosure whose declared-vs-observed
+  gap is the signal. Its governance is legible where the consumer is found. The rules live in
+  `bridges/CLAUDE.md` §Consuming apps.
 
 ### 3.7 App-manifest / domain
 - **Problem-class:** "add a new domain app" — declarative vocabulary (content types/formats,

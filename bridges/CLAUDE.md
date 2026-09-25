@@ -40,6 +40,34 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 - `k8s/` — renders and pin-verifies runtime resource envelopes and reads
   Prometheus capacity for the orchestrator; consumed through a CLI by CI,
   not by a runtime
+- `jenkins/` — the first consuming-app bridge (see below): the edge pipeline
+  as a valueflow recipe, Jenkins builds observed as external claims, and the
+  drift and governance-card gifts under a governed offer
+
+## Consuming apps: served, never in control
+
+Some bridges face a legacy *service* that does work alongside the network: Jenkins, via `jenkins/`.
+This generalizes records-lifecycle §D.8 (vendor events enter as observations) from money to work.
+
+1. **Gifts go out, and refusing one is free.** A recipe, drift, a governance card, later a plan or
+   reuse evidence. The app works without any of them.
+2. **Observations come in, on the observation plane only.** They arrive as `Process`/`FlowEvent`
+   external-claim observations: source, `service:<app>` provenance, signature status, the lowest
+   reach, `in_scope_of` the offer. Commitments, specs, heads, grants and verdicts are
+   unrepresentable. Legibility needs no permission. Standing is earned inside.
+3. **Every gift is a governed offer, not a right.** It is approved by a Steward who is not its
+   author, withdrawable by the collective, and creates no claims. Settling to token or fiat is a
+   separate Agreement needing two non-fixture Stewards. A fixture approval reads
+   `bootstrap (fixture co-steward)`.
+4. **An offer is a two-sided disclosure.** It records `inflows` (unclaimed presences, never
+   payees), `heldCapabilities` and ± `externalities`. The declared-vs-observed gap is the signal,
+   and `drift` names an `undisclosed capability`.
+5. **Governance is legible at the point of contact.** The consumer carries the offer CID and a card,
+   so anyone can discover, explore, verify and give feedback. Feedback without identity lands at
+   low reach and never withdraws an offer on its own.
+
+The network never depends on a consumer. Boundary authority comes from a human-rooted grant, never
+the consumer's position.
 
 ## Adding a new bridge
 
