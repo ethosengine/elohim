@@ -142,7 +142,7 @@ genesis/research/repos/
 # A contribution is durable shared knowledge — fruit a participant placed into shared space —
 # not a derived projection, so it belongs in the tree every clone reads, and its declared reach
 # has to match where it actually lives: `.epr-meta/collective.json` carries the paired
-# `{"path": ".eprfs/status/memory", "maxReach": "repository"}` rule over this same directory.
+# `{"path": ".eprfs/status/memory", "maxLocality": "repository"}` rule over this same directory.
 # Same ladder shape as gap-items above: only the ROOT store is reopened; `**/.eprfs/` still
 # ignores every NESTED sidecar, including any `.eprfs/` under this path.
 !/.eprfs/status/memory/
@@ -166,6 +166,14 @@ genesis/research/repos/
 # bind` — per-device and transient, so they stay ignored inside the reopened directory.
 !/.eprfs/status/participants/
 /.eprfs/status/participants/.enroll-*.json
+# FIFTH EXCEPTION: `.eprfs/status/affiliations.jsonl` is the collectives' AFFILIATIONS sidecar —
+# who belongs to which `.epr-meta/collective.json` collective, as Person / ElohimAgent / Collective
+# and Steward / Contributor / Observer: the local pre-image of the notarized Qahal Membership
+# (plan 2026-09-10 agent-provenance-and-collective-affiliations). A declaration names no steward,
+# so a clone without this file has no Steward on record and every collective-memory operation is
+# refused. Append-only `{cid, record}` lines carrying only public participant refs (`human:<handle>`,
+# `agent:<role>`), never an email. A single FILE, so it is re-included directly.
+!/.eprfs/status/affiliations.jsonl
 # TERMINAL, and deliberately NOT a re-include: `.eprfs/status/recall/` holds recall receipts and
 # session continuations. Those are PRIVATE records under `private-thought-governed-fruit` §2 — a
 # participant's reasoning trace, never fruit — so they are never imported, witnessed, projected or

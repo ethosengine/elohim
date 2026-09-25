@@ -11,17 +11,27 @@ pub struct FileRef {
     pub cid: String,
 }
 
+/// Where a passage may travel INSIDE this repository: a placement tier, never an audience.
+///
+/// "Reach" is the network's audience vocabulary (schema 8: self … commons); the reach/locality
+/// split spec (2026-07-22) keeps the two apart so a repository placement tier can never be
+/// misread at the network boundary as an audience grant. The wire spellings are unchanged
+/// (`private|workspace|repository`), so every contribution written before the rename still reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Reach {
+pub enum Locality {
     Private,
     Workspace,
     Repository,
 }
 
-/// Local collective declaration reuses charter/steward concepts, without importing
-/// Qahal's notarized Membership struct or inventing network CIDs/block heights.
-/// Existing actor claims own mutable session attribution.
+/// A local collective declaration: `<dir>/.epr-meta/collective.json`.
+///
+/// It names NO steward. Stewardship is plural and lives in [`Affiliation`] records (the local
+/// pre-image of the notarized Qahal `Membership`), so a declaration cannot elect its own
+/// steward, and a collective with nobody on record as Steward is refused by its reader. A
+/// declaration below the repository root is a CHILD collective: its `parent` pins the enclosing
+/// declaration by path and raw CID. Existing actor claims own mutable session attribution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Collective {
@@ -29,23 +39,160 @@ pub struct Collective {
     pub id: String,
     pub display_name: String,
     pub charter: String,
-    pub steward: String,
     pub participation: String,
+    /// The enclosing declaration, pinned. `None` only for the repository-root collective.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<FileRef>,
+    /// Where this collective stands in the collectives registry's vocabulary
+    /// (`genesis/data/collectives/collectives.json`): declared terms, never a copied fixture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registry: Option<RegistryTerms>,
     pub source_rules: Vec<SourceRule>,
+}
+
+/// A collective's registration, spoken in the collectives registry's own vocabulary.
+///
+/// `reach` HERE is correct usage: the registry is the network audience vocabulary, and this is
+/// the audience the collective would stand at when it crosses. It is never a source rule.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RegistryTerms {
+    /// The registry file these terms are checked against, by repository-relative path.
+    pub catalog: String,
+    /// An existing registry collective id this collective appeals to.
+    pub constitutional_parent_id: String,
+    /// One of the registry schema's `governanceLayer` values.
+    pub governance_layer: String,
+    /// One of the registry's `reachConstraints` keys.
+    pub reach: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceRule {
     pub path: String,
-    pub max_reach: Reach,
+    pub max_locality: Locality,
+}
+
+/// Which kind of member an [`Affiliation`] names: `qahal::MemberKind`, variant for variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemberKind {
+    Person,
+    Collective,
+    ElohimAgent,
+}
+
+/// The member's role in the collective: `qahal::MembershipRole`, variant for variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MembershipRole {
+    Steward,
+    Contributor,
+    Observer,
+}
+
+/// Whether a member stands for real or is a test fixture.
+///
+/// NO counterpart in `qahal::Membership`: a local-only field. A `Fixture` member is a test human
+/// (e.g. `human:adam`) who co-stewards at Bootstrap stakes so the real primitives run end to end.
+/// Every surface that reports an approval resting on a `Fixture` member must say so, and
+/// [`requires_non_fixture_stewards`] is the gate that refuses such approvals wherever real peer
+/// validation is owed (settlement, an external offer). Serde-strict: an unknown spelling is
+/// refused, never defaulted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AffiliationStanding {
+    Standing,
+    Fixture,
+}
+
+/// One member's affiliation with one collective: a `{cid, record}` line in
+/// `.eprfs/status/affiliations.jsonl`.
+///
+/// The local PRE-IMAGE of the notarized `imagodei_integrity::qahal::Membership`, so crossing is a
+/// mint rather than a translation: `member` ↔ `member_cid`, `member_kind` ↔ `member_kind`,
+/// `collective` ↔ `collective_cid`, `role` ↔ `role`, `sponsor` ↔ `sponsor_cid`, `since` ↔
+/// `joined_at_block_height`, `withdrawn` ↔ `withdrawn_at_block_height`. `version`, `acts_for` and
+/// `standing` are local-only (no Membership field carries them); the crossing must decide how
+/// each is carried before it mints. The sidecar is append-only: the LAST line for a
+/// `(collective path, member)` pair is that member's current affiliation, and a line with
+/// `withdrawn` set ends it without rewriting history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Affiliation {
+    pub version: u32,
+    /// The collective's declaration, by path and the raw CID the member affiliated under.
+    pub collective: FileRef,
+    /// `human:<handle>`, `agent:<role>[@<model>]` or `collective:<id>`; never an email.
+    pub member: String,
+    pub member_kind: MemberKind,
+    pub role: MembershipRole,
+    /// Who sponsored a Steward pending counter-attestation (a participant ref), if anyone.
+    #[serde(default)]
+    pub sponsor: Option<String>,
+    /// On whose behalf the member acts. `None` on a root-collective affiliation means the
+    /// repository agent (`repo:<owner>/<name>`).
+    #[serde(default)]
+    pub acts_for: Option<String>,
+    pub standing: AffiliationStanding,
+    /// When the affiliation began (RFC3339, the tree it was made against).
+    pub since: String,
+    /// When the affiliation was withdrawn, if it was.
+    #[serde(default)]
+    pub withdrawn: Option<String>,
+}
+
+impl Affiliation {
+    /// A Steward still on record: role Steward and never withdrawn.
+    pub fn is_active_steward(&self) -> bool {
+        self.role == MembershipRole::Steward && self.withdrawn.is_none()
+    }
+
+    /// Whether this affiliation stands for `participant`: the exact participant, or, for an
+    /// agent affiliation named at package level (`agent:<role>`), any build of that role.
+    pub fn names(&self, participant: &str) -> bool {
+        if self.member == participant {
+            return true;
+        }
+        self.member_kind == MemberKind::ElohimAgent
+            && !self.member.contains('@')
+            && participant
+                .split_once('@')
+                .is_some_and(|(role, _)| role == self.member)
+    }
+}
+
+/// Refuses unless at least `n` DISTINCT non-fixture, still-standing Stewards approved.
+///
+/// The future settlement / external-offer gate: a value crossing to token or fiat, or an offer
+/// the protocol makes outside itself, is a governance act a fixture co-steward can never carry.
+/// Nothing calls it yet; it exists so the gate is tested before its first caller needs it.
+/// Distinctness is by `member`, so one steward approving twice counts once.
+pub fn requires_non_fixture_stewards(approvals: &[&Affiliation], n: usize) -> Result<(), String> {
+    let mut real: Vec<&str> = approvals
+        .iter()
+        .filter(|a| a.is_active_steward() && a.standing == AffiliationStanding::Standing)
+        .map(|a| a.member.as_str())
+        .collect();
+    real.sort_unstable();
+    real.dedup();
+    if real.len() < n {
+        let fixtures = approvals
+            .iter()
+            .filter(|a| a.standing == AffiliationStanding::Fixture)
+            .count();
+        return Err(format!(
+            "requires {n} distinct non-fixture Steward approvals; found {} ({fixtures} fixture \
+             approval(s) never count toward it)",
+            real.len()
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Source {
     pub resource: FileRef,
-    pub reach: Reach,
+    pub reach: Locality,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,7 +203,7 @@ pub struct Contribution {
     pub author: String,
     pub steward: String,
     pub scope: String,
-    pub reach: Reach,
+    pub reach: Locality,
     pub concern: String,
     pub claim: String,
     pub uncertainty: Vec<String>,
@@ -113,7 +260,7 @@ pub struct ProjectionRequest {
     pub version: u32,
     pub collective: FileRef,
     pub purpose: String,
-    pub audience: Reach,
+    pub audience: Locality,
     pub inputs: Vec<FileRef>,
     pub omissions: Vec<String>,
 }
@@ -146,5 +293,79 @@ pub struct Graduation {
     pub contribution: FileRef,
     /// Exact existing native approved verdict event, never a claimed boolean.
     pub review: String,
-    pub audience: Reach,
+    pub audience: Locality,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn steward(member: &str, standing: AffiliationStanding) -> Affiliation {
+        Affiliation {
+            version: 1,
+            collective: FileRef {
+                path: ".epr-meta/collective.json".into(),
+                cid: "bafkreiexample".into(),
+            },
+            member: member.into(),
+            member_kind: MemberKind::Person,
+            role: MembershipRole::Steward,
+            sponsor: None,
+            acts_for: None,
+            standing,
+            since: "2026-09-25T00:00:00Z".into(),
+            withdrawn: None,
+        }
+    }
+
+    #[test]
+    fn one_real_and_one_fixture_steward_do_not_make_two() {
+        let matthew = steward("human:matthew", AffiliationStanding::Standing);
+        let adam = steward("human:adam", AffiliationStanding::Fixture);
+        let err = requires_non_fixture_stewards(&[&matthew, &adam], 2).unwrap_err();
+        assert!(err.contains("found 1"), "{err}");
+        assert!(err.contains("1 fixture"), "{err}");
+        assert!(requires_non_fixture_stewards(&[&matthew, &adam], 1).is_ok());
+    }
+
+    #[test]
+    fn distinct_real_stewards_pass_and_a_repeat_counts_once() {
+        let matthew = steward("human:matthew", AffiliationStanding::Standing);
+        let other = steward("human:ruth", AffiliationStanding::Standing);
+        assert!(requires_non_fixture_stewards(&[&matthew, &other], 2).is_ok());
+        assert!(requires_non_fixture_stewards(&[&matthew, &matthew], 2).is_err());
+        let mut withdrawn = other.clone();
+        withdrawn.withdrawn = Some("2026-09-26T00:00:00Z".into());
+        assert!(requires_non_fixture_stewards(&[&matthew, &withdrawn], 2).is_err());
+        let mut contributor = other;
+        contributor.role = MembershipRole::Contributor;
+        assert!(requires_non_fixture_stewards(&[&matthew, &contributor], 2).is_err());
+    }
+
+    #[test]
+    fn standing_is_strict_and_unknown_affiliation_fields_are_refused() {
+        let good =
+            serde_json::to_value(steward("human:adam", AffiliationStanding::Fixture)).unwrap();
+        assert_eq!(good["standing"], "Fixture");
+        let mut bad = good.clone();
+        bad["standing"] = serde_json::json!("fixture-ish");
+        assert!(serde_json::from_value::<Affiliation>(bad).is_err());
+        let mut missing = good.clone();
+        missing.as_object_mut().unwrap().remove("standing");
+        assert!(serde_json::from_value::<Affiliation>(missing).is_err());
+        let mut extra = good;
+        extra["email"] = serde_json::json!("x");
+        assert!(serde_json::from_value::<Affiliation>(extra).is_err());
+    }
+
+    #[test]
+    fn a_package_level_agent_affiliation_names_every_build_of_its_role() {
+        let mut agent = steward("agent:reviewer", AffiliationStanding::Standing);
+        agent.member_kind = MemberKind::ElohimAgent;
+        assert!(agent.names("agent:reviewer@opus-5"));
+        assert!(!agent.names("agent:reviewer-two@opus-5"));
+        let person = steward("human:matthew", AffiliationStanding::Standing);
+        assert!(person.names("human:matthew"));
+        assert!(!person.names("human:matthew@x"));
+    }
 }

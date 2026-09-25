@@ -946,16 +946,25 @@ decisionPoints:
       modulePath: elohim_epr_cli::flow::memory
     summary: >
       Local collective declaration, exact-version contribution, explicit context projection,
-      attributed feedback and repository reach rehearsal over existing files and REA notes.
+      attributed feedback and repository locality rehearsal over existing files and REA notes.
       Session claims establish local attribution only, not authentication. No memory database,
-      latest-version selection, network membership or publication is introduced.
+      latest-version selection, network membership or publication is introduced. Changed
+      2026-09-25 (plan agent-provenance-and-collective-affiliations, station 3): the declaration
+      names no steward — Stewards are `{cid, record}` affiliation lines in
+      `.eprfs/status/affiliations.jsonl` (the Qahal Membership pre-image, CID re-verified on read,
+      a forged line counts for nothing) and a collective with none on record is refused; the
+      collective of record is the nearest declaration above a path, a child pins its parent and
+      may not widen it; a write is refused when the acting claim is bound to another collective;
+      graduation additionally requires the verdict's provider to hold a standing Steward
+      affiliation that does not also stand for the author, and reports a fixture co-steward's
+      approval as `validatedAt: bootstrap (fixture co-steward)`.
     concernIds:
       - id: C0
         status: partial
         justification: Local rehearsal checks declared reach and source availability separately; network graduation remains unbound.
       - id: C1
         status: partial
-        justification: Contribution and projection cannot self-accept; local rehearsal requires independent technical verdict but establishes no experiential acceptance.
+        justification: Contribution and projection cannot self-accept; local rehearsal requires an approving verdict from a Steward affiliate distinct from the author (a package-level Steward cannot approve another build of its own role) but establishes no experiential acceptance. A fixture co-steward satisfies the local rehearsal only and is labelled bootstrap; `requires_non_fixture_stewards(n)` is the tested, not-yet-called gate for settlement and external offers.
       - id: C2
         status: answered
         justification: Exact raw BlobCid pins include source metadata. Concurrent contradictory versions survive explicit selection without last-writer authority.
@@ -989,6 +998,15 @@ decisionPoints:
     contractTests:
       - path: elohim/eprfs/epr-cli/tests/flow_memory.rs
         testName: two_agents_replay_projection_feedback_and_independent_local_graduation
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_memory_affiliations.rs
+        testName: graduate_approved_by_a_contributor_is_refused
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_memory_affiliations.rs
+        testName: a_fixture_co_stewards_approval_runs_the_primitive_and_says_so
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_memory_affiliations.rs
+        testName: a_claim_bound_to_a_different_collective_than_the_sources_is_refused_naming_both
         kind: integration
 
   # ── station two of the memory-kit replacement (2026-09-10) ──────────────────────────────────

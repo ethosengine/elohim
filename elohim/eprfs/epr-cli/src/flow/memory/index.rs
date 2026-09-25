@@ -45,7 +45,7 @@ const DEFAULT_BYTES_MEASURE: &str = "memory-index-bytes@1";
 
 pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     let mut lead = Reader::new(root)?;
-    let (collective_ref, _collective) = lead.collective()?;
+    let collective_ref = lead.collective()?.reference;
     let root = lead.root.clone();
 
     let contributions_rel = Path::new(

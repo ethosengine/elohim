@@ -45,6 +45,24 @@ fn fixture() -> TempDir {
             String::from_utf8_lossy(&status.stderr)
         );
     }
+    // Stewards are affiliation records: the reviewer package stewards this synthetic collective
+    // (so its verdict can approve a graduation), the investigator package contributes.
+    let collective = pin(root, ".epr-meta/collective.json");
+    let lines: String = [
+        ("agent:reviewer", "Steward"),
+        ("agent:investigator", "Contributor"),
+    ]
+    .iter()
+    .map(|(member, role)| {
+        let record: eprfs_agent::memory::Affiliation = serde_json::from_value(json!({
+            "version":1,"collective":collective,"member":member,"memberKind":"ElohimAgent",
+            "role":role,"standing":"Standing","since":"2026-09-25T00:00:00Z"}))
+        .unwrap();
+        memory::affiliation_line(&record).unwrap() + "\n"
+    })
+    .collect();
+    std::fs::create_dir_all(root.join(".eprfs/status")).unwrap();
+    std::fs::write(root.join(memory::AFFILIATIONS_PATH), lines).unwrap();
     actor::claim(root, "agent:investigator@fixture", "one").unwrap();
     actor::claim(root, "agent:reviewer@fixture", "two").unwrap();
     dir
@@ -246,7 +264,7 @@ fn source_policy_and_projection_metadata_prevent_reach_laundering() {
     collective["sourceRules"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"path":"genesis/private","maxReach":"private"}));
+        .push(json!({"path":"genesis/private","maxLocality":"private"}));
     write(root, ".epr-meta/collective.json", &collective);
     write(
         root,
@@ -508,7 +526,7 @@ fn private_feedback_and_request_metadata_cannot_launder_repository_reach() {
     collective["sourceRules"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"path":"genesis/private","maxReach":"private"}));
+        .push(json!({"path":"genesis/private","maxLocality":"private"}));
     write(root, ".epr-meta/collective.json", &collective);
     write(
         root,

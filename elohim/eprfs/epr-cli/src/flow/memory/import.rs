@@ -34,7 +34,8 @@
 //! * `Imported::git_name` — the **provenance** of the pinned bytes: the commit's display name
 //!   only, read from the entry's own git history. A source's origin, carrying no standing — and
 //!   never the email (the identity reserve, below).
-//! * `Contribution::steward` — the collective's declared steward, copied from the declaration;
+//! * `Contribution::steward` — the party the collective's affiliations act for by default (the
+//!   repository agent on the root collective), never a declaration field;
 //!   the note's `steward:` slot is resolved by the note leg (the device's standing human's handle
 //!   where there is one). Nothing here supplies either, which is why neither can be spoofed here.
 //!
@@ -61,7 +62,7 @@ use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
 use elohim_epr_rea::{ActorStore, SidecarActorStore};
-use eprfs_agent::memory::{Collective, Contribution, FileRef, Imported, Reach, Source};
+use eprfs_agent::memory::{Contribution, FileRef, Imported, Locality, Source};
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 
@@ -196,7 +197,12 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     // The collective is read once, from a reader that reads nothing else: every entry then gets a
     // fresh reader so one oversized entry cannot exhaust the next one's byte budget.
     let mut lead = Reader::new(root)?;
-    let (collective_ref, collective) = lead.collective()?;
+    // The collective of record for the directory being imported: its nearest declaration.
+    let declaration = lead.nearest_declaration(&rel_str(&dir_rel))?;
+    let governance = lead.governance(&declaration)?;
+    let (collective_ref, collective) =
+        (governance.reference.clone(), governance.declaration.clone());
+    let steward = governance.default_steward();
     let root = lead.root.clone();
 
     if let Some(reason) = private_reason(&dir_rel) {
@@ -216,9 +222,9 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     // 229 times without touching the file again.
     let acts = super::ContributionActs::open(&root)?;
 
-    let source_reach = lead.policy_reach(&rel_str(&dir_rel), &collective)?;
+    let source_reach = lead.policy_locality(&rel_str(&dir_rel), &collective)?;
     let request_reach =
-        lead.policy_reach(&rel_str(&contributions_rel.join("probe.json")), &collective)?;
+        lead.policy_locality(&rel_str(&contributions_rel.join("probe.json")), &collective)?;
     // Never widen: a contribution reaches no further than the narrower of the two policies that
     // govern the bytes it pins and the bytes that record it.
     let reach = source_reach.min(request_reach);
@@ -238,7 +244,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
             &file,
             &contributions_rel,
             &collective_ref,
-            &collective,
+            &steward,
             source_reach,
             reach,
             &author,
@@ -301,9 +307,9 @@ fn one(
     file: &str,
     contributions_rel: &Path,
     collective_ref: &FileRef,
-    collective: &Collective,
-    source_reach: Reach,
-    reach: Reach,
+    steward: &str,
+    source_reach: Locality,
+    reach: Locality,
     author: &str,
     acts: &Acts,
     opts: &Options,
@@ -348,7 +354,7 @@ fn one(
         // The acting participant, per the actor plane. The human whose commit produced these bytes
         // is recorded as provenance below and as the note's steward slot — never as an author.
         author: author.to_string(),
-        steward: collective.steward.clone(),
+        steward: steward.to_string(),
         scope: "repository".into(),
         reach,
         concern: bounded(&name, 256),
@@ -434,11 +440,17 @@ fn frozen(root: &Path, request_rel: &Path, candidate: &Contribution) -> bool {
     let Ok(prior) = serde_json::from_str::<Contribution>(&existing) else {
         return false;
     };
-    if prior.author == candidate.author {
+    // An amended declaration re-pins the collective's CID. The same entry, recorded under the
+    // earlier declaration of the SAME collective, stays as it was contributed: re-pinning it here
+    // would rewrite it under whoever ran this import, which is re-authoring by another name.
+    let repinned = prior.collective.path == candidate.collective.path
+        && prior.collective.cid != candidate.collective.cid;
+    if prior.author == candidate.author && !repinned {
         return false;
     }
     let mut same = candidate.clone();
     same.author = prior.author;
+    same.collective = prior.collective;
     let Ok(text) = serde_json::to_string_pretty(&same) else {
         return false;
     };

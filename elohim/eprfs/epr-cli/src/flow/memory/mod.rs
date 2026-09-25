@@ -13,12 +13,16 @@ use std::process::ExitCode;
 
 use cid::Cid;
 use elohim_epr_rea::{FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
-use eprfs_agent::memory::{Contribution, Feedback, FileRef, Graduation, ProjectionRequest, Reach};
+use eprfs_agent::memory::{
+    Affiliation, AffiliationStanding, Contribution, Feedback, FileRef, Graduation, Locality,
+    ProjectionRequest,
+};
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 
 use super::{body_cid, note, FlowError, FlowResult};
 pub(crate) use validation::COLLECTIVE_PATH;
+pub use validation::{affiliation_line, verify_affiliation_line, AFFILIATIONS_PATH};
 use validation::{bounded_text, version, Reader};
 
 fn refused(message: impl Into<String>) -> FlowError {
@@ -73,12 +77,13 @@ const OPERATIONS: [&str; 10] = [
 pub fn usage() -> String {
     format!(
         "usage: epr flow memory <{}> [--input FILE] [--session ID] [--json] [--root DIR]\n\n  \
-         collective    read the declared collective and its contracts\n  \
+         collective    read a declared collective, its Stewards and contracts (--input PATH: \
+         the collective of record for PATH)\n  \
          pin           pin one governed source file by reference\n  \
          contribute    file a governed contribution request\n  \
          project       project a contribution receipt, or --index the memory index\n  \
          feedback      file governed feedback on a contribution\n  \
-         graduate      rehearse local repository reach for a contribution\n  \
+         graduate      rehearse repository locality for a contribution (a distinct Steward approves)\n  \
          import        adopt an authored directory of requests\n  \
          migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n                    \
                    (--session ID [--basis LINE] [--contributions DIR] [--dry-run])\n  \
@@ -169,6 +174,16 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// The declaration path of the collective of record for `path`: its nearest
+/// `.epr-meta/collective.json`, verified (declaration shape, parent pin, Stewards on record).
+/// What `epr actor claim --under <path>` binds a session to.
+pub fn collective_of_record(root: &Path, path: &str) -> FlowResult<String> {
+    let mut reader = Reader::new(root)?;
+    let declaration = reader.nearest_declaration(path)?;
+    reader.governance(&declaration)?;
+    Ok(declaration)
+}
+
 /// The four-parameter shape every existing caller and contract test uses, unchanged.
 pub fn execute(
     root: &Path,
@@ -209,22 +224,42 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             json!({"operation":"pin", "resource":file.reference, "flowResourceCid":body_cid(&file.text).to_string(), "usage":reader.usage()}),
         );
     }
-    let (collective_ref, collective) = reader.collective()?;
     if operation == "collective" {
+        // `--input` here names a PATH whose collective of record to inspect; absent, the root.
+        let declaration = match input {
+            Some(path) => reader.nearest_declaration(path)?,
+            None => COLLECTIVE_PATH.to_string(),
+        };
+        let governance = reader.governance(&declaration)?;
+        let registry = reader.registry_report(&governance.declaration);
         return Ok(
-            json!({"operation":"collective", "resource":collective_ref, "declaration":collective,
-            "inputGuide":guide::input_guide(&collective_ref, &collective),
-            "relationship":{"memberKind":"Collective","role":"Steward","memberRef":collective.steward},
-            "standing":"Declared local relationship. Registered actor claims supply attribution, not authentication or network membership.","usage":reader.usage()}),
+            json!({"operation":"collective", "resource":governance.reference, "declaration":governance.declaration,
+            "inputGuide":guide::input_guide(&governance),
+            "stewards":governance.steward_report(),
+            "affiliations":{"current":governance.affiliations.len(),"invalidLines":governance.invalid_lines,"sidecar":validation::AFFILIATIONS_PATH},
+            "registry":registry,
+            "standing":"Declared local relationship. Stewards are affiliation records, the local pre-image of Qahal Membership; registered actor claims supply attribution, not authentication or network membership.","usage":reader.usage()}),
         );
     }
     let input = input.ok_or_else(|| refused("operation needs --input"))?;
     let file = reader.read(input)?;
+    // Every request names its collective by pinned declaration; that declaration governs it.
+    let named: FileRef = serde_json::from_value(
+        serde_json::from_str::<Value>(&file.text)?
+            .get("collective")
+            .cloned()
+            .ok_or_else(|| refused("request names no collective"))?,
+    )?;
+    let governance = reader.governance(&named.path)?;
+    let collective_ref = governance.reference.clone();
+    let collective = governance.declaration.clone();
     let mut output = match operation {
         "contribute" => {
             let assertion: Contribution = serde_json::from_str(&file.text)?;
-            reader.contribution(&assertion, &collective_ref, &collective)?;
+            reader.contribution(&assertion, &governance)?;
+            reader.owned_by(&file.reference.path, &governance)?;
             reader.allowed(&file.reference.path, assertion.reach, &collective)?;
+            reader.require_bound(session, &governance)?;
             let event = record(
                 &reader,
                 &file.reference,
@@ -238,7 +273,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                 ),
             )?;
             json!({"operation":"contribute","resource":file.reference,"flowResourceCid":body_cid(&file.text).to_string(),
-                "actorClaim":event["actor_claim"],"author":event["actor"],"steward":collective.steward,"event":event,"effectiveReach":assertion.reach,
+                "actorClaim":event["actor_claim"],"author":event["actor"],"steward":assertion.steward,"collectiveOfRecord":{"path":collective_ref.path,"id":collective.id},"event":event,"effectiveReach":assertion.reach,
                 "standing":"Local authored contribution; independent judgment remains open. Alternatives are not superseded by arrival."})
         }
         "project" => {
@@ -259,7 +294,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                 }
                 let source = reader.pinned(reference)?;
                 let assertion: Contribution = serde_json::from_str(&source.text)?;
-                reader.contribution(&assertion, &collective_ref, &collective)?;
+                reader.contribution(&assertion, &governance)?;
                 observed(&mut reader, reference, &source.text, &assertion)?;
                 if request.audience > assertion.reach {
                     return Err(refused("projection audience exceeds contribution reach"));
@@ -286,16 +321,17 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             reader.require_collective(&feedback.collective, &collective_ref)?;
             bounded_text(&feedback.passage, "challenged passage", 1000)?;
             bounded_text(&feedback.reason, "reason", 1000)?;
-            reader.allowed(&feedback.target.path, Reach::Private, &collective)?;
+            reader.allowed(&feedback.target.path, Locality::Private, &collective)?;
             let target = reader.pinned(&feedback.target)?;
             if !target.text.contains(&feedback.passage) {
                 return Err(refused(
                     "challenged passage is absent from exact target bytes",
                 ));
             }
+            reader.require_bound(session, &governance)?;
             let effective_reach = reader
-                .policy_reach(input, &collective)?
-                .min(reader.effective_reach(&feedback.target, &collective, 0)?);
+                .policy_locality(input, &collective)?
+                .min(reader.effective_locality(&feedback.target, &collective, 0)?);
             let event = record(
                 &reader,
                 &feedback.target,
@@ -315,7 +351,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             let request: Graduation = serde_json::from_str(&file.text)?;
             version(request.version)?;
             reader.require_collective(&request.collective, &collective_ref)?;
-            if request.audience != Reach::Repository {
+            if request.audience != Locality::Repository {
                 return Err(refused(
                     "only repository-local graduation rehearsal is supported",
                 ));
@@ -323,7 +359,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             reader.allowed(input, request.audience, &collective)?;
             let source = reader.pinned(&request.contribution)?;
             let assertion: Contribution = serde_json::from_str(&source.text)?;
-            reader.contribution(&assertion, &collective_ref, &collective)?;
+            reader.contribution(&assertion, &governance)?;
             if assertion.reach < request.audience {
                 return Err(refused("contribution restriction forbids repository reach"));
             }
@@ -361,8 +397,19 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                 if e.resource == review.resource && e.classified_as.iter().any(|v| v == "verdict:changes-requested"))) {
                 return Err(refused("a later contrary native verdict requires renewed review"));
             }
+            let (affiliation_cid, approver) =
+                steward_approval(&governance, &review.provider.0, &assertion.author)?;
+            let fixture = approver.standing == AffiliationStanding::Fixture;
+            let standing = if fixture {
+                "Repository-local locality rehearsal only, approved by a FIXTURE co-steward (a test human at Bootstrap stakes): the primitive ran, but this is not peer validation. No files moved, network publication, peer attestation or experiential acceptance established."
+            } else {
+                "Repository-local locality rehearsal only; no files moved, network publication, peer attestation or experiential acceptance established."
+            };
             json!({"operation":"graduate","resource":request.contribution,"review":request.review,
-                "audience":"repository","effectiveReach":"repository","allowed":true,"standing":"Repository-local reach rehearsal only; no files moved, network publication, peer attestation or experiential acceptance established.",
+                "audience":"repository","effectiveReach":"repository","allowed":true,
+                "approver":{"member":approver.member,"affiliation":affiliation_cid,"role":approver.role,"standing":approver.standing},
+                "validatedAt":validation::validated_at(approver.standing),
+                "standing":standing,
                 "limitations":assertion.uncertainty,"contradictions":assertion.contradicts})
         }
         // `recall` never reaches here: it is intercepted in `run` before the shared option parser,
@@ -373,6 +420,38 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
     output["usage"] = reader.usage();
     output["limits"] = json!({"sourceFiles":32,"sourceBytes":262144,"sidecarBytes":33554432,"projectionBytes":24576});
     Ok(output)
+}
+
+/// The Steward affiliation an approving verdict rests on, refused unless it is DISTINCT from the
+/// contribution's author (concern C1, anti-self-election).
+///
+/// Distinct means more than a different string: the approver's Steward affiliation must not also
+/// stand for the author, so a package-level agent affiliation cannot approve work by another
+/// build of its own role.
+fn steward_approval<'g>(
+    governance: &'g validation::Governance,
+    approver: &str,
+    author: &str,
+) -> FlowResult<(&'g str, &'g Affiliation)> {
+    let named = governance.affiliation_of(approver);
+    let Some((cid, affiliation)) = named.filter(|(_, a)| a.is_active_steward()) else {
+        let held = named.map_or_else(
+            || "no affiliation at all".to_string(),
+            |(_, a)| format!("a {:?} affiliation", a.role),
+        );
+        return Err(refused(format!(
+            "the approving verdict's provider {approver} holds no Steward affiliation in {} ({held}); \
+             graduation needs a distinct Steward's approval",
+            governance.declaration.id
+        )));
+    };
+    if affiliation.names(author) {
+        return Err(refused(format!(
+            "the approver {approver} is the author: its Steward affiliation also stands for \
+             {author}; graduation needs a Steward who is not the contribution's author"
+        )));
+    }
+    Ok((cid.as_str(), affiliation))
 }
 
 fn method_cid() -> String {

@@ -83,6 +83,12 @@ fn repo() -> TempDir {
         ".epr-meta/collective.json",
         include_str!("../../../../.epr-meta/collective.json"),
     );
+    // The collective's Stewards on record, verbatim: a declaration names none of its own.
+    write(
+        root,
+        ".eprfs/status/affiliations.jsonl",
+        include_str!("../../../../.eprfs/status/affiliations.jsonl"),
+    );
     write(
         root,
         ".claude/epr-meta/measures.yaml",
@@ -731,11 +737,15 @@ fn steward_slot_names_the_collective_never_an_email() {
     let declared: serde_json::Value =
         serde_json::from_str(include_str!("../../../../.epr-meta/collective.json"))
             .expect("collective declaration");
+    assert!(
+        declared.get("steward").is_none(),
+        "a declaration names no steward; Stewards are affiliation records"
+    );
     for (name, bytes) in contributions(root) {
         let c: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
         assert_eq!(
-            c["steward"], declared["steward"],
-            "{name}: the steward slot names the collective's declared steward"
+            c["steward"], "repo:ethosengine/elohim",
+            "{name}: the steward slot names the root collective's default acts_for"
         );
         assert!(
             !c["steward"].as_str().expect("steward").contains('@'),
@@ -778,6 +788,44 @@ fn memory_import_freezes_author() {
         assert_eq!(c["author"], AUTHOR, "{name}");
     }
     // An identical re-run appends nothing.
+    assert_eq!(events(root), events_before);
+}
+
+/// An amended declaration re-pins the collective's CID. A re-import after the amendment must not
+/// re-pin — and so re-author — every contribution recorded under the earlier declaration.
+#[test]
+fn an_amended_declaration_does_not_reauthor_earlier_contributions() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    import(root, ".claude/memory");
+    let before = contributions(root);
+    let events_before = events(root);
+    let path = root.join(".epr-meta/collective.json");
+    let mut declaration: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("declaration")).expect("json");
+    declaration["charter"] = serde_json::json!("An amended charter.");
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&declaration).expect("json"),
+    )
+    .expect("amend");
+    actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+    for session in [SESSION, SECOND_SESSION] {
+        let again = memory::execute_with(
+            root,
+            "import",
+            &Options {
+                target: Some(".claude/memory"),
+                session: Some(session),
+                ..Options::default()
+            },
+        )
+        .expect("re-import");
+        assert_eq!(again["counts"]["skipped"], before.len(), "{session}");
+        assert_eq!(again["counts"]["eventsAppended"], 0, "{session}");
+    }
+    assert_eq!(contributions(root), before);
     assert_eq!(events(root), events_before);
 }
 
@@ -827,7 +875,7 @@ const MIGRATION_SESSION: &str = "identity-reserve-session";
 /// exact state 250 live files were in. Built from the typed contribution so the layout is the
 /// serializer's own, then the one field renamed back to its retired spelling.
 fn plant_legacy(root: &Path) -> Vec<String> {
-    use eprfs_agent::memory::{Contribution, FileRef, Imported, Reach, Source};
+    use eprfs_agent::memory::{Contribution, FileRef, Imported, Locality, Source};
     let collective_bytes =
         std::fs::read(root.join(".epr-meta/collective.json")).expect("collective");
     let collective = FileRef {
@@ -844,7 +892,7 @@ fn plant_legacy(root: &Path) -> Vec<String> {
             author: AUTHOR.into(),
             steward: "repo:ethosengine/elohim".into(),
             scope: "repository".into(),
-            reach: Reach::Repository,
+            reach: Locality::Repository,
             concern: name.into(),
             claim: format!("The one-line claim of {name}."),
             // Exactly what `import` writes, so a later re-import of these entries is a re-import of
@@ -858,7 +906,7 @@ fn plant_legacy(root: &Path) -> Vec<String> {
                     path: rel.clone(),
                     cid: eprfs_core::BlobCid::compute_raw(&bytes).to_string(),
                 },
-                reach: Reach::Repository,
+                reach: Locality::Repository,
             }],
             supersedes: vec![],
             contradicts: vec![],

@@ -139,7 +139,14 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
                 },
                 _ => None,
             };
-            let outcome = claim_with_device(&opts.root, &claimed, &session, device.as_ref())?;
+            let under = take_opt(&rest, "--under")?;
+            let outcome = claim_bound(
+                &opts.root,
+                &claimed,
+                &session,
+                device.as_ref(),
+                under.as_deref(),
+            )?;
             print_outcome(opts.json, &outcome, ClaimOutcome::render)
         }
         "current" => {
@@ -321,6 +328,9 @@ pub struct ClaimOutcome {
     /// an agent's payload is byte-for-byte what it always was.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signer: Option<String>,
+    /// The declaration path of the collective of record this claim binds (the root when the
+    /// claim named none).
+    pub collective: String,
 }
 
 impl ClaimOutcome {
@@ -332,6 +342,7 @@ impl ClaimOutcome {
             short_cid_str(&self.record_cid)
         );
         println!("        claimed at: {}", self.claimed_at);
+        println!("        collective of record: {}", self.collective);
         match &self.definition_cid {
             Some(cid) => println!("        definition: {cid}"),
             None => println!("        definition: (no package on disk — honest absence)"),
@@ -375,6 +386,28 @@ pub fn claim_with_device(
     session: &str,
     device: Option<&DeviceKey>,
 ) -> ActorResult<ClaimOutcome> {
+    claim_bound(root, claimed, session, device, None)
+}
+
+/// `epr actor claim … --under <path>`: the claim, bound to the collective of record for `path`
+/// (its nearest `.epr-meta/collective.json`). Without `--under` the claim is unbound, which every
+/// reader takes as bound to the repository-root collective.
+pub fn claim_under(
+    root: &Path,
+    claimed: &str,
+    session: &str,
+    under: &str,
+) -> ActorResult<ClaimOutcome> {
+    claim_bound(root, claimed, session, None, Some(under))
+}
+
+fn claim_bound(
+    root: &Path,
+    claimed: &str,
+    session: &str,
+    device: Option<&DeviceKey>,
+    under: Option<&str>,
+) -> ActorResult<ClaimOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
     // Shape first, so a malformed `--as` never even opens the store. The refusal is
@@ -403,7 +436,13 @@ pub fn claim_with_device(
     };
 
     let is_human = matches!(participant, ParticipantRef::Human { .. });
-    let claim = ActorClaim::new(claimed, session, &claimed_at, definition_cid.clone())?;
+    let mut claim = ActorClaim::new(claimed, session, &claimed_at, definition_cid.clone())?;
+    if let Some(path) = under {
+        let declaration = crate::flow::memory::collective_of_record(root, path)
+            .map_err(|e| ActorError::InvalidArguments(e.to_string()))?;
+        claim = claim.bound_to(&declaration)?;
+    }
+    let collective = claim.collective_of_record().to_string();
     let record = ActorRecord::Claim(claim);
     let record_cid = record.cid()?;
     let signed = match device {
@@ -437,6 +476,7 @@ pub fn claim_with_device(
         appended,
         superseded,
         signer: device.filter(|_| is_human).map(DeviceKey::did_key),
+        collective,
     };
 
     // ── Phase 2: append. The claim (or nothing), then its signature (once). ──
@@ -496,6 +536,8 @@ pub struct CurrentClaim {
     pub claimed_at: String,
     pub definition_cid: Option<String>,
     pub record_cid: String,
+    /// The declaration path of the session's collective of record (the root when unbound).
+    pub collective: String,
 }
 
 /// The machine-facing result of one `current` read.
@@ -604,6 +646,7 @@ pub fn current_on_device(
     let claim = store
         .current_for(session)?
         .map(|(cid, claim)| CurrentClaim {
+            collective: claim.collective_of_record().to_string(),
             claimed: claim.claimed.0,
             session: claim.session,
             claimed_at: claim.claimed_at,
@@ -1809,7 +1852,8 @@ fn parse_global(args: &[String]) -> ActorResult<(GlobalOpts, Vec<String>)> {
                 rest.push(args[i].clone());
                 i += 1;
             }
-            "--as" | "--session" | "--subject" | "--basis" | "--handle" | "--answers" => {
+            "--as" | "--session" | "--subject" | "--basis" | "--handle" | "--answers"
+            | "--under" => {
                 let value = args.get(i + 1).ok_or_else(|| {
                     ActorError::InvalidArguments(format!("{} needs a value", args[i]))
                 })?;
@@ -1837,7 +1881,8 @@ fn short_cid_str(cid: &str) -> String {
 
 pub fn usage() -> String {
     "usage: epr actor <\n  \
-     claim --as agent:<role>@<model> | human:<handle> --session <id> [--json] [--root DIR]\n  \
+     claim --as agent:<role>@<model> | human:<handle> --session <id> [--under PATH] [--json] \
+     [--root DIR]\n  \
      | current --session <id> | --device [--json] [--root DIR]\n  \
      | witness --subject human:<handle> --as agent:<role>@<model> --session <id> \
      --basis \"<line>\" [--again [--answers <contest-cid>]] [--json] [--root DIR]\n  \

@@ -1174,16 +1174,14 @@ pub(crate) fn resolved_actor(root: &Path, actor: &NoteActor) -> FlowResult<Optio
     Ok(resolve_attribution(root, named, actor.session.as_deref(), "").actor)
 }
 
-/// The collective's declared steward — the same `steward` a tracked contribution copies from
-/// `.epr-meta/collective.json` — or the repository agent when no readable declaration names one.
-/// This is who answers for a tree no standing human speaks for; the git email never is.
-pub(crate) fn collective_steward(root: &Path) -> String {
-    std::fs::read_to_string(root.join(super::memory::COLLECTIVE_PATH))
-        .ok()
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|value| value.get("steward")?.as_str().map(str::to_string))
-        .filter(|steward| !steward.trim().is_empty() && !steward.contains('@'))
-        .unwrap_or_else(|| super::REPO_AGENT.to_string())
+/// Who answers for a tree no standing human speaks for: the root collective's default `acts_for`,
+/// the repository agent — the same party a tracked root contribution names as its steward.
+///
+/// A declaration no longer names a steward (stewards are affiliation records, plural), so nothing
+/// is read from `.epr-meta/collective.json` here; a legacy declaration still carrying `steward` is
+/// refused by the collective's reader and never consulted by this slot. The git email never is.
+pub(crate) fn collective_steward(_root: &Path) -> String {
+    super::REPO_AGENT.to_string()
 }
 
 /// Who registered for `session`, or `None` with one line on stderr saying why.
@@ -1706,15 +1704,15 @@ mod tests {
             assert!(!slots.iter().any(|s| s.contains(email)), "{slots:?}");
         }
 
-        // A declared collective names its own steward, the same one a tracked contribution
-        // copies; an email-shaped declaration is never taken.
+        // A declaration no longer names a steward: a legacy one that still does is never
+        // consulted, and an email-shaped one is never taken either way.
         std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
         std::fs::write(
             root.join(".epr-meta/collective.json"),
             r#"{"steward": "repo:example/fixture"}"#,
         )
         .unwrap();
-        assert_eq!(collective_steward(root), "repo:example/fixture");
+        assert_eq!(collective_steward(root), crate::flow::REPO_AGENT);
         std::fs::write(
             root.join(".epr-meta/collective.json"),
             r#"{"steward": "someone@example.test"}"#,

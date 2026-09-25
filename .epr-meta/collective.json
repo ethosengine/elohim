@@ -2,16 +2,21 @@
   "version": 1,
   "id": "collective:ethosengine/elohim",
   "displayName": "Elohim repository collaboration",
-  "charter": "Repository-local shared assertions preserve source versions, uncertainty and independent judgment. Registered local sessions may contribute under repository stewardship; this declaration grants no network membership, authentication or publication authority. Private runtime stores remain independently owned.",
-  "steward": "repo:ethosengine/elohim",
+  "charter": "Repository-local shared assertions preserve source versions, uncertainty and independent judgment. Registered local sessions may contribute under repository stewardship; stewards are plural and on record as affiliations in .eprfs/status/affiliations.jsonl, and widening a contribution needs an approving verdict from a Steward who is not its author. This declaration grants no network membership, authentication or publication authority. Private runtime stores remain independently owned.",
   "participation": "registered-local-session",
+  "registry": {
+    "catalog": "genesis/data/collectives/collectives.json",
+    "constitutionalParentId": "org-ethosengine",
+    "governanceLayer": "workplace",
+    "reach": "familiar"
+  },
   "sourceRules": [
-    {"path": ".epr-meta", "maxReach": "repository"},
-    {"path": "genesis", "maxReach": "repository"},
-    {"path": "elohim", "maxReach": "repository"},
-    {"path": ".claude/memory-kit", "maxReach": "workspace"},
-    {"path": ".claude/memory", "maxReach": "repository"},
-    {"path": ".eprfs", "maxReach": "workspace"},
-    {"path": ".eprfs/status/memory", "maxReach": "repository"}
+    {"path": ".epr-meta", "maxLocality": "repository"},
+    {"path": "genesis", "maxLocality": "repository"},
+    {"path": "elohim", "maxLocality": "repository"},
+    {"path": ".claude/memory-kit", "maxLocality": "workspace"},
+    {"path": ".claude/memory", "maxLocality": "repository"},
+    {"path": ".eprfs", "maxLocality": "workspace"},
+    {"path": ".eprfs/status/memory", "maxLocality": "repository"}
   ]
 }
