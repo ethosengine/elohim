@@ -498,6 +498,28 @@ impl From<serde_json::Error> for ManifestLayer1Error {
     }
 }
 
+/// The pillar manifest root layer-1 write-through defaults are read from:
+/// `ELOHIM_PILLAR_MANIFEST_DIR` when set, else this crate's own
+/// `../sdk/domains` (the observation-kind registry's source, too).
+pub fn pillar_manifest_dir() -> std::path::PathBuf {
+    resolve_pillar_manifest_dir(std::env::var_os(
+        crate::services::observation_kinds::PILLAR_MANIFEST_DIR_ENV,
+    ))
+}
+
+/// Resolution order behind [`pillar_manifest_dir`]: a non-empty override is
+/// used as given; otherwise the crate-relative source tree. Never the process
+/// cwd — a storage peer runs from its own state directory, where the former
+/// bare default `elohim/sdk/domains` named nothing and layer-1 stayed empty.
+/// On a deployed node the default names no directory either; the loader then
+/// warns once and layer-1 stays empty, as before.
+pub fn resolve_pillar_manifest_dir(override_dir: Option<std::ffi::OsString>) -> std::path::PathBuf {
+    match override_dir {
+        Some(dir) if !dir.is_empty() => std::path::PathBuf::from(dir),
+        _ => std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/domains"),
+    }
+}
+
 /// Load layer-1 write-through defaults from pillar manifests on disk.
 ///
 /// Scans `manifest_dir/{pillar}/manifest.json` for each pillar directory.
@@ -511,8 +533,7 @@ impl From<serde_json::Error> for ManifestLayer1Error {
 /// (same behaviour as before Phase 4 T12).
 ///
 /// Replaces the `let manifest_layer = std::collections::HashMap::new()` stub
-/// at `main.rs:1129`. Controlled by `ELOHIM_PILLAR_MANIFEST_DIR` env var;
-/// falls back to `elohim/sdk/domains` relative to CWD.
+/// at `main.rs:1129`. The directory comes from [`pillar_manifest_dir`].
 pub fn load_pillar_manifest_layer1(
     manifest_dir: &std::path::Path,
 ) -> Result<HashMap<String, crate::write_through::WriteThroughConfig>, ManifestLayer1Error> {
@@ -832,6 +853,46 @@ mod tests {
             registry.network_stakes_for_scope("genesis-lamad"),
             Some(("enforced".to_string(), "stakes:new:2".to_string())),
             "higher-revision declaration must supersede the lower one for the same scope"
+        );
+    }
+
+    // ---- layer-1 manifest directory resolution --------------------------
+
+    #[test]
+    fn pillar_manifest_dir_override_wins_as_given() {
+        let dir = resolve_pillar_manifest_dir(Some(std::ffi::OsString::from(
+            "/srv/household/elohim/sdk/domains",
+        )));
+        assert_eq!(
+            dir,
+            std::path::PathBuf::from("/srv/household/elohim/sdk/domains")
+        );
+    }
+
+    #[test]
+    fn pillar_manifest_dir_defaults_to_the_crate_source_tree_not_the_cwd() {
+        // A household storage peer runs from its own state directory, where a
+        // bare `elohim/sdk/domains` names nothing: the default must not depend
+        // on the process cwd.
+        let dir = resolve_pillar_manifest_dir(None);
+        assert!(dir.is_absolute(), "default must be absolute, got {dir:?}");
+        assert!(
+            dir.join("shefa/manifest.json").is_file(),
+            "default must reach the pillar manifests, got {dir:?}"
+        );
+        // And the loader finds the declared writeThrough block there.
+        let layer1 = load_pillar_manifest_layer1(&dir).expect("layer-1 loads");
+        assert!(
+            layer1.contains_key("shefa"),
+            "shefa declares writeThrough; layer-1 from the default dir must carry it"
+        );
+    }
+
+    #[test]
+    fn pillar_manifest_dir_empty_override_falls_back_to_the_default() {
+        assert_eq!(
+            resolve_pillar_manifest_dir(Some(std::ffi::OsString::new())),
+            resolve_pillar_manifest_dir(None)
         );
     }
 }

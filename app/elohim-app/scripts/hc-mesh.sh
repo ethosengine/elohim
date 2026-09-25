@@ -3225,12 +3225,22 @@ runtime_config_path_for() { # <peer-name> -> prints the path (file guaranteed to
   echo "$f"
 }
 
+# The pillar-manifest root every storage peer reads its layer-1 write-through
+# defaults from (and, as the development override, its observation kinds).
+# ABSOLUTE: a peer runs from its own state directory, where the storage's old
+# bare default `elohim/sdk/domains` named nothing — layer-1 stayed empty with
+# one boot-time WARN. An operator's explicit ELOHIM_PILLAR_MANIFEST_DIR wins.
+pillar_manifest_dir() { # -> prints the directory
+  printf '%s\n' "${ELOHIM_PILLAR_MANIFEST_DIR:-$REPO_ROOT/elohim/sdk/domains}"
+}
+
 restart_env_overlay() { # <captured-environ> <peer-name>
   # The caller's PER-PEER transport selection deliberately beats the captured
   # daemon environment. This is how one slot is cycled into a new transport.
   # MESH_RESTART_ENV_OVERLAY remains last for one-off experiments.
   printf '%s\n' "ELOHIM_TRANSPORT_BACKEND=$(peer_transport "$2")"
   printf '%s\n' "ELOHIM_RUNTIME_CONFIG_PATH=$(runtime_config_path_for "$2")"
+  printf '%s\n' "ELOHIM_PILLAR_MANIFEST_DIR=$(pillar_manifest_dir)"
   # A capture taken while the sandbox had not answered yet carries AGENT_PUBKEY=""
   # (see start_storage_peer); re-resolve it from the live conductor on restart.
   local idx key
@@ -3835,6 +3845,7 @@ start_storage_peer() { # <peer-name> <peer-index>
     DEVICE_ARCHETYPE=device-family-node-base \
     ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
     ELOHIM_RUNTIME_CONFIG_PATH="$(runtime_config_path_for "$name")" \
+    ELOHIM_PILLAR_MANIFEST_DIR="$(pillar_manifest_dir)" \
     PROJECTION_RECONCILE_SECS="$PROJECTION_RECONCILE_SECS" \
     ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
     CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
