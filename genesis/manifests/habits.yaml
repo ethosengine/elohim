@@ -3924,10 +3924,10 @@ habits:
       A person's attention on content is witnessed as an agent-private observation on their own node,
       under a manifest-declared kind. It is never written as a lens preset, never gossiped, and never
       joined by an outside observer. Every view over it is a recipe whose CID prints on the page.
-    status: red
+    status: green
     active: false
     checks:
-      - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-25: RED twice at the write-ack step — the a2o harness's injected session does not survive the shell's restoreSession, so the bearer-carrying emitter has no one to write as (receipts sprint-report-household-20260925T131704Z / T131924Z))"
+      - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-25: GREEN twice on the household, 14 of 14 steps, clean console, no bypass (receipts sprint-report-household-20260925T135856Z / T135922Z))"
       - "cargo test --lib -- observation::gossip_gate (elohim/elohim-storage — an agent-private kind yields no cursor announcement on the real write path; MEASURED 2026-09-24: absent — no `gossip_gate` anywhere in elohim/elohim-storage/src; not run, since there is nothing to run)"
       - "test $(grep -c \"trackContentLeave\\|trackContentView\" app/lamad/src/app/components/content-viewer/content-viewer.component.ts) -eq 0 (the content viewer no longer writes dwell as an AttentionTending lens record; MEASURED 2026-09-24: 3 — the viewer still tends on leave and on view)"
     evidence: >
@@ -4046,6 +4046,35 @@ habits:
       ok, 2 passed, EXIT=0"; (3) "the grep on content-viewer.component.ts = 0". Environment: the household
       recast on conductor fork e0bfc6c7a (the pin target, 81e77bcae) by session 9adf9f01 at 12:22Z, every
       role `zomePath: live`, preflight ok on every line.
+
+      DELTA 2026-09-25 (household re-proof GREEN twice — status red → GREEN; checks (1), (2) and (3) all
+      green). Two runs of `just test mesh-browser '@concern:attention-witnessed-privately'` on household-dowell
+      (transport dual, 3 peers, processControl true, commit 46883085c). Receipts
+      `genesis/a2o/reports/sprint-report-household-20260925T135856Z-46883085.{json,md}` (sut
+      sha256:d862c63a39b22f20) and `…T135922Z-46883085.{json,md}` (sut sha256:d05d629d5af26a9a), identical:
+      1 scenario passed, 14 of 14 steps passed, and the clean-console After hook found no browser error.
+      Jessica's dwell and scroll depth on the manifesto reached her own storage peer as her agent-private
+      observation, her `/lamad/me/stream` listed it with the recipe CID the peer returns, James's stream (his
+      own sign-in) had no such entry, and her peer counted the note as withheld from other peers, never
+      announced. Fix commits under measure: bab140f95 (the emitter witnesses with the session bearer on both
+      paths; 401 for an anonymous write), f45fb527e (the stream read carries the bearer), cc90d86dc (the a2o
+      harness's injected sign-in persists the provider and expiry a real sign-in persists, R-A14),
+      cfbfbe404 (the content viewer registers its renderer before the view is checked — no NG0100, R-A15),
+      5c7fbbcae (storage peers get an absolute pillar-manifest directory, R-A16), 46883085c (signals read
+      `GET /api/v1/status/write-through` once per session and never post to a declared-off path, R-A16).
+      NO BYPASS: `MESH_ALLOW_NO_PROLOGUE` was not set; the lamad readiness rail passed on matthew, jessica and
+      james, and the portal preflight answered 200. Setup: the development dists rebuilt at 46883085c
+      (`ContentViewerComponent` carries the signal and no plain field write; the shell's emitter chunk carries
+      the write-through status URL; the lamad bundle holds neither the viewer nor a signal emitter, so neither
+      marker applies there), stamped, staged via doorway A and propagated to B with the carried record (the
+      server leg's first declare hit `Stamp declared head failed: database is locked` on B and propagated on a
+      single retry, attempt 1); doorway A served the new chunks byte-identically. The running storage peers
+      predate 5c7fbbcae and still report `effective: []` from the status route, so the green rests on
+      46883085c's client side (no post, no 503); a peer restarted on 5c7fbbcae exercises the other side.
+      Checks (2) and (3) unchanged and green, as re-measured in the 2026-09-24 A1-A9 delta: (2)
+      `cargo test --lib -- gossip_gate` 2 passed EXIT=0; (3) re-measured now, after cfbfbe404 touched the viewer: the grep on content-viewer.component.ts = 0, EXIT=0.
+      Environment: conductor fork e0bfc6c7a (the pin target, 81e77bcae), the recast 9adf9f01 made at 12:22Z;
+      the receipts' `sutParts.conductor` names the submodule tree 25dd2d0be, not the running binary.
     refs:
       - "plan: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md (Lane A, rulings R-A0..R-A5, tasks A0..A10)"
       - "spec: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md (the observation layer this habit makes live; §4 gate answers, §8.2 summary graduation)"
