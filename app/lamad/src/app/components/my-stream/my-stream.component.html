@@ -27,6 +27,12 @@
     @case ('loading') {
       <p class="stream-status" role="status">Reading your stream…</p>
     }
+    @case ('signed-out') {
+      <p class="stream-status" role="status" data-testid="stream-signed-out">
+        Sign in to see your stream. What you read is kept for you alone, so your
+        node only shows this to you.
+      </p>
+    }
     @case ('error') {
       <p class="stream-status" role="alert" data-testid="stream-error">
         Your stream could not be read from your node right now.

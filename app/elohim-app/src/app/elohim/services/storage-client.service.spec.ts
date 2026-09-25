@@ -2,6 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { StorageClientService, StorageContentNode } from './storage-client.service';
+import { AuthService } from '../../imagodei/services/auth.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 import { vi } from 'vitest';
@@ -11,8 +12,11 @@ describe('StorageClientService', () => {
   let service: StorageClientService;
   let httpMock: HttpTestingController;
   let strategyMock: any;
+  /** The signed-in person's session JWT; null stands for signed out (R-A13). */
+  let sessionToken: string | null;
 
   beforeEach(() => {
+    sessionToken = 'jwt-jessica';
     const strategySpy = {
       getStorageBaseUrl: vi.fn(),
     };
@@ -25,6 +29,7 @@ describe('StorageClientService', () => {
         provideHttpClientTesting(),
         StorageClientService,
         { provide: CONNECTION_STRATEGY, useValue: strategySpy },
+        { provide: AuthService, useValue: { token: () => sessionToken } },
       ],
     });
 
@@ -297,6 +302,37 @@ describe('StorageClientService', () => {
       service.getObservationStream({}).subscribe();
       httpMock.expectOne('http://localhost:8888/api/v1/observations/stream').flush({});
       tick();
+    }));
+
+    // Ruling R-A13: the node shows a lifestream only to the person it belongs to,
+    // and it learns who that is from the `X-Agent-Cid` the doorway injects from
+    // the VERIFIED bearer. Neither bundle has an auth interceptor, so this read
+    // carries the bearer itself — exactly as the observation write does (R-A12).
+    it('stream_read_carries_the_session_bearer', fakeAsync(() => {
+      service.getObservationStream({ lens: 'all' }).subscribe();
+
+      const req = httpMock.expectOne('http://localhost:8888/api/v1/observations/stream?lens=all');
+      expect(req.request.headers.get('Authorization')).toBe('Bearer jwt-jessica');
+      req.flush({});
+      tick();
+    }));
+
+    it('stream_read_without_a_session_asks_nothing_and_answers_null', fakeAsync(() => {
+      sessionToken = null;
+      let result: unknown = 'untouched';
+      let errored = false;
+
+      service.getObservationStream({ lens: 'all' }).subscribe({
+        next: r => (result = r),
+        error: () => (errored = true),
+      });
+      tick();
+
+      // Nothing was asked of the node: an anonymous read is refused, so asking
+      // would only buy a 401 the page would have to dress as a failure.
+      // `httpMock.verify()` in afterEach proves no request was opened.
+      expect(result).toBeNull();
+      expect(errored).toBe(false);
     }));
   });
 

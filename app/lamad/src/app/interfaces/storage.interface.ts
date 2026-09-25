@@ -149,8 +149,12 @@ export interface ILamadStorageClient {
   getStorageBaseUrl(): string;
   // M-AGGR-3: server-side ContentEngagementStatsView projection
   getContentEngagement(contentId: string): Observable<ContentEngagementStatsView>;
-  // R-A4: the requester's own lifestream, rendered through the lifestream recipe
-  getObservationStream(query: LamadObservationStreamQuery): Observable<ObservationStreamView>;
+  // R-A4: the requester's own lifestream, rendered through the lifestream recipe.
+  // R-A13: `null` means nobody is signed in — the client asked the node nothing,
+  // which is not the same as a node that could not answer.
+  getObservationStream(
+    query: LamadObservationStreamQuery
+  ): Observable<ObservationStreamView | null>;
 }
 
 /**

@@ -30,7 +30,7 @@ function streamView(overrides: Partial<ObservationStreamView> = {}): Observation
 describe('MyStreamComponent', () => {
   let fixture: ComponentFixture<MyStreamComponent>;
   let getObservationStream: Mock<
-    (q: LamadObservationStreamQuery) => Observable<ObservationStreamView>
+    (q: LamadObservationStreamQuery) => Observable<ObservationStreamView | null>
   >;
 
   const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
@@ -39,7 +39,9 @@ describe('MyStreamComponent', () => {
   const one = (testid: string): HTMLElement | null =>
     el().querySelector<HTMLElement>(`[data-testid="${testid}"]`);
 
-  async function render(view: ObservationStreamView): Promise<void> {
+  // `null` is the signed-out answer: the client asked the node nothing because
+  // nobody is signed in (ruling R-A13).
+  async function render(view: ObservationStreamView | null): Promise<void> {
     getObservationStream = vi.fn(() => of(view));
     await TestBed.configureTestingModule({
       imports: [MyStreamComponent],
@@ -167,5 +169,18 @@ describe('MyStreamComponent', () => {
     });
     expect(getObservationStream).toHaveBeenCalledTimes(2);
     expect(one('stream-provenance')!.textContent).toContain('long-dwell');
+  });
+
+  // Ruling R-A13: a stream nobody is signed in for is not a broken node. The
+  // page says so plainly and never dresses a signed-out read as a failure.
+  it('signed_out_renders_the_honest_state_not_an_error_card', async () => {
+    await render(null);
+
+    const signedOut = one('stream-signed-out');
+    expect(signedOut).not.toBeNull();
+    expect(signedOut!.textContent).toContain('Sign in');
+    expect(one('stream-error')).toBeNull();
+    expect(one('stream-provenance')).toBeNull();
+    expect(all('stream-entry')).toHaveLength(0);
   });
 });

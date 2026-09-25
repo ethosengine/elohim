@@ -18,13 +18,14 @@
  */
 
 import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 
 // @coverage: 90.5% (2026-02-24)
 
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../imagodei/services/auth.service';
 import { ANONYMOUS_CONTENT_READ } from '../interceptors/anonymous-content-read';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { resolveDoorwayUrl } from '../utils/runtime-doorway';
@@ -102,6 +103,19 @@ export interface StorageRelationship {
 export class StorageClientService {
   private readonly http = inject(HttpClient);
   private readonly strategy = inject(CONNECTION_STRATEGY);
+  /**
+   * Resolves the signed-in person's session ON DEMAND.
+   *
+   * `getObservationStream` is the only route here attributed to a person
+   * (R-A13), so `AuthService` is resolved when that route is called rather than
+   * injected as a field. Injecting it eagerly makes every consumer of this
+   * service construct the whole identity stack behind it
+   * (AuthService → DoorwayRegistryService → HolochainClientService), which is a
+   * coupling the storage client has no business owning — measured: it reddened
+   * `storage-client-runtime.spec.ts`, which asks this service about origins and
+   * nothing about people.
+   */
+  private readonly injector = inject(Injector);
 
   private readonly defaultTimeoutMs = 30000;
 
@@ -227,12 +241,27 @@ export class StorageClientService {
    * by the observation-lifestream recipe whose name and CID the view carries.
    *
    * The node reads only rows whose observer is the caller (X-Agent-Cid — the
-   * doorway injects it from the session on the browser path; the native shell
-   * calls its own sidecar). There is no observer parameter.
+   * doorway injects it from the VERIFIED session bearer on the browser path;
+   * the native shell calls its own sidecar). There is no observer parameter.
+   *
+   * So the read carries the session bearer itself (ruling R-A13): neither this
+   * bundle nor lamad registers an auth interceptor, and a read the doorway
+   * cannot attribute is refused — the same defect one route over from the
+   * observation write R-A12 fixed.
+   *
+   * **Signed out answers `null`, and nothing is asked of the node.** An
+   * anonymous read can only buy a 401, and a page has no honest way to render
+   * that as anything but a failure — while nothing failed: there is simply
+   * nobody whose stream this is. `null` is that distinction, so the page can
+   * say "sign in to see your stream" instead of "your node is broken".
    *
    * @endpoint GET /api/v1/observations/stream?asOf&window&lens&kind
    */
-  getObservationStream(query: ObservationStreamQuery): Observable<ObservationStreamView> {
+  getObservationStream(query: ObservationStreamQuery): Observable<ObservationStreamView | null> {
+    const token = this.injector.get(AuthService).token();
+    if (!token) {
+      return of(null);
+    }
     const baseUrl = this.getStorageBaseUrl();
     const params = new URLSearchParams();
     if (query.asOf !== undefined) params.set('asOf', String(query.asOf));
@@ -243,10 +272,12 @@ export class StorageClientService {
     const path = `${baseUrl}/api/v1/observations/stream`;
     const endpoint = queryString ? `${path}?${queryString}` : path;
 
-    return this.http.get<ObservationStreamView>(endpoint).pipe(
-      timeout(this.defaultTimeoutMs),
-      catchError((error: HttpErrorResponse) => this.handleError('getObservationStream', error))
-    );
+    return this.http
+      .get<ObservationStreamView>(endpoint, { headers: { Authorization: `Bearer ${token}` } })
+      .pipe(
+        timeout(this.defaultTimeoutMs),
+        catchError((error: HttpErrorResponse) => this.handleError('getObservationStream', error))
+      );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

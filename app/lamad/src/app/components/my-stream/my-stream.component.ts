@@ -31,6 +31,10 @@ export const STREAM_LENSES = ['all', 'content', 'long-dwell'] as const;
 type StreamState =
   | { status: 'loading' }
   | { status: 'ready'; view: ObservationStreamView }
+  // Ruling R-A13: nobody is signed in, so the client asked the node nothing.
+  // A stream that belongs to no one is not a node that failed, and the page
+  // must not dress it as one.
+  | { status: 'signed-out' }
   | { status: 'error' };
 
 /**
@@ -42,6 +46,10 @@ type StreamState =
  * (newest first, then longest dwell) and never re-ranks it; what the view
  * cannot show or vouch for prints as named omission lines. An empty stream
  * still prints the recipe it was read through.
+ *
+ * A signed-out reader sees the honest signed-out line, never the error card
+ * (R-A13): the lifestream is shown only to the person it belongs to, so with
+ * nobody signed in there is no stream to read rather than a node to blame.
  */
 @Component({
   selector: 'app-my-stream',
@@ -65,7 +73,9 @@ export class MyStreamComponent implements OnInit {
       .pipe(
         switchMap(lens =>
           this.storageClient.getObservationStream({ lens }).pipe(
-            map((view): StreamState => ({ status: 'ready', view })),
+            map((view): StreamState =>
+              view ? { status: 'ready', view } : { status: 'signed-out' }
+            ),
             catchError(() => of<StreamState>({ status: 'error' }))
           )
         ),
