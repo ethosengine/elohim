@@ -33,6 +33,7 @@ import {
   requiredReceipts,
   peerRequestsOf,
   prefetchPeerStatuses,
+  boundStatus,
   RECEIPT_STORIES,
 } from "./scripts/serving-receipt.mjs";
 
@@ -931,6 +932,9 @@ const PEER = {
   reportSha256: "e".repeat(64),
 };
 const verifiedTask = () => ({
+  taskCid: PEER.taskCid,
+  requestActionHash: PEER.requestActionHash,
+  refusal: null,
   state: "completed",
   requester: PEER.requester,
   provider: PEER.provider,
@@ -1090,4 +1094,59 @@ test("the CLI names why a peer-stage attestation was skipped and still reads rep
     result = cli({ SERVING_RECEIPT_ATTESTATIONS: "0" });
     assert.doesNotMatch(result.stderr, /peer attestation/);
   });
+});
+
+test("a task record binds the request it was fetched for and the task CID the summary claims", () => {
+  const good = verifiedTask();
+  assert.equal(
+    boundStatus(
+      new Map([[PEER.requestActionHash, good]]),
+      PEER.requestActionHash,
+    ),
+    good,
+  );
+  const misfiled = { ...good, requestActionHash: "uhCkk-other-request" };
+  assert.equal(
+    boundStatus(
+      new Map([[PEER.requestActionHash, misfiled]]),
+      PEER.requestActionHash,
+    ),
+    undefined,
+  );
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const node = householdNode(root, story, {
+      peer: { ...PEER, taskCid: "bafy-task-B" },
+    });
+    putRef(root, story.concern, JSON.parse(node.resultSummary).sut, node);
+    const paths = ["scripts/ci/fleet-write-readiness.sh"];
+    for (const status of [{ ...good, taskCid: "bafy-task-A" }, good, misfiled])
+      assert.equal(
+        check(root, reports, paths, new Map([[PEER.requestActionHash, status]]))
+          .ok,
+        false,
+      );
+  });
+});
+
+test("the prefetch refuses a task record that names another request", async () => {
+  const got = await prefetchPeerStatuses(
+    [PEER.requestActionHash],
+    {
+      COMPUTE_API_URL: "http://127.0.0.1:8090",
+      COMPUTE_PERFORMER: PEER.requester,
+      ELOHIM_COMPUTE_LOCAL_TOKEN: "tok",
+    },
+    {
+      fetcher: async () => ({
+        ok: true,
+        json: async () => ({
+          ...verifiedTask(),
+          requestActionHash: "uhCkk-other-request",
+        }),
+      }),
+    },
+  );
+  assert.equal(got.statuses.size, 0);
+  assert.match(got.skipped, /returned task record for uhCkk-other-/);
 });

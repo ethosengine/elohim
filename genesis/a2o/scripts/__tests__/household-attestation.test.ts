@@ -418,8 +418,21 @@ describe('a peer-executed stage is admitted by its verified DHT chain, never by 
     featureSha256: 'f'.repeat(64),
     reportSha256: 'e'.repeat(64),
   };
-  function verified(): PeerTaskStatus {
+  /**
+   * Every field PeerTaskStatus declares is populated (the type forces it), so a fixture can no
+   * longer mirror an omission in the verdict: the leaf loop below mutates each one.
+   */
+  type Observed = NonNullable<PeerTaskStatus['observed']>;
+  type CompleteStatus = Required<Omit<PeerTaskStatus, 'observed'>> & {
+    envelope: { project: string; dna: { sha256: string } };
+    completion: { actionHash: string; receiptCid: string };
+    observed: Required<Omit<Observed, 'refused'>>;
+  };
+  function verified(): CompleteStatus {
     return {
+      taskCid: PEER.taskCid,
+      requestActionHash: PEER.requestActionHash,
+      refusal: null,
       state: 'completed',
       requester: PEER.requester,
       provider: PEER.provider,
@@ -574,6 +587,46 @@ describe('a peer-executed stage is admitted by its verified DHT chain, never by 
     for (const [label, status, reason] of cases) {
       assert.equal(refusal(peerNode(), status), reason, label);
     }
+  });
+
+  it('binds the returned task identity: a verified record for task A never admits a summary claiming B', () => {
+    const claimsB = peerNode({ ...PEER, taskCid: 'bafy-task-B' });
+    assert.equal(
+      refusal(claimsB, { ...verified(), taskCid: 'bafy-task-A' }),
+      'peer task CID is not the task record'
+    );
+    assert.equal(refusal(claimsB, verified()), 'peer task CID is not the task record');
+    assert.equal(
+      refusal(peerNode(), { ...verified(), requestActionHash: 'uhCkk-other-request' }),
+      'peer request is not the task record the requester returned'
+    );
+  });
+
+  it('every populated field of the complete task record binds the verdict', () => {
+    // Leaves the verdict deliberately does not compare, named so a new unbound field is a choice.
+    const unbound = new Set(['refusal', 'observed.fulfilledEventId']);
+    const leaves: string[][] = [];
+    const walk = (value: unknown, path: string[]) => {
+      if (value && typeof value === 'object') {
+        for (const [k, v] of Object.entries(value)) walk(v, [...path, k]);
+      } else leaves.push(path);
+    };
+    walk(verified(), []);
+    assert.ok(leaves.length >= 17, `walked ${leaves.length} leaves`);
+    for (const path of leaves) {
+      if (unbound.has(path.join('.'))) continue;
+      const status = verified() as unknown as Record<string, unknown>;
+      let at = status;
+      for (const k of path.slice(0, -1)) at = at[k] as Record<string, unknown>;
+      const leaf = path.at(-1) as string;
+      at[leaf] = typeof at[leaf] === 'boolean' ? !at[leaf] : `other-${String(at[leaf])}`;
+      assert.notEqual(
+        refusal(peerNode(), status as PeerTaskStatus),
+        'admitted',
+        `${path.join('.')} does not bind`
+      );
+    }
+    assert.equal(refusal(peerNode(), verified()), 'admitted');
   });
 
   it('refuses a malformed peer block', () => {

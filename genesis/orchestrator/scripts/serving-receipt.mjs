@@ -118,6 +118,15 @@ function stationNames(root, story) {
   );
 }
 
+/**
+ * The task record prefetched for `hash`, only when the record names that request itself: a status
+ * filed under another key is no evidence for this chain.
+ */
+export function boundStatus(peerStatuses, hash) {
+  const status = peerStatuses.get(hash);
+  return status?.requestActionHash === hash ? status : undefined;
+}
+
 /** The newest attestation that admits `story` on the current source, or null. */
 export function findAttestationReceipt(
   root,
@@ -136,7 +145,7 @@ export function findAttestationReceipt(
   );
   for (const { ref, node } of candidates) {
     const verdict = admitAttestation(node, story.concern, workspaceId, (hash) =>
-      peerStatuses.get(hash),
+      boundStatus(peerStatuses, hash),
     );
     if (!verdict.ok) continue;
     const s = verdict.summary;
@@ -310,10 +319,15 @@ export async function prefetchPeerStatuses(
   const failures = [];
   for (const hash of hashes) {
     try {
-      statuses.set(
-        hash,
-        await request(`/api/v1/compute/tasks/${encodeURIComponent(hash)}`),
+      const status = await request(
+        `/api/v1/compute/tasks/${encodeURIComponent(hash)}`,
       );
+      // Keyed by the hash fetched, and only when the record names that request itself.
+      if (status?.requestActionHash !== hash)
+        throw new Error(
+          `returned task record for ${String(status?.requestActionHash).slice(0, 12)}…`,
+        );
+      statuses.set(hash, status);
     } catch (error) {
       failures.push(`${hash.slice(0, 12)}…: ${error.message}`);
     }

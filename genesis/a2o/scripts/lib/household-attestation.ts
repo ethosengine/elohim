@@ -86,8 +86,14 @@ export interface PeerStage {
   reportSha256: string;
 }
 
-/** The requester storage's task record (`GET /api/v1/compute/tasks/<requestActionHash>`). */
+/**
+ * The requester storage's task record (`GET /api/v1/compute/tasks/<requestActionHash>`). Storage
+ * re-derives `taskCid` from the envelope before it answers (`verify_status`), so the task
+ * identity here is the envelope's content address, not a claim.
+ */
 export interface PeerTaskStatus {
+  taskCid?: string;
+  requestActionHash?: string;
   state?: string;
   requester?: string;
   provider?: string;
@@ -615,6 +621,12 @@ export function peerChainVerdict(peer: PeerStage, status: PeerTaskStatus | undef
   }
   if (!status || typeof status !== 'object') {
     return { ok: false, reason: 'peer chain unverifiable (requester storage unreachable)' };
+  }
+  if (status.requestActionHash !== peer.requestActionHash) {
+    return { ok: false, reason: 'peer request is not the task record the requester returned' };
+  }
+  if (status.taskCid !== peer.taskCid) {
+    return { ok: false, reason: 'peer task CID is not the task record' };
   }
   if (status.state !== 'completed') {
     return { ok: false, reason: `peer task is ${status.state ?? 'in no state'}, not completed` };
