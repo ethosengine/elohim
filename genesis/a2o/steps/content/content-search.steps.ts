@@ -124,7 +124,22 @@ function householdStorageUrl(): string {
   return requireFixturePrimaryStorageUrl(loadHouseholdMeshFixture(), 'alpha');
 }
 
-/** The asker's own agent key — what the peer resolves the reach gate against. */
+/**
+ * The asker's own identity — what the peer resolves the reach gate against.
+ *
+ * `X-Agent-Cid` carries whichever identity namespace the caller holds, and the peer resolves it
+ * by `humans.id` first and `humans.agent_pub_key` second. This asks with the SAME value the
+ * doorway itself forwards on that header — `claims.human_id`, which sign-in returns as
+ * `humanId` — so a search sent straight at the peer asks the question the doorway would ask,
+ * and the agent key stands in only where no human id came back.
+ *
+ * Measured on the household mesh 2026-09-25 (ruling R-S12): the agent key a hosted sign-in
+ * returns is the doorway's own hosted-cell key, and it appears in NO household peer's `humans`
+ * table — `GET /api/v1/identity/me` answers 401 on it for the same reason. Asking with it made
+ * every restricted row read as withheld-from-an-unresolved-reader, which is indistinguishable
+ * from "the peer refused you" unless you read the peer's own omission line. The sign-in step
+ * still requires the agent key, because a run that never signed in has neither.
+ */
 function agentCidOf(world: E2EWorld, humanName: string): string {
   const human = world.getHuman(humanName);
   assert.ok(
@@ -132,7 +147,7 @@ function agentCidOf(world: E2EWorld, humanName: string): string {
     `${humanName} has no agentPubKey — the sign-in step must run before a search, since the ` +
       'reach gate is evaluated against the asker, not against the connection'
   );
-  return human.agentPubKey;
+  return human.humanId ?? human.agentPubKey;
 }
 
 /** One `GET /db/content/search` against a peer, as a named human. */
