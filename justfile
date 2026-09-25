@@ -52,19 +52,40 @@ test target="changed" scope="":
         # (seed/probe block) and hc-mesh-prologue.sh's "a2o env" block, so a local run and the
         # pipeline read the same names. Bring the mesh up first: `just mesh start && just mesh prologue`.
         # THE BERTH LEASE IS THE ROUTER (plan R4): the household is one per workspace, so this lane
-        # claims it as `verify` for a bounded ttl before anything else runs — a second session is
-        # refused in under a second (exit 3) with the holder named, never queued. BERTH_CLASS=measure
-        # is refused too, naming `just measure <scope>`; MEASURE_ON_DEV_BERTH=1 declares an override
-        # that puts dev-berth-held-by-measure@1 on the record. Exit 2 (no session id, e.g. a bare
-        # shell) does not block. A renew — this session already holds the mesh, e.g. from
-        # `just mesh start` — keeps that hold, so only a claim this lane made is given back on exit.
-        berth="{{ root }}/genesis/agentic/bin/berth"
-        berth_rc=0
-        berth_out="$("$berth" claim mesh --class "${BERTH_CLASS:-verify}" --ttl "${BERTH_TTL:-1800}" --note "test {{ target }} {{ scope }}")" || berth_rc=$?
-        if [[ -n "$berth_out" ]]; then echo "$berth_out"; fi
-        if [[ "$berth_rc" -eq 3 ]]; then exit 3; fi
-        if [[ "$berth_rc" -eq 0 && "$berth_out" != *renewed* ]]; then
-          trap '"$berth" release mesh >/dev/null 2>&1 || true' EXIT
+        # claims it as `verify` (or a declared `measure`) for a bounded ttl before anything else
+        # runs — a second session is refused in under a second (exit 3) with the holder named, never
+        # queued. BERTH_CLASS=measure is refused naming `just measure <scope>`; MEASURE_ON_DEV_BERTH=1
+        # declares an override that puts dev-berth-held-by-measure@1 on the record. Only exit 4 (no
+        # session resolvable, e.g. a bare non-Claude shell) proceeds, unleased; every other non-zero
+        # code is propagated. A renew or a lane covered by this session's own `mesh start` daemon
+        # lease keeps that hold, so only a claim this lane made is given back on exit.
+        # DEADLINE FENCE: the lane body re-enters this recipe under `timeout` at the lease's ttl (its
+        # own process group; INT, then KILL 30 s later), so an EXPIRED lane lease implies a dead lane
+        # and a takeover is safe.
+        if [[ -z "${BERTH_FENCED:-}" ]]; then
+          berth="{{ root }}/genesis/agentic/bin/berth"
+          lane_class="${BERTH_CLASS:-verify}"
+          lane_ttl="${BERTH_TTL:-1800}"
+          case "$lane_class" in
+            verify|measure) ;;
+            *) echo "REFUSED: BERTH_CLASS=$lane_class — a test lane claims verify|measure (\`mesh\` is the daemon lease \`just mesh start\` holds)" >&2; exit 2 ;;
+          esac
+          berth_rc=0
+          berth_out="$("$berth" claim mesh --class "$lane_class" --ttl "$lane_ttl" --note "test {{ target }} {{ scope }}")" || berth_rc=$?
+          if [[ -n "$berth_out" ]]; then echo "$berth_out"; fi
+          if [[ "$berth_rc" -ne 0 && "$berth_rc" -ne 4 ]]; then exit "$berth_rc"; fi
+          if [[ "$berth_rc" -eq 0 && "$berth_out" != *renewed* ]]; then
+            trap '"$berth" release mesh >/dev/null 2>&1 || true' EXIT
+          fi
+          lane_rc=0
+          BERTH_FENCED=1 timeout --signal=INT --kill-after=30 "$lane_ttl" \
+            just --justfile "{{ root }}/justfile" app_dir="{{ app_dir }}" a2o_dir="{{ a2o_dir }}" \
+            test "{{ target }}" "{{ scope }}" || lane_rc=$?
+          if [[ "$lane_rc" -eq 124 || "$lane_rc" -eq 137 ]]; then
+            echo "BUDGET-EXCEEDED: $lane_class lane ran past its ${lane_ttl}s lease" >&2
+            exit 3
+          fi
+          exit "$lane_rc"
         fi
         # `set +e` around the source because hc-mesh.sh is `set -u` only and its optional-binary
         # probes (mongod, the conductor fork) legitimately exit non-zero at load.
@@ -355,22 +376,32 @@ mesh action="status" *args:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
-      # start/stop hold the household's berth lease (class `mesh`, ttl BERTH_TTL, default 1800 s):
-      # a start while another live session holds the mesh is refused (exit 3) with the holder named;
-      # exit 2 (no session id) does not block. A failed start gives the lease back.
+      # start holds the household's DAEMON lease (class `mesh`: no ttl, never taken over by expiry,
+      # only when its holder's mooring is dead): a start while another live session holds the mesh
+      # is refused (exit 3) with the holder named. Only exit 4 (no session resolvable) proceeds,
+      # unleased; every other non-zero code is propagated. A failed start gives the lease back.
       start)
         berth="{{ root }}/genesis/agentic/bin/berth"
         berth_rc=0
-        "$berth" claim mesh --class mesh --ttl "${BERTH_TTL:-1800}" --note "mesh start" || berth_rc=$?
-        if [[ "$berth_rc" -eq 3 ]]; then exit 3; fi
+        "$berth" claim mesh --class mesh --note "mesh start" || berth_rc=$?
+        if [[ "$berth_rc" -ne 0 && "$berth_rc" -ne 4 ]]; then exit "$berth_rc"; fi
         start_rc=0
         "{{ app_dir }}/scripts/hc-mesh.sh" start || start_rc=$?
         if [[ "$start_rc" -ne 0 && "$berth_rc" -eq 0 ]]; then "$berth" release mesh >/dev/null 2>&1 || true; fi
         exit "$start_rc" ;;
+      # stop is destructive to whoever holds the household: refused (exit 3, holder named) while
+      # another live session holds `mesh`; MESH_STOP_FORCE=1 overrides with an `override` row and
+      # gives back the overridden lease once the household is down.
       stop)
+        berth="{{ root }}/genesis/agentic/bin/berth"
+        force=()
+        if [[ "${MESH_STOP_FORCE:-0}" == "1" ]]; then force=(--force); fi
+        owner_rc=0
+        "$berth" owner-check mesh --action stop --note "just mesh stop" "${force[@]}" || owner_rc=$?
+        if [[ "$owner_rc" -ne 0 ]]; then exit "$owner_rc"; fi
         stop_rc=0
         "{{ app_dir }}/scripts/hc-mesh.sh" stop || stop_rc=$?
-        "{{ root }}/genesis/agentic/bin/berth" release mesh >/dev/null 2>&1 || true
+        if [[ "$stop_rc" -eq 0 ]]; then "$berth" release mesh "${force[@]}" >/dev/null 2>&1 || true; fi
         exit "$stop_rc" ;;
       status|probe|prologue) exec "{{ app_dir }}/scripts/hc-mesh.sh" "{{ action }}" ;;
       # preflight/wait (sprint 2026-09-08, T1): `start` already runs preflight itself and
@@ -380,9 +411,24 @@ mesh action="status" *args:
       wait) exec "{{ app_dir }}/scripts/hc-mesh.sh" wait {{ args }} ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
-      matrix) exec "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
-      recovery) exec "{{ app_dir }}/scripts/hc-mesh-recovery.sh" {{ args }} ;;
-      recovery-matrix) exec "{{ app_dir }}/scripts/hc-mesh-recovery-matrix.sh" ;;
+      # matrix/recovery/recovery-matrix are MEASURE-class runs (windows, restarts, repeated shapes):
+      # they claim `mesh --class measure` first, so on the dev berth they are refused (exit 3, naming
+      # `just measure <scope>`) unless MEASURE_ON_DEV_BERTH=1 declares the override (ttl BERTH_TTL,
+      # default 3600 s) and puts dev-berth-held-by-measure@1 on the record.
+      matrix|recovery|recovery-matrix)
+        berth="{{ root }}/genesis/agentic/bin/berth"
+        berth_rc=0
+        berth_out="$("$berth" claim mesh --class measure --ttl "${BERTH_TTL:-3600}" --note "mesh {{ action }} {{ args }}")" || berth_rc=$?
+        if [[ -n "$berth_out" ]]; then echo "$berth_out"; fi
+        if [[ "$berth_rc" -ne 0 && "$berth_rc" -ne 4 ]]; then exit "$berth_rc"; fi
+        if [[ "$berth_rc" -eq 0 && "$berth_out" != *renewed* ]]; then
+          trap '"$berth" release mesh >/dev/null 2>&1 || true' EXIT
+        fi
+        case "{{ action }}" in
+          matrix) "{{ app_dir }}/scripts/hc-mesh-transport-matrix.sh" ;;
+          recovery) "{{ app_dir }}/scripts/hc-mesh-recovery.sh" {{ args }} ;;
+          recovery-matrix) "{{ app_dir }}/scripts/hc-mesh-recovery-matrix.sh" ;;
+        esac ;;
       # Restart arms (ratchet lane D, rung D2 pawls — 2026-08-28): the same hc-mesh.sh actions the
       # recovery harness drives, reachable through the verb so a shift never has to know the script.
       conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;

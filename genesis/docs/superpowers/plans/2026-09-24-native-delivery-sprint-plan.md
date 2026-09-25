@@ -15,7 +15,7 @@ cites:
   - "submodule-pin-attestation-gate-design | pin-attestation gate spec: the rakia schema path, attested run kind and oracle Lanes B1/N1/F follow | sha256:79d9af05d5287df8 | path: genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md"
   - "runtime-artifacts-elected-content | elected-content spec; its §12.8 slice 2 is Lane N (app bundle as elected content) | sha256:eaa2716381075140 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - "workspace-berth-carrying-capacity-design | berth carrying-capacity spec: the workspace identity and lease discipline Lane F2's receipt attestation signs with | sha256:6b649b3d1b6a961b | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
+  - "workspace-berth-carrying-capacity-design | berth carrying-capacity spec: the workspace identity and lease discipline Lane F2's receipt attestation signs with | sha256:f7f53bb9e7686d19 | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
   - elohim/rakia/docs/specs/2026-04-12-rakia-design.md
   - genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md

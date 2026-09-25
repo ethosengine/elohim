@@ -104,11 +104,11 @@
     },
     "mooring_ttl_s": 10800,
     "classes": {
-      "_comment": "Lease classes per resource — the mesh lease is the dev berth's router (plan R4/R11). verify = a bounded lane (`just test mesh`), refused past max_ttl_s: a longer hold is a measure and must say so. measure = window/A-B/soak/proof runs, never on the dev berth: refused exit 3 naming the alternative; MEASURE_ON_DEV_BERTH=1 with --ttl is the declared override (ledger `kind: override` + dev-berth-held-by-measure@1 = ttl at once). mesh = the household itself (`just mesh start`). A resource with no table (cargo, disk-heavy) takes any class and gets no default ttl.",
+      "_comment": "Lease classes per resource — the mesh lease is the dev berth's router (plan R4/R11). verify = a bounded lane (`just test mesh`), refused past max_ttl_s: a longer hold is a measure and must say so. measure = window/A-B/soak/proof runs, never on the dev berth: refused exit 3 naming the alternative; MEASURE_ON_DEV_BERTH=1 with --ttl is the declared override (ledger `kind: override` + dev-berth-held-by-measure@1 = ttl at once). mesh = the DAEMON lease, the household being up (`just mesh start`): it takes no ttl and is never taken over by expiry, only when its holder's mooring is dead; a test lane (`just test mesh`) claims only verify|measure and is fenced by its own deadline (timeout at its ttl), so an expired lane lease implies a dead lane. A holder's lane under its own daemon lease is covered; any other class change on a held lease is refused (release, then claim). A resource with no table (cargo, disk-heavy) takes any class and gets no default ttl.",
       "mesh": {
         "verify": { "default_ttl_s": 1800, "max_ttl_s": 3600 },
         "measure": { "allowed": false, "alternative": "just measure <scope>" },
-        "mesh": { "default_ttl_s": 1800 }
+        "mesh": { "daemon": true }
       }
     }
   }

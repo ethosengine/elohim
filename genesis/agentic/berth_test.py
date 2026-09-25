@@ -6,9 +6,14 @@ Run: python3 -m unittest genesis.agentic.berth_test
 import json
 import os
 import runpy
+import shutil
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
 
 _NS = runpy.run_path(str(Path(__file__).parent / "bin/berth"))
 Berth = _NS["Berth"]
@@ -17,7 +22,7 @@ render_status = _NS["render_status"]
 MISSING_POLICY = "/nonexistent/pool-policy.json"
 CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
                     "measure": {"allowed": False, "alternative": "just measure <scope>"},
-                    "mesh": {"default_ttl_s": 1800}}}
+                    "mesh": {"daemon": True}}}
 
 
 class CapacityTransitionTest(unittest.TestCase):
@@ -360,7 +365,7 @@ class AncestryResolutionTest(unittest.TestCase):
     def test_no_ancestor_mooring_is_exit_2(self):
         self.berth.moor("sess-claude", pid=self.CLAUDE)
         self.assertIsNone(self.berth.session_by_ancestry([777, 3753]))
-        self.assertEqual(self.run_main([777, 3753], "claim", "mesh"), 2)
+        self.assertEqual(self.run_main([777, 3753], "claim", "mesh"), 4)
         self.assertIsNone(self.berth.raw_lease("mesh"))
 
     def test_the_ancestor_wins_not_the_newest(self):
@@ -397,6 +402,289 @@ class AncestryResolutionTest(unittest.TestCase):
         if os.getppid() > 1:
             self.assertEqual(chain[0], os.getppid())
         self.assertLessEqual(len(chain), 32)
+
+
+
+class DaemonClassTest(unittest.TestCase):
+    """`mesh` is the daemon lease: no ttl, never taken over by expiry; lanes restricted; transitions explicit."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.clock = [1000.0]
+        self.berth = Berth(self.directory.name, now=lambda: self.clock[0], obs=FakeObservation(),
+                           policy_path=MISSING_POLICY)
+        self.berth.classes = json.loads(json.dumps(CLASSES))
+        for session in ("dev", "other"):
+            self.berth.moor(session)
+
+    def test_daemon_lease_takes_no_ttl(self):
+        with self.assertRaises(BerthUsage):
+            self.berth.claim("mesh", "dev", klass="mesh", ttl_s=1800)
+        ok, lease, _ = self.berth.claim("mesh", "dev", klass="mesh")
+        self.assertTrue(ok)
+        self.assertIsNone(lease["ttl_s"])
+
+    def test_daemon_lease_never_expires_while_its_holder_lives(self):
+        self.berth.claim("mesh", "dev", klass="mesh")
+        self.clock[0] += 100000
+        self.berth.touch("dev")
+        self.berth.touch("other")
+        self.assertFalse(self.berth.claim("mesh", "other")[0])
+        self.assertIsNone(self.berth.overrun_check())
+        self.clock[0] += 20000  # dev's mooring goes stale (3 h ttl); other keeps heartbeating
+        self.berth.touch("other")
+        ok, _, reason = self.berth.claim("mesh", "other")
+        self.assertTrue(ok)
+        self.assertEqual(reason, "taken over from a stale holder")
+
+    def test_a_lane_under_the_holders_own_daemon_lease_is_covered(self):
+        self.berth.claim("mesh", "dev", klass="mesh")
+        ok, _, reason = self.berth.claim("mesh", "dev", klass="verify", ttl_s=1800)
+        self.assertTrue(ok)
+        self.assertIn("renewed — covered by your mesh daemon lease", reason)
+        self.assertEqual(self.berth.raw_lease("mesh")["class"], "mesh")
+        self.assertIsNone(self.berth.raw_lease("mesh")["ttl_s"])
+
+    def test_class_transition_on_a_held_lease_is_refused(self):
+        self.berth.claim("mesh", "dev", klass="verify")
+        ok, _, reason = self.berth.claim("mesh", "dev", klass="mesh")
+        self.assertFalse(ok)
+        self.assertIn("class transition", reason)
+        ok, _, _ = self.berth.claim("mesh", "dev", klass="measure", ttl_s=600, override=True)
+        self.assertFalse(ok)
+        self.assertEqual(self.berth.raw_lease("mesh")["class"], "verify")
+        self.assertTrue(self.berth.release("mesh", "dev"))
+        self.assertTrue(self.berth.claim("mesh", "dev", klass="mesh")[0])
+
+    def test_owner_check_refuses_a_stop_under_another_holder_and_force_is_on_the_record(self):
+        self.berth.claim("mesh", "other", klass="mesh")
+        ok, _, reason = self.berth.owner_check("mesh", "dev", "stop")
+        self.assertFalse(ok)
+        self.assertIn("held by other", reason)
+        self.assertTrue(self.berth.owner_check("mesh", "other", "stop")[0])
+        ok, _, _ = self.berth.owner_check("mesh", "dev", "stop", force=True, note="operator")
+        self.assertTrue(ok)
+        row = [r for r in self.berth.ledger(100) if r["kind"] == "override"][-1]
+        self.assertEqual((row["action"], row["holder"]), ("stop", "other"))
+        self.assertTrue(self.berth.release("mesh", "dev", force=True))
+        self.assertIsNone(self.berth.raw_lease("mesh"))
+        self.assertEqual([r for r in self.berth.ledger(100) if r["kind"] == "release"][-1]["forced_from"], "other")
+
+
+class IncarnationTest(unittest.TestCase):
+    """A pid alone is not an identity: the mooring carries the process's start time."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.starts = {4242: 111}
+        self.berth = Berth(self.directory.name, now=lambda: 1000.0, policy_path=MISSING_POLICY)
+        self.berth.pid_alive = lambda pid: int(pid) in self.starts
+        self.berth.pid_start = lambda pid: self.starts.get(int(pid))
+
+    def test_mooring_records_pid_start_and_a_reused_pid_is_dead(self):
+        m = self.berth.moor("sess", pid=4242)
+        self.assertEqual((m["pid"], m["pid_start"]), (4242, 111))
+        self.assertTrue(self.berth.is_live(self.berth.mooring("sess")))
+        self.assertEqual(self.berth.session_by_ancestry([9, 4242]), "sess")
+        self.starts[4242] = 222  # the Claude process died; the pid now names another process
+        self.assertFalse(self.berth.is_live(self.berth.mooring("sess")))
+        self.assertIsNone(self.berth.session_by_ancestry([9, 4242]))
+        self.berth.touch("sess", pid=4242)  # the hook re-asserts: new incarnation recorded
+        self.assertTrue(self.berth.is_live(self.berth.mooring("sess")))
+
+    def test_two_moorings_on_the_nearest_ancestor_are_ambiguous(self):
+        self.berth.moor("a", pid=4242)
+        self.berth.moor("b", pid=4242)
+        with self.assertRaises(_NS["BerthAmbiguous"]):
+            self.berth.session_by_ancestry([9, 4242])
+        main = _NS["main"]
+        g = main.__globals__
+        saved = (g["proc_ancestry"], g["Berth"])
+        berth = self.berth
+        g["proc_ancestry"], g["Berth"] = (lambda: [9, 4242]), (lambda *a, **k: berth)
+        env_saved = {k: os.environ.pop(k, None) for k in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        try:
+            self.assertEqual(main(["berth", "claim", "mesh"]), 4)
+        finally:
+            g["proc_ancestry"], g["Berth"] = saved
+            for k, v in env_saved.items():
+                if v is not None:
+                    os.environ[k] = v
+        self.assertIsNone(self.berth.raw_lease("mesh"))
+
+
+class _FileObservation:
+    """A cross-process fake emitter: every emit is one line in a file, slowly (widens the race)."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def available(self):
+        return True
+
+    def emit(self, measure, subject, value, *, reason, env=None, root=None):
+        time.sleep(0.2)
+        with open(self.path, "a") as f:
+            f.write(f"{measure} {value}\n")
+        return True
+
+
+class ConcurrencyTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.dir = self.directory.name
+
+    def _fork(self, fn):
+        pid = os.fork()
+        if pid == 0:
+            try:
+                fn()
+            finally:
+                os._exit(0)
+        return pid
+
+    def test_concurrent_heartbeats_never_read_as_a_dead_holder(self):
+        holder = Berth(self.dir, policy_path=MISSING_POLICY)
+        holder.moor("holder", pid=os.getpid())
+        self.assertTrue(holder.claim("cargo", "holder", ttl_s=600)[0])
+        from importlib.machinery import SourceFileLoader
+        from importlib.util import module_from_spec, spec_from_file_location
+        path = str(REPO / ".claude/hooks/ram-guard.py")
+        spec = spec_from_file_location("rg_test", path, loader=SourceFileLoader("rg_test", path))
+        ram_guard = module_from_spec(spec)
+        spec.loader.exec_module(ram_guard)  # the hook's own heartbeat path, not a copy of it
+        os.environ["BERTH_DIR"] = self.dir
+        self.addCleanup(os.environ.pop, "BERTH_DIR", None)
+
+        def beat():
+            b = Berth(self.dir, policy_path=MISSING_POLICY)
+            for i in range(400):
+                b.touch("holder", pid=os.getppid())
+                if i % 4 == 0:
+                    ram_guard.berth_touch("holder")
+
+        kids = [self._fork(beat) for _ in range(2)]
+        rival = Berth(self.dir, policy_path=MISSING_POLICY)
+        rival.moor("rival")
+        outcomes = [rival.claim("cargo", "rival")[0] for _ in range(300)]
+        for kid in kids:
+            os.waitpid(kid, 0)
+        self.assertFalse(any(outcomes), "a heartbeat mid-write read as a dead holder and was taken over")
+        self.assertEqual(rival.leases()["cargo"]["holder"], "holder")
+
+    def test_two_overrun_checks_emit_once(self):
+        emits = os.path.join(self.dir, "emits.txt")
+        seed = Berth(self.dir, policy_path=MISSING_POLICY)
+        now = time.time()
+        seed._write_leases({"mesh": {"resource": "mesh", "holder": "h", "since": now - 100,
+                                     "claimed_at": now - 100, "ttl_s": 10, "class": "verify"}})
+        kids = [self._fork(lambda: Berth(self.dir, obs=_FileObservation(emits),
+                                         policy_path=MISSING_POLICY).overrun_check()) for _ in range(4)]
+        for kid in kids:
+            os.waitpid(kid, 0)
+        with open(emits) as f:
+            self.assertEqual(len(f.read().splitlines()), 1)
+
+
+@unittest.skipUnless(shutil.which("just") and shutil.which("timeout"), "needs just + timeout")
+class JustWrapperTest(unittest.TestCase):
+    """The real justfile arms against a stub app_dir: refusals never reach the mesh, exit 4 proceeds,
+    and a verify lane is killed at its ttl so a competing claimant can take the berth safely."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.berth_dir = root / "berth"
+        self.app = root / "app"
+        (self.app / "scripts").mkdir(parents=True)
+        self.reached = root / "reached"
+        self.lane_pid = root / "lane.pid"
+        stub = f"""#!/usr/bin/env bash
+# stub hc-mesh.sh: sourced by the test lane, executed by the mesh arms — records that it was reached
+echo "$*" >> {self.reached}
+if [[ "${{BASH_SOURCE[0]}}" != "$0" ]]; then
+  if [[ "${{STUB_MODE:-}}" == "overlong" ]]; then
+    mesh_seed_env() {{ echo "$BASHPID" > {self.lane_pid}; sleep 60; }}
+  else
+    exit 42
+  fi
+else
+  exit 0
+fi
+"""
+        for name in ("hc-mesh.sh", "hc-mesh-transport-matrix.sh"):
+            (self.app / "scripts" / name).write_text(stub)
+            (self.app / "scripts" / name).chmod(0o755)
+        self.env = {k: v for k, v in os.environ.items() if k not in (
+            "BERTH_SESSION", "CLAUDE_SESSION_ID", "BERTH_CLASS", "BERTH_TTL", "MEASURE_ON_DEV_BERTH",
+            "MESH_STOP_FORCE", "BERTH_FENCED")}
+        self.env.update({"BERTH_DIR": str(self.berth_dir), "EPR_BIN": "/nonexistent-epr",
+                         "PATH": f"{REPO / 'genesis/agentic/bin'}:/usr/local/bin:/usr/bin:/bin",
+                         "MESH_DIR": str(root / "no-mesh")})
+
+    def just(self, *args, **env):
+        e = dict(self.env, **env)
+        return subprocess.run(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}", *args],
+                              env=e, capture_output=True, text=True, timeout=120)
+
+    def berth(self, *args, **env):
+        return subprocess.run([str(REPO / "genesis/agentic/bin/berth"), *args], env=dict(self.env, **env),
+                              capture_output=True, text=True, timeout=30)
+
+    def test_refusals_never_reach_the_mesh(self):
+        cases = [({"BERTH_CLASS": "measure"}, 3), ({"BERTH_CLASS": "bogus"}, 2), ({"BERTH_CLASS": "mesh"}, 2),
+                 ({"BERTH_TTL": "0"}, 2), ({"BERTH_TTL": "7200"}, 3), ({"BERTH_TTL": "soon"}, 2)]
+        for env, want in cases:
+            r = self.just("test", "mesh", "x.feature", BERTH_SESSION="me", **env)
+            self.assertEqual(r.returncode, want, (env, r.stderr[-400:]))
+        self.assertFalse(self.reached.exists())
+
+    def test_no_session_is_exit_4_and_the_lane_proceeds_unleased(self):
+        self.assertEqual(self.berth("claim", "mesh", "--ttl", "60").returncode, 4)
+        r = self.just("test", "mesh", "x.feature")
+        self.assertEqual(r.returncode, 42, r.stderr[-400:])  # the stub was sourced: the lane ran
+        self.assertTrue(self.reached.exists())
+
+    def test_measure_recipes_are_refused_on_the_dev_berth(self):
+        for action in ("matrix", "recovery", "recovery-matrix"):
+            r = self.just("mesh", action, BERTH_SESSION="me")
+            self.assertEqual(r.returncode, 3, (action, r.stderr[-300:]))
+            self.assertIn("just measure <scope>", r.stderr)
+        self.assertFalse(self.reached.exists())
+
+    def test_stop_is_refused_under_another_live_holder_unless_forced(self):
+        self.assertEqual(self.berth("claim", "mesh", "--class", "mesh", "--session", "rival").returncode, 0)
+        r = self.just("mesh", "stop", BERTH_SESSION="me")
+        self.assertEqual(r.returncode, 3, r.stderr[-300:])
+        self.assertIn("held by rival", r.stderr)
+        self.assertFalse(self.reached.exists())
+        r = self.just("mesh", "stop", BERTH_SESSION="me", MESH_STOP_FORCE="1")
+        self.assertEqual(r.returncode, 0, r.stderr[-300:])
+        self.assertTrue(self.reached.exists())
+        self.assertIsNone(json.loads(self.berth("who", "mesh").stdout))
+
+    def test_an_overlong_verify_lane_is_killed_at_its_ttl_then_the_berth_is_free(self):
+        proc = subprocess.Popen(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}",
+                                 "test", "mesh", "x.feature"],
+                                env=dict(self.env, BERTH_SESSION="me", BERTH_TTL="3", STUB_MODE="overlong"),
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        deadline = time.time() + 10
+        while not self.lane_pid.exists() and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(self.lane_pid.exists(), "the lane never started")
+        rival = self.berth("claim", "mesh", "--session", "rival", "--ttl", "60")
+        self.assertEqual(rival.returncode, 3, "a live verify lane must refuse a competing claimant")
+        out, err = proc.communicate(timeout=60)
+        self.assertEqual(proc.returncode, 3, err[-400:])
+        self.assertIn("BUDGET-EXCEEDED: verify lane ran past its 3s lease", err)
+        lane = int(self.lane_pid.read_text())
+        self.assertFalse(os.path.exists(f"/proc/{lane}"), "the fenced lane outlived its lease")
+        rival = self.berth("claim", "mesh", "--session", "rival", "--ttl", "60")
+        self.assertEqual(rival.returncode, 0, rival.stderr)
 
 
 if __name__ == "__main__":

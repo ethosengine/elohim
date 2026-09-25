@@ -321,20 +321,25 @@ def claude_pid():
     return os.getppid()
 
 
+_BERTH_MOD = None
+
+
+def _berth():
+    """berth's own implementation, loaded in-process (no subprocess on the prompt path): the mooring
+    heartbeat is one locked, atomically-published read-modify-write shared with every claimant."""
+    global _BERTH_MOD
+    if _BERTH_MOD is None:
+        _BERTH_MOD = _load(BERTH, "berth_for_ram_guard")
+    return _BERTH_MOD
+
+
 def berth_touch(session):
-    """Liveness heartbeat for this session's mooring — one small file rewrite, no subprocess. Also
-    (re)asserts the Claude pid, so a resumed session in a new process is not read as dead and a
-    Bash-tool command resolves to this session by process ancestry (`berth` session resolution)."""
+    """Liveness heartbeat for this session's mooring, re-asserting the Claude pid (+ its start time)
+    so a resumed session in a new process is not read as dead and a Bash-tool command resolves to
+    this session by process ancestry. Goes through `Berth.touch` — under the berth lock, written
+    tmp + os.replace — so a concurrent claimant never reads a half-written mooring as a dead holder."""
     try:
-        bdir = os.environ.get("BERTH_DIR") or os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config"), "berth")
-        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", session or "default")
-        path = os.path.join(bdir, "moorings", f"{safe}.json")
-        with open(path) as f:
-            m = json.load(f)
-        m["last_seen"] = round(time.time(), 3)
-        m["pid"] = claude_pid()
-        with open(path, "w") as f:
-            json.dump(m, f, indent=1, sort_keys=True)
+        _berth().Berth().touch(session or "default", pid=claude_pid())
     except Exception:
         pass
 

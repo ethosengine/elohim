@@ -26,10 +26,12 @@ Commands:
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
                 [--writes a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
-  berth touch   --session S                                        liveness heartbeat (hooks call it)
+  berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
                                                                    take one unit; exit 3 if held or refused
-  berth release RESOURCE --session S
+  berth release RESOURCE --session S [--force]                     --force gives back whoever holds it
+  berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
+                                                                   holds it; --force = override row
   berth say     --session S [--to SESSION] TEXT                    a deliberation note, on the record
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity
@@ -49,9 +51,12 @@ and gets no default ttl). The mesh lease is the dev berth's router:
   measure  a window/A-B/soak/proof run: REFUSED here (exit 3) with its alternative, `just measure
            <scope>` on a measurement peer. MEASURE_ON_DEV_BERTH=1 with --ttl declares an override:
            it claims, writes a `kind: override` row and emits dev-berth-held-by-measure@1 = ttl at once
-  mesh     the household itself (`just mesh start`): default ttl 1800 s
+  mesh     the DAEMON lease — the household being up (`just mesh start`): no ttl, never taken over by
+           expiry, only when its holder's mooring is dead. A lane the holder runs under it is covered;
+           any other class change on a held lease is refused (release, then claim)
 A lease carries class · ttl_s · claimed_at · holder · seat (the REA `use` commitment's fields).
-`claimed_at` is set once; a renew (the holder claiming again) resets `since` only, is on the record
+A mooring's runtime-asserted pid carries its incarnation (`pid_start`, /proc stat field 22): a live pid
+with a different start time is a dead mooring. `claimed_at` is set once; a renew (the holder claiming again) resets `since` only, is on the record
 as a `renew` row carrying $BERTH_SEAT, and cannot carry the hold past the class's max_ttl_s without
 an explicit --ttl, which is itself capped.
 
@@ -60,8 +65,9 @@ mooring whose runtime-asserted pid (ram-guard moors/touches with the Claude proc
 process's nearest ancestor; claim rows record `session_source: flag|env|ancestry`. A mooring expires
 `ttl` seconds after its last touch (pool-policy `berth.mooring_ttl_s`, default 3 h); a lease expires
 `ttl_s` after its last claim or renew. An expired lease can be taken over, and the takeover is on the
-record with `expired_after_s`. Exit codes: 0 ok · 2 usage / no session · 3 refused (held by a live
-mooring, a class this berth does not run, or a ttl past the class's cap).
+record with `expired_after_s`. Exit codes: 0 ok · 2 usage · 3 refused (held by a live mooring, a class
+this berth does not run, a ttl past the class's cap, a class transition, an owner check) · 4 no session
+resolvable (or ambiguous) — the only code a wrapper may proceed past, unleased.
 """
 import contextlib
 import fcntl
@@ -84,6 +90,43 @@ HOOKS_DIR = os.path.join(REPO_ROOT, ".claude", "hooks")
 
 class BerthUsage(ValueError):
     """A claim the caller mis-stated (unknown class, override without a ttl) — exit 2, no record."""
+
+
+class BerthAmbiguous(LookupError):
+    """Two live moorings share this process's nearest moored ancestor — exit 4, never a guess."""
+
+
+EXIT_NO_SESSION = 4  # no session resolvable (or ambiguous): callers may proceed unleased; 2 = usage
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+def pid_start_time(pid):
+    """The process's start time (clock ticks since boot, /proc/<pid>/stat field 22) — the incarnation
+    a pid alone cannot name. None when unreadable."""
+    try:
+        with open(f"/proc/{int(pid)}/stat") as f:
+            return int(f.read().rsplit(")", 1)[1].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def write_json_atomic(path, obj):
+    """Publish a whole file or nothing: a reader never sees a half-written mooring or lease table."""
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f, indent=1, sort_keys=True)
+    os.replace(tmp, path)
 
 
 def store_dir():
@@ -151,32 +194,38 @@ class Berth:
         self.now = now or time.time
         self.capacities, self.mooring_ttl_s, self.classes = load_policy(policy_path)
         self._obs = obs  # the `_observation` emitter; injected by tests, else imported lazily
-        self._lock_depth = 0
+        self._lock_depth = {}
+        self.pid_alive = pid_alive  # injectable: tests model liveness and incarnation
+        self.pid_start = pid_start_time
 
     # ------------------------------------------------------------ records
     def _moor_path(self, session):
         return os.path.join(self.moor_dir, f"{_safe(session)}.json")
 
     @contextlib.contextmanager
-    def _locked(self):
-        """One writer at a time over the ledger append and the leases.json read-modify-write.
-        Re-entrant within this object (claim → record), because a second flock on a fresh open file
+    def _locked(self, name="berth"):
+        """One writer at a time. `berth` serializes the ledger append and every read-modify-write of
+        leases.json and the moorings (ram-guard's heartbeat goes through `touch`, so it is under it
+        too); `emit` serializes the once-per-lease pain check so two prompt-triggered checks cannot
+        both emit, without holding the claim path hostage to an `epr` subprocess. Re-entrant per
+        name within this object (claim → record), because a second flock on a fresh open file
         description in the same process would wait on itself."""
-        if self._lock_depth:
-            self._lock_depth += 1
+        if self._lock_depth.get(name):
+            self._lock_depth[name] += 1
             try:
                 yield
             finally:
-                self._lock_depth -= 1
+                self._lock_depth[name] -= 1
             return
-        fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        path = self.lock_path if name == "berth" else os.path.join(self.dir, f"{name}.lock")
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            self._lock_depth = 1
+            self._lock_depth[name] = 1
             try:
                 yield
             finally:
-                self._lock_depth = 0
+                self._lock_depth[name] = 0
                 fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)
@@ -269,40 +318,69 @@ class Berth:
         return self.moorings().get(session)
 
     def is_live(self, m):
+        """A mooring is live while its heartbeat is inside its ttl AND, when it carries a runtime-
+        asserted pid, that process is alive in the SAME incarnation (start time) it moored with."""
         if not m:
             return False
         pid = m.get("pid")
         if pid:
-            try:
-                os.kill(int(pid), 0)
-            except ProcessLookupError:
+            if not self.pid_alive(pid):
                 return False
-            except PermissionError:
-                pass
+            want = m.get("pid_start")
+            if want is not None:
+                have = self.pid_start(pid)
+                if have is not None and have != want:
+                    return False  # the pid was reused by another process
         return (self.now() - m.get("last_seen", 0)) < m.get("ttl_s", self.mooring_ttl_s)
 
     def session_by_ancestry(self, ancestry):
-        """The session of the live mooring whose runtime-asserted pid is this process's NEAREST
-        ancestor (ties: the most recently seen) — never merely the newest mooring. None if none."""
+        """The session of the live mooring whose runtime-asserted pid (and incarnation) is this
+        process's NEAREST ancestor — never merely the newest mooring. None if none; BerthAmbiguous
+        when two live moorings claim that same nearest ancestor (a heartbeat is not an identity)."""
         rank = {pid: i for i, pid in reversed(list(enumerate(ancestry)))}
-        best = None
+        found = {}
         for session, m in self.moorings().items():
             try:
                 pid = int(m.get("pid") or 0)
             except (TypeError, ValueError):
                 continue
-            if pid not in rank or not self.is_live(m):
-                continue
-            key = (rank[pid], -m.get("last_seen", 0))
-            if best is None or key < best[0]:
-                best = (key, session)
-        return best[1] if best else None
+            if pid in rank and self.is_live(m):
+                found.setdefault(rank[pid], []).append(session)
+        if not found:
+            return None
+        nearest = found[min(found)]
+        if len(nearest) > 1:
+            raise BerthAmbiguous(f"moorings {', '.join(sorted(nearest))} all name ancestor pid "
+                                 f"{ancestry[min(found)]} — pass --session to say which one you are")
+        return nearest[0]
+
+    def _read_mooring(self, session):
+        try:
+            with open(self._moor_path(session)) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _assert_pid(self, m, pid):
+        if pid:
+            m["pid"] = int(pid)
+            start = self.pid_start(pid)
+            if start is not None:
+                m["pid_start"] = start
+            else:
+                m.pop("pid_start", None)
 
     def moor(self, session, **fields):
-        m = self.mooring(session) or {"session": session, "moored_at": round(self.now(), 3)}
+        with self._locked():
+            return self._moor_locked(session, **fields)
+
+    def _moor_locked(self, session, **fields):
+        m = self._read_mooring(session) or {"session": session, "moored_at": round(self.now(), 3)}
+        pid = fields.pop("pid", None)
         for k, v in fields.items():
             if v is not None:
                 m[k] = v
+        self._assert_pid(m, pid)
         m.setdefault("recipient", {})
         for k in ("model", "lab", "runtime"):
             if m.get(k):
@@ -314,31 +392,33 @@ class Berth:
         m["bounds"]["ttl_s"] = m.get("ttl_s", self.mooring_ttl_s)
         m.setdefault("ttl_s", self.mooring_ttl_s)
         m["last_seen"] = round(self.now(), 3)
-        tmp = self._moor_path(session) + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(m, f, indent=1, sort_keys=True)
-        os.replace(tmp, self._moor_path(session))
+        write_json_atomic(self._moor_path(session), m)
         self.record("moor", session=session, recipient=m["recipient"], provider=m.get("principal"),
                     task=m.get("task"), bounds=m["bounds"])
         return m
 
-    def touch(self, session):
-        m = self.mooring(session)
-        if not m:
-            return None
-        m["last_seen"] = round(self.now(), 3)
-        with open(self._moor_path(session), "w") as f:
-            json.dump(m, f, indent=1, sort_keys=True)
-        return m
+    def touch(self, session, pid=None):
+        """Heartbeat (and, from a hook, re-assert the runtime pid + incarnation). Serialized with every
+        other mooring/lease writer and published atomically, so a concurrent claimant never reads a
+        half-written mooring as a dead holder."""
+        with self._locked():
+            m = self._read_mooring(session)
+            if not m:
+                return None
+            m["last_seen"] = round(self.now(), 3)
+            self._assert_pid(m, pid)
+            write_json_atomic(self._moor_path(session), m)
+            return m
 
     def unmoor(self, session):
         for res in {key.removesuffix("/slots") for key in self.leases()}:
             self.release(res, session, reason="unmoor")
-        try:
-            os.remove(self._moor_path(session))
-        except FileNotFoundError:
-            pass
-        self.record("unmoor", session=session)
+        with self._locked():
+            try:
+                os.remove(self._moor_path(session))
+            except FileNotFoundError:
+                pass
+            self.record("unmoor", session=session)
 
     # ------------------------------------------------------------ leases
     def leases(self):
@@ -349,10 +429,7 @@ class Berth:
             return {}
 
     def _write_leases(self, leases):
-        tmp = self.leases_path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(leases, f, indent=1, sort_keys=True)
-        os.replace(tmp, self.leases_path)
+        write_json_atomic(self.leases_path, leases)
 
     def holder_is_live(self, lease):
         if not lease:
@@ -464,7 +541,14 @@ class Berth:
                     raise BerthUsage(f"a declared override declares its hold: MEASURE_ON_DEV_BERTH=1 berth claim "
                                      f"{resource} --class {klass} --ttl SECONDS --note '<why>'")
                 overriding = True
-            if not explicit_ttl and spec.get("default_ttl_s"):
+            if spec.get("daemon"):
+                # The daemon lease is the household being UP, not a bounded run: no ttl, never taken
+                # over by expiry — only when its holder's mooring is dead.
+                if explicit_ttl:
+                    raise BerthUsage(f"the {klass} class on {resource} is a daemon lease and takes no --ttl "
+                                     f"(a bounded run claims verify)")
+                ttl_s = None
+            elif not explicit_ttl and spec.get("default_ttl_s"):
                 ttl_s = int(spec["default_ttl_s"])
             cap = spec.get("max_ttl_s")
             if cap and explicit_ttl and ttl_s > int(cap):
@@ -477,17 +561,19 @@ class Berth:
             ok, lease, reason = self._claim_locked(resource, session, note, ttl_s if explicit_ttl else None,
                                                    ttl_s, klass, seat, overriding, session_source)
         if ok and overriding:
-            self.record("override", resource=resource, session=session, holder=session, ttl_s=lease.get("ttl_s"),
+            self.record("override", resource=resource, session=session, holder=session, ttl_s=ttl_s,
                         claimed_at=lease.get("claimed_at"), reason=note, seat=seat,
                         session_source=session_source, **{"class": klass})
-            landed = os.path.exists(self._marker(lease))
-            if not landed and self._emit_pain(
-                    lease.get("ttl_s") or 0, f"declared override: {resource} held by {session} as {klass} "
-                    f"for {lease.get('ttl_s')}s on the dev berth — {note or 'no reason given'}",
-                    resource=resource, kind="override", **{"class": klass}):
-                self._write_marker(lease)
-                landed = True
-            reason += (f"; declared override — {OVERRUN_MEASURE} = {lease.get('ttl_s')}s "
+            # Every declared override is pain on the record the moment the hold starts. Its marker
+            # stops the overrun check from counting the same lease a second time.
+            with self._locked("emit"):
+                landed = self._emit_pain(
+                    ttl_s or 0, f"declared override: {resource} held by {session} as {klass} for {ttl_s}s on "
+                    f"the dev berth — {note or 'no reason given'}", resource=resource, kind="override",
+                    **{"class": klass})
+                if landed and lease.get("ttl_s"):
+                    self._write_marker(lease)
+            reason += (f"; declared override — {OVERRUN_MEASURE} = {ttl_s}s "
                        + ("emitted" if landed else "NOT emitted (no `epr` emitter); the override row is the record"))
         return ok, lease, reason
 
@@ -499,13 +585,30 @@ class Berth:
         live = self.live_leases(leases, resource)
         mine = [lease for lease in live if lease.get("holder") == session]
         if mine:
+            covered = None
             for lease in mine:
-                refused = self._renew(lease, explicit_ttl, note, seat, klass=klass if overriding else None,
+                held_class = lease.get("class")
+                if held_class and held_class != klass:
+                    held_spec = (self.classes.get(resource) or {}).get(held_class)
+                    if isinstance(held_spec, dict) and held_spec.get("daemon"):
+                        # A lane under the holder's OWN daemon lease: covered, the daemon lease is
+                        # unchanged (the lane is fenced by its own deadline, not by this lease).
+                        covered = held_class
+                        self.record("renew", resource=resource, session=session, covered_by=held_class,
+                                    requested_class=klass, ttl_s=ttl_s, claimed_at=lease.get("claimed_at"),
+                                    seat=seat, note=note, session_source=session_source)
+                        continue
+                    self.record("refuse", resource=resource, session=session, reason="class-transition",
+                                held_class=held_class, session_source=session_source, **{"class": klass})
+                    return False, lease, (f"you hold {resource} as {held_class}; a {klass} claim is a class "
+                                          f"transition — release it first (`berth release {resource}`), "
+                                          f"then claim {klass}")
+                refused = self._renew(lease, explicit_ttl, note, seat, klass=None if held_class else klass,
                                       session_source=session_source)
                 if refused:
                     return False, lease, refused
             self._write_leases(leases)
-            return True, mine[0], "renewed"
+            return True, mine[0], (f"renewed — covered by your {covered} daemon lease" if covered else "renewed")
         if len(live) >= cap:
             if cap == 1:
                 # One slot: the refusal names THE holder as a record (who/claim callers index it).
@@ -543,44 +646,72 @@ class Berth:
                     claimed_at=lease["claimed_at"], seat=seat, session_source=session_source, **{"class": klass})
         return True, lease, "claimed"
 
-    def release(self, resource, session, reason=None):
+    def release(self, resource, session, reason=None, force=False):
+        """Give back this session's lease. `force` gives back WHOEVER holds it (a forced `mesh stop`
+        took the household down under them) and says so on the record."""
         with self._locked():
             leases = self.leases()
-            changed = False
+            changed = []
             cur = leases.get(resource)
-            if cur and cur.get("holder") == session:
+            if cur and (force or cur.get("holder") == session):
                 del leases[resource]
-                changed = True
+                changed.append(cur.get("holder"))
             slots = leases.get(resource + "/slots")
             if slots:
-                kept = [l for l in slots if l.get("holder") != session]
+                kept = [l for l in slots if not force and l.get("holder") != session]
                 if len(kept) != len(slots):
+                    changed += [l.get("holder") for l in slots if l not in kept]
                     leases[resource + "/slots"] = kept
-                    changed = True
             if changed:
                 self._write_leases(leases)
-                self.record("release", resource=resource, session=session, reason=reason)
-        return changed
+                forced = [h for h in changed if h != session]
+                self.record("release", resource=resource, session=session, reason=reason,
+                            forced_from=",".join(map(str, forced)) if forced else None)
+        return bool(changed)
+
+    def owner_check(self, resource, session, action, force=False, note=None):
+        """May `session` do `action` (a destructive act on the resource, e.g. stop the household)?
+        Refused while another LIVE session holds the resource; `force` proceeds and writes an
+        `override` row naming whom it overrode. Returns (ok, holders, reason)."""
+        with self._locked():
+            live = self.live_leases(self.leases(), resource)
+            others = [l for l in live if l.get("holder") != session]
+            if not others:
+                return True, [], "yours" if live else "free"
+            holders = ",".join(f"{l['holder']} ({l.get('class') or '?'}, {_age(self.now() - l.get('claimed_at', l['since']))})"
+                               for l in others)
+            if force:
+                self.record("override", resource=resource, session=session, action=action,
+                            holder=",".join(l["holder"] for l in others), reason=note)
+                return True, others, f"forced over {holders}"
+            self.record("refuse", resource=resource, session=session, reason="owner", action=action,
+                        holder=",".join(l["holder"] for l in others))
+            return False, others, f"{action} refused — {resource} is held by {holders}"
 
     def overrun_check(self, resource="mesh"):
         """Emit dev-berth-held-by-measure@1 (value = seconds held since claimed_at) ONCE for a lease
         held past its ttl, marked under emitted/<holder>-<claimed_at>. Returns the seconds emitted, or
         None. No marker without a landed emit, so an unavailable emitter retries on a later call."""
         lease = self.raw_lease(resource)
-        if not lease:
+        if not lease or lease.get("claimed_at") is None or not lease.get("ttl_s"):
             return None
-        claimed, ttl = lease.get("claimed_at"), lease.get("ttl_s")
-        if claimed is None or not ttl:
+        if self.now() - lease["claimed_at"] <= lease["ttl_s"]:
             return None
-        held = self.now() - claimed
-        if held <= ttl or os.path.exists(self._marker(lease)):
-            return None
-        klass = lease.get("class")
-        if not self._emit_pain(held, f"{resource} lease held by {lease.get('holder')} as {klass} for "
-                               f"{_age(held)} past a {_age(ttl)} ttl (claimed_at {claimed})",
-                               resource=resource, kind="overrun", **{"class": klass}):
-            return None
-        self._write_marker(lease)
+        # check → emit → mark is one critical section: two prompt-triggered checks cannot both emit.
+        with self._locked("emit"):
+            lease = self.raw_lease(resource)
+            if not lease or lease.get("claimed_at") is None or not lease.get("ttl_s"):
+                return None
+            claimed, ttl = lease["claimed_at"], lease["ttl_s"]
+            held = self.now() - claimed
+            if held <= ttl or os.path.exists(self._marker(lease)):
+                return None
+            klass = lease.get("class")
+            if not self._emit_pain(held, f"{resource} lease held by {lease.get('holder')} as {klass} for "
+                                   f"{_age(held)} past a {_age(ttl)} ttl (claimed_at {claimed})",
+                                   resource=resource, kind="overrun", **{"class": klass}):
+                return None
+            self._write_marker(lease)
         self.record("overrun", resource=resource, holder=lease.get("holder"), ttl_s=ttl, claimed_at=claimed,
                     held_s=round(held), measure=OVERRUN_MEASURE, **{"class": klass})
         return round(held)
@@ -730,15 +861,69 @@ def main(argv):
             return 2
         print(json.dumps(b.who(argv[0])))
         return 0
+    def resolve():
+        """--session / env first; else ancestry. Returns (session, source, error-or-None)."""
+        if session:
+            return session, source, None
+        try:
+            found = b.session_by_ancestry(proc_ancestry())
+        except BerthAmbiguous as e:
+            return None, None, f"berth: ambiguous session — {e}"
+        if found:
+            return found, "ancestry", None
+        return None, None, ("berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID) "
+                            "(no ancestor mooring; from a non-Claude shell pass --session)")
+
+    claim_args = None
+    if cmd == "claim":
+        # Parsed and class-checked BEFORE the session is resolved: a class this berth does not run
+        # is refused (exit 3) whether or not the caller can name itself.
+        usage = "usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]"
+        ttl = _opt(argv, "--ttl")
+        note = _opt(argv, "--note")
+        klass = _opt(argv, "--class") or DEFAULT_CLASS
+        if not argv:
+            print(usage, file=sys.stderr)
+            return 2
+        try:
+            ttl_s = int(ttl) if ttl else None
+        except ValueError:
+            print(f"berth: --ttl {ttl!r} is not a number of seconds\n{usage}", file=sys.stderr)
+            return 2
+        res = argv[0]
+        override = os.environ.get("MEASURE_ON_DEV_BERTH") == "1"
+        try:
+            spec = b.class_spec(res, klass)
+        except BerthUsage as e:
+            print(f"berth: {e}", file=sys.stderr)
+            return 2
+        if spec is not None and spec.get("allowed") is False and not override:
+            ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass, session_source=source)
+            print(f"{res}: REFUSED — {reason}", file=sys.stderr)
+            return 3
+        claim_args = (res, note, ttl_s, klass, override)
+
+    if cmd == "owner-check":
+        if not argv:
+            print("usage: berth owner-check RESOURCE [--action ACTION] [--force] [--note TEXT]", file=sys.stderr)
+            return 2
+        action = _opt(argv, "--action") or "act"
+        note = _opt(argv, "--note")
+        force = "--force" in argv
+        who_am_i = resolve()[0]
+        ok, _, reason = b.owner_check(argv[0], who_am_i, action, force=force, note=note)
+        if ok:
+            if force and reason.startswith("forced"):
+                print(f"{argv[0]}: {action} — {reason} (override on the record)", file=sys.stderr)
+            return 0
+        print(f"{argv[0]}: REFUSED — {reason}. Ask them (`berth say --to <holder> …`), or override on the "
+              f"record (MESH_STOP_FORCE=1 for `just mesh stop`)", file=sys.stderr)
+        return 3
+
+    session, source, err = resolve()
     if not session:
-        # Runtime-asserted identity: a Claude session's hooks moor with the Claude process's pid, and
-        # every Bash-tool command (so `just test mesh`) descends from that process.
-        session = b.session_by_ancestry(proc_ancestry())
-        source = "ancestry" if session else None
-    if not session:
-        print("berth: no session (pass --session, or set BERTH_SESSION / CLAUDE_SESSION_ID) "
-              "(no ancestor mooring; from a non-Claude shell pass --session)", file=sys.stderr)
-        return 2
+        print(err, file=sys.stderr)
+        return EXIT_NO_SESSION
     if cmd == "moor":
         writes = _opt(argv, "--writes")
         m = b.moor(session, model=_opt(argv, "--model"), lab=_opt(argv, "--lab"), runtime=_opt(argv, "--runtime"),
@@ -750,33 +935,21 @@ def main(argv):
         print(f"moored {session} as {r.get('runtime', '?')} {r.get('model', '?')}@{r.get('lab', '?')} for {m.get('principal') or '?'}")
         return 0
     if cmd == "touch":
-        return 0 if b.touch(session) else 1
+        pid = _opt(argv, "--pid")
+        return 0 if b.touch(session, pid=int(pid) if pid else None) else 1
     if cmd == "unmoor":
         b.unmoor(session)
         print(f"unmoored {session}")
         return 0
     if cmd == "claim":
-        usage = "usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]"
-        ttl = _opt(argv, "--ttl")
-        note = _opt(argv, "--note")
-        klass = _opt(argv, "--class")
-        if not argv:
-            print(usage, file=sys.stderr)
-            return 2
-        res = argv[0]
-        try:
-            ttl_s = int(ttl) if ttl else None
-        except ValueError:
-            print(f"berth: --ttl {ttl!r} is not a number of seconds\n{usage}", file=sys.stderr)
-            return 2
+        res, note, ttl_s, klass, override = claim_args
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
         if not b.touch(session):
             b.moor(session)
         try:
             ok, lease, reason = b.claim(res, session, note=note, ttl_s=ttl_s, klass=klass,
                                         seat=os.environ.get("BERTH_SEAT") or None,
-                                        override=os.environ.get("MEASURE_ON_DEV_BERTH") == "1",
-                                        session_source=source)
+                                        override=override, session_source=source)
         except BerthUsage as e:
             print(f"berth: {e}", file=sys.stderr)
             return 2
@@ -794,7 +967,9 @@ def main(argv):
         if not argv:
             print("usage: berth release RESOURCE --session S", file=sys.stderr)
             return 2
-        print(f"{argv[0]}: {'released' if b.release(argv[0], session) else 'was not held'} by {session}")
+        force = "--force" in argv
+        done = b.release(argv[0], session, force=force, reason="forced" if force else None)
+        print(f"{argv[0]}: {'released' if done else 'was not held'} by {session}" + (" (forced)" if force and done else ""))
         return 0
     if cmd == "say":
         to = _opt(argv, "--to")

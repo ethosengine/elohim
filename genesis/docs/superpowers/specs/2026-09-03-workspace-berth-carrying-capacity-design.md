@@ -156,17 +156,29 @@ disk whose full-stall share is above 10 % for twenty seconds is the discipline.
   runtime assert it is the graduation step (the recipient identity in `delegates-compute` must be
   attested, not self-typed).
 - It gates the household, and only the household. Since 2026-09-25 the mesh lease is the dev
-  berth's router: `just test mesh` claims it as class `verify` with a ttl (default 1800 s, capped
-  at 3600 s), `just mesh start` claims it as class `mesh`, and a second live session is refused
-  (exit 3) with the holder named, never queued. A `measure`-class claim is refused with its
-  alternative (`just measure <scope>`, on a measurement peer); `MEASURE_ON_DEV_BERTH=1` is a
-  declared override that claims, writes a `kind: override` row and emits
-  `dev-berth-held-by-measure@1` the moment the hold starts, and `berth overrun-check` (ram-guard's
-  prompt event) emits it once for any lease held past its ttl. The classes live in
-  `pool-policy.json` `berth.classes`. Nothing gates `cargo` or `disk-heavy`: a `cargo test` that
-  skipped `berth claim` still runs, io-guard measures what actually happens and attributes it to
-  whoever holds the lease, which is how a skipped claim becomes visible (`holder: null` on a shed
-  row). A session with no id (exit 2) is not blocked from the mesh either.
+  berth's router, with three classes in `pool-policy.json` `berth.classes`:
+  - `mesh` is the **daemon lease** — the household being up. `just mesh start` claims it with no
+    ttl; it is never taken over by expiry, only when its holder's mooring is dead.
+  - `verify` is a **bounded run** — `just test mesh` claims it with a ttl (default 1800 s, capped
+    at 3600 s). The lane body runs under a **deadline fence**: `timeout` at that ttl in its own
+    process group (INT, then KILL 30 s later), printing `BUDGET-EXCEEDED` and exiting 3. An
+    EXPIRED verify lease therefore means a dead lane, and taking it over is safe.
+  - `measure` is refused on the dev berth with its alternative (`just measure <scope>`, on a
+    measurement peer), and `just mesh matrix|recovery|recovery-matrix` claim it, so they are
+    refused too. `MEASURE_ON_DEV_BERTH=1` is a declared override: it claims, writes a
+    `kind: override` row and emits `dev-berth-held-by-measure@1` the moment the hold starts.
+
+  A test lane claims only `verify|measure`. A lane the holder runs under its own daemon lease is
+  covered by it; any other class change on a held lease is refused (release, then claim). A second
+  live session is refused (exit 3) with the holder named, never queued, and `just mesh stop` is
+  refused while another live session holds the mesh (`MESH_STOP_FORCE=1` overrides, on the record).
+  `berth overrun-check` (ram-guard's prompt event) emits the pain once for any lease held past its
+  ttl. Sessions are identified by the runtime: ram-guard moors and heartbeats with the Claude
+  process's pid and start time, and a shell with no session id resolves to the mooring whose pid is
+  its nearest ancestor. Only "no session resolvable" (exit 4) proceeds unleased. Nothing gates
+  `cargo` or `disk-heavy`: a `cargo test` that skipped `berth claim` still runs, io-guard measures
+  what actually happens and attributes it to whoever holds the lease, which is how a skipped claim
+  becomes visible (`holder: null` on a shed row).
 - It does not replace the messages. Sessions still talk; the berth is where the *decisions*
   those messages produce are recorded so the next session, and the guard, can read them.
 
