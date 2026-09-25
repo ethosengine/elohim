@@ -13,8 +13,8 @@ domain: peer-hoster dataplane (T2 libp2p × iroh) × local mesh harness × quies
 habits: [dataplane-convergence]
 topic: [transport, iroh, libp2p, dual, path-quality, race-fetch, selection, exploration, diversity-harness, two-peer, quiescence, churn, honest-absence, syncDocuments]
 cites:
-  - "substrate-trust-contract-runbook | the live-substrate invariants and per-red decision tree this arc's churn-injected quiescence measure must stay coherent with; its probes remain the authority when the local and fleet series disagree | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
-  - "elohim-seam-map-concern-routing | routes this concern to the T2 substrate track (libp2p x iroh co-resident); seams are where capability is added, tracks are how a node participates — path selection is a track property, not a new seam | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - substrate-trust-contract-runbook | the live-substrate invariants and per-red decision tree this arc's churn-injected quiescence measure must stay coherent with; its probes remain the authority when the local and fleet series disagree | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - elohim-seam-map-concern-routing | routes this concern to the T2 substrate track (libp2p x iroh co-resident); seams are where capability is added, tracks are how a node participates — path selection is a track property, not a new seam | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
   - genesis/data/timeline/backlog/2026-08-24-matthew-conductor-saturation-heal-leg-loop.md
   - genesis/a2o/features/dataplane/transport-dual-plane.feature
   - genesis/a2o/features/dataplane/transport-comparison-matrix.feature
@@ -27,9 +27,9 @@ cites:
   - elohim/elohim-storage/src/p2p_iroh/peer_book.rs
   - elohim/elohim-storage/src/p2p/blob_fetch.rs
   - elohim/elohim-storage/src/sync/doc_store.rs
-  - "swarm-curve-and-blind-custody-design | the sharded-distribution speedup claim the fanout family (§3.3) measures directly — time_to_recover vs survivor count; a flat curve is a finding against that design | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
-  - "iroh-libp2p-complementarity | the canonical selector this spec composes INSIDE: peer_map::select_transport rules 1/3 become the eligible set, Track3/NoShared stay verbatim, rule-2 iroh preference survives as the Unknown prior; its anti-capture clause is answered by the exploration floor | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
-  - genesis/docs/superpowers/plans/2026-06-14-dataplane-transport-plan.md
+  - swarm-curve-and-blind-custody-design | the sharded-distribution speedup claim the fanout family (§3.3) measures directly — time_to_recover vs survivor count; a flat curve is a finding against that design | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md
+  - iroh-libp2p-complementarity | the canonical selector this spec composes INSIDE: peer_map::select_transport rules 1/3 become the eligible set, Track3/NoShared stay verbatim, rule-2 iroh preference survives as the Unknown prior; its anti-capture clause is answered by the exploration floor | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - dataplane-transport-plan | Dataplane | sha256:234e2e3a5ffed7e1 | path: genesis/docs/superpowers/plans/2026-06-14-dataplane-transport-plan.md
   - elohim/elohim-storage/src/p2p_iroh/peer_map.rs
 ---
 

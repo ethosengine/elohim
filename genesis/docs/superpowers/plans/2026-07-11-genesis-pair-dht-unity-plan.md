@@ -8,7 +8,7 @@ steward: rust-architect
 cites:
   - genesis/data/timeline/backlog/genesis-pair-cross-conductor-fetch-blocks-canonical-convergence.md
   - peer-discovery-fractal-federation | Peer Discovery as Fractal Federation | sha256:42ae0e67f9e9d4bc | path: genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md
-  - genesis/docs/superpowers/plans/2026-06-14-federation-bootstrap-plan.md
+  - federation-bootstrap-plan | Bootstrap Store Islanding | sha256:1c0ea3dc59d4c550 | path: genesis/docs/superpowers/plans/2026-06-14-federation-bootstrap-plan.md
   - genesis/a2o/features/dataplane/notary-authority.feature
   - genesis/data/timeline/backlog/view-federation-request-flakiness-mesh-wide.md
 ---

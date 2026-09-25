@@ -9,10 +9,10 @@ domain: D5
 sprint: dataplane-automerge-spine (D5 forward slice; not in roadmap 1-6 — operator-requested 2026-06-27)
 requires_env: [household-nodes]
 cites:
-  - "p2p-dataplane-sync-engine-design-arc | History: The P2P dataplane + sync-engine design arc (March 2026) | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
-  - genesis/docs/superpowers/plans/2026-06-14-dataplane-proofs-plan.md
-  - "resiliency-card-p2p-weave-sprint-plan | Resiliency-card + P2P-sync + Operational-Weave sprint | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md"
-  - "dna-signal-as-epr-envelope | DnaSignal as EPR Envelope | sha256:e6d46225dd34020f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md"
+  - p2p-dataplane-sync-engine-design-arc | History: The P2P dataplane + sync-engine design arc (March 2026) | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
+  - dataplane-proofs-plan | Dataplane Resilience Proofs + CI P2P-sim | sha256:3260a21cc8eca2af | path: genesis/docs/superpowers/plans/2026-06-14-dataplane-proofs-plan.md
+  - resiliency-card-p2p-weave-sprint-plan | Resiliency-card + P2P-sync + Operational-Weave sprint | sha256:834716e333f5b01f | path: genesis/docs/superpowers/plans/2026-06-21-resiliency-card-p2p-weave-sprint-plan.md
+  - dna-signal-as-epr-envelope | DnaSignal as EPR Envelope | sha256:e6d46225dd34020f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-15-dna-signal-as-epr-envelope.md
 ---
 
 # Light the Automerge Content-Sync Plane — Implementation Plan

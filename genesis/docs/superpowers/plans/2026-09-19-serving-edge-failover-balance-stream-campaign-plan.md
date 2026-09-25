@@ -5,15 +5,15 @@ status: Draft
 domain: D8
 sprint: "unranked drain rung — not named in vision-readiness-sprint-roadmap; composes plans A/B/C below; S1 also lands in D5 (elohim-storage)"
 cites:
-  - "doorway-federation-failover-sprint-plan | Doorway Federation & Failover Sprint | sha256:c66fd04c3b4f16e2 | path: genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
-  - genesis/docs/superpowers/plans/2026-06-14-federation-edge-plan.md
-  - "doorway-federation-three-reds-to-green-plan | Doorway federation | sha256:d2b8f066817b690f | path: genesis/docs/superpowers/plans/2026-09-10-doorway-federation-three-reds-to-green-plan.md"
-  - "doorway-membrane-prosocial-routing-design | Doorway Membrane & Pro-Social Routing | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md"
+  - doorway-federation-failover-sprint-plan | Doorway Federation & Failover Sprint | sha256:c66fd04c3b4f16e2 | path: genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md
+  - federation-edge-plan | Federation Edge | sha256:3c47bfddaae214ca | path: genesis/docs/superpowers/plans/2026-06-14-federation-edge-plan.md
+  - doorway-federation-three-reds-to-green-plan | Doorway federation | sha256:d2b8f066817b690f | path: genesis/docs/superpowers/plans/2026-09-10-doorway-federation-three-reds-to-green-plan.md
+  - doorway-membrane-prosocial-routing-design | Doorway Membrane & Pro-Social Routing | sha256:50dd8febb5447fbb | path: genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md
   - doorway/doorway-service/.epr-meta/doorway-failover.habit.md
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
   - genesis/data/timeline/backlog/head-authority-carried-with-content-sync-unit.md
   - genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md
-  - "admission-receiver-granted-lanes-design | story 3.3's brainstorm starting frame: receiver-granted reserved lanes, shortest-expected-hold first, AIMD background after restart (TCP/Homa lessons from the 2026-09-23 publish storm) | sha256:54611915e41292b9 | path: genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md"
+  - admission-receiver-granted-lanes-design | story 3.3's brainstorm starting frame: receiver-granted reserved lanes, shortest-expected-hold first, AIMD background after restart (TCP/Homa lessons from the 2026-09-23 publish storm) | sha256:54611915e41292b9 | path: genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md
   - genesis/data/timeline/backlog/arch-dataplane-borrows-backlog.md
   - genesis/data/timeline/backlog/projection-reconcile-actionable-sawtooth.md
   - genesis/data/timeline/backlog/ci-orchestrator-baseline-advance-despite-failure.md

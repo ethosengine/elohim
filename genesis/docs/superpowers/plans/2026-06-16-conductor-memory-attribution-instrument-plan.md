@@ -5,7 +5,7 @@ status: Draft
 cites:
   - matthew-edge-resiliency-rca-fanout-synthesis | Matthew Edge Resiliency | sha256:a4fafb4f91612eba | path: genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md
   - genesis/data/timeline/backlog/arc-shrink-ineffective-memory-soak.md
-  - genesis/docs/superpowers/plans/2026-06-14-dataplane-arc-plan.md
+  - dataplane-arc-plan | Dataplane | sha256:6bc3fee12793670a | path: genesis/docs/superpowers/plans/2026-06-14-dataplane-arc-plan.md
 domain: dataplane / conductor-memory
 sprint: dataplane (P-ARC §B leak-vs-bounded prerequisite)
 # No doc-level requires_env: MIXED plan. Tasks 1–4 (readers + parsers + sampler) are

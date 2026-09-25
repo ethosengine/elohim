@@ -6,7 +6,7 @@ cites:
   - matthew-edge-resiliency-rca-fanout-synthesis | Matthew Edge Resiliency | sha256:a4fafb4f91612eba | path: genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md
   - genesis/data/timeline/backlog/conductor-memory-attribution-verdict.md
   - conductor-memory-attribution-instrument-plan | Conductor Memory Attribution Instrument | sha256:9b86bc94e115c866 | path: genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md
-  - genesis/docs/superpowers/plans/2026-06-14-dataplane-diagnostic-plan.md
+  - dataplane-diagnostic-plan | Diagnostic Read-Model End-to-End Wiring | sha256:a028fa5105720a26 | path: genesis/docs/superpowers/plans/2026-06-14-dataplane-diagnostic-plan.md
 domain: dataplane / observability
 sprint: design-decision-toolkit
 # Mixed plan. P0/P1/P3 unit-testable + observable on household-nodes/observability.
