@@ -47,6 +47,16 @@ pub struct Collective {
     /// (`genesis/data/collectives/collectives.json`): declared terms, never a copied fixture.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registry: Option<RegistryTerms>,
+    /// The lineage of this declaration: the raw CIDs of the earlier declarations at the SAME
+    /// path that this one amends, newest first. An amendment prepends the CID it replaces.
+    ///
+    /// It is carried as a list, not a single back-pointer, because a superseded declaration's
+    /// bytes do not stay in the tree: a lone pointer could not be walked offline past its first
+    /// hop. Work pinned to any CID in this chain was contributed under this collective's earlier
+    /// charter and keeps its standing (reported as lineage, never hidden); a repeated CID is a
+    /// cycle and is refused.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supersedes: Vec<String>,
     pub source_rules: Vec<SourceRule>,
 }
 
@@ -158,6 +168,28 @@ impl Affiliation {
                 .split_once('@')
                 .is_some_and(|(role, _)| role == self.member)
     }
+
+    /// Whether this affiliation's member is the SAME author as `author` for anti-self-election.
+    ///
+    /// Wider than [`Self::names`] on purpose, and used only for that refusal: when either side is
+    /// an agent ref, both are normalized to their role first, so any build of a role counts as
+    /// the author of work by any other build of it (`agent:code-reviewer@opus-5` may not approve
+    /// `agent:code-reviewer@sonnet-5`). Standing lookup keeps the narrower [`Self::names`], so a
+    /// build-specific Steward affiliation never lends its standing to a sibling build.
+    pub fn same_author_as(&self, author: &str) -> bool {
+        self.names(author)
+            || matches!(
+                (agent_role(&self.member), agent_role(author)),
+                (Some(mine), Some(theirs)) if mine == theirs
+            )
+    }
+}
+
+/// The role an agent ref names — `agent:<role>` or `agent:<role>@<model>` — else `None`.
+pub fn agent_role(participant: &str) -> Option<&str> {
+    participant
+        .strip_prefix("agent:")
+        .map(|rest| rest.split_once('@').map_or(rest, |(role, _)| role))
 }
 
 /// Refuses unless at least `n` DISTINCT non-fixture, still-standing Stewards approved.
@@ -367,5 +399,20 @@ mod tests {
         let person = steward("human:matthew", AffiliationStanding::Standing);
         assert!(person.names("human:matthew"));
         assert!(!person.names("human:matthew@x"));
+    }
+
+    #[test]
+    fn same_author_normalizes_agent_refs_to_their_role_on_either_side() {
+        let mut build = steward("agent:code-reviewer@opus-5", AffiliationStanding::Standing);
+        build.member_kind = MemberKind::ElohimAgent;
+        // A build-specific affiliation does not NAME a sibling build (no borrowed standing)…
+        assert!(!build.names("agent:code-reviewer@sonnet-5"));
+        // …but it is the same author for anti-self-election.
+        assert!(build.same_author_as("agent:code-reviewer@sonnet-5"));
+        assert!(build.same_author_as("agent:code-reviewer"));
+        assert!(!build.same_author_as("agent:rust-architect@opus-5"));
+        let person = steward("human:matthew", AffiliationStanding::Standing);
+        assert!(!person.same_author_as("agent:matthew@opus-5"));
+        assert!(person.same_author_as("human:matthew"));
     }
 }

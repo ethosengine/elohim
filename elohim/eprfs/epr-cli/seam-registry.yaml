@@ -957,7 +957,11 @@ decisionPoints:
       may not widen it; a write is refused when the acting claim is bound to another collective;
       graduation additionally requires the verdict's provider to hold a standing Steward
       affiliation that does not also stand for the author, and reports a fixture co-steward's
-      approval as `validatedAt: bootstrap (fixture co-steward)`.
+      approval as `validatedAt: bootstrap (fixture co-steward)`. An amended declaration lists
+      the raw CIDs it `supersedes` (newest first, bounded, a recurring CID refused as a cycle);
+      project/feedback/graduate accept work pinned anywhere in that chain at the same path and
+      say `pinned to superseded declaration <cid> (lineage ok)`, while a NEW contribution must
+      pin the current declaration.
     concernIds:
       - id: C0
         status: partial

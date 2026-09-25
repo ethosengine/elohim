@@ -257,6 +257,8 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
         "contribute" => {
             let assertion: Contribution = serde_json::from_str(&file.text)?;
             reader.contribution(&assertion, &governance)?;
+            // New work is filed under the current charter; lineage covers only what already was.
+            reader.require_current(&assertion.collective, &governance)?;
             reader.owned_by(&file.reference.path, &governance)?;
             reader.allowed(&file.reference.path, assertion.reach, &collective)?;
             reader.require_bound(session, &governance)?;
@@ -279,7 +281,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
         "project" => {
             let request: ProjectionRequest = serde_json::from_str(&file.text)?;
             version(request.version)?;
-            reader.require_collective(&request.collective, &collective_ref)?;
+            reader.require_collective(&request.collective, &governance)?;
             bounded_text(&request.purpose, "purpose", 1000)?;
             reader.allowed(input, request.audience, &collective)?;
             validation::strings(&request.omissions, "omissions", 8, 300)?;
@@ -294,14 +296,18 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                 }
                 let source = reader.pinned(reference)?;
                 let assertion: Contribution = serde_json::from_str(&source.text)?;
-                reader.contribution(&assertion, &governance)?;
+                let lineage = reader.contribution(&assertion, &governance)?;
                 observed(&mut reader, reference, &source.text, &assertion)?;
                 if request.audience > assertion.reach {
                     return Err(refused("projection audience exceeds contribution reach"));
                 }
                 reader.allowed(&reference.path, request.audience, &collective)?;
-                items.push(json!({"resource":reference,"assertion":assertion,
-                    "selectionReason":"Explicit caller selection; no ranking or completeness claim.","standing":"Unreviewed contribution; inclusion confers no acceptance."}));
+                let mut item = json!({"resource":reference,"assertion":assertion,
+                    "selectionReason":"Explicit caller selection; no ranking or completeness claim.","standing":"Unreviewed contribution; inclusion confers no acceptance."});
+                if let Some(line) = lineage {
+                    item["collectivePin"] = json!(line);
+                }
+                items.push(item);
             }
             let receipt = json!({"version":1,"method":{"id":"collective-memory-explicit-projection","version":1,
                 "cid":method_cid()},"collective":collective_ref,"request":file.reference,
@@ -318,7 +324,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
         "feedback" => {
             let feedback: Feedback = serde_json::from_str(&file.text)?;
             version(feedback.version)?;
-            reader.require_collective(&feedback.collective, &collective_ref)?;
+            let request_lineage = reader.require_collective(&feedback.collective, &governance)?;
             bounded_text(&feedback.passage, "challenged passage", 1000)?;
             bounded_text(&feedback.reason, "reason", 1000)?;
             reader.allowed(&feedback.target.path, Locality::Private, &collective)?;
@@ -328,6 +334,11 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                     "challenged passage is absent from exact target bytes",
                 ));
             }
+            // A contribution target's collective pin is checked and, when it is lineage, said.
+            let target_lineage = match serde_json::from_str::<Contribution>(&target.text) {
+                Ok(assertion) => reader.require_collective(&assertion.collective, &governance)?,
+                Err(_) => None,
+            };
             reader.require_bound(session, &governance)?;
             let effective_reach = reader
                 .policy_locality(input, &collective)?
@@ -344,13 +355,20 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                     feedback.kind, file.reference.path, file.reference.cid, feedback.reason
                 ),
             )?;
-            json!({"operation":"feedback","resource":file.reference,"target":feedback.target,"actorClaim":event["actor_claim"],
-                "author":event["actor"],"event":event,"effectiveReach":effective_reach,"standing":"Challenge recorded; target bytes pinned by reference. No source rewritten or judgment discharged."})
+            let mut out = json!({"operation":"feedback","resource":file.reference,"target":feedback.target,"actorClaim":event["actor_claim"],
+                "author":event["actor"],"event":event,"effectiveReach":effective_reach,"standing":"Challenge recorded; target bytes pinned by reference. No source rewritten or judgment discharged."});
+            if let Some(line) = request_lineage {
+                out["collectivePin"] = json!(line);
+            }
+            if let Some(line) = target_lineage {
+                out["targetCollectivePin"] = json!(line);
+            }
+            out
         }
         "graduate" => {
             let request: Graduation = serde_json::from_str(&file.text)?;
             version(request.version)?;
-            reader.require_collective(&request.collective, &collective_ref)?;
+            let request_lineage = reader.require_collective(&request.collective, &governance)?;
             if request.audience != Locality::Repository {
                 return Err(refused(
                     "only repository-local graduation rehearsal is supported",
@@ -359,7 +377,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             reader.allowed(input, request.audience, &collective)?;
             let source = reader.pinned(&request.contribution)?;
             let assertion: Contribution = serde_json::from_str(&source.text)?;
-            reader.contribution(&assertion, &governance)?;
+            let lineage = reader.contribution(&assertion, &governance)?;
             if assertion.reach < request.audience {
                 return Err(refused("contribution restriction forbids repository reach"));
             }
@@ -405,12 +423,19 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             } else {
                 "Repository-local locality rehearsal only; no files moved, network publication, peer attestation or experiential acceptance established."
             };
-            json!({"operation":"graduate","resource":request.contribution,"review":request.review,
+            let mut out = json!({"operation":"graduate","resource":request.contribution,"review":request.review,
                 "audience":"repository","effectiveReach":"repository","allowed":true,
                 "approver":{"member":approver.member,"affiliation":affiliation_cid,"role":approver.role,"standing":approver.standing},
                 "validatedAt":validation::validated_at(approver.standing),
                 "standing":standing,
-                "limitations":assertion.uncertainty,"contradictions":assertion.contradicts})
+                "limitations":assertion.uncertainty,"contradictions":assertion.contradicts});
+            if let Some(line) = lineage {
+                out["collectivePin"] = json!(line);
+            }
+            if let Some(line) = request_lineage {
+                out["requestCollectivePin"] = json!(line);
+            }
+            out
         }
         // `recall` never reaches here: it is intercepted in `run` before the shared option parser,
         // and it is not an `execute_with` operation because it owns a session lock and a private
@@ -445,10 +470,12 @@ fn steward_approval<'g>(
             governance.declaration.id
         )));
     };
-    if affiliation.names(author) {
+    if affiliation.same_author_as(author) {
         return Err(refused(format!(
-            "the approver {approver} is the author: its Steward affiliation also stands for \
-             {author}; graduation needs a Steward who is not the contribution's author"
+            "the approver {approver} is the author: its Steward affiliation ({}) is the same \
+             author as {author} (agent refs compare by role); graduation needs a Steward who is \
+             not the contribution's author",
+            affiliation.member
         )));
     }
     Ok((cid.as_str(), affiliation))

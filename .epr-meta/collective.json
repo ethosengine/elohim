@@ -4,6 +4,10 @@
   "displayName": "Elohim repository collaboration",
   "charter": "Repository-local shared assertions preserve source versions, uncertainty and independent judgment. Registered local sessions may contribute under repository stewardship; stewards are plural and on record as affiliations in .eprfs/status/affiliations.jsonl, and widening a contribution needs an approving verdict from a Steward who is not its author. This declaration grants no network membership, authentication or publication authority. Private runtime stores remain independently owned.",
   "participation": "registered-local-session",
+  "supersedes": [
+    "bafkreickenjem7hwreyijyilwrykj4cvhpi4xf5t3mal6adqd32wqfrjyi",
+    "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  ],
   "registry": {
     "catalog": "genesis/data/collectives/collectives.json",
     "constitutionalParentId": "org-ethosengine",

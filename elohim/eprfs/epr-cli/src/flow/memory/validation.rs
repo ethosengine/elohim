@@ -62,11 +62,17 @@ impl Governance {
     }
 
     /// The standing (never withdrawn) affiliation that stands for `participant`, if any.
+    /// An exact member match wins over a package-level agent affiliation that also names the
+    /// participant, so a build-specific Steward is found even beside its role's Contributor line.
     pub fn affiliation_of(&self, participant: &str) -> Option<&(String, Affiliation)> {
-        self.affiliations
-            .iter()
-            .filter(|(_, a)| a.withdrawn.is_none())
-            .find(|(_, a)| a.names(participant))
+        let standing = || {
+            self.affiliations
+                .iter()
+                .filter(|(_, a)| a.withdrawn.is_none())
+        };
+        standing()
+            .find(|(_, a)| a.member == participant)
+            .or_else(|| standing().find(|(_, a)| a.names(participant)))
     }
 
     /// Whom an affiliation acts for: its declared `acts_for`, else the repository agent on the
@@ -304,6 +310,7 @@ impl Reader {
         }
         bounded_text(&declaration.display_name, "displayName", 256)?;
         bounded_text(&declaration.charter, "charter", 4000)?;
+        supersedes_chain(path, &file.reference.cid, &declaration.supersedes)?;
         if declaration.source_rules.is_empty() || declaration.source_rules.len() > 16 {
             return Err(refused("requires 1..16 source rules"));
         }
@@ -442,13 +449,40 @@ impl Reader {
         Ok(())
     }
 
-    pub fn require_collective(&self, supplied: &FileRef, actual: &FileRef) -> FlowResult<()> {
-        if supplied != actual {
-            return Err(refused(
-                "collective declaration version/path differs; re-read current governance",
-            ));
+    /// A pinned collective must be the current declaration, or an earlier declaration of the
+    /// SAME collective named in its `supersedes` chain. `Ok(None)` is the current declaration;
+    /// `Ok(Some(line))` is lineage, and the line is what a surface prints instead of hiding it.
+    pub fn require_collective(
+        &self,
+        supplied: &FileRef,
+        governance: &Governance,
+    ) -> FlowResult<Option<String>> {
+        let actual = &governance.reference;
+        if supplied == actual {
+            return Ok(None);
         }
-        Ok(())
+        if supplied.path == actual.path && governance.declaration.supersedes.contains(&supplied.cid)
+        {
+            return Ok(Some(lineage_line(&supplied.cid)));
+        }
+        Err(refused(format!(
+            "collective declaration version/path differs; re-read current governance: pinned \
+             {}@{} is neither the current declaration {}@{} nor in its supersedes chain",
+            supplied.path, supplied.cid, actual.path, actual.cid
+        )))
+    }
+
+    /// Like [`Self::require_collective`], but a NEW write must pin the current declaration: new
+    /// work is never filed under a charter that has already been amended.
+    pub fn require_current(&self, supplied: &FileRef, governance: &Governance) -> FlowResult<()> {
+        match self.require_collective(supplied, governance)? {
+            None => Ok(()),
+            Some(_) => Err(refused(format!(
+                "collective declaration version/path differs; re-read current governance: \
+                 {}@{} is a superseded declaration — a new contribution pins the current one, {}",
+                supplied.path, supplied.cid, governance.reference.cid
+            ))),
+        }
     }
 
     /// `path` must lie in the collective `governance` names, never in a nearer child.
@@ -547,10 +581,17 @@ impl Reader {
         Ok(locality)
     }
 
-    pub fn contribution(&mut self, c: &Contribution, governance: &Governance) -> FlowResult<()> {
+    /// Validates a contribution under `governance`. Returns the lineage line when the
+    /// contribution is pinned to a superseded declaration of the same collective (see
+    /// [`Self::require_collective`]); a caller filing NEW work refuses that with `require_current`.
+    pub fn contribution(
+        &mut self,
+        c: &Contribution,
+        governance: &Governance,
+    ) -> FlowResult<Option<String>> {
         let collective = &governance.declaration;
         version(c.version)?;
-        self.require_collective(&c.collective, &governance.reference)?;
+        let lineage = self.require_collective(&c.collective, governance)?;
         if !["session", "workspace", "repository"].contains(&c.scope.as_str()) {
             return Err(refused("contribution steward or scope is not declared"));
         }
@@ -602,7 +643,7 @@ impl Reader {
                 ));
             }
         }
-        Ok(())
+        Ok(lineage)
     }
 
     /// Whether a declaration's registry terms are spoken in the collectives registry's vocabulary:
@@ -682,6 +723,44 @@ fn retired_vocabulary(raw: &Value, path: &str) -> FlowResult<()> {
              network's audience vocabulary; where a passage travels inside the repository is \
              its locality"
         )));
+    }
+    Ok(())
+}
+
+/// How many earlier declarations a lineage may name before the walk is refused.
+const MAX_LINEAGE: usize = 64;
+
+/// What a surface prints for work pinned to an earlier declaration of the same collective.
+pub fn lineage_line(cid: &str) -> String {
+    format!("pinned to superseded declaration {cid} (lineage ok)")
+}
+
+/// Walk a declaration's `supersedes` chain with a bound, refusing a cycle (a CID that recurs,
+/// or the declaration naming its own CID), naming the CIDs involved.
+fn supersedes_chain(path: &str, current: &str, chain: &[String]) -> FlowResult<()> {
+    if chain.len() > MAX_LINEAGE {
+        return Err(refused(format!(
+            "{path}: supersedes chain exceeds {MAX_LINEAGE} declarations; stop or narrow it"
+        )));
+    }
+    let mut seen = BTreeSet::new();
+    for (hop, cid) in chain.iter().enumerate() {
+        if cid.parse::<Cid>().is_err() {
+            return Err(refused(format!(
+                "{path}: supersedes[{hop}] `{cid}` is not a CID"
+            )));
+        }
+        if cid == current {
+            return Err(refused(format!(
+                "{path}: supersedes chain is a cycle — it names the declaration's own CID {cid}"
+            )));
+        }
+        if !seen.insert(cid.as_str()) {
+            let first = chain.iter().position(|c| c == cid).unwrap_or(0);
+            return Err(refused(format!(
+                "{path}: supersedes chain is a cycle — {cid} recurs at hops {first} and {hop}"
+            )));
+        }
     }
     Ok(())
 }

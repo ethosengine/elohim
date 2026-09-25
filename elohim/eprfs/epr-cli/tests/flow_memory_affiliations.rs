@@ -323,6 +323,42 @@ fn a_package_level_steward_cannot_approve_another_build_of_its_own_role() {
     assert!(err.contains("is the author"), "{err}");
 }
 
+/// A build-specific agent Steward: its session claims exactly that build.
+fn build_steward(root: &Path, build: &str, session: &str) {
+    affiliate(
+        root,
+        build,
+        MemberKind::ElohimAgent,
+        MembershipRole::Steward,
+    );
+    actor::claim(root, build, session).unwrap();
+}
+
+#[test]
+fn a_build_specific_steward_cannot_approve_a_sibling_build_of_its_own_role() {
+    let dir = fixture();
+    let root = dir.path();
+    // The author is agent:investigator@fixture; the Steward is another investigator build.
+    build_steward(root, "agent:investigator@steward-build", "sibling");
+    contribute(root);
+    let review = verdict(root, "sibling");
+    let err = graduate(root, &review).unwrap_err();
+    assert!(err.contains("is the author"), "{err}");
+    assert!(err.contains("agent:investigator@steward-build"), "{err}");
+}
+
+#[test]
+fn a_build_specific_steward_of_a_different_role_may_approve() {
+    let dir = fixture();
+    let root = dir.path();
+    build_steward(root, "agent:reviewer@steward-build", "other-role");
+    contribute(root);
+    let review = verdict(root, "other-role");
+    let passed = graduate(root, &review).unwrap();
+    assert_eq!(passed["allowed"], true);
+    assert_eq!(passed["approver"]["member"], "agent:reviewer@steward-build");
+}
+
 #[test]
 fn graduate_approved_by_a_distinct_steward_passes_and_names_its_affiliation() {
     let dir = fixture();
@@ -567,6 +603,133 @@ fn a_claim_bound_to_a_different_collective_than_the_sources_is_refused_naming_bo
     .unwrap_err()
     .to_string();
     assert!(err.contains("belongs to the collective at"), "{err}");
+}
+
+// ── declaration lineage: an amendment supersedes, it never orphans ─────────────────────────
+
+/// Amend the root declaration's charter, declaring `supersedes` (newest first).
+fn amend(root: &Path, supersedes: Vec<String>) -> String {
+    let mut value: Value =
+        serde_json::from_slice(&std::fs::read(root.join(ROOT)).unwrap()).unwrap();
+    value["charter"] = json!("An amended charter.");
+    value["supersedes"] = json!(supersedes);
+    write(root, ROOT, &value);
+    pin(root, ROOT)["cid"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn a_contribution_pinned_to_the_prior_declaration_can_feedback_and_graduate() {
+    let dir = fixture();
+    let root = dir.path();
+    contribute(root);
+    let prior = pin(root, ROOT)["cid"].as_str().unwrap().to_string();
+    let review = verdict(root, "matthew");
+    amend(root, vec![prior.clone()]);
+    let expected = format!("pinned to superseded declaration {prior} (lineage ok)");
+
+    let passed = graduate(root, &review).unwrap();
+    assert_eq!(passed["allowed"], true);
+    assert_eq!(passed["collectivePin"], expected.as_str());
+
+    write(
+        root,
+        "genesis/feedback.json",
+        &json!({"version":1,"collective":pin(root,ROOT),
+        "target":pin(root,"genesis/assertion.json"),"kind":"stale-source",
+        "passage":"Only the measured scope is supported","reason":"Recheck under the amended charter"}),
+    );
+    let feedback = memory::execute(
+        root,
+        "feedback",
+        Some("genesis/feedback.json"),
+        Some("matthew"),
+    )
+    .unwrap();
+    assert_eq!(feedback["targetCollectivePin"], expected.as_str());
+
+    write(
+        root,
+        "genesis/project-request.json",
+        &json!({"version":1,"collective":pin(root,ROOT),"purpose":"Read under lineage",
+        "audience":"workspace","inputs":[pin(root,"genesis/assertion.json")],"omissions":["none"]}),
+    );
+    let projected =
+        memory::execute(root, "project", Some("genesis/project-request.json"), None).unwrap();
+    assert_eq!(
+        projected["receipt"]["items"][0]["collectivePin"],
+        expected.as_str()
+    );
+
+    // New work is never filed under the superseded charter.
+    let err = memory::execute(
+        root,
+        "contribute",
+        Some("genesis/assertion.json"),
+        Some("author"),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("superseded declaration"), "{err}");
+}
+
+#[test]
+fn a_contribution_pinned_outside_the_chain_is_refused_naming_both() {
+    let dir = fixture();
+    let root = dir.path();
+    contribute(root);
+    let prior = pin(root, ROOT)["cid"].as_str().unwrap().to_string();
+    let review = verdict(root, "matthew");
+    // An unrelated (well-formed) CID in the chain: the contribution's pin is not in it.
+    let unrelated = pin(root, "genesis/evidence.json")["cid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let current = amend(root, vec![unrelated]);
+    let err = graduate(root, &review).unwrap_err();
+    assert!(err.contains(&prior), "{err}");
+    assert!(err.contains(&current), "{err}");
+    assert!(err.contains("supersedes chain"), "{err}");
+}
+
+#[test]
+fn a_cyclic_supersedes_chain_is_refused_naming_the_cid() {
+    let dir = fixture();
+    let root = dir.path();
+    let a = pin(root, ROOT)["cid"].as_str().unwrap().to_string();
+    let b = pin(root, "genesis/evidence.json")["cid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    amend(root, vec![a.clone(), b, a.clone()]);
+    let err = collective_err(root);
+    assert!(err.contains("cycle"), "{err}");
+    assert!(err.contains(&a), "{err}");
+    // A chain naming something that is not a CID is refused too.
+    amend(root, vec!["not-a-cid".into()]);
+    assert!(collective_err(root).contains("is not a CID"));
+}
+
+#[test]
+fn every_repository_contribution_pins_the_current_declaration_or_its_lineage() {
+    let view = memory::execute(repository(), "collective", None, None).unwrap();
+    let current = view["resource"]["cid"].as_str().unwrap().to_string();
+    let chain: Vec<String> =
+        serde_json::from_value(view["declaration"]["supersedes"].clone()).unwrap();
+    let dir = repository().join(".eprfs/status/memory/contributions");
+    let mut checked = 0;
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let c: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let cid = c["collective"]["cid"].as_str().unwrap();
+        assert_eq!(c["collective"]["path"], ROOT, "{}", path.display());
+        assert!(
+            cid == current || chain.iter().any(|c| c == cid),
+            "{} pins {cid}, outside the declaration's lineage",
+            path.display()
+        );
+        checked += 1;
+    }
+    assert!(checked > 0);
 }
 
 // ── the repository's own seed, read-only ────────────────────────────────────────────────────

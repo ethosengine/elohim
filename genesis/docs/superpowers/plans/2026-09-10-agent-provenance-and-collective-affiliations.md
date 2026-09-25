@@ -213,7 +213,10 @@ Bootstrap stakes; every approval resting on him reports `validatedAt: bootstrap 
 co-steward)`, and `requires_non_fixture_stewards(n)` (tested, not yet called) is the future
 settlement and external-offer gate. Affiliations match their collective by declaration path;
 a claim binds its collective with `epr actor claim --under <path>` (unbound means the root);
-registry terms are reported, not enforced, by `epr flow memory collective`. The memory-kit
+registry terms are reported, not enforced, by `epr flow memory collective`. The amended
+declaration lists the raw CIDs it `supersedes`, so the 246 contributions pinned to the prior
+declaration keep project, feedback and graduate standing (reported as `pinned to superseded
+declaration <cid> (lineage ok)`); none was rewritten. The memory-kit
 script named above no longer exists (retired 2026-09-11). Evidence: tests in
 `elohim/eprfs/epr-cli/tests/flow_memory_affiliations.rs` (17) plus `flow_memory.rs`,
 `flow_memory_import.rs` and the `eprfs-agent` and `elohim-epr-rea` unit tests; the
