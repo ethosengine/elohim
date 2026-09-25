@@ -88,6 +88,7 @@ for p in "${WRITABLE[@]}"; do [ -w "$p" ] || refuse "not writable: $p"; done
 
 # ---- run -----------------------------------------------------------------------
 REPORT="$SCRATCH/cucumber.json"
+export REPORT   # the framing step below reads process.env.REPORT — a plain shell var never reaches node
 rm -f "$REPORT"
 printf 'running %d test\n' "${#SCENARIOS[@]}"
 cd "$REPO" || refuse "cannot cd $REPO"
