@@ -240,11 +240,16 @@ Then(
         `readiness probe must answer, never wait: ${describeAnswer(answer)}`
     );
     const want = expected === 'ready' ? READINESS_EXIT.ready : READINESS_EXIT.notReady;
-    assert.equal(
-      answer.code,
-      want,
-      `expected the probe to answer ${expected} (exit ${want}); it answered ${describeAnswer(answer)}`
-    );
+    // assert.fail, not assert.equal: cucumber's error formatter replaces an equal()'s message
+    // with an actual/expected diff (and cuts any message at "…: expected"), so a miss printed
+    // "-3 +0" and never the FLEET-NOT-READY line that names the doorway and its face.
+    if (answer.code !== want) {
+      const named = answer.notReady.map(line => line.raw).join('\n') || '(no FLEET-NOT-READY line)';
+      assert.fail(
+        `the probe was asked for ${expected} (exit ${want}) and answered otherwise.\n` +
+          `Named not ready:\n${named}\nFull answer, ${describeAnswer(answer)}`
+      );
+    }
     if (want === READINESS_EXIT.notReady) {
       assert.ok(
         answer.notReady.length > 0,
