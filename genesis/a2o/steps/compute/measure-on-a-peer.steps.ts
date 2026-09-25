@@ -20,86 +20,116 @@
  */
 import { Given, Then, When } from '@cucumber/cucumber';
 
-Given('the developer is at their own desk, where ordinary work already holds the household mesh\'s one lease', async function () {
+Given(
+  "the developer is at their own desk, where ordinary work already holds the household mesh's one lease",
+  function () {
+    return 'pending';
+  }
+);
+
+When('the developer tries to start a long check there too', function () {
   return 'pending';
 });
 
-When('the developer tries to start a long check there too', async function () {
+Then(
+  'the desk refuses the run outright — a long check is never allowed to compete for that lease, held or not',
+  function () {
+    return 'pending';
+  }
+);
+
+Then("the refusal names the neighbour's-peer path as where it belongs instead", function () {
   return 'pending';
 });
 
-Then('the desk refuses the run outright — a long check is never allowed to compete for that lease, held or not', async function () {
+Then('the refusal does not offer to queue the run and wait for the lease', function () {
   return 'pending';
 });
 
-Then('the refusal names the neighbour\'s-peer path as where it belongs instead', async function () {
+Given('a long check the developer wants run', function () {
   return 'pending';
 });
 
-Then('the refusal does not offer to queue the run and wait for the lease', async function () {
+When("the developer sends it with one command to the household's compute provider", function () {
   return 'pending';
 });
 
-Given('a long check the developer wants run', async function () {
+Then(
+  'that one command returns to the developer without waiting for the run to finish',
+  function () {
+    return 'pending';
+  }
+);
+
+Then("the developer's own desk holds no lease for the run that just left it", function () {
   return 'pending';
 });
 
-When('the developer sends it with one command to the household\'s compute provider', async function () {
+Given(
+  "the household compute provider has run the developer's long check to completion",
+  function () {
+    return 'pending';
+  }
+);
+
+When("the developer's own workspace reads back what the provider signed", function () {
   return 'pending';
 });
 
-Then('that one command returns to the developer without waiting for the run to finish', async function () {
+Then('the workspace admits it as household evidence', function () {
   return 'pending';
 });
 
-Then('the developer\'s own desk holds no lease for the run that just left it', async function () {
+Then(
+  'what makes it admissible is the grant naming this developer, not whose key signed the run',
+  function () {
+    return 'pending';
+  }
+);
+
+Then(
+  'a signed run from a peer who never held that grant would be refused the same read',
+  function () {
+    return 'pending';
+  }
+);
+
+When("the developer's workspace reads back the completed run", function () {
   return 'pending';
 });
 
-Given('the household compute provider has run the developer\'s long check to completion', async function () {
+Then(
+  "the developer's own record shows the neighbour's capacity as spent, not merely offered",
+  function () {
+    return 'pending';
+  }
+);
+
+Then('that record did not exist before this read', function () {
   return 'pending';
 });
 
-When('the developer\'s own workspace reads back what the provider signed', async function () {
+Given(
+  'Adam is provisioned as a household compute provider on a machine of his own, apart from the household mesh',
+  function () {
+    return 'pending';
+  }
+);
+
+When('the developer sends the same long check to Adam', function () {
   return 'pending';
 });
 
-Then('the workspace admits it as household evidence', async function () {
-  return 'pending';
-});
+Then(
+  "the developer's desk holds no lease on the household mesh at any point while Adam runs it",
+  function () {
+    return 'pending';
+  }
+);
 
-Then('what makes it admissible is the grant naming this developer, not whose key signed the run', async function () {
-  return 'pending';
-});
-
-Then('a signed run from a peer who never held that grant would be refused the same read', async function () {
-  return 'pending';
-});
-
-When('the developer\'s workspace reads back the completed run', async function () {
-  return 'pending';
-});
-
-Then('the developer\'s own record shows the neighbour\'s capacity as spent, not merely offered', async function () {
-  return 'pending';
-});
-
-Then('that record did not exist before this read', async function () {
-  return 'pending';
-});
-
-Given('Adam is provisioned as a household compute provider on a machine of his own, apart from the household mesh', async function () {
-  return 'pending';
-});
-
-When('the developer sends the same long check to Adam', async function () {
-  return 'pending';
-});
-
-Then('the developer\'s desk holds no lease on the household mesh at any point while Adam runs it', async function () {
-  return 'pending';
-});
-
-Then('the developer\'s desk is free to run its own ordinary verification at the same time', async function () {
-  return 'pending';
-});
+Then(
+  "the developer's desk is free to run its own ordinary verification at the same time",
+  function () {
+    return 'pending';
+  }
+);

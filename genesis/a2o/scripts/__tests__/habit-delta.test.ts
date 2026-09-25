@@ -1,8 +1,10 @@
-import { test } from 'node:test';
+/* eslint-disable @typescript-eslint/no-floating-promises -- node:test owns returned promises. */
+/* eslint-disable sonarjs/no-duplicate-string -- fixture paths and concern tags are intentionally repeated. */
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { test } from 'node:test';
 
 import {
   appendDelta,
@@ -33,7 +35,7 @@ DELTA 2026-01-01: born RED.
 
 async function makeRepo(t: { after: (fn: () => unknown) => void }) {
   const root = await mkdtemp(join(tmpdir(), 'habit-delta-repo-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(async () => rm(root, { recursive: true, force: true }));
   return root;
 }
 
@@ -47,7 +49,12 @@ async function writeHabit(root: string, dir: string, id: string, concern: string
 
 test('findHabitByConcern resolves the one habit atom naming the tag', async t => {
   const root = await makeRepo(t);
-  const path = await writeHabit(root, 'elohim/elohim-storage', 'operator-runtime-surface', 'operator-runtime-surface');
+  const path = await writeHabit(
+    root,
+    'elohim/elohim-storage',
+    'operator-runtime-surface',
+    'operator-runtime-surface'
+  );
   // A sibling habit with a DIFFERENT concern must not be picked up.
   await writeHabit(root, 'doorway/doorway-service', 'doorway-failover', 'doorway-failover');
   await mkdir(join(root, 'node_modules', '.epr-meta'), { recursive: true });
@@ -63,7 +70,12 @@ test('findHabitByConcern resolves the one habit atom naming the tag', async t =>
 
 test('findHabitByConcern skips a nested git worktree checkout (dir with a .git FILE)', async t => {
   const root = await makeRepo(t);
-  const real = await writeHabit(root, 'elohim/elohim-storage', 'operator-runtime-surface', 'operator-runtime-surface');
+  const real = await writeHabit(
+    root,
+    'elohim/elohim-storage',
+    'operator-runtime-surface',
+    'operator-runtime-surface'
+  );
 
   // A nested worktree checkout under an unlisted parent name (.claude/worktrees/<slice>, not
   // the bare .worktrees SKIP_DIRS already knows) — the shape `git worktree add` produces: a
@@ -71,8 +83,16 @@ test('findHabitByConcern skips a nested git worktree checkout (dir with a .git F
   // the SAME concern; before the fix this made findHabitByConcern report "ambiguous".
   const worktreeDir = join(root, '.claude', 'worktrees', 'fake-slice');
   await mkdir(worktreeDir, { recursive: true });
-  await writeFile(join(worktreeDir, '.git'), 'gitdir: /projects/elohim/.git/worktrees/fake-slice\n');
-  await writeHabit(worktreeDir, 'elohim/elohim-storage', 'operator-runtime-surface', 'operator-runtime-surface');
+  await writeFile(
+    join(worktreeDir, '.git'),
+    'gitdir: /projects/elohim/.git/worktrees/fake-slice\n'
+  );
+  await writeHabit(
+    worktreeDir,
+    'elohim/elohim-storage',
+    'operator-runtime-surface',
+    'operator-runtime-surface'
+  );
 
   const found = findHabitByConcern(root, 'operator-runtime-surface');
   assert.equal(found.ok, true);
@@ -85,7 +105,7 @@ test('findHabitByConcern refuses when zero atoms name the tag', async t => {
 
   const found = findHabitByConcern(root, 'missing-concern');
   assert.equal(found.ok, false);
-  assert.ok(!found.ok && /no habit atom/.test(found.reason));
+  assert.ok(!found.ok && found.reason.includes('no habit atom'));
   assert.ok(!found.ok && found.matches.length === 0);
 });
 
@@ -96,7 +116,7 @@ test('findHabitByConcern refuses when more than one atom names the tag', async t
 
   const found = findHabitByConcern(root, 'shared-concern');
   assert.equal(found.ok, false);
-  assert.ok(!found.ok && /ambiguous/.test(found.reason));
+  assert.ok(!found.ok && found.reason.includes('ambiguous'));
   assert.ok(!found.ok && found.matches.length === 2);
 });
 
@@ -105,10 +125,7 @@ test('walkHabitFiles skips node_modules, target, .worktrees and .git', async t =
   const real = await writeHabit(root, 'keep', 'keep-habit', 'keep-concern');
   for (const skipped of ['node_modules', 'target', '.worktrees', '.git']) {
     await mkdir(join(root, skipped, '.epr-meta'), { recursive: true });
-    await writeFile(
-      join(root, skipped, '.epr-meta', 'decoy.habit.md'),
-      HABIT_BODY('keep-concern')
-    );
+    await writeFile(join(root, skipped, '.epr-meta', 'decoy.habit.md'), HABIT_BODY('keep-concern'));
   }
   const files = walkHabitFiles(root);
   assert.deepEqual(files, [real]);
@@ -136,7 +153,10 @@ test('appendDelta inserts newest-first directly after the closing frontmatter fe
   const content = await readFile(path, 'utf8');
   const lines = content.split('\n');
   const fenceEndIndex = lines.findIndex((l, i) => i > 0 && l === '---');
-  assert.equal(lines[fenceEndIndex + 1], 'DELTA 2026-09-25 (peer-stage rung H, provider ab12cd34): x-concern passed=1 failed=0 — report reports/peer-stage/2026-09-25/abc/stage.json');
+  assert.equal(
+    lines[fenceEndIndex + 1],
+    'DELTA 2026-09-25 (peer-stage rung H, provider ab12cd34): x-concern passed=1 failed=0 — report reports/peer-stage/2026-09-25/abc/stage.json'
+  );
   // The old newest DELTA (2026-01-01) is still present, now second.
   assert.ok(content.includes('DELTA 2026-01-01: born RED.'));
   assert.ok(content.indexOf('DELTA 2026-09-25') < content.indexOf('DELTA 2026-01-01'));

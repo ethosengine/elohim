@@ -102,10 +102,7 @@ Given("a configured native compute workspace and Adam's dedicated test worker", 
     enabled?: boolean;
   };
   if (workerConfig.enabled !== true) {
-    this.attach(
-      "adam's compute worker is not enabled in adam-compute-worker.json",
-      'text/plain'
-    );
+    this.attach("adam's compute worker is not enabled in adam-compute-worker.json", 'text/plain');
     return 'pending';
   }
   const file = process.env.COMPUTE_A2O_CONFIG;

@@ -41,7 +41,7 @@ function isGitWorktreeCheckout(dir: string): boolean {
 }
 
 /** `habits-status.py:273`'s own grammar — the line a written delta must satisfy. */
-export const DELTA_DATE_RE = /^\s*DELTA (20\d{2}-\d{2}-\d{2})/m;
+export const DELTA_DATE_RE = /^[ \t]*DELTA (20\d{2}-\d{2}-\d{2})/m;
 
 function safeReaddir(dir: string): { name: string; isDirectory: () => boolean }[] {
   try {
@@ -183,7 +183,8 @@ export function appendDelta(path: string, input: DeltaInput): AppendResult {
   const fenceEnd = end + 4; // past the closing "---"
   const before = content.slice(0, fenceEnd);
   const after = content.slice(fenceEnd).replace(/^\n+/, '');
-  const line = `DELTA ${input.date}${input.label ? ` (${input.label})` : ''}: ${input.text}`;
+  const label = input.label ? ` (${input.label})` : '';
+  const line = `DELTA ${input.date}${label}: ${input.text}`;
   if (!DELTA_DATE_RE.test(line)) {
     return {
       ok: false,
