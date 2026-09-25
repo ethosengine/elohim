@@ -79,8 +79,10 @@ export type {
   SignalIntent,
   SignalEmitSuccessResponse,
   SignalEmitResult,
+  WriteThroughStatusView,
+  WriteThroughEffectiveRow,
 } from './lib/signal-emit-types';
-export { SignalEmitService } from './lib/signal-emit.service';
+export { SignalEmitService, WRITE_THROUGH_STATUS_URL } from './lib/signal-emit.service';
 
 // Shefa DI tokens — REA action-type stewardship interfaces
 export {

@@ -51,3 +51,26 @@ export type SignalEmitResult =
   | { status: 'emitted'; response: SignalEmitSuccessResponse }
   | { status: 'fallback'; reason: string }
   | { status: 'error'; status_code: number; message: string };
+
+/**
+ * `GET /api/v1/status/write-through` — the node's effective write-through flag
+ * per (pillar, kind), composed across its four override layers. Mirrors
+ * elohim-storage `api::write_through_status::WriteThroughStatusView` (camelCase
+ * on the wire). A pair the node does not list is not on.
+ */
+export interface WriteThroughStatusView {
+  effective: WriteThroughEffectiveRow[];
+  /** Integrity-bearing kinds: always written through, whatever the rows say. */
+  integrityKinds: string[];
+  /** Live layer-4 admin override, when one is set (opaque to the client). */
+  adminOverride: unknown;
+}
+
+/** One effective (pillar, kind) row of {@link WriteThroughStatusView}. */
+export interface WriteThroughEffectiveRow {
+  pillar: string;
+  kind: string;
+  on: boolean;
+  /** Which layer decided (`manifest-default`, `env-override`, …). */
+  source: string;
+}

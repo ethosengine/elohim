@@ -26,8 +26,23 @@ describe('SignalEmitService', () => {
 
   afterEach(() => httpMock.verify());
 
+  /**
+   * The service reads the node's write-through status once per session and
+   * posts only for an effective-on pair (R-A16): answer that read with
+   * shefa/EconomicEvent ON so each case below reaches the post it asserts.
+   */
+  const statusSaysOn = async (): Promise<void> => {
+    httpMock.expectOne('/api/v1/status/write-through').flush({
+      effective: [{ pillar: 'shefa', kind: 'EconomicEvent', on: true, source: 'env-override' }],
+      integrityKinds: [],
+      adminOverride: null,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+  };
+
   it('returns emitted on HTTP 201', async () => {
     const promise = service.tryEmit(stubIntent);
+    await statusSaysOn();
     const req = httpMock.expectOne('/api/v1/signal/emit');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(stubIntent);
@@ -42,6 +57,7 @@ describe('SignalEmitService', () => {
 
   it('returns fallback on HTTP 503 (write-through OFF)', async () => {
     const promise = service.tryEmit(stubIntent);
+    await statusSaysOn();
     const req = httpMock.expectOne('/api/v1/signal/emit');
     req.flush(
       { error: 'write-through is OFF for pillar=shefa' },
@@ -57,6 +73,7 @@ describe('SignalEmitService', () => {
 
   it('returns error on HTTP 400', async () => {
     const promise = service.tryEmit(stubIntent);
+    await statusSaysOn();
     const req = httpMock.expectOne('/api/v1/signal/emit');
     req.flush({ error: 'invalid agent cid' }, { status: 400, statusText: 'Bad Request' });
 
@@ -69,6 +86,7 @@ describe('SignalEmitService', () => {
 
   it('returns error on HTTP 500', async () => {
     const promise = service.tryEmit(stubIntent);
+    await statusSaysOn();
     const req = httpMock.expectOne('/api/v1/signal/emit');
     req.flush({ error: 'ingest failed' }, { status: 500, statusText: 'Internal Server Error' });
 
