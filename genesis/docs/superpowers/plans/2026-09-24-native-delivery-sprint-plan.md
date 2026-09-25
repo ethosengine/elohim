@@ -786,6 +786,30 @@ approve; the majors are fixed in wave 1.5 below. Rulings on the forks the lanes 
 **Wave 1.5 (small fixes before Lane 0b):** B5 + mirror-schema `attested`/`class`; D
 `spread()` NaN; A/C one face vocabulary + origin-URL host.
 
+## Rulings log — wave 2 (2026-09-25, operator + controller)
+
+- **Measure-class work never runs on the dev berth** (operator, 2026-09-25: "this LONG measured run…
+  is exactly the kind of thing that holds up development"). The K0 A/B and the household proof held this
+  workspace's mesh lease from 2026-09-24 20:16Z to 2026-09-25 ~13:00Z across two container restarts:
+  measurement-by-blocking, the anti-pattern ruling 2 names, done to ourselves. Ruling: a run whose class
+  is `measure` or `profile` (window/A-B measurements, soaks, proofs on grown stores) is dispatched to a
+  **measurement peer** — a second stewarded device or devworkspace on the T3 hybrid rung (the P52s, or
+  shem via `just dev conductor`), never the workspace a human is developing in. The dev berth runs only
+  `verify`-class lanes, each bounded to its declared budget and refusing fast past it; the household
+  proof on this workspace is that bound (≤ 30 min wall-clock or it stops and reports). Lane B's
+  `RUN_CLASS ∈ {measure, profile}` therefore carries a *dispatch target*, and `berth` learns a
+  `measure` resource whose lease on a dev workspace is itself a pain: the next `/pain-sweep` mints
+  `dev-berth-held-by-measure@1` (mesh lease held by a measure-class task > 30 min on a workspace with a
+  live human session). The measurement peer is the first job the ethosengine-collective seam below
+  takes: a measure-class claim travels to the peer that has the stores, and its receipt travels back
+  through brit. Until that peer exists, measure-class runs are queued, not run here.
+- **K0 disposition**: e0bfc6c7a is the pin target on the household evidence (window 15–19 min → ~1 min;
+  CPU and WAL unchanged). `pin/lane-K-on-dev` (52cc0f125) holds the move; landing + `[build:conductor]`
+  + roll are the operator's. Two items leave K for the conductor arc: the per-hosted-agent publish
+  selector/COUNT(*)/ScheduledFunction cost (steady-state 230–414 % CPU per conductor) and the WAL that
+  checkpoints only in the first 90 s after boot (H3). The grown stores for reproducing both are archived
+  at `/projects/.claude-config/k0-household-stores-20260925/`; the household was recast on e0bfc6c7a.
+
 ## Complementary work captured (backlog, not this sprint)
 
 - **`ethosengine` as a Qahal collective — the collaboration level between devices** (operator,
