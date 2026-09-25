@@ -91,7 +91,13 @@ pub fn edge(root: &Path, from: &str, to: &str) {
 /// ceremony something real to select.
 #[allow(dead_code)]
 pub fn repo() -> TempDir {
-    let dir = tempfile::tempdir().expect("tempdir");
+    // The recall goldens pin a rendering whose line truncation counts the fixture root's bytes
+    // (`<FIXTURE_ROOT>` is substituted only after rendering), so the root sits at a fixed-length
+    // path — /tmp/.tmpXXXXXX — whatever TMPDIR the runner sets. Under a longer TMPDIR the
+    // `semantic:` line truncated 18 bytes earlier and GOLDEN_WHOLE moved (elohim-eprfs #36).
+    let dir = tempfile::Builder::new()
+        .tempdir_in("/tmp")
+        .expect("tempdir");
     let root = dir.path();
     for name in ["a", "b", "source"] {
         write(
