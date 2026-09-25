@@ -45,6 +45,12 @@ const AGENT_PREFIX: &str = "agent:";
 /// participant is an `AgentPubKey` with a source chain, human or not, and these two forms are
 /// the repository node's rehearsal of that until the mesh mints the key.
 const HUMAN_PREFIX: &str = "human:";
+/// The prefix of a non-native SERVICE, `service:<name>` (e.g. `service:jenkins`): a legacy app
+/// that consumes the network's gifts and whose observations enter as external claims. Parsed so a
+/// record can NAME it as provenance; it has no roster row, no standing and no ability to act —
+/// [`parse_acting_participant`] refuses it wherever something claims, authors or attests. The
+/// vendor is provenance, not payee.
+const SERVICE_PREFIX: &str = "service:";
 /// A model segment no AI agent may claim. `agent:<person>@human` is the forgery the human form
 /// exists to make unnecessary: a substrate asserting a persona nobody claimed. Refused in
 /// [`parse_agent_ref`] itself, so every caller that validates the agent shape refuses it too.
@@ -141,8 +147,9 @@ impl ActorClaim {
         definition_cid: Option<String>,
     ) -> Result<Self> {
         // Shape first: a claim whose identity does not parse can never be attributed to
-        // anything, so nothing else about it is worth checking.
-        let participant = parse_participant_ref(claimed)?;
+        // anything, so nothing else about it is worth checking. A service is provenance only
+        // and can never claim.
+        let participant = parse_acting_participant(claimed)?;
 
         // A human has no build. A definition address on a human claim is not honest narrowing,
         // it is a category error that would read as a real package address and compare unequal
@@ -205,7 +212,8 @@ impl ActorClaim {
     }
 }
 
-/// A claimed identity, parsed. Two kinds fill the one [`AgentRef`] slot.
+/// A participant identity, parsed. Three kinds fill the one [`AgentRef`] slot; only the first
+/// two can ACT (see [`parse_acting_participant`]).
 ///
 /// The distinction is load-bearing for attribution and for nothing else: an AI agent's produce
 /// is rent on a commons it did not make and flows to the pool that constituted the persona,
@@ -218,6 +226,10 @@ pub enum ParticipantRef {
     Agent { role: String, model: String },
     /// `human:<handle>` — a human participant, identified by the handle they claimed.
     Human { handle: String },
+    /// `service:<name>` — a non-native consumer (a legacy app such as Jenkins) named as the
+    /// PROVENANCE of an external claim. Never an actor: it cannot claim, author or attest, holds
+    /// no standing and is never a payee.
+    Service { name: String },
 }
 
 /// Parse either participant form, refusing anything else.
@@ -226,6 +238,17 @@ pub enum ParticipantRef {
 /// this; callers that accept only the agent form keep using [`parse_agent_ref`], and callers
 /// that accept any participant (a note's `--as`, a contribution's `author`) use this one.
 pub fn parse_participant_ref(claimed: &str) -> Result<ParticipantRef> {
+    if let Some(name) = claimed.strip_prefix(SERVICE_PREFIX) {
+        if name.is_empty() || !name.chars().all(is_role_char) {
+            return Err(malformed(
+                claimed,
+                "a service name must be a non-empty `[a-z0-9-]+`",
+            ));
+        }
+        return Ok(ParticipantRef::Service {
+            name: name.to_string(),
+        });
+    }
     if let Some(handle) = claimed.strip_prefix(HUMAN_PREFIX) {
         if handle.contains('@') {
             return Err(malformed(
@@ -246,6 +269,23 @@ pub fn parse_participant_ref(claimed: &str) -> Result<ParticipantRef> {
     }
     let (role, model) = parse_agent_ref(claimed)?;
     Ok(ParticipantRef::Agent { role, model })
+}
+
+/// Parse a participant that is about to ACT — claim, author, attest or approve — refusing a
+/// service.
+///
+/// ONE refusing helper for every acting position (`ActorClaim::new`, a note's `--as`, a
+/// contribution's `author`, the recall `attested_by` filter): a non-native consumer is legible as
+/// provenance without permission, but standing is earned only inside, so `service:<name>` can
+/// never pass as an actor anywhere a record would read as its act.
+pub fn parse_acting_participant(claimed: &str) -> Result<ParticipantRef> {
+    match parse_participant_ref(claimed)? {
+        ParticipantRef::Service { name } => Err(FabricError::Decode(format!(
+            "`{claimed}` is a service (`{name}`), provenance only — a non-native consumer cannot \
+             claim, author or attest; it enters only as an external-claim observation"
+        ))),
+        acting => Ok(acting),
+    }
 }
 
 /// Split `agent:<role>@<model>` into its halves, refusing anything else.
@@ -303,7 +343,8 @@ fn is_model_char(c: char) -> bool {
 
 fn malformed(claimed: &str, why: &str) -> FabricError {
     FabricError::Decode(format!(
-        "actor claim `{claimed}` is neither `agent:<role>@<model>` nor `human:<handle>`: {why}"
+        "actor claim `{claimed}` is neither `agent:<role>@<model>`, `human:<handle>` nor \
+         `service:<name>`: {why}"
     ))
 }
 
@@ -440,10 +481,12 @@ impl ActorWitness {
     pub fn handle(&self) -> Result<String> {
         match parse_participant_ref(&self.subject.0)? {
             ParticipantRef::Human { handle } => Ok(handle),
-            ParticipantRef::Agent { .. } => Err(FabricError::Decode(format!(
-                "witness subject `{}` is not a human participant",
-                self.subject.0
-            ))),
+            ParticipantRef::Agent { .. } | ParticipantRef::Service { .. } => {
+                Err(FabricError::Decode(format!(
+                    "witness subject `{}` is not a human participant",
+                    self.subject.0
+                )))
+            }
         }
     }
 }
@@ -844,6 +887,27 @@ mod tests {
                 handle: "matthew".into()
             }
         );
+    }
+
+    #[test]
+    fn a_service_parses_as_provenance_and_can_never_claim() {
+        assert_eq!(
+            parse_participant_ref("service:jenkins").unwrap(),
+            ParticipantRef::Service {
+                name: "jenkins".into()
+            }
+        );
+        assert!(parse_participant_ref("service:").is_err());
+        assert!(parse_participant_ref("service:Jenkins").is_err());
+        assert!(parse_participant_ref("service:jen@kins").is_err());
+        let err =
+            ActorClaim::new("service:jenkins", "s1", AT, None).expect_err("a service cannot claim");
+        assert!(err.to_string().contains("provenance only"), "got: {err}");
+        assert!(parse_acting_participant("service:jenkins").is_err());
+        assert!(parse_acting_participant("human:matthew").is_ok());
+        assert!(parse_acting_participant("agent:scribe@opus-5").is_ok());
+        // Nor can a service be witnessed as a human.
+        assert!(ActorWitness::new("service:jenkins", "agent:scribe@opus-5", "s", "b", AT).is_err());
     }
 
     #[test]

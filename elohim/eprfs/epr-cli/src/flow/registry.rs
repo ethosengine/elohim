@@ -16,7 +16,7 @@ pub struct Registry {
     pub recipes: Vec<Recipe>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Recipe {
     pub id: String,
@@ -29,7 +29,7 @@ pub struct Recipe {
     pub edges: Vec<RecipeEdge>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecipeStage {
     pub name: String,
@@ -37,9 +37,15 @@ pub struct RecipeStage {
     /// Repo-relative globs — BINDING/PLACEMENT, excluded from the hashed ProcessSpec.
     #[serde(default)]
     pub paths: Vec<String>,
+    /// Capabilities this stage exercises when a consumer runs it (`deploy:kube-credentials`,
+    /// `registry:push`, …) — BINDING, excluded from the hashed ProcessSpec like `paths:`. A
+    /// consuming-app bridge compares them with an offer's disclosed `heldCapabilities`, so an
+    /// exercised capability nobody disclosed reads `undisclosed capability`, not `extra stage`.
+    #[serde(default)]
+    pub exercises: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecipeEdge {
     pub from: String,
@@ -102,5 +108,36 @@ impl Recipe {
     /// The stage whose `name` matches, if any.
     pub fn stage(&self, name: &str) -> Option<&RecipeStage> {
         self.stages.iter().find(|s| s.name == name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BASE: &str = "version: 1\nrecipes:\n  - id: r\n    version: 1\n    stages:\n      - name: build\n        artifactKind: \"oci:image\"\n      - name: deploy\n        artifactKind: \"deploy:rollout\"\n    edges:\n      - { from: build, to: deploy, meaningful: true, validators: [] }\n";
+
+    fn spec_cid(yaml: &str) -> String {
+        let registry: Registry = serde_yaml::from_str(yaml).expect("yaml");
+        elohim_epr_rea::atom_cid(&registry.recipes[0].to_process_spec())
+            .expect("cid")
+            .to_string()
+    }
+
+    /// `exercises:` and `paths:` are binding, never recipe semantics: declaring them must not
+    /// move the recipe CID a consumer's Process pins.
+    #[test]
+    fn exercises_and_paths_do_not_move_the_recipe_cid() {
+        let bound = BASE.replace(
+            "        artifactKind: \"deploy:rollout\"\n",
+            "        artifactKind: \"deploy:rollout\"\n        paths: [\"x/**\"]\n        exercises: [\"deploy:kube-credentials\"]\n",
+        );
+        assert_ne!(bound, BASE, "fixture must actually bind the stage");
+        let registry: Registry = serde_yaml::from_str(&bound).unwrap();
+        assert_eq!(
+            registry.recipes[0].stage("deploy").unwrap().exercises,
+            vec!["deploy:kube-credentials".to_string()]
+        );
+        assert_eq!(spec_cid(&bound), spec_cid(BASE));
     }
 }

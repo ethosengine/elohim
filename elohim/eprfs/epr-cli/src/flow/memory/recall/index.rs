@@ -504,7 +504,7 @@ fn attested_by(root: &Path, session: Option<&str>) -> AgentRef {
         .and_then(|s| crate::actor::current(root, s).ok())
         .and_then(|outcome| outcome.claim)
         .map(|claim| claim.claimed)
-        .filter(|claimed| elohim_epr_rea::actor::parse_participant_ref(claimed).is_ok());
+        .filter(|claimed| elohim_epr_rea::actor::parse_acting_participant(claimed).is_ok());
     AgentRef(claimed.unwrap_or_else(|| UNCLAIMED.to_string()))
 }
 

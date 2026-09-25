@@ -5,6 +5,7 @@ pub mod footprint;
 mod guide;
 mod import;
 mod index;
+pub mod offer;
 pub mod recall;
 mod validation;
 

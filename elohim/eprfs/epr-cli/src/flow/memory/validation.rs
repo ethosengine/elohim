@@ -607,7 +607,7 @@ impl Reader {
         }
         // Either participant kind may author a contribution — the human as themselves, never
         // as a persona the substrate minted for them.
-        elohim_epr_rea::parse_participant_ref(&c.author)?;
+        elohim_epr_rea::parse_acting_participant(&c.author)?;
         bounded_text(&c.concern, "concern", 256)?;
         bounded_text(&c.claim, "claim", 1000)?;
         strings(&c.uncertainty, "uncertainty", 8, 300)?;

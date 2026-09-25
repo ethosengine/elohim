@@ -621,7 +621,7 @@ pub fn standing_human(
             ActorRecord::Witness(witness) => witness.handle().ok()?,
             ActorRecord::Claim(claim) => match claim.participant().ok()? {
                 ParticipantRef::Human { handle } => handle,
-                ParticipantRef::Agent { .. } => return None,
+                ParticipantRef::Agent { .. } | ParticipantRef::Service { .. } => return None,
             },
             ActorRecord::Signed(_) => return None,
         };
@@ -659,9 +659,9 @@ pub fn standing_human_pinned(
 fn validate_handle(handle: &str) -> Result<()> {
     match parse_participant_ref(&format!("human:{handle}"))? {
         ParticipantRef::Human { .. } => Ok(()),
-        ParticipantRef::Agent { .. } => Err(FabricError::Decode(format!(
-            "`{handle}` is not a human handle"
-        ))),
+        ParticipantRef::Agent { .. } | ParticipantRef::Service { .. } => Err(FabricError::Decode(
+            format!("`{handle}` is not a human handle"),
+        )),
     }
 }
 

@@ -40,10 +40,10 @@ use std::process::ExitCode;
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_participant_ref, record_signing_message, standing_human_pinned, verify_binding,
-    ActorClaim, ActorRecord, ActorStore, ActorWitness, FabricError, ParticipantRef, ParticipantRow,
-    RecordSignature, Roster, RosterStanding, RosterVia, SidecarActorStore, SidecarRoster,
-    SignatureVerifier,
+    parse_acting_participant, parse_participant_ref, record_signing_message, standing_human_pinned,
+    verify_binding, ActorClaim, ActorRecord, ActorStore, ActorWitness, FabricError, ParticipantRef,
+    ParticipantRow, RecordSignature, Roster, RosterStanding, RosterVia, SidecarActorStore,
+    SidecarRoster, SignatureVerifier,
 };
 use eprfs_meta::hex_lower;
 use rand_core::{OsRng, RngCore};
@@ -413,7 +413,7 @@ fn claim_bound(
     // Shape first, so a malformed `--as` never even opens the store. The refusal is
     // `elohim-epr-rea`'s own, verbatim: one parser for the shape, in one crate. Either
     // participant kind may claim; only an AI agent has a package build to address.
-    let participant = parse_participant_ref(claimed)?;
+    let participant = parse_acting_participant(claimed)?;
     let session = non_empty(session, "--session")?;
 
     // A claim is dated by the tree it was made against, never by wall clock — so a tree with no
@@ -432,7 +432,8 @@ fn claim_bound(
     // keeps the CLI from ever asserting one.
     let definition_cid = match &participant {
         ParticipantRef::Agent { role, .. } => definition_cid(root, role),
-        ParticipantRef::Human { .. } => None,
+        // Unreachable past `parse_acting_participant`; a service has no build either.
+        ParticipantRef::Human { .. } | ParticipantRef::Service { .. } => None,
     };
 
     let is_human = matches!(participant, ParticipantRef::Human { .. });
@@ -958,7 +959,7 @@ fn human_handle(record: &ActorRecord) -> Option<String> {
         ActorRecord::Witness(witness) => witness.handle().ok(),
         ActorRecord::Claim(claim) => match claim.participant().ok()? {
             ParticipantRef::Human { handle } => Some(handle),
-            ParticipantRef::Agent { .. } => None,
+            ParticipantRef::Agent { .. } | ParticipantRef::Service { .. } => None,
         },
         ActorRecord::Signed(_) => None,
     }
@@ -1487,7 +1488,7 @@ pub fn contest(
              is contested here"
         )));
     };
-    parse_participant_ref(contest_as)?;
+    parse_acting_participant(contest_as)?;
     let session = non_empty(session, "--session")?;
     let basis = basis.trim();
     if basis.is_empty() {

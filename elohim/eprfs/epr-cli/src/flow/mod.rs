@@ -169,7 +169,8 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "walk" => {
             let Some(target) = args.get(1).filter(|a| !a.starts_with("--")) else {
                 return Err(FlowError::InvalidArguments(
-                    "usage: epr flow walk <path> [--json] [--root DIR]".into(),
+                    "usage: epr flow walk <path|process-or-intent-cid> [--json] [--root DIR]"
+                        .into(),
                 ));
             };
             let (opts, rest) = parse_global(&args[2..])?;
@@ -177,6 +178,17 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown walk argument `{other}`"
                 )));
+            }
+            // A record addressed by its atom CID (a Process or an Intent) walks directly; a
+            // document still walks by its path.
+            if let Ok(cid) = target.parse::<Cid>() {
+                let result = walk::walk_cid(&opts.root, &cid)?;
+                if opts.json {
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else {
+                    result.render();
+                }
+                return Ok(ExitCode::SUCCESS);
             }
             let result = walk::walk(&opts.root, target)?;
             if opts.json {

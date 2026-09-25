@@ -53,7 +53,7 @@ use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_participant_ref, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude,
+    parse_acting_participant, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude,
     ReaVerb, SidecarActorStore, SidecarFlowStore,
 };
 use serde::Serialize;
@@ -1093,7 +1093,8 @@ pub(crate) fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>>
             let trimmed = non_empty(raw, "--as")?;
             // Either participant kind may author a note; the human form is as legal here as
             // the agent form, and the same one parser refuses everything else.
-            parse_participant_ref(trimmed)?;
+            // A service (`service:jenkins`) is provenance only and can never author.
+            parse_acting_participant(trimmed)?;
             Ok(Some(trimmed.to_string()))
         }
         None => Ok(None),

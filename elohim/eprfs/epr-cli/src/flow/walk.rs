@@ -1546,3 +1546,172 @@ pub(crate) fn attach_evidence(
     result.diagnostics = diagnostics;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// walk <cid>: a Process or Intent addressed directly by its record CID
+// ---------------------------------------------------------------------------
+
+/// One event a directly-walked record reaches: its action, classification and magnitude.
+#[derive(Debug, Serialize)]
+pub struct CidEventView {
+    pub cid: String,
+    pub action: String,
+    pub provider: String,
+    pub occurred_at: String,
+    pub quantity: String,
+    pub classified_as: Vec<String>,
+}
+
+/// `epr flow walk <cid>` — a record addressed by its atom CID rather than a file path: a Process
+/// with each output event it groups, or an Intent with the processes scoped to it and the
+/// verdicts written against it.
+#[derive(Debug, Serialize)]
+pub struct CidWalk {
+    pub target_cid: String,
+    pub kind: String,
+    /// `spec@version` for a Process; the raising agent for an Intent.
+    pub head: String,
+    pub in_scope_of: String,
+    pub classified_as: Vec<String>,
+    /// A Process's output events, in the order the Process lists them.
+    pub events: Vec<CidEventView>,
+    /// Output CIDs this sidecar holds no event for (honest absence, never dropped).
+    pub missing_outputs: Vec<String>,
+    /// An Intent's scoped processes (their CIDs).
+    pub processes: Vec<String>,
+    /// Events whose `resource` is this record — verdicts, observations, contests.
+    pub notes: Vec<CidEventView>,
+}
+
+fn quantity_label(q: &elohim_epr_rea::Magnitude) -> String {
+    match q {
+        elohim_epr_rea::Magnitude::Count { value, unit } => format!("{value} {unit}"),
+        elohim_epr_rea::Magnitude::Vote { sign } => format!("vote {sign}"),
+        elohim_epr_rea::Magnitude::Classification { frame_ref } => format!("frame {frame_ref}"),
+    }
+}
+
+fn cid_event_view(cid: &Cid, e: &elohim_epr_rea::FlowEvent) -> CidEventView {
+    CidEventView {
+        cid: cid.to_string(),
+        action: format!("{:?}", e.action).to_lowercase(),
+        provider: e.provider.0.clone(),
+        occurred_at: e.occurred_at.clone(),
+        quantity: quantity_label(&e.quantity),
+        classified_as: e.classified_as.clone(),
+    }
+}
+
+/// Walk the record `cid` names. Refuses a CID this sidecar holds no Process or Intent for.
+pub fn walk_cid(root: &Path, cid: &Cid) -> FlowResult<CidWalk> {
+    let records = SidecarFlowStore::open(root)?.records()?;
+    let record = records
+        .iter()
+        .find(|(c, _)| c == cid)
+        .map(|(_, r)| r)
+        .ok_or_else(|| FlowError::UnknownResource(format!("{cid} (no record in this sidecar)")))?;
+    let notes: Vec<CidEventView> = records
+        .iter()
+        .filter_map(|(c, r)| match r {
+            FlowRecord::Event(e) if &e.resource == cid => Some(cid_event_view(c, e)),
+            _ => None,
+        })
+        .collect();
+    let event_of = |target: &Cid| {
+        records.iter().find_map(|(c, r)| match r {
+            FlowRecord::Event(e) if c == target => Some(cid_event_view(c, e)),
+            _ => None,
+        })
+    };
+    match record {
+        FlowRecord::Process(p) => {
+            let mut events = Vec::new();
+            let mut missing_outputs = Vec::new();
+            for output in &p.outputs {
+                match event_of(output) {
+                    Some(view) => events.push(view),
+                    None => missing_outputs.push(output.to_string()),
+                }
+            }
+            Ok(CidWalk {
+                target_cid: cid.to_string(),
+                kind: "process".into(),
+                head: format!("{}@{}", p.spec.id, p.spec.version),
+                in_scope_of: p.in_scope_of.to_string(),
+                classified_as: Vec::new(),
+                events,
+                missing_outputs,
+                processes: Vec::new(),
+                notes,
+            })
+        }
+        FlowRecord::Intent(i) => Ok(CidWalk {
+            target_cid: cid.to_string(),
+            kind: "intent".into(),
+            head: i.raised_by.0.clone(),
+            in_scope_of: i.in_scope_of.to_string(),
+            classified_as: i.resource_spec.classified_as.clone(),
+            events: Vec::new(),
+            missing_outputs: Vec::new(),
+            processes: records
+                .iter()
+                .filter_map(|(c, r)| match r {
+                    FlowRecord::Process(p) if &p.in_scope_of == cid => Some(c.to_string()),
+                    _ => None,
+                })
+                .collect(),
+            notes,
+        }),
+        other => Err(FlowError::InvalidArguments(format!(
+            "{cid} is a {} record — `epr flow walk <cid>` walks a process or an intent; walk a \
+             document by its path",
+            match other {
+                FlowRecord::Commitment(_) => "commitment",
+                FlowRecord::Event(_) => "event",
+                FlowRecord::Spec(_) => "spec",
+                FlowRecord::Edge(_) => "edge",
+                FlowRecord::Intent(_) | FlowRecord::Process(_) => unreachable!(),
+            }
+        ))),
+    }
+}
+
+impl CidWalk {
+    pub fn render(&self) {
+        println!("epr flow walk — {} {}", self.kind, self.target_cid);
+        println!("  {}  (in scope of {})", self.head, self.in_scope_of);
+        if !self.classified_as.is_empty() {
+            println!("  [{}]", self.classified_as.join(", "));
+        }
+        if self.kind == "process" {
+            println!("\n  EVENTS ({} output(s))", self.events.len());
+            for e in &self.events {
+                let tag = e.classified_as.first().map(String::as_str).unwrap_or("");
+                let subject = e.classified_as.get(1).map(String::as_str).unwrap_or("");
+                println!(
+                    "    {:8} {:28} {:24} {} · {}",
+                    e.action, subject, tag, e.quantity, e.occurred_at
+                );
+            }
+            for m in &self.missing_outputs {
+                println!("    ? {m} (output not in this sidecar)");
+            }
+        } else {
+            println!("\n  SCOPED PROCESSES ({})", self.processes.len());
+            for p in &self.processes {
+                println!("    {p}");
+            }
+        }
+        if !self.notes.is_empty() {
+            println!("\n  NOTES ON THIS RECORD");
+            for n in &self.notes {
+                println!(
+                    "    {} by {} [{}]",
+                    n.cid,
+                    n.provider,
+                    n.classified_as.join(", ")
+                );
+            }
+        }
+    }
+}

@@ -196,7 +196,8 @@ pub fn agent_role(participant: &str) -> Option<&str> {
 ///
 /// The future settlement / external-offer gate: a value crossing to token or fiat, or an offer
 /// the protocol makes outside itself, is a governance act a fixture co-steward can never carry.
-/// Nothing calls it yet; it exists so the gate is tested before its first caller needs it.
+/// Its first caller is a consuming-app offer with `crossesNetwork: true` (bridges/jenkins); the
+/// future settlement Agreement is the second.
 /// Distinctness is by `member`, so one steward approving twice counts once.
 pub fn requires_non_fixture_stewards(approvals: &[&Affiliation], n: usize) -> Result<(), String> {
     let mut real: Vec<&str> = approvals
