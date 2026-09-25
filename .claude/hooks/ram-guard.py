@@ -298,8 +298,33 @@ IO_GUARD = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "io-guard")
 BERTH = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "berth")
 
 
+_SHELLS = {"sh", "bash", "dash", "zsh", "ash"}
+
+
+def claude_pid():
+    """The Claude process that spawned this hook — the runtime-asserted identity a mooring carries.
+    The hook's parent, skipping a `sh -c` wrapper when the harness did not exec through it."""
+    pid = os.getppid()
+    try:
+        for _ in range(3):
+            with open(f"/proc/{pid}/comm") as f:
+                comm = f.read().strip()
+            if comm not in _SHELLS:
+                return pid
+            with open(f"/proc/{pid}/stat") as f:
+                nxt = int(f.read().rsplit(")", 1)[1].split()[1])
+            if nxt <= 1:
+                break
+            pid = nxt
+    except (OSError, ValueError, IndexError):
+        pass
+    return os.getppid()
+
+
 def berth_touch(session):
-    """Liveness heartbeat for this session's mooring — one small file rewrite, no subprocess."""
+    """Liveness heartbeat for this session's mooring — one small file rewrite, no subprocess. Also
+    (re)asserts the Claude pid, so a resumed session in a new process is not read as dead and a
+    Bash-tool command resolves to this session by process ancestry (`berth` session resolution)."""
     try:
         bdir = os.environ.get("BERTH_DIR") or os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config"), "berth")
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", session or "default")
@@ -307,6 +332,7 @@ def berth_touch(session):
         with open(path) as f:
             m = json.load(f)
         m["last_seen"] = round(time.time(), 3)
+        m["pid"] = claude_pid()
         with open(path, "w") as f:
             json.dump(m, f, indent=1, sort_keys=True)
     except Exception:
@@ -347,7 +373,8 @@ def io_guard_and_berth_lines(session):
         out.append(f"IO-GUARD: unavailable ({e!r})")
     try:
         subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
-                        "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator"],
+                        "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator",
+                        "--pid", str(claude_pid())],
                        capture_output=True, text=True, timeout=6)
         r = subprocess.run([sys.executable, BERTH, "status"], capture_output=True, text=True, timeout=6)
         st = (r.stdout or "").strip().splitlines()

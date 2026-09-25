@@ -319,5 +319,85 @@ class LedgerSafetyTest(unittest.TestCase):
             json.load(f)
 
 
+class AncestryResolutionTest(unittest.TestCase):
+    """Runtime-asserted identity: a Claude session moors with the Claude pid; a shell it spawned
+    (a Bash-tool command, `just test mesh`) resolves to that session through its process ancestry."""
+
+    CLAUDE, OTHER_CLAUDE = 4242, 5151
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.clock = [1000.0]
+        self.berth = Berth(self.directory.name, now=lambda: self.clock[0], policy_path=MISSING_POLICY)
+        # fake pids: liveness by kill(0) would fail, so is_live consults last_seen only
+        self.berth.is_live = lambda m: bool(m) and (self.clock[0] - m.get("last_seen", 0)) < m.get("ttl_s", 10800)
+
+    def run_main(self, ancestry, *args):
+        main = _NS["main"]
+        g = main.__globals__
+        saved = (g["proc_ancestry"], g["Berth"])
+        berth = self.berth
+        g["proc_ancestry"] = lambda: list(ancestry)
+        g["Berth"] = lambda *a, **k: berth
+        env_saved = {k: os.environ.pop(k, None) for k in ("BERTH_SESSION", "CLAUDE_SESSION_ID")}
+        try:
+            return main(["berth", *args])
+        finally:
+            g["proc_ancestry"], g["Berth"] = saved
+            for k, v in env_saved.items():
+                if v is not None:
+                    os.environ[k] = v
+
+    def test_moored_pid_is_an_ancestor_resolves(self):
+        self.berth.moor("sess-claude", pid=self.CLAUDE)
+        self.assertEqual(self.berth.session_by_ancestry([777, 778, self.CLAUDE, 3753]), "sess-claude")
+        rc = self.run_main([777, 778, self.CLAUDE, 3753], "claim", "mesh", "--ttl", "60", "--note", "probe")
+        self.assertEqual(rc, 0)
+        row = [r for r in self.berth.ledger(100) if r["kind"] == "claim"][-1]
+        self.assertEqual((row["session"], row["session_source"]), ("sess-claude", "ancestry"))
+
+    def test_no_ancestor_mooring_is_exit_2(self):
+        self.berth.moor("sess-claude", pid=self.CLAUDE)
+        self.assertIsNone(self.berth.session_by_ancestry([777, 3753]))
+        self.assertEqual(self.run_main([777, 3753], "claim", "mesh"), 2)
+        self.assertIsNone(self.berth.raw_lease("mesh"))
+
+    def test_the_ancestor_wins_not_the_newest(self):
+        self.berth.moor("sess-mine", pid=self.CLAUDE)
+        self.clock[0] += 50
+        self.berth.moor("sess-newer", pid=self.OTHER_CLAUDE)
+        self.assertEqual(self.berth.session_by_ancestry([777, self.CLAUDE, 1]), "sess-mine")
+
+    def test_a_stale_ancestor_mooring_does_not_resolve(self):
+        self.berth.moor("sess-claude", pid=self.CLAUDE)
+        self.clock[0] += 20000
+        self.assertIsNone(self.berth.session_by_ancestry([self.CLAUDE]))
+
+    def test_explicit_env_wins_and_is_recorded(self):
+        self.berth.moor("sess-claude", pid=self.CLAUDE)
+        os.environ["BERTH_SESSION"] = "sess-env"
+        try:
+            main = _NS["main"]
+            g = main.__globals__
+            saved = g["Berth"]
+            berth = self.berth
+            g["Berth"] = lambda *a, **k: berth
+            try:
+                self.assertEqual(main(["berth", "claim", "mesh"]), 0)
+            finally:
+                g["Berth"] = saved
+        finally:
+            os.environ.pop("BERTH_SESSION", None)
+        row = [r for r in self.berth.ledger(100) if r["kind"] == "claim"][-1]
+        self.assertEqual((row["session"], row["session_source"]), ("sess-env", "env"))
+
+    def test_real_proc_walk_reaches_this_process_parent(self):
+        chain = _NS["proc_ancestry"]()
+        if os.getppid() > 1:
+            self.assertEqual(chain[0], os.getppid())
+        self.assertLessEqual(len(chain), 32)
+
+
 if __name__ == "__main__":
     unittest.main()
