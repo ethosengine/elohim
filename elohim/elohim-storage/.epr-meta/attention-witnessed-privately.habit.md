@@ -8,7 +8,7 @@ invariant: >
 status: red
 active: false
 checks:
-  - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-24: absent — the feature file does not exist)"
+  - "a2o @concern:attention-witnessed-privately (genesis/a2o/features/lms/attention-witnessed-privately.feature — Jessica's dwell and scroll depth appear in her own /me/stream with the recipe CID printed, James's stream has no such entry, and her storage peer counts the cursor as suppressed, never announced; runnable via `just test mesh-browser '@concern:attention-witnessed-privately'`; MEASURED 2026-09-25: RED twice at the write-ack step — the a2o harness's injected session does not survive the shell's restoreSession, so the bearer-carrying emitter has no one to write as (receipts sprint-report-household-20260925T131704Z / T131924Z))"
   - "cargo test --lib -- observation::gossip_gate (elohim/elohim-storage — an agent-private kind yields no cursor announcement on the real write path; MEASURED 2026-09-24: absent — no `gossip_gate` anywhere in elohim/elohim-storage/src; not run, since there is nothing to run)"
   - "test $(grep -c \"trackContentLeave\\|trackContentView\" app/lamad/src/app/components/content-viewer/content-viewer.component.ts) -eq 0 (the content viewer no longer writes dwell as an AttentionTending lens record; MEASURED 2026-09-24: 3 — the viewer still tends on leave and on view)"
 refs:
@@ -106,3 +106,32 @@ jessica 38 incoming / 18 outgoing) while `lamad` is unblocked; jessica additiona
 `declare_canonical_head: target action … is not retrievable`, while the same declare with the
 5120-b64-char record fetched from doorway A's `/head-record` answered
 `✓ canonical head propagated` on attempt 1.
+
+DELTA 2026-09-25 (household re-proof after the bearer fixes; status STAYS red — check (1) is red twice
+on a named a2o-HARNESS cause, not on the fixes and not on the scenario's text). Two runs of
+`just test mesh-browser '@concern:attention-witnessed-privately'` on household-dowell (transport dual,
+3 peers, processControl true, commit a2846c534, sut sha256:0a86588763f52241 / sha256:ae9cd29b07d22ec3;
+fix commits bab140f95 f45fb527e 9f7529be5 4a661191e under measure; the lamad and shell development
+dists rebuilt at f45fb527e's source, checked for `stream-signed-out`, `stream-provenance` and a
+`keepalive` fetch carrying `Authorization`, re-staged via doorway A and propagated to B with the carried
+record). Receipts `genesis/a2o/reports/sprint-report-household-20260925T131704Z-a2846c53.{json,md}` and
+`…T131924Z-a2846c53.{json,md}`, identical: 1 scenario, 14 steps — 8 passed, 1 FAILED, 5 skipped. Failing
+step: `And Jessica waits until her storage peer replies to her app that it has kept her note on the
+"manifesto" page` (steps/lamad/attention-witnessed.steps.ts:352): `no POST /api/v1/observations was
+answered within 15 s of Jessica leaving "manifesto" — the view was never witnessed`. The write no longer
+reaches storage anonymous (the old 500 is gone); it is not sent at all. CAUSE, proven with a read-only
+browser probe through the harness's own `PlaywrightDevice.login`: `injectAuth`
+(genesis/a2o/src/framework/devices/playwright-device.ts) writes only `elohim-auth-token`,
+`elohim-auth-agent-pub-key` and `elohim-auth-human-id`, while the shell's `AuthService.restoreSession()`
+needs `elohim-auth-provider` and a live `elohim-auth-expiry` — a missing expiry reads as expired, so the
+token store CLEARS the session at boot (every `elohim-auth-*` key present after injection, none after
+`/resource/manifesto` loads). `AuthService.token()` is therefore null, and the R-A12 emitter correctly
+posts nothing for a reader it cannot name. The same gap made the first proof's write anonymous (so its
+500 was two causes stacked; R-A12's fix was right and necessary). The cure is the harness: write the
+provider and the expiry the sign-in returns, as a real sign-in does; no product source changes. NO
+BYPASS: the readiness rail passed on all three peers. Checks (2) and (3) are unchanged and green, quoted
+verbatim from the 2026-09-24 A1-A9 delta: (2) "`cargo test --lib -- gossip_gate` (CARGO_BUILD_JOBS=1,
+pool target) ran `agent_private_kind_yields_no_announcement` ok and `non_private_kind_yields_announcement`
+ok, 2 passed, EXIT=0"; (3) "the grep on content-viewer.component.ts = 0". Environment: the household
+recast on conductor fork e0bfc6c7a (the pin target, 81e77bcae) by session 9adf9f01 at 12:22Z, every
+role `zomePath: live`, preflight ok on every line.

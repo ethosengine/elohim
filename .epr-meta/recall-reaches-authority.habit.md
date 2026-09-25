@@ -20,7 +20,7 @@ status: red
 active: false
 checks:
   - "a2o @concern:recall-reaches-authority (genesis/a2o/features/devflow/ceremony-reconciliation.feature — a fresh agent opens with its own question, the orientation carries it, a passage under .claude/skills/ is readable and receipted, and finish reports the question with bounded bytes)"
-  - "a2o @concern:recall-reaches-authority (genesis/a2o/features/content/content-search.feature — a household's own peer answers a search with the recipe it ranked by, named and content-addressed, and says plainly whether its ranking is known; a private item is absent from a non-holder's results AND from the tally underneath them; a peer holding no index says so instead of answering with an empty list). MEASURED 2026-09-25: not yet run on the mesh"
+  - "a2o @concern:recall-reaches-authority (genesis/a2o/features/content/content-search.feature — a household's own peer answers a search with the recipe it ranked by, named and content-addressed, and says plainly whether its ranking is known; a private item is absent from a non-holder's results AND from the tally underneath them; a peer holding no index says so instead of answering with an empty list). MEASURED 2026-09-25: scenarios 1 and 2 GREEN twice on the household (receipts sprint-report-household-20260925T131537Z / T131624Z); scenario 3 held per R-S9"
   - "just gate memory-ceremony (the native recall executor, corrections view and footprint suites plus the hook, lens and cucumber legs)"
   - "epr flow report --bound recall-journey-window-ceiling (the rolling-quarter rate over recall-mistaken-assertions@1 and recall-unmetered-bytes@1, grouped into journeys by the env:journey slot sample/judge write on every fold — the fraction of the last window_days worth of journeys that were NOT clean); MAY LEGITIMATELY read `skipped` while fewer than 3 journeys exist in the window — that is not a defect in the entry, only an early standing reader"
   - "epr flow report --bound recall-metered-bytes-ceiling / recall-unmetered-bytes-ceiling / recall-mistaken-assertions-ceiling / recall-screens-to-shape-ceiling: the four per-journey ceilings, each read against the LATEST journey alone — a fold is written per journey by the reader's own honest account and by `recall measure --phase close`; no fold is `skipped`, never green"
@@ -266,3 +266,25 @@ was seeded green by `just mesh prologue` and all fixture sign-ins succeeded. The
 launch precondition against opaque 401s, not part of the assertion.
 The check line stays red: scenario 1 is green twice, scenario 2 is red twice on a named storage-side
 cause, scenario 3 is held.
+
+DELTA 2026-09-25 (household re-proof of the content-search check after the creator fixes; NO status
+change, the habit stays red on its window; the content-search check line now reads GREEN for its two
+measurable scenarios). Two runs of `just test mesh features/content/content-search.feature` on
+household-dowell (transport dual, 3 peers, processControl true, sut sha256:50bbe76d0b147958, commit
+a2846c534; fix commits bab140f95 f45fb527e 9f7529be5 4a661191e all under measure). Receipts:
+`genesis/a2o/reports/sprint-report-household-20260925T131537Z-a2846c53.{json,md}` (run 1) and
+`genesis/a2o/reports/sprint-report-household-20260925T131624Z-a2846c53.{json,md}` (run 2), identical:
+3 scenarios — 2 passed, 1 pending; 24 steps — 19 passed, 1 pending, 4 skipped. Scenario 1 (the answer
+names its recipe by name and content address, the same address twice) GREEN twice. Scenario 2 GREEN
+twice: its non-vacuity control now holds (the holder finds his own private note first — 9f7529be5
+stamps `created_by` from the doorway's X-Agent-Id/X-Agent-Cid, 4a661191e asks as the doorway's
+`humanId`), and Susan's results AND her tally by reach carry no trace of it. Scenario 3 is HELD per
+R-S9 (`@requires:unfolded-peer`, `E2E_STORAGE_UNFOLDED` unset, pending by design; storage's
+`unfolded_store_answers_fold_absent` pins it meanwhile). The recipe's EXIT=1 is cucumber strict-mode
+on that one pending step. NO BYPASS: the lamad readiness rail passed on all three peers (jessica
+included) — `MESH_ALLOW_NO_PROLOGUE` was not set. Environment, stated so the receipt is honest: the
+household ran on the recast 9adf9f01 left at 13:14Z (MESH_RESET on conductor fork e0bfc6c7a, the pin
+TARGET per the wave-2 ruling in 81e77bcae; the receipt's `sutParts.conductor` names the submodule tree
+25dd2d0be, not the running binary), with every role `zomePath: live`, `just mesh preflight` ok on
+every line, and the development dists rebuilt at f45fb527e's source and re-staged via doorway A and
+propagated to B with the carried record (attempt 1 each).
