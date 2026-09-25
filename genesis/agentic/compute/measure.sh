@@ -318,19 +318,72 @@ cmd_worker() {
 }
 
 # ---- the chmod blast radius (operations.md "The capacity grant a provider must make") --------
+# It is enumerated here because on a shared host it is a real act with a real blast radius,
+# and hiding it would misstate what "the peer ran it" cost.
+#
+# The guest_dir_or_refuse list is more than genesis/a2o/reports/ + the three peers'
+# runtime-config.toml: the household `test mesh` lane's inner `just test mesh <feature>` run
+# (stage-runner.template.sh) REWRITES pre-existing, root-owned files under reports/ every run
+# — a world-writable DIRECTORY does not make an existing file inside it writable (opening an
+# existing file for write, `>` / writeFileSync, needs the write bit on the FILE itself). Read
+# from the `test mesh` arm of the justfile: `cucumber-$profile-scoped.mjs` is regenerated
+# whenever a scope is passed (justfile:~228, always true here since the guest always passes one
+# feature); `reports/console/` is written directly by genesis/a2o/steps/common.steps.ts (hardcoded,
+# not the lane's own `--console-dir` override — justfile:283-287); `reports/coverage-gap.json` is
+# build-sprint-report.ts's own default when a caller doesn't override `--coverage-gap`. Any
+# `sprint-report-*` output is a NEW file each run (run-id-suffixed), so the reports_dir grant
+# alone covers it — nothing to enumerate there.
+MEASURE_REPORTS_DIR="${MEASURE_REPORTS_DIR:-$ROOT/genesis/a2o/reports}"
+
+# Tests writability the way UID 65534 actually experiences it — NOT `[ -w path ]` run as this
+# script's own (usually root) euid, which bypasses the permission bits entirely and reports
+# every path writable regardless. That blind spot is exactly how the previous check missed a
+# root-owned 0644 file under a world-writable directory: as root, setpriv drops to the guest
+# identity for a real answer; off-root (no privilege to drop), fall back to reading the mode's
+# own other-write bit as the best available approximation.
+guest_writable() { # <path>
+  local path="$1"
+  if [ "$(id -u)" = "0" ] && command -v setpriv >/dev/null 2>&1; then
+    setpriv --reuid=65534 --regid=65534 --clear-groups test -w "$path"
+  else
+    local mode
+    mode="$(stat -c '%a' "$path" 2>/dev/null)" || return 1
+    case "${mode: -1}" in
+      2 | 3 | 6 | 7) return 0 ;;
+      *) return 1 ;;
+    esac
+  fi
+}
+
 check_writable_or_refuse() {
-  local reports_dir="$ROOT/genesis/a2o/reports"
-  echo "measure: the guest (UID 65534) needs write access to:"
-  echo "  chmod o+w $reports_dir"
+  local reports_dir="$MEASURE_REPORTS_DIR"
+  # path, recursive(0|1) pairs — recursive only for console/, whose EXISTING entries (not just
+  # new ones) are re-touched by common.steps.ts run after run.
+  local -a targets=(
+    "$reports_dir" 0
+    "$reports_dir/cucumber-mesh-scoped.mjs" 0
+    "$reports_dir/console" 1
+    "$reports_dir/coverage-gap.json" 0
+  )
   local peer
   for peer in matthew jessica james; do
-    echo "  chmod o+w $MESH_DIR/$peer/runtime-config.toml"
+    targets+=("$MESH_DIR/$peer/runtime-config.toml" 0)
   done
-  local missing=0
-  [ -w "$reports_dir" ] || { echo "measure: not writable: $reports_dir" >&2; missing=1; }
-  for peer in matthew jessica james; do
-    local rc="$MESH_DIR/$peer/runtime-config.toml"
-    [ -w "$rc" ] || { echo "measure: not writable: $rc" >&2; missing=1; }
+
+  echo "measure: the guest (UID 65534) needs write access to:"
+  local missing=0 i path recurse
+  for ((i = 0; i < ${#targets[@]}; i += 2)); do
+    path="${targets[$i]}"
+    recurse="${targets[$((i + 1))]}"
+    [ -e "$path" ] || continue # not there yet — created fresh under an already-granted parent
+    guest_writable "$path" && continue
+    if [ "$recurse" = "1" ]; then
+      echo "  chmod -R o+w $path"
+    else
+      echo "  chmod o+w $path"
+    fi
+    echo "measure: not writable (as guest UID 65534): $path" >&2
+    missing=1
   done
   [ "$missing" -eq 0 ] || refuse 2 "run the chmod lines above, then retry"
 }
@@ -414,6 +467,11 @@ cmd_run_feature() {
   local submit_args=(submit "$out_dir/task.json" "$out_dir/stage-runner.sh" "$out_dir/$feature_file" --rung H)
   [ -n "$gap" ] && submit_args+=(--on "$gap")
 
+  # A real, non-destructive preflight — runs under MEASURE_DRY_RUN too, so a dry run still
+  # tells the truth about whether the guest is currently blocked, rather than previewing a
+  # command that would refuse the moment it actually ran.
+  check_writable_or_refuse
+
   if dry_run; then
     print_env_block
     echo "[dry-run] task bound: cpu-millis=$MEASURE_CPU_MILLIS ($CPU_MILLIS_SOURCE) memory-bytes=$MEASURE_MEMORY_BYTES ($MEMORY_BYTES_SOURCE) timeout-seconds=$MEASURE_TIMEOUT_SECONDS ($TIMEOUT_SECONDS_SOURCE)"
@@ -422,8 +480,6 @@ cmd_run_feature() {
     echo "[dry-run] node $WORKSPACE_MJS start"
     return 0
   fi
-
-  check_writable_or_refuse
 
   "${build_cmd[@]}" >/dev/null
 

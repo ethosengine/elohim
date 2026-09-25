@@ -8,9 +8,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MEASURE_SH = resolve(HERE, "measure.sh");
@@ -100,6 +101,42 @@ test("a nonexistent feature path refuses exit 2 before printing anything else", 
       return true;
     },
   );
+});
+
+// The guest capacity grant is more than the reports_dir + three runtime-config.toml
+// (D2-follow-up, live rung H run 2 2026-09-25): the household `test mesh` lane's inner run
+// REWRITES pre-existing, root-owned files under genesis/a2o/reports/ every pass —
+// cucumber-mesh-scoped.mjs is one of them (justfile's scoped-run arm, always hit since the
+// guest always passes exactly one feature). A world-writable reports_dir does not make an
+// existing file inside it writable; MEASURE_REPORTS_DIR lets this test point the check at a
+// disposable temp dir instead of the real repo's reports_dir.
+test("a pre-existing root-owned-shaped 0644 cucumber-mesh-scoped.mjs is named in the capacity grant and refuses until writable", () => {
+  const tempReports = mkdtempSync(join(tmpdir(), "measure-reports-"));
+  chmodSync(tempReports, 0o777);
+  const blockedPath = join(tempReports, "cucumber-mesh-scoped.mjs");
+  writeFileSync(blockedPath, "// stand-in for a root-owned file the lane regenerates\n", {
+    mode: 0o644,
+  });
+  const chmodLine = new RegExp(`chmod o\\+w ${blockedPath.replace(/[.]/g, "\\.")}\\b`);
+
+  try {
+    assert.throws(
+      () => runDry([FEATURE_GENESIS_A2O_PREFIXED], { MEASURE_REPORTS_DIR: tempReports }),
+      (error) => {
+        assert.equal(error.status, 2);
+        assert.match(error.stdout.toString(), chmodLine);
+        assert.match(error.stderr.toString(), /run the chmod lines above, then retry/);
+        return true;
+      },
+    );
+
+    // Simulate the operator running the printed chmod line.
+    chmodSync(blockedPath, 0o646);
+    const output = runDry([FEATURE_GENESIS_A2O_PREFIXED], { MEASURE_REPORTS_DIR: tempReports });
+    assert.doesNotMatch(output, chmodLine);
+  } finally {
+    rmSync(tempReports, { recursive: true, force: true });
+  }
 });
 
 test("--on adam still refuses (unprovisioned) and now names COMPUTE_SLICE_* as where its bound would come from", () => {
