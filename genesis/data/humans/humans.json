@@ -1116,6 +1116,12 @@
       "target": "human-pete-pastor",
       "relationshipType": "congregation-member",
       "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-adam-firstman",
+      "relationshipType": "trusted-friend",
+      "intimacyLevel": "trusted"
     }
   ]
 }

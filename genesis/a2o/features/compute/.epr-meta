@@ -3,25 +3,36 @@ epr-meta-version: 1
 id: a2o-compute-peer-executed-stage
 covers: subtree
 purpose: >
-  The peer-executed CI stage a2o binding — one feature file proving a household compute
-  provider can run an a2o stage (a feature file, its declared scenario inventory, and a
-  verdict) as a delegated compute task, and that the requester reads back the provider's
-  signed completion and the report it actually produced rather than trusting the receipt's
-  claimed status. Design: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md.
-  Step definitions live in steps/compute/peer-executed-stage.steps.ts, owning their own
-  state (a private WeakMap, mirroring steps/dataplane/delegated-sweettest.steps.ts) rather
-  than reusing that file's phrasings or state.
+  The peer-executed CI stage a2o bindings — two feature files. `peer-executed-stage.feature`
+  proves a household compute provider can run an a2o stage (a feature file, its declared
+  scenario inventory, and a verdict) as a delegated compute task, and that the requester reads
+  back the provider's signed completion and the report it actually produced rather than
+  trusting the receipt's claimed status. `measure-on-a-peer.feature` proves the developer-side
+  verb that sends a measure-class run to that same substrate instead of holding the dev berth
+  (the `just measure` verb, the berth `--class measure` router, and the requester-side
+  admission of a peer's signed completion). Design: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md;
+  sprint plan (measure-on-a-peer): /projects/.claude-config/plans/we-ran-into-a-cryptic-robin.md.
+  Step definitions live in steps/compute/peer-executed-stage.steps.ts and
+  steps/compute/measure-on-a-peer.steps.ts, each owning its own state (a private WeakMap,
+  mirroring steps/dataplane/delegated-sweettest.steps.ts) rather than reusing another file's
+  phrasings or state — except the one Background step text both files' features share
+  ("a household compute provider with a signed compute grant for this requester"), which
+  measure-on-a-peer.steps.ts reuses verbatim from peer-executed-stage.steps.ts rather than
+  redefining (a second identical registration would make cucumber's step matching ambiguous).
 cites:
   - genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md
   - genesis/a2o/features/dataplane/delegated-sweettest.feature
 ---
-# compute/ — peer-executed CI stage a2o binding
+# compute/ — peer-executed CI stage a2o bindings
 
-One feature file: `peer-executed-stage.feature`. It exercises the same delegated-compute
+Two feature files. `peer-executed-stage.feature` exercises the same delegated-compute
 substrate `dataplane/delegated-sweettest.feature` measures, shaped as a CI stage (§3 D1-D2
 of the design doc) rather than a Holochain feedback sweettest — the `feedback_signal::`
 namespace token in the envelope's `expectedTests` is a pinned-executor requirement, not a
-claim about what kind of test this is (see design §3 D6).
+claim about what kind of test this is (see design §3 D6). `measure-on-a-peer.feature` proves
+the developer-facing side of the same substrate: the verb that routes a measure-class run to
+a neighbour's peer rather than the developer's own desk, born red alongside the habit
+`measure-runs-on-a-peer` (genesis/agentic/.epr-meta/measure-runs-on-a-peer.habit.md).
 
 **Considered, no enforcing rule beyond the parent's.** This manifest exists to satisfy the
 parent `genesis/a2o/.epr-meta` no-orphan-subtree rule (`new-feature-subdir-needs-meta`) and
@@ -29,4 +40,4 @@ to claim coverage (`covers: subtree`) so the coverage walk terminates here, foll
 precedent of `genesis/a2o/features/dataplane/resiliency-saga/.epr-meta`. The real authoring
 discipline (tag requirements, RED-FIRST assertions, step-definition placement) is the
 parent `CLAUDE.md`/`README.md`'s prose convention; no new drift has been observed in this
-one-file tree that a rule would catch better than review.
+tree that a rule would catch better than review.
