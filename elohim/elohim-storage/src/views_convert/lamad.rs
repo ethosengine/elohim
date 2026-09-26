@@ -496,7 +496,9 @@ mod trust_label_tests {
             ..bare_content()
         };
         assert_eq!(
-            content_head_view_from_content(&coherent).unwrap().anchor_matches_head,
+            content_head_view_from_content(&coherent)
+                .unwrap()
+                .anchor_matches_head,
             Some(true)
         );
 
@@ -505,7 +507,9 @@ mod trust_label_tests {
             ..bare_content()
         };
         assert_eq!(
-            content_head_view_from_content(&anchor_only).unwrap().anchor_matches_head,
+            content_head_view_from_content(&anchor_only)
+                .unwrap()
+                .anchor_matches_head,
             None
         );
         let declared_only = Content {
@@ -513,7 +517,9 @@ mod trust_label_tests {
             ..bare_content()
         };
         assert_eq!(
-            content_head_view_from_content(&declared_only).unwrap().anchor_matches_head,
+            content_head_view_from_content(&declared_only)
+                .unwrap()
+                .anchor_matches_head,
             None
         );
     }

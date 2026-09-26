@@ -67,7 +67,14 @@ async fn hand_filled_peer_book_converges_a_to_bs_document() -> Result<()> {
 
     let rounds_before = elohim_storage::metrics::IROH_SYNC_ROUNDS.get();
     let changes_before = elohim_storage::metrics::IROH_SYNC_CHANGES_APPLIED.get();
-    run_iroh_sync_round(fixture.fetcher.endpoint(), &peer_book, &fetcher_sync, None, None).await;
+    run_iroh_sync_round(
+        fixture.fetcher.endpoint(),
+        &peer_book,
+        &fetcher_sync,
+        None,
+        None,
+    )
+    .await;
 
     assert_eq!(
         fetcher_sync
