@@ -364,3 +364,42 @@ describe('worktree-scoped cargo target', () => {
     assert.equal(worktreeTargetDir('/tmp/x', '/r', () => null), '/tmp/x');
   });
 });
+
+describe('a shared cargo slot never serves another checkout its compiled crates', () => {
+  test('a slot built by a different checkout forgets only this workspace\'s own crates', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync: read, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const target = mkdtempSync(resolve(tmpdir(), 'gate-slot-'));
+    const fp = resolve(target, 'debug/.fingerprint');
+    mkdirSync(resolve(fp, 'elohim-epr-0123abcd'), { recursive: true });
+    mkdirSync(resolve(fp, 'serde-89ef4567'), { recursive: true });
+    writeFileSync(resolve(target, '.gate-owner'), '/projects/elohim/.claude/worktrees/some-other-checkout');
+    const run = () => spawnSync(
+      'bash',
+      [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
+        ROOT, 'selftest', 'elohim/epr', 'root-just', '_gate-selftest-env', '', target, 'dev', ''],
+      { encoding: 'utf8', env: { ...process.env, GATE_CARGO_ENV: undefined } }
+    );
+    try {
+      const first = run();
+      assert.equal(first.status, 0, first.stderr);
+      assert.match(first.stdout, /slot last built by .*some-other-checkout; forgot 1 local-crate fingerprint/);
+      assert.equal(existsSync(resolve(fp, 'elohim-epr-0123abcd')), false, 'the local crate must rebuild');
+      assert.equal(existsSync(resolve(fp, 'serde-89ef4567')), true, 'third-party deps stay cached');
+      assert.equal(read(resolve(target, '.gate-owner'), 'utf8'), resolve(ROOT));
+      // The same checkout again: nothing is forgotten.
+      mkdirSync(resolve(fp, 'elohim-epr-0123abcd'), { recursive: true });
+      const again = run();
+      assert.equal(again.status, 0, again.stderr);
+      assert.doesNotMatch(again.stdout, /forgot/);
+      assert.equal(existsSync(resolve(fp, 'elohim-epr-0123abcd')), true);
+      // A slot from before the guard (no marker) has an unknown owner: treated as foreign once.
+      rmSync(resolve(target, '.gate-owner'));
+      const unmarked = run();
+      assert.equal(unmarked.status, 0, unmarked.stderr);
+      assert.match(unmarked.stdout, /slot last built by an unknown checkout; forgot 1/);
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+});

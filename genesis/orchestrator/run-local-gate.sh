@@ -36,6 +36,30 @@ if [[ -n "$target_dir" ]]; then
   mkdir -p "$backing"
   export CARGO_TARGET_DIR="$target_dir"
   echo "  [$project_name] cargo target: $CARGO_TARGET_DIR"
+  # One slot, many checkouts: cargo keys workspace members by their path RELATIVE to the
+  # workspace root and judges freshness by source mtime, so a second worktree whose files are
+  # older than the slot's last build silently reuses the FIRST worktree's compiled crates (a
+  # gate once passed on a deleted worktree's test binary, 2026-09-26). When the slot changes
+  # checkout, forget this workspace's own crates only — third-party deps stay cached.
+  owner_file="$backing/.gate-owner"
+  owner="$(readlink -m "$repo_root")"
+  # An unmarked slot predates this guard: its owner is unknown, so it is treated as foreign once.
+  previous="$(cat "$owner_file" 2>/dev/null || echo 'an unknown checkout')"
+  if [[ "$previous" != "$owner" ]]; then
+    members="$(cd "$repo_root/$project_dir" && cargo metadata --no-deps --format-version 1 2>/dev/null \
+      | python3 -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))' 2>/dev/null || true)"
+    dropped=0
+    while IFS= read -r name; do
+      [[ -n "$name" ]] || continue
+      for fp in "$backing"/*/.fingerprint/"$name"-*; do
+        [[ -e "$fp" ]] || continue
+        rm -rf "$fp"
+        dropped=$((dropped + 1))
+      done
+    done <<< "$members"
+    echo "  [$project_name] slot last built by $previous; forgot $dropped local-crate fingerprint(s)"
+  fi
+  printf '%s' "$owner" > "$owner_file"
 fi
 
 if [[ "$rustflags" != "__inherit__" ]]; then
