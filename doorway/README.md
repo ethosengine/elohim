@@ -6,6 +6,8 @@ The porch of the peer-to-peer network.
 
 A physical porch has an address (so people can find you), a door (so people can enter), and a mailbox (so messages arrive). Doorway does the same for the Elohim Protocol: it gives the P2P network a web address, a way in, and a place for content to land.
 
+A doorway does little on its own, any more than a door out of its frame, so this README explains what it is and why it is built this way; to see one standing in its frame, run `just dev start` from the repository root.
+
 ## Why Doorway Exists
 
 Holochain, a framework for peer-to-peer applications, gives us agent-centric identity, content-addressed data, and cryptographic validation at the edges. What it doesn't give us is a URL. The web still runs on HTTP, DNS, and TLS. Billions of people navigate by typing addresses into browsers. Doorway is where those two worlds meet.
@@ -48,7 +50,7 @@ Content flows through doorway in two paths:
 
 **Visitors** — people browsing from the open web — hit the projection cache. No Holochain identity needed. No conductor cells consumed. This is a web server reading from a database. Every scaling technique the web already knows applies here.
 
-**Hosted humans** — people who have created accounts but haven't yet graduated to their own devices — write through the conductor. Their custodial keys live in doorway's memory. Their cells participate in the DHT. This costs real resources: RAM, CPU, gossip bandwidth.
+**Hosted humans** — people who have created accounts but haven't yet graduated to their own devices — write through the conductor. Their custodial keys live in doorway's memory. Their cells (each one a person's running share of the network) participate in the DHT. This costs real resources: RAM, CPU, gossip bandwidth.
 
 The beautiful thing is that the second group shrinks over time. As people graduate to running their own nodes, their conductor cells are freed. The steward's identity-hosting load *decreases as doorway succeeds*. Meanwhile, the projection layer may be busier than ever — because the content is good, and the world is reading it.
 
@@ -79,6 +81,21 @@ A doorway is operationally useful but architecturally replaceable. It cannot cre
 
 This is the design constraint that keeps doorway honest: it's useful *because* it can't capture you.
 
+## Into the House
+
+Everything above is a promise a doorway makes, and the doorway can keep it only because of what lies behind the door: the house, and the neighborhood it belongs to.
+
+**The house holds the stuff.** A household is what it sounds like: the people who share a home and the devices they keep together, usually including one always-on box on a shelf. That box runs the household's storage peer, which keeps the actual bytes, the photos, videos, and pages, and passes them to other households over the peer fabric (peer-to-peer connections built on libp2p and iroh, two open networking toolkits), the way neighbors stock and share a pantry. When a doorway serves a page, it reads from one of these households.
+
+**The neighborhood keeps it honest.** No household vouches for itself. Integrity comes from the distributed hash tables that households share with their neighbors. There is not one table but many, one for each group that shares rules: a family's own devices, a church or co-op, the commons of the whole network. In each, the members check every record against the rules they hold in common and keep a small signed record of who said what and what each household has promised to keep, never the bytes themselves. That shared ground is the true commons: no single house owns it, and no single operator can rewrite it.
+
+The two work as one. Each household reads what its neighborhoods say it has promised to keep, compares that with what it actually holds, and mends the difference. It takes no neighbor's word for what is current until its own copy of the shared record agrees. The page a doorway serves is fast because the house is stocked, and trustworthy because the neighborhood checked it.
+
+To keep walking:
+
+- [The house](../elohim/elohim-storage/README.md): how a household holds the bytes, moves them to its neighbors, and heals what goes missing.
+- [The neighborhood](../elohim/holochain/docs/README.md): how households that share rules decide together what is true, who said it, and what each has promised to keep.
+
 ## What's Here
 
 ```
@@ -89,4 +106,4 @@ doorway/
                      graduation pipeline, hosted-account care
 ```
 
-See `CLAUDE.md` for developer guidance.
+See [`CLAUDE.md`](CLAUDE.md) in this directory for developer guidance.
