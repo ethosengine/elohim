@@ -1,6 +1,7 @@
 //! Bounded local collective-memory composition over governed source files and REA notes.
 //! No mutable memory index, latest-head selection, network membership or new EPR kind.
 mod affiliate;
+mod attribution;
 pub mod entries;
 pub mod footprint;
 mod guide;
@@ -82,19 +83,24 @@ pub struct Options<'a> {
     /// This device's key, loaded (never minted) for `affiliate` to sign with when it is enrolled
     /// for the sponsor.
     pub device: Option<&'a crate::device_key::DeviceKey>,
-    /// `import <entry.md>… --as-of RFC3339` — when the named entries were written. Each is then
-    /// authored by the claim current in the session AT that instant, never by a later one; it is
-    /// threaded to `contribute`, whose note is pinned to that same claim. Refused elsewhere.
+    /// `--as-of RFC3339` — the instant an act's author is resolved at: the claim current in the
+    /// session AT that instant, never a later one. Admitted on exactly two operations:
+    /// `import`'s entry form, where it is only an assertion the entry's own evidence must agree
+    /// with (its `modified`, else a harness write witness of its bytes — see `attribution`), and
+    /// the direct `contribute` it threads through, which resolves the claim with
+    /// `claim_as_of_bound` and pins its note to it. Refused by every other operation.
     pub as_of: Option<&'a str>,
     /// `import <entry.md>… --session S --steward-of-record` — the standing human stands for
     /// entries no witnessed agent authored (operator ruling). Admitted only for an active,
-    /// non-fixture human Steward and only for entries unattributable by the as-of rule; the
+    /// non-fixture human Steward and only for entries whose agent author could not possibly be
+    /// witnessed (no origin, an origin that never claimed, or a proven write before its first
+    /// claim); the
     /// contribution then carries the `authorship: steward-of-record` slot. Refused elsewhere.
     pub steward_of_record: bool,
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
-const OPERATIONS: [&str; 11] = [
+const OPERATIONS: [&str; 12] = [
     "collective",
     "affiliate",
     "pin",
@@ -103,6 +109,7 @@ const OPERATIONS: [&str; 11] = [
     "feedback",
     "graduate",
     "import",
+    "attribution",
     "migrate-identity-reserve",
     "recall",
     "index",
@@ -123,9 +130,10 @@ pub fn usage() -> String {
          feedback      file governed feedback on a contribution\n  \
          graduate      rehearse repository locality for a contribution (a distinct Steward approves)\n  \
          import        adopt an authored directory of requests, or name entry files to import\n                   \
-                   only those, attributed to --session's own claim (never a fallback); --as-of T\n                   \
-                   takes the claim held at T; --steward-of-record lets a standing human Steward\n                   \
-                   stand for entries no witnessed agent authored\n  \
+                   only those, each under the claim its writer held when it was written (its own\n                   \
+                   originSessionId/modified, else the harness write witness); --steward-of-record\n                   \
+                   lets a standing human Steward stand for entries no agent could have authored\n  \
+         attribution   read who wrote each entry and when, and whether it is attributable\n  \
          migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n                    \
                    (--session ID [--basis LINE] [--contributions DIR] [--dry-run])\n  \
          recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n  \
@@ -165,7 +173,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         let key = args[i].as_str();
         if !key.starts_with("--") {
             if opts.target.is_some() {
-                if operation != "import" {
+                if operation != "import" && operation != "attribution" {
                     return Err(refused(format!("unexpected second argument {key}")));
                 }
                 opts.more_targets.push(key);
@@ -300,7 +308,12 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
         ));
     }
     if opts.as_of.is_some() && operation != "contribute" {
-        return Err(refused("--as-of belongs to import's entry form alone"));
+        return Err(refused(
+            "--as-of belongs to import's entry form and the contribute it threads through",
+        ));
+    }
+    if operation == "attribution" {
+        return import::attribution(root, opts);
     }
     if let Some(extra) = opts.more_targets.first() {
         return Err(refused(format!("unexpected second argument {extra}")));

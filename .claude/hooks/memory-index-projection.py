@@ -43,34 +43,32 @@ Three things it does that a bare command line in settings.json cannot, and each 
    `feedback_harness_witnesses_agents_dont_narrate`).** An entry with no contribution used to
    end in an advisory asking the agent to run `epr flow memory import` by hand. Now the hook
    DISPATCHES that import itself, DETACHED from the PostToolUse call (it takes ~8s, over the
-   budget), under the session that wrote the entry: its frontmatter `originSessionId`, else the
-   hook input's `session_id`. The worker uses import's ENTRY form (`import <entry.md> --session
-   S --as-of T`), which imports only the named entry, authored by the claim S held AT T — the
-   instant the entry was written (frontmatter `modified`, else the mtime the hook saw, captured
-   synchronously before the worker exists). A claim S registered LATER (a subagent persona in
-   the same session) never takes the entry; no claim yet at T means no import. An edit by S never
-   sweeps up entries other sessions wrote, and never borrows an author. Workers serialize on one
-   flock (two quick edits never race), then project and install under the guard above. Every
-   step is one JSON line in a bounded log (`.eprfs/status/memory-import.log.jsonl`), never
-   stdout. An entry whose writer held no claim when it was written is named UNATTRIBUTABLE.
+   budget). It never parses the entry to decide who wrote it: at the edit moment it appends a
+   harness WRITE WITNESS (`.eprfs/status/memory-writes.jsonl`: path, sha256 of the exact bytes,
+   its own session, the instant it saw them) and asks `epr flow memory attribution`, the one
+   authority, for the rest. The native verb reads the entry through the one frontmatter parser
+   (its `originSessionId` governs; `modified` is its write instant), else the witness of its
+   exact bytes, and authors it by the claim that writer held AT that instant — a claim made
+   later never takes it, and an ambiguous write time (no `modified`, no matching witness; live
+   mtime drifts) is never guessed. Workers serialize on one flock (two quick edits never race),
+   then project and install under the guard above. Every step is one JSON line in a bounded log
+   (`.eprfs/status/memory-import.log.jsonl`), never stdout.
 
 5. **The backfill.** Entries written before (4) existed, by sessions now closed, are imported
-   under the claim their `originSessionId` held when each was written. It needs no harness
-   registration: every worker runs a BOUNDED sweep of the owed orphans under the same lock, so
-   they are picked up the next time anyone edits memory. `--backfill` runs the same sweep
-   unbounded, for a SessionStart entry to call later with no code change. An entry with no
-   origin, or whose origin had not claimed when it was written, is NOT imported under anyone:
-   it is reported by name as `unattributable — awaiting its author or the standing human's
-   claim`, and its row is the one row the install guard lets the projection leave out.
-   `unattributable()` below is the one derivation of that set; the hook advisory, the backfill
-   report and the parity test all read it. Claims order by `recordedAt` (the instant `epr actor
-   claim` recorded them), falling back to `claimedAt` only for legacy claims.
+   under the claim their writer held when each was written, exactly as (4) decides. It needs no
+   harness registration: every worker runs a BOUNDED sweep of the owed orphans under the same
+   lock, so they are picked up the next time anyone edits memory. `--backfill` runs the same
+   sweep unbounded, for a SessionStart entry to call later with no code change. An orphan the
+   native verb cannot attribute is NOT imported under anyone: it is reported by name as
+   `unattributable — awaiting its author or the standing human's claim` with the verb's reason,
+   and its row is the one row the install guard lets the projection leave out.
 
 6. **Steward of record (operator ruling).** An unattributable entry often records the operator's
    own ruling. The advisory names the ONE line the standing human would run —
-   `epr flow memory import <entry.md>… --session S --steward-of-record` — and never runs it: the
-   native verb admits only an active, non-fixture human Steward, and only entries no witnessed
-   agent authored, and records the authorship as steward of record, never as written by them.
+   `epr flow memory import <entry.md>… --session S --steward-of-record` — for the entries the
+   native verb says no agent author could possibly have written (no origin session; one that
+   never claimed; or a write PROVEN by `modified`/a witness to predate its first claim), and
+   never runs it. The authorship is recorded as steward of record, never as written by them.
 
 Fail-open by contract: any error, timeout or missing tool exits 0 having changed nothing, and
 nothing is ever printed except a hook `additionalContext` advisory.
@@ -80,6 +78,7 @@ from __future__ import annotations
 
 import datetime
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -226,217 +225,116 @@ def project_native(binary: str, root: Path, out_rel: str, timeout: int | None = 
         return None
 
 
-# ── the contribution plane, read the way import reads it ─────────────────────────────────────────
+# ── the contribution plane, read through the ONE authority ──────────────────────────────────────
+#
+# This hook never parses an entry's frontmatter to decide who wrote it or when. It records what
+# the HARNESS itself observed — a write witness of the entry's exact bytes, its own session, the
+# instant it saw the edit — and asks `epr flow memory attribution` for everything else: the
+# entry's `originSessionId`/`modified` through the one frontmatter parser, the witness, the claim
+# the writer held at that instant, and whether the entry is attributable, importable, or
+# admissible for steward of record. Two parsers once disagreed; there is one now.
 
 MEMORY_REL = ".claude/memory"
-CONTRIBUTIONS_REL = ".eprfs/status/memory/contributions"
 ACTORS_REL = ".eprfs/status/actors.jsonl"
+WITNESS_REL = ".eprfs/status/memory-writes.jsonl"
 LOG_REL = ".eprfs/status/memory-import.log.jsonl"
 LOCK_REL = ".eprfs/status/.memory-import.lock"
 # The log keeps its last LOG_KEEP lines once past LOG_MAX: bounded, never a growing ledger.
 LOG_MAX = 400
 LOG_KEEP = 200
+# Witnesses are evidence an import may still need, so they are kept longer — still bounded.
+WITNESS_MAX = 4000
+WITNESS_KEEP = 2000
 # Seconds. The worker runs outside any hook budget; these bound a wedged native verb, nothing else.
 IMPORT_TIMEOUT = 180
 LOCK_WAIT = 300
 
 UNATTRIBUTABLE = "unattributable — awaiting its author or the standing human's claim"
 
-_ORIGIN_RE = re.compile(r"^\s*originSessionId:\s*[\"']?([^\"'\s]+)", re.M)
-_INDEX_RE = re.compile(r"^index:\s*[\"']?false[\"']?\s*$", re.M | re.I)
+
+def _now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(
+        timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _frontmatter(path: Path) -> str:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return ""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return ""
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            return "\n".join(lines[1:i])
-    return ""
-
-
-def origin_session(path: Path) -> str | None:
-    """The session the harness recorded as having written this entry, or None."""
-    m = _ORIGIN_RE.search(_frontmatter(path))
-    return m.group(1) if m else None
-
-
-def opted_out(path: Path) -> bool:
-    """`index: false` — the entry is contributed but never carries a row."""
-    return bool(_INDEX_RE.search(_frontmatter(path)))
-
-
-_MODIFIED_RE = re.compile(r"^\s*modified:\s*[\"']?([^\"'\s]+)", re.M)
-
-
-def _instant(value: str | None) -> datetime.datetime | None:
-    """An RFC 3339 instant in UTC, or None. Compared as time, never as text."""
-    if not value:
-        return None
-    try:
-        t = datetime.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if t.tzinfo is None:
-        return None
-    return t.astimezone(datetime.timezone.utc)
-
-
-def _rfc3339(t: datetime.datetime) -> str:
-    return t.astimezone(datetime.timezone.utc).isoformat(timespec="milliseconds").replace(
-        "+00:00", "Z")
-
-
-def written_at(path: Path) -> str | None:
-    """When the entry was written: its frontmatter `modified`, else the file's mtime NOW.
-
-    The hook calls this synchronously, before its worker is detached, so the mtime is the one the
-    edit left — not whatever a later write leaves by the time the worker runs.
-    """
-    m = _MODIFIED_RE.search(_frontmatter(path))
-    if m and _instant(m.group(1)):
-        return m.group(1)
-    try:
-        return _rfc3339(datetime.datetime.fromtimestamp(path.stat().st_mtime,
-                                                        datetime.timezone.utc))
-    except OSError:
-        return None
-
-
-def claim_history(root: Path) -> dict[str, list[tuple[int, datetime.datetime | None, str]]]:
-    """Session -> its claims in APPEND order: (position, ordering instant, claimed identity).
-
-    The ordering instant is `recordedAt` — when the claim was recorded — and only for a LEGACY
-    claim that predates that field, `claimedAt` (the HEAD time, which ties across claims made
-    against one tree): exactly `ActorClaim::ordering_instant`.
-    """
-    out: dict[str, list[tuple[int, datetime.datetime | None, str]]] = {}
-    try:
-        with open(root / ACTORS_REL, encoding="utf-8") as fh:
-            for i, line in enumerate(fh):
-                try:
-                    rec = json.loads(line).get("record") or {}
-                except (json.JSONDecodeError, ValueError, AttributeError):
-                    continue
-                if rec.get("kind") == "claim" and rec.get("session") and rec.get("claimed"):
-                    instant = rec.get("recordedAt") or rec.get("claimedAt")
-                    out.setdefault(rec["session"], []).append(
-                        (i, _instant(instant), rec["claimed"]))
-    except OSError:
-        pass
-    return out
-
-
-def claim_as_of(history: dict, session: str | None, at: str | None
-                ) -> tuple[int, str] | None:
-    """The claim current in `session` as of `at` — the LAST appended with claimedAt <= at —
-    exactly as `current_for_at` resolves it. None when no claim existed yet: never a later one.
-    """
-    when = _instant(at)
-    if not session or when is None:
-        return None
-    found = None
-    for pos, claimed_at, claimed in history.get(session, []):
-        if claimed_at is not None and claimed_at <= when:
-            found = (pos, claimed)
-    return found
-
-
-def contribution_author(root: Path, name: str) -> str | None:
-    """The author of the entry's contribution request, or None when it has none.
-
-    Import names the request `<contributions>/<stem>.json`; that is the only shape looked up.
-    """
-    try:
-        blob = json.loads((root / CONTRIBUTIONS_REL / f"{Path(name).stem}.json")
-                          .read_text(encoding="utf-8"))
-        return str(blob.get("author") or "") or None
-    except (OSError, json.JSONDecodeError, ValueError, AttributeError):
-        return None
-
-
-def entry_names(root: Path) -> list[str]:
-    try:
-        return sorted((p.name for p in (root / MEMORY_REL).glob("*.md")
-                       if p.is_file() and p.name != "MEMORY.md"), key=str.lower)
-    except OSError:
-        return []
-
-
-def author_session(root: Path, name: str, fallback: str | None = None) -> str | None:
-    """Who wrote the entry: its recorded origin session, else the session the hook saw write it."""
-    return origin_session(root / MEMORY_REL / name) or fallback
-
-
-def orphans(root: Path) -> list[str]:
-    """Entries with no contribution request at all."""
-    return [n for n in entry_names(root) if contribution_author(root, n) is None]
-
-
-def attributable(root: Path, history: dict) -> dict[str, tuple[str, str, int, str]]:
-    """Orphan -> (origin session, written-at, claim position, claimed identity) for every orphan
-    whose origin session HAD claimed by the time the entry was written."""
-    out = {}
-    for name in orphans(root):
-        path = root / MEMORY_REL / name
-        origin, at = origin_session(path), written_at(path)
-        claim = claim_as_of(history, origin, at)
-        if claim:
-            out[name] = (origin, at, claim[0], claim[1])
-    return out
-
-
-def unattributable(root: Path, history: dict | None = None) -> list[dict]:
-    """The ONE derivation of the unattributable set: orphans no claim current AT THEIR WRITING
-    can author. A claim the session registered only later never counts.
-
-    An orphan whose origin session had claimed is NOT here — it is owed an import (the backfill's
-    job), and a parity check that excused it would be hiding a real mismatch.
-    """
-    history = claim_history(root) if history is None else history
-    out = []
-    for name in orphans(root):
-        path = root / MEMORY_REL / name
-        origin, at = origin_session(path), written_at(path)
-        if claim_as_of(history, origin, at):
-            continue
-        if not origin:
-            why = "no originSessionId in its frontmatter"
-        elif not history.get(origin):
-            why = f"origin session {origin} registered no actor claim"
-        else:
-            first = min((c for _, c, _ in history[origin] if c), default=None)
-            why = (f"origin session {origin} had registered no actor claim when it was written "
-                   f"({at}; its first claim is dated {_rfc3339(first) if first else 'undated'})")
-        out.append({"entry": name, "originSession": origin, "writtenAt": at,
-                    "reason": f"{UNATTRIBUTABLE} ({why})"})
-    return out
-
-
-# ── the bounded log, the lock ───────────────────────────────────────────────────────────────────
-
-def log(root: Path, **record) -> None:
-    """One JSON line; trimmed to the last LOG_KEEP lines once past LOG_MAX. Never raises."""
-    record = {"at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-              **record}
-    path = root / LOG_REL
+def _append_bounded(path: Path, line: str, max_lines: int, keep: int) -> None:
+    """Append one line; once past `max_lines`, keep the last `keep`. Never raises."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
+            fh.write(line + "\n")
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        if len(lines) > LOG_MAX:
+        if len(lines) > max_lines:
             tmp = path.with_suffix(".trim")
-            tmp.write_text("".join(lines[-LOG_KEEP:]), encoding="utf-8")
+            tmp.write_text("".join(lines[-keep:]), encoding="utf-8")
             os.replace(tmp, path)
     except OSError:
         pass
 
+
+def log(root: Path, **record) -> None:
+    """One JSON line in the bounded import log."""
+    _append_bounded(root / LOG_REL, json.dumps({"at": _now(), **record}, sort_keys=True),
+                    LOG_MAX, LOG_KEEP)
+
+
+def witness(root: Path, target: Path, session: str | None) -> str | None:
+    """The harness's write witness, appended AT the edit moment: `{path, sha256, session,
+    observedAt}` of the entry's exact bytes. The harness's own record — not an agent narrating —
+    and the only write time the import trusts after the entry's own `modified`: a live mtime
+    drifts forward (a checkout, a re-save) and could make a LATER claim look current."""
+    if not session:
+        return None
+    try:
+        data = target.read_bytes()
+    except OSError:
+        return None
+    observed = _now()
+    _append_bounded(root / WITNESS_REL, json.dumps({
+        "path": f"{MEMORY_REL}/{target.name}",
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "session": session,
+        "observedAt": observed,
+    }, sort_keys=True), WITNESS_MAX, WITNESS_KEEP)
+    return observed
+
+
+def attribution(binary: str, root: Path, timeout: int | None = None) -> list[dict] | None:
+    """`epr flow memory attribution .claude/memory` — per entry: its writer, write instant, the
+    claim that authors it, and whether it is attributable/importable/admissible for steward of
+    record. None when the verb is unavailable (fail-open: nothing is decided without it)."""
+    argv = [binary, "flow", "memory", "attribution", MEMORY_REL, "--json", "--root", str(root)]
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True,
+                           timeout=timeout or IMPORT_TIMEOUT)
+        if r.returncode != 0:
+            return None
+        return list(json.loads(r.stdout).get("entries") or [])
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError,
+            AttributeError):
+        return None
+
+
+def orphans(report: list[dict]) -> list[dict]:
+    """Entries with no contribution request at all."""
+    return [e for e in report if not e.get("contributedBy")]
+
+
+def unattributable(report: list[dict]) -> list[dict]:
+    """The unattributable orphans, each with the native verb's own reason. The ONE derivation:
+    the advisory, the backfill and the parity test all read this, from the same report."""
+    return [{"entry": e["entry"], "originSession": e.get("session"),
+             "reason": f"{UNATTRIBUTABLE} ({e.get('reason')})",
+             "stewardOfRecordAdmissible": bool(e.get("stewardOfRecordAdmissible")),
+             "stewardOfRecordReason": e.get("stewardOfRecordReason")}
+            for e in orphans(report) if not e.get("attributable")]
+
+
+def opted(report: list[dict]) -> set[str]:
+    return {e["entry"] for e in report if e.get("indexed") is False}
+
+
+# ── the lock ────────────────────────────────────────────────────────────────────────────────────
 
 class ImportLock:
     """One flock for every harness import and install: two quick edits queue, never race."""
@@ -467,13 +365,12 @@ class ImportLock:
 
 # ── the native verbs the worker and the backfill drive ──────────────────────────────────────────
 
-def import_entries(binary: str, root: Path, session: str, names: list[str],
-                   as_of: str) -> tuple[bool, str]:
-    """`epr flow memory import <entry.md>… --session S --as-of T` — the ENTRY form: only these,
-    authored by the claim S held AT T (when they were written), never a later one."""
+def import_entries(binary: str, root: Path, names: list[str]) -> tuple[bool, str]:
+    """`epr flow memory import <entry.md>…` — the ENTRY form, with NO caller assertions: the
+    native verb derives each entry's writer and write instant itself and authors it by the claim
+    that writer held then, never a later one."""
     argv = [binary, "flow", "memory", "import",
-            *[f"{MEMORY_REL}/{n}" for n in names],
-            "--session", session, "--as-of", as_of, "--json", "--root", str(root)]
+            *[f"{MEMORY_REL}/{n}" for n in names], "--json", "--root", str(root)]
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=IMPORT_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -498,14 +395,16 @@ def rows(text: str) -> set[str]:
 
 
 def install(binary: str, root: Path, excused: set[str], must_carry: str | None = None,
-            timeout: int | None = None) -> tuple[str, dict | None]:
+            timeout: int | None = None, opted_out: set[str] | None = None
+            ) -> tuple[str, dict | None]:
     """Project to scratch; install only if no row is lost but the EXCUSED ones.
 
     Excused: the named unattributable entries, entries that no longer exist, and entries that opt
-    out (`index: false`). Any other lost row means the plane is missing something it should hold,
-    and installing would hide it — the index is left as it stands and the outcome says which.
-    Returns (outcome, report).
+    out (`index: false`, as the native report reads them). Any other lost row means the plane is
+    missing something it should hold, and installing would hide it — the index is left as it
+    stands and the outcome says which. Returns (outcome, report).
     """
+    opted_out = opted_out or set()
     report = project_native(binary, root, SCRATCH_REL, timeout)
     scratch = root / SCRATCH_REL
     if report is None or not scratch.is_file():
@@ -515,8 +414,8 @@ def install(binary: str, root: Path, excused: set[str], must_carry: str | None =
     live = index.read_text(encoding="utf-8") if index.is_file() else ""
     mem = root / MEMORY_REL
     lost = sorted(n for n in rows(live) - rows(rendered)
-                  if n not in excused and (mem / n).is_file() and not opted_out(mem / n))
-    if must_carry and f"]({must_carry})" not in rendered and not opted_out(mem / must_carry):
+                  if n not in excused and (mem / n).is_file() and n not in opted_out)
+    if must_carry and f"]({must_carry})" not in rendered and must_carry not in opted_out:
         lost = sorted(set(lost) | {must_carry})
     if lost:
         try:
@@ -541,68 +440,58 @@ def _binary_or_log(root: Path, mode: str) -> str | None:
     return binary
 
 
-# The orphan sweep a worker runs after its own import is BOUNDED: at most this many import runs
-# and this many seconds, so one edit never pays for a whole backlog. What it leaves, the next
-# memory edit (or `--backfill`) picks up.
+# The orphan sweep a worker runs after its own import is BOUNDED: at most this many entries in one
+# import run, so one edit never pays for a whole backlog. What it leaves, the next memory edit (or
+# `--backfill`) picks up.
 SWEEP_MAX_IMPORTS = 6
-SWEEP_BUDGET_SECONDS = 90
 
 
-def sweep_orphans(binary: str, root: Path, mode: str, max_imports: int | None = None,
-                  budget_s: float | None = None) -> dict:
-    """Import each orphan under the claim its origin session held WHEN IT WAS WRITTEN. Called
-    with the import lock held. Entries resolving to the same claim go in one import, dated by the
-    latest of their write times — which, by construction, still resolves to that same claim."""
-    result: dict = {"imported": [], "failed": [], "deferred": []}
-    history = claim_history(root)
-    groups: dict[tuple[str, int], dict] = {}
-    for name, (origin, at, pos, claimed) in sorted(attributable(root, history).items()):
-        g = groups.setdefault((origin, pos), {"claim": claimed, "entries": [], "asOf": at})
-        g["entries"].append(name)
-        if _instant(at) > _instant(g["asOf"]):
-            g["asOf"] = at
-    started, runs = time.monotonic(), 0
-    for (session, _), g in sorted(groups.items()):
-        if (max_imports is not None and runs >= max_imports) or (
-                budget_s is not None and time.monotonic() - started > budget_s):
-            result["deferred"].extend(g["entries"])
-            continue
-        runs += 1
-        ok, detail = import_entries(binary, root, session, g["entries"], g["asOf"])
-        result["imported" if ok else "failed"].append({"session": session, **g, "detail": detail})
-        log(root, mode=mode, session=session, entries=g["entries"], asOf=g["asOf"],
-            outcome="imported" if ok else "import-failed", detail=detail)
-    if result["deferred"]:
-        log(root, mode=mode, outcome="sweep-deferred", entries=result["deferred"])
-    return result
+def owed(report: list[dict], skip: str | None = None) -> list[str]:
+    """Orphans the native verb says are importable (a claim authored them), minus `skip`."""
+    return [e["entry"] for e in orphans(report) if e.get("importable") and e["entry"] != skip]
 
 
-def worker(root: Path, session: str | None, name: str, as_of: str) -> int:
-    """The detached leg of one PostToolUse dispatch: import the edited entry as of its writing,
-    then a bounded sweep of any other orphans, then install. Fail-open: every failure is logged."""
+def _install_from(binary: str, root: Path, must_carry: str | None) -> tuple[str, list[dict]]:
+    report = attribution(binary, root) or []
+    unattr = unattributable(report)
+    outcome, _ = install(binary, root, {u["entry"] for u in unattr}, must_carry=must_carry,
+                         timeout=IMPORT_TIMEOUT, opted_out=opted(report))
+    return outcome, unattr
+
+
+def worker(root: Path, session: str | None, name: str) -> int:
+    """The detached leg of one PostToolUse dispatch: import the edited entry if the native verb
+    says it is importable, then a bounded sweep of the other owed orphans, then install.
+    Fail-open: every failure is a log line."""
     binary = _binary_or_log(root, "worker")
     if not binary:
         return 0
     try:
         with ImportLock(root):
-            claim = claim_as_of(claim_history(root), session, as_of)
-            author = contribution_author(root, name)
-            if session and claim and (author is None or author == claim[1]):
-                ok, detail = import_entries(binary, root, session, [name], as_of)
-                log(root, mode="worker", session=session, entries=[name], asOf=as_of,
+            report = attribution(binary, root)
+            if report is None:
+                log(root, mode="worker", session=session, entries=[name],
+                    outcome="attribution-unavailable")
+                return 0
+            entry = next((e for e in report if e.get("entry") == name), None)
+            if entry and entry.get("importable"):
+                ok, detail = import_entries(binary, root, [name])
+                log(root, mode="worker", session=entry.get("session"), entries=[name],
+                    asOf=entry.get("writtenAt"), basis=entry.get("writtenBasis"),
                     outcome="imported" if ok else "import-failed", detail=detail)
                 if not ok:
                     return 0  # a failed import changes nothing: no sweep, no install
-            try:
-                sweep_orphans(binary, root, "worker-sweep", SWEEP_MAX_IMPORTS,
-                              SWEEP_BUDGET_SECONDS)
-            except Exception as exc:  # noqa: BLE001 — the sweep is fail-open on its own
-                log(root, mode="worker-sweep", outcome="error",
-                    detail=f"{type(exc).__name__}: {exc}")
-            excused = {u["entry"] for u in unattributable(root)}
-            carry = name if contribution_author(root, name) else None
-            outcome, _ = install(binary, root, excused, must_carry=carry,
-                                 timeout=IMPORT_TIMEOUT)
+            elif entry and not entry.get("contributedBy"):
+                log(root, mode="worker", session=entry.get("session"), entries=[name],
+                    outcome="unattributable", detail=entry.get("reason"))
+            sweep = owed(report, skip=name)[:SWEEP_MAX_IMPORTS]
+            if sweep:
+                ok, detail = import_entries(binary, root, sweep)
+                log(root, mode="worker-sweep", entries=sweep,
+                    outcome="imported" if ok else "import-failed", detail=detail)
+            carry = name if entry and (entry.get("contributedBy") or entry.get("importable")) \
+                else None
+            outcome, _ = _install_from(binary, root, carry)
             log(root, mode="worker", session=session, entries=[name], outcome=outcome)
     except Exception as exc:  # noqa: BLE001 — fail-open, recorded
         log(root, mode="worker", session=session, entries=[name],
@@ -611,25 +500,37 @@ def worker(root: Path, session: str | None, name: str, as_of: str) -> int:
 
 
 def backfill(root: Path) -> dict:
-    """Import every orphan under the claim its origin held when it was written; name the rest.
+    """Import every owed orphan (the native verb decides who authored each); name the rest.
     Unbounded: the `--backfill` CLI mode (a SessionStart leg can call it later unchanged)."""
-    result: dict = {"imported": [], "failed": [], "unattributable": [], "install": None}
+    result: dict = {"imported": [], "failed": [], "unattributable": [], "install": None,
+                    "stewardOfRecordCommand": None}
     binary = _binary_or_log(root, "backfill")
     if not binary:
         result["install"] = "no-binary"
         return result
     try:
         with ImportLock(root):
-            swept = sweep_orphans(binary, root, "backfill")
-            result["imported"], result["failed"] = swept["imported"], swept["failed"]
-            result["unattributable"] = unattributable(root)
+            report = attribution(binary, root)
+            if report is None:
+                result["install"] = "attribution-unavailable"
+                return result
+            by = {e["entry"]: e for e in report}
+            names = owed(report)
+            if names:
+                ok, detail = import_entries(binary, root, names)
+                rows_ = [{"entry": n, "session": by[n].get("session"), "claim": by[n].get("claim"),
+                          "asOf": by[n].get("writtenAt"), "basis": by[n].get("writtenBasis")}
+                         for n in names]
+                result["imported" if ok else "failed"] = rows_
+                log(root, mode="backfill", entries=names,
+                    outcome="imported" if ok else "import-failed", detail=detail)
+            outcome, unattr = _install_from(binary, root, None)
+            result["unattributable"] = unattr
             # The advisory names the exact line the standing human would run — never runs it.
-            result["stewardOfRecordCommand"] = steward_command(root, result["unattributable"])
-            excused = {u["entry"] for u in result["unattributable"]}
-            outcome, _ = install(binary, root, excused, timeout=IMPORT_TIMEOUT)
+            result["stewardOfRecordCommand"] = steward_command(root, unattr)
             result["install"] = outcome
             log(root, mode="backfill", outcome=outcome,
-                unattributable=[u["entry"] for u in result["unattributable"]],
+                unattributable=[u["entry"] for u in unattr],
                 stewardOfRecordCommand=result["stewardOfRecordCommand"])
     except Exception as exc:  # noqa: BLE001 — fail-open, recorded
         result["install"] = f"error: {type(exc).__name__}: {exc}"
@@ -637,15 +538,14 @@ def backfill(root: Path) -> dict:
     return result
 
 
-def dispatch(root: Path, session: str | None, name: str, as_of: str) -> bool:
+def dispatch(root: Path, session: str | None, name: str) -> bool:
     """Start the worker DETACHED: its own session, no inherited pipes, so the hook returns now.
-    `as_of` is captured by the hook BEFORE this — the worker never re-reads the write time.
-    With no `session` the worker imports nothing for `name`: it only sweeps the other orphans."""
+    The worker is told nothing about attribution: the witness already recorded what the harness
+    saw, and the native verb reads it."""
     try:
         subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve()), "--import-worker",
-             *(["--session", session] if session else []),
-             "--entry", name, "--as-of", as_of],
+             *(["--session", session] if session else []), "--entry", name],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             cwd=str(root), env={**os.environ, "CLAUDE_PROJECT_DIR": str(root)},
             start_new_session=True, close_fds=True)
@@ -686,12 +586,13 @@ def standing_human(root: Path) -> str:
 
 
 def steward_command(root: Path, items: list[dict]) -> str | None:
-    """The ONE line the standing human runs to stand for these entries as steward of record
-    (operator ruling). The native verb re-checks every condition: it admits only an active,
-    non-fixture human Steward, and only entries no witnessed agent authored."""
-    if not items:
+    """The ONE line the standing human runs to stand, as steward of record, for the entries the
+    native verb says NO agent author could have written (operator ruling). Entries whose author
+    could still be witnessed are never listed; the verb re-checks every condition anyway."""
+    admissible = [i for i in items if i.get("stewardOfRecordAdmissible")]
+    if not admissible:
         return None
-    files = " ".join(f"{MEMORY_REL}/{i['entry']}" for i in items)
+    files = " ".join(f"{MEMORY_REL}/{i['entry']}" for i in admissible)
     return (f"epr actor claim --as {standing_human(root)} --session {STEWARD_SESSION} && "
             f"epr flow memory import {files} --session {STEWARD_SESSION} --steward-of-record")
 
@@ -703,7 +604,8 @@ def _unattributable_line(items: list[dict], root: Path | None = None) -> str | N
             f"index as {UNATTRIBUTABLE}: " + ", ".join(i["entry"] for i in items))
     command = steward_command(root, items) if root else None
     if command:
-        line += f". The standing human may stand for them as steward of record: {command}"
+        line += f". The standing human may stand for the admissible ones as steward of record: " \
+                f"{command}"
     return line
 
 
@@ -733,65 +635,66 @@ def hook(payload_text: str) -> int:
                 "under .claude/memory/; the harness imports it and re-projects."])
         return 0
 
-    if os.environ.get("MEMORY_INDEX_NATIVE") == "0" or not resolve_bin():
+    if os.environ.get("MEMORY_INDEX_NATIVE") == "0":
+        return 0
+    binary = resolve_bin()
+    if not binary:
         return 0
 
-    # (4) The entry has no contribution — or has one authored by this very writer, whose edit the
-    # plane should carry: the HARNESS imports it, detached, under the claim the writing session
-    # held WHEN IT WROTE THE ENTRY. The write time is captured here, synchronously, before any
-    # worker exists: a later write must not move it, and a claim made later must not take it.
-    history = claim_history(root)
-    writer = author_session(root, target.name, payload.get("session_id"))
-    written = written_at(target) or _rfc3339(datetime.datetime.now(datetime.timezone.utc))
-    claim = claim_as_of(history, writer, written)
-    author = contribution_author(root, target.name)
-    # Other orphans ride along: any worker sweeps them (bounded), so they are picked up the next
-    # time anyone edits memory. With nothing owed, no sweep-only worker is started.
-    owed = bool(attributable(root, history))
-    if author is None or (claim and author == claim[1]):
-        if not claim:
-            why = ("no session is recorded as its writer" if not writer
-                   else f"session {writer} had registered no actor claim when it was written "
-                        f"({written})")
-            log(root, mode="dispatch", session=writer, entries=[target.name], asOf=written,
-                outcome="unattributable", detail=why)
-            if owed:
-                dispatch(root, None, target.name, written)
-            if author is None:
-                advise([f"[memory-index] {target.name} is {UNATTRIBUTABLE} ({why}); it is not "
-                        "imported under anyone else, and the index is left UNCHANGED. If it "
-                        "records the operator's own ruling, the standing human may stand for it "
-                        "as steward of record: "
-                        + steward_command(root, [{"entry": target.name}])])
-            return 0
-        if dispatch(root, writer, target.name, written):
-            log(root, mode="dispatch", session=writer, entries=[target.name], asOf=written,
-                outcome="dispatched")
-            if author is None:
-                advise([f"[memory-index] {target.name} is not yet a contribution: the harness "
-                        f"is importing it under session {writer} as {claim[1]} (its claim as "
-                        f"of {written}) and will re-project the index when that lands. "
-                        "Nothing to run."])
+    # (4) The harness's own record of this edit, FIRST and synchronously: the exact bytes, this
+    # session, the instant it saw them. Nothing here reads the entry's frontmatter.
+    session = payload.get("session_id")
+    witness(root, target, session)
+
+    report = attribution(binary, root, timeout=_budget())
+    if report is None:
         return 0
-    if owed:
-        dispatch(root, None, target.name, written)
+    entry = next((e for e in report if e.get("entry") == target.name), None)
+    if entry is None:
+        return 0
+    orphan = not entry.get("contributedBy")
+    # The harness imports it — detached — when the native verb says a claim authored it; and any
+    # other owed orphans ride along on the same worker, so they are picked up the next time anyone
+    # edits memory. With nothing to import, no worker is started for it.
+    if entry.get("importable") or owed(report, skip=target.name):
+        if dispatch(root, session, target.name):
+            log(root, mode="dispatch", session=session, entries=[target.name],
+                outcome="dispatched")
+    if orphan:
+        if entry.get("importable"):
+            advise([f"[memory-index] {target.name} is not yet a contribution: the harness is "
+                    f"importing it as {entry.get('claim')} (session {entry.get('session')}, "
+                    f"written {entry.get('writtenAt')} by its {entry.get('writtenBasis')}) and "
+                    "will re-project the index when that lands. Nothing to run."])
+        else:
+            log(root, mode="dispatch", session=session, entries=[target.name],
+                outcome="unattributable", detail=entry.get("reason"))
+            items = unattributable([entry])
+            command = steward_command(root, items)
+            advise([f"[memory-index] {target.name} is {UNATTRIBUTABLE} ({entry.get('reason')}); "
+                    "it is not imported under anyone, and the index is left UNCHANGED."
+                    + (" If it records the operator's own ruling, the standing human may stand "
+                       f"for it as steward of record: {command}" if command else "")])
+        return 0
+    if entry.get("importable"):
+        return 0  # its author's own edit: the worker re-imports and re-projects
 
     # Contributed already, by someone else: project and install under the guard, as before —
     # inside the hook's budget, so only when the probe says the native leg fits it.
     binary, reason = native_route(root)
     if binary is None:
         return 0
-    unattr = unattributable(root, history)
+    unattr = unattributable(report)
     # The same lock the workers hold, waited on briefly: a worker mid-import will re-project when
     # it lands, so a busy lock is a reason to stand aside, never to install beside it.
     try:
         with ImportLock(root, wait=1.0):
-            outcome, report = install(binary, root, {u["entry"] for u in unattr},
-                                      must_carry=target.name)
+            outcome, proj = install(binary, root, {u["entry"] for u in unattr},
+                                    must_carry=target.name, opted_out=opted(report))
     except TimeoutError:
         log(root, mode="hook", entries=[target.name], outcome="deferred-to-worker")
         return 0
-    if report is None:
+    if proj is None:
         advise([f"[memory-index] native projection unavailable this run ({reason}); "
                 f"the index is unchanged."])
         return 0
@@ -800,14 +703,14 @@ def hook(payload_text: str) -> int:
         msgs.append(f"[memory-index] the projection would drop row(s) for "
                     f"{outcome.split(':', 1)[1]} — the index is left UNCHANGED rather than "
                     "installing a render that loses them.")
-    budget = report.get("budget") or {}
+    budget = proj.get("budget") or {}
     if budget.get("state") and budget["state"] != "ok":
         msgs.append(
-            f"[memory-index] {report.get('bytes')}B against {budget.get('bound', BUDGET_MEASURE)} "
+            f"[memory-index] {proj.get('bytes')}B against {budget.get('bound', BUDGET_MEASURE)} "
             f"(soft {budget.get('soft')} / hard {budget.get('hard')}: {budget['state']}) — "
             "consolidation is population work: fold related entries under an umbrella or graduate "
             "durable knowledge to its managed home.")
-    unloaded = report.get("unloadedRows") or []
+    unloaded = proj.get("unloadedRows") or []
     if unloaded:
         msgs.append(f"[memory-index] {len(unloaded)} row(s) past the harness load cap — "
                     "they cost tokens to write and no session can read them.")
@@ -832,11 +735,11 @@ def main() -> int:
         except Exception:  # noqa: BLE001 — hooks are fail-open by contract
             return 0
     if "--import-worker" in sys.argv:
-        entry, as_of = _arg("--entry"), _arg("--as-of")
+        entry = _arg("--entry")
         session = _arg("--session") if "--session" in sys.argv else None
-        if entry and as_of:
+        if entry:
             try:
-                return worker(_repo(), session, entry, as_of)
+                return worker(_repo(), session, entry)
             except Exception:  # noqa: BLE001
                 return 0
         return 0
@@ -851,9 +754,10 @@ def main() -> int:
     # Manual probe: which leg would this hook take, and why.
     root = _repo()
     binary, reason = native_route(root)
+    report = attribution(binary, root) if binary else None
     print(json.dumps({"route": "native" if binary else "stand-down",
                       "binary": binary or resolve_bin(), "reason": reason,
-                      "unattributable": unattributable(root)}))
+                      "unattributable": unattributable(report or [])}))
     return 0
 
 

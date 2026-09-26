@@ -195,13 +195,13 @@ impl Outcome {
 /// import what ONE session wrote under THAT session — per entry, never per importer — and it
 /// therefore accepts only the session's own registered claim. Falling back to anyone else would
 /// be the misattribution the form exists to prevent.
-enum Named {
+pub(super) enum Named {
     Directory(PathBuf),
     Entries { dir: PathBuf, files: Vec<PathBuf> },
 }
 
 impl Named {
-    fn resolve(root: &Path, opts: &Options) -> FlowResult<Self> {
+    pub(super) fn resolve(root: &Path, opts: &Options) -> FlowResult<Self> {
         let first = opts.target.ok_or_else(|| {
             refused(
                 "import needs a directory or entry files: epr flow memory import <dir> | \
@@ -263,11 +263,22 @@ impl Named {
         })
     }
 
-    fn dir(&self) -> &Path {
+    pub(super) fn dir(&self) -> &Path {
         match self {
             Named::Directory(dir) | Named::Entries { dir, .. } => dir,
         }
     }
+}
+
+/// Who one entry's contribution is authored by, under which session, as of which instant.
+struct EntryAct {
+    author: String,
+    session: Option<String>,
+    /// The PROVEN write instant the author's claim was resolved at (entry form only); threaded
+    /// to `contribute`, whose note is pinned to the same claim.
+    as_of: Option<String>,
+    /// `Some(origin)` on a steward-of-record act: the entry's origin session, if any.
+    steward_origin: Option<Option<String>>,
 }
 
 pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
@@ -305,34 +316,89 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     // A session bound to another collective is refused HERE, before any request file is written —
     // not at the first entry's `contribute`, which would leave a request on disk with no act.
     // `--steward-of-record`: a standing human stands for entries NO witnessed agent authored.
-    // Admitted only when the session is that human AND every named entry is unattributable by
-    // the as-of rule — so it can never override a real author (see [`steward_of_record`]).
-    let steward_of_record = if opts.steward_of_record {
-        let human = steward_of_record(&root, opts, &named, &governance)?;
-        lead.require_bound(opts.session, &governance)?;
-        Some(human)
-    } else {
-        None
+    // Admitted only when the session is that human AND no agent author could possibly be
+    // witnessed for any named entry (see [`steward_of_record`]).
+    //
+    // The ENTRY form never trusts a caller's `--session`/`--as-of`: every entry's writer and write
+    // instant come from `attribution` — the entry's own `originSessionId`/`modified` (read by the
+    // one frontmatter parser), else the harness's write witness of its exact bytes — and the
+    // author is the claim that writer held AT that instant. A caller that names a different
+    // writer or instant is refused; an entry whose instant is ambiguous, or whose writer held no
+    // claim then, is refused as unattributable. All of it before any request file is written.
+    let evidence = super::attribution::Evidence::load(&root)?;
+    let paths = match &named {
+        Named::Directory(_) => list_entries(&root.join(&dir_rel))?,
+        Named::Entries { files, .. } => files.iter().map(|f| root.join(f)).collect(),
     };
-    let author = match (&named, opts.as_of) {
-        _ if steward_of_record.is_some() => steward_of_record.clone().unwrap_or_default(),
-        (Named::Directory(_), Some(_)) => {
-            return Err(refused(
-                "--as-of belongs to the entry form: name the entries written at that instant",
-            ))
-        }
-        (Named::Directory(_), None) => {
+    let rels: Vec<PathBuf> = paths
+        .iter()
+        .map(|p| dir_rel.join(p.file_name().unwrap_or_default()))
+        .collect();
+    let entry_acts: Vec<EntryAct> = match &named {
+        Named::Directory(_) => {
+            if opts.as_of.is_some() {
+                return Err(refused(
+                    "--as-of belongs to the entry form: name the entries written at that instant",
+                ));
+            }
+            if opts.steward_of_record {
+                return Err(refused(
+                    "--steward-of-record names the entries it stands for; a directory is not an \
+                     entry",
+                ));
+            }
             let author = acting_author(&root, opts.session)?;
             lead.require_bound(opts.session, &governance)?;
-            author
+            rels.iter()
+                .map(|_| EntryAct {
+                    author: author.clone(),
+                    session: opts.session.map(str::to_string),
+                    as_of: None,
+                    steward_origin: None,
+                })
+                .collect()
         }
-        (Named::Entries { .. }, None) => {
-            let author = claimed_author(&root, opts.session)?;
+        Named::Entries { .. } if opts.steward_of_record => {
+            let (human, origins) = steward_of_record(&root, opts, &rels, &governance, &evidence)?;
             lead.require_bound(opts.session, &governance)?;
-            author
+            origins
+                .into_iter()
+                .map(|origin| EntryAct {
+                    author: human.clone(),
+                    session: opts.session.map(str::to_string),
+                    as_of: None,
+                    steward_origin: Some(origin),
+                })
+                .collect()
         }
-        (Named::Entries { .. }, Some(at)) => {
-            claim_as_of_bound(&root, opts.session, at, &governance.reference.path)?.1
+        Named::Entries { .. } => {
+            let mut resolved = Vec::new();
+            for rel in &rels {
+                let attribution =
+                    super::attribution::resolve(&root, rel, &evidence, opts.session, opts.as_of)?;
+                if let Err(reason) = attribution.verdict() {
+                    return Err(refused(format!(
+                        "{} is unattributable — {reason}; it is imported under no one until its \
+                         author or the standing human claims it",
+                        rel_str(rel)
+                    )));
+                }
+                let session = attribution
+                    .session
+                    .as_ref()
+                    .map(|(s, _)| s.clone())
+                    .unwrap_or_default();
+                let as_of = attribution.as_of().unwrap_or_default();
+                let (_, author) =
+                    claim_as_of_bound(&root, Some(&session), &as_of, &governance.reference.path)?;
+                resolved.push(EntryAct {
+                    author,
+                    session: Some(session),
+                    as_of: Some(as_of),
+                    steward_origin: None,
+                });
+            }
+            resolved
         }
     };
 
@@ -351,11 +417,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     let mut results = Vec::new();
     // contributed, skipped, refused, appended, refused-and-currently-indexed
     let mut counts = (0usize, 0usize, 0usize, 0usize, 0usize);
-    let paths = match &named {
-        Named::Directory(_) => list_entries(&root.join(&dir_rel))?,
-        Named::Entries { files, .. } => files.iter().map(|f| root.join(f)).collect(),
-    };
-    for path in paths {
+    for (path, act) in paths.into_iter().zip(entry_acts.iter()) {
         let file = path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -370,8 +432,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
             &steward,
             source_reach,
             reach,
-            &author,
-            steward_of_record.is_some(),
+            act,
             &acts,
             opts,
         )?;
@@ -435,11 +496,11 @@ fn one(
     steward: &str,
     source_reach: Locality,
     reach: Locality,
-    author: &str,
-    steward_of_record: bool,
+    act: &EntryAct,
     acts: &Acts,
     opts: &Options,
 ) -> FlowResult<Outcome> {
+    let author = act.author.as_str();
     if let Some(reason) = private_reason(rel) {
         return Ok(Outcome::refused(format!("private record — {reason}")));
     }
@@ -493,8 +554,8 @@ fn one(
             )];
             // The authorship slot, in the contribution's own uncertainty list: the record says
             // who STANDS for these bytes, and that no one was witnessed writing them.
-            if steward_of_record {
-                lines.push(steward_of_record_line(author, origin_session(&fm)));
+            if let Some(origin) = &act.steward_origin {
+                lines.push(steward_of_record_line(author, origin.clone()));
             }
             lines
         },
@@ -552,8 +613,8 @@ fn one(
         "contribute",
         &Options {
             input: Some(&rel_str(&request_rel)),
-            session: opts.session,
-            as_of: opts.as_of,
+            session: act.session.as_deref(),
+            as_of: act.as_of.as_deref(),
             ..Options::default()
         },
     )?;
@@ -1016,36 +1077,14 @@ fn acting_author(root: &Path, session: Option<&str>) -> FlowResult<String> {
     acting_author_on(root, session, crate::actor::standing_here(root))
 }
 
-/// The session's OWN registered claim, and nothing else: the entry form's author.
+/// The claim that was current in `session` AS OF `at`: the one whose instant (`recordedAt`, or
+/// `claimedAt` for a legacy claim) is the latest not after `at`, ties to append order. No claim yet
+/// at that instant is a refusal — the entry is unattributable — and never a fall-forward to a claim
+/// made later.
 ///
-/// No standing-human fallback. The entry form is how the harness imports an entry under the
-/// session that wrote it — including a session that has since closed — and a session that never
-/// claimed has no author to offer; attributing its entry to whoever stands on this device would
-/// credit someone with an act they did not perform. Refused before anything is written.
-fn claimed_author(root: &Path, session: Option<&str>) -> FlowResult<String> {
-    let session = session
-        .ok_or_else(|| refused("importing named entries needs the --session that wrote them"))?;
-    match SidecarActorStore::open(root)?.current_for(session)? {
-        Some((_, claim)) => Ok(claim.claimed.0),
-        None => Err(refused(format!(
-            "session `{session}` registered no actor claim; the entry form attributes each entry \
-             to the session that wrote it and never to anyone else — the entry stays \
-             unattributable until its author or the standing human claims it"
-        ))),
-    }
-}
-
-/// An RFC 3339 instant, parsed. Instants are compared, never strings: `…:09.540Z` sorts before
-/// `…:09Z` as text and after it as time.
-fn instant(at: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    chrono::DateTime::parse_from_rfc3339(at.trim())
-        .ok()
-        .map(|t| t.with_timezone(&chrono::Utc))
-}
-
-/// The claim that was current in `session` AS OF `at`: the last one appended whose `claimed_at`
-/// is not after `at`. No claim yet at that instant is a refusal — the entry is unattributable —
-/// and never a fall-forward to a claim made later.
+/// `import`'s entry form resolves `at` from the entry's own evidence and threads it to
+/// `contribute`; a direct `contribute --as-of` runs this same resolution against the instant it
+/// names, so both paths author the act by one rule.
 ///
 /// Refused too when that claim is bound to a collective other than `collective` (the check
 /// `require_bound` makes against the latest claim, made here against the one that authors).
@@ -1057,16 +1096,22 @@ pub(super) fn claim_as_of_bound(
 ) -> FlowResult<(cid::Cid, String)> {
     let session =
         session.ok_or_else(|| refused("--as-of needs the --session that wrote the entries"))?;
-    let when =
-        instant(at).ok_or_else(|| refused(format!("--as-of `{at}` is not an RFC 3339 instant")))?;
+    if super::attribution::instant(at).is_none() {
+        return Err(refused(format!(
+            "--as-of `{at}` is not an RFC 3339 instant"
+        )));
+    }
     let store = SidecarActorStore::open(root)?;
-    let not_after = |claimed_at: &str| instant(claimed_at).is_some_and(|c| c <= when);
-    let Some((cid, claim, _basis)) = store.current_for_at(session, &not_after)? else {
+    let Some((cid, claim, _basis)) =
+        store.current_for_at(session, at, &super::attribution::compare)?
+    else {
         let first = store
             .claims()?
             .into_iter()
-            .find(|(_, c)| c.session == session)
-            .map(|(_, c)| format!(" (its first claim is dated {})", c.ordering_instant().0))
+            .filter(|(_, c)| c.session == session)
+            .filter_map(|(_, c)| super::attribution::instant(c.ordering_instant().0))
+            .min()
+            .map(|t| format!(" (its first claim is dated {})", t.to_rfc3339()))
             .unwrap_or_default();
         return Err(refused(format!(
             "session `{session}` had registered no actor claim as of {at}{first}; an entry is \
@@ -1099,52 +1144,27 @@ fn steward_of_record_line(human: &str, origin: Option<String>) -> String {
     )
 }
 
-/// The session the harness recorded as having written the entry (`metadata.originSessionId`).
-fn origin_session(fm: &entries::Frontmatter) -> Option<String> {
-    [fm.meta("originSessionId"), fm.get("originSessionId")]
-        .into_iter()
-        .map(|v| v.trim().trim_matches(['"', '\'']).to_string())
-        .find(|v| !v.is_empty())
-}
-
-/// When the entry was written: its frontmatter `modified`, else the file's mtime — the same rule
-/// the harness hook applies before it dispatches an import.
-fn entry_written_at(
-    root: &Path,
-    rel: &Path,
-    fm: &entries::Frontmatter,
-) -> Option<chrono::DateTime<chrono::Utc>> {
-    [fm.meta("modified"), fm.get("modified")]
-        .into_iter()
-        .find_map(|v| instant(v.trim().trim_matches(['"', '\''])))
-        .or_else(|| {
-            let modified = std::fs::metadata(root.join(rel)).ok()?.modified().ok()?;
-            Some(chrono::DateTime::<chrono::Utc>::from(modified))
-        })
-}
-
-/// Admit `--steward-of-record`, or refuse naming why. Returns the standing human's handle.
+/// Admit `--steward-of-record`, or refuse naming why. Returns the standing human's handle and
+/// each entry's origin session (for the authorship slot).
 ///
 /// Every condition is the operator's ruling, checked before anything is written:
 /// - the session's claim NOW is a `human:` participant — an agent authors; it does not stand;
 /// - that human is an active, NON-fixture Steward of the collective of record, read from the
 ///   affiliations sidecar exactly as graduation reads it — a fixture human cannot stand for
 ///   real fruit;
-/// - every named entry is unattributable by the as-of rule. An entry whose origin session held a
-///   claim when it was written HAS a witnessable author, and is refused naming that session and
-///   claim: steward of record never overrides a real author.
+/// - for every named entry NO agent author could possibly be witnessed: it names no origin
+///   session, or that session never claimed, or its `modified`/a harness witness PROVES the write
+///   predates that session's first claim. Anything else — a witnessable author, or an ambiguous
+///   write time under a session that did claim — is refused naming the session. Live mtime never
+///   admits.
 fn steward_of_record(
     root: &Path,
     opts: &Options,
-    named: &Named,
+    rels: &[PathBuf],
     governance: &super::validation::Governance,
-) -> FlowResult<String> {
+    evidence: &super::attribution::Evidence,
+) -> FlowResult<(String, Vec<Option<String>>)> {
     use eprfs_agent::memory::AffiliationStanding;
-    let Named::Entries { files, .. } = named else {
-        return Err(refused(
-            "--steward-of-record names the entries it stands for; a directory is not an entry",
-        ));
-    };
     if opts.as_of.is_some() {
         return Err(refused(
             "--steward-of-record stands NOW for entries no one authored; --as-of belongs to an \
@@ -1189,26 +1209,19 @@ fn steward_of_record(
             governance.declaration.id
         )));
     }
-    for rel in files {
-        let text = std::fs::read_to_string(root.join(rel))?;
-        let fm = entries::parse(&text);
-        let (Some(origin), Some(at)) = (origin_session(&fm), entry_written_at(root, rel, &fm))
-        else {
-            continue;
-        };
-        let not_after = |t: &str| instant(t).is_some_and(|c| c <= at);
-        if let Some((_, author, _)) = store.current_for_at(&origin, &not_after)? {
+    let mut origins = Vec::new();
+    for rel in rels {
+        // The standing human's session is NOT the writer: resolve with no caller assertions.
+        let attribution = super::attribution::resolve(root, rel, evidence, None, None)?;
+        if let Err(reason) = attribution.steward_of_record() {
             return Err(refused(format!(
-                "{} has a witnessable author: session {origin} held the claim {} when it was \
-                 written ({}); import it under that session with --as-of — steward of record \
-                 never overrides a real author",
-                rel_str(rel),
-                author.claimed.0,
-                at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                "{} cannot take a steward of record — {reason}",
+                rel_str(rel)
             )));
         }
+        origins.push(attribution.session.map(|(s, _)| s));
     }
-    Ok(human)
+    Ok((human, origins))
 }
 
 /// [`acting_author`] with this device's standing human already resolved.
@@ -1276,6 +1289,24 @@ fn bounded(value: &str, max: usize) -> String {
 }
 
 /// `*.md` in one directory, `MEMORY.md` excluded, in the projector's sort order.
+/// `epr flow memory attribution <dir> | <entry.md>…` — the read the harness takes instead of
+/// parsing an entry itself (see `attribution.rs`). Names entries exactly as `import` does.
+pub fn attribution(root: &Path, opts: &Options) -> FlowResult<Value> {
+    let named = Named::resolve(root, opts)?;
+    let dir_rel = named.dir().to_path_buf();
+    let rels: Vec<PathBuf> = match &named {
+        Named::Directory(_) => list_entries(&root.join(&dir_rel))?
+            .iter()
+            .map(|p| dir_rel.join(p.file_name().unwrap_or_default()))
+            .collect(),
+        Named::Entries { files, .. } => files.clone(),
+    };
+    let contributions = root.join(normalized(
+        opts.contributions.unwrap_or(DEFAULT_CONTRIBUTIONS_DIR),
+    )?);
+    super::attribution::report(root, &rels, &contributions)
+}
+
 fn list_entries(dir: &Path) -> FlowResult<Vec<PathBuf>> {
     let mut found: Vec<PathBuf> = Vec::new();
     let mut seen = BTreeSet::new();

@@ -1301,6 +1301,19 @@ fn the_entry_form_imports_only_the_named_entries_under_their_writers_claim() {
     plant_small(root);
     // A LATER session claims; SESSION (the fixture's first) is now a past session.
     actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+    // The harness witnessed each write: beta by the second session, the rest by the first.
+    witness(
+        root,
+        ".claude/memory/project_beta.md",
+        SECOND_SESSION,
+        "2099-01-01T00:00:00Z",
+    );
+    for file in [
+        ".claude/memory/feedback_alpha.md",
+        ".claude/memory/reference_gamma.md",
+    ] {
+        witness(root, file, SESSION, "2099-01-01T00:00:00Z");
+    }
 
     let beta = import_entries(root, SECOND_SESSION, &[".claude/memory/project_beta.md"])
         .expect("the second session imports its own entry");
@@ -1469,12 +1482,36 @@ fn claim_at(root: &Path, claimed: &str, session: &str, at: &str) {
         .expect("append");
 }
 
+/// The harness's write witness for an entry's CURRENT bytes: what the PostToolUse hook appends at
+/// the edit moment. Written here exactly as the hook writes it.
+fn witness(root: &Path, file: &str, session: &str, observed_at: &str) {
+    use std::io::Write as _;
+    let bytes = std::fs::read(root.join(file)).expect("entry bytes");
+    let line = serde_json::json!({
+        "path": file,
+        "sha256": sha256(&bytes),
+        "session": session,
+        "observedAt": observed_at,
+    });
+    let log = root.join(".eprfs/status/memory-writes.jsonl");
+    std::fs::create_dir_all(log.parent().expect("parent")).expect("mkdir");
+    let mut fh = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .expect("witness log");
+    writeln!(fh, "{line}").expect("append");
+}
+
 fn import_as_of(
     root: &Path,
     session: &str,
     at: &str,
     files: &[&str],
 ) -> elohim_epr_cli::flow::FlowResult<serde_json::Value> {
+    for file in files {
+        witness(root, file, session, at);
+    }
     memory::execute_with(
         root,
         "import",
@@ -1541,11 +1578,12 @@ fn an_entry_written_before_any_claim_is_unattributable() {
     .expect_err("no claim existed yet; the later one must not be borrowed");
     let message = err.to_string();
     assert!(
-        message.contains("no actor claim as of") && message.contains("unattributable"),
+        message.contains("no actor claim when it was written")
+            && message.contains("unattributable"),
         "{message}"
     );
     assert!(
-        message.contains("2026-09-25T10:00:00Z"),
+        message.contains("2026-09-25T10:00:00"),
         "names the first claim: {message}"
     );
     assert!(!root.join(".eprfs/status/memory/contributions").exists());
@@ -1827,5 +1865,180 @@ fn steward_of_record_admits_an_unattributable_entry_and_labels_it() {
     assert!(
         row.contains("[steward of record: human:matthew]"),
         "the row does not say who stands for it: {row}"
+    );
+}
+
+// ── one parser, the harness's write witness, a conservative steward of record ──────────────────
+
+fn attribution_of(root: &Path, file: &str) -> serde_json::Value {
+    let out = memory::execute_with(
+        root,
+        "attribution",
+        &Options {
+            target: Some(file),
+            ..Options::default()
+        },
+    )
+    .expect("attribution report");
+    out["entries"][0].clone()
+}
+
+fn import_plain(
+    root: &Path,
+    file: &str,
+    session: Option<&str>,
+    as_of: Option<&str>,
+) -> elohim_epr_cli::flow::FlowResult<serde_json::Value> {
+    memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(file),
+            session,
+            as_of,
+            ..Options::default()
+        },
+    )
+}
+
+/// The review's finding: a `|` block quoting `originSessionId:`/`modified:` read as the entry's
+/// own keys by a second, naive parser. There is one parser now, and it skips a block scalar's
+/// body at the top level AND inside `metadata:` — so the import follows the real keys.
+#[test]
+fn a_block_scalar_quoting_the_keys_is_ignored_and_the_import_follows_the_real_keys() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim_recorded_at(root, ORCHESTRATOR, "real-session", "2026-09-25T10:00:00Z")
+        .expect("real writer's claim");
+    actor::claim_recorded_at(root, SUBAGENT, "quoted-session", "2026-09-25T09:00:00Z")
+        .expect("quoted session's claim");
+    write(
+        root,
+        ".claude/memory/feedback_block.md",
+        "---\nname: feedback_block\ndescription: An entry that quotes attribution keys.\n\
+         details: |\n  originSessionId: quoted-session\n  modified: 2026-09-25T09:30:00Z\n\
+         metadata:\n  type: feedback\n  originSessionId: real-session\n  modified: 2026-09-25T11:00:00Z\n\
+         \x20 note: |\n    originSessionId: quoted-session\n    modified: 2026-09-25T09:30:00Z\n\
+         ---\n\nbody\n",
+    );
+    let file = ".claude/memory/feedback_block.md";
+    let report = attribution_of(root, file);
+    assert_eq!(report["session"], "real-session", "{report}");
+    assert_eq!(report["sessionSource"], "frontmatter");
+    assert_eq!(report["writtenAt"], "2026-09-25T11:00:00.000Z", "{report}");
+    assert_eq!(report["writtenBasis"], "modified");
+
+    // A caller naming the quoted writer is refused, naming both.
+    let err = import_plain(root, file, Some("quoted-session"), None)
+        .expect_err("the entry's own origin governs");
+    let message = err.to_string();
+    assert!(
+        message.contains("real-session") && message.contains("quoted-session"),
+        "{message}"
+    );
+    // A caller's instant that disagrees with the entry's `modified` is refused.
+    let err = import_plain(root, file, None, Some("2026-09-25T09:30:00Z"))
+        .expect_err("the entry's own modified governs");
+    assert!(err.to_string().contains("disagrees"), "{err}");
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+
+    // No caller assertions at all: the entry's real keys decide the author.
+    import_plain(root, file, None, None).expect("imports under its real writer");
+    assert_eq!(author_of(root, "feedback_block"), ORCHESTRATOR);
+    assert_eq!(last_provider(root), ORCHESTRATOR);
+}
+
+/// Live mtime is never evidence: with no `modified` and no witness of its bytes, an entry under a
+/// session that DID claim is unattributable, and no one may stand for it either.
+#[test]
+fn an_ambiguous_write_under_a_claimed_session_is_unattributable_and_never_stood_for() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+    // SESSION claimed AUTHOR in `repo()`. No `modified`, and no witness of these bytes.
+    let entry = |stem: &str, desc: &str| {
+        format!(
+            "---\nname: {stem}\ndescription: {desc}\nmetadata:\n  type: feedback\n  originSessionId: {SESSION}\n---\n"
+        )
+    };
+    let file = ".claude/memory/feedback_unwitnessed.md";
+    write(
+        root,
+        file,
+        &entry("feedback_unwitnessed", "No modified, no witness."),
+    );
+    let report = attribution_of(root, file);
+    assert_eq!(report["writtenBasis"], "ambiguous", "{report}");
+    assert_eq!(report["attributable"], false);
+    assert_eq!(report["stewardOfRecordAdmissible"], false);
+    assert!(
+        report["reason"].as_str().unwrap().contains("ambiguous"),
+        "{report}"
+    );
+
+    let err = import_plain(root, file, None, None).expect_err("never guessed");
+    assert!(err.to_string().contains("unattributable"), "{err}");
+    let err = stand(root, "human-session", &[file]).expect_err("never stood for");
+    let message = err.to_string();
+    assert!(
+        message.contains(SESSION) && message.contains("ambiguous"),
+        "{message}"
+    );
+
+    // A witness of these exact bytes proves the write, and the import follows it.
+    witness(root, file, SESSION, "2099-01-01T00:00:00Z");
+    import_plain(root, file, None, None).expect("witnessed, so attributable");
+    assert_eq!(author_of(root, "feedback_unwitnessed"), AUTHOR);
+
+    // A witness of DIFFERENT bytes proves nothing about these.
+    let edited = ".claude/memory/feedback_reedited.md";
+    write(root, edited, &entry("feedback_reedited", "Witnessed once."));
+    witness(root, edited, SESSION, "2099-01-01T00:00:00Z");
+    write(
+        root,
+        edited,
+        &entry("feedback_reedited", "Edited again, unwitnessed."),
+    );
+    let report = attribution_of(root, edited);
+    assert_eq!(report["writtenBasis"], "ambiguous", "{report}");
+}
+
+/// The steward of record is admitted only when no agent author could possibly be witnessed —
+/// including a PROVEN write that predates the origin session's first claim.
+#[test]
+fn steward_of_record_admits_a_write_proven_to_predate_the_first_claim() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+    actor::claim_recorded_at(root, ORCHESTRATOR, "late-session", "2026-09-25T10:00:00Z")
+        .expect("late claim");
+    plant_entry(
+        root,
+        "feedback_early",
+        Some("late-session"),
+        "2026-09-25T09:00:00Z",
+    );
+    let file = ".claude/memory/feedback_early.md";
+    let report = attribution_of(root, file);
+    assert_eq!(report["attributable"], false, "{report}");
+    assert_eq!(report["stewardOfRecordAdmissible"], true, "{report}");
+    import_plain(root, file, None, None).expect_err("no claim when it was written");
+
+    stand(root, "human-session", &[file]).expect("proven to predate: admissible");
+    assert_eq!(author_of(root, "feedback_early"), STANDING_HUMAN);
+
+    // The same session, a write AFTER its first claim: an author is witnessable; refused.
+    plant_entry(
+        root,
+        "feedback_after",
+        Some("late-session"),
+        "2026-09-25T11:00:00Z",
+    );
+    let err = stand(root, "human-session", &[".claude/memory/feedback_after.md"])
+        .expect_err("a witnessable author is never overridden");
+    let message = err.to_string();
+    assert!(
+        message.contains("late-session") && message.contains(ORCHESTRATOR),
+        "{message}"
     );
 }

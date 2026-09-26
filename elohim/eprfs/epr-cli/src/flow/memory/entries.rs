@@ -137,8 +137,19 @@ pub fn parse(text: &str) -> Frontmatter {
     };
 
     let mut metadata_open = false;
+    // The indent of a `metadata:` key whose value is a block scalar (`|`, `|-`, `>`, …): every
+    // deeper line is that scalar's BODY, never a key. Without this a body quoting
+    // `originSessionId: x` would be read as the entry's own origin — and attribution rests on it.
+    let mut block_body: Option<usize> = None;
     for line in &lines[1..end] {
         let stripped = line.trim_end();
+        if let Some(indent) = block_body {
+            let this = stripped.len() - stripped.trim_start().len();
+            if stripped.is_empty() || this > indent {
+                continue;
+            }
+            block_body = None;
+        }
         if stripped.is_empty() {
             metadata_open = false;
             continue;
@@ -164,6 +175,10 @@ pub fn parse(text: &str) -> Frontmatter {
         }
         if metadata_open {
             if let Some((key, value)) = indented_kv(stripped) {
+                if value.starts_with('|') || value.starts_with('>') {
+                    block_body = Some(stripped.len() - stripped.trim_start().len());
+                    continue;
+                }
                 fm.metadata
                     .insert(key.to_string(), unquote(value).to_string());
             }

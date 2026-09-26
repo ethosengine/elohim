@@ -715,8 +715,14 @@ pub trait ActorStore {
             .rfind(|(_, claim)| claim.session == session))
     }
 
-    /// Who was acting in `session` AS OF an instant: the last claim appended for it whose
-    /// ordering instant the caller's `not_after` admits (`instant <= at`, decided by the caller).
+    /// Who was acting in `session` AS OF an instant: the claim whose ordering instant is the
+    /// LATEST one not after `at`, compared as instants by the caller's `compare` (the ordering of
+    /// two RFC3339 values, `None` when either is unreadable). A tie goes to append order — the
+    /// later-appended claim — which is also the only order a legacy tie ever had.
+    ///
+    /// Instants, not append order, pick the claim: a claim appended LATER but recorded EARLIER
+    /// (a backdated `recorded_at`) is ordered where its instant puts it, so it can neither take
+    /// an act performed after a later-recorded claim nor hide one.
     ///
     /// The ordering instant is `recorded_at` — when the claim was recorded — and only for a
     /// LEGACY claim, recorded before that field existed, `claimed_at` (the HEAD time it was made
@@ -730,16 +736,34 @@ pub trait ActorStore {
     fn current_for_at(
         &self,
         session: &str,
-        not_after: &dyn Fn(&str) -> bool,
+        at: &str,
+        compare: &dyn Fn(&str, &str) -> Option<std::cmp::Ordering>,
     ) -> Result<Option<(Cid, ActorClaim, AsOfBasis)>> {
-        Ok(self
-            .claims()?
-            .into_iter()
-            .rfind(|(_, claim)| claim.session == session && not_after(claim.ordering_instant().0))
-            .map(|(cid, claim)| {
-                let basis = claim.ordering_instant().1;
-                (cid, claim, basis)
-            }))
+        use std::cmp::Ordering::{Equal, Greater, Less};
+        let mut best: Option<(Cid, ActorClaim)> = None;
+        for (cid, claim) in self.claims()? {
+            if claim.session != session {
+                continue;
+            }
+            let instant = claim.ordering_instant().0;
+            if !matches!(compare(instant, at), Some(Less | Equal)) {
+                continue;
+            }
+            let replaces = match &best {
+                None => true,
+                Some((_, held)) => matches!(
+                    compare(instant, held.ordering_instant().0),
+                    Some(Greater | Equal)
+                ),
+            };
+            if replaces {
+                best = Some((cid, claim));
+            }
+        }
+        Ok(best.map(|(cid, claim)| {
+            let basis = claim.ordering_instant().1;
+            (cid, claim, basis)
+        }))
     }
 }
 
@@ -1225,9 +1249,7 @@ mod tests {
     fn current_for_at_orders_by_recorded_at_and_names_legacy_claims() {
         let head = "2026-09-25T20:00:00Z";
         // RFC3339 UTC in one shape, so text order is time order for this fixture.
-        fn at(c: &'static str) -> impl Fn(&str) -> bool {
-            move |t: &str| t <= c
-        }
+        let cmp = |a: &str, b: &str| Some(a.cmp(b));
         let mut store = MemoryActorStore::new();
         store
             .append(ActorRecord::Claim(
@@ -1246,15 +1268,16 @@ mod tests {
             ))
             .unwrap();
         // An entry written at 20:20, between the two recordings: the EARLIER claim.
-        let between = at("2026-09-25T20:20:00Z");
-        let (_, current, basis) = store.current_for_at("s1", &between).unwrap().unwrap();
+        let (_, current, basis) = store
+            .current_for_at("s1", "2026-09-25T20:20:00Z", &cmp)
+            .unwrap()
+            .unwrap();
         assert_eq!(current.claimed.0, "agent:orchestrator@opus-5");
         assert_eq!(basis, AsOfBasis::Recorded);
         // After both: the later one. Before both: none, never a fall-forward.
-        let after = at("2026-09-25T20:40:00Z");
         assert_eq!(
             store
-                .current_for_at("s1", &after)
+                .current_for_at("s1", "2026-09-25T20:40:00Z", &cmp)
                 .unwrap()
                 .unwrap()
                 .1
@@ -1262,8 +1285,10 @@ mod tests {
                 .0,
             "agent:scribe@opus-5"
         );
-        let before = at("2026-09-25T20:05:00Z");
-        assert!(store.current_for_at("s1", &before).unwrap().is_none());
+        assert!(store
+            .current_for_at("s1", "2026-09-25T20:05:00Z", &cmp)
+            .unwrap()
+            .is_none());
 
         // Legacy-only claims behave exactly as before, and are named as legacy.
         let mut legacy = MemoryActorStore::new();
@@ -1274,7 +1299,7 @@ mod tests {
             .append(ActorRecord::Claim(claim("agent:scribe@opus-5", "s2")))
             .unwrap();
         let (_, latest, basis) = legacy
-            .current_for_at("s2", &at("2026-09-30T00:00:00Z"))
+            .current_for_at("s2", "2026-09-30T00:00:00Z", &cmp)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -1282,6 +1307,61 @@ mod tests {
             "the legacy tie still goes to the later"
         );
         assert_eq!(basis, AsOfBasis::LegacyClaimedAt);
+    }
+
+    /// A claim appended LATER but recorded EARLIER (a backdated `recorded_at`) is ordered by its
+    /// instant, not by where it sits in the log: append order only breaks a tie.
+    #[test]
+    fn current_for_at_picks_by_instant_not_append_order() {
+        let head = "2026-09-25T20:00:00Z";
+        let cmp = |a: &str, b: &str| Some(a.cmp(b));
+        let mut store = MemoryActorStore::new();
+        let recorded = |who: &str, at: &str| {
+            ActorRecord::Claim(
+                ActorClaim::new(who, "s1", head, None)
+                    .unwrap()
+                    .recorded_at(at)
+                    .unwrap(),
+            )
+        };
+        store
+            .append(recorded(
+                "agent:orchestrator@opus-5",
+                "2026-09-25T20:15:00Z",
+            ))
+            .unwrap();
+        // Appended second, but backdated before the first.
+        store
+            .append(recorded("agent:scribe@opus-5", "2026-09-25T20:05:00Z"))
+            .unwrap();
+        let (_, at_20, _) = store
+            .current_for_at("s1", "2026-09-25T20:20:00Z", &cmp)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            at_20.claimed.0, "agent:orchestrator@opus-5",
+            "the latest INSTANT not after 20:20 wins, not the last line appended"
+        );
+        let (_, at_10, _) = store
+            .current_for_at("s1", "2026-09-25T20:10:00Z", &cmp)
+            .unwrap()
+            .unwrap();
+        assert_eq!(at_10.claimed.0, "agent:scribe@opus-5");
+        // A tie at one instant goes to the later-appended claim.
+        store
+            .append(recorded("agent:critic@opus-5", "2026-09-25T20:15:00Z"))
+            .unwrap();
+        let (_, tied, _) = store
+            .current_for_at("s1", "2026-09-25T20:20:00Z", &cmp)
+            .unwrap()
+            .unwrap();
+        assert_eq!(tied.claimed.0, "agent:critic@opus-5");
+        // An unreadable instant is never admitted.
+        let never = |_: &str, _: &str| None;
+        assert!(store
+            .current_for_at("s1", "2026-09-25T20:20:00Z", &never)
+            .unwrap()
+            .is_none());
     }
 
     /// Pinned so the canonical dag-cbor encoding of an `ActorClaim` can never silently drift
