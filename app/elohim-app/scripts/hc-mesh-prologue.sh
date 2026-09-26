@@ -205,6 +205,17 @@ say "landing browser/server + lamad-spa browser dist dirs all present"
 # dists lacks a stamp, write the SAME stamp to all of them — browser and server must
 # agree byte-for-byte or the server archive is refused on that comparison instead.
 # ---------------------------------------------------------------------------
+# buildTime is the COMMIT time (SOURCE_DATE_EPOCH when set), not the wall clock, so
+# two stagings of one commit stamp byte-identical files and keep one bundle address.
+stamp_build_time() {
+  local epoch="${SOURCE_DATE_EPOCH:-}"
+  [ -n "$epoch" ] || epoch="$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || true)"
+  if [ -z "$epoch" ]; then
+    echo "warning: no SOURCE_DATE_EPOCH or commit time; version.json buildTime uses the wall clock" >&2
+    epoch="$(date +%s)"
+  fi
+  date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%S.000Z
+}
 stamp_build_version() { # <service> <dist-dir>...
   local service="$1"; shift
   local dists=("$@") d missing=0
@@ -217,7 +228,7 @@ stamp_build_version() { # <service> <dist-dir>...
   commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
   if [ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)" ]; then dirty=true; else dirty=false; fi
   stamp="$(printf '{\n  "commit": "%s",\n  "dirty": %s,\n  "buildTime": "%s",\n  "service": "%s",\n  "environment": "local"\n}\n' \
-    "$commit" "$dirty" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$service")"
+    "$commit" "$dirty" "$(stamp_build_time)" "$service")"
   # printf '%s\n': command substitution above stripped the trailing newline that
   # package-angular.mjs's `JSON.stringify(...) + "\n"` writes. The check compares
   # PARSED json, so this is fidelity, not correctness.

@@ -1409,13 +1409,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 sh 'pnpm run build:sw'
                                 sh "pnpm exec ng build --configuration=${buildConfig}"
 
-                                // Generate version.json for deployment verification
+                                // Generate version.json for deployment verification.
+                                // buildTime = commit time, so one commit rebuilds to the same bundle CID.
                                 sh """
 cat > dist/elohim-app/browser/version.json << VEOF
 {
   "commit": "${GIT_COMMIT_HASH}",
   "version": "${BASE_VERSION}",
-  "buildTime": "\$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "buildTime": "\$(date -u -d @\${SOURCE_DATE_EPOCH:-\$(git log -1 --format=%ct 2>/dev/null || date +%s)} +%Y-%m-%dT%H:%M:%SZ)",
   "environment": "${buildConfig}",
   "service": "elohim-app"
 }

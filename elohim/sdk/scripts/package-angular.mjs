@@ -48,6 +48,29 @@ function layout({ appDir }) {
   return bundles;
 }
 
+// Commit time, not wall-clock time: two builds of one commit stamp byte-identical
+// version.json files, so the packaged bundle keeps one content address.
+function buildTime(cwd) {
+  const epoch = process.env.SOURCE_DATE_EPOCH;
+  if (epoch && /^\d+$/.test(epoch))
+    return new Date(Number(epoch) * 1000).toISOString();
+  try {
+    const committed = execFileSync("git", ["log", "-1", "--format=%ct"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (/^\d+$/.test(committed))
+      return new Date(Number(committed) * 1000).toISOString();
+  } catch {
+    // fall through to the wall clock
+  }
+  process.stderr.write(
+    "warning: no SOURCE_DATE_EPOCH or commit time; version.json buildTime uses the wall clock and the bundle address will differ per build\n",
+  );
+  return new Date().toISOString();
+}
+
 function build(context) {
   const { appDir } = context;
   const commit = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -106,7 +129,7 @@ function build(context) {
       {
         commit,
         dirty,
-        buildTime: new Date().toISOString(),
+        buildTime: buildTime(appDir),
         service: bundles[0].name,
         environment: "local",
       },
