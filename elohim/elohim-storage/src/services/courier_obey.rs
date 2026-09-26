@@ -110,6 +110,23 @@ pub trait BytePresence: Send + Sync {
     fn request(&self, origin: &str, address: &str, holder: &str);
 }
 
+/// The node's one byte-presence handle, registered where the adoption
+/// trigger's courier is built (`main.rs`). The sweep reaches it through
+/// [`crate::services::head_adoption::AdoptContext::bytes`]; like the iroh fetch
+/// leg, this names a process fact rather than introducing one.
+static NODE_BYTE_PRESENCE: std::sync::OnceLock<Arc<dyn BytePresence>> = std::sync::OnceLock::new();
+
+/// Publish this node's byte presence. First registration wins.
+pub fn register_node_byte_presence(bytes: Arc<dyn BytePresence>) -> bool {
+    NODE_BYTE_PRESENCE.set(bytes).is_ok()
+}
+
+/// The registered byte presence, or `None` before the peer plane exists (the
+/// boot pass) or on a node with no content pool.
+pub fn node_byte_presence() -> Option<&'static dyn BytePresence> {
+    NODE_BYTE_PRESENCE.get().map(|b| b.as_ref())
+}
+
 /// What one courier attempt did. Closed metric-label vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CourierOutcome {

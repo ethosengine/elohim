@@ -1019,6 +1019,10 @@ pub struct AdoptContext<'a> {
     /// `config.contest_undeclared_divergence` — the per-pod switch for the
     /// SPIN-discharge arm. `false` restores the pre-2026-08-14 MissLedger spin.
     pub contest_divergent_enabled: bool,
+    /// Byte presence for the obey arm's bytes-before-the-move gate. `None`
+    /// (the boot pass, before any peer plane) stamps without the gate, which
+    /// is what the arm did before it had one.
+    pub bytes: Option<&'a dyn crate::services::courier_obey::BytePresence>,
 }
 
 impl AdoptContext<'_> {
@@ -1037,6 +1041,7 @@ impl AdoptContext<'_> {
             contest_enabled: false,
             divergent_advertisers: EMPTY_DIVERGENT.get_or_init(HashMap::new),
             contest_divergent_enabled: false,
+            bytes: None,
         }
     }
 }
@@ -1731,9 +1736,17 @@ pub async fn try_adopt_canonical_head(
     // arm moves is left holding the elected head with its ordering recorded — so
     // the very next sweep sees `canonical_declared_at` set and quiesces.
     if should_probe_election(head.is_some()) {
-        if let Some(outcome) =
-            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher, election_resolve)
-                .await
+        if let Some(outcome) = try_obey_visible_election(
+            hc,
+            pool,
+            ctx,
+            id,
+            hint,
+            adopt.fetcher,
+            adopt.bytes,
+            election_resolve,
+        )
+        .await
         {
             return outcome;
         }
@@ -1752,9 +1765,17 @@ pub async fn try_adopt_canonical_head(
         // ANY failure falls through to the normal decision so the contest arm
         // still mints its DHT candidate — the durable supply for every other
         // peer — exactly as before.
-        if let Some(outcome) =
-            try_obey_visible_election(hc, pool, ctx, id, hint, adopt.fetcher, election_resolve)
-                .await
+        if let Some(outcome) = try_obey_visible_election(
+            hc,
+            pool,
+            ctx,
+            id,
+            hint,
+            adopt.fetcher,
+            adopt.bytes,
+            election_resolve,
+        )
+        .await
         {
             if matches!(outcome, AdoptOutcome::Adopted) {
                 return outcome;
@@ -2489,6 +2510,7 @@ async fn try_obey_visible_election(
     id: &str,
     hint: Option<&PeerHeadHint>,
     fetcher: Option<&dyn HeadRecordFetcher>,
+    byte_presence: Option<&dyn crate::services::courier_obey::BytePresence>,
     election_resolve: ElectionResolve<'_>,
 ) -> Option<AdoptOutcome> {
     // (0) The DENOMINATOR. Counted at entry, before any gate, because the
@@ -2692,6 +2714,27 @@ async fn try_obey_visible_election(
                 return Some(AdoptOutcome::Held);
             }
         };
+
+    // (4b) THE BYTES BEFORE THE MOVE — the rule the trigger's paths already
+    // hold. Stamping repoints the row; if this node does not hold the version's
+    // bytes, the page it serves goes from working to 503/404 until heal-on-read
+    // catches up. Keep serving the version it holds, ask the peer that served
+    // the record, and let a later sweep (or the trigger) move it.
+    if let Some(presence) = byte_presence {
+        if !crate::services::courier_obey::bytes_ready(presence, &proven.content, id, &hint.peer_id)
+            .await
+        {
+            crate::metrics::inc_election_obey_failed("awaiting_bytes");
+            tracing::debug!(
+                content_id = %id,
+                from_peer = %hint.peer_id,
+                elected = %winner,
+                "election-obey: the elected head is proven but its bytes are not held here \
+                 yet — requested; the row keeps serving the version it holds"
+            );
+            return Some(AdoptOutcome::Held);
+        }
+    }
 
     // (5) Stamp under the ELECTION's ordering. `HealCanonical` + the election
     // clock means `canonical_move_verdict` still decides: fill, forward-move, or

@@ -5778,17 +5778,21 @@ async fn async_main(
         // `command_tx` is `None` on a pure-iroh node; byte requests then go
         // over the iroh fetch leg (`NodeBytePresence::request`).
         if let (Some(peers), Some(pool)) = (reconcile_peers.clone(), db_pool.clone()) {
+            let bytes: Arc<dyn elohim_storage::services::courier_obey::BytePresence> =
+                Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {
+                    blob_store: blob_store.clone(),
+                    pool,
+                    command_tx: trigger_command_tx,
+                    self_cid: config.self_cid.clone().unwrap_or_default(),
+                });
+            // The sweep's obey arm holds the same bytes-before-the-move rule.
+            elohim_storage::services::courier_obey::register_node_byte_presence(bytes.clone());
             let _ = trigger_courier_slot.set(
                 elohim_storage::services::head_adoption_trigger::TriggerCourier {
                     fetcher: Arc::new(
                         elohim_storage::p2p::trigger_courier::OwnedPeerHeadRecordFetcher(peers),
                     ),
-                    bytes: Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {
-                        blob_store: blob_store.clone(),
-                        pool,
-                        command_tx: trigger_command_tx,
-                        self_cid: config.self_cid.clone().unwrap_or_default(),
-                    }),
+                    bytes,
                 },
             );
         }

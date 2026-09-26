@@ -5335,7 +5335,7 @@ pub fn inc_election_obeyed(path: &str) {
 }
 
 /// Count an election-obey attempt that did not move the row
-/// (`fetch` | `validate` | `stamp_refused`).
+/// (`fetch` | `validate` | `awaiting_bytes` | `stamp_refused`).
 pub fn inc_election_obey_failed(class: &str) {
     CONTENT_ELECTION_OBEY_FAILED
         .with_label_values(&[class])

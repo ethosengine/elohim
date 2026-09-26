@@ -2698,6 +2698,7 @@ pub async fn run_heal(
         contest_enabled: crate::config::contest_two_way_declared_enabled(),
         divergent_advertisers: &divergent_actionable_advertisers,
         contest_divergent_enabled: crate::config::contest_undeclared_divergence_enabled(),
+        bytes: crate::services::courier_obey::node_byte_presence(),
     };
 
     // Deferred adoptions FIRST: these are ids the heal leg just refused to
