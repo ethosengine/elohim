@@ -19,10 +19,17 @@ use jenkins_bridge::{
 const COLLECTIVE: &str = include_str!("../../../.epr-meta/collective.json");
 const RECIPES: &str = include_str!("../../../.claude/epr-meta/recipes.yaml");
 const OFFER: &str = include_str!("../../.epr-meta/offers/jenkins-edge-pipeline.offer.md");
+/// The offer's text frozen at the version the address goldens were pinned against. Every event is
+/// `in_scope_of` its governing offer, so a legitimate edit to the live offer (which re-addresses
+/// it and needs fresh approval) moves event CIDs; address-stability tests pin this copy instead.
+const OFFER_GOLDEN: &str = include_str!("fixtures/offer-golden.offer.md");
 const W1483: &str = include_str!("fixtures/edge-1483.wfapi.json");
 const W1484: &str = include_str!("fixtures/edge-1484.wfapi.json");
 const G1903: &str = include_str!("fixtures/orchestrator-1903.actual-build-graph.json");
 const G1906: &str = include_str!("fixtures/orchestrator-1906.actual-build-graph.json");
+/// Orchestrator #1910 archived a still-queued sibling (elohim-storybook) as `buildNumber: null`.
+const W1485: &str = include_str!("fixtures/edge-1485.wfapi.json");
+const G1910: &str = include_str!("fixtures/orchestrator-1910.actual-build-graph.json");
 const AUTHOR: &str = "agent:implementer@claude-opus-5-5";
 
 fn write(root: &Path, path: &str, text: &str) {
@@ -149,7 +156,11 @@ fn sidecar_sha(root: &Path) -> String {
 
 /// Minted and approved by the fixture co-steward: active at Bootstrap stakes.
 fn active() -> (tempfile::TempDir, String) {
-    let dir = fixture();
+    active_with(OFFER)
+}
+
+fn active_with(offer: &str) -> (tempfile::TempDir, String) {
+    let dir = fixture_with(offer);
     let c = ctx(dir.path());
     let (cid, _) = jenkins_bridge::mint_offer(&c).unwrap();
     verdict(dir.path(), &cid.to_string(), "bob", "approved");
@@ -400,7 +411,7 @@ fn translate_output_can_only_express_observations() {
 /// of #1484; all 17+19+19 event records were diffed byte-identical when the envelope moved).
 #[test]
 fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address() {
-    let (dir, _) = active();
+    let (dir, _) = active_with(OFFER_GOLDEN);
     let c = ctx(dir.path());
     let offer = c.offer_cid().unwrap();
     for (stages, graph, build, result, event_golden) in [
@@ -456,6 +467,21 @@ fn the_process_carries_the_build_and_its_envelope_and_events_keep_their_address(
             "the Process groups every event"
         );
     }
+}
+
+#[test]
+fn a_graph_with_a_still_queued_sibling_pipeline_translates() {
+    // Real archive: #1910 dispatched elohim-edge #1485 while elohim-storybook was still queued.
+    assert!(
+        G1910.contains("\"buildNumber\": null"),
+        "fixture no longer has a queued sibling"
+    );
+    let (dir, _) = active();
+    let c = ctx(dir.path());
+    let t = c.translate(&inputs(W1485, Some(G1910))).unwrap();
+    assert_eq!(t.basis, "graph");
+    assert!(t.sha.is_some());
+    assert!(c.drift_of(&t).is_clean());
 }
 
 #[test]

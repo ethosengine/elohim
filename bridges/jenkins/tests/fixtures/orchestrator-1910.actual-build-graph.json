@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1",
+  "executedAt": "2026-09-26T00:19:14Z",
+  "commitSha": "a67b20b4af87f1084a26f75dbb5ef63f65c14d7f",
+  "branch": "dev",
+  "buildNumber": "1910",
+  "executionOrder":   [
+    "elohim",
+    "elohim-storybook",
+    "elohim-conductor",
+    "elohim-epr",
+    "elohim-eprfs",
+    "elohim-edge",
+    "elohim-holochain",
+    "elohim-genesis"
+  ],
+  "results":   {
+    "elohim-storybook":     {
+      "success": true,
+      "dispatched": true,
+      "result": "DISPATCHED",
+      "duration": 0,
+      "url": "(queued)",
+      "buildNumber": null,
+      "level": 0
+    },
+    "elohim-epr":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 179746,
+      "url": "https://jenkins.ethosengine.com/job/elohim-epr/job/dev/38/",
+      "buildNumber": 38,
+      "level": 0
+    },
+    "elohim-eprfs":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 567478,
+      "url": "https://jenkins.ethosengine.com/job/elohim-eprfs/job/dev/38/",
+      "buildNumber": 38,
+      "level": 0
+    },
+    "elohim-conductor":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 1260467,
+      "url": "https://jenkins.ethosengine.com/job/elohim-edgenode/job/main/33/",
+      "buildNumber": 33,
+      "level": 0
+    },
+    "elohim-holochain":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 2618649,
+      "url": "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/1464/",
+      "buildNumber": 1464,
+      "level": 0
+    },
+    "elohim-edge":     {
+      "success": true,
+      "unstable": false,
+      "wasted": false,
+      "result": "SUCCESS",
+      "duration": 8449914,
+      "url": "https://jenkins.ethosengine.com/job/elohim-edge/job/dev/1485/",
+      "buildNumber": 1485,
+      "level": 1
+    },
+    "elohim":     {
+      "success": true,
+      "unstable": true,
+      "wasted": false,
+      "result": "UNSTABLE",
+      "duration": 517232,
+      "url": "https://jenkins.ethosengine.com/job/elohim/job/dev/1727/",
+      "buildNumber": 1727,
+      "level": 2
+    },
+    "elohim-genesis":     {
+      "success": true,
+      "unstable": true,
+      "wasted": false,
+      "result": "UNSTABLE",
+      "duration": 4351276,
+      "url": "https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/1578/",
+      "buildNumber": 1578,
+      "level": "genesis-trailer"
+    }
+  },
+  "abortedBeforeStart": []
+}

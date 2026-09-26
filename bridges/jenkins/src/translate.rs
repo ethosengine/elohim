@@ -100,7 +100,9 @@ pub struct BuildGraph {
 pub struct GraphResult {
     pub result: String,
     pub url: String,
-    pub build_number: u64,
+    /// Absent while a dispatched pipeline is still queued: the orchestrator archives
+    /// `"buildNumber": null` with `"url": "(queued)"` (orchestrator #1910, elohim-storybook).
+    pub build_number: Option<u64>,
 }
 
 pub fn parse_wfapi(text: &str) -> Result<WfapiRun, Refusal> {
@@ -309,10 +311,13 @@ pub fn translate(
                     graph.build_number
                 ))
             })?;
-            if edge.build_number != build {
+            if edge.build_number != Some(build) {
+                let dispatched = edge
+                    .build_number
+                    .map_or_else(|| "a still-queued build".to_string(), |n| format!("#{n}"));
                 return Err(refuse(format!(
-                    "orchestrator run {} dispatched {EDGE_JOB} #{}, not #{build}",
-                    graph.build_number, edge.build_number
+                    "orchestrator run {} dispatched {EDGE_JOB} {dispatched}, not #{build}",
+                    graph.build_number
                 )));
             }
             (
