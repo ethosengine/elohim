@@ -120,7 +120,7 @@ export interface ContentView {
    */
   trust: string;
   /**
-   * The content row's tags (content_tags projection). Always present; an empty array is the honest 'no tags' answer.
+   * The content row's tags (content_tags projection). Always present; an empty array is the honest 'no tags' answer. REQUIRED from the build that added it (plan Lane S, ruling R-S5); a peer serving an older binary omits the field entirely, so a client normalises it at the adapter (`tags ?? []`) rather than treating absence as a schema break (ruling R-S10, review m3).
    */
   tags: string[];
   /**
