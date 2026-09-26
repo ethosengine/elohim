@@ -119,10 +119,10 @@ pub fn render(ctx: &Context, stewards: Value, last: Option<LastObserved<'_>>) ->
         "verify": verify,
         "feedback": {
             "route": format!(
-                "epr flow note {cid} --kind observation --reason \"<what you saw>\" --session <your session>"
+                "epr flow note --on {cid} --kind observation --reason \"<what you saw>\" --session <your session>"
             ),
             "contest": format!(
-                "a Steward withdraws the gift by the same process it was approved: epr flow note {cid} --kind verdict --verdict changes-requested --reason \"<why>\" --session <steward session>"
+                "a Steward withdraws the gift by the same process it was approved: epr flow note --on {cid} --kind verdict --verdict changes-requested --reason \"<why>\" --session <steward session>"
             ),
             "note": "Feedback is an observation against the offer CID. Feedback without an identity is a low-reach unattested observation: counted and visible, and it can never withdraw an offer on its own.",
         },

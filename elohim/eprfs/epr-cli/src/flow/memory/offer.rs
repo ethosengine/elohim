@@ -3,7 +3,7 @@
 //!
 //! An offer is a VF `Intent` in the flow sidecar, addressed by its atom CID. This module does not
 //! mint it (the offer's own tooling does); it reads the verdict notes written against that CID
-//! (`epr flow note <offer-cid> --kind verdict --verdict approved|changes-requested`) and resolves
+//! (`epr flow note --on <offer-cid> --kind verdict --verdict approved|changes-requested`) and resolves
 //! them through the SAME distinct-Steward rule graduation uses ([`super::steward_approval`]):
 //!
 //! - an approving verdict counts only from an active Steward who is not the offer's author
@@ -246,7 +246,7 @@ pub fn offer_standing(
             .map(|e| e.to_string()),
         OfferState::Proposed => Some(format!(
             "an approving verdict from a Steward of {} who is not the offer's author ({author}){}: \
-             epr flow note {offer} --kind verdict --verdict approved --reason \"<what you \
+             epr flow note --on {offer} --kind verdict --verdict approved --reason \"<what you \
              approve>\" --session <your registered session>",
             governance.declaration.id,
             if crosses_network {
