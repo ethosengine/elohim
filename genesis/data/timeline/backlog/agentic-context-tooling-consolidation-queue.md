@@ -479,6 +479,16 @@ before investing.
       "any negation excludes" rather than gitignore's last-match-wins. Two surface negations are
       owed to the next measure version: the generated habit register and the question bank
       (both refused on first screens by rule today, still folded).
+27. **One projection contract, adopted one pipeline at a time** (surveyed 2026-09-26 grounding
+    the record-proves spec). "Authoritative source → generated projection" is built five times,
+    each with its own hashing and its own drift check: storage's projector and reconcile
+    controller (DHT/atoms → SQLite), the doorway's projection engine (signals → Mongo, bundles →
+    app-file cache), ts-rs plus Node codegen, `package-projections.mjs` (packages →
+    `.claude`/`.codex`/`.agents`), and `habits-project.py` (atoms → `habits.yaml`). The crystal is
+    an invariant, not a framework: every projection names its inputs by address and regenerates
+    from them byte for byte, with a `--check` that proves it — stated once and bound as a habit
+    check. Convergence is by adoption: `eprfs-core`'s `ProjectionManifest` (path → BlobCid) is the
+    candidate, and the package projection is the smallest first adopter.
 
 ## Exit criteria
 

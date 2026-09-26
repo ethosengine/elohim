@@ -620,7 +620,7 @@ scenario 2 still green with the crutch deleted.
 - [x] **N3 — AppBundleVehicle writes every bound slug in one transaction, plus the head_adoption Held predicate** (serves dataplane-convergence) — ee5f9e54a; channel bind 31c0bfac6
 - [x] **N4 — doorway candidate channel through storage handle_content_head for a bound slug** (serves dataplane-convergence) — ee5f9e54a
 - [x] **N5 — CI publish-app-release.sh and verify-app-adoption.sh; channels followed as a list** (serves dataplane-convergence, push-delivers-within-budget) — 2cb1b6b2a, doorway transport 31c0bfac6; app-bundle soak-probe arm owed
-- [ ] **N6 — household app-bundle-elected-delivery.feature, then fleet; retire prologue leg 4b and the app to edge dependsOn** (serves dataplane-convergence) — household leg PASSED 6/6 twice 2026-09-26 (sprint-report-household-20260926T215314Z, -215920Z); fleet leg and retirements open
+- [ ] **N6 — household app-bundle-elected-delivery.feature, then fleet; retire prologue leg 4b and the app to edge dependsOn** (serves dataplane-convergence) — household leg PASSED 6/6 twice 2026-09-26 (sprint-report-household-20260926T215314Z, -215920Z); fleet leg and retirements open. Remaining, in order: move the rakia pin to a commit whose `release-manifest.schema.json` enum carries `app-bundle` (dev's pin d3329b2 lacks it; the household runs used `ELOHIM_RAKIA_ROOT` at pin/lane-N 720c132), through the attested pin gate; wire `scripts/ci/publish-app-release.sh` into the root Jenkinsfile; `verify-app-adoption.sh` green on both alpha peers with no per-host PUT; then retire prologue leg 4b, `stageSpaBlobs`/`authorHeadOnce` and the app→edge `dependsOn`. Owed from N5: the app-bundle soak-probe arm.
 
 ---
 

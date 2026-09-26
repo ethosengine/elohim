@@ -198,6 +198,24 @@ hence the open licence on this document.
     mirror, and a submodule pin is attested by a brit attestation on the pinned commit rather than
     a forge's CI check. brit's crates sit behind a registry credential today, so brit is itself a
     row in slice 9's table.
+11. **One client resolver.** The browser holds several partial resolvers, none of which owns
+    naming and verification; the service worker (slices 2–3) is now honest, the rest are not:
+
+    | Piece | Defect |
+    |---|---|
+    | `elohim-core` `Loader` (`app/elohim-elements/elohim-core/src/loader/loader.ts`) | the right shape (transport-ordered, `verifyCid` on by default) — no production caller |
+    | `BlobVerificationService` (`app/lamad/src/app/services/blob-verification.service.ts`) | falls back to the SERVER as the "authoritative" verifier — inverted trust |
+    | `HeliaFetchService` | default `verifiedFetch` looks to the public IPFS network, where household blocks are not announced; its HTTP fallback verifies nothing |
+    | `ContentService.getContent` → `DataLoaderService` | errors become placeholders, so the IndexedDB fallback is unreachable |
+    | `IndexedDBCacheService` | keyed by id/slug with a TTL, not by CID; no head records |
+    | `HolochainCacheService` | no consumers |
+    | `SwBridgeService.invalidateApp` | no callers |
+
+    The move: the `Loader` (verification on) becomes the one resolver the content service, media
+    and the worker share; the server-authority fallback is removed; IndexedDB is keyed by CID with
+    head records (name → CID, when verified); dead pieces are deleted. The Tauri path gets the
+    same contract (it runs no worker and verifies nothing today), so browser and native pass the
+    same test vectors.
 
 ## §8 — P2P design gate
 
