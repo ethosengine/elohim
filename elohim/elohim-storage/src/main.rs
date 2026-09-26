@@ -3156,6 +3156,16 @@ async fn async_main(
     // Built when the backend is anything other than pure `Iroh` — i.e. for
     // `Libp2p` AND `Dual`. In `Dual` the iroh node is built alongside (below);
     // the two share one `sync.sled` DocStore and one `DedupLru`.
+    // The head-adoption trigger, built ONCE for whichever plane applies content:
+    // the libp2p node below when it exists (Libp2p and Dual), else the iroh
+    // sync plane (pure Iroh). Both planes offer into the same gate, so a Dual
+    // node never runs two workers against one DocStore.
+    #[cfg(feature = "p2p-iroh")]
+    #[allow(unused_mut)]
+    let mut head_adoption_gate: Option<
+        Arc<elohim_storage::services::head_adoption_trigger::TriggerGate>,
+    > = None;
+
     #[cfg(feature = "p2p")]
     let mut p2p_node = if args.enable_p2p
         && config.transport_backend != elohim_storage::config::TransportBackend::Iroh
@@ -3417,6 +3427,10 @@ async fn async_main(
             use elohim_storage::services::head_adoption_trigger as hat;
             let (gate, rx) = hat::TriggerGate::new(hat::DEFAULT_TRIGGER_COOLDOWN);
             p2p_node = p2p_node.with_head_adoption_trigger(gate.clone());
+            #[cfg(feature = "p2p-iroh")]
+            {
+                head_adoption_gate = Some(gate.clone());
+            }
             let trigger_sync = p2p_node.sync_manager().clone();
             let trigger_shutdown = shutdown_tx.subscribe();
             tokio::spawn(hat::run_head_adoption_trigger_worker(
@@ -4131,12 +4145,48 @@ async fn async_main(
         // The iroh sync-round driver — the initiator the plane never had
         // (`main.rs` used to say so in a comment). Same cadence as the libp2p
         // round; walks the book, so it does nothing until a manifest lands.
+        // The iroh plane offers content applies to the head-adoption trigger as
+        // the libp2p plane does. Dual reuses the libp2p node's gate (one worker,
+        // one DocStore); pure Iroh builds it here, where its SyncManager first
+        // exists. Without it an iroh-only peer's head stayed sweep-bound.
+        let iroh_head_adoption = head_adoption_gate.clone().or_else(|| {
+            let (Some(pool), Some(registry), Some(sync)) = (
+                db_pool.clone(),
+                hc_registry_for_http.clone(),
+                iroh_sync_manager.clone(),
+            ) else {
+                info!(
+                    "head-adoption trigger: not wired on the iroh plane (needs the content DB \
+                     pool, a conductor registry and a sync manager)"
+                );
+                return None;
+            };
+            use elohim_storage::services::head_adoption_trigger as hat;
+            let (gate, rx) = hat::TriggerGate::new(hat::DEFAULT_TRIGGER_COOLDOWN);
+            tokio::spawn(hat::run_head_adoption_trigger_worker(
+                rx,
+                gate.clone(),
+                registry,
+                pool,
+                sync,
+                trigger_courier_slot.clone(),
+                shutdown_tx.subscribe(),
+            ));
+            info!("head-adoption trigger: pure iroh — the iroh sync plane raises it");
+            Some(gate)
+        });
+        if let (Some(backend), Some(gate)) =
+            (iroh_sync_backend.as_ref(), iroh_head_adoption.clone())
+        {
+            backend.set_head_adoption_trigger(gate);
+        }
         if let Some(sync_mgr) = iroh_sync_manager.as_ref() {
             elohim_storage::p2p_iroh::spawn_iroh_sync_driver(
                 iroh_n.endpoint().clone(),
                 book.clone(),
                 sync_mgr.clone(),
                 receive_pool.clone(),
+                iroh_head_adoption,
                 elohim_storage::p2p::sync_round::round_interval(Some(config.sync_interval_secs)),
             );
         } else {
@@ -5725,9 +5775,9 @@ async fn async_main(
         // arms ask, and byte presence over this node's blob store. Filled here
         // because this is where the peer plane first exists; the trigger runs
         // without it until then.
-        if let (Some(peers), Some(pool), Some(command_tx)) =
-            (reconcile_peers.clone(), db_pool.clone(), trigger_command_tx)
-        {
+        // `command_tx` is `None` on a pure-iroh node; byte requests then go
+        // over the iroh fetch leg (`NodeBytePresence::request`).
+        if let (Some(peers), Some(pool)) = (reconcile_peers.clone(), db_pool.clone()) {
             let _ = trigger_courier_slot.set(
                 elohim_storage::services::head_adoption_trigger::TriggerCourier {
                     fetcher: Arc::new(
@@ -5736,7 +5786,8 @@ async fn async_main(
                     bytes: Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {
                         blob_store: blob_store.clone(),
                         pool,
-                        command_tx,
+                        command_tx: trigger_command_tx,
+                        self_cid: config.self_cid.clone().unwrap_or_default(),
                     }),
                 },
             );

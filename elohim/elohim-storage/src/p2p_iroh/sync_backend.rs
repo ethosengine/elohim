@@ -28,6 +28,7 @@ use super::sync::{IrohSyncClient, SyncBackend};
 use crate::db::DbPool;
 use crate::p2p::sync_protocol::{DocumentInfo, SyncRequest, SyncResponse};
 use crate::p2p::sync_round::MAX_ANNOUNCE_PAYLOAD_BYTES;
+use crate::services::head_adoption_trigger::TriggerGate;
 use crate::sync::SyncManager;
 
 /// Ceiling on the receive-side fallback pull. The pull is opened from inside a
@@ -56,6 +57,9 @@ struct AnnouncePullBack {
 pub struct SyncManagerBackend {
     sync_manager: Arc<SyncManager>,
     pull_back: OnceLock<AnnouncePullBack>,
+    /// Late-bound like `pull_back`: the trigger worker is built after the
+    /// backend is handed to the ALPN handler.
+    head_adoption: OnceLock<Arc<TriggerGate>>,
 }
 
 impl SyncManagerBackend {
@@ -63,7 +67,18 @@ impl SyncManagerBackend {
         Self {
             sync_manager,
             pull_back: OnceLock::new(),
+            head_adoption: OnceLock::new(),
         }
+    }
+
+    /// Offer every content doc an announce lands to the head-adoption trigger,
+    /// as the libp2p announce arm does. Set once; `false` if already set.
+    pub fn set_head_adoption_trigger(&self, gate: Arc<TriggerGate>) -> bool {
+        self.head_adoption.set(gate).is_ok()
+    }
+
+    fn head_adoption_for(&self, peer: Option<NodeId>) -> Option<(&TriggerGate, NodeId)> {
+        self.head_adoption.get().map(Arc::as_ref).zip(peer)
     }
 
     /// Give the announce arm a way to dial back at an announcer.
@@ -173,6 +188,7 @@ impl SyncManagerBackend {
                         &self.sync_manager,
                         pb.db_pool.as_ref(),
                         &doc_id,
+                        self.head_adoption_for(peer),
                     )
                     .await
                     {
@@ -231,6 +247,7 @@ impl SyncManagerBackend {
             .unwrap_or_else(|| NodeAddr::new(peer));
         let endpoint = pb.endpoint.clone();
         let db_pool = pb.db_pool.clone();
+        let head_adoption = self.head_adoption.get().cloned();
         let sync_manager = self.sync_manager.clone();
         let h_app_id = h_app_id.to_string();
         let doc_id = doc_id.to_string();
@@ -242,6 +259,7 @@ impl SyncManagerBackend {
                     addr,
                     &sync_manager,
                     db_pool.as_ref(),
+                    head_adoption.as_deref(),
                     &h_app_id,
                     &doc_id,
                 ),
@@ -268,6 +286,7 @@ async fn pull_announced_doc(
     addr: NodeAddr,
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
+    head_adoption: Option<&TriggerGate>,
     h_app_id: &str,
     doc_id: &str,
 ) {
@@ -320,7 +339,8 @@ async fn pull_announced_doc(
         Ok(_) => {
             crate::metrics::add_iroh_sync_changes_applied(count);
             info!(peer = %peer_id, doc_id = %doc_id, changes = count, "iroh announce pull applied changes");
-            if super::sync_driver::reverse_project(sync_manager, db_pool, doc_id).await {
+            let adoption = head_adoption.map(|gate| (gate, peer_id));
+            if super::sync_driver::reverse_project(sync_manager, db_pool, doc_id, adoption).await {
                 crate::metrics::observe_sync_projected_apply_staleness("iroh", origin_timestamps);
             }
         }

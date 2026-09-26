@@ -15,6 +15,7 @@ use super::{IrohPeerBook, IrohSyncClient};
 use crate::db::DbPool;
 use crate::p2p::sync_protocol::{next_doc_list_offset, DocumentInfo, SyncRequest, SyncResponse};
 use crate::p2p::sync_round::{FetchWindow, SettleOutcome, SYNC_LIST_PAGE_LIMIT};
+use crate::services::head_adoption_trigger::TriggerGate;
 use crate::sync::{projector::PROJECTION_NAMESPACE, SyncManager};
 
 /// Hard ceiling for a future paginated `SyncChanges` backend. The current
@@ -29,6 +30,7 @@ pub fn spawn_iroh_sync_driver(
     peer_book: IrohPeerBook,
     sync_manager: Arc<SyncManager>,
     db_pool: Option<DbPool>,
+    head_adoption: Option<Arc<TriggerGate>>,
     interval: Duration,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -38,7 +40,14 @@ pub fn spawn_iroh_sync_driver(
         // missed ticks collapse instead of accumulating catch-up rounds.
         loop {
             ticker.tick().await;
-            run_iroh_sync_round(&endpoint, &peer_book, &sync_manager, db_pool.as_ref()).await;
+            run_iroh_sync_round(
+                &endpoint,
+                &peer_book,
+                &sync_manager,
+                db_pool.as_ref(),
+                head_adoption.as_deref(),
+            )
+            .await;
         }
     })
 }
@@ -54,6 +63,7 @@ pub async fn run_iroh_sync_round(
     peer_book: &IrohPeerBook,
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
+    head_adoption: Option<&TriggerGate>,
 ) {
     crate::metrics::inc_iroh_sync_round();
     let peers = peer_book.snapshot(Some(&endpoint.node_id()));
@@ -61,7 +71,7 @@ pub async fn run_iroh_sync_round(
 
     let client = IrohSyncClient::new(endpoint);
     for peer in peers {
-        sync_peer(&client, peer.addr, sync_manager, db_pool).await;
+        sync_peer(&client, peer.addr, sync_manager, db_pool, head_adoption).await;
     }
 }
 
@@ -70,6 +80,7 @@ async fn sync_peer(
     peer: NodeAddr,
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
+    head_adoption: Option<&TriggerGate>,
 ) {
     let peer_id = peer.node_id;
     let mut offset = 0;
@@ -126,7 +137,15 @@ async fn sync_peer(
         while let Some(doc_id) = window.next_doc() {
             let outcome = match by_doc.remove(&doc_id) {
                 Some(document) => {
-                    sync_document(client, peer.clone(), sync_manager, db_pool, document).await
+                    sync_document(
+                        client,
+                        peer.clone(),
+                        sync_manager,
+                        db_pool,
+                        head_adoption,
+                        document,
+                    )
+                    .await
                 }
                 // A duplicate doc_id in one page — the second copy has nothing
                 // left to sync; free the slot rather than stalling the window.
@@ -153,6 +172,7 @@ async fn sync_document(
     peer: NodeAddr,
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
+    head_adoption: Option<&TriggerGate>,
     remote: DocumentInfo,
 ) -> SettleOutcome {
     let mut local_heads = match sync_manager
@@ -226,7 +246,8 @@ async fn sync_document(
             Ok(applied_heads) => {
                 crate::metrics::add_iroh_sync_changes_applied(change_count);
                 local_heads = applied_heads;
-                if reverse_project(sync_manager, db_pool, &remote.doc_id).await {
+                let adoption = head_adoption.map(|gate| (gate, peer.node_id));
+                if reverse_project(sync_manager, db_pool, &remote.doc_id, adoption).await {
                     crate::metrics::observe_sync_projected_apply_staleness(
                         "iroh",
                         origin_timestamps,
@@ -275,10 +296,20 @@ async fn request(
 /// row (amber tier). `pub(crate)` because the announce receive arm
 /// (`super::sync_backend`) owes the same heal a pulled change gets — a doorbell
 /// that converges the DocStore but leaves the serving row stale is half a cure.
+///
+/// `head_adoption` is the gate and the peer whose apply this was. When the
+/// projection completes, the id is offered to the head-adoption trigger exactly
+/// as the libp2p heal leg offers it (`P2PNode::heal_content_row`): after the
+/// pool guard, only for a doc this node has a projection home for, and never
+/// for one it could not read. Without it an iroh-only peer's head stayed
+/// sweep-bound (47–59 s or never) while a libp2p peer adopted in about a
+/// second. The peer is the iroh node id — the courier route the iroh
+/// reconcile leg resolves.
 pub(crate) async fn reverse_project(
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
     doc_id: &str,
+    head_adoption: Option<(&TriggerGate, iroh::NodeId)>,
 ) -> bool {
     if !doc_id.starts_with("node:") {
         return false;
@@ -286,15 +317,76 @@ pub(crate) async fn reverse_project(
     let Some(pool) = db_pool else {
         return false;
     };
-    match crate::sync::projector::reverse_project_content_doc(sync_manager, pool, doc_id).await {
-        Ok(true) => {
-            debug!(doc_id = %doc_id, "iroh sync reverse-projected content pointer");
-            true
+    let projected =
+        match crate::sync::projector::reverse_project_content_doc(sync_manager, pool, doc_id).await
+        {
+            Ok(true) => {
+                debug!(doc_id = %doc_id, "iroh sync reverse-projected content pointer");
+                true
+            }
+            Ok(false) => true,
+            Err(error) => {
+                warn!(doc_id = %doc_id, error = %error, "iroh sync reverse projection failed");
+                false
+            }
+        };
+    if projected {
+        if let Some((gate, peer)) = head_adoption {
+            let decision = gate.offer(PROJECTION_NAMESPACE, doc_id, &peer.to_string());
+            crate::metrics::inc_head_adoption_trigger(decision.label());
         }
-        Ok(false) => true,
-        Err(error) => {
-            warn!(doc_id = %doc_id, error = %error, "iroh sync reverse projection failed");
-            false
-        }
+    }
+    projected
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::head_adoption_trigger::{TriggerGate, DEFAULT_TRIGGER_COOLDOWN};
+    use crate::sync::{DocStore, DocStoreConfig, StreamTracker};
+
+    async fn empty_sync_manager() -> (SyncManager, tempfile::TempDir) {
+        let temp = tempfile::TempDir::new().unwrap();
+        let store = DocStore::new(DocStoreConfig {
+            db_path: temp.path().join("driver.sled"),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        (
+            SyncManager::new(Arc::new(store), Arc::new(StreamTracker::new())),
+            temp,
+        )
+    }
+
+    fn a_peer() -> iroh::NodeId {
+        iroh::SecretKey::generate(&mut rand::rngs::OsRng).public()
+    }
+
+    /// An iroh apply offers the content id to the head-adoption trigger exactly
+    /// where the libp2p heal leg does: after the pool guard, for a content doc
+    /// the projector could read. Before this, an iroh-only peer never raised
+    /// the trigger and its head stayed sweep-bound.
+    #[tokio::test]
+    async fn an_iroh_apply_offers_the_content_id_to_the_adoption_trigger() {
+        let (sync, _temp) = empty_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        let peer = a_peer();
+
+        assert!(reverse_project(&sync, Some(&pool), "node:iroh-head", Some((&gate, peer))).await);
+        let trigger = rx.try_recv().expect("the apply raised the trigger");
+        assert_eq!(trigger.content_id, "iroh-head");
+        assert_eq!(
+            trigger.peer,
+            peer.to_string(),
+            "the courier is the iroh peer"
+        );
+
+        // Nothing is offered for a doc with no projection home, or with no pool.
+        assert!(!reverse_project(&sync, Some(&pool), "manifest:x", Some((&gate, peer))).await);
+        assert!(!reverse_project(&sync, None, "node:no-pool", Some((&gate, peer))).await);
+        assert!(rx.try_recv().is_err());
+        assert_eq!(gate.claim_count(), 1);
     }
 }

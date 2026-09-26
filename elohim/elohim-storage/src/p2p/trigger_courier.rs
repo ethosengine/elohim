@@ -28,12 +28,78 @@ impl HeadRecordFetcher for OwnedPeerHeadRecordFetcher {
     }
 }
 
-/// Byte presence over this node's blob store and shard manifests; requests go
-/// to the P2P event loop as [`P2PCommand::HealBlobBytes`].
+/// Byte presence over this node's blob store and shard manifests. Requests go
+/// to the libp2p event loop as [`P2PCommand::HealBlobBytes`] when that plane
+/// exists, else over the iroh fetch leg to the courier directly.
 pub struct NodeBytePresence {
     pub blob_store: Arc<BlobStore>,
     pub pool: DbPool,
-    pub command_tx: mpsc::Sender<P2PCommand>,
+    /// The libp2p plane's command queue; `None` on a pure-iroh node.
+    pub command_tx: Option<mpsc::Sender<P2PCommand>>,
+    /// This node's steward identity, which books an iroh-fetched blob the way
+    /// every other fetch is booked (`finalize_fetch_success`).
+    pub self_cid: String,
+}
+
+/// Iroh byte requests in flight at once. A request past the bound is dropped:
+/// the trigger re-checks presence on its next rung and asks again.
+#[cfg(feature = "p2p-iroh")]
+static IROH_BYTE_REQUESTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+
+/// One dial, one answer: the same per-peer bound the heal-on-read race uses.
+#[cfg(feature = "p2p-iroh")]
+const IROH_BYTE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+impl NodeBytePresence {
+    /// Fetch `hash` from `holder` over the iroh leg and book it. Pure-iroh
+    /// nodes have no libp2p event loop to send `HealBlobBytes` to; without
+    /// this, the bytes gate would hold a head move until the sweep.
+    #[cfg(feature = "p2p-iroh")]
+    fn request_over_iroh(&self, origin: &str, hash: String, holder: &str) {
+        let Ok(permit) = IROH_BYTE_REQUESTS.try_acquire() else {
+            return;
+        };
+        let (blob_store, pool, self_cid) = (
+            self.blob_store.clone(),
+            self.pool.clone(),
+            self.self_cid.clone(),
+        );
+        let (origin, holder) = (origin.to_string(), holder.to_string());
+        tokio::spawn(async move {
+            let _permit = permit;
+            // No libp2p plane: an inert sender, and no peer counts as connected,
+            // so only the iroh leg is planned.
+            let (inert, _rx) = mpsc::channel(1);
+            let outcome = crate::p2p::blob_swarm::race_fetch_dual(
+                &hash,
+                vec![holder],
+                &inert,
+                |_| false,
+                1,
+                IROH_BYTE_REQUEST_TIMEOUT,
+            )
+            .await;
+            let crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, source_peer } = outcome else {
+                tracing::debug!(origin = %origin, hash = %hash, "iroh byte request: no bytes");
+                return;
+            };
+            let Ok(mut conn) = pool.get() else {
+                return;
+            };
+            if let Err(error) = crate::p2p::blob_fetch::finalize_fetch_success(
+                &mut conn,
+                &hash,
+                &source_peer,
+                &bytes,
+                &self_cid,
+                &blob_store,
+            )
+            .await
+            {
+                tracing::warn!(origin = %origin, hash = %hash, error = %error, "iroh byte request: store failed");
+            }
+        });
+    }
 }
 
 /// `sha256-<hex>` for any address form the blob plane accepts, or `None`.
@@ -68,9 +134,14 @@ impl BytePresence for NodeBytePresence {
         let Some(hash) = legacy_hash(address) else {
             return;
         };
+        let Some(command_tx) = self.command_tx.as_ref() else {
+            #[cfg(feature = "p2p-iroh")]
+            self.request_over_iroh(origin, hash, holder);
+            return;
+        };
         // try_send: a full command queue drops the request; the trigger's ladder
         // re-checks presence and asks again on its next rung.
-        let _ = self.command_tx.try_send(P2PCommand::HealBlobBytes {
+        let _ = command_tx.try_send(P2PCommand::HealBlobBytes {
             origin: origin.to_string(),
             hash,
             holder_hint: Some(holder.to_string()),
