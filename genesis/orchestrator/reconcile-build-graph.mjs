@@ -19,11 +19,15 @@ import { SUCCESSFUL_RESULTS } from './pipeline-results.mjs';
 // ── Reconciliation primitives ──────────────────────────────────────
 
 const UNSUCCESSFUL_TERMINAL = new Set(['FAILURE', 'ABORTED', 'NOT_BUILT', 'ERROR']);
+// Never dispatched: the orchestrator doomed it because a producer it consumes
+// failed in an earlier level (backlog row 19). Drift, but not its own verdict.
+const SKIPPED_BY_UPSTREAM = 'SKIPPED-BY-UPSTREAM-FAILURE';
 
 function classifyResult(name, info) {
   const result = info?.result;
   if (result === 'SUCCESS') return 'success';
   if (result === 'UNSTABLE') return 'unstable';
+  if (result === SKIPPED_BY_UPSTREAM) return 'skipped-by-upstream';
   if (UNSUCCESSFUL_TERMINAL.has(result)) return 'aborted';
   // Defensive: unknown result codes treated as drift, not match.
   return 'unknown';
@@ -55,6 +59,7 @@ function pipelineUrl(name, info) {
  *     unstableResults: string[],
  *     commitShaDrift: boolean,
  *     unknownResults: string[],
+ *     skippedByUpstream: string[],
  *   },
  *   summary: string,
  *   investigationPointers: string[],
@@ -99,11 +104,13 @@ export function reconcile({ predicted, actual }) {
   const abortedAfterStart = [];
   const unstableResults = [];
   const unknownResults = [];
+  const skippedByUpstream = [];
   for (const name of actualSet) {
     const klass = classifyResult(name, actualResults[name]);
     if (klass === 'aborted') abortedAfterStart.push(name);
     else if (klass === 'unstable') unstableResults.push(name);
     else if (klass === 'unknown') unknownResults.push(name);
+    else if (klass === 'skipped-by-upstream') skippedByUpstream.push(name);
   }
 
   const commitShaDrift =
@@ -117,6 +124,7 @@ export function reconcile({ predicted, actual }) {
     abortedAfterStart.length > 0 ||
     unstableResults.length > 0 ||
     unknownResults.length > 0 ||
+    skippedByUpstream.length > 0 ||
     commitShaDrift;
 
   const verdict = hasDrift ? 'drift' : 'match';
@@ -130,6 +138,10 @@ export function reconcile({ predicted, actual }) {
     const url = pipelineUrl(name, info);
     const piece = url ? `${name} ${info.result} — ${url}` : `${name} ${info.result}`;
     investigationPointers.push(piece);
+  }
+  for (const name of skippedByUpstream) {
+    const upstream = actualResults[name]?.upstream;
+    investigationPointers.push(`${name} ${SKIPPED_BY_UPSTREAM}${upstream ? ` (upstream ${upstream})` : ''}`);
   }
   for (const name of predictedNotExecuted) {
     investigationPointers.push(`${name} predicted but did NOT run`);
@@ -197,6 +209,7 @@ export function reconcile({ predicted, actual }) {
   if (abortedAfterStart.length) parts.push(`${abortedAfterStart.length} aborted`);
   if (unstableResults.length) parts.push(`${unstableResults.length} unstable`);
   if (unknownResults.length) parts.push(`${unknownResults.length} unknown-result`);
+  if (skippedByUpstream.length) parts.push(`${skippedByUpstream.length} skipped-by-upstream-failure`);
   const summary = parts.length === 0
     ? `match: ${actualSet.size} pipelines ran clean`
     : `drift: ${parts.join(', ')}`;
@@ -215,6 +228,7 @@ export function reconcile({ predicted, actual }) {
       unstableResults: [...unstableResults].sort(),
       commitShaDrift,
       unknownResults: [...unknownResults].sort(),
+      skippedByUpstream: [...skippedByUpstream].sort(),
     },
     summary,
     investigationPointers,

@@ -553,6 +553,10 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
                 echo "📦 ${name}: delivered — pendingDeploy cleared"
             }
         }
+    } else if (result.result == 'SKIPPED-BY-UPSTREAM-FAILURE') {
+        // Never dispatched: a producer failed (backlog row 19). Not this pipeline's
+        // verdict, so its baseline and any pendingDeploy intent are held.
+        echo "⏭️ ${name}: SKIPPED-BY-UPSTREAM-FAILURE — ${result.upstream} failed; baseline held"
     } else if (result.wasted) {
         // ABORTED — superseded, or an operator pressed Stop. The work was never
         // verdicted, so this is neither a pass nor a fail. Baseline deliberately
@@ -570,6 +574,61 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
             echo "   pendingDeploy dropped — the re-dispatch went ${result.result}"
         }
     }
+}
+
+/**
+ * Fail forward (backlog row 19): a failed pipeline dooms ONLY its transitive
+ * consumers; unrelated pipelines keep the wave. Each doomed, planned name gets
+ * a SKIPPED-BY-UPSTREAM-FAILURE result so the actual build graph and
+ * delivery-series read it as not delivered. Returns the names that failed in
+ * this level; the caller still ends the run FAILURE.
+ */
+def doomDependents(List ran, List pipelines, Map results, Map pipelineBaselines) {
+    def levelFailed = ran.findAll { !results[it]?.success }
+    if (!levelFailed) return []
+    // Checkpoint BEFORE the fallible doom walk: a throw below degrades to the
+    // old fail-fast with every verdict and baseline already handed to post.
+    env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+    env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+    def failedCsv = levelFailed.join(',')
+    def doomed = dependentsOf(levelFailed, pipelines).findAll { pipelines.contains(it) && !results.containsKey(it) }
+    for (name in doomed) {
+        results[name] = [success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: failedCsv]
+        recordPipelineResult(name, results[name], pipelineBaselines)
+    }
+    env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+    echo "❌ ${levelFailed.join(', ')} failed — dooming ${doomed ?: 'nothing'}; unrelated pipelines continue"
+    return levelFailed
+}
+
+/**
+ * Transitive consumers of `failed`, from the same dependsOn source
+ * groupByDependencyLevel reads (getPipelineMetadata) — no shell-out, since the
+ * orchestrator checkout has no node_modules. Reference semantics:
+ * graph-walker.mjs dependentsClosure (dependents-closure.test.mjs).
+ */
+def dependentsOf(List failed, List pipelines) {
+    def registry = readJSON(text: env.PIPELINE_REGISTRY_JSON ?: '{}')
+    def names = (registry.keySet().collect { it.toString() } + pipelines).unique()
+    def deps = [:]
+    for (n in names) { deps[n] = (getPipelineMetadata(n).dependsOn ?: []).collect { it.toString() } }
+    def doomed = []
+    def grew = true
+    while (grew) {
+        grew = false
+        for (n in names) {
+            if (failed.contains(n) || doomed.contains(n)) continue
+            if (deps[n].any { failed.contains(it) || doomed.contains(it) }) { doomed.add(n); grew = true }
+        }
+    }
+    return doomed.sort()
+}
+
+/** The names in a level no earlier failure doomed (doomed ones are not dispatched). */
+def undoomedInLevel(List level, Map results) {
+    def doomed = level.findAll { results[it]?.result == 'SKIPPED-BY-UPSTREAM-FAILURE' }
+    doomed.each { name -> echo "⏭️ ${name}: not dispatched — doomed by ${results[name].upstream}" }
+    return level.findAll { !doomed.contains(it) }
 }
 
 /**
@@ -2573,6 +2632,7 @@ spec:
                         }
 
                         def levels = groupByDependencyLevel(pipelines)
+                        def failedPipelines = []
                         def hasGenesis = pipelines.contains('elohim-genesis')
                         def levelDesc = levels.collect { lvl ->
                             lvl.size() > 1 ? "[${lvl.join(' + ')}]" : lvl[0]
@@ -2594,8 +2654,9 @@ spec:
                             echo "📦 Level ${idx}: ${level.join(' + ')}"
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            if (level.size() == 1) {
-                                def name = level[0]
+                            def runnable = undoomedInLevel(level, results)
+                            if (runnable.size() == 1) {
+                                def name = runnable[0]
                                 echo "🔨 Building: ${name}"
                                 // wait=null → triggerPipeline auto-derives from
                                 // build-manifest.json longRunning flag (bug #5 fix).
@@ -2606,9 +2667,9 @@ spec:
                                 def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier)
                                 results[name] = result
                                 recordPipelineResult(name, result, pipelineBaselines)
-                            } else {
+                            } else if (runnable) {
                                 def parallelBuilds = [:]
-                                level.each { name ->
+                                runnable.each { name ->
                                     parallelBuilds[name] = {
                                         echo "🔨 Building: ${name}"
                                         // wait=null → auto-derive per longRunning
@@ -2621,20 +2682,8 @@ spec:
                                 parallel parallelBuilds
                             }
 
-                            // Fail fast: abort if any pipeline in this level failed.
-                            def levelFailed = level.findAll { !results[it]?.success }
-                            if (levelFailed) {
-                                // Checkpoint before throwing. Previously the
-                                // post.always backstop saw `{}` here, so the CI
-                                // summary claimed 0 failures and the actual graph
-                                // omitted the downstream result that caused the red.
-                                env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-                                env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
-                                def failedActualGraph = buildActualGraph(pipelines, results, levels)
-                                writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: failedActualGraph, pretty: 2)
-                                archivePipelineBaselines('execute')
-                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
-                            }
+                            // Fail forward (row 19): a failure dooms only its transitive consumers.
+                            failedPipelines.addAll(doomDependents(runnable, pipelines, results, pipelineBaselines))
 
                             // Checkpoint every completed level. The per-pipeline map above
                             // is local to this stage, so a run killed mid-level by the
@@ -2650,8 +2699,8 @@ spec:
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
                         env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
-                        // Genesis still runs after all dependency levels succeed.
-                        if (pipelines.contains('elohim-genesis')) {
+                        // Genesis runs last unless a failed producer doomed it.
+                        if (pipelines.contains('elohim-genesis') && !results.containsKey('elohim-genesis')) {
                             echo ''
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                             echo '🌱 Running Genesis (seed + test)'
@@ -2700,6 +2749,11 @@ spec:
                         writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: actualGraph, pretty: 2)
                         // Archive happens in the dedicated Post Actual Build Graph
                         // stage below — keeps Execute Builds focused on dispatch.
+                        // A failed wave stays FAILURE; lastSuccessfulCommit is not advanced.
+                        if (failedPipelines) {
+                            archivePipelineBaselines('execute')
+                            error "Build(s) failed: ${failedPipelines.join(', ')}"
+                        }
 
                         // Now that builds succeeded, advance the build graph's
                         // lastSuccessfulCommit. During planning we deliberately

@@ -48,6 +48,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { builtinModules } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCH_JENKINSFILE = resolve(__dirname, 'Jenkinsfile');
@@ -72,9 +73,63 @@ describe('build-state continuity and stable history (#1844)', () => {
         assert.ok(execution.length > 0);
         assert.doesNotMatch(execution, /\bstage\s*\(/);
         assert.match(execution, /parallel parallelBuilds/);
-        assert.match(execution, /if \(levelFailed\)/);
-        assert.match(execution, /pipelines.contains\('elohim-genesis'\)/);
+        // Fail forward (backlog row 19): a failure dooms only its transitive
+        // consumers; doomed names are skipped, not dispatched, and the run
+        // still ends FAILURE before lastSuccessfulCommit can advance.
+        assert.match(execution, /undoomedInLevel\(level, results\)/);
+        assert.match(execution, /failedPipelines\.addAll\(doomDependents\(runnable,/);
+        assert.doesNotMatch(execution, /Aborting/);
+        assert.match(execution, /pipelines.contains\('elohim-genesis'\) && !results\.containsKey\('elohim-genesis'\)/);
+        const tail = source.slice(source.indexOf('// Actual Build Graph artifact'), source.indexOf('bState.lastSuccessfulCommit'));
+        assert.match(tail, /if \(failedPipelines\) \{\s*archivePipelineBaselines\('execute'\)\s*error /);
     });
+
+    it('fail forward computes the doom closure in Groovy, checkpointing before it', () => {
+        // The orchestrator checkout has no node_modules: graph-walker.mjs imports
+        // picomatch, so a `--dependents` shell-out crashes at import on the first
+        // red level and loses the level checkpoint (C1 review, CRITICAL 1).
+        assert.doesNotMatch(source, /graph-walker\.mjs['"]?\s+--dependents/);
+        const doom = source.slice(source.indexOf('def doomDependents('), source.indexOf('\n/**', source.indexOf('def doomDependents(')));
+        assert.ok(doom.length > 0);
+        assert.doesNotMatch(doom, /\bsh\s*\(/);
+        const checkpoint = doom.search(/env\.BUILD_RESULTS = writeJSON[^\n]*\n\s*env\.PIPELINE_BASELINES = writeJSON/);
+        assert.ok(checkpoint !== -1 && checkpoint < doom.indexOf('dependentsOf('),
+            'BUILD_RESULTS + PIPELINE_BASELINES must be checkpointed before the doom walk');
+        const walk = source.slice(source.indexOf('def dependentsOf('), source.indexOf('\n/**', source.indexOf('def dependentsOf(')));
+        assert.match(walk, /getPipelineMetadata\(n\)\.dependsOn/);
+        assert.doesNotMatch(walk, /\bsh\s*\(/);
+    });
+});
+
+describe('orchestrator .mjs the Jenkinsfile runs with `node` need no node_modules', () => {
+    // The orchestrator never installs node_modules in its checkout; a bare
+    // package import anywhere in the relative import graph of a script the
+    // Jenkinsfile invokes is ERR_MODULE_NOT_FOUND at dispatch time.
+    const source = readFileSync(ORCH_JENKINSFILE, 'utf8');
+    const repoRoot = resolve(__dirname, '../..');
+    const invoked = [...new Set([...source.matchAll(/node (genesis\/orchestrator\/[\w./-]+\.mjs)/g)].map(m => m[1]))];
+    const builtins = new Set(builtinModules);
+
+    it('finds the invoked scripts', () => assert.ok(invoked.length >= 3, JSON.stringify(invoked)));
+
+    for (const rel of invoked) {
+        it(`${rel} imports only builtins and relative modules, transitively`, () => {
+            const seen = new Set();
+            const bare = [];
+            const visit = (file) => {
+                if (seen.has(file)) return;
+                seen.add(file);
+                const text = readFileSync(file, 'utf8');
+                for (const m of text.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm)) {
+                    const spec = m[1] ?? m[2];
+                    if (spec.startsWith('.')) visit(resolve(dirname(file), spec));
+                    else if (!spec.startsWith('node:') && !builtins.has(spec)) bare.push(`${file.slice(repoRoot.length + 1)} → ${spec}`);
+                }
+            };
+            visit(resolve(repoRoot, rel));
+            assert.deepEqual(bare, []);
+        });
+    }
 });
 
 /**
@@ -105,7 +160,7 @@ const SCRIPT_SCOPE_GLOBAL_NAMES = new Set([
     // Keep this list close to the Jenkinsfile; when a helper is added/renamed,
     // update here too.
     'loadBuildVars', 'withBuildVars', 'shouldRunStep', 'triggerPipeline',
-    'recordPipelineResult', 'analyzePipelineRequirements',
+    'recordPipelineResult', 'doomDependents', 'dependentsOf', 'undoomedInLevel', 'analyzePipelineRequirements',
     'analyzeChangeset', 'propagateDependencies', 'groupByDependencyLevel',
     'parseCommitTags', 'parseSkipCi', 'matchesCiIgnore', 'parseCiIgnore',
     'buildPredictedGraph', 'runBuildGraph', 'applyBuildGraphRouting',

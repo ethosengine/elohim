@@ -157,6 +157,30 @@ describe('reconcile — abortedAfterStart', () => {
   });
 });
 
+describe('reconcile — skippedByUpstream (backlog row 19)', () => {
+  it('names a doomed consumer and its failed upstream instead of an unknown result', () => {
+    const predicted = predictedFixture();
+    const actual = actualFixture({
+      results: {
+        'elohim-holochain': { success: false, result: 'FAILURE', durationMs: 60000, level: 0 },
+        'elohim-edge': { success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: 'elohim-holochain', level: 1 },
+        elohim: { success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: 'elohim-holochain', level: 1 },
+        'elohim-genesis': { success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: 'elohim-holochain', level: 'genesis-trailer' },
+      },
+    });
+
+    const r = reconcile({ predicted, actual });
+
+    assert.equal(r.verdict, 'drift');
+    assert.deepEqual(r.disconnects.unknownResults, []);
+    assert.deepEqual(r.disconnects.skippedByUpstream, ['elohim', 'elohim-edge', 'elohim-genesis']);
+    assert.deepEqual(r.disconnects.abortedAfterStart, ['elohim-holochain']);
+    assert.ok(r.investigationPointers.includes('elohim-edge SKIPPED-BY-UPSTREAM-FAILURE (upstream elohim-holochain)'));
+    assert.match(r.summary, /3 skipped-by-upstream-failure/);
+    assert.doesNotMatch(r.summary, /unknown-result/);
+  });
+});
+
 describe('reconcile — schema validation', () => {
   it('throws when predicted is missing pipelines field', () => {
     assert.throws(

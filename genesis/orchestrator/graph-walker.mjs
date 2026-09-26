@@ -4,6 +4,7 @@
 //
 // Library usage: import { walkGraph } from './graph-walker.mjs'
 // CLI usage: echo "file1\nfile2" | node graph-walker.mjs
+//            node graph-walker.mjs --dependents a,b   (transitive consumers, one per line)
 
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -54,6 +55,36 @@ export function topoSort(stepIndex) {
   }
 
   return order;
+}
+
+/**
+ * Transitive consumers of any failed pipeline (backlog row 19). The
+ * orchestrator dooms exactly these after a level fails; every other pipeline
+ * keeps its wave. Pure: walks `dependsOn` in reverse.
+ *
+ * @param {Record<string, {dependsOn?: string[]}>} pipelineMeta
+ * @param {string[]} failed
+ * @returns {string[]} sorted, excluding the failed names themselves
+ */
+export function dependentsClosure(pipelineMeta, failed) {
+  const consumers = new Map();
+  for (const [name, meta] of Object.entries(pipelineMeta)) {
+    for (const dep of meta?.dependsOn ?? []) {
+      if (!consumers.has(dep)) consumers.set(dep, []);
+      consumers.get(dep).push(name);
+    }
+  }
+  const failedSet = new Set(failed);
+  const doomed = new Set();
+  const queue = [...failedSet];
+  while (queue.length > 0) {
+    for (const consumer of consumers.get(queue.shift()) ?? []) {
+      if (failedSet.has(consumer) || doomed.has(consumer)) continue;
+      doomed.add(consumer);
+      queue.push(consumer);
+    }
+  }
+  return [...doomed].sort();
 }
 
 function matchInputs(inputs, changedFiles) {
@@ -196,7 +227,21 @@ export function walkGraph(manifests, changedFiles) {
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
                import.meta.url === `file://${resolve(process.argv[1])}`;
 
-if (isMain) {
+const dependentsIdx = isMain ? process.argv.indexOf('--dependents') : -1;
+
+if (isMain && dependentsIdx !== -1) {
+  // `--dependents a,b` → the pipelines a failure of a/b dooms, one per line.
+  // Reads no stdin: the orchestrator's fail-forward block calls it bare.
+  const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
+  const failed = (process.argv[dependentsIdx + 1] ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  const meta = Object.fromEntries(
+    loadManifests(ROOT)
+      .filter(({ content }) => content.pipeline)
+      .map(({ content }) => [content.pipeline, { dependsOn: Array.isArray(content.dependsOn) ? content.dependsOn : [] }]),
+  );
+  const doomed = dependentsClosure(meta, failed);
+  if (doomed.length > 0) process.stdout.write(doomed.join('\n') + '\n');
+} else if (isMain) {
   const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
   // Read stdin via fd 0 (works for both terminal and pipe; '/dev/stdin'
   // fails with ENXIO when stdin is a child-process pipe).
