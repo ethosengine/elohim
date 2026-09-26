@@ -333,19 +333,239 @@ fn a_fixture_steward_sponsors_contributors_and_fixtures_never_standing_stewards(
 }
 
 #[test]
-fn a_withdrawal_needs_a_sponsor_who_is_not_the_leaver() {
+fn a_withdrawal_names_a_sponsor_and_leaving_yourself_is_never_gated() {
     let dir = fixture();
     let root = dir.path();
     steward(root, "human:ruth", Some("human:matthew"));
     withdraw(root, "human:ruth", None);
-    withdraw(root, "human:ruth", Some("human:ruth"));
-    assert_eq!(refusals(root).len(), 2);
+    assert_eq!(refusals(root).len(), 1);
     assert!(stewards(root).contains(&"human:ruth".to_string()));
-    withdraw(root, "human:ruth", Some("human:matthew"));
+    // Self-withdrawal passes: the line names its own member as sponsor.
+    withdraw(root, "human:ruth", Some("human:ruth"));
     assert!(!stewards(root).contains(&"human:ruth".to_string()));
-    // A rejoin is sponsored like any line.
+    let admitted = &view(root)["affiliations"];
+    assert_eq!(admitted["invalidLines"], 1, "{admitted}");
+    // A rejoin is sponsored like any line…
     steward(root, "human:ruth", Some("human:matthew"));
     assert!(stewards(root).contains(&"human:ruth".to_string()));
+    // …and a self-join never stands: only leaving is ungated.
+    append(
+        root,
+        &person(
+            root,
+            "human:carol",
+            MembershipRole::Contributor,
+            Some("human:carol"),
+        ),
+    );
+    let refused = refusals(root);
+    assert!(
+        refused.last().unwrap().contains("self-sponsorship"),
+        "{refused:?}"
+    );
+    assert!(
+        refused.last().unwrap().contains("only leaving is ungated"),
+        "{refused:?}"
+    );
+}
+
+// ── stewardless ─────────────────────────────────────────────────────────────────────────────
+
+/// Both Stewards of the fixture leave themselves: the collective reads stewardless.
+fn stewardless(root: &Path) {
+    let mut adam = line(
+        root,
+        "human:adam",
+        MemberKind::Person,
+        MembershipRole::Steward,
+        AffiliationStanding::Fixture,
+        Some("human:adam"),
+    );
+    adam.withdrawn = Some("2026-09-26T00:00:00Z".into());
+    append(root, &adam);
+    withdraw(root, "human:matthew", Some("human:matthew"));
+}
+
+#[test]
+fn the_last_steward_may_leave_and_only_steward_acts_refuse_naming_stewardless() {
+    let dir = fixture();
+    let root = dir.path();
+    write(
+        root,
+        "genesis/evidence.json",
+        &json!({"observed":"Only narrow claims are supported"}),
+    );
+    stewardless(root);
+    let view = view(root);
+    assert_eq!(view["stewardship"], "stewardless", "{view}");
+    assert_eq!(view["stewards"], json!([]));
+    assert_eq!(view["affiliations"]["invalidLines"], 0);
+    // Value still flows: a contribution files.
+    let pin =
+        |path: &str| memory::execute(root, "pin", Some(path), None).unwrap()["resource"].clone();
+    write(
+        root,
+        "genesis/assertion.json",
+        &json!({"version":1,"collective":pin(ROOT),
+        "author":"agent:investigator@fixture","steward":"repo:ethosengine/elohim",
+        "scope":"workspace","reach":"repository","concern":"stewardless evidence",
+        "claim":"Only the measured scope is supported","uncertainty":["Wider use remains untested"],
+        "sources":[{"resource":pin("genesis/evidence.json"),"reach":"repository"}],"supersedes":[],"contradicts":[]}),
+    );
+    memory::execute(
+        root,
+        "contribute",
+        Some("genesis/assertion.json"),
+        Some("contributor"),
+    )
+    .unwrap();
+    // Graduation needs a Steward's verdict: refused, naming the state.
+    write(
+        root,
+        "genesis/graduation.json",
+        &json!({"version":1,"collective":pin(ROOT),"contribution":pin("genesis/assertion.json"),
+        "review":"bafyreigh2akiscaildc4ecb5fxd4osdmnjoxzmvhrrkqbzsicgqj3bnzfy","audience":"repository"}),
+    );
+    let err = memory::execute(root, "graduate", Some("genesis/graduation.json"), None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("stewardless"), "{err}");
+    // Sponsorship refuses, naming the state — for a former Steward and a Contributor alike.
+    for session in ["matthew", "contributor"] {
+        let err = affiliate(root, session, "human:ruth", "contributor", |_| {}).unwrap_err();
+        assert!(err.contains("stewardless"), "{err}");
+    }
+    // Leaving still works while stewardless: the Contributor withdraws itself through the verb.
+    let out = affiliate(
+        root,
+        "contributor",
+        "agent:investigator",
+        "contributor",
+        |o| {
+            o.kind = Some("elohim-agent");
+            o.withdraw = true;
+        },
+    )
+    .unwrap();
+    assert_eq!(out["admittedAs"], "self-withdrawal");
+    assert_eq!(out["appended"]["record"]["sponsor"], "agent:investigator");
+}
+
+#[test]
+fn a_root_collective_is_refounded_only_through_its_declaration() {
+    let dir = fixture();
+    let root = dir.path();
+    stewardless(root);
+    let before = memory::execute(root, "pin", Some(ROOT), None).unwrap()["resource"]["cid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // A new genesis pinned to the same declaration is a raw edit: refused.
+    steward(root, "human:matthew", None);
+    let refused = refusals(root);
+    assert!(
+        refused[0].contains("re-founded only through its declaration"),
+        "{refused:?}"
+    );
+    assert_eq!(view(root)["stewardship"], "stewardless");
+    // A reviewed amendment whose lineage names the stewardless declaration re-founds it.
+    let mut declaration: Value =
+        serde_json::from_slice(&std::fs::read(root.join(ROOT)).unwrap()).unwrap();
+    declaration["charter"] = json!("Re-founded after the last Steward left.");
+    declaration["supersedes"] = json!([before]);
+    write(root, ROOT, &declaration);
+    steward(root, "human:matthew", None);
+    let view = view(root);
+    assert_eq!(view["stewardship"], "stewarded", "{view}");
+    assert_eq!(view["stewards"][0]["member"], "human:matthew");
+    // The earlier refused line stays refused; the re-founding line stands.
+    assert_eq!(view["affiliations"]["invalidLines"], 1);
+    // …and the sponsor chain of a line it sponsors reads the re-founding.
+    steward(root, "human:ruth", Some("human:matthew"));
+    let chain = &view_of(root, "human:ruth")["sponsorChain"][0];
+    assert_eq!(chain["admittedAs"], "refounded-by-declaration");
+}
+
+fn view_of(root: &Path, member: &str) -> Value {
+    view(root)["stewards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["member"] == member)
+        .unwrap()
+        .clone()
+}
+
+const CHILD: &str = "genesis/concern/.epr-meta/collective.json";
+
+#[test]
+fn a_stewardless_child_is_refounded_by_a_steward_of_its_parent() {
+    let dir = fixture();
+    let root = dir.path();
+    let parent = memory::execute(root, "pin", Some(ROOT), None).unwrap()["resource"].clone();
+    write(
+        root,
+        CHILD,
+        &json!({"version":1,"id":"collective:ethosengine/elohim/concern","displayName":"Concern",
+        "charter":"A narrower collective inside the repository.","participation":"registered-local-session",
+        "parent":parent,"sourceRules":[{"path":"genesis/concern","maxLocality":"repository"}]}),
+    );
+    let child_line = |member: &str, sponsor: Option<&str>, withdrawn: bool| {
+        let bytes = std::fs::read(root.join(CHILD)).unwrap();
+        let mut record = person(root, member, MembershipRole::Steward, sponsor);
+        record.collective = FileRef {
+            path: CHILD.into(),
+            cid: eprfs_core::BlobCid::compute_raw(&bytes).to_string(),
+        };
+        record.withdrawn = withdrawn.then(|| "2026-09-26T00:00:00Z".to_string());
+        record
+    };
+    let child_view = || memory::execute(root, "collective", Some("genesis/concern"), None).unwrap();
+    append(root, &child_line("human:ruth", None, false));
+    append(root, &child_line("human:ruth", Some("human:ruth"), true));
+    assert_eq!(child_view()["stewardship"], "stewardless");
+    // Nobody outside the parent's Stewards re-founds it — nor a sponsorless line.
+    append(root, &child_line("human:carol", Some("human:dan"), false));
+    append(root, &child_line("human:carol", None, false));
+    assert_eq!(child_view()["stewardship"], "stewardless");
+    // A Steward of the parent (human:matthew) sponsors the new genesis.
+    append(
+        root,
+        &child_line("human:carol", Some("human:matthew"), false),
+    );
+    let view = child_view();
+    assert_eq!(view["stewardship"], "stewarded", "{view}");
+    assert_eq!(view["stewards"][0]["member"], "human:carol");
+    assert_eq!(view["affiliations"]["invalidLines"], 2);
+}
+
+#[test]
+fn a_fixture_genesis_is_refused() {
+    let dir = fixture();
+    let root = dir.path();
+    std::fs::remove_file(root.join(memory::AFFILIATIONS_PATH)).unwrap();
+    append(
+        root,
+        &line(
+            root,
+            "human:adam",
+            MemberKind::Person,
+            MembershipRole::Steward,
+            AffiliationStanding::Fixture,
+            None,
+        ),
+    );
+    let err = memory::execute(root, "collective", None, None)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("never founded"), "{err}");
+    steward(root, "human:matthew", None);
+    let refused = refusals(root);
+    assert!(
+        refused[0].contains("a fixture never mints real authority"),
+        "{refused:?}"
+    );
+    assert_eq!(stewards(root), ["human:matthew"]);
 }
 
 // ── the verb ────────────────────────────────────────────────────────────────────────────────

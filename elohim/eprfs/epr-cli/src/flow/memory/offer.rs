@@ -76,6 +76,10 @@ pub struct OfferStanding {
     /// What an operator must do to activate it, while it is not Active.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub missing: Option<String>,
+    /// The collective has no active Steward: the offer can never be active until it is
+    /// re-founded. Serialized only when true.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub stewardless: bool,
 }
 
 impl OfferStanding {
@@ -94,6 +98,10 @@ impl OfferStanding {
                 "offer {} withdrawn by verdict {}",
                 self.offer,
                 self.withdrawn_by.as_deref().unwrap_or("?")
+            ),
+            _ if self.stewardless => format!(
+                "offer {} proposed — collective {} is stewardless; no Steward can approve it",
+                self.offer, self.collective
             ),
             _ => format!(
                 "offer {} proposed — no distinct Steward's approval",
@@ -227,8 +235,15 @@ pub fn offer_standing(
         }
     }
 
+    // A stewardless collective's offer is never active: every approval above was refused by
+    // `steward_approval`, naming the state, and a withdrawal needs no Steward to stand.
+    let stewardless = governance.is_stewardless();
     let missing = match state {
         OfferState::Active => None,
+        _ if stewardless => governance
+            .require_stewarded("activating this offer")
+            .err()
+            .map(|e| e.to_string()),
         OfferState::Proposed => Some(format!(
             "an approving verdict from a Steward of {} who is not the offer's author ({author}){}: \
              epr flow note {offer} --kind verdict --verdict approved --reason \"<what you \
@@ -254,5 +269,6 @@ pub fn offer_standing(
         withdrawn_by,
         ignored,
         missing,
+        stewardless,
     })
 }

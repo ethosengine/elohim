@@ -115,10 +115,24 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
                  --standing or --acts-for, and a --kind or --role must match the current line",
             ));
         }
+        // Leaving is never gated: a member withdrawing themselves names themselves as sponsor
+        // (any build of an agent role speaks for that role's own membership).
+        let own = sponsor == member
+            || matches!(
+                (
+                    eprfs_agent::memory::agent_role(&sponsor),
+                    eprfs_agent::memory::agent_role(member)
+                ),
+                (Some(a), Some(b)) if a == b
+            );
         Affiliation {
             version: 1,
             collective: governance.reference.clone(),
-            sponsor: Some(sponsor.clone()),
+            sponsor: Some(if own {
+                member.to_string()
+            } else {
+                sponsor.clone()
+            }),
             withdrawn: Some(date),
             ..prior.clone()
         }
@@ -163,7 +177,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     };
 
     // The same rule the reader folds with — refused here is refused there.
-    let sponsor_line = Fold::from_governance(&governance)
+    let admission = Fold::from_governance(&governance)
         .admit(&record)
         .map_err(|reason| {
             refused(format!(
@@ -212,10 +226,12 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         "operation":"affiliate",
         "appended":{"cid":parsed.cid,"record":parsed.record},
         "sponsor":sponsor,
-        "sponsorLine":sponsor_line,
+        "sponsorLine":admission.sponsor_line,
+        "admittedAs":admission.kind,
         "signature":signature,
         "collectiveOfRecord":{"path":governance.reference.path,"id":governance.declaration.id},
         "stewards":after.as_ref().map_or(Value::Null, |g| g.steward_report()),
+        "stewardship":after.as_ref().map_or("unknown", |g| g.stewardship()),
         "sidecar":AFFILIATIONS_PATH,
         "standing":"Local affiliation sponsored by a Steward on record; the pre-image of Qahal \
             Membership, not network membership."

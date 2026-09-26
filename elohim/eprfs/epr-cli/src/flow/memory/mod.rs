@@ -291,6 +291,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             json!({"operation":"collective", "resource":governance.reference, "declaration":governance.declaration,
             "inputGuide":guide::input_guide(&governance),
             "stewards":governance.steward_report(),
+            "stewardship":governance.stewardship(),"stewardlessSince":governance.stewardless_since,
             "affiliations":{"current":governance.affiliations.len(),"invalidLines":governance.invalid_lines,"refused":governance.refused,"sidecar":validation::AFFILIATIONS_PATH},
             "registry":registry,
             "standing":"Declared local relationship. Stewards are affiliation records, the local pre-image of Qahal Membership; every line after the genesis Steward is sponsored by an active Steward who is not its member (`affiliate`), and an unsponsored line does not stand. Registered actor claims supply attribution, not authentication or network membership.","usage":reader.usage()}),
@@ -421,6 +422,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             out
         }
         "graduate" => {
+            governance.require_stewarded("graduation")?;
             let request: Graduation = serde_json::from_str(&file.text)?;
             version(request.version)?;
             let request_lineage = reader.require_collective(&request.collective, &governance)?;
@@ -514,6 +516,7 @@ fn steward_approval<'g>(
     approver: &str,
     author: &str,
 ) -> FlowResult<(&'g str, &'g Affiliation)> {
+    governance.require_stewarded("an approving verdict")?;
     let named = governance.affiliation_of(approver);
     let Some((cid, affiliation)) = named.filter(|(_, a)| a.is_active_steward()) else {
         let held = named.map_or_else(

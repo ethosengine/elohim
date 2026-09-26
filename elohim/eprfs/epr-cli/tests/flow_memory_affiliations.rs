@@ -240,11 +240,11 @@ fn a_collective_with_no_steward_on_record_is_refused() {
         MemberKind::Person,
         MembershipRole::Steward,
     );
-    let withdrawal = |sponsor: &str| {
+    let withdrawal = |member: &str, sponsor: &str| {
         let mut withdrawn = affiliation(
             root,
             ROOT,
-            "human:matthew",
+            member,
             MemberKind::Person,
             MembershipRole::Steward,
             AffiliationStanding::Standing,
@@ -253,16 +253,19 @@ fn a_collective_with_no_steward_on_record_is_refused() {
         withdrawn.withdrawn = Some("2026-09-26T00:00:00Z".into());
         withdrawn
     };
-    // A Steward cannot sponsor its own withdrawal: the line is refused, standing stays.
-    append(root, &withdrawal("human:matthew"));
-    let view = memory::execute(root, "collective", None, None).unwrap();
-    assert_eq!(view["stewards"].as_array().unwrap().len(), 2);
     // Withdrawn by a later line another Steward sponsors: history stays, standing ends.
-    append(root, &withdrawal("human:ruth"));
+    append(root, &withdrawal("human:matthew", "human:ruth"));
     let view = memory::execute(root, "collective", None, None).unwrap();
     let stewards = view["stewards"].as_array().unwrap();
     assert_eq!(stewards.len(), 1);
     assert_eq!(stewards[0]["member"], "human:ruth");
+    assert_eq!(view["stewardship"], "stewarded");
+    // Leaving is never gated: the last Steward withdraws herself, and the founded collective
+    // reads stewardless rather than refused.
+    append(root, &withdrawal("human:ruth", "human:ruth"));
+    let view = memory::execute(root, "collective", None, None).unwrap();
+    assert_eq!(view["stewardship"], "stewardless");
+    assert_eq!(view["stewards"], json!([]));
 }
 
 #[test]

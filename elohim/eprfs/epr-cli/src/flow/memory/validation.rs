@@ -9,8 +9,8 @@ use elohim_epr_rea::{
     ParticipantRef, SidecarActorStore, SidecarFlowStore, ROOT_COLLECTIVE_DECLARATION,
 };
 use eprfs_agent::memory::{
-    Affiliation, AffiliationStanding, Collective, Contribution, Feedback, FileRef, Locality,
-    MemberKind, ProjectionRequest,
+    agent_role, Affiliation, AffiliationStanding, Collective, Contribution, Feedback, FileRef,
+    Locality, MemberKind, ProjectionRequest,
 };
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
@@ -52,6 +52,11 @@ pub struct Governance {
     pub refused: Vec<RefusedLine>,
     /// Every admitted line of this collective by CID: its sponsor's line and its signature.
     pub admitted: BTreeMap<String, Admitted>,
+    /// `Some(declaration CID)` when the collective is STEWARDLESS: its last Steward left under
+    /// that declaration. Contributions still flow; every act needing a Steward refuses.
+    pub stewardless_since: Option<String>,
+    /// A child collective's parent Stewards (active), who may sponsor its re-founding.
+    pub parent_stewards: Vec<(String, Affiliation)>,
 }
 
 /// One sidecar line that counts for nothing, and why — never silently dropped.
@@ -73,12 +78,52 @@ pub struct RefusedLine {
 pub struct Admitted {
     pub record: Affiliation,
     pub sponsor_line: Option<String>,
+    pub kind: AdmissionKind,
     pub signature: LineSignature,
 }
 
 impl Governance {
     pub fn is_root(&self) -> bool {
         self.reference.path == COLLECTIVE_PATH
+    }
+
+    /// Whether the collective has no active Steward (its last Steward left).
+    pub fn is_stewardless(&self) -> bool {
+        self.stewardless_since.is_some()
+    }
+
+    /// `stewardless` or `stewarded`: the word every surface prints.
+    pub fn stewardship(&self) -> &'static str {
+        if self.is_stewardless() {
+            "stewardless"
+        } else {
+            "stewarded"
+        }
+    }
+
+    /// Refuses, naming the state, when an act needs a Steward and the collective has none.
+    pub fn require_stewarded(&self, act: &str) -> FlowResult<()> {
+        match &self.stewardless_since {
+            None => Ok(()),
+            Some(since) => Err(refused(format!(
+                "{act} needs a Steward, and collective {} is stewardless (its last Steward left                  under declaration {since}); contributions still flow, but no Steward's verdict                  or sponsorship can stand until it is re-founded",
+                self.declaration.id
+            ))),
+        }
+    }
+
+    /// How this collective may be re-founded should it be stewardless.
+    pub fn refounding(&self) -> Refounding {
+        if self.is_root() {
+            Refounding::Root {
+                current: self.reference.cid.clone(),
+                supersedes: self.declaration.supersedes.clone(),
+            }
+        } else {
+            Refounding::Child {
+                parent: self.parent_stewards.clone(),
+            }
+        }
     }
 
     /// Stewards still on record.
@@ -179,7 +224,7 @@ impl Governance {
             };
             chain.push(json!({"member":line.record.member,"affiliation":hop,
                 "role":line.record.role,"standing":line.record.standing,
-                "genesis":line.sponsor_line.is_none(),
+                "genesis":line.sponsor_line.is_none(),"admittedAs":line.kind,
                 "signature":self.signature_report(&hop)["status"]}));
             next = line.sponsor_line.clone();
         }
@@ -187,29 +232,84 @@ impl Governance {
     }
 }
 
+/// How one admitted line was admitted — what its sponsor chain reads at that hop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdmissionKind {
+    /// The collective's first Steward line: it names no sponsor.
+    Genesis,
+    /// Sponsored by a distinct active Steward of the collective.
+    Sponsored,
+    /// The member withdrew themselves. Leaving is never gated.
+    SelfWithdrawal,
+    /// A stewardless ROOT collective re-founded through a reviewed amendment of its declaration.
+    RefoundedByDeclaration,
+    /// A stewardless CHILD collective re-founded by a Steward of its parent collective.
+    RefoundedByParent,
+}
+
+/// What [`Fold::admit`] admits a line as: the admitted line its sponsor stood on, and how.
+#[derive(Clone, Debug)]
+pub struct Admission {
+    pub sponsor_line: Option<String>,
+    pub kind: AdmissionKind,
+}
+
+/// How a stewardless collective may be founded again.
+#[derive(Clone, Default)]
+pub enum Refounding {
+    /// A root collective: only through its declaration. `current` is the declaration's raw CID
+    /// now, `supersedes` its lineage (newest first).
+    Root {
+        current: String,
+        supersedes: Vec<String>,
+    },
+    /// A child collective: a Steward of the parent collective sponsors the new genesis.
+    Child { parent: Vec<(String, Affiliation)> },
+    /// No re-founding route (a fold read without its collective's context).
+    #[default]
+    Closed,
+}
+
 /// The sponsorship chain, folded in FILE ORDER over one collective's sidecar lines.
 ///
-/// The first Steward line of a collective is its genesis and names no sponsor. Every later line
-/// — a new member, a role change, a withdrawal, a rejoin — names a `sponsor` who, at that point
-/// in the fold, is an ACTIVE Steward of the collective and is not the line's member (by
-/// [`Affiliation::same_author_as`], so a sibling build of the same agent role cannot sponsor it).
-/// A Fixture Steward may sponsor only a Fixture or a Contributor line: a fixture never mints real
-/// authority. Membership is the first place the anti-self-election rule holds: a Steward added by
-/// a raw file edit without a valid sponsor does not stand.
+/// The first Steward line of a collective is its genesis: it names no sponsor and is never a
+/// Fixture (a fixture never mints real authority). Joining, rejoining and a role change name a
+/// `sponsor` who, at that point in the fold, is an ACTIVE Steward of the collective and is not
+/// the line's member (by [`Affiliation::same_author_as`], so a sibling build of the same agent
+/// role cannot sponsor it); a Fixture Steward may sponsor only a Fixture or a Contributor line.
+/// LEAVING IS NEVER GATED: a withdrawal naming its own member as sponsor is always admitted, so
+/// the last Steward may leave, and the collective then reads STEWARDLESS — contributions still
+/// flow, every act that needs a Steward refuses naming the state, and only a re-founding
+/// ([`Refounding`]) admits a new genesis. Membership is the first place the anti-self-election
+/// rule holds: a Steward added by a raw file edit without a valid sponsor does not stand.
 #[derive(Default)]
 pub struct Fold {
     order: Vec<String>,
     current: BTreeMap<String, (String, Affiliation)>,
     genesis: bool,
+    /// The declaration CID pinned by the line that left the collective with no active Steward.
+    stewardless_since: Option<String>,
+    refounding: Refounding,
     admitted: BTreeMap<String, Admitted>,
 }
 
 impl Fold {
+    /// An empty fold for a collective re-founded by `refounding` should it ever go stewardless.
+    pub fn new(refounding: Refounding) -> Self {
+        Self {
+            refounding,
+            ..Self::default()
+        }
+    }
+
     /// The fold as it stands after a read collective: its current affiliations, past genesis
-    /// (a collective read at all has a Steward on record, so its genesis is behind it).
+    /// (a collective read at all was founded), stewardless or not, with its re-founding route.
     pub fn from_governance(governance: &Governance) -> Self {
         let mut fold = Self {
             genesis: true,
+            stewardless_since: governance.stewardless_since.clone(),
+            refounding: governance.refounding(),
             ..Self::default()
         };
         for (cid, affiliation) in &governance.affiliations {
@@ -222,30 +322,63 @@ impl Fold {
         fold
     }
 
-    /// Whether `line` may follow the fold so far: `Ok(sponsor's line CID)` (`None` for the
-    /// genesis), or the refusal naming why.
-    pub fn admit(&self, line: &Affiliation) -> Result<Option<String>, String> {
+    /// Whether `line` may follow the fold so far, and as what; or the refusal naming why.
+    pub fn admit(&self, line: &Affiliation) -> Result<Admission, String> {
         use eprfs_agent::memory::MembershipRole;
-        if !self.genesis
-            && line.role == MembershipRole::Steward
-            && line.withdrawn.is_none()
-            && line.sponsor.is_none()
+        // Leaving is never gated: a member may always withdraw themselves.
+        if line.withdrawn.is_some() && line.sponsor.as_deref() == Some(line.member.as_str()) {
+            return match self.current.get(&line.member) {
+                Some((cid, a)) if a.withdrawn.is_none() => Ok(Admission {
+                    sponsor_line: Some(cid.clone()),
+                    kind: AdmissionKind::SelfWithdrawal,
+                }),
+                _ => Err(format!(
+                    "{} holds no standing affiliation to withdraw",
+                    line.member
+                )),
+            };
+        }
+        let founding = line.role == MembershipRole::Steward && line.withdrawn.is_none();
+        if founding
+            && line.standing == AffiliationStanding::Fixture
+            && (!self.genesis || self.stewardless_since.is_some())
         {
-            return Ok(None);
+            return Err(format!(
+                "{} cannot be a genesis Steward as a Fixture: a fixture never mints real \
+                 authority, so a collective is founded only by a standing Steward",
+                line.member
+            ));
+        }
+        if !self.genesis {
+            if founding && line.sponsor.is_none() {
+                return Ok(Admission {
+                    sponsor_line: None,
+                    kind: AdmissionKind::Genesis,
+                });
+            }
+            return Err(format!(
+                "{} precedes the collective's genesis Steward, so no Steward could sponsor it",
+                line.member
+            ));
+        }
+        if let Some(since) = &self.stewardless_since {
+            return self.refound(line, since, founding);
         }
         let Some(sponsor) = line.sponsor.as_deref() else {
-            return Err(if self.genesis {
-                format!(
-                    "{} names no sponsor: every line after the genesis Steward needs an active                      Steward's sponsorship",
-                    line.member
-                )
-            } else {
-                format!(
-                    "{} precedes the collective's genesis Steward and names no sponsor",
-                    line.member
-                )
-            });
+            return Err(format!(
+                "{} names no sponsor: joining, rejoining and a role change need an active \
+                 Steward's sponsorship (only leaving is ungated)",
+                line.member
+            ));
         };
+        if agent_or_same(sponsor, &line.member) {
+            return Err(format!(
+                "self-sponsorship: {sponsor} may not sponsor its own membership line for {} — \
+                 only leaving is ungated; joining, rejoining and a role change need a distinct \
+                 active Steward",
+                line.member
+            ));
+        }
         let Some((sponsor_line, steward)) = self.active_steward(sponsor) else {
             let held = self
                 .current
@@ -260,12 +393,14 @@ impl Fold {
                     }
                 });
             return Err(format!(
-                "sponsor {sponsor} is not an active Steward of this collective at this point in                  the fold ({held})"
+                "sponsor {sponsor} is not an active Steward of this collective at this point in \
+                 the fold ({held})"
             ));
         };
         if steward.same_author_as(&line.member) {
             return Err(format!(
-                "self-sponsorship: sponsor {sponsor} (Steward line {}) is the same author as the                  member {} (agent refs compare by role)",
+                "self-sponsorship: sponsor {sponsor} (Steward line {}) is the same author as the \
+                 member {} (agent refs compare by role)",
                 steward.member, line.member
             ));
         }
@@ -274,11 +409,87 @@ impl Fold {
             && line.role != MembershipRole::Contributor
         {
             return Err(format!(
-                "fixture Steward {sponsor} cannot sponsor a standing {:?} line for {}: a fixture                  may sponsor only a Fixture or Contributor line, never real authority",
+                "fixture Steward {sponsor} cannot sponsor a standing {:?} line for {}: a fixture \
+                 may sponsor only a Fixture or Contributor line, never real authority",
                 line.role, line.member
             ));
         }
-        Ok(Some(sponsor_line.to_string()))
+        Ok(Admission {
+            sponsor_line: Some(sponsor_line.to_string()),
+            kind: AdmissionKind::Sponsored,
+        })
+    }
+
+    /// A line arriving while the collective is stewardless: only a re-founding genesis stands.
+    fn refound(
+        &self,
+        line: &Affiliation,
+        since: &str,
+        founding: bool,
+    ) -> Result<Admission, String> {
+        let stewardless = |how: &str| {
+            format!(
+                "the collective is stewardless (its last Steward left under declaration \
+                 {since}): no Steward can sponsor {}; {how}",
+                line.member
+            )
+        };
+        match &self.refounding {
+            Refounding::Root {
+                current,
+                supersedes,
+            } => {
+                let how = "a root collective is re-founded only through its declaration — \
+                           amend it by a reviewed edit whose `supersedes` names the stewardless \
+                           declaration, then append a sponsorless standing genesis Steward line \
+                           pinned to the amended declaration";
+                if !founding || line.sponsor.is_some() {
+                    return Err(stewardless(how));
+                }
+                let pinned = line.collective.cid.as_str();
+                let position = |cid: &str| supersedes.iter().position(|c| c == cid);
+                // Newest first: the pin must be the current declaration or an amendment that
+                // came after the stewardless one in the lineage.
+                let moved = pinned != since
+                    && position(since).is_some()
+                    && (pinned == current
+                        || matches!((position(pinned), position(since)), (Some(p), Some(s)) if p < s));
+                if !moved {
+                    return Err(stewardless(how));
+                }
+                Ok(Admission {
+                    sponsor_line: None,
+                    kind: AdmissionKind::RefoundedByDeclaration,
+                })
+            }
+            Refounding::Child { parent } => {
+                let how = "a child collective is re-founded by a Steward of its parent \
+                           collective sponsoring a standing genesis Steward line";
+                let sponsor = line.sponsor.as_deref().filter(|_| founding);
+                let steward = sponsor.and_then(|sponsor| {
+                    let active = || parent.iter().filter(|(_, a)| a.is_active_steward());
+                    active()
+                        .find(|(_, a)| a.member == sponsor)
+                        .or_else(|| active().find(|(_, a)| a.names(sponsor)))
+                });
+                let Some((cid, steward)) = steward else {
+                    return Err(stewardless(how));
+                };
+                if steward.same_author_as(&line.member)
+                    || steward.standing == AffiliationStanding::Fixture
+                {
+                    return Err(stewardless(
+                        "the parent Steward sponsoring a re-founding must be standing and not \
+                         the new genesis Steward itself",
+                    ));
+                }
+                Ok(Admission {
+                    sponsor_line: Some(cid.clone()),
+                    kind: AdmissionKind::RefoundedByParent,
+                })
+            }
+            Refounding::Closed => Err(stewardless("no re-founding route is known here")),
+        }
     }
 
     /// The active Steward `participant` stands as: the exact member, else a package-level agent
@@ -292,25 +503,56 @@ impl Fold {
     }
 
     fn accept(&mut self, cid: String, line: Affiliation, admitted: Admitted) {
-        use eprfs_agent::memory::MembershipRole;
-        if admitted.sponsor_line.is_none() && line.role == MembershipRole::Steward {
+        let pinned = line.collective.cid.clone();
+        if matches!(
+            admitted.kind,
+            AdmissionKind::Genesis
+                | AdmissionKind::RefoundedByDeclaration
+                | AdmissionKind::RefoundedByParent
+        ) {
             self.genesis = true;
+            self.stewardless_since = None;
         }
         if !self.current.contains_key(&line.member) {
             self.order.push(line.member.clone());
         }
         self.admitted.insert(cid.clone(), admitted);
         self.current.insert(line.member.clone(), (cid, line));
+        if self.genesis
+            && self.stewardless_since.is_none()
+            && !self.current.values().any(|(_, a)| a.is_active_steward())
+        {
+            self.stewardless_since = Some(pinned);
+        }
     }
 
-    fn finish(mut self) -> (Vec<(String, Affiliation)>, BTreeMap<String, Admitted>) {
+    fn finish(mut self) -> FoldOutcome {
         let current = self
             .order
             .iter()
             .filter_map(|member| self.current.remove(member))
             .collect();
-        (current, self.admitted)
+        FoldOutcome {
+            current,
+            admitted: self.admitted,
+            founded: self.genesis,
+            stewardless_since: self.stewardless_since,
+        }
     }
+}
+
+/// Whether `sponsor` names the same participant as `member` (agent refs compare by role).
+fn agent_or_same(sponsor: &str, member: &str) -> bool {
+    sponsor == member
+        || matches!((agent_role(sponsor), agent_role(member)), (Some(a), Some(b)) if a == b)
+}
+
+/// What folding one collective's lines yields.
+pub struct FoldOutcome {
+    pub current: Vec<(String, Affiliation)>,
+    pub admitted: BTreeMap<String, Admitted>,
+    pub founded: bool,
+    pub stewardless_since: Option<String>,
 }
 
 /// How far an approval resting on a Steward of this standing validates anything. A fixture
@@ -516,6 +758,7 @@ impl Reader {
                 return Err(refused("source rule must be a normalized relative path"));
             }
         }
+        let mut parent_stewards: Vec<(String, Affiliation)> = Vec::new();
         match (&declaration.parent, path == COLLECTIVE_PATH) {
             (Some(_), true) => {
                 return Err(refused(
@@ -542,6 +785,7 @@ impl Reader {
                     )));
                 }
                 let upper = self.governance_at(&parent.path, depth + 1)?;
+                parent_stewards = upper.stewards().cloned().collect();
                 for rule in &declaration.source_rules {
                     if !Path::new(&rule.path).starts_with(&dir) {
                         return Err(refused(format!(
@@ -559,23 +803,35 @@ impl Reader {
             }
             (None, true) => {}
         }
-        let (affiliations, admitted, refused_lines) = self.affiliations_for(&file.reference)?;
-        let governance = Governance {
-            reference: file.reference,
-            declaration,
-            affiliations,
-            invalid_lines: refused_lines.len(),
-            refused: refused_lines,
-            admitted,
+        let refounding = if path == COLLECTIVE_PATH {
+            Refounding::Root {
+                current: file.reference.cid.clone(),
+                supersedes: declaration.supersedes.clone(),
+            }
+        } else {
+            Refounding::Child {
+                parent: parent_stewards.clone(),
+            }
         };
-        if governance.stewards().next().is_none() {
+        let (outcome, refused_lines) = self.affiliations_for(&file.reference, refounding)?;
+        if !outcome.founded {
             return Err(refused(format!(
-                "collective {} ({path}) has no Steward on record — stewards are affiliation \
-                 records (role Steward) in {AFFILIATIONS_PATH}, never a declaration field",
-                governance.declaration.id
+                "collective {} ({path}) has no Steward on record — it was never founded: \
+                 stewards are affiliation records (role Steward) in {AFFILIATIONS_PATH}, never a \
+                 declaration field, and a collective is founded by its genesis Steward line",
+                declaration.id
             )));
         }
-        Ok(governance)
+        Ok(Governance {
+            reference: file.reference,
+            declaration,
+            affiliations: outcome.current,
+            invalid_lines: refused_lines.len(),
+            refused: refused_lines,
+            admitted: outcome.admitted,
+            stewardless_since: outcome.stewardless_since,
+            parent_stewards,
+        })
     }
 
     /// Every current affiliation with the collective whose declaration is at `reference.path`,
@@ -584,13 +840,17 @@ impl Reader {
     /// Matched by declaration PATH: a charter amendment re-pins the declaration's CID, and a
     /// member's standing does not lapse because the text they affiliated under was amended — the
     /// CID each member affiliated under stays on their line as the record of it.
-    fn affiliations_for(&self, reference: &FileRef) -> FlowResult<AffiliationFold> {
+    fn affiliations_for(
+        &self,
+        reference: &FileRef,
+        refounding: Refounding,
+    ) -> FlowResult<(FoldOutcome, Vec<RefusedLine>)> {
+        let mut fold = Fold::new(refounding);
         if !self.root.join(AFFILIATIONS_PATH).exists() {
-            return Ok((Vec::new(), BTreeMap::new(), Vec::new()));
+            return Ok((fold.finish(), Vec::new()));
         }
         self.sidecar(AFFILIATIONS_PATH)?;
         let text = std::fs::read_to_string(self.path(AFFILIATIONS_PATH)?)?;
-        let mut fold = Fold::default();
         let mut refused = Vec::new();
         for (index, line) in text.lines().enumerate() {
             if line.trim().is_empty() {
@@ -612,17 +872,18 @@ impl Reader {
             if parsed.record.collective.path != reference.path {
                 continue;
             }
-            let verdict = fold.admit(&parsed.record).and_then(|sponsor_line| {
+            let verdict = fold.admit(&parsed.record).and_then(|admission| {
                 self.signer_enrolled(&parsed)?;
-                Ok(sponsor_line)
+                Ok(admission)
             });
             match verdict {
-                Ok(sponsor_line) => fold.accept(
+                Ok(admission) => fold.accept(
                     parsed.cid,
                     parsed.record.clone(),
                     Admitted {
                         record: parsed.record,
-                        sponsor_line,
+                        sponsor_line: admission.sponsor_line,
+                        kind: admission.kind,
                         signature: parsed.signature,
                     },
                 ),
@@ -634,8 +895,7 @@ impl Reader {
                 }),
             }
         }
-        let (current, admitted) = fold.finish();
-        Ok((current, admitted, refused))
+        Ok((fold.finish(), refused))
     }
 
     /// A signed line's signer must be a device enrolled for the party that signs it: the
@@ -1029,14 +1289,6 @@ fn normalized(path: &str) -> FlowResult<&Path> {
 fn is_plain_file(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_file())
 }
-
-/// What [`Reader::affiliations_for`] folds a sidecar into: the current affiliations, every
-/// admitted line by CID, and every refused line.
-type AffiliationFold = (
-    Vec<(String, Affiliation)>,
-    BTreeMap<String, Admitted>,
-    Vec<RefusedLine>,
-);
 
 /// How an affiliation line is signed: the honest literal `unsigned`, or a DETACHED device
 /// signature over the record's CID (a line field, never a record field, so the CID is unchanged).

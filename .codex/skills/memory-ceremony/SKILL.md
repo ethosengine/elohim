@@ -22,9 +22,12 @@ static local relationship with `epr flow memory collective`, which carries the
 declaration, its Stewards on record and its native input guides. A declaration names no
 steward: Stewards are affiliation records in `.eprfs/status/affiliations.jsonl` (the
 local pre-image of Qahal Membership). Membership is decided collectively: a collective's
-first Steward line is its genesis, and every later line (a new member, a role change, a
-withdrawal, a rejoin) names a sponsor who is then an active Steward and not the member, and a
-fixture Steward sponsors only Fixture or Contributor lines. Add, change or withdraw a member
+first Steward line is its genesis (never a Fixture), and joining, rejoining or a role change
+names a sponsor who is then an active Steward and not the member; a fixture Steward sponsors
+only Fixture or Contributor lines. Leaving is never gated: a member may always withdraw
+themselves. When the last Steward leaves the collective reads `stewardless`: contributions
+still flow, but graduation, offer approval and sponsorship refuse until it is re-founded (a
+root collective through a reviewed amendment of its declaration, a child by a parent Steward). Add, change or withdraw a member
 only with `epr flow memory affiliate --member <ref> --kind person|collective|elohim-agent
 --role steward|contributor|observer [--standing fixture] [--withdraw] --session <id>`; the
 sponsor is that session's claimed participant, and the line is signed over its CID when this

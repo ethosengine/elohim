@@ -47,6 +47,20 @@ fn git(root: &Path, args: &[&str]) {
 }
 
 fn affiliate(root: &Path, member: &str, standing: AffiliationStanding) {
+    affiliate_line(root, member, standing, None);
+}
+
+/// A member withdrawing themselves: leaving is never gated, the line names its own member.
+fn withdraw_self(root: &Path, member: &str, standing: AffiliationStanding) {
+    affiliate_line(root, member, standing, Some("2026-09-26T00:00:00Z"));
+}
+
+fn affiliate_line(
+    root: &Path,
+    member: &str,
+    standing: AffiliationStanding,
+    withdrawn: Option<&str>,
+) {
     use std::io::Write;
     let bytes = std::fs::read(root.join(".epr-meta/collective.json")).unwrap();
     let record = Affiliation {
@@ -58,11 +72,15 @@ fn affiliate(root: &Path, member: &str, standing: AffiliationStanding) {
         member: member.into(),
         member_kind: MemberKind::Person,
         role: MembershipRole::Steward,
-        sponsor: None,
+        // human:alice is the genesis Steward; every later line is sponsored by her.
+        sponsor: match withdrawn {
+            Some(_) => Some(member.to_string()),
+            None => (member != "human:alice").then(|| "human:alice".to_string()),
+        },
         acts_for: None,
         standing,
         since: "2026-09-25T00:00:00Z".into(),
-        withdrawn: None,
+        withdrawn: withdrawn.map(str::to_string),
     };
     let path = root.join(memory::AFFILIATIONS_PATH);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -136,6 +154,38 @@ fn active() -> (tempfile::TempDir, String) {
     let (cid, _) = jenkins_bridge::mint_offer(&c).unwrap();
     verdict(dir.path(), &cid.to_string(), "bob", "approved");
     (dir, cid.to_string())
+}
+
+#[test]
+fn a_stewardless_collectives_offer_is_never_active() {
+    let (dir, _) = active();
+    let root = dir.path();
+    let c = ctx(root);
+    let Standing::Minted(s) = c.standing().unwrap() else {
+        panic!("minted")
+    };
+    assert!(s.is_active());
+    // Both Stewards leave: leaving is never gated, and the collective reads stewardless.
+    withdraw_self(root, "human:bob", AffiliationStanding::Fixture);
+    withdraw_self(root, "human:alice", AffiliationStanding::Standing);
+    let Standing::Minted(s) = c.standing().unwrap() else {
+        panic!("minted")
+    };
+    assert!(!s.is_active());
+    assert!(s.stewardless);
+    assert!(
+        s.stakes_line().contains("stewardless"),
+        "{}",
+        s.stakes_line()
+    );
+    assert!(s.missing.as_deref().unwrap().contains("stewardless"));
+    assert!(
+        s.ignored.iter().any(|i| i.contains("stewardless")),
+        "{:?}",
+        s.ignored
+    );
+    let err = observe(&c, &inputs(W1483, Some(G1903))).unwrap_err();
+    assert_eq!(err.exit_code(), 3, "{err}");
 }
 
 #[test]
