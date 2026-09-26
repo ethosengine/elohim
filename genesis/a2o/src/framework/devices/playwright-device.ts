@@ -118,11 +118,21 @@ interface PWBrowserContext {
   newPage(): Promise<PWPage>;
   close(): Promise<void>;
   tracing: PWTracing;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  /** Emulate the network being down for every page and service worker of this context. */
+  setOffline(offline: boolean): Promise<void>;
+  /** Chromium-only DevTools protocol session (used to stop service workers). */
+  newCDPSession(page: PWPage): Promise<PWCDPSession>;
   addInitScript(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     script: string | { path?: string } | ((...args: any[]) => void),
     arg?: unknown
   ): Promise<void>;
+}
+
+interface PWCDPSession {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  detach(): Promise<void>;
 }
 
 interface PWTracing {
@@ -160,12 +170,27 @@ export interface CapturedFailedRequest {
   timestamp: number;
 }
 
+/**
+ * Captured HTTP response, from a page or from a service worker's own fetches.
+ * `fromServiceWorker`: a page request the worker's fetch handler answered.
+ * `serviceWorkerOriginated`: a request the worker itself made (Chromium only).
+ */
+export interface CapturedResponse {
+  url: string;
+  status: number;
+  fromServiceWorker: boolean;
+  serviceWorkerOriginated: boolean;
+  timestamp: number;
+}
+
 /** All captured browser errors for a device session. */
 export interface CapturedErrors {
   console: CapturedConsoleLog[];
   page: CapturedPageError[];
   network: CapturedFailedRequest[];
 }
+
+const NOT_INITIALIZED = 'PlaywrightDevice not initialized — call init() first';
 
 export class PlaywrightDevice extends Device {
   readonly type: DeviceType = 'playwright';
@@ -183,6 +208,15 @@ export class PlaywrightDevice extends Device {
 
   /** Captured failed network requests. */
   failedRequests: CapturedFailedRequest[] = [];
+
+  /** Captured responses across the context — page requests and service-worker fetches. */
+  responses: CapturedResponse[] = [];
+
+  /** Failed requests a service worker made itself (kept apart from the page's). */
+  workerFailedRequests: CapturedFailedRequest[] = [];
+
+  /** Console messages from service workers (they never reach the page's console). */
+  workerConsoleLogs: CapturedConsoleLog[] = [];
 
   constructor(
     label: string,
@@ -213,7 +247,7 @@ export class PlaywrightDevice extends Device {
   }
 
   get page(): PWPage {
-    if (!this._page) throw new Error('PlaywrightDevice not initialized — call init() first');
+    if (!this._page) throw new Error(NOT_INITIALIZED);
     return this._page;
   }
 
@@ -271,6 +305,72 @@ export class PlaywrightDevice extends Device {
         timestamp: Date.now(),
       });
     });
+
+    // Responses at context level, so a service worker's own fetches are visible too.
+    this.context.on('response', (...args: unknown[]) => {
+      const resp = args[0] as {
+        url(): string;
+        status(): number;
+        fromServiceWorker(): boolean;
+        request(): { serviceWorker(): unknown };
+      };
+      this.responses.push({
+        url: resp.url(),
+        status: resp.status(),
+        fromServiceWorker: resp.fromServiceWorker(),
+        serviceWorkerOriginated: resp.request().serviceWorker() !== null,
+        timestamp: Date.now(),
+      });
+    });
+
+    this.context.on('requestfailed', (...args: unknown[]) => {
+      const req = args[0] as {
+        url(): string;
+        method(): string;
+        failure(): { errorText: string } | null;
+        serviceWorker(): unknown;
+      };
+      if (req.serviceWorker() === null) return; // page failures are captured above
+      this.workerFailedRequests.push({
+        url: req.url(),
+        method: req.method(),
+        failure: req.failure()?.errorText,
+        timestamp: Date.now(),
+      });
+    });
+
+    this.context.on('console', (...args: unknown[]) => {
+      const msg = args[0] as { type(): string; text(): string; worker(): unknown };
+      if (msg.worker() === null) return; // page console is captured above
+      this.workerConsoleLogs.push({
+        level: msg.type(),
+        text: msg.text(),
+        url: '',
+        timestamp: Date.now(),
+      });
+    });
+  }
+
+  /** Cut (or restore) the network for every page and service worker in this context. */
+  async setOffline(offline: boolean): Promise<void> {
+    if (!this.context) return; // already closed — nothing left to cut or restore
+    await this.context.setOffline(offline);
+  }
+
+  /**
+   * Stop every running service worker (Chromium DevTools protocol). The registration
+   * and its caches survive; the worker's in-memory state does not — the next request
+   * starts it cold, as after a browser restart.
+   */
+  async stopServiceWorkers(): Promise<void> {
+    if (!this.context) throw new Error(NOT_INITIALIZED);
+    const session = await this.context.newCDPSession(this.page);
+    try {
+      await session.send('ServiceWorker.enable');
+      await session.send('ServiceWorker.stopAllWorkers');
+    } finally {
+      await session.detach();
+    }
   }
 
   /**
@@ -279,7 +379,7 @@ export class PlaywrightDevice extends Device {
    * Call this before navigating to the target page.
    */
   async preloadLocalStorage(key: string, value: string): Promise<void> {
-    if (!this.context) throw new Error('PlaywrightDevice not initialized — call init() first');
+    if (!this.context) throw new Error(NOT_INITIALIZED);
     await this.context.addInitScript(
       `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)});`
     );
@@ -332,6 +432,9 @@ export class PlaywrightDevice extends Device {
     this.consoleLogs = [];
     this.pageErrors = [];
     this.failedRequests = [];
+    this.responses = [];
+    this.workerFailedRequests = [];
+    this.workerConsoleLogs = [];
   }
 
   /** Stop tracing and save to a zip file. Returns path or undefined if tracing not enabled. */

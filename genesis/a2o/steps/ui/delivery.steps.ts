@@ -41,6 +41,56 @@ const APPS_PATH = '/apps/';
 const NO_DOORWAY_MSG = 'No doorway configured';
 
 /**
+ * The apps service worker names its CacheStorage `apps-v<N>` and deletes older
+ * generations on activate. Steps read whichever `apps-` cache is live, preferring the
+ * generation this suite was written against, so a cache-name bump cannot silently turn
+ * every cache assertion into a read of an empty, freshly created cache.
+ */
+export const APPS_CACHE_PREFERRED = 'apps-v3';
+
+/** The live apps cache's name and its entry pathnames (`name: null` = no apps cache yet). */
+export async function appsCacheEntries(
+  device: PlaywrightDevice
+): Promise<{ name: string | null; paths: string[] }> {
+  return (await device.page.evaluate(async (preferred: string) => {
+    const names = (await caches.keys()).filter(n => n.startsWith('apps-'));
+    const generation = (n: string): number => Number(n.replace(/^apps-v/, '')) || 0;
+    names.sort((a, b) => generation(b) - generation(a));
+    const name = names.includes(preferred) ? preferred : (names[0] ?? null);
+    if (!name) return { name: null, paths: [] };
+    const cache = await caches.open(name);
+    const paths = (await cache.keys()).map(r => new URL(r.url).pathname);
+    return { name, paths };
+  }, APPS_CACHE_PREFERRED)) as { name: string | null; paths: string[] };
+}
+
+/** Delete every apps cache generation so a scenario starts cold. */
+export async function clearAppsCaches(device: PlaywrightDevice): Promise<void> {
+  await device.page.evaluate(async () => {
+    const names = (await caches.keys()).filter(n => n.startsWith('apps-'));
+    await Promise.all(names.map(async n => caches.delete(n)));
+  });
+}
+
+/** The html5-app slug the scenario loaded while online — read back by cache/offline steps. */
+const loadedAppSlug = new WeakMap<E2EWorld, string>();
+
+/** Poll `probe` until it returns true or `timeoutMs` passes; returns the last verdict. */
+async function pollUntil(
+  device: PlaywrightDevice,
+  probe: () => Promise<boolean>,
+  timeoutMs: number,
+  intervalMs = 500
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await probe()) return true;
+    if (Date.now() >= deadline) return false;
+    await device.page.waitForTimeout(intervalMs);
+  }
+}
+
+/**
  * Resolve the human's Playwright device, or null in HTTP mode (callers return
  * 'pending' — the documented convention: browser-dependent steps HOLD in the
  * API stage instead of throwing; genesis #1080 failed "Operator walks the
@@ -287,30 +337,63 @@ Given(
     // Navigate to the origin so we can call the CacheStorage API
     await device.page.goto(`${doorway.url}/`, { waitUntil: 'domcontentloaded' });
 
-    await device.page.evaluate(async () => {
-      // Delete the SW apps cache (name matches apps-sw registration)
-      await caches.delete('apps-v1');
-    });
+    // Delete every apps cache generation the SW may have created
+    await clearAppsCaches(device);
   }
 );
 
 /**
- * Verify the SW has populated CacheStorage with app files (post-load assertion).
+ * Verify the SW has cached the loaded app's verified bundle (post-load assertion).
+ *
+ * The fill is background work (`event.waitUntil` after the first load), so this polls.
+ * "All app files" is judged by the SW's own completion mark: it remembers the slug's
+ * head (`/apps/_heads/<slug>` → blobHash) only after the archive hashed to its address
+ * and every entry was written under `/apps/<blobHash>/`.
  *
  * Example: And the Service Worker has cached all app files
  */
-Given('the Service Worker has cached all app files', async function (this: E2EWorld) {
-  const device = firstPlaywright(this);
-  if (!device) return 'pending';
+Given(
+  'the Service Worker has cached all app files',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const device = firstPlaywright(this);
+    if (!device) return 'pending';
+    const slug = loadedAppSlug.get(this);
+    assert.ok(slug, 'No app was loaded while online in this scenario — nothing to have cached');
 
-  const cacheCount = (await device.page.evaluate(async () => {
-    const cache = await caches.open('apps-v1');
-    const keys = await cache.keys();
-    return keys.length;
-  })) as number;
+    const headPath = `/apps/_heads/${slug}`;
+    let seen: { name: string | null; paths: string[] } = { name: null, paths: [] };
+    let blobHash = '';
+    const filled = await pollUntil(
+      device,
+      async () => {
+        seen = await appsCacheEntries(device);
+        if (!seen.paths.includes(headPath)) return false;
+        blobHash = (await device.page.evaluate(
+          async (args: { name: string; headPath: string }) => {
+            const cache = await caches.open(args.name);
+            const head = await cache.match(new URL(args.headPath, location.origin).href);
+            return head ? (await head.text()).trim() : '';
+          },
+          { name: seen.name ?? '', headPath }
+        )) as string;
+        return blobHash !== '' && seen.paths.some(p => p.startsWith(`/apps/${blobHash}/`));
+      },
+      60_000
+    );
 
-  assert.ok(cacheCount > 0, 'SW CacheStorage is empty — app files were not cached');
-});
+    const headNote = blobHash ? `, head → ${blobHash}` : ', no remembered head';
+    assert.ok(
+      filled,
+      `SW did not finish caching "${slug}" within 60s — cache ${seen.name ?? '(none)'} holds ` +
+        `${seen.paths.length} entr(y/ies)${headNote}:\n` +
+        seen.paths
+          .slice(0, 20)
+          .map(p => `  ${p}`)
+          .join('\n')
+    );
+  }
+);
 
 /**
  * Precondition: the SW has a specific app version cached.
@@ -456,13 +539,21 @@ When(
   }
 );
 
+/** Contexts this suite has taken offline — a reload there cannot wait for networkidle. */
+const offlineWorlds = new WeakSet<E2EWorld>();
+
 /**
  * Reload a cached app (for offline resilience scenarios).
+ *
+ * Offline, `networkidle` is the wrong wait (requests outside the SW's scope fail
+ * rather than settle), so the reload waits for `load` — the document and every
+ * subresource the page asked for have resolved, from the SW or not at all.
  *
  * Example: And Terrance reloads "evolution-of-trust"
  */
 When(
   '{word} reloads {string}',
+  { timeout: 60_000 },
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     if (!device) return 'pending';
@@ -471,15 +562,17 @@ When(
 
     device.clearCapture();
     await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
-      waitUntil: 'networkidle',
+      waitUntil: offlineWorlds.has(this) ? 'load' : 'networkidle',
       timeout: 30_000,
     });
   }
 );
 
 /**
- * Simulate going offline by intercepting network requests in the browser context.
- * Uses Playwright's network interception to block all non-cached requests.
+ * Really cut the network: the browser context goes offline for every page AND the
+ * service worker. The worker is then stopped, so the next request starts it cold —
+ * nothing it merely held in memory (its per-slug probe memo) can carry the reload;
+ * only what it persisted (verified bytes and the remembered head) can.
  *
  * Example: When Terrance goes offline
  */
@@ -487,22 +580,27 @@ When('{word} goes offline', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  // Use CDP to set offline mode (Chromium-specific but standard for Playwright)
-  // The page evaluates navigator.onLine after this
-  await device.page.evaluate(() => {
-    // Override fetch to simulate offline by rejecting all network requests
-    // SW cache should intercept before fetch is called
-    (globalThis as unknown as Record<string, unknown>).__e2e_offline = true;
-  });
+  await device.setOffline(true);
+  offlineWorlds.add(this);
+  // The context is per-scenario and closed at cleanup, but restore the network
+  // explicitly so nothing later in this scenario's cleanup runs against a dead link.
+  this.onCleanup(async () => device.setOffline(false));
+  await device.stopServiceWorkers();
 });
 
 /**
  * Precondition: the given human has already loaded the app while online.
  *
+ * The apps SW is registered only by the Angular shell (`main.ts`, on window load,
+ * scope `/apps/`) — opening `/apps/<slug>/index.html` directly never registers it.
+ * So: visit the shell, wait until the `/apps/` registration is active, then open the
+ * app; a new navigation inside the scope is controlled by the worker.
+ *
  * Example: Given Terrance has loaded "evolution-of-trust" while online
  */
 Given(
   '{word} has loaded {string} while online',
+  { timeout: 120_000 },
   async function (this: E2EWorld, humanName: string, appSlug: string) {
     const device = requirePlaywright(this, humanName);
     if (!device) return 'pending';
@@ -510,10 +608,32 @@ Given(
     assert.ok(doorway, NO_DOORWAY_MSG);
 
     device.clearCapture();
+    await device.page.goto(`${doorway.url}/`, { waitUntil: 'load', timeout: 30_000 });
+    const active = await pollUntil(
+      device,
+      async () =>
+        (await device.page.evaluate(async () => {
+          const reg = await navigator.serviceWorker?.getRegistration('/apps/');
+          return Boolean(reg?.active);
+        })) as boolean,
+      30_000
+    );
+    const registrationLog = device.consoleLogs
+      .filter(l => l.text.includes('[apps-sw] regist'))
+      .map(l => `  [${l.level}] ${l.text}`)
+      .join('\n');
+    assert.ok(
+      active,
+      `The apps Service Worker did not become active for scope /apps/ within 30s of ` +
+        `loading the shell at ${doorway.url}/\n${registrationLog || '  (no [apps-sw] registration log)'}`
+    );
+
+    device.clearCapture();
     await device.page.goto(`${doorway.url}/apps/${appSlug}/index.html`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
+    loadedAppSlug.set(this, appSlug);
   }
 );
 
@@ -558,9 +678,9 @@ When(
 /**
  * Verify the app rendered successfully (body has content).
  *
- * Example: Then the app loads and functions normally
+ * Example: Then the app's page renders with visible text
  */
-Then('the app loads and functions normally', async function (this: E2EWorld) {
+Then("the app's page renders with visible text", async function (this: E2EWorld) {
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
@@ -569,6 +689,35 @@ Then('the app loads and functions normally', async function (this: E2EWorld) {
   )) as number;
   assert.ok(bodyLength > 0, 'Page body is empty — app did not render');
 });
+
+/**
+ * The version a browser shows offline is the one the household elected, checked by
+ * the browser itself. Pending: the service worker takes the version from the
+ * doorway's X-Blob-Hash header and never consults the election. Lands when the
+ * client resolves the address from the elected head (record-proves spec §7 slice 8).
+ *
+ * Example: Then the blob_hash his browser shows is the one the household's election names as current
+ */
+Given(
+  "his browser kept the household's signed election record for {string} while online",
+  function (_appSlug: string) {
+    return 'pending';
+  }
+);
+
+Then(
+  "the blob_hash his browser shows is the one the household's election names as current",
+  function () {
+    return 'pending';
+  }
+);
+
+Then(
+  'his browser read that election itself rather than taking the version from a doorway',
+  function () {
+    return 'pending';
+  }
+);
 
 /**
  * Verify the app renders within a time budget (uses body content check).
@@ -716,11 +865,7 @@ Then('the SW extracts all app files into CacheStorage', async function (this: E2
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
-  const cacheCount = (await device.page.evaluate(async () => {
-    const cache = await caches.open('apps-v1');
-    const keys = await cache.keys();
-    return keys.length;
-  })) as number;
+  const cacheCount = (await appsCacheEntries(device)).paths.length;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract files from ZIP');
 });
@@ -729,11 +874,7 @@ Then('the SW extracts all files from the ZIP into CacheStorage', async function 
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
-  const cacheCount = (await device.page.evaluate(async () => {
-    const cache = await caches.open('apps-v1');
-    const keys = await cache.keys();
-    return keys.length;
-  })) as number;
+  const cacheCount = (await appsCacheEntries(device)).paths.length;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty — SW did not extract ZIP files');
 });
@@ -766,11 +907,7 @@ Then('each file is cached in SW CacheStorage', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
-  const cacheCount = (await device.page.evaluate(async () => {
-    const cache = await caches.open('apps-v1');
-    const keys = await cache.keys();
-    return keys.length;
-  })) as number;
+  const cacheCount = (await appsCacheEntries(device)).paths.length;
 
   assert.ok(cacheCount > 0, 'CacheStorage is empty after individual file fetch');
 });
@@ -801,11 +938,7 @@ Then(
     if (!device) return 'pending';
 
     // Verify CacheStorage has entries
-    const cacheCount = (await device.page.evaluate(async () => {
-      const cache = await caches.open('apps-v1');
-      const keys = await cache.keys();
-      return keys.length;
-    })) as number;
+    const cacheCount = (await appsCacheEntries(device)).paths.length;
     assert.ok(cacheCount > 0, 'CacheStorage empty — SW cannot serve subsequent requests');
   }
 );
@@ -934,11 +1067,7 @@ Then(
     if (!device) return 'pending';
 
     // After eviction, CacheStorage should be empty for this app
-    const cacheCount = (await device.page.evaluate(async () => {
-      const cache = await caches.open('apps-v1');
-      const keys = await cache.keys();
-      return keys.length;
-    })) as number;
+    const cacheCount = (await appsCacheEntries(device)).paths.length;
 
     assert.equal(
       cacheCount,
@@ -1036,11 +1165,7 @@ Then('the SW fetch event fires for the request', async function (this: E2EWorld)
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
-  const cacheCount = (await device.page.evaluate(async () => {
-    const cache = await caches.open('apps-v1');
-    const keys = await cache.keys();
-    return keys.length;
-  })) as number;
+  const cacheCount = (await appsCacheEntries(device)).paths.length;
 
   // SW intercepted the request if it cached files
   assert.ok(cacheCount > 0, 'SW did not intercept — CacheStorage is empty');
@@ -1069,21 +1194,73 @@ Then('no CORS preflight is triggered', async function (this: E2EWorld) {
 });
 
 /**
- * Verify zero network requests were attempted for /apps/ paths.
+ * Verify the reload was answered by the client, not by a server.
  *
- * Example: And zero network requests are attempted
+ * Judged from what the browser recorded since the reload began:
+ *   - every page request under /apps/ was answered by the SW's fetch handler
+ *     (`fromServiceWorker`), and at least one was — the document itself, with 200;
+ *   - no page request under /apps/ failed, and none was answered 5xx (the SW
+ *     synthesizes 503 when it had to reach the network and could not);
+ *   - no request the SW itself made received a network response — while offline,
+ *     its own attempts (the capability probe) may FAIL, which is the offline
+ *     condition, but none may be answered.
+ *
+ * Example: And no request is answered by the network
  */
 // eslint-disable-next-line @typescript-eslint/require-await
-Then('zero network requests are attempted', async function (this: E2EWorld) {
+Then('no request is answered by the network', async function (this: E2EWorld) {
   const device = firstPlaywright(this);
   if (!device) return 'pending';
 
-  const networkRequests = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
+  const pageApps = device.responses.filter(
+    r => !r.serviceWorkerOriginated && new URL(r.url).pathname.startsWith(APPS_PATH)
+  );
+  const notFromSw = pageApps.filter(r => !r.fromServiceWorker);
+  const serverErrors = pageApps.filter(r => r.status >= 500);
+  const failed = device.failedRequests.filter(r => r.url.includes(APPS_PATH));
+  const answeredWorker = device.responses.filter(r => r.serviceWorkerOriginated);
+  const documentOk = pageApps.some(
+    r => r.fromServiceWorker && r.status === 200 && r.url.includes('/index.html')
+  );
+
+  const lines = (rs: { url: string; status?: number }[]): string =>
+    rs.map(r => `  ${r.status ?? '-'} ${r.url}`).join('\n');
+  const workerTrail = device.workerConsoleLogs
+    .filter(l => l.text.includes('[apps-sw]'))
+    .slice(-15)
+    .map(l => `  ${l.text}`)
+    .join('\n');
+  const context =
+    `\nSW attempts that failed (expected offline): ${device.workerFailedRequests.length}` +
+    `\nSW console (last 15):\n${workerTrail || '  (none captured)'}`;
+
+  assert.ok(pageApps.length > 0, `No /apps/ response was recorded for the reload.${context}`);
   assert.equal(
-    networkRequests.length,
+    notFromSw.length,
     0,
-    `${networkRequests.length} network requests made for /apps/ (expected SW cache to serve all):\n` +
-      networkRequests.map(r => `  ${r.method} ${r.url}`).join('\n')
+    `${notFromSw.length} /apps/ response(s) came from the network, not the SW:\n${lines(notFromSw)}${context}`
+  );
+  assert.equal(
+    failed.length,
+    0,
+    `${failed.length} /apps/ request(s) failed:\n` +
+      failed.map(r => `  ${r.method} ${r.url} (${r.failure ?? '?'})`).join('\n') +
+      context
+  );
+  assert.equal(
+    serverErrors.length,
+    0,
+    `${serverErrors.length} /apps/ response(s) were 5xx — the SW reached for the network:\n${lines(serverErrors)}${context}`
+  );
+  assert.equal(
+    answeredWorker.length,
+    0,
+    `${answeredWorker.length} request(s) the SW made were answered by the network — the ` +
+      `context was not offline for the worker:\n${lines(answeredWorker)}${context}`
+  );
+  assert.ok(
+    documentOk,
+    `The app document was not served 200 by the SW:\n${lines(pageApps)}${context}`
   );
 });
 

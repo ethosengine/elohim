@@ -16,8 +16,6 @@ import { Injectable, inject } from '@angular/core';
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '@app/lamad/models/content-node.model';
@@ -25,6 +23,7 @@ import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
 
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
+import { expectedSha256Hex, verifyRawSha256 } from '../utils/raw-cid-verify';
 
 import { StorageClientService } from './storage-client.service';
 
@@ -319,26 +318,12 @@ export class ContentBackendService {
     if (anonymousPublicRead) {
       return this.storageClient.fetchBlob(blobCid, true).pipe(
         switchMap(async bytes => {
-          const digest = await sha256.digest(new Uint8Array(bytes));
-          const cid = blobCid.startsWith('bafk') ? CID.parse(blobCid) : null;
-          if (
-            cid &&
-            (cid.version !== 1 ||
-              cid.code !== 0x55 ||
-              cid.multihash.code !== sha256.code ||
-              cid.multihash.size !== 32)
-          ) {
+          if (blobCid.startsWith('bafk') && expectedSha256Hex(blobCid) === null) {
             throw new Error('Public content requires a raw SHA256 CID');
           }
-          const expected = cid
-            ? Array.from(cid.multihash.digest)
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('')
-            : blobCid.replace(/^sha256[:-]/, '');
-          const actual = Array.from(digest.digest)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-          if (actual !== expected)
+          // A bare 64-hex digest has always been accepted here; give it the prefix the util reads.
+          const address = /^[0-9a-f]{64}$/.test(blobCid) ? `sha256-${blobCid}` : blobCid;
+          if (!(await verifyRawSha256(bytes, address)))
             throw new Error('Public content blob failed integrity verification');
           return new TextDecoder().decode(bytes);
         })

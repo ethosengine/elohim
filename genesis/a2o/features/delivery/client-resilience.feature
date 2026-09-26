@@ -1,13 +1,34 @@
 @e2e @content @delivery @requires:doorway @requires:seeded-content @act:i
 Feature: Client Resilience — Service Worker and Capability Negotiation
   As a learner
-  I want HTML5 apps to work offline after first load
-  So that my learning is not interrupted by network conditions
+  I want HTML5 apps to work offline after first load, delivered the cheapest way the network can
+  So that my learning is not interrupted by network conditions or by a small peer's limits
 
-  The Service Worker (SW) makes every browser and Tauri instance a self-sufficient
-  peer. Once content is loaded, it stays cached locally. Capability negotiation
-  lets the client software select the best delivery strategy: fetch individual
-  files from a peer with warm extraction, or fetch the ZIP and extract locally.
+  Caching is this feature's resilience strategy: the Service Worker (SW) makes every
+  browser a self-sufficient peer. Once content is loaded, it stays cached locally.
+  Capability negotiation lets the client select the best delivery strategy: fetch
+  individual files from a peer with warm extraction, or fetch the ZIP and extract
+  locally when a small peer can only hand over raw bytes.
+
+  The roles. A DOORWAY is the household's gateway to the ordinary web: a browser asks
+  it for pages and files. ELOHIM-STORAGE is the storage service each peer runs; a
+  SERVING PEER is whichever storage node hands over the bytes. An app's files travel as
+  one ZIP blob named by its blob_hash — the sha256 of its bytes — so a browser can check
+  the bytes it received against the name it asked for. The HOUSEHOLD is the set of peers
+  that share this content, and its ELECTION is the rule every peer applies to decide
+  which version of an app is current.
+
+  A serving peer keeps an EXTRACTION CACHE (ExtractionCache) of apps it has already
+  unzipped, and lists them as ready_content in the capability announcement it publishes;
+  a peer that lists an app can hand over its files one by one. When an app gets a new
+  version, a CONTENT UPDATE SIGNAL — a message to the Service Worker naming the new
+  blob_hash — tells the worker its cached copy is out of date.
+
+  What the offline promise proves today, and what it does not. When Matthew goes offline,
+  his browser shows the app from bytes it checked against their blob_hash, at the
+  version it last checked. Which version that is, it learned from a doorway. Checking
+  that version against the household's election is the next stage, named as its own
+  scenario below.
 
   Two local cache rings compose, innermost first: the elohim-cache-core WASM
   cache (IndexedDB, sub-5ms) is consulted before the SW CacheStorage; the SW
@@ -37,14 +58,25 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
 
   # --- Offline Capability ---
 
-  @wip @browser-only
+  # RED-FIRST 2026-09-26 (the record-proves check).
+  @browser-only @concern:record-proves
   Scenario: Cached app works offline
     Given Matthew has loaded "evolution-of-trust" while online
     And the Service Worker has cached all app files
     When Matthew goes offline
     And Matthew reloads "evolution-of-trust"
-    Then the app loads and functions normally
-    And zero network requests are attempted
+    Then the app's page renders with visible text
+    And no request is answered by the network
+
+  @wip @browser-only @concern:record-proves
+  Scenario: The version shown offline is the one the household elected, not only one a doorway named
+    Given Matthew has loaded "evolution-of-trust" while online
+    And the Service Worker has cached all app files
+    And his browser kept the household's signed election record for "evolution-of-trust" while online
+    When Matthew goes offline
+    And Matthew reloads "evolution-of-trust"
+    Then the blob_hash his browser shows is the one the household's election names as current
+    And his browser read that election itself rather than taking the version from a doorway
 
   @wip @tauri-only
   # HELD (2026-08-21): @tauri-only: no declared layer runs a Tauri device; no runner anywhere today.
@@ -54,7 +86,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     When the local elohim-storage pod restarts
     And Matthew reloads "evolution-of-trust"
     Then the app loads from the Service Worker cache
-    And Matthew's experience is uninterrupted
+    And the app's page renders with visible text
 
   # --- Capability Negotiation ---
 
@@ -105,7 +137,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   # --- Cache Invalidation ---
 
   @wip @browser-only
-  Scenario: SW invalidates cache when content is re-seeded
+  Scenario: SW invalidates cache when an app's version changes
     Given the Service Worker has cached "evolution-of-trust" with blob_hash "sha256-old"
     When a content update signal arrives with blob_hash "sha256-new" for "evolution-of-trust"
     Then the SW evicts all cached files for "evolution-of-trust"
@@ -114,7 +146,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   # --- elohim-cache-core (WASM) Layer — the innermost cache ring (see preamble) ---
 
   @wip @browser-only
-  Scenario: WASM cache provides sub-millisecond content lookups
+  Scenario: WASM cache provides sub-5ms content lookups
     # elohim-cache-core is an IndexedDB-backed WASM module that sits in front of
     # the SW → doorway → storage chain. When warm it resolves content without any
     # network round-trip. Sub-5ms lookups are the design target.
@@ -136,7 +168,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
 
   @wip @browser-only @regression
   Scenario: WASM cache unavailable degrades gracefully
-    # elohim-cache-core WASM is built by the DNA pipeline and fetched from Harbor.
+    # elohim-cache-core WASM is built by the DNA CI pipeline and fetched from Harbor, the artifact registry.
     # If the DNA pipeline hasn't run, the WASM blob is absent and the fetch returns
     # 404. The app must not crash or block content delivery when this happens.
     # See known issue: "WASM cache 404 noise" in CLAUDE.md.
