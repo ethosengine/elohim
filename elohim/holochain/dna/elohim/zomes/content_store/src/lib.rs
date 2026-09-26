@@ -3337,6 +3337,45 @@ mod canonical_tag_tier_tests {
     }
 
     #[test]
+    fn a_carried_declaration_tag_over_the_gossip_size_bound_is_not_a_declaration() {
+        let mut tag = CANONICAL_TAG_EARNED.to_vec();
+        assert_eq!(carried_declaration_tier(&tag), Some(true));
+        tag.resize(MAX_CARRIED_LINK_TAG_BYTES, b'x');
+        assert_eq!(
+            carried_declaration_tier(&tag),
+            Some(true),
+            "at the bound is admissible"
+        );
+        tag.push(b'x');
+        assert_eq!(
+            carried_declaration_tier(&tag),
+            None,
+            "one byte over is refused"
+        );
+        assert_eq!(carried_declaration_tier(b"ordinary"), None);
+    }
+
+    #[test]
+    fn authoring_standing_is_the_root_author_or_its_delegate_over_a_held_root() {
+        // Self-declaration by the root author of its own version.
+        assert!(holds_authoring_standing(&"a", &"a", Some(&"a"), false));
+        // Another agent declaring, without a grant.
+        assert!(!holds_authoring_standing(&"b", &"a", Some(&"a"), false));
+        // The root author declaring a version it did not author.
+        assert!(!holds_authoring_standing(&"a", &"b", Some(&"a"), false));
+        // A non-root author declaring its own version, without a grant.
+        assert!(!holds_authoring_standing(&"b", &"b", Some(&"a"), false));
+        // A delegate declaring the root author's version, or its own.
+        assert!(holds_authoring_standing(&"d", &"a", Some(&"a"), true));
+        assert!(holds_authoring_standing(&"d", &"d", Some(&"a"), true));
+        // A delegate declaring a third agent's version.
+        assert!(!holds_authoring_standing(&"d", &"x", Some(&"a"), true));
+        // A root this conductor does not hold stands for no one.
+        assert!(!holds_authoring_standing(&"a", &"a", None, false));
+        assert!(!holds_authoring_standing(&"d", &"d", None, true));
+    }
+
+    #[test]
     fn canonical_tag_tier_refuses_non_declaration_tags() {
         // An unrecognized tag is a REFUSAL, never a default tier — an ordinary
         // IdToContent link must not read as a declaration.
@@ -6398,15 +6437,24 @@ pub struct CanonicalElectionEvidenceOutput {
 pub fn get_canonical_election_evidence(
     id: String,
 ) -> ExternResult<Option<CanonicalElectionEvidenceOutput>> {
-    let outcome = match select_election(&id, GetStrategy::Local)? {
+    let candidates = gather_election_candidates(&id, GetStrategy::Local)?;
+    let outcome = match run_election(candidates.clone()) {
         Some(o) => o,
         None => return Ok(None),
     };
     let winner = &outcome.winner;
-    // The winning declaration LINK's own Record. A conductor that can see the
-    // link in get_links but cannot retrieve its Record answers None — honest
-    // absence, the requester degrades exactly as if no evidence were served.
-    let record = match get(winner.link_hash.clone(), GetOptions::local())? {
+    // The link served is the winning HEAD's own author's declaration of it when
+    // this conductor holds one, else the winning link itself. A receiver admits
+    // carried evidence only on authoring standing
+    // ([`verify_carried_head_evidence`]); another peer's declaration of the same
+    // head — a deploy's per-peer declare, a contest — elects the same head but
+    // carries none. The ELECTION reported is unchanged either way.
+    let link_hash = author_declaration_of(&candidates, &winner.target)?
+        .unwrap_or_else(|| winner.link_hash.clone());
+    // That declaration LINK's own Record. A conductor that can see the link in
+    // get_links but cannot retrieve its Record answers None — honest absence,
+    // the requester degrades exactly as if no evidence were served.
+    let record = match get(link_hash.clone(), GetOptions::local())? {
         Some(r) => r,
         None => return Ok(None),
     };
@@ -6420,6 +6468,31 @@ pub fn get_canonical_election_evidence(
         election: CanonicalElectionOutput::from_outcome(&outcome),
         link_record: bytes,
     }))
+}
+
+/// The strongest local declaration of `target` signed by `target`'s own author,
+/// by the shared election ordering, if this conductor holds one. Bounded by the
+/// declarations of that one target.
+fn author_declaration_of(
+    candidates: &[CanonicalCandidate],
+    target: &ActionHash,
+) -> ExternResult<Option<ActionHash>> {
+    let Some(target_record) = get(target.clone(), GetOptions::local())? else {
+        return Ok(None);
+    };
+    let author = target_record.action().author().clone();
+    let mut authored: Vec<CanonicalCandidate> = Vec::new();
+    for candidate in candidates.iter().filter(|c| &c.target == target) {
+        let Some(link) = get(candidate.link_hash.clone(), GetOptions::local())? else {
+            continue;
+        };
+        if link.action().author() == &author {
+            authored.push(candidate.clone());
+        }
+    }
+    // The author's own declarations of the head, ordered exactly as every
+    // election is (tier, link clock, link-hash tiebreak).
+    Ok(select_canonical_winner(authored).map(|c| c.link_hash))
 }
 
 /// Input for [`verify_carried_election`].
@@ -6495,11 +6568,92 @@ pub fn canonical_tag_tier(tag: &[u8]) -> Option<bool> {
 pub fn verify_carried_election(
     input: VerifyCarriedElectionInput,
 ) -> ExternResult<Option<CanonicalElectionOutput>> {
-    let record: Record = holochain_serialized_bytes::decode(&input.link_record).map_err(|e| {
+    let proven =
+        prove_carried_declaration(&input.id, &input.link_record, "verify_carried_election")?;
+
+    // Merge the proven carried candidate with every candidate this conductor
+    // already sees, and let the ONE shared ordering arbitrate. Duplicates are
+    // harmless (identical keys order identically); a locally-visible earned
+    // declaration beats a carried staging one by tier precedence.
+    let mut candidates = gather_election_candidates(&input.id, GetStrategy::Local)?;
+    candidates.push(proven.candidate);
+    // `run_election`, not `select_canonical_winner` alone: the merged set must
+    // yield the SAME pair (winner + staging candidate) the local read path
+    // yields, or a carried-evidence answer would silently drop a candidate the
+    // caller can see by asking the peer directly.
+    Ok(run_election(candidates).map(|o| CanonicalElectionOutput::from_outcome(&o)))
+}
+
+/// Largest link tag a carried declaration may carry — the conductor's own
+/// sys-validation bound (`holochain::core::sys_validate::MAX_TAG_SIZE`). A link
+/// over it never enters the DHT by gossip, so it must not enter an election by
+/// carriage either.
+const MAX_CARRIED_LINK_TAG_BYTES: usize = 1000;
+
+/// The declared tier of a CARRIED declaration tag: [`canonical_tag_tier`], and
+/// `None` for a tag gossip would have refused for its size.
+pub fn carried_declaration_tier(tag: &[u8]) -> Option<bool> {
+    if tag.len() > MAX_CARRIED_LINK_TAG_BYTES {
+        return None;
+    }
+    canonical_tag_tier(tag)
+}
+
+/// Does the declaring agent hold AUTHORING STANDING over the version it elects?
+///
+/// Authorship is a standing held over an existing content identity: the root
+/// the version descends from must be one this conductor ALREADY holds for the
+/// id (`root_author` is `None` otherwise, see [`verify_carried_head_evidence`]),
+/// so a stranger's new root for the same id carries none. Over that root, the
+/// declarer stands when it IS the root author, or carries a head delegation the
+/// root author signed for it (`delegated`, verified by the caller with
+/// [`verify_head_delegation`]); and the version itself must be authored by one
+/// of those two. A steward's affiliated role is the same standing held another
+/// way; it is not checkable from carried bytes yet.
+pub fn holds_authoring_standing<K: PartialEq>(
+    declarer: &K,
+    version_author: &K,
+    root_author: Option<&K>,
+    delegated: bool,
+) -> bool {
+    root_author.is_some_and(|root| {
+        (declarer == root || delegated) && (version_author == root || version_author == declarer)
+    })
+}
+
+/// The head delegation a delegate's declaration carries in its link tag
+/// (`canonical_tag_with_delegation`), if any. Decoding only; the grant is
+/// verified by [`verify_head_delegation`].
+fn delegation_from_tag(tag: &[u8]) -> Option<HeadDelegation> {
+    let at = tag
+        .windows(CANONICAL_TAG_DELEGATION_SEP.len())
+        .position(|w| w == CANONICAL_TAG_DELEGATION_SEP)?;
+    let bytes = tag[at + CANONICAL_TAG_DELEGATION_SEP.len()..].to_vec();
+    HeadDelegation::try_from(SerializedBytes::from(UnsafeBytes::from(bytes))).ok()
+}
+
+/// A carried canonical-head declaration, proven from its own bytes.
+struct ProvenDeclaration {
+    candidate: CanonicalCandidate,
+    declarer: AgentPubKey,
+    tag: Vec<u8>,
+}
+
+/// The proofs every carried declaration must pass, shared by
+/// [`verify_carried_election`] and [`verify_carried_head_evidence`]:
+/// self-binding, the author's signature, a `CreateLink` on `id`'s
+/// canonical-head anchor of this zome's `IdToContent` type, a declaration tag
+/// within the sys-validation size bound, an action-hash target, and no
+/// `DeleteLink` for it in this conductor's local view (a revoked declaration is
+/// not resurrected by carrying it).
+fn prove_carried_declaration(
+    id: &str,
+    link_record: &[u8],
+    caller: &str,
+) -> ExternResult<ProvenDeclaration> {
+    let record: Record = holochain_serialized_bytes::decode(link_record).map_err(|e| {
         wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link record for id '{}' could not be \
-             deserialized: {e}",
-            input.id
+            "{caller}: carried link record for id '{id}' could not be deserialized: {e}"
         )))
     })?;
 
@@ -6507,8 +6661,7 @@ pub fn verify_carried_election(
     let computed = hash_action(record.action().clone())?;
     if record.action_address() != &computed {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link record claims action {:?} but hashes to \
-             {computed:?}",
+            "{caller}: carried link record claims action {:?} but hashes to {computed:?}",
             record.action_address()
         ))));
     }
@@ -6518,8 +6671,8 @@ pub fn verify_carried_election(
     let signature = record.signature().clone();
     if !verify_signature(author.clone(), signature, record.action())? {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link record {computed:?} carries an invalid \
-             author signature (author {author:?})"
+            "{caller}: carried link record {computed:?} carries an invalid author signature \
+             (author {author:?})"
         ))));
     }
 
@@ -6528,37 +6681,37 @@ pub fn verify_carried_election(
         ActionData::CreateLink(cl) => cl.clone(),
         _ => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "verify_carried_election: carried record {computed:?} is a {} action, not a \
-                 CreateLink",
+                "{caller}: carried record {computed:?} is a {} action, not a CreateLink",
                 record.action().action_type()
             ))));
         }
     };
-    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, &input.id);
+    let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     if create_link.base_address != AnyLinkableHash::from(anchor_hash.clone()) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link {computed:?} is based on {:?}, not id '{}''s \
+            "{caller}: carried link {computed:?} is based on {:?}, not id '{id}''s \
              canonical-head anchor {anchor_hash:?}",
-            create_link.base_address, input.id
+            create_link.base_address
         ))));
     }
 
-    // (4) Link type + declared tier.
+    // (4) Link type + declared tier, within the size gossip enforces.
     let scoped: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
     if create_link.zome_index != scoped.zome_index || create_link.link_type != scoped.zome_type {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link {computed:?} has link type ({:?}, {:?}), not \
-             this zome's IdToContent ({:?}, {:?})",
+            "{caller}: carried link {computed:?} has link type ({:?}, {:?}), not this zome's \
+             IdToContent ({:?}, {:?})",
             create_link.zome_index, create_link.link_type, scoped.zome_index, scoped.zome_type
         ))));
     }
-    let is_earned = match canonical_tag_tier(create_link.tag.0.as_slice()) {
+    let is_earned = match carried_declaration_tier(create_link.tag.0.as_slice()) {
         Some(tier) => tier,
         None => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "verify_carried_election: carried link {computed:?} does not carry a \
-                 canonical-head provenance tag — not a declaration"
+                "{caller}: carried link {computed:?} does not carry an admissible canonical-head \
+                 declaration tag ({} bytes) — not a declaration",
+                create_link.tag.0.len()
             ))));
         }
     };
@@ -6566,28 +6719,230 @@ pub fn verify_carried_election(
     // (5) The declared head target must be an action.
     let target = ActionHash::try_from(create_link.target_address.clone()).map_err(|_| {
         wasm_error!(WasmErrorInner::Guest(format!(
-            "verify_carried_election: carried link {computed:?} targets {:?}, which is not an \
-             ActionHash",
+            "{caller}: carried link {computed:?} targets {:?}, which is not an ActionHash",
             create_link.target_address
         )))
     })?;
 
-    // Merge the proven carried candidate with every candidate this conductor
-    // already sees, and let the ONE shared ordering arbitrate. Duplicates are
-    // harmless (identical keys order identically); a locally-visible earned
-    // declaration beats a carried staging one by tier precedence.
-    let mut candidates = gather_election_candidates(&input.id, GetStrategy::Local)?;
-    candidates.push(CanonicalCandidate {
-        is_earned,
-        timestamp: record.action().timestamp(),
-        link_hash: computed,
-        target,
+    // (6) Not revoked in what this conductor already holds.
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> =
+        get_links_details(query, GetStrategy::Local)?.into();
+    if details
+        .iter()
+        .any(|(create, deletes)| create.as_hash() == &computed && !deletes.is_empty())
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{caller}: carried link {computed:?} was deleted in this conductor's view — a \
+             revoked declaration is not re-admitted by carrying it"
+        ))));
+    }
+
+    Ok(ProvenDeclaration {
+        candidate: CanonicalCandidate {
+            is_earned,
+            timestamp: record.action().timestamp(),
+            link_hash: computed,
+            target,
+        },
+        declarer: author,
+        tag: create_link.tag.0.clone(),
+    })
+}
+
+/// Marker in [`verify_carried_head_evidence`]'s refusal when the carried
+/// version's lineage is not fully held yet — a transient absence the caller must
+/// not remember as a verdict on the evidence.
+pub const LINEAGE_NOT_HELD: &str = "lineage-not-held";
+
+/// Is `record` a Content CREATE for `id` — a root of that content identity?
+fn is_content_root_for(record: &Record, id: &str) -> bool {
+    if !matches!(record.action().data, ActionData::Create(_)) {
+        return false;
+    }
+    matches!(
+        record.entry().to_app_option::<Content>(),
+        Ok(Some(content)) if content.id == id
+    )
+}
+
+/// Input for [`verify_carried_head_evidence`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyCarriedHeadEvidenceInput {
+    pub id: String,
+    /// The declaring agent's canonical-head CreateLink `Record`, as served by
+    /// [`get_canonical_election_evidence`].
+    #[serde(with = "serde_bytes")]
+    pub link_record: Vec<u8>,
+    /// The `Record` of the head that link elects, as served by
+    /// [`get_record_for_action`].
+    #[serde(with = "serde_bytes")]
+    pub head_record: Vec<u8>,
+}
+
+/// Answer of [`verify_carried_head_evidence`].
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CarriedHeadEvidenceOutput {
+    /// The election the carried declaration yields merged with every candidate
+    /// this conductor holds.
+    pub election: CanonicalElectionOutput,
+    /// The proven head, present only when that merged election elects the
+    /// carried head. Its canonical ordering is the election's.
+    pub head: Option<ContentHeadOutput>,
+}
+
+/// Verify a peer-carried head — its author's own election link AND the version
+/// it elects — as one verdict, committing nothing. The receiver side of the
+/// adoption trigger's courier path.
+///
+/// Beyond [`prove_carried_declaration`] and the record proofs of
+/// [`validate_carried_head_record`] (hash, signature, entry binding, target id),
+/// this requires:
+///
+/// - the link targets exactly the carried record;
+/// - the carried `Content` passes the same entry validation the integrity zome
+///   runs on a gossiped one (a coordinator cannot call the integrity callback,
+///   so it calls the same public validators);
+/// - the declaring agent holds authoring standing
+///   ([`holds_authoring_standing`]) — it authored this version and the root the
+///   version descends from, resolved from records this conductor already holds.
+///   A root this conductor does not hold is a refusal, never a pass.
+///
+/// Coordinator-only and read-only: `update_coordinators` hot-swap, no DNA-hash
+/// move. Bounded local work: one Local link gather, one Local lineage walk
+/// (depth-bounded by `correction::MAX_LINEAGE_DEPTH`), signature checks.
+#[hdk_extern]
+pub fn verify_carried_head_evidence(
+    input: VerifyCarriedHeadEvidenceInput,
+) -> ExternResult<Option<CarriedHeadEvidenceOutput>> {
+    const CALLER: &str = "verify_carried_head_evidence";
+    let id = input.id.as_str();
+    let declaration = prove_carried_declaration(id, &input.link_record, CALLER)?;
+    let target = declaration.candidate.target.clone();
+
+    let record = validate_carried_record(&target, &input.head_record).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "{CALLER}: head record refused: {e:?}"
+        )))
+    })?;
+    let content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "{CALLER}: carried record for {target:?} carries no Content entry"
+            )))
+        })?;
+    if content.id != id {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{CALLER}: carried record {target:?} carries Content id '{}', not '{id}'",
+            content.id
+        ))));
+    }
+    {
+        use hc_rna::SelfHealingEntry;
+        content.validate().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "{CALLER}: carried Content {target:?} fails entry validation: {e}"
+            )))
+        })?;
+    }
+    if content.content_type.starts_with("attestation:")
+        || content.content_type.starts_with("governance-action:")
+    {
+        if let ValidateCallbackResult::Invalid(reason) =
+            content_store_integrity::attestation_validator::validate_attestation_floors(&content)?
+        {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{CALLER}: carried Content {target:?} fails attestation floors: {reason}"
+            ))));
+        }
+    }
+
+    // The roots this conductor already holds for the id: the Content Creates its
+    // own IdToContent links name. Authority is over an EXISTING content identity,
+    // so the version must descend from one of them.
+    let held_roots: Vec<Record> = match gather_content_chain(id, GetStrategy::Local)? {
+        Some((_, records)) => records
+            .into_iter()
+            .filter(|r| is_content_root_for(r, id))
+            .collect(),
+        None => Vec::new(),
+    };
+    let version_root: Option<Record> = match &record.action().data {
+        ActionData::Update(update) => {
+            match correction::resolve_root_create(
+                update.original_action_address.clone(),
+                GetStrategy::Local,
+            )? {
+                Some(root) => Some(root),
+                None => {
+                    // Honest absence, not a verdict: an intermediate version has
+                    // not reached this conductor yet.
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "{CALLER}: {LINEAGE_NOT_HELD}: the lineage of {target:?} is not fully \
+                         held here yet"
+                    ))));
+                }
+            }
+        }
+        _ => Some(record.clone()),
+    };
+    let root = version_root.filter(|root| {
+        is_content_root_for(root, id)
+            && held_roots
+                .iter()
+                .any(|held| held.action_address() == root.action_address())
     });
-    // `run_election`, not `select_canonical_winner` alone: the merged set must
-    // yield the SAME pair (winner + staging candidate) the local read path
-    // yields, or a carried-evidence answer would silently drop a candidate the
-    // caller can see by asking the peer directly.
-    Ok(run_election(candidates).map(|o| CanonicalElectionOutput::from_outcome(&o)))
+    let version_author = record.action().author().clone();
+    let root_author = root.as_ref().map(|r| r.action().author().clone());
+    let delegated = match (&root_author, delegation_from_tag(&declaration.tag)) {
+        (Some(root), Some(grant)) if &declaration.declarer != root => {
+            verify_head_delegation(&grant, &declaration.declarer, root, id).is_ok()
+        }
+        _ => false,
+    };
+    if !holds_authoring_standing(
+        &declaration.declarer,
+        &version_author,
+        root_author.as_ref(),
+        delegated,
+    ) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{CALLER}: declarer {:?} holds no authoring standing over {target:?} (version \
+             author {version_author:?}, root author {root_author:?} among the roots this \
+             conductor holds for '{id}')",
+            declaration.declarer
+        ))));
+    }
+
+    let carried_link = declaration.candidate.link_hash.clone();
+    let mut candidates = gather_election_candidates(id, GetStrategy::Local)?;
+    candidates.push(declaration.candidate);
+    let Some(outcome) = run_election(candidates) else {
+        return Ok(None);
+    };
+    // The head is proven only when the CARRIED declaration is the one that wins:
+    // its standing was checked, and its ordering is the one reported. Another
+    // declaration winning for the same target (whose declarer was never checked)
+    // must not lend it a newer clock.
+    let head = if outcome.winner.link_hash == carried_link {
+        let mut out = build_content_head_output(id, &record, true)?;
+        out.canonical_declared_at = Some(outcome.winner.timestamp);
+        out.canonical_earned = Some(outcome.winner.is_earned);
+        if let Some(candidate) = &outcome.staging_candidate {
+            out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target.clone()));
+            out.staging_candidate_declared_at = Some(candidate.timestamp);
+        }
+        Some(out)
+    } else {
+        None
+    };
+    Ok(Some(CarriedHeadEvidenceOutput {
+        election: CanonicalElectionOutput::from_outcome(&outcome),
+        head,
+    }))
 }
 
 /// Input for [`validate_carried_head_record`].

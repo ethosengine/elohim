@@ -2858,3 +2858,376 @@ async fn update_of_update_supersedes_previous_version_not_root() -> Result<()> {
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Carried head evidence — the adoption trigger's courier path (story 1.4b)
+// ---------------------------------------------------------------------------
+
+/// Mirrors `content_store::CanonicalElectionEvidenceOutput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CanonicalElectionEvidenceOutput {
+    pub election: CanonicalElectionOutput,
+    pub link_record: Vec<u8>,
+}
+
+/// Mirrors `content_store::VerifyCarriedHeadEvidenceInput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VerifyCarriedHeadEvidenceInput {
+    pub id: String,
+    pub link_record: Vec<u8>,
+    pub head_record: Vec<u8>,
+}
+
+/// Mirrors `content_store::CarriedHeadEvidenceOutput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CarriedHeadEvidenceOutput {
+    pub election: CanonicalElectionOutput,
+    pub head: Option<ContentHeadOutput>,
+}
+
+/// Poll `conductor` until it holds `action` locally, or panic at the deadline.
+async fn await_record(
+    conductor: &SweetConductor,
+    zome: &holochain::sweettest::SweetZome,
+    action: &ActionHash,
+    who: &str,
+) -> Vec<u8> {
+    let b64 = ActionHashB64::from(action.clone()).to_string();
+    let deadline = Instant::now() + Duration::from_secs(120);
+    loop {
+        let held: Option<CarriedRecordOutput> = conductor
+            .call(
+                zome,
+                "get_record_for_action",
+                GetRecordForActionInput {
+                    action_hash: b64.clone(),
+                },
+            )
+            .await;
+        if let Some(r) = held {
+            return r.record;
+        }
+        if Instant::now() >= deadline {
+            panic!("{who} did not come to hold {b64} within 120s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// Poll `conductor` until it resolves a head for `id` (its content links have
+/// arrived, not only the records), or panic at the deadline.
+async fn await_resolves(
+    conductor: &SweetConductor,
+    zome: &holochain::sweettest::SweetZome,
+    id: &str,
+    who: &str,
+) {
+    let deadline = Instant::now() + Duration::from_secs(120);
+    loop {
+        let head: Option<ContentHeadOutput> = conductor
+            .call(zome, "resolve_content_head", id.to_string())
+            .await;
+        if head.is_some() {
+            return;
+        }
+        if Instant::now() >= deadline {
+            panic!("{who} could not resolve '{id}' within 120s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// A sibling can adopt the head an author just declared from the author's own
+/// carried evidence — verified read-only, admitted only on authoring standing.
+///
+/// Proves, with the real verifier on a real receiver:
+///   a. the author's own staging election for its own new version, carried with
+///      that version's record, verifies on the receiver and yields the version
+///      as the proven head under the author's ORIGINAL link clock;
+///   b. a link paired with a record of a different action is refused;
+///   c. an election declared by a DIFFERENT agent for an author's version is
+///      refused for want of authoring standing — a valid signature is not
+///      standing;
+///   d. evidence for an older version, once the author has declared a newer
+///      one, verifies but elects the newer one: it yields no head to adopt;
+///   e. a delegate holding the root author's head delegation stands over the
+///      version it published: the grant rides in its earned declaration.
+#[tokio::test(flavor = "multi_thread")]
+async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let zome1 = app1.cells().first().unwrap().zome("content_store");
+    let zome2 = app2.cells().first().unwrap().zome("content_store");
+
+    let id = unique_id("carried-evidence");
+    let root: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+    let version_b: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: id.clone(),
+                title: Some("Version B".to_string()),
+            },
+        )
+        .await;
+    let b64 = ActionHashB64::from(version_b.action_hash.clone()).to_string();
+    let _: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: id.clone(),
+                head_action_hash: b64.clone(),
+            },
+        )
+        .await;
+    let evidence: Option<CanonicalElectionEvidenceOutput> = c1
+        .call(&zome1, "get_canonical_election_evidence", id.clone())
+        .await;
+    let evidence = evidence.expect("the author serves its own election");
+    assert_eq!(evidence.election.winner_target, b64);
+    let link_b = evidence.link_record;
+    let record_b = await_record(&c1, &zome1, &version_b.action_hash, "the author").await;
+    let record_root = await_record(&c1, &zome1, &root.action_hash, "the author").await;
+
+    // The receiver must hold the root the version descends from: standing is
+    // resolved from what it already holds.
+    await_record(&c2, &zome2, &root.action_hash, "the receiver").await;
+
+    // (a) The author's own election is admitted, under its original clock.
+    let verified: Option<CarriedHeadEvidenceOutput> = c2
+        .call(
+            &zome2,
+            "verify_carried_head_evidence",
+            VerifyCarriedHeadEvidenceInput {
+                id: id.clone(),
+                link_record: link_b.clone(),
+                head_record: record_b.clone(),
+            },
+        )
+        .await;
+    let verified = verified.expect("the merged election has a winner");
+    assert_eq!(verified.election.winner_target, b64);
+    assert_eq!(
+        verified.election.canonical_declared_at, evidence.election.canonical_declared_at,
+        "the receiver keeps the author's own link clock, it mints none"
+    );
+    let head = verified
+        .head
+        .expect("the carried version is the proven head");
+    assert_eq!(head.head_action_hash, version_b.action_hash);
+    assert_eq!(head.canonical_earned, Some(false));
+
+    // (b) A link paired with another action's record is refused.
+    let mispaired: std::result::Result<Option<CarriedHeadEvidenceOutput>, _> = c2
+        .call_fallible(
+            &zome2,
+            "verify_carried_head_evidence",
+            VerifyCarriedHeadEvidenceInput {
+                id: id.clone(),
+                link_record: link_b.clone(),
+                head_record: record_root,
+            },
+        )
+        .await;
+    assert!(mispaired.is_err(), "a mispaired record must be refused");
+
+    // (c) Another agent's election of an author's version carries no standing.
+    // A second id the author updates but never declares, so the only
+    // declaration of that version anywhere is the other agent's.
+    let other = unique_id("carried-evidence-foreign");
+    let other_root: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&other))
+        .await;
+    let other_version: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: other.clone(),
+                title: Some("Undeclared by its author".to_string()),
+            },
+        )
+        .await;
+    let other_b64 = ActionHashB64::from(other_version.action_hash.clone()).to_string();
+    let other_record =
+        await_record(&c2, &zome2, &other_version.action_hash, "the other agent").await;
+    await_record(&c2, &zome2, &other_root.action_hash, "the other agent").await;
+    await_resolves(&c2, &zome2, &other, "the other agent").await;
+    let _: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: other.clone(),
+                head_action_hash: other_b64.clone(),
+            },
+        )
+        .await;
+    let foreign: Option<CanonicalElectionEvidenceOutput> = c2
+        .call(&zome2, "get_canonical_election_evidence", other.clone())
+        .await;
+    let foreign = foreign.expect("the other agent serves its declaration");
+    assert_eq!(foreign.election.winner_target, other_b64);
+    let refused: std::result::Result<Option<CarriedHeadEvidenceOutput>, _> = c1
+        .call_fallible(
+            &zome1,
+            "verify_carried_head_evidence",
+            VerifyCarriedHeadEvidenceInput {
+                id: other.clone(),
+                link_record: foreign.link_record,
+                head_record: other_record,
+            },
+        )
+        .await;
+    let err = format!(
+        "{:?}",
+        refused.expect_err("a non-author's election must be refused")
+    );
+    assert!(
+        err.contains("authoring standing"),
+        "refused for standing: {err}"
+    );
+
+    // (e) A delegate of the root author stands: the grant rides in its earned
+    // declaration's tag, and the receiver verifies it against the root it holds.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct GrantHeadDelegationInput {
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationPayloadMirror {
+        grantor: AgentPubKey,
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationMirror {
+        payload: HeadDelegationPayloadMirror,
+        signature: hdk::prelude::Signature,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct DeclareEarnedWithDelegationInput {
+        id: String,
+        head_action_hash: String,
+        delegation: Option<HeadDelegationMirror>,
+    }
+    let delegated = unique_id("carried-evidence-delegated");
+    let delegated_root: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&delegated))
+        .await;
+    let valid_until = Timestamp::from_micros(Timestamp::now().as_micros() + 3_600_000_000);
+    let grant: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "grant_head_delegation",
+            GrantHeadDelegationInput {
+                delegate: a2.clone(),
+                scope: "*".to_string(),
+                valid_until,
+            },
+        )
+        .await;
+    await_record(&c2, &zome2, &delegated_root.action_hash, "the delegate").await;
+    await_resolves(&c2, &zome2, &delegated, "the delegate").await;
+    let delegate_version: ContentOutput = c2
+        .call(
+            &zome2,
+            "update_content",
+            UpdateContentInput {
+                id: delegated.clone(),
+                title: Some("Published from the second device".to_string()),
+            },
+        )
+        .await;
+    let delegate_b64 = ActionHashB64::from(delegate_version.action_hash.clone()).to_string();
+    let _: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: delegated.clone(),
+                head_action_hash: delegate_b64.clone(),
+                delegation: Some(grant),
+            },
+        )
+        .await;
+    let delegate_evidence: Option<CanonicalElectionEvidenceOutput> = c2
+        .call(&zome2, "get_canonical_election_evidence", delegated.clone())
+        .await;
+    let delegate_evidence = delegate_evidence.expect("the delegate serves its declaration");
+    let delegate_record =
+        await_record(&c2, &zome2, &delegate_version.action_hash, "the delegate").await;
+    let admitted: Option<CarriedHeadEvidenceOutput> = c1
+        .call(
+            &zome1,
+            "verify_carried_head_evidence",
+            VerifyCarriedHeadEvidenceInput {
+                id: delegated.clone(),
+                link_record: delegate_evidence.link_record,
+                head_record: delegate_record,
+            },
+        )
+        .await;
+    let admitted = admitted
+        .and_then(|v| v.head)
+        .expect("the root author's delegate stands over its own version");
+    assert_eq!(admitted.head_action_hash, delegate_version.action_hash);
+    assert_eq!(admitted.canonical_earned, Some(true));
+
+    // (d) Older evidence verifies but elects the author's newer version.
+    let version_c: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: id.clone(),
+                title: Some("Version C".to_string()),
+            },
+        )
+        .await;
+    let c64 = ActionHashB64::from(version_c.action_hash.clone()).to_string();
+    let _: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: id.clone(),
+                head_action_hash: c64.clone(),
+            },
+        )
+        .await;
+    let replayed: Option<CarriedHeadEvidenceOutput> = c1
+        .call(
+            &zome1,
+            "verify_carried_head_evidence",
+            VerifyCarriedHeadEvidenceInput {
+                id: id.clone(),
+                link_record: link_b,
+                head_record: record_b,
+            },
+        )
+        .await;
+    let replayed = replayed.expect("the merged election still has a winner");
+    assert_eq!(
+        replayed.election.winner_target, c64,
+        "the newer declaration wins"
+    );
+    assert!(
+        replayed.head.is_none(),
+        "older evidence yields nothing to adopt"
+    );
+
+    Ok(())
+}
