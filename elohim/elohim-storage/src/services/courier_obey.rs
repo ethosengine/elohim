@@ -575,7 +575,7 @@ mod tests {
             HEAD_A,
             Some(AT_A),
             None,
-            StampMode::Declare,
+            StampMode::HealCanonical,
             Some((AT_A, false)),
         )
         .unwrap();
