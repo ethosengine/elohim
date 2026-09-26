@@ -379,6 +379,47 @@ mod decode_path_id_tests {
     }
 }
 
+/// Split `/apps/{identifier}/{file_path}` into its identifier and the file to
+/// serve. The bare app URL (`/apps/x`) and its directory URL (`/apps/x/`) both
+/// resolve to `index.html`: the directory URL is the one a visitor opens and the
+/// one relative asset paths resolve under, so an empty file path is the front
+/// page, not a miss. The doorway applies the same rule in its own
+/// `routes/apps.rs::parse_app_path`; the Tauri steward reaches storage directly,
+/// so the rule has to hold here too.
+fn parse_app_path(path: &str) -> (&str, &str) {
+    let remainder = path.strip_prefix("/apps/").unwrap_or("");
+    match remainder.split_once('/') {
+        Some((identifier, "")) => (identifier, "index.html"),
+        Some((identifier, file_path)) => (identifier, file_path),
+        None => (remainder, "index.html"),
+    }
+}
+
+#[cfg(test)]
+mod parse_app_path_tests {
+    use super::parse_app_path;
+
+    #[test]
+    fn directory_url_serves_the_front_page() {
+        assert_eq!(parse_app_path("/apps/x/"), ("x", "index.html"));
+    }
+
+    #[test]
+    fn bare_app_url_serves_the_front_page() {
+        assert_eq!(parse_app_path("/apps/x"), ("x", "index.html"));
+    }
+
+    #[test]
+    fn nested_asset_path_is_kept_whole() {
+        assert_eq!(parse_app_path("/apps/x/a/b.js"), ("x", "a/b.js"));
+    }
+
+    #[test]
+    fn missing_identifier_stays_empty() {
+        assert_eq!(parse_app_path("/apps/"), ("", "index.html"));
+    }
+}
+
 #[cfg(test)]
 mod head_declare_write_admission_carveout_tests {
     use super::*;
@@ -10525,11 +10566,7 @@ impl HttpServer {
         use zip::ZipArchive;
 
         // Parse path: /apps/{identifier}/{file_path}
-        let remainder = path.strip_prefix("/apps/").unwrap_or("");
-        let (identifier, file_path) = match remainder.find('/') {
-            Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
-            None => (remainder, "index.html"),
-        };
+        let (identifier, file_path) = parse_app_path(path);
 
         // SPA deep-link fallback opt-out (§12.2). The storage safety net serves
         // a ROUTE miss's index.html by convention (Class C) — this is what makes
