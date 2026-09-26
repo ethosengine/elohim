@@ -591,7 +591,8 @@ def readinessRefusal(String name, Map result) {
     String dir = "downstream-artifacts/${name}-${result.buildNumber}"
     String outFile = "${dir}/readiness-refusal.json"
     try {
-        sh "mkdir -p '${dir}'"
+        // No `sh mkdir` first: sh runs as root in the builder container, and copyArtifacts
+        // writes as the agent user, so a root-made target refuses the copy (#1910).
         copyArtifacts(
             projectName: "${getPipelineMetadata(name).jenkinsJob ?: name}/${env.BRANCH_NAME}",
             selector: specific(result.buildNumber.toString()),
@@ -1909,8 +1910,8 @@ def hydrateStageAnnotations(String pipelineName, def buildNumber, String branch)
     // Copy into a per-build dir so successive trigger calls don't clobber
     // each other's artifacts. The dir is local to the orchestrator workspace
     // and not archived — only the parsed values land in stageAnnotations.
+    // copyArtifacts creates it as the agent user (see readinessRefusal).
     def downstreamDir = "downstream-artifacts/${pipelineName}-${buildNumber}"
-    sh "mkdir -p '${downstreamDir}'"
 
     // Build an Ant glob that catches all wanted basenames, regardless of
     // where they were archived inside the downstream build. The seeders
