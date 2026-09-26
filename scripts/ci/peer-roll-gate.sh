@@ -36,6 +36,19 @@
 #    An unreachable/absent/malformed projectionReconcile is NOT a pass. Absence
 #    of evidence is not settlement (same fail-closed rule as the quiesce gate).
 #
+#    SETTLED-AT-BASELINE (edge #1486, 2026-09-26): a peer can carry a standing
+#    divergence INTO the roll — `no-movement(healed 0->0, divergentAnchor
+#    55->55)` burned 450-599s on four of six peers. That divergence is not the
+#    roll's debt. When scripts/ci/pre-roll-reading.sh recorded
+#    `PRE_DIVERGENT_<peer>=<n>` in <state-file> before this deploy touched the
+#    peer, the peer is also released once, on >=2 DISTINCT sweeps strictly
+#    newer than the post-restart baseline, divergentAnchor <= PRE_DIVERGENT and
+#    healedTotal >= the baseline's. It is printed as
+#    `settled-at-baseline(divergentAnchor pre=<p> now=<n>, sweeps +<k>)` and is
+#    never called converged: the standing divergence is still measured by the
+#    validate-only Dataplane Validation run. No PRE_DIVERGENT line (reading
+#    absent or unreachable) = this branch does not exist for the peer.
+#
 # 2. CFS THROTTLE, from Prometheus, on this peer's CONDUCTOR container only:
 #      rate(container_cpu_cfs_throttled_periods_total{...}[5m])
 #      / rate(container_cpu_cfs_periods_total{...}[5m])  <  ROLL_THROTTLE_MAX
@@ -114,7 +127,7 @@ for v in "$PEER" "$STORAGE_URL" "$NAMESPACE" "$POD" "$GATES_REMAINING" "$STATE_F
   if [ -z "$v" ]; then usage; exit 1; fi
 done
 
-for cmd in curl python3 awk sed tail date sleep; do
+for cmd in curl python3 awk sed tail date sleep mv; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "peer-roll-gate: required command not found: ${cmd}" >&2
     exit 1
@@ -164,9 +177,24 @@ log() {
 # Plain key=value read with sed, never `source` — the state file is ours but a
 # sourced file is an arbitrary-code seam we do not need.
 BUDGET_LEFT="$SEQ_BUDGET"
+PRE_DIVERGENT=""
+PRE_HEALED=""
+state_value() { # exact-key lookup, last write wins; the key is never a regex
+  awk -v k="$1" 'index($0, k "=") == 1 { v = substr($0, length(k) + 2) } END { if (v != "") print v }' "$STATE_FILE"
+}
 if [ -f "$STATE_FILE" ]; then
   from_file=$(sed -n 's/^BUDGET_LEFT=//p' "$STATE_FILE" | tail -n 1)
   if [ -n "$from_file" ]; then BUDGET_LEFT="$from_file"; fi
+  PRE_DIVERGENT=$(state_value "PRE_DIVERGENT_${PEER}")
+  # Informational only: printed in the opening banner, never compared — the
+  # settle branch compares against the post-restart base_healed instead.
+  PRE_HEALED=$(state_value "PRE_HEALED_${PEER}")
+fi
+# A malformed pre-roll reading is no reading: the settle branch stays off
+# rather than comparing against a value we cannot trust.
+if [ -n "$PRE_DIVERGENT" ] && ! [[ "$PRE_DIVERGENT" =~ ^(0|[1-9][0-9]*)$ ]]; then
+  echo "peer-roll-gate: ignoring malformed PRE_DIVERGENT_${PEER}='${PRE_DIVERGENT}' — settled-at-baseline is OFF for this peer" >&2
+  PRE_DIVERGENT=""
 fi
 
 gates_left="$GATES_REMAINING"
@@ -189,6 +217,11 @@ DEADLINE=$(awk -v budget="$BUDGET_LEFT" -v gates="$gates_left" \
 }')
 
 log "gate opening — deadline=${DEADLINE}s (ceiling=${PEER_DEADLINE}s, budget-left=${BUDGET_LEFT}s over ${gates_left} remaining gate(s), floor=${MIN_DEADLINE}s) poll=${POLL_SECS}s throttle-max=${THROTTLE_MAX} window=${WINDOW}"
+if [ -n "$PRE_DIVERGENT" ]; then
+  log "pre-roll baseline — divergentAnchor=${PRE_DIVERGENT} healedTotal=${PRE_HEALED:-?} (before this deploy touched the peer); settled-at-baseline is ON"
+else
+  log "pre-roll baseline — none recorded; settled-at-baseline is OFF (converged/healing legs only)"
+fi
 
 start_ts=$(date +%s)
 deadline_ts=$((start_ts + DEADLINE))
@@ -224,6 +257,10 @@ THROTTLE_QUERY="rate(container_cpu_cfs_throttled_periods_total{namespace=\"${NAM
 base_healed=""
 base_divergent=""
 base_sweeps=""
+# settled-at-baseline needs >=2 DISTINCT fresh sweeps in a row at/below the
+# pre-roll divergence; a poll that re-reads the same sweep does not count.
+settle_seen=0
+settle_last_sweep=""
 
 last_summary="no-observation"
 outcome="DEADLINE"
@@ -272,6 +309,7 @@ if not isinstance(pr, dict):
     emit("HEALED", "")
     emit("DIVERGENT", "")
     emit("SWEEPS", "")
+    emit("MEASURED_SWEEP", "0")
 else:
     def as_int(key):
         v = pr.get(key)
@@ -291,6 +329,7 @@ else:
         emit("HEALED", "")
         emit("DIVERGENT", "")
         emit("SWEEPS", "")
+        emit("MEASURED_SWEEP", "0")
     else:
         emit("PR_OK", "1")
         emit("CONVERGED", "1" if pr.get("converged") is True else "0")
@@ -298,6 +337,14 @@ else:
         emit("HEALED", healed)
         emit("DIVERGENT", divergent)
         emit("SWEEPS", sweeps)
+        # An UNMEASURED sweep (db unavailable: ReaDiscovery::empty() in
+        # projection_reconcile.rs) still bumps sweeps with divergentAnchor=0
+        # and peersAsked=0. It observed nothing, so it may not count toward
+        # settled-at-baseline. `measured` is honoured too if the wire ever
+        # carries it.
+        peers_asked = as_int("peersAsked")
+        measured = pr.get("measured", True) is True
+        emit("MEASURED_SWEEP", "1" if (peers_asked is not None and peers_asked > 0 and measured) else "0")
 
 traw = os.environ.get("THROTTLE", "")
 ratio = None
@@ -324,6 +371,7 @@ PYEOF
   healed=$(printf '%s\n' "$parsed" | sed -n 's/^HEALED=//p')
   divergent=$(printf '%s\n' "$parsed" | sed -n 's/^DIVERGENT=//p')
   sweeps=$(printf '%s\n' "$parsed" | sed -n 's/^SWEEPS=//p')
+  measured_sweep=$(printf '%s\n' "$parsed" | sed -n 's/^MEASURED_SWEEP=//p')
   ratio=$(printf '%s\n' "$parsed" | sed -n 's/^RATIO=//p')
 
   converge_ok=0
@@ -336,6 +384,7 @@ PYEOF
       # Counters went backwards: the peer's process restarted under us. Two
       # process lifetimes are not comparable — re-anchor, never subtract.
       base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
+      settle_seen=0; settle_last_sweep=""
       converge_why="counter-reset-reanchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
     elif [ "$sweeps" -le "$base_sweeps" ]; then
       converge_why="awaiting-fresh-sweep(baseline=${base_sweeps},current=${sweeps})"
@@ -345,7 +394,23 @@ PYEOF
     elif [ "$healed" -gt "$base_healed" ] && [ "$divergent" -lt "$base_divergent" ]; then
       converge_ok=1
       converge_why="healing(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
+    elif [ -n "$PRE_DIVERGENT" ] && [ "$measured_sweep" != "1" ]; then
+      # Absence of evidence is not settlement: an unmeasured sweep breaks the
+      # settle streak exactly like a fresh sweep above the baseline.
+      settle_seen=0; settle_last_sweep=""
+      converge_why="unmeasured-sweep(peersAsked=0, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps}) — not counted toward settled-at-baseline"
+    elif [ -n "$PRE_DIVERGENT" ] && [ "$measured_sweep" = "1" ] && [ "$divergent" -le "$PRE_DIVERGENT" ] && [ "$healed" -ge "$base_healed" ]; then
+      if [ -z "$settle_last_sweep" ] || [ "$sweeps" -gt "$settle_last_sweep" ]; then
+        settle_seen=$((settle_seen + 1)); settle_last_sweep="$sweeps"
+      fi
+      if [ "$settle_seen" -ge 2 ]; then
+        converge_ok=1
+        converge_why="settled-at-baseline(divergentAnchor pre=${PRE_DIVERGENT} now=${divergent}, sweeps +$((sweeps - base_sweeps)))"
+      else
+        converge_why="at-baseline-confirming(divergentAnchor pre=${PRE_DIVERGENT} now=${divergent}, fresh sweeps ${settle_seen}/2)"
+      fi
     else
+      settle_seen=0; settle_last_sweep=""
       converge_why="no-movement(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
     fi
   fi
@@ -390,7 +455,14 @@ done
 end_ts=$(date +%s)
 spent=$((end_ts - start_ts))
 new_budget=$(awk -v b="$BUDGET_LEFT" -v s="$spent" 'BEGIN{ v=b-s; if (v<0) v=0; printf "%d", v }')
-printf 'BUDGET_LEFT=%s\n' "$new_budget" > "$STATE_FILE"
+# Rewrite BUDGET_LEFT only: the pre-roll readings of peers not yet gated
+# live in the same file and must survive this gate.
+state_tmp="${STATE_FILE}.tmp.$$"
+{
+  printf 'BUDGET_LEFT=%s\n' "$new_budget"
+  if [ -f "$STATE_FILE" ]; then sed '/^BUDGET_LEFT=/d' "$STATE_FILE"; fi
+} > "$state_tmp"
+mv -f "$state_tmp" "$STATE_FILE"
 printf '%s|%s|%ss|%s|throttle-leg=%s\n' "$PEER" "$outcome" "$spent" "$last_summary" "$THROTTLE_LEG" >> "$SUMMARY_FILE"
 
 log "budget: spent ${spent}s, ${new_budget}s left for the remaining gates"

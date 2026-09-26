@@ -789,10 +789,17 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
     // Synchronized map: parallel branches each write their own key, no
     // collisions, but the wrapper guarantees memory visibility on read.
     def outcomes = java.util.Collections.synchronizedMap([:])
+    // The roll-gate state file is reset BEFORE the storage phase: each branch
+    // appends its peer's pre-roll reading to it (recordPreRollReading), and the
+    // sequenced conductor phase's gates read those lines back.
+    def stateFile = "${env.WORKSPACE}/.conductor-roll-gate.state"
+    sh "rm -f '${stateFile}' '${stateFile}.summary'"
     def branches = [:]
     humans.each { humanConfig ->
         def hc = humanConfig
         branches["deploy-${hc.resourcePrefix}"] = {
+            // Before this deploy touches the peer: the divergence it carries IN.
+            recordPreRollReading(hc, stateFile)
             catchError(
                 buildResult: 'UNSTABLE',
                 stageResult: 'UNSTABLE',
@@ -834,8 +841,6 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
     for (h in humans) { byName[h.name] = h }
     def plan = sequencedConductorPlan(humans)
     def soakSecs = env.CONDUCTOR_STAGGER_SOAK_SECS ?: '90'
-    def stateFile = "${env.WORKSPACE}/.conductor-roll-gate.state"
-    sh "rm -f '${stateFile}' '${stateFile}.summary'"
     def gateState = [left: 0]
     for (s in plan) { if (s.gate) { gateState.left = gateState.left + 1 } }
     // HALT-ON-FIRST-FAILURE (2026-09-02, edge #1413/#1414 — museum trap #18).
@@ -984,6 +989,28 @@ def runPeerRollGate(Map humanConfig, String gatesLeft, String stateFile) {
     } else {
         unstable("roll gate: ${humanConfig.name} helper exited ${rc} (implementation or environment failure) — remaining conductors are HELD")
         return false
+    }
+}
+
+/**
+ * Record the divergence a peer carries INTO this deploy, before its storage
+ * apply/restart and its sequenced conductor roll (edge #1486: four of six
+ * peers burned 450-599s holding the roll on `no-movement` — a standing
+ * divergence that was not the roll's debt). scripts/ci/pre-roll-reading.sh
+ * appends PRE_DIVERGENT_<peer>/PRE_HEALED_<peer> to the roll-gate state file;
+ * peer-roll-gate.sh then releases the peer as settled-at-baseline (never
+ * "converged") once it is back at or below that reading. The helper never
+ * fails a deploy: an absent reading writes nothing and the gate keeps its
+ * converged/healing legs only.
+ */
+def recordPreRollReading(Map humanConfig, String stateFile) {
+    def storageUrl = "http://${humanConfig.resourcePrefix}.${humanConfig.namespace}.svc.cluster.local:8090"
+    def rc = sh(
+        returnStatus: true,
+        script: "bash '${env.WORKSPACE}/scripts/ci/pre-roll-reading.sh' '${humanConfig.name}' '${storageUrl}' '${stateFile}'",
+    )
+    if (rc != 0) {
+        echo "pre-roll reading: ${humanConfig.name} helper exited ${rc} — no baseline recorded; the roll gate keeps its converged/healing legs for this peer"
     }
 }
 
