@@ -442,13 +442,11 @@ async function ensureEarlierEarned(world: E2EWorld): Promise<void> {
   await ensureAppsAuthored();
   await ensureFollowing();
   const builds = buildApps('earlier');
-  const { manifestPath, packagerLog } = packageRelease(
-    world,
-    'earlier',
-    builds,
-    await currentHeadCid(),
-    0
-  );
+  // The first release on a channel this run just created names no parent. The
+  // channel's content head at this point is its root entry, not a release, and
+  // every peer refuses a declared parent that is not a release on the channel
+  // (`lineage_parent_mismatch`, household run 2026-09-26).
+  const { manifestPath, packagerLog } = packageRelease(world, 'earlier', builds, null, 0);
   const declared = declareEarned(manifestPath);
   run.earlier = {
     label: 'earlier',
@@ -662,7 +660,7 @@ Then(
 );
 
 Then(
-  'both apps moved together on each peer, in the same step, so no peer ever showed one app new and the other old',
+  "throughout the take-up, no peer was ever seen naming one app's new build beside the other app's old one",
   function () {
     for (const peer of PEERS) {
       const mixed = run.samples[peer].filter(([a, b]) => a !== b);
@@ -822,6 +820,15 @@ When(
       packagerLog,
       ceremonyOutput: declared,
     };
+  }
+);
+
+When(
+  "each household peer's runtime next looks at the channel and takes the earlier release up itself",
+  { timeout: 600_000 },
+  async function () {
+    // Nobody writes the revert onto a peer: each runtime's own sweep applies it.
+    await waitForRecords(run.reverted as Release);
   }
 );
 
