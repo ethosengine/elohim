@@ -27,3 +27,11 @@ serde_json = "1"
 serde_yaml = "0.9"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+# The debug `epr` is what the hooks and the gate run. Its recall open SHA-256s up to 20 MB of
+# footprint (flow/memory/footprint.rs) and queries the bundled SQLite fold; unoptimized, those
+# dependencies pushed it past the SessionStart hooks' 6 s budget as recall receipts grew
+# (7.6 s measured 2026-09-26). Optimizing dependencies only keeps the budget, and our own crates'
+# debug build, as they are.
+[profile.dev.package."*"]
+opt-level = 2
