@@ -39,6 +39,19 @@ dhtAnchorHash: string | null,
  */
 trust: string, 
 /**
+ * Whether the row's DHT anchor IS its declared HEAD: `Some(true)` when the
+ * two are the same action, `Some(false)` when they differ, `None` when the
+ * row lacks either (wire: `anchorMatchesHead`).
+ *
+ * `trust` stays anchor-presence-only (it is `ContentView.trust`'s shared
+ * vocabulary), so a torn row — declared head A, pointer written from
+ * action B — reports `notarized` there. This is the honest companion: it
+ * reads `false` for that row. It is weaker than "the bytes match the
+ * head" (an anchor can advance without the pointer moving); the byte-level
+ * check is the head record's own `blob_cid` (seam 6, pointer audit).
+ */
+anchorMatchesHead?: boolean, 
+/**
  * The serving blob hash of the resolved row, if any (browser bundle).
  */
 blobHash: string | null, 

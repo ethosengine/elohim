@@ -26,6 +26,10 @@ export interface ContentHeadView {
    */
   trust: string;
   /**
+   * Whether the row's DHT anchor is its declared HEAD: true when they are the same action, false when they differ, null when the row lacks either. A false does not by itself mean the served bytes are wrong (an anchor can advance without the pointer moving), but a torn row — declared head A, pointer written from action B — reads false here while trust still says 'notarized'. Additive: absent from older serving nodes.
+   */
+  anchorMatchesHead?: boolean | null;
+  /**
    * The serving blob hash of the resolved row (browser bundle), if any.
    */
   blobHash?: string | null;

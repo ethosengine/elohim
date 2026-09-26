@@ -196,6 +196,7 @@ fn content_head_view_matches_schema() {
             "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
         ),
         trust: "notarized".to_string(),
+        anchor_matches_head: Some(false),
         blob_hash: Some("sha256-abc123".to_string()),
         updated_at: Some("2026-07-04T00:00:00Z".to_string()),
         staging_candidate: Some(
@@ -221,6 +222,7 @@ fn content_head_view_matches_schema() {
             "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
         ),
         trust: "notarized".to_string(),
+        anchor_matches_head: None,
         blob_hash: None,
         updated_at: None,
         staging_candidate: None,

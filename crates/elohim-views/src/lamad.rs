@@ -108,6 +108,18 @@ pub struct ContentHeadView {
     /// REQ-F10 trust legibility label — same vocabulary as `ContentView.trust`
     /// (`notarized` | `published` | `unconfirmed`). Never an authority source.
     pub trust: String,
+    /// Whether the row's DHT anchor IS its declared HEAD: `Some(true)` when the
+    /// two are the same action, `Some(false)` when they differ, `None` when the
+    /// row lacks either (wire: `anchorMatchesHead`).
+    ///
+    /// `trust` stays anchor-presence-only (it is `ContentView.trust`'s shared
+    /// vocabulary), so a torn row — declared head A, pointer written from
+    /// action B — reports `notarized` there. This is the honest companion: it
+    /// reads `false` for that row. It is weaker than "the bytes match the
+    /// head" (an anchor can advance without the pointer moving); the byte-level
+    /// check is the head record's own `blob_cid` (seam 6, pointer audit).
+    #[ts(optional)]
+    pub anchor_matches_head: Option<bool>,
     /// The serving blob hash of the resolved row, if any (browser bundle).
     pub blob_hash: Option<String>,
     /// When the resolved row was last written (mirrors `ContentView.updatedAt`).

@@ -195,6 +195,11 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         declared: c.declared_head_action_hash.is_some(),
         dht_anchor_hash: c.dht_anchor_hash.clone(),
         trust: trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some()),
+        anchor_matches_head: c
+            .declared_head_action_hash
+            .as_deref()
+            .zip(c.dht_anchor_hash.as_deref())
+            .map(|(head, anchor)| head == anchor),
         blob_hash: c.blob_hash.clone(),
         updated_at: Some(c.updated_at.clone()),
         // The candidate is NOT in the SQLite row: it is a pure function of the
@@ -468,5 +473,48 @@ mod trust_label_tests {
         // The anchor is still surfaced for provenance even when the declared head leads.
         assert_eq!(v.dht_anchor_hash.as_deref(), Some("uhCkk_anchor"));
         assert_eq!(v.trust, "notarized");
+    }
+
+    /// A torn row — declared head A, anchor (and pointer) from action B — still
+    /// reads `trust: notarized`, because that label is anchor presence alone.
+    /// `anchor_matches_head` is the honest companion that says so; it is
+    /// `None`, not a guess, when the row lacks either side.
+    #[test]
+    fn head_view_names_a_row_whose_anchor_is_not_its_declared_head() {
+        let torn = Content {
+            declared_head_action_hash: Some("uhCkk_A".to_string()),
+            dht_anchor_hash: Some("uhCkk_B".to_string()),
+            ..bare_content()
+        };
+        let v = content_head_view_from_content(&torn).unwrap();
+        assert_eq!(v.trust, "notarized", "trust stays the shared vocabulary");
+        assert_eq!(v.anchor_matches_head, Some(false));
+
+        let coherent = Content {
+            declared_head_action_hash: Some("uhCkk_A".to_string()),
+            dht_anchor_hash: Some("uhCkk_A".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(
+            content_head_view_from_content(&coherent).unwrap().anchor_matches_head,
+            Some(true)
+        );
+
+        let anchor_only = Content {
+            dht_anchor_hash: Some("uhCkk_A".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(
+            content_head_view_from_content(&anchor_only).unwrap().anchor_matches_head,
+            None
+        );
+        let declared_only = Content {
+            declared_head_action_hash: Some("uhCkk_A".to_string()),
+            ..bare_content()
+        };
+        assert_eq!(
+            content_head_view_from_content(&declared_only).unwrap().anchor_matches_head,
+            None
+        );
     }
 }
