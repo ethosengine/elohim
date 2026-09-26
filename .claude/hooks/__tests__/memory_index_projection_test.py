@@ -166,6 +166,13 @@ def load_module(name: str, path: Path):
     return mod
 
 
+
+def raw_cid(sha_hex: str) -> str:
+    """A raw CIDv1 (bafkrei…) over a sha256 digest, as elohim_epr mints source CIDs."""
+    import base64
+    raw = bytes([0x01, 0x55, 0x12, 0x20]) + bytes.fromhex(sha_hex)
+    return "b" + base64.b32encode(raw).decode().lower().rstrip("=")
+
 class RouterCase(unittest.TestCase):
     """The hook's ROUTE, asserted through the real module against a stub binary."""
 
@@ -199,8 +206,14 @@ class RouterCase(unittest.TestCase):
         self.mod.reset_cache()
 
     def contribute(self, name: str, author: str) -> None:
-        (self.contrib / f"{Path(name).stem}.json").write_text(
-            json.dumps({"author": author, "imported": {"file": name}}))
+        # As production writes it: the source's raw CIDv1 over the entry's CURRENT bytes.
+        rel = f".claude/memory/{name}"
+        (self.contrib / f"{Path(name).stem}.json").write_text(json.dumps({
+            "author": author, "imported": {"file": name},
+            "sources": [{"resource": {"path": rel, "cid": raw_cid(self.sha(name))}}]}))
+
+    def sha(self, name: str) -> str:
+        return hashlib.sha256((self.root / ".claude" / "memory" / name).read_bytes()).hexdigest()
 
     def orphan(self, *names: str) -> None:
         for name in names:
@@ -356,7 +369,8 @@ class RouterCase(unittest.TestCase):
              "observedAt": at}, sort_keys=True) + "\n"
         lines = [line(OTHER, "orphan-sha", "first-writer", "2026-09-25T10:00:00.000Z"),
                  line(OTHER, "orphan-sha", "later-writer", "2026-09-25T10:05:00.000Z")]
-        lines += [line(ENTRY, f"sha-{i}", "w", f"2026-09-25T11:{i:02d}:00.000Z")
+        entry_sha = self.sha(ENTRY)  # the bytes ENTRY's contribution covers
+        lines += [line(ENTRY, entry_sha, "w", f"2026-09-25T11:{i:02d}:00.000Z")
                   for i in range(10)]
         log.write_text("".join(lines))
         self.mod.trim_witnesses(self.root, max_lines=5, keep=3)
@@ -366,7 +380,27 @@ class RouterCase(unittest.TestCase):
         self.assertEqual(kept[0]["session"], "first-writer", kept)
         self.assertEqual([k for k in kept if k["path"].endswith(OTHER)], [kept[0]])
         self.assertEqual(len(kept), 1 + 3, kept)
-        self.assertEqual([k["sha256"] for k in kept[1:]], ["sha-7", "sha-8", "sha-9"])
+        self.assertEqual([k["observedAt"][11:16] for k in kept[1:]], ["11:07", "11:08", "11:09"])
+
+    def test_trimming_keeps_the_first_witness_of_bytes_edited_after_contribution(self):
+        # ENTRY was contributed at its current bytes, then re-edited: the NEW bytes are not yet
+        # contributed, so their first witness names their author and must survive trimming —
+        # even though a contribution exists for the path.
+        log = self.root / ".eprfs" / "status" / "memory-writes.jsonl"
+        line = lambda sha, session, at: json.dumps(
+            {"path": f".claude/memory/{ENTRY}", "sha256": sha, "session": session,
+             "observedAt": at}, sort_keys=True) + "\n"
+        old_sha = self.sha(ENTRY)
+        lines = [line(old_sha, "w", f"2026-09-25T09:{i:02d}:00.000Z") for i in range(4)]
+        lines += [line("re-edited-sha", "re-editor", "2026-09-25T10:00:00.000Z"),
+                  line("re-edited-sha", "later", "2026-09-25T10:01:00.000Z")]
+        lines += [line(old_sha, "w", f"2026-09-25T11:{i:02d}:00.000Z") for i in range(6)]
+        log.write_text("".join(lines))
+        self.mod.trim_witnesses(self.root, max_lines=5, keep=3)
+        kept = [json.loads(l) for l in log.read_text().splitlines()]
+        re_edited = [k for k in kept if k["sha256"] == "re-edited-sha"]
+        self.assertEqual([k["session"] for k in re_edited], ["re-editor"], kept)
+        self.assertEqual(len([k for k in kept if k["sha256"] == old_sha]), 3, kept)
 
     def test_an_unimported_entry_is_imported_by_the_harness_with_no_caller_assertions(self):
         self.orphan(ENTRY)

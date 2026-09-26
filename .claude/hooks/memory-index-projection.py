@@ -286,8 +286,34 @@ def _witness_lines(path: Path) -> list[str]:
         return []
 
 
-def _uncontributed(root: Path, rel: str) -> bool:
-    return not (root / CONTRIBUTIONS_REL / f"{Path(rel).stem}.json").is_file()
+def _contributed_shas(root: Path, rel: str) -> set:
+    """The sha256 digests of the bytes a contribution covers for `rel`. A source's `cid` is a raw
+    CIDv1 (`bafkrei…`: version 1, codec raw 0x55, sha2-256 0x12, length 0x20), so its digest IS the
+    sha256 of the entry bytes — the same digest a witness line carries. Never raises."""
+    import base64
+    try:
+        data = json.loads((root / CONTRIBUTIONS_REL / f"{Path(rel).stem}.json").read_text())
+    except (OSError, ValueError):
+        return set()
+    shas = set()
+    for source in data.get("sources") or []:
+        cid = ((source or {}).get("resource") or {}).get("cid") or ""
+        if not cid.startswith("b"):
+            continue
+        body = cid[1:].upper()
+        try:
+            raw = base64.b32decode(body + "=" * (-len(body) % 8))
+        except (ValueError, TypeError):
+            continue
+        if raw[:4] == bytes([0x01, 0x55, 0x12, 0x20]) and len(raw) == 36:
+            shas.add(raw[4:].hex())
+    return shas
+
+
+def _uncontributed(root: Path, rel: str, sha256: str) -> bool:
+    """True unless a contribution covers `rel` AT THESE BYTES: an entry contributed once and then
+    re-edited has uncontributed bytes again, and the first witness of those bytes must survive."""
+    return sha256 not in _contributed_shas(root, rel)
 
 
 def trim_witnesses(root: Path, max_lines: int = WITNESS_MAX, keep: int = WITNESS_KEEP) -> None:
@@ -307,7 +333,7 @@ def trim_witnesses(root: Path, max_lines: int = WITNESS_MAX, keep: int = WITNESS
             key = (w["path"], w["sha256"])
         except (json.JSONDecodeError, ValueError, KeyError, TypeError):
             continue
-        if key in seen or not _uncontributed(root, key[0]):
+        if key in seen or not _uncontributed(root, key[0], key[1]):
             continue
         seen.add(key)
         preserved.append(line)
