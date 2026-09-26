@@ -913,6 +913,12 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
     p == pattern.len()
 }
 
+/// Top-level frontmatter keys, plus the valued keys of a `metadata:` block.
+///
+/// Claude Code's native memory format nests every field past name/description under `metadata:`,
+/// so an agent's memory carries its title there. A required field is present when either place
+/// names it (operator ruling 2026-09-26); a top-level value always wins. The Python evaluator
+/// (`.claude/scripts/_lib/epr_meta.py`) reads it the same way.
 fn frontmatter_fields(content: Option<&str>) -> Map<String, Value> {
     let Some(content) = content.and_then(|content| content.strip_prefix("---\n")) else {
         return Map::new();
@@ -920,10 +926,18 @@ fn frontmatter_fields(content: Option<&str>) -> Map<String, Value> {
     let Some(end) = content.find("\n---") else {
         return Map::new();
     };
-    serde_yaml::from_str::<Value>(&content[..end])
+    let mut fields = serde_yaml::from_str::<Value>(&content[..end])
         .ok()
         .and_then(|value| value.as_object().cloned())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(Value::Object(metadata)) = fields.get("metadata").cloned() {
+        for (key, value) in metadata {
+            if !value.is_null() {
+                fields.entry(key).or_insert(value);
+            }
+        }
+    }
+    fields
 }
 
 fn line_count(content: &str) -> u64 {
@@ -1088,6 +1102,31 @@ policies:
             evaluation.rules[0].parameters,
             serde_json::json!(["id", "cites"])
         );
+    }
+
+    #[test]
+    fn required_frontmatter_is_satisfied_under_metadata() {
+        let dir = TempDir::new().unwrap();
+        write_root(
+            &dir,
+            "  - id: memory-born\n    class: deny\n    when: { write: \"*.md\", new: true }\n    require-frontmatter: [name, title]",
+        );
+        let target = dir.path().join("new.md");
+        let mut write = GovernanceWrite::new("new.md");
+        write.is_new = true;
+        write.content = Some(
+            "---\nname: slug\nmetadata:\n  title: Nested title\n  type: feedback\n---\n".into(),
+        );
+        assert!(evaluate_path(dir.path(), &target, &write)
+            .unwrap()
+            .verdicts
+            .is_empty());
+
+        // An empty nested key is not a title.
+        write.content = Some("---\nname: slug\nmetadata:\n  title:\n---\n".into());
+        let evaluation = evaluate_path(dir.path(), &target, &write).unwrap();
+        assert_eq!(evaluation.verdicts.len(), 1);
+        assert!(evaluation.verdicts[0].reason.contains("title"));
     }
 
     #[test]

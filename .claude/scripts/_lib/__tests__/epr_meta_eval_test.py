@@ -52,6 +52,16 @@ check("require-frontmatter denies when missing", v.cls == "deny" and "status" in
 check("require-frontmatter allows when present",
       epr_meta.combine(epr_meta.evaluate(m,
           {"path": "specs/new.md", "content": "---\nid: x\nstatus: Draft\n---\n# b", "is_new": True})) is None)
+check("require-frontmatter reads a field nested under metadata (native memory format)",
+      epr_meta.combine(epr_meta.evaluate(m,
+          {"path": "specs/new.md",
+           "content": "---\nid: x\nmetadata:\n  status: Draft\n  type: feedback\n---\n# b",
+           "is_new": True})) is None)
+check("require-frontmatter ignores an empty metadata key and keys outside the block",
+      "status" in epr_meta.combine(epr_meta.evaluate(m,
+          {"path": "specs/new.md",
+           "content": "---\nid: x\nmetadata:\n  status:\nother:\n  status: Draft\n---\n# b",
+           "is_new": True})).reason)
 
 m = _merged([{"id": "route", "class": "ask", "when": {"write": "*-plan.md"},
               "route-to": {"type": "*-plan.md", "dest": "plans/"}, "why": "to plans/"}])

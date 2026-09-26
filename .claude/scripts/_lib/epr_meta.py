@@ -363,10 +363,29 @@ def _matches_when(when: dict, write: dict) -> bool:
     return True
 
 
+_METADATA_KEY_RE = re.compile(r"^\s+([a-zA-Z0-9_-]+)\s*:\s*(\S.*)?$")
+
+
 def _frontmatter_fields(content: str | None) -> set[str]:
+    """Top-level keys, plus the valued keys of a `metadata:` block.
+
+    Claude Code's native memory format nests every field past name/description under
+    `metadata:`, so an agent's memory carries its title there. A required field is present when
+    either place names it (operator ruling 2026-09-26); the native evaluator reads it the same way.
+    """
     if not content:
         return set()
-    return set(fm.parse(content).fields.keys())
+    parsed = fm.parse(content)
+    present = set(parsed.fields.keys())
+    in_metadata = False
+    for line in parsed.raw_block.splitlines():
+        if line[:1] not in ("", " ", "\t"):
+            in_metadata = line.rstrip() == "metadata:"
+            continue
+        m = _METADATA_KEY_RE.match(line) if in_metadata else None
+        if m and m.group(2):
+            present.add(m.group(1))
+    return present
 
 
 def _eval_rule(rule: dict, write: dict) -> Verdict | None:

@@ -390,6 +390,25 @@ fn scalar(text: &str, key: &str) -> String {
     parse_frontmatter(text).get(key).unwrap_or("").to_string()
 }
 
+/// A document's slug identity: its `id:`, or for a native memory entry its `name:`.
+///
+/// Claude Code's memory format declares an entry's identity as `name:` (a unique kebab slug) and
+/// has no `id:`. Minting an `id:` into another participant's entry would rewrite bytes it authored
+/// and break its attribution, so the reader accepts the native field instead (operator ruling
+/// 2026-09-26, the same one that lets the birth gate read `metadata.title`).
+fn doc_id(path: &Path, text: &str) -> String {
+    let id = scalar(text, "id");
+    if !id.is_empty()
+        || !path
+            .to_string_lossy()
+            .replace('\\', "/")
+            .contains(".claude/memory/")
+    {
+        return id;
+    }
+    scalar(text, "name")
+}
+
 fn read_text(path: &Path) -> FlowResult<String> {
     std::fs::read_to_string(path).map_err(|source| FlowError::Read {
         path: path.to_path_buf(),
@@ -587,7 +606,7 @@ fn build_slug_index(roots: &[PathBuf]) -> BTreeMap<String, PathBuf> {
     for root in roots {
         for md in markdown_under(root) {
             if let Some(text) = read_lossy(&md) {
-                let id = scalar(&text, "id");
+                let id = doc_id(&md, &text);
                 if !id.is_empty() {
                     index.insert(id, md);
                 }
@@ -626,7 +645,7 @@ fn duplicate_slugs(root: &Path) -> BTreeMap<String, Vec<PathBuf>> {
     for dir in doc_roots(root) {
         for md in markdown_under(&dir) {
             if let Some(text) = read_lossy(&md) {
-                let id = scalar(&text, "id");
+                let id = doc_id(&md, &text);
                 if !id.is_empty() {
                     seen.entry(id).or_default().push(md);
                 }
@@ -901,6 +920,8 @@ fn assign_id(root: &Path, doc: &Path) -> FlowResult<bool> {
     let Some((fm_lines, body)) = split_frontmatter(&text) else {
         return Ok(false);
     };
+    // Sealing is the author's own act, so it mints an `id:` even where `name:` identifies a
+    // memory entry; only the passive readers and the migrate sweep accept `name:` (see `doc_id`).
     if !scalar(&text, "id").is_empty() {
         return Ok(false);
     }
@@ -978,7 +999,7 @@ fn verify_doc(root: &Path, doc: &Path) -> FlowResult<Vec<String>> {
             match resolve_doc(root, &cite.reference, &index) {
                 Some(target) => {
                     let has_id = read_lossy(&target)
-                        .map(|t| !scalar(&t, "id").is_empty())
+                        .map(|t| !doc_id(&target, &t).is_empty())
                         .unwrap_or(false);
                     if is_doc_root(root, &target) && has_id {
                         problems.push(format!(
@@ -1112,7 +1133,7 @@ fn legacy_doc_cite_with_id(root: &Path, cite: &Cite) -> bool {
     target.is_file()
         && is_doc_root(root, &target)
         && read_lossy(&target)
-            .map(|t| !scalar(&t, "id").is_empty())
+            .map(|t| !doc_id(&target, &t).is_empty())
             .unwrap_or(false)
 }
 
@@ -1420,7 +1441,7 @@ fn migrate(root: &Path, apply: bool) -> FlowResult<MigrateOutcome> {
     let mut id_by_path: BTreeMap<PathBuf, String> = BTreeMap::new();
     for doc in &docs {
         if let Some(text) = read_lossy(doc) {
-            let id = scalar(&text, "id");
+            let id = doc_id(doc, &text);
             if !id.is_empty() {
                 taken.insert(id.clone());
                 id_by_path.insert(doc.clone(), id);
@@ -1865,6 +1886,24 @@ fn parse_describe_args(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_native_memory_entry_is_identified_by_its_name() {
+        let entry =
+            "---\nname: feedback_x\ndescription: d\nmetadata:\n  type: feedback\n---\nbody\n";
+        assert_eq!(
+            doc_id(Path::new("/r/.claude/memory/feedback_x.md"), entry),
+            "feedback_x"
+        );
+        // `id:` still wins where both are declared.
+        let both = "---\nid: sealed-x\nname: feedback_x\n---\n";
+        assert_eq!(
+            doc_id(Path::new("/r/.claude/memory/feedback_x.md"), both),
+            "sealed-x"
+        );
+        // Outside the memory directory `name:` is not an identity.
+        assert_eq!(doc_id(Path::new("/r/genesis/docs/a.md"), entry), "");
+    }
 
     #[test]
     fn inline_comment_is_stripped_at_the_whitespace_run() {
