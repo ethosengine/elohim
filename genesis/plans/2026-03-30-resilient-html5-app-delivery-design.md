@@ -61,6 +61,8 @@ All three coexist permanently. None replaces the other. Doorway is not a band-ai
 
 **The invariant across all three:** The ZIP blob is truth. CID-addressed, content-verified. Every cache layer — MongoDB, extraction disk, SW CacheStorage — is a projection that can be rebuilt from the blob. Hash-based invalidation propagates through all layers on re-seed.
 
+> **Amended 2026-09-26** by `genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md` §4: the record is truth; the ZIP is one content-verified projection of it, and a cache layer keeps only bytes it has itself verified against their address.
+
 ## P2P Design Gate
 
 All entities in this design are **Operational (Category C)**. No new DHT entry types. No new storage projections with `dht_anchor_hash`. Pure cache/delivery infrastructure.
