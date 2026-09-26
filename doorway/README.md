@@ -4,7 +4,7 @@
 
 The porch of the peer-to-peer network.
 
-A physical porch has an address (so people can find you), a door (so people can enter), and a mailbox (so messages arrive). Doorway does the same for the Elohim Protocol: it gives the P2P network a web address, a way in, and a place for content to land.
+A physical porch has an address (so people can find you), a door (so people can enter), and a mailbox (so messages arrive). Doorway does the same for the Elohim Protocol: it gives the P2P network a web address, a way in, and a place for content to land, but itself is not the destination of the Elohim Protocol. 
 
 A doorway does little on its own, any more than a door out of its frame, so this README explains what it is and why it is built this way; to see one standing in its frame, run `just dev start` from the repository root.
 
@@ -94,7 +94,7 @@ The two work as one. Each household reads what its neighborhoods say it has prom
 To keep walking:
 
 - [The house](../elohim/elohim-storage/README.md): how a household holds the bytes, moves them to its neighbors, and heals what goes missing.
-- [The neighborhood](../elohim/holochain/docs/README.md): how households that share rules decide together what is true, who said it, and what each has promised to keep.
+- [The neighborhood](../elohim/holochain/README.md): how households that share rules decide together what is true, who said it, and what each has promised to keep.
 
 ## What's Here
 
