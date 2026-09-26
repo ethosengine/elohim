@@ -192,3 +192,13 @@ worth a grep sweep for other `--filter` names that no longer resolve.
 ## 2026-09-25 — the lease router and the `measure` verb
 
 `just test mesh` and `just mesh start|stop` now claim the household lease through `berth` with a class and a TTL (`BERTH_CLASS=verify|measure`, `BERTH_TTL`, default 1800 s, verify max 3600 s): a live holder refuses exit 3, `measure` is refused on the dev berth and names `just measure <scope>`, `MEASURE_ON_DEV_BERTH=1` is the declared override (ledger row + immediate `dev-berth-held-by-measure@1` observation), a verify lane is fenced by `timeout` at its TTL (`BUDGET-EXCEEDED`, exit 3), `mesh start` holds the daemon `mesh` class with no TTL, `mesh stop` refuses under another live holder (`MESH_STOP_FORCE=1` overrides on the record), and `matrix` / `recovery` / `recovery-matrix` are measure-class. Sessions resolve by process ancestry (moorings carry the Claude pid + start time; exit 4 = no session resolvable, the only non-blocking exit). New ninth verb: `just measure <feature-path> [--on jessica|adam] [--gap <id>]` (`genesis/agentic/compute/measure.sh`; sub-verbs `grant`, `worker`, `status`, `poll`, `fixture`) sends one feature as a peer-executed stage to the provider that holds the stores and returns immediately; the listener writes the brit validate ref, the sprint report, the gap fulfil and the habit DELTA when the completion arrives. Coupled context synced: root `CLAUDE.md` Build & Test (commits 06f296df3, 4aebfc462); the `hc-dev-orchestrator` skill is a package projection (`master: package`) and is updated through its package. Plan: `/projects/.claude-config/plans/we-ran-into-a-cryptic-robin.md`.
+
+## 2026-09-26 — `doorway-restart` reaches the verb
+
+`just mesh doorway-restart <a|b|c>` passes through to hc-mesh.sh's existing `doorway-restart` arm: one doorway is
+restarted on the binary now at its path, with its captured environment. The arm, and the root gospel's reference to
+it, predated the verb, which rejected it; found while rebuilding a doorway cure into the running household. No new
+script. Coupled context synced: root `CLAUDE.md` Build & Test (via the `elohim-root-gospel` package) and the
+`hc-dev-orchestrator` skill (via its package), where a stale storage-binary path was also corrected to the parked
+`mesh-bin` copy. The same pass made the preflight judge each zome wasm against its own crate, so a coordinator-only
+change no longer falsely refuses the integrity wasm.

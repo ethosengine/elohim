@@ -431,9 +431,15 @@ PeerStatus heartbeat holds a fourth, unsupervised client — so `/health conduct
 
 `storage-restart [peer…]` re-execs each storage peer in place from its captured `/proc` environ
 (conductors untouched; a chaos-re-keyed `AGENT_PUBKEY` survives). The mesh runs the
-**doorway-family debug** binary (`/projects/.cargo-target-pool/family/doorway/elohim__elohim-storage/dev/debug/elohim-storage`),
-not the release path the script defaults to — rebuild into that slot first
-(`CARGO_TARGET_DIR=<slot> cargo build --bin elohim-storage`) when a Rust cure must reach the mesh.
+**parked mesh copy** (`/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/mesh-bin/elohim-storage`,
+built with `--features "p2p p2p-iroh"` in the dev slot and copied there, where `just gate`'s
+`cargo test` cannot overwrite it) — `hc-mesh.sh`'s `print_iroh_build_command` prints the exact pair when a
+Rust cure must reach the mesh.
+
+`doorway-restart <a|b|c>` (`just mesh doorway-restart`, 2026-09-26) is the doorway twin: it re-execs one
+doorway on the binary now at its path with its captured environment. The gate's `cargo test` does not
+refresh that binary either, so rebuild it first (`CARGO_TARGET_DIR=<pool>/doorway__doorway-service/dev
+RUSTFLAGS="" cargo build --bin doorway`).
 A live peer's binary is read from `/proc/<pid>/exe` and recorded beside the environ
 (`$MESH_DIR/storage-restart/<name>.exe`); a DEAD peer is restored from that record, then a running
 sibling's exe, then `STORAGE_BIN` — so the default path no longer has to exist. Before those
