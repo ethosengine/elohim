@@ -97,7 +97,7 @@ it observes, and the gap between them is the signal.
 ```bash
 jenkins-bridge offer mint                  # proposes the Intent; prints its CID
 jenkins-bridge offer status                # Proposed | Active | Withdrawn, with the stakes
-epr flow note <offer-cid> --kind verdict --verdict approved \
+epr flow note --on <offer-cid> --kind verdict --verdict approved \
   --reason "<what you approve>" --session <a Steward's registered session>
 jenkins-bridge card --out elohim-governance.json
 ```
