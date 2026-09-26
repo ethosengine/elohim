@@ -201,13 +201,16 @@ test("alpha humans WITH the field render the real workspace channel line at thei
   // (james to canary, then matthew/jessica to apply on the bootstrap pair) is
   // a later data change the operator flips after Task 4's first
   // workspace->alpha receipt, not minted here.
-  // The alpha serving pair (doorway A → matthew, doorway B → jessica) also
-  // follows the app-bundle channel, at =observe until C10 is met.
-  const appBundle = `,${APP_BUNDLE_CHANNEL_ID}=observe`;
+  // 2026-09-26 (one-head-delivered sprint Lane D, Task D3): the alpha serving
+  // pair (doorway A -> matthew, doorway B -> jessica) flips the app-bundle
+  // channel to =apply -- the household proof (app-bundle-elected-delivery
+  // 6/6 twice, 2026-09-26) is green and the deployed storage (edge #1486)
+  // lists app-bundle among its applyVehicles. See $appBundleChannelComment.
+  const appBundleApply = `,${APP_BUNDLE_CHANNEL_ID}=apply`;
   for (const [name, mode, extra] of [
     ["james", "canary", ""],
-    ["matthew", "observe", appBundle],
-    ["jessica", "observe", appBundle],
+    ["matthew", "observe", appBundleApply],
+    ["jessica", "observe", appBundleApply],
     ["adam", "observe", ""],
     ["gertrude", "observe", ""],
     ["susan", "observe", ""],
@@ -228,6 +231,14 @@ test("alpha humans WITH the field render the real workspace channel line at thei
       `${name}: renders the workspace channel line at ${mode}`,
     );
   }
+
+  // adam never follows the app-bundle channel -- the apply flip is scoped to
+  // the serving pair (matthew, jessica) only.
+  assert.doesNotMatch(
+    humanNamed("adam").runtimeConfig?.ELOHIM_RELEASE_CHANNELS ?? "",
+    /runtime:app-bundle:alpha:dev=apply/,
+    "adam: does not follow app-bundle at apply",
+  );
 });
 
 const MANIFEST_PLACEHOLDER = "RUNTIME_MANIFEST_CID_PLACEHOLDER";
