@@ -1,0 +1,15 @@
+-- The election's tiebreak for the notary-declared content HEAD.
+--
+-- `canonical_declared_at` and `canonical_earned` project two of the three
+-- fields `content_store::select_canonical_winner` orders on. The third — the
+-- winning declaration's create-link hash — never reached the projection, so two
+-- peers that projected different winners of an exact (tier, clock) tie each
+-- refused the other's answer as "not newer", forever.
+--
+-- Stored as Holochain's `u`-prefixed URL-safe base64; compared only after
+-- decoding to the 39 raw bytes, which is the order the selector uses.
+--
+-- NULL = unknown: every pre-migration row, and any election answered by an
+-- older coordinator. Such a row still orders by tier and clock; it takes no part
+-- in an exact tie, which is the pre-migration behaviour. Additive, no backfill.
+ALTER TABLE content ADD COLUMN canonical_link_hash TEXT;

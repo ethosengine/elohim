@@ -1667,19 +1667,86 @@ pub enum StampOutcome {
 }
 
 /// The DHT election standing behind a canonical head answer: the winning
-/// declaration LINK's notarized timestamp, and whether it was EARNED.
+/// declaration LINK's notarized timestamp, whether it was EARNED, and the link's
+/// own hash.
 ///
-/// This is what `content_store::select_canonical_winner` arbitrated on, carried
-/// verbatim to the projection. `None` = the answer carries no election.
-pub type CanonicalOrdering = (i64, bool);
+/// This is the whole key `content_store::select_canonical_winner` arbitrated on
+/// — tier, clock, tiebreak — carried verbatim to the projection.
+/// `Option<CanonicalOrdering>::None` = the answer carries no election.
+///
+/// `link` is `None` for an election recorded before the tiebreak travelled (an
+/// older coordinator, or a row stamped before the column existed). Such an
+/// election still orders by tier and clock; it simply cannot win or lose an
+/// exact tie, which is the pre-tiebreak behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanonicalOrdering {
+    pub declared_at: i64,
+    pub earned: bool,
+    pub link: Option<ElectionLink>,
+}
+
+impl CanonicalOrdering {
+    /// An election known only by tier and clock.
+    pub const fn new(declared_at: i64, earned: bool) -> Self {
+        Self {
+            declared_at,
+            earned,
+            link: None,
+        }
+    }
+
+    pub fn with_link(self, link: Option<ElectionLink>) -> Self {
+        Self { link, ..self }
+    }
+
+    /// Same tier and clock: the two can differ only in the tiebreak.
+    pub fn same_clock(&self, other: &Self) -> bool {
+        self.declared_at == other.declared_at && self.earned == other.earned
+    }
+}
+
+/// A declaration link's hash as the election's tiebreak orders it: the 39 raw
+/// bytes, compared lexicographically — `HoloHash`'s own `Ord`, which is what
+/// `select_arbitrated_winner` sorts on in the zome. Comparing the base64 text
+/// instead would not agree with it (the alphabet `-`/`_` does not sort in
+/// byte order), so the column is decoded before any comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ElectionLink([u8; 39]);
+
+impl ElectionLink {
+    pub fn from_raw(raw: &[u8]) -> Option<Self> {
+        raw.try_into().ok().map(Self)
+    }
+
+    /// Parse the `u`-prefixed URL-safe base64 form Holochain prints and this
+    /// crate stores. Anything else reads as no tiebreak, never as a guess.
+    pub fn from_b64(text: &str) -> Option<Self> {
+        use base64::Engine as _;
+        let body = text.strip_prefix('u')?;
+        let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(body)
+            .ok()?;
+        Self::from_raw(&raw)
+    }
+
+    pub fn to_b64(self) -> String {
+        use base64::Engine as _;
+        format!(
+            "u{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(self.0)
+        )
+    }
+}
 
 fn canonical_ordering_from_columns(
     declared_at: Option<i64>,
     earned: Option<i32>,
+    link: Option<&str>,
 ) -> Option<CanonicalOrdering> {
-    declared_at
-        .zip(earned)
-        .map(|(timestamp, tier)| (timestamp, tier != 0))
+    declared_at.zip(earned).map(|(timestamp, tier)| {
+        CanonicalOrdering::new(timestamp, tier != 0)
+            .with_link(link.and_then(ElectionLink::from_b64))
+    })
 }
 
 /// Why a [`StampMode::HealCanonical`] stamp declined to move an already-declared
@@ -1760,13 +1827,18 @@ impl StaleReason {
 ///    here is forward in AUTHORITY: notarized election over un-elected
 ///    self-declaration. It is the invariant's "key it on the authority the write
 ///    CARRIES", applied literally.
-/// 3. **CLOCK.** Both sides elected ⇒ strictly-newer link timestamp wins; equal
-///    or older refuses. This is what keeps a stale-canonical conductor (one that
+/// 3. **CLOCK.** Both sides elected ⇒ strictly-newer link timestamp wins; older
+///    refuses. This is what keeps a stale-canonical conductor (one that
 ///    has not yet integrated a newer link, answering with the OLD canonical
 ///    record) from moving the head BACKWARDS — the 2026-07-12 regression. Note
 ///    the comparison is now between two ELECTION clocks, which are the same
 ///    notarized values on every peer, so it is globally consistent in a way the
 ///    old head-action-timestamp comparison never was.
+/// 4. **TIEBREAK.** Same tier, same clock ⇒ the higher declaration-link hash
+///    wins, compared on raw bytes exactly as the selector does. Without it two
+///    peers that projected different winners of an exact tie each refused the
+///    other's as not newer, forever. A side whose link is unknown (recorded
+///    before the tiebreak travelled) takes no part in a tie and refuses.
 ///
 /// Returns `Ok(())` to move, `Err(reason)` to keep the adopted head.
 pub fn canonical_move_verdict(
@@ -1775,19 +1847,23 @@ pub fn canonical_move_verdict(
 ) -> Result<(), StaleReason> {
     match (incoming, stored) {
         // (1) TIER — checked before anything else, both directions.
-        (Some((_, true)), Some((_, false))) => Ok(()),
-        (Some((_, false)), Some((_, true))) => Err(StaleReason::Tier),
+        (Some(inc), Some(sto)) if inc.earned && !sto.earned => Ok(()),
+        (Some(inc), Some(sto)) if !inc.earned && sto.earned => Err(StaleReason::Tier),
         // (2) ELECTION PRESENCE.
         (Some(_), None) => Ok(()),
         (None, Some(_)) => Err(StaleReason::StoredNull),
-        // (3) CLOCK — same tier on both sides.
-        (Some((inc, _)), Some((sto, _))) => {
-            if inc > sto {
-                Ok(())
-            } else {
-                Err(StaleReason::NotNewer)
-            }
-        }
+        // (3) CLOCK, then (4) TIEBREAK — same tier on both sides.
+        (Some(inc), Some(sto)) => match inc.declared_at.cmp(&sto.declared_at) {
+            std::cmp::Ordering::Greater => Ok(()),
+            std::cmp::Ordering::Less => Err(StaleReason::NotNewer),
+            // An exact tie on tier and clock: the higher link hash won in the
+            // zome, so it wins here. A side that carries no link cannot take
+            // part — it neither displaces nor is displaced on a tie.
+            std::cmp::Ordering::Equal => match (inc.link, sto.link) {
+                (Some(a), Some(b)) if a > b => Ok(()),
+                _ => Err(StaleReason::NotNewer),
+            },
+        },
         // Neither side carries an election: nothing authorizes a move. This is
         // the pre-cure world, preserved exactly — the old guard refused on NULL
         // either side, and with no election anywhere there is still nothing to
@@ -1892,7 +1968,13 @@ fn stamp_declared_head_mode_transaction(
     use diesel::sql_types::Text;
 
     #[allow(clippy::type_complexity)]
-    let existing: Option<(Option<String>, Option<i64>, Option<i64>, Option<i32>)> = content::table
+    let existing: Option<(
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<i32>,
+        Option<String>,
+    )> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
         .select((
@@ -1900,21 +1982,30 @@ fn stamp_declared_head_mode_transaction(
             content::declared_head_at,
             content::canonical_declared_at,
             content::canonical_earned,
+            content::canonical_link_hash,
         ))
-        .first::<(Option<String>, Option<i64>, Option<i64>, Option<i32>)>(conn)
+        .first(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Stamp declared head lookup: {e}")))?;
 
-    let (declared, _stored_declared_at, stored_canonical_at, stored_canonical_earned) =
-        match existing {
-            None => return Ok(StampOutcome::NoRow),
-            Some(row) => row,
-        };
+    let (
+        declared,
+        _stored_declared_at,
+        stored_canonical_at,
+        stored_canonical_earned,
+        stored_canonical_link,
+    ) = match existing {
+        None => return Ok(StampOutcome::NoRow),
+        Some(row) => row,
+    };
 
-    // The stored election, reassembled. Both columns are written together, so a
+    // The stored election, reassembled. The columns are written together, so a
     // half-populated pair cannot occur; a defensive `zip` treats one as none.
-    let stored_ordering =
-        canonical_ordering_from_columns(stored_canonical_at, stored_canonical_earned);
+    let stored_ordering = canonical_ordering_from_columns(
+        stored_canonical_at,
+        stored_canonical_earned,
+        stored_canonical_link.as_deref(),
+    );
 
     let moving_declared_row = matches!(
         declared.as_deref(),
@@ -1984,7 +2075,13 @@ fn stamp_declared_head_mode_transaction(
                 // bookkeeping. An unordered same-head legacy refresh keeps
                 // the ordering already known.
                 if let (Some(incoming), Some(stored)) = (canonical_ordering, stored_ordering) {
-                    if incoming != stored {
+                    // Same tier and clock with the link known on only one
+                    // side is the SAME election seen by a coordinator that did
+                    // or did not report its tiebreak: a refresh (which fills
+                    // the link in, or keeps it), not a contest.
+                    let same_election = incoming.same_clock(&stored)
+                        && (incoming.link.is_none() || stored.link.is_none());
+                    if incoming != stored && !same_election {
                         if let Err(reason) = canonical_move_verdict(Some(incoming), Some(stored)) {
                             crate::metrics::inc_projection_refused_stale(reason.label());
                             return Ok(StampOutcome::SkippedStale);
@@ -2041,15 +2138,24 @@ fn stamp_declared_head_mode_transaction(
     // and keeping it would let a superseded election veto the next real one.
     // Same-head stamps carrying nothing keep whatever is known (a refresh must
     // not erase an election).
-    if let Some((ts, earned)) = canonical_ordering {
+    if let Some(incoming) = canonical_ordering {
+        // A same-head refresh of the same election that happens to carry no
+        // link (an older coordinator answering) keeps the tiebreak already
+        // known rather than erasing it.
+        let link = incoming.link.or_else(|| {
+            stored_ordering
+                .filter(|stored| same_declared_head && stored.same_clock(&incoming))
+                .and_then(|stored| stored.link)
+        });
         diesel::update(
             content::table
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id)),
         )
         .set((
-            content::canonical_declared_at.eq(Some(ts)),
-            content::canonical_earned.eq(Some(i32::from(earned))),
+            content::canonical_declared_at.eq(Some(incoming.declared_at)),
+            content::canonical_earned.eq(Some(i32::from(incoming.earned))),
+            content::canonical_link_hash.eq(link.map(ElectionLink::to_b64)),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Stamp canonical ordering failed: {e}")))?;
@@ -2062,6 +2168,7 @@ fn stamp_declared_head_mode_transaction(
         .set((
             content::canonical_declared_at.eq(None::<i64>),
             content::canonical_earned.eq(None::<i32>),
+            content::canonical_link_hash.eq(None::<String>),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Clear canonical ordering failed: {e}")))?;
@@ -2786,6 +2893,7 @@ mod tests {
                 canonical_earned INTEGER,
                 dht_anchor_state TEXT,
                 dht_anchor_checked_at TEXT,
+                canonical_link_hash TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
@@ -4984,7 +5092,7 @@ mod tests {
             Some(1_000),
             None,
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(filled, StampOutcome::Stamped);
@@ -5001,7 +5109,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((2_000, false)),
+            Some(CanonicalOrdering::new(2_000, false)),
         )
         .unwrap();
         assert_eq!(newer, StampOutcome::Stamped);
@@ -5020,7 +5128,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -5064,7 +5172,7 @@ mod tests {
             Some(9_999),
             None,
             StampMode::HealCanonical,
-            Some((2_000, false)),
+            Some(CanonicalOrdering::new(2_000, false)),
         )
         .unwrap();
         assert_eq!(tied, StampOutcome::SkippedStale);
@@ -5079,7 +5187,7 @@ mod tests {
             Some(2_000),
             None,
             StampMode::HealCanonical,
-            Some((2_000, false)),
+            Some(CanonicalOrdering::new(2_000, false)),
         )
         .unwrap();
         assert_eq!(same, StampOutcome::Refreshed);
@@ -5101,7 +5209,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((3_000, false)),
+            Some(CanonicalOrdering::new(3_000, false)),
         )
         .unwrap();
         assert_eq!(forward, StampOutcome::Stamped);
@@ -5130,7 +5238,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((500, true)),
+            Some(CanonicalOrdering::new(500, true)),
         )
         .unwrap();
         assert_eq!(
@@ -5148,7 +5256,7 @@ mod tests {
             Some(9_000),
             None,
             StampMode::HealCanonical,
-            Some((9_000, false)),
+            Some(CanonicalOrdering::new(9_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -5188,7 +5296,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((2_000, false)),
+            Some(CanonicalOrdering::new(2_000, false)),
         )
         .unwrap();
         assert_eq!(newer, StampOutcome::Stamped);
@@ -5209,7 +5317,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -5262,7 +5370,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::Declare,
-            Some((2_000, false)),
+            Some(CanonicalOrdering::new(2_000, false)),
         )
         .unwrap();
         assert_eq!(declared, StampOutcome::Stamped);
@@ -5278,7 +5386,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(stale, StampOutcome::SkippedStale);
@@ -5294,7 +5402,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(delayed_same_head, StampOutcome::SkippedStale);
@@ -5361,7 +5469,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((7_000, false)),
+            Some(CanonicalOrdering::new(7_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -5418,7 +5526,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((2_000, true)),
+            Some(CanonicalOrdering::new(2_000, true)),
         )
         .unwrap();
         assert_eq!(declared, StampOutcome::Stamped);
@@ -5709,7 +5817,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::HealCanonical,
-            Some((1_000, false)),
+            Some(CanonicalOrdering::new(1_000, false)),
         )
         .unwrap();
         assert_eq!(
@@ -5740,12 +5848,10 @@ mod tests {
         )
         .unwrap();
 
-        let pointer_absent_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::PointerAbsent.label()])
-            .get();
-        let stored_null_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::StoredNull.label()])
-            .get();
+        let pointer_absent_before =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::PointerAbsent.label());
+        let stored_null_before =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::StoredNull.label());
 
         let outcome = stamp_declared_head_mode(
             &mut conn,
@@ -5760,12 +5866,10 @@ mod tests {
         .unwrap();
         assert_eq!(outcome, StampOutcome::SkippedStale);
 
-        let pointer_absent_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::PointerAbsent.label()])
-            .get();
-        let stored_null_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::StoredNull.label()])
-            .get();
+        let pointer_absent_after =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::PointerAbsent.label());
+        let stored_null_after =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::StoredNull.label());
 
         assert!(
             pointer_absent_after >= pointer_absent_before + 1,
@@ -5794,12 +5898,10 @@ mod tests {
         create_content(&mut conn, &ctx, mk_plain("cid-non-canonical")).unwrap();
         stamp_declared_head(&mut conn, &ctx, "cid-non-canonical", "uhCkk-A", None, None).unwrap();
 
-        let pointer_absent_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::PointerAbsent.label()])
-            .get();
-        let stored_null_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::StoredNull.label()])
-            .get();
+        let pointer_absent_before =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::PointerAbsent.label());
+        let stored_null_before =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::StoredNull.label());
 
         let outcome = stamp_declared_head_mode(
             &mut conn,
@@ -5819,12 +5921,10 @@ mod tests {
              verdict before the patch is ever looked at"
         );
 
-        let pointer_absent_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::PointerAbsent.label()])
-            .get();
-        let stored_null_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
-            .with_label_values(&[StaleReason::StoredNull.label()])
-            .get();
+        let pointer_absent_after =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::PointerAbsent.label());
+        let stored_null_after =
+            crate::metrics::refused_stale_on_this_thread(StaleReason::StoredNull.label());
 
         assert_eq!(
             pointer_absent_after, pointer_absent_before,
@@ -5875,7 +5975,7 @@ mod tests {
                 ..Default::default()
             }),
             StampMode::Declare,
-            Some((2_000, true)),
+            Some(CanonicalOrdering::new(2_000, true)),
         );
         assert!(result.is_err(), "the injected late write must fail");
 
@@ -5931,7 +6031,7 @@ mod tests {
                     ..Default::default()
                 }),
                 StampMode::Declare,
-                Some((at, false)),
+                Some(CanonicalOrdering::new(at, false)),
             )
             .unwrap()
         };
@@ -5955,20 +6055,51 @@ mod tests {
         );
     }
 
+    fn ord(at: i64, earned: bool) -> CanonicalOrdering {
+        CanonicalOrdering::new(at, earned)
+    }
+
+    fn linked(at: i64, earned: bool, seed: u8) -> CanonicalOrdering {
+        CanonicalOrdering::new(at, earned).with_link(ElectionLink::from_raw(&[seed; 39]))
+    }
+
     /// The pure rule, exhaustively — every ordered pair of (election, no
-    /// election) × (earned, staging) resolves without ambiguity, and the two
-    /// directions are never both moves (which would be a flap).
+    /// election) × (earned, staging) × (link known, unknown) resolves without
+    /// ambiguity, and the two directions are never both moves (which would be
+    /// a flap).
     #[test]
     fn canonical_move_verdict_is_antisymmetric_and_total() {
         let cases = [
-            (Some((10, false)), None, true),
-            (None, Some((10, false)), false),
-            (Some((10, true)), Some((99, false)), true),
-            (Some((99, false)), Some((10, true)), false),
-            (Some((20, false)), Some((10, false)), true),
-            (Some((10, false)), Some((20, false)), false),
-            (Some((10, false)), Some((10, false)), false),
+            (Some(ord(10, false)), None, true),
+            (None, Some(ord(10, false)), false),
+            (Some(ord(10, true)), Some(ord(99, false)), true),
+            (Some(ord(99, false)), Some(ord(10, true)), false),
+            (Some(ord(20, false)), Some(ord(10, false)), true),
+            (Some(ord(10, false)), Some(ord(20, false)), false),
+            (Some(ord(10, false)), Some(ord(10, false)), false),
             (None, None, false),
+            // The tiebreak: same tier, same clock, higher link wins.
+            (Some(linked(10, false, 2)), Some(linked(10, false, 1)), true),
+            (
+                Some(linked(10, false, 1)),
+                Some(linked(10, false, 2)),
+                false,
+            ),
+            (
+                Some(linked(10, false, 1)),
+                Some(linked(10, false, 1)),
+                false,
+            ),
+            // An unknown link takes no part in a tie, on either side.
+            (Some(linked(10, false, 9)), Some(ord(10, false)), false),
+            (Some(ord(10, false)), Some(linked(10, false, 1)), false),
+            // The link never outranks the clock or the tier.
+            (
+                Some(linked(10, false, 9)),
+                Some(linked(20, false, 1)),
+                false,
+            ),
+            (Some(linked(99, false, 9)), Some(linked(10, true, 1)), false),
         ];
         for (incoming, stored, expect_move) in cases {
             assert_eq!(
@@ -5980,7 +6111,16 @@ mod tests {
 
         // ANTISYMMETRY: for any two DIFFERENT elections, at most one direction
         // moves. If both moved, two peers would swap heads forever.
-        let elections = [(10, false), (20, false), (10, true), (20, true)];
+        let elections = [
+            ord(10, false),
+            ord(20, false),
+            ord(10, true),
+            ord(20, true),
+            linked(10, false, 1),
+            linked(10, false, 2),
+            linked(10, true, 1),
+            linked(10, true, 2),
+        ];
         for a in elections {
             for b in elections {
                 if a == b {
@@ -5993,17 +6133,169 @@ mod tests {
         }
     }
 
+    /// TOTALITY where it matters: two different elections that both carry
+    /// their link always resolve — exactly one direction moves. Before the
+    /// tiebreak travelled, an exact (tier, clock) tie refused both ways, and
+    /// two peers holding different winners stayed split for good.
     #[test]
-    fn half_stored_canonical_ordering_has_no_election_authority() {
-        assert_eq!(canonical_ordering_from_columns(Some(42), None), None);
-        assert_eq!(canonical_ordering_from_columns(None, Some(1)), None);
+    fn two_linked_elections_always_resolve_one_way() {
+        let elections = [
+            linked(10, false, 1),
+            linked(10, false, 2),
+            linked(10, true, 1),
+            linked(10, true, 2),
+            linked(20, false, 1),
+        ];
+        for a in elections {
+            for b in elections {
+                if a == b {
+                    continue;
+                }
+                let ab = canonical_move_verdict(Some(a), Some(b)).is_ok();
+                let ba = canonical_move_verdict(Some(b), Some(a)).is_ok();
+                assert!(ab ^ ba, "{a:?} vs {b:?} must resolve exactly one way");
+            }
+        }
+    }
+
+    /// The tiebreak orders the RAW bytes, as `HoloHash`'s `Ord` does in the
+    /// zome — not the base64 text, whose alphabet does not sort in byte order
+    /// (`-` sorts before `A` in ASCII but encodes 62, not 0).
+    #[test]
+    fn the_tiebreak_orders_raw_bytes_not_base64_text() {
+        let high = ElectionLink::from_raw(&[0xF8; 39]).unwrap();
+        let low = ElectionLink::from_raw(&[0x00; 39]).unwrap();
+        assert!(high > low);
+        assert!(
+            high.to_b64() < low.to_b64(),
+            "the text order disagrees — which is why the column is decoded first"
+        );
+        assert_eq!(ElectionLink::from_b64(&high.to_b64()), Some(high));
+        assert_eq!(ElectionLink::from_b64("uhCkk-not-a-hash"), None);
         assert_eq!(
-            canonical_ordering_from_columns(Some(42), Some(0)),
-            Some((42, false))
+            ElectionLink::from_b64(&high.to_b64()[1..]),
+            None,
+            "the u prefix is required"
+        );
+    }
+
+    fn tie_row(conn: &mut SqliteConnection, ctx: &AppContext, id: &str) {
+        create_content(
+            conn,
+            ctx,
+            CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: "commons".to_string(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .unwrap();
+    }
+
+    fn heal(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        id: &str,
+        head: &str,
+        ordering: CanonicalOrdering,
+    ) -> StampOutcome {
+        stamp_declared_head_mode(
+            conn,
+            ctx,
+            id,
+            head,
+            None,
+            Some(ContentProjectionPatch::default()),
+            StampMode::HealCanonical,
+            Some(ordering),
+        )
+        .unwrap()
+    }
+
+    fn stored_link(conn: &mut SqliteConnection, id: &str) -> Option<String> {
+        content::table
+            .filter(content::id.eq(id))
+            .select(content::canonical_link_hash)
+            .first::<Option<String>>(conn)
+            .unwrap()
+    }
+
+    /// Two peers that projected different winners of an exact (tier, clock)
+    /// tie converge on the one the zome elects — the higher link — and the
+    /// loser cannot come back.
+    #[test]
+    fn an_exact_tie_converges_on_the_higher_link_and_stays_there() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::default_lamad();
+        tie_row(&mut conn, &ctx, "tie");
+
+        assert_eq!(
+            heal(&mut conn, &ctx, "tie", "uhCkkA", linked(10, false, 1)),
+            StampOutcome::Stamped
         );
         assert_eq!(
-            canonical_ordering_from_columns(Some(42), Some(1)),
-            Some((42, true))
+            heal(&mut conn, &ctx, "tie", "uhCkkB", linked(10, false, 2)),
+            StampOutcome::Stamped
+        );
+        assert_eq!(
+            heal(&mut conn, &ctx, "tie", "uhCkkA", linked(10, false, 1)),
+            StampOutcome::SkippedStale,
+            "the lower link lost the election; it must not win the row back"
+        );
+        let winner = linked(10, false, 2).link.unwrap().to_b64();
+        assert_eq!(stored_link(&mut conn, "tie"), Some(winner.clone()));
+
+        // An older coordinator re-answering the same election without its link
+        // refreshes the row and keeps the tiebreak already known.
+        assert_eq!(
+            heal(&mut conn, &ctx, "tie", "uhCkkB", ord(10, false)),
+            StampOutcome::Refreshed
+        );
+        assert_eq!(stored_link(&mut conn, "tie"), Some(winner));
+    }
+
+    /// A row stamped before the link travelled learns it from the next answer
+    /// for the same election; a head that moves without one forgets it.
+    #[test]
+    fn the_link_is_backfilled_by_its_own_election_and_cleared_by_a_move_without_one() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::default_lamad();
+        tie_row(&mut conn, &ctx, "backfill");
+
+        assert_eq!(
+            heal(&mut conn, &ctx, "backfill", "uhCkkA", ord(10, false)),
+            StampOutcome::Stamped
+        );
+        assert_eq!(stored_link(&mut conn, "backfill"), None);
+        assert_eq!(
+            heal(&mut conn, &ctx, "backfill", "uhCkkA", linked(10, false, 5)),
+            StampOutcome::Refreshed
+        );
+        assert_eq!(
+            stored_link(&mut conn, "backfill"),
+            Some(linked(10, false, 5).link.unwrap().to_b64())
+        );
+        assert_eq!(
+            heal(&mut conn, &ctx, "backfill", "uhCkkB", ord(20, false)),
+            StampOutcome::Stamped
+        );
+        assert_eq!(
+            stored_link(&mut conn, "backfill"),
+            None,
+            "the link belonged to A's election"
         );
     }
 
@@ -6013,15 +6305,23 @@ mod tests {
     #[test]
     fn stale_reasons_are_distinct_and_labelled() {
         assert_eq!(
-            canonical_move_verdict(None, Some((1, false))).unwrap_err(),
+            canonical_move_verdict(None, Some(CanonicalOrdering::new(1, false))).unwrap_err(),
             StaleReason::StoredNull
         );
         assert_eq!(
-            canonical_move_verdict(Some((1, false)), Some((2, false))).unwrap_err(),
+            canonical_move_verdict(
+                Some(CanonicalOrdering::new(1, false)),
+                Some(CanonicalOrdering::new(2, false))
+            )
+            .unwrap_err(),
             StaleReason::NotNewer
         );
         assert_eq!(
-            canonical_move_verdict(Some((9, false)), Some((1, true))).unwrap_err(),
+            canonical_move_verdict(
+                Some(CanonicalOrdering::new(9, false)),
+                Some(CanonicalOrdering::new(1, true))
+            )
+            .unwrap_err(),
             StaleReason::Tier
         );
         let labels = [

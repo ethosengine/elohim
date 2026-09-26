@@ -1013,6 +1013,7 @@ mod tests {
             canonical_earned: None,
             dht_anchor_state: None,
             dht_anchor_checked_at: None,
+            canonical_link_hash: None,
         }
     }
 

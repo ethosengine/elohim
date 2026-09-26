@@ -2671,6 +2671,17 @@ pub struct ContentHeadOutput {
     /// re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
+    /// The WINNING declaration's create-link hash — the third field of
+    /// [`select_canonical_winner`]'s key, the tiebreak between two declarations
+    /// of the same tier at the same link timestamp. `Some` exactly when
+    /// [`Self::canonical_declared_at`] is `Some` from this coordinator; `None`
+    /// from an older one via `serde(default)`.
+    ///
+    /// Without it the storage projection holds only (tier, clock), and two peers
+    /// that projected different winners of an exact tie each refuse the other's
+    /// as "not newer" forever. With it the projection replays the whole key.
+    #[serde(default)]
+    pub canonical_link_hash: Option<holo_hash::ActionHashB64>,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion. See
     /// [`select_staging_candidate`] for the (pure, per-peer identical) rule.
@@ -3189,6 +3200,8 @@ pub(crate) struct CanonicalHeadAnswer {
     declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     is_earned: bool,
+    /// The winning declaration's create-link hash — the selector's tiebreak.
+    link_hash: ActionHash,
     /// The staging declaration standing beneath an EARNED winner, if any — see
     /// [`select_staging_candidate`]. Carried through so the read path can report
     /// the candidate WITHOUT a second link gather.
@@ -3312,6 +3325,7 @@ pub(crate) fn gather_canonical_head_record(
             record,
             declared_at: winner.timestamp,
             is_earned: winner.is_earned,
+            link_hash: winner.link_hash,
             staging_candidate,
         })),
         None => Ok(None),
@@ -4300,6 +4314,7 @@ fn build_content_head_output(
         // backfills the ordering on its next heal resolve.
         canonical_declared_at: None,
         canonical_earned: None,
+        canonical_link_hash: None,
         // Same rule, same reason: only the canonical branch of
         // `resolve_content_head_inner` holds an election, so only it can name a
         // candidate beneath the winner.
@@ -4329,6 +4344,7 @@ fn resolve_content_head_inner(
         // of guessing from head-action timestamps.
         out.canonical_declared_at = Some(answer.declared_at);
         out.canonical_earned = Some(answer.is_earned);
+        out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(answer.link_hash));
         // ...and the candidate standing beneath it, when the winner is earned.
         // Both fields move together (see `staging_candidate`'s doc): a consumer
         // reading one without the other could not order the candidate.
@@ -5537,6 +5553,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
                 author: out.author.clone(),
                 canonical_declared_at: None,
                 canonical_earned: None,
+                canonical_link_hash: None,
             })?;
             return Ok(out);
         }
@@ -5565,6 +5582,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
             author: out.author.clone(),
             canonical_declared_at: None,
             canonical_earned: None,
+            canonical_link_hash: None,
         })?;
         return Ok(out);
     }
@@ -5609,6 +5627,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
         author: out.author.clone(),
         canonical_declared_at: None,
         canonical_earned: None,
+        canonical_link_hash: None,
     })?;
     Ok(out)
 }
@@ -5883,6 +5902,9 @@ fn declare_canonical_head_inner(
     let mut out = build_content_head_output(id, &winner_record, true)?;
     out.canonical_declared_at = Some(election.winner.timestamp);
     out.canonical_earned = Some(election.winner.is_earned);
+    out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(
+        election.winner.link_hash.clone(),
+    ));
     if let Some(candidate) = election.staging_candidate {
         out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target));
         out.staging_candidate_declared_at = Some(candidate.timestamp);
@@ -5908,6 +5930,7 @@ fn declare_canonical_head_inner(
         author: out.author.clone(),
         canonical_declared_at: out.canonical_declared_at,
         canonical_earned: out.canonical_earned,
+        canonical_link_hash: out.canonical_link_hash.clone().map(ActionHash::from),
     })?;
     Ok(out)
 }
@@ -6213,6 +6236,9 @@ pub struct CanonicalElectionOutput {
     pub canonical_declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     pub canonical_earned: bool,
+    /// The winning declaration's create-link hash — the election's tiebreak.
+    /// See [`ContentHeadOutput::canonical_link_hash`].
+    pub canonical_link_hash: holo_hash::ActionHashB64,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion. See
     /// [`select_staging_candidate`]: a pure function of the same link set, so
@@ -6240,6 +6266,7 @@ impl CanonicalElectionOutput {
             winner_target: holo_hash::ActionHashB64::from(outcome.winner.target.clone()),
             canonical_declared_at: outcome.winner.timestamp,
             canonical_earned: outcome.winner.is_earned,
+            canonical_link_hash: holo_hash::ActionHashB64::from(outcome.winner.link_hash.clone()),
             staging_candidate: outcome
                 .staging_candidate
                 .as_ref()
@@ -6931,6 +6958,9 @@ pub fn verify_carried_head_evidence(
         let mut out = build_content_head_output(id, &record, true)?;
         out.canonical_declared_at = Some(outcome.winner.timestamp);
         out.canonical_earned = Some(outcome.winner.is_earned);
+        out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(
+            outcome.winner.link_hash.clone(),
+        ));
         if let Some(candidate) = &outcome.staging_candidate {
             out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target.clone()));
             out.staging_candidate_declared_at = Some(candidate.timestamp);
@@ -14940,6 +14970,10 @@ pub enum ProjectionSignal {
         /// Tier paired with `canonical_declared_at`; both are Some or both None.
         #[serde(default)]
         canonical_earned: Option<bool>,
+        /// The winning declaration's create-link hash, paired with the two
+        /// fields above — the election's tiebreak.
+        #[serde(default)]
+        canonical_link_hash: Option<ActionHash>,
     },
     /// Manifest entry was created or updated (Phase 3 P3.2).
     ManifestCommitted {

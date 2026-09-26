@@ -4189,7 +4189,7 @@ mod tests {
                 Some(1),
                 None,
                 StampMode::Declare,
-                Some((1, false)),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(1, false)),
             )
             .expect("seed declaration");
         }
@@ -4283,7 +4283,7 @@ mod tests {
                 Some(1),
                 None,
                 StampMode::Declare,
-                Some((1, false)),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(1, false)),
             )
             .expect("seed declaration");
         }
@@ -6108,16 +6108,40 @@ mod tests {
         use crate::db::content_diesel::{canonical_move_verdict, StaleReason};
 
         // Forward election ⇒ the obey stamp moves.
-        assert!(canonical_move_verdict(Some((9_000, false)), Some((1_000, false))).is_ok());
+        assert!(canonical_move_verdict(
+            Some(crate::db::content_diesel::CanonicalOrdering::new(
+                9_000, false
+            )),
+            Some(crate::db::content_diesel::CanonicalOrdering::new(
+                1_000, false
+            ))
+        )
+        .is_ok());
         // Older election ⇒ refused, even though the bytes were cryptographically
         // proven. Proof of WHAT is not permission to go BACKWARDS.
         assert_eq!(
-            canonical_move_verdict(Some((1_000, false)), Some((9_000, false))).unwrap_err(),
+            canonical_move_verdict(
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    1_000, false
+                )),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    9_000, false
+                ))
+            )
+            .unwrap_err(),
             StaleReason::NotNewer,
         );
         // Staging election cannot displace an earned one, proven bytes or not.
         assert_eq!(
-            canonical_move_verdict(Some((9_000, false)), Some((1_000, true))).unwrap_err(),
+            canonical_move_verdict(
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    9_000, false
+                )),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    1_000, true
+                ))
+            )
+            .unwrap_err(),
             StaleReason::Tier,
         );
     }
@@ -6138,8 +6162,12 @@ mod tests {
         // `stamp_refused` rather than treating as progress.
         assert_eq!(
             crate::db::content_diesel::canonical_move_verdict(
-                Some((7_000, false)),
-                Some((7_000, false))
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    7_000, false
+                )),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(
+                    7_000, false
+                ))
             )
             .unwrap_err(),
             crate::db::content_diesel::StaleReason::NotNewer,

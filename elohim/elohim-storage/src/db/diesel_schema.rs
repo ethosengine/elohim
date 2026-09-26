@@ -92,6 +92,7 @@ diesel::table! {
         canonical_earned -> Nullable<Integer>,
         dht_anchor_state -> Nullable<Text>,
         dht_anchor_checked_at -> Nullable<Text>,
+        canonical_link_hash -> Nullable<Text>,
     }
 }
 

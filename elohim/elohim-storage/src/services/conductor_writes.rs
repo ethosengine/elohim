@@ -535,6 +535,12 @@ pub struct ContentHeadWire {
     /// regardless of recency) without re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
+    /// The winning declaration's create-link hash — the election's tiebreak
+    /// between two declarations of the same tier at the same clock. `None` from
+    /// an older coordinator (via `serde(default)`), which leaves the ordering
+    /// able to decide everything except an exact tie.
+    #[serde(default)]
+    pub canonical_link_hash: Option<HoloHashB64>,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion
     /// (`content_store::select_staging_candidate`, a pure function of the same
@@ -564,7 +570,14 @@ impl ContentHeadWire {
     /// pre-cure coordinator, a fallback resolve, or a legacy/single-author
     /// declare path can honestly report.
     pub fn canonical_ordering(&self) -> Option<crate::db::content_diesel::CanonicalOrdering> {
-        self.canonical_declared_at.zip(self.canonical_earned)
+        use crate::db::content_diesel::{CanonicalOrdering, ElectionLink};
+        let link = self
+            .canonical_link_hash
+            .as_ref()
+            .and_then(|h| ElectionLink::from_b64(&h.0));
+        self.canonical_declared_at
+            .zip(self.canonical_earned)
+            .map(|(at, earned)| CanonicalOrdering::new(at, earned).with_link(link))
     }
 
     /// Election tier label for `elohim_content_canonical_answers_total`.
@@ -605,6 +618,10 @@ pub struct CanonicalElectionWire {
     /// `content_diesel::CanonicalOrdering` directly.
     pub canonical_declared_at: i64,
     pub canonical_earned: bool,
+    /// The winning declaration's create-link hash — the tiebreak. See
+    /// `ContentHeadWire::canonical_link_hash`.
+    #[serde(default)]
+    pub canonical_link_hash: Option<HoloHashB64>,
     /// The STAGING declaration standing beneath an earned winner — see
     /// `ContentHeadWire::staging_candidate` for the full contract. Additive and
     /// `serde(default)`: a pre-candidate coordinator omits the key and it reads
@@ -620,7 +637,12 @@ pub struct CanonicalElectionWire {
 impl CanonicalElectionWire {
     /// The election in the shape the stamp guard takes.
     pub fn ordering(&self) -> crate::db::content_diesel::CanonicalOrdering {
-        (self.canonical_declared_at, self.canonical_earned)
+        use crate::db::content_diesel::{CanonicalOrdering, ElectionLink};
+        CanonicalOrdering::new(self.canonical_declared_at, self.canonical_earned).with_link(
+            self.canonical_link_hash
+                .as_ref()
+                .and_then(|h| ElectionLink::from_b64(&h.0)),
+        )
     }
 }
 
@@ -2046,7 +2068,10 @@ mod tests {
         head.canonical_declared_at = Some(2);
         assert_eq!(head.canonical_ordering(), None);
         head.canonical_earned = Some(false);
-        assert_eq!(head.canonical_ordering(), Some((2, false)));
+        assert_eq!(
+            head.canonical_ordering(),
+            Some(crate::db::content_diesel::CanonicalOrdering::new(2, false))
+        );
     }
 }
 

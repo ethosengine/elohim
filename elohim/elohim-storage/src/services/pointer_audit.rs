@@ -464,6 +464,7 @@ mod candidate_query_tests {
                 declared_head_at BIGINT,
                 canonical_declared_at BIGINT,
                 canonical_earned INTEGER,
+                canonical_link_hash TEXT,
                 dht_anchor_state TEXT,
                 dht_anchor_checked_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),

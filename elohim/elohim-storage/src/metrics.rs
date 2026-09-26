@@ -4501,6 +4501,24 @@ pub fn inc_projection_refused_stale(reason: &str) {
     PROJECTION_REFUSED_STALE_REASONS
         .with_label_values(&[reason])
         .inc();
+    #[cfg(test)]
+    REFUSED_STALE_ON_THIS_THREAD.with(|seen| seen.borrow_mut().push(reason.to_string()));
+}
+
+// The process-wide counter is shared by every test running in parallel, so a
+// test asserting "this refusal was NOT counted under reason X" raced any other
+// test refusing under X. Each test runs on its own thread and the stamp is
+// synchronous, so the refusals recorded here are exactly this test's own.
+#[cfg(test)]
+thread_local! {
+    static REFUSED_STALE_ON_THIS_THREAD: std::cell::RefCell<Vec<String>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// How many refusals under `reason` THIS thread has counted.
+#[cfg(test)]
+pub fn refused_stale_on_this_thread(reason: &str) -> usize {
+    REFUSED_STALE_ON_THIS_THREAD.with(|seen| seen.borrow().iter().filter(|r| *r == reason).count())
 }
 
 /// `source` label for a link minted by the ADOPT-BEFORE-AUTHOR arm — a node with

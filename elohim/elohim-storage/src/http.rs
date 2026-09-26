@@ -247,7 +247,9 @@ mod head_declare_stamp_policy_tests {
         head.canonical_declared_at = Some(42);
         assert_eq!(
             head_declare_stamp_policy(true, &head),
-            Ok(HeadDeclareStampPolicy::Canonical((42, true)))
+            Ok(HeadDeclareStampPolicy::Canonical(
+                crate::db::content_diesel::CanonicalOrdering::new(42, true)
+            ))
         );
     }
 }

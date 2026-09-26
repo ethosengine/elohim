@@ -576,7 +576,9 @@ mod tests {
             Some(AT_A),
             None,
             StampMode::HealCanonical,
-            Some((AT_A, false)),
+            Some(crate::db::content_diesel::CanonicalOrdering::new(
+                AT_A, false,
+            )),
         )
         .unwrap();
         drop(conn);

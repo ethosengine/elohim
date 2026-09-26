@@ -202,6 +202,10 @@ pub enum ReaProjectionSignal {
         canonical_declared_at: Option<i64>,
         #[serde(default)]
         canonical_earned: Option<bool>,
+        /// The winning declaration's create-link hash, paired with the two
+        /// fields above; absent from an older coordinator.
+        #[serde(default)]
+        canonical_link_hash: Option<HoloHashB64>,
     },
 }
 
@@ -637,7 +641,11 @@ fn validate_ordered_content_head(
         || head.content.id != content_id
         || head.head_action_hash.as_str() != head_action_hash.as_str()
         || !head.canonical
-        || head.canonical_ordering() != Some(ordering)
+        || !head.canonical_ordering().is_some_and(|resolved| {
+            // The signal's link, when it carries one, must be the resolved
+            // election's; an older coordinator's signal carries none.
+            resolved.same_clock(&ordering) && ordering.link.is_none_or(|l| resolved.link == Some(l))
+        })
     {
         return Err(StorageError::InvalidInput(format!(
             "ordered ContentHeadDeclared did not resolve its exact canonical payload: {content_id}"
@@ -748,6 +756,7 @@ pub async fn handle_authenticated_content_head_signal(
         head_action_hash,
         canonical_declared_at: Some(canonical_declared_at),
         canonical_earned: Some(canonical_earned),
+        canonical_link_hash,
         ..
     } = signal
     else {
@@ -779,7 +788,11 @@ pub async fn handle_authenticated_content_head_signal(
     apply_ordered_content_head(
         &content_id,
         &head_action_hash,
-        (canonical_declared_at, canonical_earned),
+        content_diesel::CanonicalOrdering::new(canonical_declared_at, canonical_earned).with_link(
+            canonical_link_hash
+                .as_ref()
+                .and_then(|h| content_diesel::ElectionLink::from_b64(&h.0)),
+        ),
         head,
         pool,
         ctx,
@@ -1153,8 +1166,9 @@ mod tests {
             "head_action_hash": action_hash,
             "declared_at": 1_700_000_000_000_000i64,
             "canonical": true,
-            "canonical_declared_at": ordering.0,
-            "canonical_earned": ordering.1,
+            "canonical_declared_at": ordering.declared_at,
+            "canonical_earned": ordering.earned,
+            "canonical_link_hash": ordering.link.map(content_diesel::ElectionLink::to_b64),
             "content": {
                 "id": id,
                 "content_type": "concept",
@@ -1203,6 +1217,7 @@ mod tests {
             author: None,
             canonical_declared_at: at,
             canonical_earned: earned,
+            canonical_link_hash: None,
         };
         assert!(requires_authenticated_head_projection(&signal(
             Some(10),
@@ -1228,6 +1243,7 @@ mod tests {
                 author: None,
                 canonical_declared_at: Some(10),
                 canonical_earned: Some(true),
+                canonical_link_hash: None,
             },
             &registry,
             &pool,
@@ -1270,7 +1286,7 @@ mod tests {
                 Some(20),
                 None,
                 content_diesel::StampMode::HealCanonical,
-                Some((20, true)),
+                Some(crate::db::content_diesel::CanonicalOrdering::new(20, true)),
             )
             .expect("reproduce split pointer stamp");
         }
@@ -1278,8 +1294,13 @@ mod tests {
         apply_ordered_content_head(
             id,
             &HoloHashB64("uhCkk-head-b".into()),
-            (20, true),
-            ordered_head(id, "uhCkk-head-b", "blob-b", (20, true)),
+            crate::db::content_diesel::CanonicalOrdering::new(20, true),
+            ordered_head(
+                id,
+                "uhCkk-head-b",
+                "blob-b",
+                crate::db::content_diesel::CanonicalOrdering::new(20, true),
+            ),
             &pool,
             &ctx,
         )
@@ -1310,8 +1331,13 @@ mod tests {
         let error = apply_ordered_content_head(
             id,
             &HoloHashB64("uhCkk-head-b".into()),
-            (20, true),
-            ordered_head(id, "uhCkk-head-a", "blob-stale", (10, true)),
+            crate::db::content_diesel::CanonicalOrdering::new(20, true),
+            ordered_head(
+                id,
+                "uhCkk-head-a",
+                "blob-stale",
+                crate::db::content_diesel::CanonicalOrdering::new(10, true),
+            ),
             &pool,
             &ctx,
         )
@@ -1436,7 +1462,9 @@ mod tests {
             Some(2_000),
             None,
             crate::db::content_diesel::StampMode::HealCanonical,
-            Some((2_000, true)),
+            Some(crate::db::content_diesel::CanonicalOrdering::new(
+                2_000, true,
+            )),
         )
         .expect("ordered stamp");
         drop(conn);
@@ -1449,6 +1477,7 @@ mod tests {
                 author: None,
                 canonical_declared_at: None,
                 canonical_earned: None,
+                canonical_link_hash: None,
             },
             &pool,
             &ctx,
