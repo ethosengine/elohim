@@ -6,8 +6,8 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-09-24"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence); re-triaged 2026-09-17 (runtime-triage — node condition unchanged and flat; third flap traced to CLOSE_STREAK == predicate window, fixed); fourth filing 2026-09-24 (runtime-triage — the chronic ceiling CLEARED and closed honestly; re-filed by a fresh post-deploy process that has not yet converged)"
+updated: "2026-09-26"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence); re-triaged 2026-09-17 (runtime-triage — node condition unchanged and flat; third flap traced to CLOSE_STREAK == predicate window, fixed); fourth filing 2026-09-24 (runtime-triage — the chronic ceiling CLEARED and closed honestly; re-filed by a fresh post-deploy process that has not yet converged; fifth filing 2026-09-26 (runtime-triage — deleted by UNMEASURED samples the node labels as such, re-filed after a pod restart; poller fixed so unmeasured sweeps abstain)"
 status: "wip"
 priority: "high"
 self_heal_status: blocked
@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure, unmeasured-sweep, measured-term, peer-set-variance]
 cites:
   - "resiliency-saga-valueflow | the saga plan whose sprint-3 delivery found this ch06 runtime blocker | sha256:1ffcaefb3212d80b | path: genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md"
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
@@ -957,3 +957,183 @@ the next read.
   that `CLOSE_STREAK` was insufficient **only if** the cursor window before the re-file
   contains no run of 5 converged samples from one monotonic sweep series. Check the window
   before concluding.
+
+# 2026-09-26 — fifth filing: an UNMEASURED run deleted the live line, a pod restart re-filed it
+
+## What is exhausted
+
+The ledger line was re-filed as NEW (`.claude/data/runtime-findings.jsonl`, poll 188):
+
+```json
+{"fp": "79f357281ca5", "class": "self-heal-exhaustion", "node": "alpha-b",
+ "provenance": "projector:reconcile",
+ "line": "projector healed NOTHING (healedTotal 0 over 40-163 sweeps, divergentAnchor 59, converged=false) sustained >= 3 polls",
+ "status": "open", "seen": 1, "first_poll": 188, "last_poll": 188,
+ "clean_poll_streak": 0, "ts": "2026-09-26T12:05:49+00:00"}
+```
+
+The 2026-09-24 section closed with a check to run before blaming closure: look for five
+converged samples from one monotonic series in the cursor window. There are none. The
+stored alpha-b ring in `.claude/data/runtime-cursor.json` (polls 181–188) replayed
+read-only. The pod IP comes from `p2p_status.listenAddresses`:
+
+| poll | pod IP | sweeps | healedTotal | divergentAnchor | pending | failed | peersAsked | converged | old `_heals_nothing` |
+|---|---|---|---|---|---|---|---|---|---|
+| 181 | 10.1.79.42 | 260 | 0 | 60 | 5 | 3 | 4 | false | True |
+| 182 | 10.1.79.42 | 262 | 0 | 59 | 14 | 3 | 6 | false | True |
+| 183 | 10.1.79.42 | 289 | 0 | **0** | 0 | 0 | **0** | false | False |
+| 184 | 10.1.79.42 | 313 | 0 | **0** | 0 | 0 | **0** | false | False |
+| 185 | 10.1.79.42 | 326 | 0 | **0** | 0 | 0 | **0** | false | False |
+| 186 | **10.1.79.50** | 40 | 0 | 53 | 56 | 5 | 3 | false | True |
+| 187 | 10.1.79.50 | 163 | 0 | 59 | 3 | 3 | 6 | false | True |
+| 188 | 10.1.79.50 | 163 | 0 | 59 | 3 | 3 | 6 | false | True |
+
+Polls 181–185 come from one process: the same pod and a monotonic sweep series. That
+process never reported `converged: true` in the window. For polls 183–185 it kept sweeping
+(289 → 326) but asked **no peer**. It published `divergentAnchor: 0` with `converged:
+false`, and only the `unmeasured` blocker can produce that combination: every other
+blocker term is zero. `projection_reconcile.rs` calls this state "the purest false green
+there is". The source withholds `converged` because such a sweep observed nothing.
+
+The poller counted those samples as evidence in the other direction. `_heals_nothing`
+requires `divergentAnchor > 0`. An unmeasured zero fails that term, so each of the three
+samples read as "not healing nothing". The predicate ANDs a 3-wide window, so it stayed
+silent for polls 183, 184, 185, 186 and 187. That is five polls, exactly `CLOSE_STREAK =
+5`. Closure-by-disappearance deleted the live blocked line at poll 187. The pod had
+restarted between polls 185 and 186. Its fresh process was unconverged and measured, so
+poll 188 re-filed the fp as NEW and cost a full triage dispatch. The node condition did
+not move at any point.
+
+## Re-fetch at triage — LIVE, flapping per sweep with the peer set
+
+`https://elohim.host/p2p/status`, which is adam behind doorway B (HTTP 200 on every sample):
+
+```
+12:10:53Z {"pending": 3, "failed": 3, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 163, "converged": false}
+12:14:13Z {"pending": 3, "failed": 3, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 164, "converged": false}
+12:18:03Z {"pending": 0, "failed": 0, "caughtUp": true,  "peersAsked": 3, "divergentAnchor": 53, "healedTotal": 0, "sweeps": 165, "converged": true}
+12:21:09Z {"pending": 4, "failed": 2, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 166, "converged": false}
+12:24:10Z {"pending": 4, "failed": 2, "caughtUp": false, "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0, "sweeps": 166, "converged": false}
+```
+
+`https://elohim.host/admin/self-healing` at 12:10Z and again at 12:18Z showed the
+following. Admission was `{maxInflight: 256, available: 256, shedTotal: 0}`. The upstream
+circuit was `closed`. Warm-up was complete and the conductor had `4/4` workers. **6 of 7
+conductor peers were `Degraded`**, the 2026-09-17 shape; on 2026-09-24 all seven were
+`Healthy`. `https://elohim.host/health` showed doorway `uptime: 48203` at 12:10:47Z,
+which puts the doorway boot at about 2026-09-25T22:47Z. The storage pod restart between
+polls 185 and 186 is a separate event.
+
+A-side control, `https://doorway-alpha.elohim.host/p2p/status`, taken in the same minutes:
+`{"pending": 0, "failed": 0, "peersAsked": 6, "divergentAnchor": 60, "sweeps": 175–176,
+"converged": true}` on all three samples. Matthew converges and adam does not.
+
+The pattern is sharper than on 2026-09-24. **Adam converges on a sweep that asks 3 peers
+(divergence 53, all adjudicated). It fails on a sweep that asks 6 (divergence 59, with a
+residue of 2–4 rows that end `failed` on every such sweep).** Across 160+ sweeps of this
+process that residue never spent its cross-sweep retry budget: `exhausted: 0` on every
+sample.
+
+## Root-cause inventory
+
+- **The re-dispatch (fixed in this pass).**
+  `.claude/scripts/_lib/runtime_harvest.py` `_projector_lag` / `_heals_nothing` treated
+  a `peersAsked: 0` sample as clean evidence. The node publishes that state as "unmeasured"
+  (`elohim/elohim-storage/src/p2p/projection_reconcile.rs`, the
+  `measured = … && peers_asked > 0` term, and `crate::metrics::converged_blockers`'
+  `("unmeasured", !measured)` in `elohim/elohim-storage/src/metrics.rs`). Three unmeasured
+  samples were enough to silence the 3-wide window for five polls and delete the line.
+  `CLOSE_STREAK = 5` absorbs non-adjacent junk samples, but it cannot absorb a *run* of
+  three.
+- **The node residue (substrate, not fixed).** The rows that fail only on 6-peer sweeps
+  are advertised by a peer subset that adam does not ask every sweep. The cross-sweep
+  `MissLedger` budget (`projection_reconcile.rs`, `MAX_RETRIES = 3`, "failed to resolve
+  for MAX_RETRIES sweeps under UNCHANGED peer evidence") is keyed on
+  `advertised_anchor|advertised_state` taken from whichever peers answered. **Hypothesis,
+  not yet measured:** `peersAsked` alternates between 3, 4 and 6 from sweep to sweep. If
+  that changes the evidence key for these ids, or drops them from discovery on the short
+  sweeps, their budget may never accrue. That would stop them exhausting into the ledger,
+  and the `failed` blocker would stay set on every 6-peer sweep. That is the "static
+  residue" failure mode the retry budget exists to prevent. The alternative explanation is
+  the rekeyed-peer ghost anchors. The same node shows
+  `provideLoop.reanchorDeadRemaining: 9, deadRemainingStuck` (ledger fp `2b4761b2eaf6`,
+  `genesis/data/timeline/backlog/dataplane-reanchor-dead-remaining-rekeyed-peer.md`).
+  Either reading needs the per-id view described in **Fix path**, and this pass could not
+  reach it.
+- **The unmeasured run itself** (polls 183–185): an old process that swept 37 times with
+  6 connected libp2p peers and asked none of them, until its pod restarted. The restart
+  cause (a deploy, a liveness kill or OOM) cannot be read from here. Cluster reads are
+  operator-owned.
+
+## Fix path
+
+**Taken (poller, bounded):** unmeasured samples now **abstain** in both directions, which
+is the node's own `measured` semantics.
+
+- `_unmeasured(report)`: true exactly when `peersAsked` is an integer `0`. A runtime that
+  does not publish the field is still treated as measured.
+- If the 3-wide window is a mix, the heals-nothing verdict is taken over the last
+  `LAG_POLLS` **measured** reports in the whole 8-sample ring, looking past the unmeasured
+  ones. A run of unmeasured sweeps can therefore neither file a finding nor build the clean
+  streak that deletes one.
+- If all three windowed samples are unmeasured, the sweep counter moved inside the window,
+  and `sweeps >= MIN_SWEEPS`, the predicate files on the same fp with the line `projector
+  observed NOTHING (peersAsked 0 over N-M sweeps, converged=false)`. A projector that keeps
+  sweeping while asking nobody is the exhaustion the source names, and it now holds the
+  line instead of clearing it. Three polls that land inside one slow first sweep after a
+  boot (2026-09-24: sweeps 7, 7, `peersAsked 0`) stay silent, because the counter did not
+  move.
+- This is the `peersAsked > 0` term the 2026-09-24 section declined, now without the blind
+  spot it objected to. Isolation is detected rather than ignored.
+
+**Named, not taken (substrate):** read `elohim_projection_reconcile_converged_blocked_by{term}`
+and `elohim_projection_heal_outcomes_total` on adam from Prometheus. Also read the
+`elohim_storage::projection_reconcile` info lines (`peers_asked`, `conductor_missing`,
+`divergent_anchor`) and the `projection-reconcile[ghost-witness]` lines from Loki. Take
+both over a window that spans 3-peer and 6-peer sweeps, to name the residue ids and check
+whether their MissLedger evidence key changes with the peer set. If it does, the cure is a
+storage change: key the budget on the id's evidence *from the peers that advertise it*, and
+do not let a sweep that did not ask those peers reset the budget. That change needs a
+fleet roll and a household receipt first (`just test mesh`), so it belongs in an
+operator-initiated storage sprint.
+
+## Current decision
+
+**BLOCKED** on the node residue. The re-dispatch amplifier is **fixed** in the working tree
+(`.claude/scripts/_lib/runtime_harvest.py`, with tests in
+`.claude/scripts/_lib/__tests__/runtime_harvest_test.py`), uncommitted, for the
+orchestrator to review. Ledger line `79f357281ca5` is set to `status: blocked` and cites
+this file.
+
+**Expected next state:** adam's `converged` keeps flipping with the peer set. The line
+stays present while measured samples are unconverged. It closes by disappearance only
+after measured samples stop affirming, and unmeasured runs no longer count toward that
+closure. A `seen: 1` re-file of this fp after this change, where the preceding ring
+contains an unmeasured run, is a **defect in the abstain logic**. It is not the node.
+
+**Stasis-sweep re-check:** the Prometheus/Loki read under **Fix path** is the next step.
+If the residue ids turn out to be the rekeyed-peer ghost anchors, fold this concern's node
+half into `dataplane-reanchor-dead-remaining-rekeyed-peer.md` and keep only the sensing
+history here.
+
+## Verification
+
+- 2026-09-26 12:10–12:24Z: `https://elohim.host/p2p/status` was sampled 8 times,
+  `https://doorway-alpha.elohim.host/p2p/status` 3 times,
+  `https://elohim.host/admin/self-healing` twice, and `https://elohim.host/health` once.
+  Every request returned HTTP 200, and the results are quoted above. The condition is
+  **LIVE and intermittent**: converged on one sweep out of four observed (165).
+- The cursor ring (polls 181–188) was replayed through the HEAD predicate and the fixed
+  one. HEAD is silent at polls 183–187 and fires at 188. The fixed predicate holds the
+  line at 185 (`observed NOTHING … 289-326 sweeps`) and at 186–188 (`healed NOTHING`).
+  Polls 183–184 are unreplayable because the ring is truncated before poll 181.
+- The regression test encodes the live ring (with three affirming samples before it) and
+  drives `evaluate` + `reconcile` poll by poll. HEAD dispatches
+  `['79f357281ca5', '79f357281ca5']`, which is the re-file. The fix dispatches once. The
+  full suite `python3 .claude/scripts/_lib/__tests__/runtime_harvest_test.py` passes 64
+  assertions (60 before, plus 4 new) with exit 0. The live ledger and cursor mtimes are
+  unchanged by the run (12:05:49).
+- Not verified: the Prometheus and Loki families named above, because no observability
+  datasource was reachable from this pass; the pod restart cause; and whether the residue
+  ids are the rekeyed-peer anchors. No cargo, mesh, cluster action, commit or push was
+  run in this pass.

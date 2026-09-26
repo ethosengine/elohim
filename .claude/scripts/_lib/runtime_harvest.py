@@ -219,6 +219,28 @@ def _heals_nothing(report):
             and report.get("converged") is False)
 
 
+def _unmeasured(report):
+    """The sweep behind this self-report OBSERVED NOTHING: `peersAsked == 0`.
+
+    The source makes this the fourth `converged` blocker (`measured` in
+    `elohim/elohim-storage/src/p2p/projection_reconcile.rs`, `peers_asked > 0`): with no peer
+    asked, the all-zero divergence it publishes is "indistinguishable from a healthy in-sync
+    sweep" — the node's own "purest false green". Such a sample is therefore NO EVIDENCE in
+    either direction: it neither affirms "healing nothing" nor refutes it. Only an explicit
+    integer 0 counts; a runtime that does not publish `peersAsked` stays measured (field-
+    presence-tolerant, like every predicate here).
+
+    WHY (measured 2026-09-26, fifth filing of fp 79f357281ca5): one adam process (same pod
+    IP, sweeps 260 -> 326 monotonic) answered two unconverged polls, then three with
+    `peersAsked 0, divergentAnchor 0, converged false`. Those three read as "not healing
+    nothing" — `divergentAnchor > 0` fails on an unmeasured zero — so the 3-wide window went
+    silent for five polls and closure-by-disappearance DELETED the live blocked line on
+    evidence the node itself labels unmeasured. The pod restarted, and the next three polls
+    re-filed the fp as NEW: a full triage dispatch on a condition that never moved."""
+    asked = report.get("peersAsked")
+    return isinstance(asked, int) and not isinstance(asked, bool) and asked == 0
+
+
 def _projector_lag(node, samples):
     """Projector exhaustion: lagSeconds over threshold, or the projector is SWEEPING AND
     HEALING NOTHING, across LAG_POLLS polls. Absent `projector` => no signal.
@@ -279,10 +301,29 @@ def _projector_lag(node, samples):
 
     reports = [r for r in (_reconcile_report(s) for s in win) if r is not None]
     if len(reports) == LAG_POLLS:
-        if all(_heals_nothing(r) for r in reports):
-            sweeps = [r["sweeps"] for r in reports]
+        # UNMEASURED SAMPLES ABSTAIN (see `_unmeasured`). Two consequences, both read from
+        # the node's own `measured` term rather than a new threshold:
+        #   1. the heals-nothing verdict is taken over the last LAG_POLLS MEASURED reports in
+        #      the whole ring (look past the unmeasured ones), so a run of "asked nobody"
+        #      sweeps can neither file a finding nor build a clean streak that deletes one;
+        #   2. a projector that keeps sweeping while asking NO peer across the whole predicate
+        #      window is itself the exhaustion the source names (converged blocked by
+        #      `unmeasured`) — it files on the same fp instead of reading as clean. It needs
+        #      the sweep counter to have MOVED inside the window, so three polls landing in
+        #      one slow first sweep after a boot (2026-09-24: sweeps 7, 7) stay silent.
+        if all(_unmeasured(r) for r in reports):
+            sweeps = [r.get("sweeps") for r in reports]
+            if (all(isinstance(v, int) for v in sweeps) and min(sweeps) >= MIN_SWEEPS
+                    and len(set(sweeps)) > 1 and reports[-1].get("converged") is False):
+                return finding(f"observed NOTHING (peersAsked 0 over {min(sweeps)}-"
+                               f"{max(sweeps)} sweeps, converged=false)")
+            return None
+        measured = [r for r in (_reconcile_report(s) for s in samples)
+                    if r is not None and not _unmeasured(r)][-LAG_POLLS:]
+        if len(measured) == LAG_POLLS and all(_heals_nothing(r) for r in measured):
+            sweeps = [r["sweeps"] for r in measured]
             return finding(f"healed NOTHING (healedTotal 0 over {min(sweeps)}-{max(sweeps)} "
-                           f"sweeps, divergentAnchor {reports[-1]['divergentAnchor']}, "
+                           f"sweeps, divergentAnchor {measured[-1]['divergentAnchor']}, "
                            f"converged=false)")
         return None  # it publishes the fields -> they are the authority; caughtUp adds nothing
 

@@ -246,6 +246,47 @@ lag_with_pr = _win("alpha-b", [_shpr(_pr(9, 21), projector={"caughtUp": True, "l
 check("projector-lag still fires on lagSeconds regardless of the self-report",
       any("lagSeconds" in f["line"] for f in rh.evaluate(lag_with_pr)))
 
+# ── unmeasured sweeps (peersAsked 0) abstain — fp 79f357281ca5 fifth filing, 2026-09-26 ──
+# The LIVE alpha-b ring (runtime-cursor.json, polls 181-188): one adam process (pod IP
+# 10.1.79.42, sweeps 260 -> 326) answered two unconverged polls, then three with peersAsked 0 /
+# divergentAnchor 0 / converged false; the pod restarted (10.1.79.50) and answered three more
+# unconverged. The old predicate read the three unmeasured samples as clean, went silent for
+# five polls, and closure-by-disappearance deleted the live blocked line; poll 188 re-filed it.
+def _prm(healed, sweeps, divergent=59, converged=False, asked=6):
+    d = _pr(healed, sweeps, divergent=divergent, converged=converged)
+    d["peersAsked"] = asked
+    return d
+
+
+_affirm = [_shpr(_prm(0, 250 + i)) for i in range(3)]          # the ring before poll 181
+_ring = _affirm + [_shpr(_prm(0, 260, divergent=60)), _shpr(_prm(0, 262)),
+                   _shpr(_prm(0, 289, divergent=0, asked=0)),
+                   _shpr(_prm(0, 313, divergent=0, asked=0)),
+                   _shpr(_prm(0, 326, divergent=0, asked=0)),
+                   _shpr(_prm(0, 40, divergent=53)), _shpr(_prm(0, 163)), _shpr(_prm(0, 163))]
+_led, _dispatched = [], []
+for _i in range(3, len(_ring) + 1):
+    _w = _win("alpha-b", _ring[max(0, _i - rh.WINDOW):_i])
+    _found = [dict(f, fp=rh.fingerprint(f["node"], f["class"], f["provenance"]))
+              for f in rh.evaluate(_w) if f["provenance"] == "projector:reconcile"]
+    _n, _, _ = rh.reconcile(_led, _found, 170 + _i)
+    _dispatched += [x["fp"] for x in _n]
+check("unmeasured sweeps neither clear nor re-file a live projector line (one dispatch, not two)",
+      _dispatched == ["79f357281ca5"] and any(x["fp"] == "79f357281ca5" for x in _led))
+_iso_win = _win("alpha-b", [_shpr(_prm(0, 289, divergent=0, asked=0)),
+                            _shpr(_prm(0, 313, divergent=0, asked=0)),
+                            _shpr(_prm(0, 326, divergent=0, asked=0))])
+check("a projector sweeping while asking NO peer files on the same fp (isolation)",
+      any("observed NOTHING" in f["line"] for f in rh.evaluate(_iso_win)))
+_first_sweep = _win("alpha-b", [_shpr(_prm(0, 7, divergent=2, asked=0))] * rh.LAG_POLLS)
+check("three polls inside one slow first sweep with no peer asked stay silent (fresh boot)",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(_first_sweep)))
+_recovered = _win("alpha-b", [_shpr(_prm(0, 60 + i)) for i in range(3)]
+                  + [_shpr(_prm(0, 63 + i, divergent=0, asked=0)) for i in range(2)]
+                  + [_shpr(_prm(0, 65, converged=True))])
+check("a converged measured sample still clears through interleaved unmeasured ones",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(_recovered)))
+
 # absent /admin/self-healing block -> none of the pending predicates fire
 absent = _win("alpha", [{"render": {"degenerateRate": 0.0}}] * rh.WINDOW)
 check("pending predicates silent when self-healing block absent",
