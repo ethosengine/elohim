@@ -156,14 +156,16 @@ fail() { echo "FATAL: $*" >&2; exit 2; }
 # substring unique to the target process AND excludes our own pid.
 # ---------------------------------------------------------------------------
 conductor_pid() { # <peer> -> pid of `holochain --config-path .../<peer>/conductor-config.yaml`
-  ps -eo pid=,args= \
-    | awk -v me="$$" -v pat="/$1/conductor-config.yaml" \
-      '$1 != me && index($0, "holochain ") && index($0, pat) { print $1; exit }'
+  # Match the process NAME (comm): this awk's own argv carries the pattern, and
+  # once pids wrap its pid can sort ahead of the real process.
+  ps -eo pid=,comm=,args= \
+    | awk -v pat="/$1/conductor-config.yaml" \
+      '$2 == "holochain" && index($0, pat) { print $1; exit }'
 }
 storage_pid() { # <http-port> -> pid of `elohim-storage --http-port <port>`
-  ps -eo pid=,args= \
-    | awk -v me="$$" -v port="--http-port $1" \
-      '$1 != me && index($0, "elohim-storage") && index($0, port) { print $1; exit }'
+  ps -eo pid=,comm=,args= \
+    | awk -v port="--http-port $1" \
+      '$2 == "elohim-storage" && index($0, port) { print $1; exit }'
 }
 wait_gone() { # <pid> <secs>
   local p="$1" t="$2"

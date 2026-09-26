@@ -15,7 +15,7 @@ cpu_of() { local pid=$1 key=$2; CPU=-1; [ -r /proc/$pid/stat ] || return; local 
 while true; do
   ts=$(date -u +%H:%M:%S); line="{\"t\":\"$ts\""
   for spec in "storage-m:elohim-storage --http-port 8090" "storage-j:elohim-storage --http-port 8091" "storage-s:elohim-storage --http-port 8092" "doorway-a:doorway --dev-mode --listen 0.0.0.0:8888" "doorway-b:doorway --dev-mode --listen 0.0.0.0:8889"; do
-    name=${spec%%:*}; pat=${spec#*:}; pid=$(ps -eo pid=,args= | awk -v p="$pat" 'index($0,p){print $1; exit}'); c=-1; [ -n "$pid" ] && { cpu_of $pid $name; c=$CPU; }
+    name=${spec%%:*}; pat=${spec#*:}; pid=$(ps -eo pid=,comm=,args= | awk -v p="$pat" '$2 != "awk" && index($0,p){print $1; exit}'); c=-1; [ -n "$pid" ] && { cpu_of $pid $name; c=$CPU; }
     line="$line,\"cpu_$name\":$c"; awk -v c=$c 'BEGIN{exit !(c>1.5)}' && echo "$ts SPIKE cpu $name=$c" >> $OUT/watch.spikes
   done
   i=0; for pid in $(ps -eo pid=,args= | awk '/[h]olochain --piped/{print $1}' | head -3); do cpu_of $pid c$i; c=$CPU; line="$line,\"cpu_conductor$i\":$c"; awk -v c=$c 'BEGIN{exit !(c>1.5)}' && echo "$ts SPIKE cpu conductor$i=$c" >> $OUT/watch.spikes; i=$((i+1)); done

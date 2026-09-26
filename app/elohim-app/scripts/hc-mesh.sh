@@ -1759,8 +1759,9 @@ assert_storage_transport_capability() { # <binary> <mode>
 }
 
 storage_pid_for_port() { # <http-port>
-  ps -eo pid=,args= | awk -v me="$$" -v pat="--http-port $1" \
-    '$1 != me && index($0, "elohim-storage") && index($0, pat) { print $1; exit }'
+  # comm, not argv alone: this awk's own argv carries both strings (see storage_restart).
+  ps -eo pid=,comm=,args= | awk -v pat="--http-port $1" \
+    '$2 == "elohim-storage" && index($0, pat) { print $1; exit }'
 }
 
 transport_from_environ() { # <nul-delimited environ file>
@@ -2824,7 +2825,7 @@ status_all() {
   # fact is exactly the kind of confident-wrong measure this mesh keeps teaching
   # us to distrust.
   local _running_bin _running_desc
-  _running_bin="$(for pid in $(ps -eo pid=,args= | awk -v me="$$" '$1 != me && index($0, "--config-path") && index($0, "/local-dev/") { print $1 }'); do
+  _running_bin="$(for pid in $(ps -eo pid=,comm=,args= | awk '$2 == "holochain" && index($0, "--config-path") && index($0, "/local-dev/") { print $1 }'); do
       readlink "/proc/$pid/exe" 2>/dev/null | sed 's/ (deleted)$//'; done | sort -u | head -1)"
   if [ -n "$_running_bin" ]; then
     _running_desc="$_running_bin ($("$_running_bin" --version 2>&1 | head -1))"
@@ -2993,9 +2994,13 @@ restart_storage() {
     fi
 
     # Exact pid: the storage binary's argv carries --http-port <port>, which no
-    # other process has, and which never appears in this script's own argv.
-    pid="$(ps -eo pid=,args= | awk -v me="$$" -v pat="--http-port $port" \
-      '$1 != me && index($0, "elohim-storage") && index($0, pat) { print $1; exit }')"
+    # other process has. Match on the process NAME (comm), not argv alone: this
+    # awk's own argv contains both "elohim-storage" and the pattern, and once pids
+    # wrap around its pid can sort ahead of the real peer — the restart then
+    # "succeeds" against a dead awk pid and never touches the running storage
+    # (2026-09-26: all three peers kept the old binary, restart printed UP).
+    pid="$(ps -eo pid=,comm=,args= | awk -v pat="--http-port $port" \
+      '$2 == "elohim-storage" && index($0, pat) { print $1; exit }')"
 
     # Capture the live environment when we can. A pid that exists but whose
     # /proc is unreadable (a process already exiting) is treated exactly like no
@@ -3297,7 +3302,7 @@ restore_binary_for() {
     [ -x "$cand" ] && { echo "$cand"; return 0; }
   fi
   local spid
-  for spid in $(ps -eo pid=,args= | awk -v me="$$" 'index($0, "elohim-storage") && index($0, "--http-port") && $1 != me { print $1 }'); do
+  for spid in $(ps -eo pid=,comm=,args= | awk '$2 == "elohim-storage" && index($0, "--http-port") { print $1 }'); do
     cand="$(readlink "/proc/$spid/exe" 2>/dev/null)"; cand="${cand% (deleted)}"
     [ -n "$cand" ] && [ -x "$cand" ] && { echo "$cand"; return 0; }
   done
