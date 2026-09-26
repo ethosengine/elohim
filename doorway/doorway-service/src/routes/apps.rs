@@ -22,6 +22,7 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
+use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 use hyper::{Response, StatusCode};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -604,13 +605,22 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
     let endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
     let storage_resp = reqwest::Client::new().head(&endpoint).send().await;
 
-    let mut builder = Response::builder().status(StatusCode::OK);
+    // One value per header name. Storage's capability headers are forwarded, then the
+    // doorway's own values REPLACE them: an appended second X-Blob-Hash or
+    // X-Delivery-Mode reaches a browser as one comma-joined value ("h, h"), which
+    // names no blob and no mode.
+    let mut headers = HeaderMap::new();
 
     // Forward storage's capability headers (extraction cache state, blob hash, etc.)
     if let Ok(resp) = &storage_resp {
         for (name, value) in resp.headers() {
             if name.as_str().starts_with("x-") {
-                builder = builder.header(name, value);
+                if let (Ok(n), Ok(v)) = (
+                    HeaderName::from_bytes(name.as_str().as_bytes()),
+                    HeaderValue::from_bytes(value.as_bytes()),
+                ) {
+                    headers.insert(n, v);
+                }
             }
         }
     }
@@ -624,10 +634,11 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         let projection_ready = blob_hash.is_some();
 
         // Override: doorway's projection cache is the outermost layer
-        builder = builder.header("X-Delivery-Mode", "extracted");
-        builder = builder.header("X-Cache-Tier", "projection");
-        builder = builder.header(
-            "X-Projection-Ready",
+        set_header(&mut headers, "x-delivery-mode", "extracted");
+        set_header(&mut headers, "x-cache-tier", "projection");
+        set_header(
+            &mut headers,
+            "x-projection-ready",
             if projection_ready { "true" } else { "false" },
         );
 
@@ -635,7 +646,7 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         // so the client sees the full node picture. Storage's X-Ready becomes
         // X-Extraction-Ready; doorway adds X-Projection-Ready.
         if let Some(hash) = &blob_hash {
-            builder = builder.header("X-Blob-Hash", hash.as_str());
+            set_header(&mut headers, "x-blob-hash", hash);
         }
     } else {
         // No doorway projection-cache layer. Storage still serves individual app
@@ -648,8 +659,8 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         // reliable, if not yet blazing, delivery.)
         match &storage_resp {
             Ok(_) => {
-                builder = builder.header("X-Delivery-Mode", "extracted");
-                builder = builder.header("X-Cache-Tier", "storage-ondemand");
+                set_header(&mut headers, "x-delivery-mode", "extracted");
+                set_header(&mut headers, "x-cache-tier", "storage-ondemand");
             }
             Err(_) => {
                 return Response::builder()
@@ -661,10 +672,21 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         }
     }
 
+    let mut builder = Response::builder().status(StatusCode::OK);
+    for (name, value) in &headers {
+        builder = builder.header(name, value);
+    }
     builder
         .header("Content-Length", "0")
         .body(Full::new(Bytes::new()))
         .unwrap()
+}
+
+/// Set a header, replacing any value already present under that name.
+fn set_header(headers: &mut HeaderMap, name: &'static str, value: &str) {
+    if let Ok(v) = HeaderValue::from_str(value) {
+        headers.insert(HeaderName::from_static(name), v);
+    }
 }
 
 // =============================================================================
@@ -836,6 +858,25 @@ mod tests {
     // =========================================================================
     // Capability path parsing tests
     // =========================================================================
+
+    #[test]
+    fn capability_override_replaces_the_forwarded_value() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-delivery-mode"),
+            HeaderValue::from_static("compressed"),
+        );
+        headers.insert(
+            HeaderName::from_static("x-blob-hash"),
+            HeaderValue::from_static("bafkreiabc"),
+        );
+        set_header(&mut headers, "x-delivery-mode", "extracted");
+        set_header(&mut headers, "x-blob-hash", "bafkreiabc");
+        let modes: Vec<_> = headers.get_all("x-delivery-mode").iter().collect();
+        let hashes: Vec<_> = headers.get_all("x-blob-hash").iter().collect();
+        assert_eq!(modes, vec!["extracted"]);
+        assert_eq!(hashes, vec!["bafkreiabc"]);
+    }
 
     #[test]
     fn test_parse_capability_path_normal() {

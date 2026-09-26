@@ -32,6 +32,7 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-26: record-proves check (client-resilience 'Cached app works offline') first real household runs against the new worker bytes (staged dev dist, apps-v3): 8/9 steps — shell-registered worker, verified archive fill, remembered head, cold worker, offline reload renders from cache (sprint-report-household-20260926T221600Z). Red step is the proof's reach, not the product: Playwright setOffline does not cut the worker's own fetches, so its capability probes still reached doorway A (200). Next: cut the network for real (stop doorway A across the reload). Found and fixed on the way: every app's _capability carried X-Blob-Hash and X-Delivery-Mode twice (doorway appended over storage's), which a browser reads as one comma-joined value, so the worker could never fetch or verify; and a tsx __name trap in the cache step. NO status change.
 DELTA 2026-09-25 (peer-stage rung H, household stand-in, no offload proven, provider uhCAknbv, run peer-4e7a496d, completion uhCkkA8y): doorway-failover passed=2 failed=0 — report genesis/a2o/reports/sprint-report-peer-stage-peer-4e7a496d.json; receipt genesis/a2o/reports/peer-stage/2026-09-25/4e7a496d418c2dfc5335874284fa1f58cf411ba7611ff503879f5d60b0537b14/receipt.json
 
 DELTA 2026-09-11c (SERVING RECEIPT on current source; habit RED preserved by rule): epr-app-deliverability.feature

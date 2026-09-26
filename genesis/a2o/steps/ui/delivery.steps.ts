@@ -52,10 +52,13 @@ export const APPS_CACHE_PREFERRED = 'apps-v3';
 export async function appsCacheEntries(
   device: PlaywrightDevice
 ): Promise<{ name: string | null; paths: string[] }> {
+  // No named function may be declared inside page.evaluate: tsx (esbuild keepNames)
+  // wraps it in a `__name(...)` helper that does not exist in the browser.
   return (await device.page.evaluate(async (preferred: string) => {
     const names = (await caches.keys()).filter(n => n.startsWith('apps-'));
-    const generation = (n: string): number => Number(n.replace(/^apps-v/, '')) || 0;
-    names.sort((a, b) => generation(b) - generation(a));
+    names.sort(
+      (a, b) => (Number(b.replace(/^apps-v/, '')) || 0) - (Number(a.replace(/^apps-v/, '')) || 0)
+    );
     const name = names.includes(preferred) ? preferred : (names[0] ?? null);
     if (!name) return { name: null, paths: [] };
     const cache = await caches.open(name);
