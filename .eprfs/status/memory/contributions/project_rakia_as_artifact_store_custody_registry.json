@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_rakia_as_artifact_store_custody_registry",
+  "claim": "2026-09-25: the p2p dataplane IS the store; rakia adds none — it is the package manifest giving blobs meaning over the storage SDK; latest = channel head.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_rakia_as_artifact_store_custody_registry.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 184fb351-36f9-402f-b933-974a3cf7b37c."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_rakia_as_artifact_store_custody_registry.md",
+        "cid": "bafkreiggccwquwmxwbbtpmgkj2wlf7vdfyeylhctvjmtmltwzktp5ys4s4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "rakia = package manifest over the dataplane store",
+    "file": "project_rakia_as_artifact_store_custody_registry.md",
+    "scopePath": ".claude/memory/project_rakia_as_artifact_store_custody_registry.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

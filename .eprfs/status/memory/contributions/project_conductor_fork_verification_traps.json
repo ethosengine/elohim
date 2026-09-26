@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:integrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_conductor_fork_verification_traps",
+  "claim": "How to verify a conductor-fork change locally — patch-crate tests in-dir, one build at a time, timing the startup window from storage, metrics have no exporter",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_conductor_fork_verification_traps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_conductor_fork_verification_traps.md",
+        "cid": "bafkreigf5vmmuw77ksnjcwglnjcp2y5meusdzc4pvqpnj7gwyomhqphtge"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_conductor_fork_verification_traps",
+    "file": "project_conductor_fork_verification_traps.md",
+    "scopePath": ".claude/memory/project_conductor_fork_verification_traps.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

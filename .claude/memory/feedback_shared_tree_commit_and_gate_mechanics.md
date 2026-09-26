@@ -25,6 +25,10 @@ Three mechanics for working in the shared `/projects/elohim` tree alongside othe
    HUSKY=0 git commit -F msg; unset; git add <paths>`. For a generated projection that also holds another session's
    uncommitted entries (`genesis/manifests/habits.yaml`), build a copy of HEAD's file plus only your line and stage it
    with `git update-index --cacheinfo 100644,<blob>,<path>`.
+2b. **A pathspec commit of a gitlink records the WORKTREE submodule HEAD, not the staged pin** (2026-09-25): a
+   `git cherry-pick -n <pin-commit>` staged e0bfc6c7a, then `git commit -- elohim/holochain-conductor` committed
+   7e553f9c3 (the known-regressed pin the checkout sat at). For a pin move: `git update-index --cacheinfo
+   160000,<full-sha>,<gitlink>`, commit from the index with NO pathspec, verify with `git ls-tree HEAD <gitlink>`.
 3. **When another session's uncommitted work breaks a crate's gate, gate from a clean export** —
    `git archive HEAD <dirs> | tar -x -C /projects/elohim-specimens/export-gate-<sha>`, overlay only your files, run
    the crate's `just gate` there with the pool `CARGO_TARGET_DIR`. The export must live OUTSIDE the repo: a copy of

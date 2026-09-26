@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:integrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_human_participant_actor_plane",
+  "claim": "Operator 2026-09-23 — human:<handle> claimed never inferred; acts append-only, author frozen; attribution bounds r=1/2, judgment=production, vendor is provenance not payee",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_human_participant_actor_plane.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_human_participant_actor_plane.md",
+        "cid": "bafkreifhbo42s3nii4sz3txevdndqyqxisatvu23oale4qh5j4p3qda2ui"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Human is a first-class actor in the eprfs actor plane",
+    "file": "project_human_participant_actor_plane.md",
+    "scopePath": ".claude/memory/project_human_participant_actor_plane.md",
+    "gitName": "Matthew Dowell",
+    "entryType": "project",
+    "indexed": true
+  }
+}

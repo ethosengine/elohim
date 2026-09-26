@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_delivery_sprints_2026_09_24_25",
+  "claim": "Plans hold sprint state; kept here: pin now e0bfc6c7a, 7e553f9c3 unbisected, fork has no forge CI, K0 store archive, auditor routine, adam compute-chain home.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_delivery_sprints_2026_09_24_25.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_delivery_sprints_2026_09_24_25.md",
+        "cid": "bafkreicq2z4tqwvzhp5essv77dezo2fpcalnymktd52bflzeul6wcfzxr4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [
+    {
+      "path": ".eprfs/status/memory/contributions/project_native_delivery_sprint_2026_09_24.json",
+      "cid": "bafkreifwt65zxzievdfa27hcm4abbsic4kk73zhgilra6cazc2ghl2eoye"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/project_post_station_4_sprint_2026_09_25.json",
+      "cid": "bafkreibwizluahlvz4yxkj5jls4cbh4wap6mbx4eeuc3txmy6ytfmo2lwe"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/project_next_sprint_adam_measurement_peer_compute_agreements.json",
+      "cid": "bafkreibqqa3idkcn5ei3czc2gu2hss6pjzno47gcanryas6jdfexalh23a"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/project_conductor_pin_7e553f9c3_convergence_regression.json",
+      "cid": "bafkreicdvavmrxmyoab7eet5faakmy4dhjg7siowaltjnmvb3p6esqogze"
+    }
+  ],
+  "contradicts": [],
+  "imported": {
+    "display": "Delivery sprints 2026-09-24/25 (umbrella)",
+    "file": "project_delivery_sprints_2026_09_24_25.md",
+    "scopePath": ".claude/memory/project_delivery_sprints_2026_09_24_25.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

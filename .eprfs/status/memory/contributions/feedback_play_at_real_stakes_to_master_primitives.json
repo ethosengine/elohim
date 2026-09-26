@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_play_at_real_stakes_to_master_primitives",
+  "claim": "Operator 2026-09-25: the matthew↔adam compute market is play — play with the real primitives at Bootstrap stakes; no shortcut that skips a primitive.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_play_at_real_stakes_to_master_primitives.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 184fb351-36f9-402f-b933-974a3cf7b37c."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_play_at_real_stakes_to_master_primitives.md",
+        "cid": "bafkreih7smaoenqcbhknn656dkxpk4wdzw3kztahb5uv3nvblrqnxdk7cy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback_play_at_real_stakes_to_master_primitives",
+    "file": "feedback_play_at_real_stakes_to_master_primitives.md",
+    "scopePath": ".claude/memory/feedback_play_at_real_stakes_to_master_primitives.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

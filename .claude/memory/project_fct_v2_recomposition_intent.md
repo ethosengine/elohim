@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 299c4def-4fbc-4b04-a717-d28a63eacbc9
   modified: 2026-09-23T01:42:43.178Z
+cites:
+  - genesis/docs/content/fct/fct-course/
 ---
 
 On 2026-09-23 the FCT course v2 (fifteen modules, five movements, Micah 6:8 refrain) landed

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_local_mesh_first_cadence_and_measure_offload",
+  "claim": "Household mesh proves first; fleet confirms, never discovers. Batch ~10, then one Jenkins pass; DoD runs the gate; measure-class runs go to a peer.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_local_mesh_first_cadence_and_measure_offload.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_local_mesh_first_cadence_and_measure_offload.md",
+        "cid": "bafkreieflku6bxufrdj3uum2stwalyblwi6wkysrifkpbxeflfsdkyicla"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_local_mesh_first_cadence.json",
+      "cid": "bafkreigxodchx7oulz4j2k5qlbgk7udbhixmi26cniavraftmsxmetojxa"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_measure_class_runs_off_dev_berth.json",
+      "cid": "bafkreibvjj25pccfrgfwntinnthcodgq63vofmsp54gtuo53wk3cuh52ye"
+    }
+  ],
+  "contradicts": [],
+  "imported": {
+    "display": "Local-mesh-first cadence, verification & offload (umbrella)",
+    "file": "feedback_local_mesh_first_cadence_and_measure_offload.md",
+    "scopePath": ".claude/memory/feedback_local_mesh_first_cadence_and_measure_offload.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

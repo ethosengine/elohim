@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_measure_class_runs_off_dev_berth",
+  "claim": "Operator 2026-09-25: long measured runs (A/B windows, soaks, proofs on grown stores) never run on the workspace a human develops in — delegate to a measurement peer; dev berth runs bounded verify lanes only.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_measure_class_runs_off_dev_berth.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 9adf9f01-3f4d-4b27-8758-d78fda7cada3."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_measure_class_runs_off_dev_berth.md",
+        "cid": "bafkreihpwx4xopa6nakwjx3rrdthjk7imfe7qf4kgwwoybjo5mosa7xdxq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Measure-class runs go to a peer, never the dev berth",
+    "file": "feedback_measure_class_runs_off_dev_berth.md",
+    "scopePath": ".claude/memory/feedback_measure_class_runs_off_dev_berth.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

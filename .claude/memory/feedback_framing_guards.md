@@ -46,3 +46,18 @@ packing more agents per conductor or lowering the arc; the ceiling is a design n
 (conductor-capacity habit), the measure of health is the hosted→steward transition rate, and the
 chrome carries the invitation ("this doorway hosts N of its M"), not an apology. See
 [[feedback_doorway_projection_is_commons_privilege]], [[feedback_epr_chrome_is_the_trust_signal]].
+
+**Imagodei ≠ self-image (operator correction, 2026-09-24; manifesto commit `feaa4ff0f`).** What a
+person states is gathered through self-reflection tools; what they reveal is observed over time;
+neither is the person. Beneath both stands their imagodei, the image of God in them: an identity no
+one composes and no one holds, the person included; if anything holds it, God does. The network's
+part is never to define it but to approach it with respect, humility and reverence, as inviolable,
+and it extends the same regard to the elohim, which by construction are an emergent reflection of
+it. Never gloss imagodei as "self-image", "stated identity" or "profile" — that is the
+individualist substitution the whole witnessed-humanity passage argues against. Final form
+(commit `d07a1b55d`): the theology is one clause named as inheritance, the claim is held open to
+every honest pursuit including other faiths, **humility is the hard requirement, not a courtesy**
+(it is what lets the network make the claim honestly and keep it), and the one failure the protocol
+will not host is stated once: a person or system that sets itself in that place and extends
+unearned power over others; the same regard and the same limit bind the elohim. Related:
+[[feedback_elohim_witness_human_identity]], [[feedback-identity-sovereignty-ontology-guard]].

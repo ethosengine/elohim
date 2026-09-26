@@ -25,3 +25,10 @@ When a choice has a conventional default, or you've already reasoned to a clear 
 **Why this one is worse than over-asking:** an over-ask costs attention; a false blocker costs *delivery* — the work stops and looks legitimately blocked. Two repo-specific checks that would have caught it in under a minute: `stringData` in `genesis/orchestrator/manifests/**` is the LIVE value (grep for a sealed-secret/`--from-literal`/`withCredentials` provisioning path — there is none), and `git log`/manifest comments often name the workaround AND its own TODO (`alpha-b.yaml` said `DEV_MODE:"true"` existed to open that exact gate, *"Remove when doorway-B federation auth hardens"*).
 
 **How to apply:** before asking, run the test — *does the user's answer change what I do, AND is there a real conflict / no obvious default?* If I've recommended an option and there's no genuine fork, just do it (mention the choice in passing). This is the same bar as the AskUserQuestion guidance ("decisions genuinely the user's to make") and the harness's "when you have enough information to act, act." Related: [[feedback_reviewer_issue_admissibility]], [[feedback_shift_drive_cure_not_stage]], [[feedback_verify_the_measure_before_the_ranking]].
+
+**2026-09-24 (governance rebinds).** When a rule row moves version (`@3 → @5`) because its
+implementation changed, rebinding the `.epr-meta` manifests that name it is the orchestrator's
+call, not an escalation: "there's not a material difference between an @3 and an @5; if there
+is, catch it and make a decision." Surface a refusal only when a seat was actually denied; then
+make the edit on the operator's explicit word, in the orchestrator's own seat, with the reason in
+the commit.

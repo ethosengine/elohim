@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_legacy_consumers_governed_gifts",
+  "claim": "Operator 2026-09-25 — legacy apps serve, never control; gifts are distinct-Steward-governed offers; settlement to token/fiat is a governance act.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_legacy_consumers_governed_gifts.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_legacy_consumers_governed_gifts.md",
+        "cid": "bafkreif6lolybcvxl5kark43psbrrzz3qpmys744xu4z6xhcfk3jpdk6hm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Legacy consumers get governed gifts",
+    "file": "feedback_legacy_consumers_governed_gifts.md",
+    "scopePath": ".claude/memory/feedback_legacy_consumers_governed_gifts.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

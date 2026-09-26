@@ -27,6 +27,7 @@ Folds the multi-agent fleet-sizing, delegation and workflow-harness trap cluster
 - [[feedback_workflow_long_cargo_orphan_lock]] — Bash timeout orphans cargo still holding .cargo-lock; let it finish (work lands on disk), keep one profile per gate phase, run_in_background for >10min cargo.
 - [[feedback_workflow_structuredoutput_hang]] — schema'd workflow agents retry empty {} StructuredOutput forever (48→481 calls, no completion notify) and hang the run — go schemaless prose + stall-watcher
 - [[feedback_subagent_liveness_clock_skew]] — Container clocks skew hours apart — never infer agent death from transcript mtime vs date; check writer-relative freshness and TaskStop live racers first.
+- [[feedback_bookkeeping_is_witnessed_not_performed]] — Operator 2026-09-23: participants act, the harness witnesses into eprfs; manual bookkeeping (re-import, re-attribute, re-project) is a harness gap to name, not a procedure to hand on.
 - [[feedback_overnight_permission_stalls]] — An idle overnight session may be blocked on a permission prompt (auth paths), not done; check the transcript tail and never race a blocked session.
 
 **Shared-index race (2026-09-05):** two agents committing in ONE worktree raced on the git

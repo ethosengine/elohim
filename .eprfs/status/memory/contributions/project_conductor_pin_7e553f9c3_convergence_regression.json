@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:integrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_conductor_pin_7e553f9c3_convergence_regression",
+  "claim": "Household A/B on 2026-09-24 — deliverability lane passes on fleet pin 25dd2d0be, misses doorway-B convergence 3× on 7e553f9c3; pin held, bisect owed",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md",
+        "cid": "bafkreiderwqq3rohbtnsjjetm3lqfz7k3tecrvp7lid4ewlrudwnnavhtu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_conductor_pin_7e553f9c3_convergence_regression",
+    "file": "project_conductor_pin_7e553f9c3_convergence_regression.md",
+    "scopePath": ".claude/memory/project_conductor_pin_7e553f9c3_convergence_regression.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_framing_and_projection_guards",
+  "claim": "Sovereign ≠ apex; Mishpat ≠ punishment; human ≠ terminal; collectives starved; hosted cost = anti-capture; doorway = thin commons standing; play at real stakes.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_framing_and_projection_guards.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_framing_and_projection_guards.md",
+        "cid": "bafkreib3nv6sxbp5eft72xkb7ir4vmgugn2bfyzpmfrd2u24eptoh5zvhq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_framing_guards.json",
+      "cid": "bafkreicqnnehd3z3u724a7lvvztmvldff2sihlhei2gr4g32jbq5yx46yq"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_play_at_real_stakes_to_master_primitives.json",
+      "cid": "bafkreifonqzghw3h5uo3l4hcy3armjdwycoaqykgcpwbavfk4chohuqq7e"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_doorway_projection_is_commons_privilege.json",
+      "cid": "bafkreiborevyuwwe47kizkichfi2whfu5l4x2hrmdzhjepedlxnwe4xhn4"
+    },
+    {
+      "path": ".eprfs/status/memory/contributions/feedback_doorway_thin_plural_projection_not_trusted_tier.json",
+      "cid": "bafkreibvzcl2psddcsssbci43ipmrf5mkg6ypknvn6icgyf6of5rexrm2m"
+    }
+  ],
+  "contradicts": [],
+  "imported": {
+    "display": "Framing, ontology & projection guards (umbrella)",
+    "file": "feedback_framing_and_projection_guards.md",
+    "scopePath": ".claude/memory/feedback_framing_and_projection_guards.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_consent_fatigue_route_by_stakes",
+  "claim": "Operator 2026-09-26: constant approval asks become a TOS stream; batch same-kind verdicts, surface one-at-a-time only network-crossing, identity or irreversible acts.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_consent_fatigue_route_by_stakes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_consent_fatigue_route_by_stakes.md",
+        "cid": "bafkreigalqzfuuwtnsq4dyvsjitf35dfp4j6yeedygrl4ojjghe6wq72fq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Consent fatigue is a capture vector — route verdicts by stakes",
+    "file": "feedback_consent_fatigue_route_by_stakes.md",
+    "scopePath": ".claude/memory/feedback_consent_fatigue_route_by_stakes.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

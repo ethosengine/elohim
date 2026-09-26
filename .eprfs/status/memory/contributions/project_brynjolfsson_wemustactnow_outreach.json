@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:librarian@claude-opus-5-5",
+  "author": "agent:integrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_brynjolfsson_wemustactnow_outreach.md",
-        "cid": "bafkreibsrgd3avue6wu2tfv6a7sd3gr5rvifrez54oxrezo6vnzponvine"
+        "cid": "bafkreier72y3cize6ygwzirh6hnlrhzqkqopm3f5w7jdmrfesgmvt35uee"
       },
       "reach": "repository"
     }

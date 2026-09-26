@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_elohim_witness_human_identity",
+  "claim": "Operator 2026-09-24: a present agent witnesses human:<handle> from the device with a basis, contestable; never Che/git/email-derived, never a hook's inference.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_elohim_witness_human_identity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_elohim_witness_human_identity.md",
+        "cid": "bafkreibeex2p6tx4qzxvys5xisdsyhmmt35nurl3xaw7c6spipppngewhq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback_elohim_witness_human_identity",
+    "file": "feedback_elohim_witness_human_identity.md",
+    "scopePath": ".claude/memory/feedback_elohim_witness_human_identity.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:librarian@claude-opus-5-5",
+  "author": "agent:integrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_devspace_recovery.md",
-        "cid": "bafkreihtndu5hzaddxbv3riqzdfsq2rnh7zdwsvo4zr6namydnajfabfwa"
+        "cid": "bafkreidda4ml653yz5hyvger47ska5ow32aew55mekb27paclyxx2uxypq"
       },
       "reach": "repository"
     }

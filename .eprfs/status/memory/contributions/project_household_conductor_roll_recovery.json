@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_household_conductor_roll_recovery",
+  "claim": "2026-09-25 mesh proof: after a conductor roll propagate-landing-to-B recovers only with a carried record; jessica's cell can stay STRANDED (CellDisabled, database is locked) so the shared lamad readiness rail refuses; a mutual BlockSpan sits on the infrastructure DNA.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_household_conductor_roll_recovery.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: none recorded."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_household_conductor_roll_recovery.md",
+        "cid": "bafkreiazr6mqikgw3xbj4jtmzqbzekgn5n7ft5tv73xk2xwzobfwx2apo4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Household conductor roll — carried-record cure, stranded cell, infrastructure BlockSpan",
+    "file": "project_household_conductor_roll_recovery.md",
+    "scopePath": ".claude/memory/project_household_conductor_roll_recovery.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

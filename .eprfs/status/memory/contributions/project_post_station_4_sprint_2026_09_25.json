@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_post_station_4_sprint_2026_09_25",
+  "claim": "Landed on dev 2026-09-25 (plan 73a351fd5), not pushed (rides the next batch); artifact + rulings under genesis/a2o/reports/post-station-4-2026-09-25/; open backlog and the operator's one remaining decision.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_post_station_4_sprint_2026_09_25.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_post_station_4_sprint_2026_09_25.md",
+        "cid": "bafkreifkwlc2zmaunolmvpb45fitp4nuutoyz5kft7wlco2je27v2yekzq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_post_station_4_sprint_2026_09_25",
+    "file": "project_post_station_4_sprint_2026_09_25.md",
+    "scopePath": ".claude/memory/project_post_station_4_sprint_2026_09_25.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}
