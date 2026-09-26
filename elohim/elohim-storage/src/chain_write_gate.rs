@@ -324,6 +324,7 @@ const CRATE_READ_FNS: &[&str] = &[
     "resolve_content_heads_local",
     "validate_carried_head_record",
     "verify_carried_election",
+    "verify_carried_head_evidence",
     // --- imagodei ----------------------------------------------------------
     "get_bindings_for_peer",
     "get_collab_qahal_cid_for_agreement",
@@ -789,6 +790,7 @@ mod tests {
             "get_canonical_election_evidence",
             "validate_carried_head_record",
             "verify_carried_election",
+            "verify_carried_head_evidence",
             "find_publishers",
             "sign_for_agent",
             "known_agents",

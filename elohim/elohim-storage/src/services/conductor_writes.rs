@@ -728,6 +728,58 @@ pub async fn call_verify_carried_election(
     Ok(out)
 }
 
+/// Caller-input wire shape for `content_store::verify_carried_head_evidence`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct VerifyCarriedHeadEvidenceInput {
+    pub id: String,
+    #[serde(with = "serde_bytes")]
+    pub link_record: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub head_record: Vec<u8>,
+}
+
+/// Wire shape of `content_store::verify_carried_head_evidence`'s answer: the
+/// merged election, and the proven head when that election elects the carried
+/// version (its canonical ordering is the election's).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CarriedHeadEvidenceWire {
+    pub election: CanonicalElectionWire,
+    #[serde(default)]
+    pub head: Option<ContentHeadWire>,
+}
+
+/// Verify a peer-carried head — its declaring agent's own election link and the
+/// version it elects — as one read-only verdict
+/// (`content_store::verify_carried_head_evidence`). Commits nothing; the work is
+/// bounded in wasm (Local link gather, depth-bounded Local lineage walk,
+/// signature checks). `Err` means the evidence was refused.
+pub async fn call_verify_carried_head_evidence(
+    hc: &Arc<HcClient>,
+    id: &str,
+    link_record: Vec<u8>,
+    head_record: Vec<u8>,
+    class: AdmissionClass,
+) -> Result<Option<CarriedHeadEvidenceWire>, StorageError> {
+    let input = VerifyCarriedHeadEvidenceInput {
+        id: id.to_string(),
+        link_record,
+        head_record,
+    };
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode verify_carried_head_evidence: {e}"
+        ))
+    })?;
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "verify_carried_head_evidence", payload, class)
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode CarriedHeadEvidenceWire: {e}"
+        ))
+    })
+}
+
 /// Caller-input wire shape for `content_store::validate_carried_head_record`.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ValidateCarriedHeadRecordInput {

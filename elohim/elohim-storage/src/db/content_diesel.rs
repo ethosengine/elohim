@@ -982,7 +982,7 @@ pub struct ContentProjectionPatch {
 
 /// Derive only from conductor-verified Content metadata. An absent key clears
 /// obsolete executable identity; CRDT reverse projection never calls this.
-fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
+pub(crate) fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
     serde_json::from_str::<serde_json::Value>(metadata)
         .ok()?
         .get("serverBlobHash")?
@@ -1836,7 +1836,8 @@ pub fn stamp_declared_head_mode(
     mode: StampMode,
     canonical_ordering: Option<CanonicalOrdering>,
 ) -> Result<StampOutcome, StorageError> {
-    conn.transaction(|conn| {
+    let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
+    let outcome = conn.transaction(|conn| {
         stamp_declared_head_mode_transaction(
             conn,
             ctx,
@@ -1847,7 +1848,33 @@ pub fn stamp_declared_head_mode(
             mode,
             canonical_ordering,
         )
-    })
+    })?;
+    if outcome == StampOutcome::Stamped || (outcome == StampOutcome::Refreshed && carries_pointer) {
+        bump_pointer_generation();
+        // Announce the move to everything outside this process that follows
+        // content: the doorway's live tail (`content.updated`) and this row's
+        // sync doc. Without it a head adopted by the trigger, courier or sweep
+        // stays invisible to the doorway until a poll or a doorbell, and the
+        // visitor is served the previous version's page.
+        crate::rea_projection::notify_content_touched(id);
+    }
+    Ok(outcome)
+}
+
+/// Bumped each time a stamp moves a declared head or rewrites a row's blob
+/// pointer. In-process readers that cache pointers (the `/apps` resolver's
+/// slug index) compare it against the generation they loaded at and reload
+/// when it moved — so a head adopted by ANY channel (the adoption trigger, the
+/// courier path, the sweep, the pointer audit) is served without each channel
+/// having to know about the cache.
+static POINTER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub fn pointer_generation() -> u64 {
+    POINTER_GENERATION.load(std::sync::atomic::Ordering::Acquire)
+}
+
+pub fn bump_pointer_generation() {
+    POINTER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5862,6 +5889,70 @@ mod tests {
         assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser-a"));
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-a"));
         assert!(row.canonical_declared_at.is_none());
+    }
+
+    /// Every stamp that moves a head or rewrites a pointer tells in-process
+    /// pointer caches to reload; a stamp that changes neither does not.
+    #[test]
+    fn a_head_move_or_pointer_rewrite_advances_the_pointer_generation() {
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::default_lamad();
+        create_content(
+            &mut conn,
+            &ctx,
+            CreateContentInput {
+                id: "gen".to_string(),
+                title: "gen".to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "html5-app".to_string(),
+                blob_hash: Some("sha256-a".to_string()),
+                blob_cid: Some("sha256-a".to_string()),
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: "commons".to_string(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .unwrap();
+        let stamp = |conn: &mut SqliteConnection, head: &str, at: i64, blob: Option<&str>| {
+            stamp_declared_head_mode(
+                conn,
+                &ctx,
+                "gen",
+                head,
+                Some(at),
+                blob.map(|b| ContentProjectionPatch {
+                    blob_cid: Some(b.to_string()),
+                    ..Default::default()
+                }),
+                StampMode::Declare,
+                Some((at, false)),
+            )
+            .unwrap()
+        };
+        let g0 = pointer_generation();
+        assert_eq!(
+            stamp(&mut conn, "uhCkkA", 1, Some("sha256-a")),
+            StampOutcome::Stamped
+        );
+        let g1 = pointer_generation();
+        assert!(g1 > g0, "a head move advances the generation");
+        assert_eq!(stamp(&mut conn, "uhCkkA", 1, None), StampOutcome::Refreshed);
+        // Other tests run concurrently and may bump it; only assert what this
+        // test's own stamps must have done.
+        assert_eq!(
+            stamp(&mut conn, "uhCkkA", 1, Some("sha256-b")),
+            StampOutcome::Refreshed
+        );
+        assert!(
+            pointer_generation() > g1,
+            "a pointer rewrite advances the generation"
+        );
     }
 
     /// The pure rule, exhaustively — every ordered pair of (election, no

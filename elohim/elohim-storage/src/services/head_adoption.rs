@@ -2704,19 +2704,7 @@ async fn try_obey_visible_election(
             return Some(AdoptOutcome::Held);
         }
     };
-    let c = &proven.content;
-    let patch = content_diesel::ContentProjectionPatch {
-        blob_cid: c.blob_cid.clone(),
-        content_size_bytes: c
-            .content_size_bytes
-            .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
-        title: Some(c.title.clone()),
-        description: Some(c.description.clone()),
-        content_type: Some(c.content_type.clone()),
-        content_format: Some(c.content_format.clone()),
-        reach: Some(c.reach.clone()),
-        metadata_json: Some(c.metadata_json.clone()),
-    };
+    let patch = crate::services::courier_obey::patch_from_proven(&proven.content);
     match content_diesel::stamp_declared_head_mode(
         &mut conn,
         ctx,

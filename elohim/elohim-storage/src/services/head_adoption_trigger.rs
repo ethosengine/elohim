@@ -166,7 +166,7 @@ use crate::db::{content_diesel, AppContext, DbPool};
 use crate::hc_client::HcClient;
 use crate::services::conductor_writes::{self, ContentHeadWire};
 use crate::services::head_adoption::{
-    self, AdoptContext, AdoptOutcome, ElectionResolve, LocalResolve,
+    self, AdoptContext, AdoptOutcome, ElectionResolve, HeadRecordFetcher, LocalResolve,
 };
 use crate::sync::SyncManager;
 use crate::trust::pricer::PricedVerification;
@@ -206,6 +206,14 @@ const CLAIM_PRUNE_INTERVAL: Duration = Duration::from_secs(1);
 struct ClaimLedger {
     claims: HashMap<String, Instant>,
     last_prune: Instant,
+    /// Ids whose claimed trigger is only SLEEPING on a ladder rung — nothing is
+    /// queued or running for them. A new change for such an id is a new event
+    /// (the author published again), so it takes the claim over instead of
+    /// waiting out the rung (2026-09-26 household: the author's second publish
+    /// landed 45 s after the first, while the first's ladder slept, and the
+    /// survivor never asked about it). Bounded by `claims`: an id is only here
+    /// while it holds a claim.
+    sleeping: std::collections::HashSet<String>,
 }
 
 /// Back-off ladder for re-probing an id whose head is proven to exist but is
@@ -555,6 +563,7 @@ impl TriggerGate {
                 claims: Mutex::new(ClaimLedger {
                     claims: HashMap::new(),
                     last_prune: Instant::now(),
+                    sleeping: std::collections::HashSet::new(),
                 }),
                 cooldown,
                 pending_retries: std::sync::atomic::AtomicUsize::new(0),
@@ -621,6 +630,7 @@ impl TriggerGate {
                 attempt: trigger.attempt + 1,
                 ..trigger
             };
+            self.set_sleeping(&next.content_id, true);
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
                 // Release BEFORE the send: the slot bounds sleeping timers, not
@@ -653,6 +663,7 @@ impl TriggerGate {
             slow_retry_used: true,
             ..trigger
         };
+        self.set_sleeping(&next.content_id, true);
         tokio::spawn(async move {
             tokio::time::sleep(SLOW_REPROBE_DELAY).await;
             gate.release_retry();
@@ -667,6 +678,7 @@ impl TriggerGate {
     /// backstop, exactly as on the initial-enqueue path.
     fn resend_retry(&self, trigger: HeadAdoptionTrigger) {
         let content_id = trigger.content_id.clone();
+        self.set_sleeping(&content_id, false);
         if self.tx.try_send(trigger).is_err() {
             crate::metrics::inc_head_adoption_trigger("retry_dropped_full");
             tracing::debug!(
@@ -745,6 +757,13 @@ impl TriggerGate {
         };
         if let Some(last) = ledger.claims.get(content_id) {
             if now.duration_since(*last) < self.cooldown {
+                // A queued or running trigger will read the doc's CURRENT hint
+                // when it runs, so a change landing now is already covered. A
+                // sleeping one will not run until its rung fires: take over.
+                // One takeover per rung, since the new trigger clears the mark.
+                if ledger.sleeping.remove(content_id) {
+                    return Ok(());
+                }
                 return Err(EnqueueDecision::Deduped);
             }
             // Expired but present: re-stamping in place cannot grow the map, so
@@ -773,9 +792,21 @@ impl TriggerGate {
         Ok(())
     }
 
+    /// Mark or clear an id's claimed trigger as sleeping on a ladder rung.
+    fn set_sleeping(&self, content_id: &str, sleeping: bool) {
+        if let Ok(mut ledger) = self.claims.lock() {
+            if !sleeping {
+                ledger.sleeping.remove(content_id);
+            } else if ledger.claims.contains_key(content_id) {
+                ledger.sleeping.insert(content_id.to_string());
+            }
+        }
+    }
+
     /// Drop a claim taken but not honoured (the full-queue path).
     fn release(&self, content_id: &str) {
         if let Ok(mut ledger) = self.claims.lock() {
+            ledger.sleeping.remove(content_id);
             ledger.claims.remove(content_id);
         }
     }
@@ -799,6 +830,17 @@ impl ConductorSource for crate::hc_client_registry::HcClientRegistry {
     }
 }
 
+/// What the courier path needs from the node: a way to ask a peer for its head
+/// evidence, and byte presence. See [`crate::services::courier_obey`].
+pub struct TriggerCourier {
+    pub fetcher: Arc<dyn HeadRecordFetcher>,
+    pub bytes: Arc<dyn crate::services::courier_obey::BytePresence>,
+}
+
+/// Filled once the node's peer plane exists, which is after the worker starts;
+/// until then the trigger behaves exactly as it did without a courier.
+pub type CourierSlot = Arc<std::sync::OnceLock<TriggerCourier>>;
+
 /// The serial worker. ONE at a time, on purpose: a seed storm must become a
 /// queue, never 3,500 concurrent zome calls.
 ///
@@ -814,11 +856,17 @@ pub async fn run_head_adoption_trigger_worker(
     conductor: Arc<dyn ConductorSource>,
     pool: DbPool,
     sync: Arc<SyncManager>,
+    courier: CourierSlot,
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
 ) {
     use futures::FutureExt;
 
     let ctx = AppContext::default_lamad();
+    let memo = crate::services::courier_obey::RefusalMemo::new(
+        crate::services::courier_obey::REFUSAL_CAP,
+        crate::services::courier_obey::REFUSAL_TTL,
+        crate::services::courier_obey::COURIER_REFUSAL_LIMIT,
+    );
     tracing::info!(
         target: "elohim_storage::head_adoption_trigger",
         queue_capacity = TRIGGER_QUEUE_CAPACITY,
@@ -841,6 +889,8 @@ pub async fn run_head_adoption_trigger_worker(
             &pool,
             &sync,
             &ctx,
+            &courier,
+            &memo,
             &mut shutdown,
         ))
         .catch_unwind()
@@ -905,6 +955,8 @@ async fn worker_loop(
     pool: &DbPool,
     sync: &SyncManager,
     ctx: &AppContext,
+    courier: &CourierSlot,
+    memo: &crate::services::courier_obey::RefusalMemo,
     shutdown: &mut tokio::sync::broadcast::Receiver<()>,
 ) -> WorkerExit {
     loop {
@@ -915,12 +967,13 @@ async fn worker_loop(
             },
             _ = shutdown.recv() => return WorkerExit::Shutdown,
         };
-        process_trigger(&trigger, conductor, pool, sync, ctx, gate).await;
+        process_trigger(&trigger, conductor, pool, sync, ctx, gate, courier, memo).await;
     }
 }
 
 /// One trigger, start to finish. Separated from the loop so the shutdown/select
 /// plumbing stays readable and the body is directly exercisable.
+#[allow(clippy::too_many_arguments)]
 async fn process_trigger(
     trigger: &HeadAdoptionTrigger,
     conductor: &dyn ConductorSource,
@@ -928,6 +981,8 @@ async fn process_trigger(
     sync: &SyncManager,
     ctx: &AppContext,
     gate: &Arc<TriggerGate>,
+    courier: &CourierSlot,
+    memo: &crate::services::courier_obey::RefusalMemo,
 ) {
     let id = trigger.content_id.as_str();
     let Some(hc) = conductor.hc() else {
@@ -987,6 +1042,17 @@ async fn process_trigger(
     );
     if action != TriggerAction::Probe {
         crate::metrics::inc_head_adoption_trigger(action.label());
+        // Settled without a conductor call: the row already names the doc's
+        // head, or the doc names none. Release the claim so the NEXT change for
+        // this id (the author's next publish) is a new event rather than a
+        // duplicate inside the cooldown. A no-local-row id keeps its claim: that
+        // one is the anti-fabrication bound.
+        if matches!(
+            action,
+            TriggerAction::SkippedCurrent | TriggerAction::NoHintLeftToSweep
+        ) {
+            gate.release(id);
+        }
         if action == TriggerAction::NoLocalRow {
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
@@ -994,6 +1060,13 @@ async fn process_trigger(
                 "head-adoption trigger: no local content row for a peer-named id — \
                  terminal; no conductor call, no ladder"
             );
+            // The row often arrives seconds later (the sweep projects it), and
+            // the author's NEXT publish must not be swallowed by this claim
+            // (2026-09-26 household: B arrived 55 s after A had found no row).
+            // A later change may take the claim over; for an id that never
+            // gets a row that costs one row read per change and no conductor
+            // call, which is the bound this arm exists to keep.
+            gate.set_sleeping(id, true);
         }
         return;
     }
@@ -1047,6 +1120,25 @@ async fn process_trigger(
             "head-adoption trigger: the own conductor cannot yet walk the head this doc \
              names — NOT declaring a stale head; re-probing"
         );
+        // THE COURIER. The peer whose apply raised this trigger declared the head
+        // the doc names and holds its evidence. Ask it, verify read-only in the
+        // own conductor, and stamp only once the bytes are here. A settled answer
+        // ends the ladder; anything else leaves it to the next rung.
+        if let Some(outcome) =
+            try_courier(trigger, &hc, pool, ctx, courier, memo, doc_hint.as_deref()).await
+        {
+            if matches!(
+                outcome,
+                crate::services::courier_obey::CourierOutcome::Stamped
+                    | crate::services::courier_obey::CourierOutcome::Current
+            ) {
+                // The row now names the doc's head; the next change is new.
+                gate.release(id);
+            }
+            if !outcome.retry_warranted() {
+                return;
+            }
+        }
         schedule_reprobe(
             gate,
             trigger,
@@ -1055,6 +1147,44 @@ async fn process_trigger(
         );
         return;
     };
+
+    // THE BYTES BEFORE THE MOVE. The own conductor now answers the head the doc
+    // names, but adopting it repoints the row; if this node does not hold the
+    // version's bytes yet, the page it serves would go from working to 503/404.
+    // Keep serving what we hold, ask for the bytes, and let the next rung adopt.
+    if crate::services::courier_obey::pointer_would_be_left_behind(pool, ctx, id, &head.content) {
+        // A version that names no blob would leave this row's previous pointer
+        // standing under it (`blob_cid: None` preserves the column): the new head
+        // would serve the old bytes. Leave it to the sweep's canonical channels.
+        crate::metrics::inc_head_adoption_trigger("adopt_pointer_absent");
+        return;
+    }
+    if let Some(c) = courier.get() {
+        if !crate::services::courier_obey::bytes_ready(
+            c.bytes.as_ref(),
+            &head.content,
+            id,
+            &trigger.peer,
+        )
+        .await
+        {
+            crate::metrics::inc_head_adoption_trigger("adopt_awaiting_bytes");
+            tracing::debug!(
+                target: "elohim_storage::head_adoption_trigger",
+                content_id = %id,
+                attempt = trigger.attempt,
+                "head-adoption trigger: the head is adoptable but its bytes are not held \
+                 here yet — requested; the row keeps serving the version it holds"
+            );
+            schedule_reprobe(
+                gate,
+                trigger,
+                doc_hint.as_deref(),
+                local_declared.as_deref(),
+            );
+            return;
+        }
+    }
 
     // THE one adoption implementation. `observed(Some(head))` hands it the read
     // just made, so it does not pay for a second one — and `should_probe_election`
@@ -1081,6 +1211,8 @@ async fn process_trigger(
     match outcome {
         AdoptOutcome::Adopted => {
             crate::metrics::inc_head_adoption_trigger("adopted");
+            // The row now names the doc's head; the next change is a new event.
+            gate.release(id);
             // THE confirming line. Pair it with the `Applying changes from peer
             // … node:<slug>` line for the same id: the delta between them is the
             // measurement the 2026-09-17 analysis asked for, and it is now
@@ -1133,6 +1265,66 @@ async fn process_trigger(
             );
         }
     }
+}
+
+/// The courier step of the not-yet-walkable arm. `None` when it did not run:
+/// carry-the-election is off, the node's peer plane is not wired yet, or the doc
+/// names no head.
+#[allow(clippy::too_many_arguments)]
+async fn try_courier(
+    trigger: &HeadAdoptionTrigger,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    courier: &CourierSlot,
+    memo: &crate::services::courier_obey::RefusalMemo,
+    doc_hint: Option<&str>,
+) -> Option<crate::services::courier_obey::CourierOutcome> {
+    use crate::services::courier_obey::{courier_obey, ConductorVerifier, CourierOutcome};
+
+    if !crate::config::obey_carried_election_enabled() {
+        return None;
+    }
+    let (c, hint) = (courier.get()?, doc_hint?);
+    let verifier = ConductorVerifier(hc.clone());
+    let outcome = courier_obey(
+        &verifier,
+        c.fetcher.as_ref(),
+        c.bytes.as_ref(),
+        memo,
+        pool,
+        ctx,
+        &trigger.content_id,
+        &trigger.peer,
+        hint,
+    )
+    .await;
+    crate::metrics::inc_head_adoption_trigger(outcome.label());
+    let elapsed_ms = trigger.raised_at.elapsed().as_millis();
+    if outcome == CourierOutcome::Stamped {
+        crate::metrics::inc_content_head_adopted();
+        tracing::info!(
+            target: "elohim_storage::head_adoption_trigger",
+            content_id = %trigger.content_id,
+            source_peer = %trigger.peer,
+            head = %hint,
+            trigger_to_adopt_ms = elapsed_ms,
+            attempt = trigger.attempt,
+            "head-adoption trigger: ADOPTED the head a sibling just declared, on its own \
+             election evidence verified read-only here, before the election gossiped in"
+        );
+    } else {
+        tracing::debug!(
+            target: "elohim_storage::head_adoption_trigger",
+            content_id = %trigger.content_id,
+            source_peer = %trigger.peer,
+            outcome = outcome.label(),
+            trigger_to_adopt_ms = elapsed_ms,
+            attempt = trigger.attempt,
+            "head-adoption trigger: courier path did not adopt"
+        );
+    }
+    Some(outcome)
 }
 
 /// Book the next rung of the ladder, when one is warranted.
@@ -1254,6 +1446,47 @@ mod tests {
     }
 
     // ── dedup + cooldown (one structure, both obligations) ───────────────────
+
+    #[test]
+    fn a_settled_id_is_released_so_the_authors_next_publish_is_a_new_event() {
+        // 2026-09-26 household run: the author's second publish arrived 45 s
+        // after the first; the first's claim was still inside the cooldown, so
+        // the survivor never asked about the new head.
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        let t0 = Instant::now();
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0),
+            EnqueueDecision::Enqueued
+        );
+        let _ = rx.try_recv();
+        gate.release("alpha");
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0 + Duration::from_secs(45)),
+            EnqueueDecision::Enqueued
+        );
+    }
+
+    #[test]
+    fn a_change_while_the_claimed_trigger_sleeps_on_a_rung_takes_the_claim_over_once() {
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        let t0 = Instant::now();
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0),
+            EnqueueDecision::Enqueued
+        );
+        let _ = rx.try_recv();
+        gate.set_sleeping("alpha", true);
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0 + Duration::from_secs(45)),
+            EnqueueDecision::Enqueued,
+            "the author's next publish is processed now, not after the rung"
+        );
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0 + Duration::from_secs(46)),
+            EnqueueDecision::Deduped,
+            "one takeover per rung: the new trigger is queued"
+        );
+    }
 
     #[test]
     fn claim_dedups_a_second_offer_for_the_same_id() {

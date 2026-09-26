@@ -487,6 +487,9 @@ pub struct HttpServer {
     reach_gates_prepared: Arc<std::sync::atomic::AtomicUsize>,
     /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
+    /// The `content_diesel::pointer_generation` the slug index was last loaded
+    /// at; `u64::MAX` until the first load.
+    slug_index_generation: Arc<std::sync::atomic::AtomicU64>,
     /// Write-admission limiter (mutating requests): prevents OOM under burst
     /// traffic (e.g., HTML5 app loads, seed storms). Reads use `read_semaphore`.
     request_semaphore: Arc<Semaphore>,
@@ -1247,6 +1250,7 @@ impl HttpServer {
             search_index: None,
             reach_gates_prepared: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            slug_index_generation: Arc::new(std::sync::atomic::AtomicU64::new(u64::MAX)),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             read_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_READS)),
             embedded_conductor: false,
@@ -1709,8 +1713,25 @@ impl HttpServer {
         self
     }
 
+    /// Reload the slug index when a declared head or blob pointer has moved
+    /// since it was loaded (`content_diesel::pointer_generation`). Called by the
+    /// `/apps` resolvers before they read it.
+    async fn refresh_slug_index_if_moved(&self) {
+        let current = db::content_diesel::pointer_generation();
+        if self
+            .slug_index_generation
+            .load(std::sync::atomic::Ordering::Acquire)
+            != current
+        {
+            self.load_slug_index().await;
+        }
+    }
+
     /// Load the slug index from database (call after db_pool is set)
     pub async fn load_slug_index(&self) {
+        // Read the generation BEFORE the rows, so a move that lands during the
+        // load is seen as newer on the next request rather than lost.
+        let generation = db::content_diesel::pointer_generation();
         let mut conn = match self.get_conn() {
             Ok(c) => c,
             Err(e) => {
@@ -1774,6 +1795,8 @@ impl HttpServer {
             }
         }
         info!(count = index.len(), "Slug index loaded");
+        self.slug_index_generation
+            .store(generation, std::sync::atomic::Ordering::Release);
     }
 
     /// Get a connection from the Diesel pool
@@ -4011,33 +4034,12 @@ impl HttpServer {
             return true;
         }
 
+        // Erasure-coded manifests are available once `data_shards` of them are
+        // held — that is what parity buys, and it is what
+        // `reassemble_from_local_shards` will actually serve.
         match self.resolve_manifest(&hash).await {
-            Some(manifest) if manifest.encoding != "none" => {
-                if manifest.shard_hashes.is_empty() {
-                    return false;
-                }
-                // Erasure-coded manifests are available once `data_shards` of
-                // them are held — that is what parity buys, and it is what
-                // `reassemble_from_local_shards` will actually serve. Requiring
-                // all seven here would make the presence twin disagree with the
-                // read it is supposed to predict.
-                if !matches!(manifest.encoding.as_str(), "chunked") {
-                    let mut present = 0usize;
-                    for shard_hash in &manifest.shard_hashes {
-                        if self.blob_store.exists(shard_hash).await {
-                            present += 1;
-                        }
-                    }
-                    return present >= manifest.data_shards as usize;
-                }
-                for shard_hash in &manifest.shard_hashes {
-                    if !self.blob_store.exists(shard_hash).await {
-                        return false;
-                    }
-                }
-                true
-            }
-            _ => false,
+            Some(manifest) => self.blob_store.holds_as_shards(&manifest).await,
+            None => false,
         }
     }
 
@@ -8610,11 +8612,9 @@ impl HttpServer {
 
     /// Resolve the blob named by an already-elected subordinate candidate.
     ///
-    /// The public [`crate::sync::SyncManager::declared_head_blob`] resolver is
-    /// intentionally not used here: its anti-laundering gate accepts only the
-    /// elected public head, while `candidate_action` is subordinate to that
-    /// head. Instead, this asks the same local conductor for the exact record
-    /// and hands those opaque bytes back to the coordinator's existing
+    /// The content doc's head blob is never consulted: it is unauthenticated
+    /// peer input (story 1.4c). This asks the same local conductor for the exact
+    /// record and hands those opaque bytes back to the coordinator's existing
     /// cryptographic verifier. The verifier binds action hash, signature,
     /// entry hash, and Content id; storage adds only the local-byte check.
     async fn resolve_exact_candidate_blob(
@@ -10466,6 +10466,7 @@ impl HttpServer {
         let (resolved_slug, blob_hash) = if is_cid {
             (None, Some(canonical.clone()))
         } else {
+            self.refresh_slug_index_if_moved().await;
             let hash = self.slug_index.read().await.get(identifier).cloned();
             (Some(identifier.to_string()), hash)
         };
@@ -10580,6 +10581,7 @@ impl HttpServer {
         let (resolved_slug, cached_blob_hash) = if is_cid {
             (None, Some(canonical.clone()))
         } else {
+            self.refresh_slug_index_if_moved().await;
             let hash = {
                 let index = self.slug_index.read().await;
                 index.get(identifier).cloned()
@@ -10800,38 +10802,13 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // C3 read side (Plan C3 / notary-authority): honor the notary-DECLARED
-        // canonical head over "whatever this peer last authored". For a slug/id
-        // (never a bare CID), prefer the declared head's blob when it is a
-        // distinct, LOCALLY-PRESENT blob whose declared-head hint matches the
-        // row — otherwise degrade to the resolved own-row `blob_hash`
-        // (`declared_head_served_blob` never fans out; the own hash still rides
-        // the existing `get_blob_or_heal`/T17 peer-fallback below). Keep the
-        // slug_index coherent so the O(1) fast path serves the same head next
-        // time.
-        let blob_hash = if is_cid {
-            blob_hash
-        } else if let Some(content) = self.lookup_app_content(identifier).await {
-            match self.declared_head_served_blob(&content).await {
-                Some(head_blob) => {
-                    info!(
-                        identifier = %identifier,
-                        own_blob = %blob_hash,
-                        declared_head_blob = %head_blob,
-                        "C3: serving notary-declared head blob over own-row blob"
-                    );
-                    self.slug_index
-                        .write()
-                        .await
-                        .insert(identifier.to_string(), head_blob.clone());
-                    head_blob
-                }
-                None => blob_hash,
-            }
-        } else {
-            blob_hash
-        };
-
+        // The row's own `blob_hash` is the only pointer served. Every channel that
+        // moves a declared head writes the verified pointer in the same stamp
+        // (adoption, the courier path, the pointer audit), so there is nothing
+        // for a second source to add — and the one that used to be consulted, the
+        // content doc's head blob, is unauthenticated peer input: a doc whose head
+        // hint matched the row could name any locally held blob and have it served
+        // under a verified head (story 1.4c).
         debug!(identifier = %identifier, blob_hash = %blob_hash, "Found blob hash");
 
         // Fetch the ZIP from the blob store, healing from peers on a local miss
@@ -11111,94 +11088,6 @@ impl HttpServer {
         }
 
         Ok(found_hash)
-    }
-
-    /// Resolve the app-bundle content ROW backing an `/apps/{identifier}` request
-    /// — matched by row id OR inner `content_body.slug`, across the app-bundle
-    /// formats, at the Amber serving floor (same query surface as
-    /// `lookup_slug_blob_hash` / `load_slug_index`). Returns the full row so the
-    /// C3 read side can consult its `declared_head_action_hash`.
-    ///
-    /// `None` on: no DB pool, query error, or no matching row (a bare CID
-    /// identifier has no row here and never reaches this helper).
-    async fn lookup_app_content(&self, identifier: &str) -> Option<crate::db::models::Content> {
-        let mut conn = self.get_conn().ok()?;
-        let app_ctx = db::AppContext::default_lamad();
-        const APP_BUNDLE_FORMATS: [&str; 2] = ["html5-app", "spa-bundle"];
-        for fmt in APP_BUNDLE_FORMATS {
-            let query = ContentQuery {
-                content_format: Some(fmt.to_string()),
-                limit: 100,
-                ..Default::default()
-            };
-            let items = db::content_diesel::list_content(
-                &mut conn,
-                &app_ctx,
-                &query,
-                db::content_diesel::MinTrust::Amber,
-            )
-            .ok()?;
-            for item in items {
-                if item.content.id == identifier {
-                    return Some(item.content);
-                }
-                if let Some(ref content_body) = item.content.content_body {
-                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                        if obj.get("slug").and_then(|v| v.as_str()) == Some(identifier) {
-                            return Some(item.content);
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// C3 read side (Plan C3 / notary-authority): the notary-DECLARED head's blob
-    /// for `content`, IFF it is a DISTINCT, LOCALLY-PRESENT blob whose declared-
-    /// head hint matches the row's `declared_head_action_hash`. `None` ⇒ degrade
-    /// to the row's own `blob_hash` (the current serve behavior).
-    ///
-    /// The serve path prefers the elected canonical head over "whatever this peer
-    /// last authored" (the head-election gap the notary-authority spine names),
-    /// but NEVER fans out: if the declared head's bytes are not already local,
-    /// this returns `None` and the caller serves the own row — the replication
-    /// plane heals absence (doorway single-target doctrine; peer-fallback for the
-    /// served hash still rides the existing `get_blob_or_heal`/T17 sequence).
-    async fn declared_head_served_blob(
-        &self,
-        content: &crate::db::models::Content,
-    ) -> Option<String> {
-        let declared = content
-            .declared_head_action_hash
-            .as_deref()
-            .filter(|h| !h.is_empty())?;
-        let sync = self.sync_manager.as_ref()?;
-        let doc_id = crate::sync::projector::content_doc_id(&content.id);
-        let head_blob = sync
-            .declared_head_blob(
-                crate::sync::projector::PROJECTION_NAMESPACE,
-                &doc_id,
-                declared,
-            )
-            .await?;
-        // Identical to the row's own blob → nothing to prefer.
-        if Some(head_blob.as_str()) == content.blob_hash.as_deref() {
-            return None;
-        }
-        // Local-presence gate — NEVER fan out to fetch a declared head we don't
-        // hold; degrade to the own row and let the replication plane heal.
-        //
-        // Manifest-aware by way of `blob_available_locally`: a `>16MB` bundle is
-        // held as its manifest's shards, never as a file under the composite's
-        // own name, so a raw `exists_by_address` probe answered "absent" for
-        // every oversized declared head — which meant no oversized bundle could
-        // ever be served as its notary-declared head.
-        if self.blob_available_locally(&head_blob).await {
-            Some(head_blob)
-        } else {
-            None
-        }
     }
 
     // ========================================================================
@@ -21130,13 +21019,6 @@ mod admission_tests {
     }
 }
 
-// =============================================================================
-// C3 read side — serve-path prefers the notary-DECLARED head blob (Plan C3 /
-// notary-authority). Exercises `declared_head_served_blob` across the three
-// cases the spine names: declared head present+distinct+LOCAL → serve head;
-// no declared head → own row; declared head present but blob NOT local → own
-// row (degrade; never fan out — the replication plane heals absence).
-// =============================================================================
 #[cfg(test)]
 mod conductor_diagnostics_tests {
     use super::project_agent_info;
@@ -21257,215 +21139,6 @@ mod conductor_diagnostics_tests {
         assert_eq!(v["raw"], "not json at all");
         let v2 = project_agent_info(r#"{"agentInfo":"{broken","signature":"x"}"#);
         assert_eq!(v2["raw"], r#"{"agentInfo":"{broken","signature":"x"}"#);
-    }
-}
-
-#[cfg(test)]
-mod c3_serve_head_preference_tests {
-    use super::*;
-    use crate::db::models::Content;
-    use crate::sync::{DocStore, DocStoreConfig, StreamTracker, SyncManager};
-
-    fn content_row(id: &str, own_blob: Option<&str>, declared: Option<&str>) -> Content {
-        Content {
-            id: id.to_string(),
-            h_app_id: "lamad".to_string(),
-            title: id.to_string(),
-            description: None,
-            content_type: "concept".to_string(),
-            content_format: "spa-bundle".to_string(),
-            blob_hash: own_blob.map(str::to_string),
-            blob_cid: None,
-            content_size_bytes: None,
-            metadata_json: Some("{}".to_string()),
-            reach: "commons".to_string(),
-            validation_status: "valid".to_string(),
-            created_by: None,
-            created_at: "2026-07-10T00:00:00Z".to_string(),
-            updated_at: "2026-07-10T00:00:00Z".to_string(),
-            content_body: None,
-            // A verified declared-head stamp mirrors the action into both fields.
-            dht_anchor_hash: declared.map(str::to_string),
-            p2p_published_at: None,
-            server_blob_hash: None,
-            crdt_converged_at: None,
-            declared_head_action_hash: declared.map(str::to_string),
-            declared_head_at: None,
-            canonical_declared_at: None,
-            canonical_earned: None,
-            dht_anchor_state: None,
-            dht_anchor_checked_at: None,
-        }
-    }
-
-    /// Build a SyncManager whose doc for `id` projects `head_blob` as the head
-    /// version with `declared` as the `headActionHash` hint (the shape the REQ-F4
-    /// gate matches against).
-    async fn sync_with_head_doc(
-        id: &str,
-        head_blob: &str,
-        declared: &str,
-    ) -> (Arc<SyncManager>, tempfile::TempDir) {
-        let temp = tempfile::tempdir().unwrap();
-        let doc_store = Arc::new(
-            DocStore::new(DocStoreConfig {
-                db_path: temp.path().join("c3.sled"),
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
-        let sync = Arc::new(SyncManager::new(doc_store, Arc::new(StreamTracker::new())));
-        let head_content = content_row(id, Some(head_blob), Some(declared));
-        crate::sync::projector::project_content_doc(sync.as_ref(), &head_content)
-            .await
-            .unwrap();
-        (sync, temp)
-    }
-
-    fn well_formed_absent_addr(byte: &str) -> String {
-        format!("sha256-{}", byte.repeat(32))
-    }
-
-    /// (a) Declared head present, distinct from the own row, and its bytes are
-    /// LOCALLY present → the serve path prefers the declared head's blob.
-    #[tokio::test]
-    async fn serves_declared_head_blob_when_present_and_local() {
-        let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
-        );
-        let head_hash = blob_store
-            .store(b"DECLARED-HEAD-BUNDLE")
-            .await
-            .unwrap()
-            .hash;
-        let (sync, _t) = sync_with_head_doc("epr-c3-a", &head_hash, "uhCkkDECLARED").await;
-        let server =
-            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
-
-        // Own row points at a DIFFERENT (distinct) blob than the declared head.
-        let row = content_row(
-            "epr-c3-a",
-            Some(&well_formed_absent_addr("cd")),
-            Some("uhCkkDECLARED"),
-        );
-        let got = server.declared_head_served_blob(&row).await;
-        assert_eq!(
-            got.as_deref(),
-            Some(head_hash.as_str()),
-            "declared head blob is distinct + local → serve it over the own row"
-        );
-    }
-
-    /// (a2) Declared head is a `>16MB` composite: its bytes live only as the
-    /// manifest-named shards, never under the composite's own name. A raw
-    /// filesystem probe therefore answers "absent" for a blob `/blob/{head}`
-    /// serves in full, so the local-presence gate must read through the same
-    /// manifest-aware seam the serving path uses — otherwise no oversized
-    /// bundle can EVER be served as its notary-declared head.
-    #[tokio::test]
-    async fn serves_declared_head_blob_when_only_its_shards_are_local() {
-        let dir = tempfile::tempdir().unwrap();
-        let blob_store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
-
-        // The shards are ordinary content-addressed blobs; the composite is not
-        // stored under its own name — exactly what `put_blob_bytes` leaves.
-        let shard_a = blob_store.store(b"HEAD-SHARD-A").await.unwrap().hash;
-        let shard_b = blob_store.store(b"HEAD-SHARD-B").await.unwrap().hash;
-        let head_hash = well_formed_absent_addr("1a");
-
-        let pool = crate::test_util::test_pool();
-        {
-            let mut conn = pool.get().unwrap();
-            let manifest = ShardManifest {
-                blob_cid: String::new(),
-                blob_hash: head_hash.clone(),
-                total_size: 24,
-                mime_type: "application/zip".to_string(),
-                encoding: "chunked".to_string(),
-                data_shards: 2,
-                total_shards: 2,
-                shard_size: 12,
-                shard_hashes: vec![shard_a, shard_b],
-                reach: "commons".to_string(),
-                author_id: None,
-                created_at: "2026-08-16T00:00:00Z".to_string(),
-                verified_at: None,
-            };
-            crate::db::shard_manifests::record_generated_manifest(
-                &mut conn,
-                &format!("blob:{head_hash}"),
-                "lamad",
-                &manifest,
-            )
-            .expect("persist declared-head manifest");
-        }
-
-        let (sync, _t) = sync_with_head_doc("epr-c3-a2", &head_hash, "uhCkkDECLARED").await;
-        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
-            .with_sync_manager(sync)
-            .with_db_pool(pool);
-
-        let row = content_row(
-            "epr-c3-a2",
-            Some(&well_formed_absent_addr("cd")),
-            Some("uhCkkDECLARED"),
-        );
-        assert_eq!(
-            server.declared_head_served_blob(&row).await.as_deref(),
-            Some(head_hash.as_str()),
-            "a sharded declared head whose shards are ALL local counts as locally \
-             present — the composite is never a file, so a raw exists() probe lies"
-        );
-    }
-
-    /// (b) No declared head on the row → nothing to prefer; degrade to own row.
-    #[tokio::test]
-    async fn degrades_to_own_when_no_declared_head() {
-        let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
-        );
-        let (sync, _t) =
-            sync_with_head_doc("epr-c3-b", &well_formed_absent_addr("ef"), "uhCkkDECLARED").await;
-        let server =
-            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
-
-        let row = content_row("epr-c3-b", Some(&well_formed_absent_addr("cd")), None);
-        assert_eq!(
-            server.declared_head_served_blob(&row).await,
-            None,
-            "no declared head → serve the own row"
-        );
-    }
-
-    /// (c) Declared head present but its bytes are NOT locally held → degrade to
-    /// own row (never fan out; the replication plane heals absence).
-    #[tokio::test]
-    async fn degrades_to_own_when_declared_head_blob_absent_locally() {
-        let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
-        );
-        let absent_head = well_formed_absent_addr("ab");
-        let (sync, _t) = sync_with_head_doc("epr-c3-c", &absent_head, "uhCkkDECLARED").await;
-        let server =
-            HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_sync_manager(sync);
-
-        let row = content_row(
-            "epr-c3-c",
-            Some(&well_formed_absent_addr("cd")),
-            Some("uhCkkDECLARED"),
-        );
-        assert_eq!(
-            server.declared_head_served_blob(&row).await,
-            None,
-            "declared head blob absent locally → degrade to own row, do NOT fan out"
-        );
     }
 }
 

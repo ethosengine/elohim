@@ -519,7 +519,9 @@ lazy_static! {
     /// requires an UNDECLARED local row) never fires and no election is ever
     /// created for the arbiter to run on.
     ///
-    /// Sources: `adopt_peer` (the adopt-before-author pre-flight), `http`
+    /// Sources: `author_publish` (a publish PATCH declaring the author's own
+    /// election for the version it committed), `adopt_peer` (the
+    /// adopt-before-author pre-flight), `http`
     /// (`POST /db/content/{id}/canonical-head`, i.e. the deploy's stage-spa-blob
     /// declare), and the two CONTEST shapes —
     /// - `contest_peer_head` — nominated the peer's head, carried over
@@ -1560,7 +1562,18 @@ lazy_static! {
     ///   which this path deliberately does NOT act on;
     /// - `no_bridge` / `failed` — no conductor yet, or a local read failed. The
     ///   sweep remains the backstop in both cases, so these are not errors —
-    ///   they are the visible statement that the trigger did nothing here.
+    ///   they are the visible statement that the trigger did nothing here;
+    /// - `courier_*` — the courier path after a `not_yet_walkable` probe
+    ///   ([`crate::services::courier_obey::CourierOutcome::label`]).
+    ///   `courier_obeyed` is the adoption the sibling's evidence made possible
+    ///   before gossip; `courier_awaiting_bytes` is a verified head held back
+    ///   until its bytes are here; `courier_refused` is evidence the own
+    ///   conductor rejected, and should be zero between honest peers;
+    /// - `adopt_awaiting_bytes` — the own conductor answered the doc's head, but
+    ///   this node does not hold its bytes yet, so the row keeps serving the
+    ///   version it holds and the next rung adopts once they arrive;
+    /// - `adopt_pointer_absent` — the adoptable head names no blob while this
+    ///   row serves one; adopting would leave the old bytes under the new head.
     pub static ref HEAD_ADOPTION_TRIGGER: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_head_adoption_trigger_total",

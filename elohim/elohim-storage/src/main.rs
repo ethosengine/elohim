@@ -1400,6 +1400,11 @@ async fn async_main(
 
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
+    // The head-adoption trigger's courier (see `services::courier_obey`): the
+    // trigger starts before the peer plane exists, so it gets a slot that is
+    // filled once the reconcile peers are built.
+    let trigger_courier_slot: elohim_storage::services::head_adoption_trigger::CourierSlot =
+        Arc::new(std::sync::OnceLock::new());
 
     // One-shot shard-manifest backfill (no-p2p build). The p2p build runs the
     // distribution-capable variant later, once the p2p handle exists; here we
@@ -3420,6 +3425,7 @@ async fn async_main(
                 registry,
                 pool,
                 trigger_sync,
+                trigger_courier_slot.clone(),
                 trigger_shutdown,
             ));
         } else {
@@ -5659,6 +5665,7 @@ async fn async_main(
         // asked, across two full fleet reboots. Dual now means dual: the legs
         // compose (union of peers, transport-shaped fallthrough) via
         // `CompositeReconcilePeers`.
+        let trigger_command_tx = p2p_handle.as_ref().map(|h| h.command_sender());
         let libp2p_leg: Option<Arc<dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers>> =
             match p2p_handle {
                 Some(handle) => Some(Arc::new(handle)),
@@ -5714,6 +5721,26 @@ async fn async_main(
                 }
                 (None, None) => None,
             };
+        // The adoption trigger's courier: the same peer source the reconcile
+        // arms ask, and byte presence over this node's blob store. Filled here
+        // because this is where the peer plane first exists; the trigger runs
+        // without it until then.
+        if let (Some(peers), Some(pool), Some(command_tx)) =
+            (reconcile_peers.clone(), db_pool.clone(), trigger_command_tx)
+        {
+            let _ = trigger_courier_slot.set(
+                elohim_storage::services::head_adoption_trigger::TriggerCourier {
+                    fetcher: Arc::new(
+                        elohim_storage::p2p::trigger_courier::OwnedPeerHeadRecordFetcher(peers),
+                    ),
+                    bytes: Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {
+                        blob_store: blob_store.clone(),
+                        pool,
+                        command_tx,
+                    }),
+                },
+            );
+        }
         match (reconcile_secs, reconcile_peers, db_pool.clone()) {
             (0, _, _) => {
                 info!("projection-reconcile: disabled (PROJECTION_RECONCILE_SECS=0)");

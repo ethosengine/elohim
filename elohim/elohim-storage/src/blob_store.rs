@@ -192,7 +192,9 @@ impl BlobStore {
     fn blob_path(&self, hash: &str) -> PathBuf {
         // Use first 4 chars of hash (after "sha256-") as subdirectory for better filesystem distribution
         let hash_part = hash.strip_prefix("sha256-").unwrap_or(hash);
-        let subdir = &hash_part[..4.min(hash_part.len())];
+        // `get`, not indexing: a malformed hash (a shard name read from a peer's
+        // manifest) with a multibyte character across byte four must not panic.
+        let subdir = hash_part.get(..4).unwrap_or(hash_part);
         self.root_dir.join("blobs").join(subdir).join(hash)
     }
 
@@ -408,6 +410,37 @@ impl BlobStore {
     pub async fn exists(&self, hash: &str) -> bool {
         fs::metadata(self.blob_path(hash)).await.is_ok()
             || crate::compute_payload_store::contains(&self.root_dir, hash).await
+    }
+
+    /// Do we hold the blob a shard manifest describes, as shards?
+    ///
+    /// The shard half of "do we hold this blob locally": `put_blob_bytes` files a
+    /// large blob under its shards' hashes and never under the composite's own
+    /// name, so [`Self::exists`] on the composite answers "absent" for bytes we
+    /// fully hold. Callers check `exists` first and fall back to this with the
+    /// manifest they resolved. An erasure-coded manifest is held once
+    /// `data_shards` of its shards are, since that is what reassembly needs; a
+    /// `chunked` manifest needs every chunk; a `none` manifest names the
+    /// composite itself and holds nothing beyond it.
+    pub async fn holds_as_shards(&self, manifest: &crate::sharding::ShardManifest) -> bool {
+        if manifest.encoding == "none" || manifest.shard_hashes.is_empty() {
+            return false;
+        }
+        if manifest.encoding != "chunked" {
+            let mut present = 0usize;
+            for shard_hash in &manifest.shard_hashes {
+                if self.exists(shard_hash).await {
+                    present += 1;
+                }
+            }
+            return present >= manifest.data_shards as usize;
+        }
+        for shard_hash in &manifest.shard_hashes {
+            if !self.exists(shard_hash).await {
+                return false;
+            }
+        }
+        true
     }
 
     /// Check if a blob exists by CID or hash

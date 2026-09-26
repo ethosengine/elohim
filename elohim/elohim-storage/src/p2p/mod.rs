@@ -81,6 +81,7 @@ pub mod sync_state; // the sync-state contract: epoch before position, caught-up
 pub mod topics;
 pub mod transport_manifest_gossip;
 pub mod transport_paths; // PathObservation + select_path — transport self-awareness (spec 2026-08-24 §3.1)
+pub mod trigger_courier; // the node's half of the adoption trigger's courier path: owned head-record fetcher + byte presence
 pub mod trust_cache;
 pub mod trust_protocol;
 pub mod view_federation;
@@ -1314,6 +1315,17 @@ pub enum P2PCommand {
     /// which relay they call home. Producer: `conductor_agent_info_gossip::publish_once`.
     /// See `genesis/docs/superpowers/specs/2026-05-28-conductor-agent-info-substrate-gossip-design.md`.
     PublishConductorAgentInfo(crate::p2p::conductor_agent_info_gossip::ConductorAgentInfo),
+    /// Pull a blob from peers that advertise it, when this node lacks it — the
+    /// hash-keyed form of the content-heal leg's eager byte fetch. Sent by the
+    /// head-adoption trigger's bytes gate, which will not move a declared head
+    /// onto bytes this node does not hold. Fire-and-forget: the trigger's
+    /// re-probe ladder re-checks presence, and a dropped request costs latency,
+    /// never correctness. `origin` names the asker for the logs only.
+    HealBlobBytes {
+        origin: String,
+        hash: String,
+        holder_hint: Option<String>,
+    },
     /// Advertise that this node holds the EPR atom with the given CID by issuing
     /// `kademlia.start_providing(...)`. Triggered by `FederatedEprStore::put`
     /// when the fanout policy includes a Kad/KadLight channel for the EPR's reach.
@@ -1638,6 +1650,7 @@ impl P2PHandle {
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
                     P2PCommand::PublishConductorAgentInfo(_) => {} // fire-and-forget
+                    P2PCommand::HealBlobBytes { .. } => {}  // fire-and-forget
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                     P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
                     P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
@@ -4950,6 +4963,14 @@ impl P2PNode {
             // Step-zero substrate gossip: publish a Holochain conductor's
             // agent_info JSON via DualGossipPublisher. Best-effort — publish
             // failure is logged and the next 60s heartbeat retries.
+            P2PCommand::HealBlobBytes {
+                origin,
+                hash,
+                holder_hint,
+            } => {
+                self.heal_blob_hash_if_absent(&origin, hash, holder_hint)
+                    .await;
+            }
             P2PCommand::PublishConductorAgentInfo(payload) => match payload.to_bytes() {
                 Ok(bytes) => {
                     if let Err(e) = self.gossip_publisher.publish(
@@ -8698,9 +8719,6 @@ impl P2PNode {
     /// commitment-scored placement; plain freshness-windowed inventory order
     /// is enough and keeps this path free of the transport-manifest seam.
     async fn heal_blob_bytes_if_absent(&self, doc_id: &str) {
-        use crate::p2p::blob_fetch::finalize_fetch_success;
-        use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
-
         let Ok(hash) = self
             .sync_manager
             .get_doc_field(
@@ -8712,6 +8730,27 @@ impl P2PNode {
         else {
             return; // no blobHash on the doc — nothing to pull
         };
+        self.heal_blob_hash_if_absent(doc_id, hash, None).await;
+    }
+
+    /// The hash-keyed body of [`Self::heal_blob_bytes_if_absent`]: pull `hash`
+    /// from peers that advertise it when the local store lacks it. `origin`
+    /// names who asked (a doc id, or `head-adoption:<id>` for the adoption
+    /// trigger's bytes gate) and appears only in logs. Same bounds as the doc
+    /// path: drop on a saturated `commitment_fetch_semaphore`, candidates from
+    /// fresh inventory, one race per call. `holder_hint` is a peer the asker
+    /// believes holds the bytes (the adoption trigger's courier, which just
+    /// published them and may not have advertised them yet); it joins the
+    /// candidates, and the fetched bytes are verified by hash like any other.
+    async fn heal_blob_hash_if_absent(
+        &self,
+        doc_id: &str,
+        hash: String,
+        holder_hint: Option<String>,
+    ) {
+        use crate::p2p::blob_fetch::finalize_fetch_success;
+        use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
+
         if hash.is_empty() || self.blob_store.exists(&hash).await {
             return;
         }
@@ -8756,7 +8795,7 @@ impl P2PNode {
         tokio::spawn(async move {
             let _permit = permit; // held for task lifetime; releases on drop
 
-            let candidates: Vec<String> = match pool.get() {
+            let mut candidates: Vec<String> = match pool.get() {
                 Ok(mut c) => {
                     crate::db::peer_blob_inventory::lookup_hosts(&mut c, &hash, &fresh_after)
                         .unwrap_or_default()
@@ -8766,6 +8805,11 @@ impl P2PNode {
                 }
                 Err(_) => return,
             };
+            if let Some(hint) = holder_hint.filter(|h| !h.is_empty()) {
+                if !candidates.contains(&hint) {
+                    candidates.insert(0, hint);
+                }
+            }
             let connected_set: std::collections::HashSet<String> = peer_metrics
                 .iter()
                 .filter_map(|e| {

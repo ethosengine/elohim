@@ -352,6 +352,64 @@ impl ContentService {
     /// NOTARY-DECLARED head, and is required at every call site rather than
     /// defaulted — see [`content_diesel::HeadElection`]. Request-borne
     /// re-notarization declares; the heal-class re-author sweeps preserve.
+    /// The author's publish is the head-declaration act, so it also declares the
+    /// author's own staging election for the version it just committed. The
+    /// caller records the returned ordering on the row in the same transaction
+    /// that declares the version there.
+    ///
+    /// Two things follow. Siblings can adopt the version from the author's own
+    /// signed election before it gossips in (`services::courier_obey`); the
+    /// author's standing over its own version is what they check. And the row
+    /// never names a published version with a cleared ordering, which a stale
+    /// sibling doc still naming the previous head could otherwise use to roll
+    /// the author back (a complete old election beats a NULL ordering).
+    ///
+    /// `None` when the election could not be declared or is out-voted (an earned
+    /// head stands over this publish): the row then keeps the declaration the
+    /// publish makes, with no ordering, exactly as before this existed, and
+    /// siblings adopt only once some election for the version reaches them.
+    async fn declare_author_election(
+        &self,
+        hc: &Arc<HcClient>,
+        id: &str,
+        action: &str,
+    ) -> Option<(content_diesel::CanonicalOrdering, i64)> {
+        let declared = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            conductor_writes::call_declare_canonical_content_head(
+                hc,
+                id,
+                action.to_string(),
+                None,
+                false,
+            ),
+        )
+        .await;
+        let declared = match declared {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(
+                    content_id = %id, head = %action, error = %e,
+                    "publish: the author's own election for its new version was not declared; \
+                     siblings cannot adopt it from carried evidence until an election for it exists"
+                );
+                return None;
+            }
+        };
+        crate::metrics::inc_content_canonical_link_minted("author_publish");
+        if declared.head_action_hash.to_string() != action {
+            tracing::info!(
+                content_id = %id, head = %action, elected = %declared.head_action_hash,
+                "publish: the author's election for its new version is out-voted (an earned \
+                 head stands over it); the row keeps the declaration the publish makes"
+            );
+            return None;
+        }
+        declared
+            .canonical_ordering()
+            .map(|ordering| (ordering, declared.declared_at))
+    }
+
     pub async fn update_via_conductor(
         &self,
         hc: &Arc<HcClient>,
@@ -525,16 +583,50 @@ impl ContentService {
             reach: Some(oc.reach.clone()),
             metadata_json: Some(oc.metadata_json.clone()),
         };
+        // Declare the author's own election for the version BEFORE the row names
+        // it, so the declaration and its ordering land together below: a row
+        // naming B with a cleared ordering is exactly what an older complete
+        // election could otherwise beat.
+        let author_election = if matches!(election, content_diesel::HeadElection::Declare) {
+            self.declare_author_election(hc, id, &action_hash_str).await
+        } else {
+            None
+        };
         {
-            let mut conn = self.conn()?;
-            content_diesel::upsert_with_anchor(
-                &mut conn,
-                &self.ctx,
-                id,
-                patch,
-                &action_hash_str,
-                election,
-            )?;
+            use diesel::Connection;
+            let mut pooled = self.conn()?;
+            let conn: &mut diesel::SqliteConnection = &mut pooled;
+            let ctx = &self.ctx;
+            conn.transaction::<_, StorageError, _>(|conn| {
+                content_diesel::upsert_with_anchor(
+                    conn,
+                    ctx,
+                    id,
+                    patch,
+                    &action_hash_str,
+                    election,
+                )?;
+                if let Some((ordering, declared_at)) = author_election {
+                    let outcome = content_diesel::stamp_declared_head_mode(
+                        conn,
+                        ctx,
+                        id,
+                        &action_hash_str,
+                        Some(declared_at),
+                        None,
+                        content_diesel::StampMode::HealCanonical,
+                        Some(ordering),
+                    )?;
+                    if outcome != content_diesel::StampOutcome::Refreshed {
+                        tracing::warn!(
+                            content_id = %id, head = %action_hash_str, outcome = ?outcome,
+                            "publish: the author's election ordering was not recorded on the \
+                             row the publish just declared"
+                        );
+                    }
+                }
+                Ok(())
+            })?;
         }
 
         // Mirror the COMMITTED reach into SQL when the re-publish carried a
