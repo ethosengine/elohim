@@ -46,9 +46,12 @@ Three things it does that a bare command line in settings.json cannot, and each 
    budget). It never parses the entry to decide who wrote it: at the edit moment it appends a
    harness WRITE WITNESS (`.eprfs/status/memory-writes.jsonl`: path, sha256 of the exact bytes,
    its own session, the instant it saw them) and asks `epr flow memory attribution`, the one
-   authority, for the rest. The native verb reads the entry through the one frontmatter parser
-   (its `originSessionId` governs; `modified` is its write instant), else the witness of its
-   exact bytes, and authors it by the claim that writer held AT that instant — a claim made
+   authority, for the rest. The native verb names the writer of the CURRENT bytes from the
+   earliest witness of those exact bytes (its `observedAt` is the write instant), and only for a
+   legacy entry with no witness from the one frontmatter parser (`originSessionId`, `modified`);
+   it authors the entry by the claim that writer held AT that instant — an edit by a participant
+   other than the entry's contributor is reported (`editedByAnotherParticipant`) and never
+   imported — a claim made
    later never takes it, and an ambiguous write time (no `modified`, no matching witness; live
    mtime drifts) is never guessed. Workers serialize on one flock (two quick edits never race),
    then project and install under the guard above. Every step is one JSON line in a bounded log
@@ -63,7 +66,14 @@ Three things it does that a bare command line in settings.json cannot, and each 
    `unattributable — awaiting its author or the standing human's claim` with the verb's reason,
    and its row is the one row the install guard lets the projection leave out.
 
-6. **Steward of record (operator ruling).** An unattributable entry often records the operator's
+6. **Supersession (consolidation, governed).** A curator folds entries under a NEW umbrella entry
+   whose frontmatter declares `supersedes: [<entry-name>, …]`. The native projection hides the
+   members only once the fold is EFFECTIVE — at once for the curator's own work, else after an
+   approving verdict from an active Steward who is not the curator — and reports them as
+   `supersededRows`, the one extra excuse the install guard takes. Until then both stay indexed,
+   and the projection's `advisory` names the approval command, which this hook relays verbatim.
+
+7. **Steward of record (operator ruling).** An unattributable entry often records the operator's
    own ruling. The advisory names the ONE line the standing human would run —
    `epr flow memory import <entry.md>… --session S --steward-of-record` — for the entries the
    native verb says no agent author could possibly have written (no origin session; one that
@@ -485,10 +495,12 @@ def install(binary: str, root: Path, excused: set[str], must_carry: str | None =
             ) -> tuple[str, dict | None]:
     """Project to scratch; install only if no row is lost but the EXCUSED ones.
 
-    Excused: the named unattributable entries, entries that no longer exist, and entries that opt
-    out (`index: false`, as the native report reads them). Any other lost row means the plane is
-    missing something it should hold, and installing would hide it — the index is left as it
-    stands and the outcome says which. Returns (outcome, report).
+    Excused: the named unattributable entries, entries that no longer exist, entries that opt
+    out (`index: false`, as the native report reads them), and entries an EFFECTIVE supersession
+    folds under an umbrella (the projection's own `supersededRows` — the native verb decides
+    effectiveness; a pending fold hides nothing and excuses nothing). Any other lost row means the
+    plane is missing something it should hold, and installing would hide it — the index is left
+    as it stands and the outcome says which. Returns (outcome, report).
     """
     opted_out = opted_out or set()
     report = project_native(binary, root, SCRATCH_REL, timeout)
@@ -496,12 +508,15 @@ def install(binary: str, root: Path, excused: set[str], must_carry: str | None =
     if report is None or not scratch.is_file():
         return "projection-failed", None
     rendered = scratch.read_text(encoding="utf-8")
+    superseded = set(report.get("supersededRows") or [])
     index = root / INDEX_REL
     live = index.read_text(encoding="utf-8") if index.is_file() else ""
     mem = root / MEMORY_REL
     lost = sorted(n for n in rows(live) - rows(rendered)
-                  if n not in excused and (mem / n).is_file() and n not in opted_out)
-    if must_carry and f"]({must_carry})" not in rendered and must_carry not in opted_out:
+                  if n not in excused and (mem / n).is_file() and n not in opted_out
+                  and n not in superseded)
+    if must_carry and f"]({must_carry})" not in rendered and must_carry not in opted_out \
+            and must_carry not in superseded:
         lost = sorted(set(lost) | {must_carry})
     if lost:
         try:
@@ -803,6 +818,8 @@ def hook(payload_text: str) -> int:
     line = _unattributable_line(unattr, root)
     if line:
         msgs.append(line)
+    # A fold awaiting a Steward's verdict: the native verb's own line, naming the approval command.
+    msgs.extend(a for a in (proj.get("advisory") or []) if isinstance(a, str))
     advise(msgs)
     return 0
 

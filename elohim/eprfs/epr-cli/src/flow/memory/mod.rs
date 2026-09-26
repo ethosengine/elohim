@@ -9,6 +9,7 @@ mod import;
 mod index;
 pub mod offer;
 pub mod recall;
+mod supersession;
 mod validation;
 
 use std::path::Path;
@@ -613,6 +614,7 @@ fn method_cid() -> String {
         include_str!("entries.rs"),
         include_str!("import.rs"),
         include_str!("index.rs"),
+        include_str!("supersession.rs"),
         include_str!("../../../../eprfs-agent/src/memory.rs"),
     ]
     .join("\n");
@@ -717,19 +719,48 @@ pub(super) struct ContributionActs {
     /// `(resource body CID, provider, reason slot)` — the exact triple
     /// [`is_contribution_act`] matched, so the set answers the identical question the scan did.
     keys: std::collections::BTreeSet<(String, String, String)>,
+    /// Every verdict note in the plane, in plane order, read in the SAME scan: a supersession's
+    /// standing is folded from the verdicts on its umbrella's contribution, and a second pass over
+    /// the plane is the cost this structure exists to avoid.
+    verdicts: Vec<Verdict>,
+}
+
+/// One verdict note, as a supersession's standing reads it.
+#[derive(Debug, Clone)]
+pub(super) struct Verdict {
+    pub record: String,
+    pub resource: String,
+    pub provider: String,
+    /// `verdict:approved`; otherwise it is `verdict:changes-requested`.
+    pub approved: bool,
 }
 
 impl ContributionActs {
     pub(super) fn open(root: &Path) -> FlowResult<Self> {
         let mut keys = std::collections::BTreeSet::new();
         let mut lineages = Vec::new();
+        let mut verdicts = Vec::new();
         if !root.join(".eprfs/status/flows.jsonl").exists() {
-            return Ok(Self { keys });
+            return Ok(Self { keys, verdicts });
         }
-        for (_, record) in SidecarFlowStore::open(root)?.records()? {
+        for (record_cid, record) in SidecarFlowStore::open(root)?.records()? {
             let FlowRecord::Event(event) = record else {
                 continue;
             };
+            if event.action == ReaVerb::Cite
+                && event.classified_as.first().map(String::as_str) == Some("run:verdict")
+            {
+                let has = |slot: &str| event.classified_as.iter().any(|v| v == slot);
+                if has("verdict:approved") || has("verdict:changes-requested") {
+                    verdicts.push(Verdict {
+                        record: record_cid.to_string(),
+                        resource: event.resource.to_string(),
+                        provider: event.provider.0.clone(),
+                        approved: has("verdict:approved"),
+                    });
+                }
+                continue;
+            }
             if event.action != ReaVerb::Cite
                 || !event.classified_as.iter().any(|v| v == "run:observation")
             {
@@ -771,7 +802,15 @@ impl ContributionActs {
                 }
             }
         }
-        Ok(Self { keys })
+        Ok(Self { keys, verdicts })
+    }
+
+    /// The verdict notes on `resource` (a flow resource CID), in plane order.
+    pub(super) fn verdicts_on<'a>(
+        &'a self,
+        resource: &'a str,
+    ) -> impl Iterator<Item = &'a Verdict> {
+        self.verdicts.iter().filter(move |v| v.resource == resource)
     }
 
     /// Whether the attributed contribution act for these EXACT request bytes is already recorded.

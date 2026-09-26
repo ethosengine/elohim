@@ -8,23 +8,35 @@
 //! — the entry-form import, `--steward-of-record`, the `attribution` report the hook reads —
 //! asks it.
 //!
-//! ## The writer
+//! ## The writer of the CURRENT bytes, in order of authority
 //!
-//! The entry's own `originSessionId` governs. A caller's `--session` means "the writing session
-//! when the entry names none", and is refused when it names a different one. With neither, a
-//! write witness whose bytes match the entry names the session the harness saw write it.
+//! 1. the EARLIEST harness write witness (`.eprfs/status/memory-writes.jsonl`) whose sha256
+//!    matches the entry's current bytes — the harness's own record, made at write time;
+//! 2. only when no witness of these bytes exists (a legacy entry predating the log), the entry's
+//!    own `originSessionId` — self-report, which an editor who leaves the first writer's
+//!    frontmatter in place does not change: frontmatter names who STARTED the entry, a witness
+//!    names who wrote THESE bytes;
+//! 3. else a caller's `--session`.
+//!
+//! A caller's `--session` is refused when it names a writer other than (1) or (2).
 //!
 //! ## The write instant, in order of authority
 //!
-//! 1. the entry's own `modified`;
-//! 2. a harness write witness (`.eprfs/status/memory-writes.jsonl`) whose sha256 matches the
-//!    entry's CURRENT bytes — the harness's own record of the edit, not an agent narrating;
+//! 1. the matching witness's `observedAt`, whenever (1) above named the writer;
+//! 2. else the entry's own `modified`;
 //! 3. otherwise **ambiguous**. Live mtime drifts forward (a checkout, a re-save), which can make a
 //!    LATER claim look current, so an ambiguous entry is never attributed: it is unattributable,
 //!    and never guessed.
 //!
 //! A caller's `--as-of` is not evidence. It must agree with (1) or (2) where they exist, and it
 //! cannot rescue an ambiguous entry.
+//!
+//! ## An edit by another participant
+//!
+//! When the current bytes were written by a participant other than the entry's existing
+//! contributor, the report says so (`editedByAnotherParticipant`, writer vs contributor) and the
+//! entry is not importable: a contribution is never re-authored by someone else. Recording such
+//! an edit as its own act is a different act, not this module's.
 //!
 //! When several witnesses carry the entry's current bytes, the EARLIEST wins: the first session
 //! to produce those bytes is their author, and a later identical re-save by another session
@@ -47,6 +59,7 @@
 //! human's claim), where the proof is a signature over the act, not a line in a file.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use elohim_epr_rea::{ActorClaim, ActorStore, AsOfBasis, MemoryActorStore, SidecarActorStore};
@@ -217,38 +230,37 @@ pub(super) fn resolve(
     let sha = format!("{:x}", Sha256::digest(&bytes));
     let witness = evidence.witness(&rel_s, &sha);
 
-    // The writer: the entry's own origin governs; a caller naming another is refused.
+    // The writer of THESE bytes: the harness's earliest witness of them → the entry's own origin
+    // (legacy, unwitnessed) → the caller. A caller naming another writer is refused.
     let origin = declared_origin(&fm);
-    if let (Some(origin), Some(caller)) = (origin.as_deref(), caller_session) {
-        if origin != caller {
-            return Err(refused(format!(
-                "{rel_s} declares originSessionId {origin}; --session {caller} names a different \
-                 writer — the entry's own origin governs, and --session only names the writer of \
-                 an entry that names none"
-            )));
-        }
-    }
-    let session = match (origin, witness, caller_session) {
-        (Some(o), _, _) => Some((o, "frontmatter")),
-        (None, Some(w), Some(caller)) if w.session != caller => {
+    let session = match (witness, origin, caller_session) {
+        (Some(w), _, Some(caller)) if w.session != caller => {
             return Err(refused(format!(
                 "{rel_s} was witnessed written by session {} (harness write witness); --session \
                  {caller} names a different writer",
                 w.session
             )))
         }
-        (None, Some(w), _) => Some((w.session.clone(), "witness")),
+        (Some(w), _, _) => Some((w.session.clone(), "witness")),
+        (None, Some(origin), Some(caller)) if origin != caller => {
+            return Err(refused(format!(
+                "{rel_s} declares originSessionId {origin}; --session {caller} names a different \
+                 writer — with no harness witness of its bytes the entry's own origin governs, \
+                 and --session only names the writer of an entry that names none"
+            )))
+        }
+        (None, Some(o), _) => Some((o, "frontmatter")),
         (None, None, Some(caller)) => Some((caller.to_string(), "caller")),
         (None, None, None) => None,
     };
 
-    // The write instant: `modified` → a witness of these bytes → ambiguous.
+    // The write instant: the witness that named the writer → `modified` → ambiguous.
     let written = match (
-        declared_modified(&fm),
         witness.and_then(|w| instant(&w.observed_at)),
+        declared_modified(&fm),
     ) {
-        (Some(m), _) => Written::Declared(m),
-        (None, Some(w)) => Written::Witnessed(w),
+        (Some(w), _) => Written::Witnessed(w),
+        (None, Some(m)) => Written::Declared(m),
         (None, None) => Written::Ambiguous(
             std::fs::metadata(root.join(rel))
                 .ok()
@@ -375,11 +387,22 @@ impl Attribution {
         })
     }
 
-    fn report(&self, contributed_by: Option<String>, indexed: bool) -> Value {
+    fn report(&self, contribution: &Contributed, indexed: bool) -> Value {
         let verdict = self.verdict();
         let steward = self.steward_of_record();
         let author = self.claim.as_ref().map(|(_, c, _)| c.clone());
+        let contributed_by = contribution.author.clone();
+        // An edit by another participant: the current bytes' writer is not the contributor, and
+        // the contribution does not already cover these exact bytes (a re-save of contributed
+        // bytes is not an edit, whoever the witness names).
+        let edited_by_another = match (&contributed_by, &author) {
+            (Some(by), Some(writer)) if by != writer && !contribution.covers_current => {
+                Some(json!({"writer": writer, "contributor": by}))
+            }
+            _ => None,
+        };
         let importable = verdict.is_ok()
+            && edited_by_another.is_none()
             && contributed_by
                 .as_deref()
                 .is_none_or(|by| Some(by) == author.as_deref());
@@ -400,31 +423,87 @@ impl Attribution {
             "attributable": verdict.is_ok(),
             "reason": verdict.err(),
             "importable": importable,
+            "editedByAnotherParticipant": edited_by_another,
+            "supersededBy": contribution.superseded_by,
+            "supersessionPending": contribution.supersession_pending,
             "stewardOfRecordAdmissible": steward.is_ok(),
             "stewardOfRecordReason": steward.err(),
         })
     }
 }
 
+/// What the contribution plane holds for one entry, as the report reads it.
+#[derive(Debug, Default)]
+struct Contributed {
+    author: Option<String>,
+    /// Whether the contribution's pinned source is the entry's CURRENT bytes.
+    covers_current: bool,
+    /// The umbrella entry whose EFFECTIVE fold hides this contribution from the index.
+    superseded_by: Option<String>,
+    /// The umbrella entry whose fold of this contribution awaits a Steward's verdict.
+    supersession_pending: Option<String>,
+}
+
 /// `epr flow memory attribution <dir> | <entry.md>…` — the read the harness hook takes instead of
 /// parsing frontmatter itself: per entry, its writer, write instant, the claim it resolves to,
 /// whether it is attributable, importable, or admissible for steward of record. Writes nothing.
-pub(super) fn report(root: &Path, files: &[PathBuf], contributions: &Path) -> FlowResult<Value> {
+pub(super) fn report(
+    root: &Path,
+    files: &[PathBuf],
+    contributions_rel: &Path,
+) -> FlowResult<Value> {
     let evidence = Evidence::load(root)?;
+    // The supersession folds, read once for the batch: recall and attribution still see a
+    // superseded member; the report says who folded it and whether the fold stands.
+    let (hidden, pending) = if root.join(contributions_rel).is_dir() {
+        let mut reader = super::validation::Reader::new(root)?;
+        let acts = super::ContributionActs::open(root)?;
+        let folds = super::supersession::load(&mut reader, contributions_rel, &acts);
+        let pending: BTreeMap<String, String> = folds
+            .iter()
+            .filter(|f| !f.effective())
+            .flat_map(|f| {
+                f.members
+                    .iter()
+                    .map(move |m| (m.path.clone(), f.umbrella.clone()))
+            })
+            .collect();
+        (super::supersession::hidden(&folds), pending)
+    } else {
+        (BTreeMap::new(), BTreeMap::new())
+    };
     let mut rows = Vec::new();
     for rel in files {
-        let text = std::fs::read_to_string(root.join(rel)).unwrap_or_default();
-        let fm = entries::parse(&text);
+        let bytes = std::fs::read(root.join(rel)).unwrap_or_default();
+        let fm = entries::parse(&String::from_utf8_lossy(&bytes));
         let stem = rel
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
-        let contributed_by = std::fs::read_to_string(contributions.join(format!("{stem}.json")))
-            .ok()
-            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-            .and_then(|v| v["author"].as_str().map(str::to_string));
+        let request = contributions_rel
+            .join(format!("{stem}.json"))
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut contributed = Contributed::default();
+        if let Ok(text) = std::fs::read_to_string(root.join(&request)) {
+            if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                contributed.author = value["author"].as_str().map(str::to_string);
+                let current = eprfs_core::BlobCid::compute_raw(&bytes).to_string();
+                contributed.covers_current = value["sources"]
+                    .as_array()
+                    .is_some_and(|s| s.iter().any(|s| s["resource"]["cid"] == json!(current)));
+            }
+            let raw = eprfs_core::BlobCid::compute_raw(text.as_bytes()).to_string();
+            contributed.superseded_by = hidden
+                .get(&request)
+                .filter(|(cid, _)| *cid == raw)
+                .map(|(_, umbrella)| umbrella.clone());
+            if contributed.superseded_by.is_none() {
+                contributed.supersession_pending = pending.get(&request).cloned();
+            }
+        }
         let attribution = resolve(root, rel, &evidence, None, None)?;
-        rows.push(attribution.report(contributed_by, fm.indexed()));
+        rows.push(attribution.report(&contributed, fm.indexed()));
     }
     Ok(json!({"operation": "attribution", "witnessLog": WITNESS_LOG, "entries": rows}))
 }

@@ -2135,3 +2135,549 @@ fn the_earliest_witness_of_the_bytes_is_the_author_not_a_later_identical_resave(
     assert_eq!(author_of(root, "feedback_resaved"), ORCHESTRATOR);
     assert_eq!(last_provider(root), ORCHESTRATOR);
 }
+
+// ── the writer of the current bytes: the harness's witness before the entry's self-report ──────
+
+const CURATOR: &str = "agent:librarian@fixture";
+const CURATOR_SESSION: &str = "curator-session";
+const WRITER_SESSION: &str = "writer-session";
+
+/// A memory entry whose frontmatter names `origin` as its writer, with extra top-level lines.
+fn memory_entry(root: &Path, stem: &str, desc: &str, origin: Option<&str>, extra: &str) -> String {
+    let file = format!(".claude/memory/{stem}.md");
+    let origin = origin
+        .map(|o| format!("  originSessionId: {o}\n"))
+        .unwrap_or_default();
+    write(
+        root,
+        &file,
+        &format!(
+            "---\nname: {stem}\ndescription: {desc}\n{extra}metadata:\n  type: feedback\n{origin}---\n\nbody of {stem}\n"
+        ),
+    );
+    file
+}
+
+/// The librarian's defect (2026-09-26): S2 edited an entry whose frontmatter still named its first
+/// writer S1, and the edit was imported under S1's claim. The harness witnessed S2 writing the
+/// current bytes; that witness names the writer, and the edit is reported as S2's — never S1's.
+#[test]
+fn an_edit_by_another_session_is_attributed_to_its_editor_never_the_frontmatter_origin() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("S1's claim");
+    actor::claim_recorded_at(root, CURATOR, CURATOR_SESSION, "2026-09-25T09:00:00Z")
+        .expect("S2's claim");
+    let file = memory_entry(
+        root,
+        "feedback_edited",
+        "Written by S1.",
+        Some(WRITER_SESSION),
+        "",
+    );
+    witness(root, &file, WRITER_SESSION, "2099-01-01T00:00:00Z");
+    import_plain(root, &file, None, None).expect("S1 contributes its own entry");
+    assert_eq!(author_of(root, "feedback_edited"), ORCHESTRATOR);
+    let contributed =
+        std::fs::read(root.join(".eprfs/status/memory/contributions/feedback_edited.json"))
+            .expect("contribution");
+
+    // S2 edits; the frontmatter still names S1.
+    memory_entry(
+        root,
+        "feedback_edited",
+        "Rewritten by S2.",
+        Some(WRITER_SESSION),
+        "",
+    );
+    witness(root, &file, CURATOR_SESSION, "2099-01-01T01:00:00Z");
+    let report = attribution_of(root, &file);
+    assert_eq!(report["session"], CURATOR_SESSION, "{report}");
+    assert_eq!(report["sessionSource"], "witness", "{report}");
+    assert_eq!(report["claim"], CURATOR, "{report}");
+    assert_eq!(report["writtenAt"], "2099-01-01T01:00:00.000Z", "{report}");
+    assert_eq!(report["contributedBy"], ORCHESTRATOR, "{report}");
+    assert_eq!(
+        report["editedByAnotherParticipant"],
+        serde_json::json!({"writer": CURATOR, "contributor": ORCHESTRATOR}),
+        "{report}"
+    );
+    assert_eq!(report["importable"], false, "{report}");
+
+    // Neither S1's claim nor S2's may re-author the contribution through the entry form.
+    let err = import_plain(root, &file, None, None).expect_err("never re-authored");
+    assert!(err.to_string().contains("never re-authored"), "{err}");
+    let err = import_plain(root, &file, Some(WRITER_SESSION), None)
+        .expect_err("the frontmatter origin is not the writer of these bytes");
+    assert!(err.to_string().contains(CURATOR_SESSION), "{err}");
+    assert_eq!(
+        std::fs::read(root.join(".eprfs/status/memory/contributions/feedback_edited.json"))
+            .expect("contribution"),
+        contributed,
+        "the contribution was rewritten"
+    );
+}
+
+/// An entry predating the witness log has only its frontmatter: its `originSessionId` and
+/// `modified` still name its writer and instant.
+#[test]
+fn a_legacy_entry_with_no_witness_still_resolves_by_its_frontmatter() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("claim");
+    let file = memory_entry(
+        root,
+        "feedback_legacy",
+        "Written before the witness log existed.",
+        Some(WRITER_SESSION),
+        "",
+    );
+    // `modified` sits in metadata beside the origin.
+    let text = std::fs::read_to_string(root.join(&file)).expect("entry");
+    write(
+        root,
+        &file,
+        &text.replace(
+            "  originSessionId:",
+            "  modified: 2026-09-25T11:00:00Z\n  originSessionId:",
+        ),
+    );
+    let report = attribution_of(root, &file);
+    assert_eq!(report["session"], WRITER_SESSION, "{report}");
+    assert_eq!(report["sessionSource"], "frontmatter", "{report}");
+    assert_eq!(report["writtenBasis"], "modified", "{report}");
+    assert_eq!(report["importable"], true, "{report}");
+    import_plain(root, &file, None, None).expect("imports by its frontmatter");
+    assert_eq!(author_of(root, "feedback_legacy"), ORCHESTRATOR);
+}
+
+/// The earliest witness of the bytes wins — over a later identical re-save, and over a frontmatter
+/// origin naming the re-saver.
+#[test]
+fn the_earliest_witness_wins_over_a_later_resave_and_over_the_frontmatter() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim_recorded_at(root, ORCHESTRATOR, "session-a", "2026-09-25T09:00:00Z")
+        .expect("claim a");
+    actor::claim_recorded_at(root, SUBAGENT, "session-b", "2026-09-25T09:00:00Z").expect("claim b");
+    let file = memory_entry(
+        root,
+        "feedback_first",
+        "Written by A; B's frontmatter and re-save do not take it.",
+        Some("session-b"),
+        "",
+    );
+    witness(root, &file, "session-a", "2099-01-01T00:00:00Z");
+    witness(root, &file, "session-b", "2099-01-01T01:00:00Z");
+    let report = attribution_of(root, &file);
+    assert_eq!(report["session"], "session-a", "{report}");
+    assert_eq!(report["writtenAt"], "2099-01-01T00:00:00.000Z", "{report}");
+    import_plain(root, &file, None, None).expect("imports under its first writer");
+    assert_eq!(author_of(root, "feedback_first"), ORCHESTRATOR);
+}
+
+// ── cross-author supersession, governed ────────────────────────────────────────────────────────
+
+const WITNESSED_AT: &str = "2099-01-01T00:00:00Z";
+
+/// Write an entry as `session`, witness it, and import it through the entry form.
+fn contribute_entry(root: &Path, stem: &str, session: &str, extra: &str) -> serde_json::Value {
+    let file = memory_entry(root, stem, &format!("The claim of {stem}."), None, extra);
+    witness(root, &file, session, WITNESSED_AT);
+    let out = import_plain(root, &file, None, None).expect("import");
+    out["entries"][0].clone()
+}
+
+fn fold_claims(root: &Path) {
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("orchestrator");
+    actor::claim_recorded_at(root, CURATOR, CURATOR_SESSION, "2026-09-25T09:00:00Z")
+        .expect("curator");
+}
+
+/// Project and install the index; return (report, index text).
+fn project_index(root: &Path) -> (serde_json::Value, String) {
+    let out = project(
+        root,
+        Options {
+            out: Some(".claude/memory/MEMORY.md"),
+            ..Options::default()
+        },
+    )
+    .expect("index projects");
+    let text = std::fs::read_to_string(root.join(".claude/memory/MEMORY.md")).expect("index");
+    (out, text)
+}
+
+fn row<'a>(index: &'a str, file: &str) -> Option<&'a str> {
+    index.lines().find(|l| l.contains(&format!("]({file})")))
+}
+
+/// Every member's entry file and contribution file, byte for byte.
+fn member_bytes(root: &Path, stems: &[&str]) -> Vec<Vec<u8>> {
+    stems
+        .iter()
+        .flat_map(|s| {
+            [
+                std::fs::read(root.join(format!(".claude/memory/{s}.md"))).expect("entry"),
+                std::fs::read(root.join(format!(".eprfs/status/memory/contributions/{s}.json")))
+                    .expect("contribution"),
+            ]
+        })
+        .collect()
+}
+
+fn verdict_on(root: &Path, resource: &str, session: &str, verdict: &str) {
+    elohim_epr_cli::flow::note::note(
+        root,
+        resource,
+        "verdict",
+        "the umbrella keeps what its members said",
+        None,
+        Some(verdict),
+        &elohim_epr_cli::flow::note::NoteActor {
+            as_ref: None,
+            session: Some(session.into()),
+        },
+    )
+    .expect("verdict note");
+}
+
+fn fold_of<'a>(report: &'a serde_json::Value, umbrella: &str) -> &'a serde_json::Value {
+    report["supersession"]
+        .as_array()
+        .expect("supersession")
+        .iter()
+        .find(|f| f["umbrella"] == umbrella)
+        .expect("the umbrella's fold")
+}
+
+#[test]
+fn a_same_author_fold_hides_its_members_at_once_and_touches_none_of_their_bytes() {
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    contribute_entry(root, "feedback_one", CURATOR_SESSION, "");
+    contribute_entry(root, "feedback_two", CURATOR_SESSION, "");
+    let before = member_bytes(root, &["feedback_one", "feedback_two"]);
+
+    let umbrella = contribute_entry(
+        root,
+        "feedback_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_one, feedback_two.md]\n",
+    );
+    assert_eq!(umbrella["state"], "contributed", "{umbrella}");
+    assert_eq!(umbrella["supersession"]["state"], "effective", "{umbrella}");
+    assert_eq!(umbrella["supersession"]["basis"], "same-author");
+    assert_eq!(author_of(root, "feedback_umbrella"), CURATOR);
+    let recorded: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            root.join(".eprfs/status/memory/contributions/feedback_umbrella.json"),
+        )
+        .expect("umbrella"),
+    )
+    .expect("json");
+    let pinned = recorded["supersedes"].as_array().expect("supersedes");
+    assert_eq!(pinned.len(), 2, "{recorded}");
+    assert_eq!(
+        pinned[0]["path"],
+        ".eprfs/status/memory/contributions/feedback_one.json"
+    );
+
+    let (report, index) = project_index(root);
+    assert!(row(&index, "feedback_umbrella.md").is_some(), "{index}");
+    assert!(row(&index, "feedback_one.md").is_none(), "{index}");
+    assert!(row(&index, "feedback_two.md").is_none(), "{index}");
+    assert_eq!(
+        report["supersededRows"],
+        serde_json::json!(["feedback_one.md", "feedback_two.md"])
+    );
+    assert_eq!(report["population"]["superseded"], 2, "{report}");
+    assert_eq!(
+        member_bytes(root, &["feedback_one", "feedback_two"]),
+        before
+    );
+
+    // Attribution still sees the member, and names who folded it.
+    let member = attribution_of(root, ".claude/memory/feedback_one.md");
+    assert_eq!(member["supersededBy"], "feedback_umbrella.md", "{member}");
+    assert_eq!(member["contributedBy"], CURATOR);
+}
+
+#[test]
+fn a_cross_author_fold_stays_pending_until_a_distinct_steward_approves() {
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("steward claim");
+    contribute_entry(root, "feedback_theirs", WRITER_SESSION, "");
+    contribute_entry(root, "feedback_mine", CURATOR_SESSION, "");
+    let before = member_bytes(root, &["feedback_theirs", "feedback_mine"]);
+
+    let umbrella = contribute_entry(
+        root,
+        "feedback_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_theirs, feedback_mine]\n",
+    );
+    let resource = umbrella["supersession"]["resource"]
+        .as_str()
+        .expect("resource")
+        .to_string();
+    assert_eq!(umbrella["supersession"]["state"], "pending", "{umbrella}");
+    let command = format!("epr flow note --on {resource} --kind verdict --verdict approved");
+    assert!(
+        umbrella["supersession"]["approve"]
+            .as_str()
+            .unwrap()
+            .starts_with(&command),
+        "{umbrella}"
+    );
+
+    // Pending: umbrella and members all indexed; the umbrella's row says so; the advisory names
+    // the command.
+    let (report, index) = project_index(root);
+    for file in ["feedback_theirs.md", "feedback_mine.md"] {
+        assert!(
+            row(&index, file).is_some(),
+            "{file} was hidden early: {index}"
+        );
+    }
+    assert!(
+        row(&index, "feedback_umbrella.md")
+            .unwrap()
+            .contains("[supersession pending a Steward's verdict]"),
+        "{index}"
+    );
+    assert_eq!(fold_of(&report, "feedback_umbrella.md")["state"], "pending");
+    assert!(
+        report["advisory"][0].as_str().unwrap().contains(&command),
+        "{report}"
+    );
+    let member = attribution_of(root, ".claude/memory/feedback_theirs.md");
+    assert_eq!(member["supersededBy"], serde_json::Value::Null, "{member}");
+    assert_eq!(member["supersessionPending"], "feedback_umbrella.md");
+
+    // The curator's own approval counts for nothing.
+    verdict_on(root, &resource, CURATOR_SESSION, "approved");
+    let (report, index) = project_index(root);
+    assert_eq!(fold_of(&report, "feedback_umbrella.md")["state"], "pending");
+    assert!(row(&index, "feedback_theirs.md").is_some());
+
+    // A distinct, standing Steward approves: the members fold out.
+    verdict_on(root, &resource, "human-session", "approved");
+    let (report, index) = project_index(root);
+    let fold = fold_of(&report, "feedback_umbrella.md");
+    assert_eq!(fold["state"], "effective", "{fold}");
+    assert_eq!(fold["basis"], "steward-verdict");
+    assert_eq!(fold["approval"]["approver"], STANDING_HUMAN);
+    assert_eq!(fold["approval"]["validatedAt"], "local (steward on record)");
+    assert!(row(&index, "feedback_theirs.md").is_none(), "{index}");
+    assert!(row(&index, "feedback_mine.md").is_none(), "{index}");
+    let umbrella_row = row(&index, "feedback_umbrella.md").expect("umbrella row");
+    assert!(!umbrella_row.contains("pending"), "{umbrella_row}");
+    assert_eq!(
+        member_bytes(root, &["feedback_theirs", "feedback_mine"]),
+        before,
+        "a superseded member's bytes moved"
+    );
+    let member = attribution_of(root, ".claude/memory/feedback_theirs.md");
+    assert_eq!(member["supersededBy"], "feedback_umbrella.md", "{member}");
+    assert_eq!(member["contributedBy"], ORCHESTRATOR, "never re-authored");
+}
+
+#[test]
+fn a_steward_curator_cannot_approve_its_own_fold_and_a_fixture_approval_reads_bootstrap() {
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    actor::claim_recorded_at(
+        root,
+        STANDING_HUMAN,
+        "human-session",
+        "2026-09-25T09:00:00Z",
+    )
+    .expect("steward curator");
+    actor::claim(root, FIXTURE_HUMAN, "fixture-session").expect("fixture steward");
+    contribute_entry(root, "feedback_theirs", WRITER_SESSION, "");
+    let umbrella = contribute_entry(
+        root,
+        "feedback_umbrella",
+        "human-session",
+        "supersedes: [feedback_theirs]\n",
+    );
+    assert_eq!(author_of(root, "feedback_umbrella"), STANDING_HUMAN);
+    let resource = umbrella["supersession"]["resource"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    verdict_on(root, &resource, "human-session", "approved");
+    let (report, index) = project_index(root);
+    let fold = fold_of(&report, "feedback_umbrella.md");
+    assert_eq!(fold["state"], "pending", "{fold}");
+    assert!(
+        fold["reason"].as_str().unwrap().contains("is the author"),
+        "{fold}"
+    );
+    assert!(row(&index, "feedback_theirs.md").is_some());
+
+    verdict_on(root, &resource, "fixture-session", "approved");
+    let (report, index) = project_index(root);
+    let fold = fold_of(&report, "feedback_umbrella.md");
+    assert_eq!(fold["state"], "effective", "{fold}");
+    assert_eq!(fold["approval"]["approver"], FIXTURE_HUMAN);
+    assert_eq!(
+        fold["approval"]["validatedAt"],
+        "bootstrap (fixture co-steward)"
+    );
+    assert!(row(&index, "feedback_theirs.md").is_none(), "{index}");
+
+    // A later contrary verdict from an active Steward withdraws the fold.
+    verdict_on(root, &resource, "fixture-session", "changes-requested");
+    let (report, index) = project_index(root);
+    assert_eq!(fold_of(&report, "feedback_umbrella.md")["state"], "pending");
+    assert!(row(&index, "feedback_theirs.md").is_some(), "{index}");
+}
+
+#[test]
+fn a_stewardless_collective_never_makes_a_cross_author_fold_effective() {
+    use eprfs_agent::memory::{Affiliation, AffiliationStanding, MemberKind, MembershipRole};
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("steward claim");
+    contribute_entry(root, "feedback_theirs", WRITER_SESSION, "");
+    let umbrella = contribute_entry(
+        root,
+        "feedback_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_theirs]\n",
+    );
+    let resource = umbrella["supersession"]["resource"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    verdict_on(root, &resource, "human-session", "approved");
+
+    // Both Stewards leave: the fixture co-steward (sponsored by matthew), then matthew himself.
+    let declaration = std::fs::read(root.join(".epr-meta/collective.json")).expect("declaration");
+    let withdrawal = |member: &str, standing: AffiliationStanding, sponsor: &str| Affiliation {
+        version: 1,
+        collective: eprfs_agent::memory::FileRef {
+            path: ".epr-meta/collective.json".into(),
+            cid: eprfs_core::BlobCid::compute_raw(&declaration).to_string(),
+        },
+        member: member.into(),
+        member_kind: MemberKind::Person,
+        role: MembershipRole::Steward,
+        sponsor: Some(sponsor.into()),
+        acts_for: None,
+        standing,
+        since: "2026-09-26T00:00:00Z".into(),
+        withdrawn: Some("2026-09-26T00:00:00Z".into()),
+    };
+    let mut lines =
+        std::fs::read_to_string(root.join(memory::AFFILIATIONS_PATH)).expect("affiliations");
+    for record in [
+        withdrawal(FIXTURE_HUMAN, AffiliationStanding::Fixture, STANDING_HUMAN),
+        withdrawal(
+            STANDING_HUMAN,
+            AffiliationStanding::Standing,
+            STANDING_HUMAN,
+        ),
+    ] {
+        lines.push_str(&memory::affiliation_line(&record).expect("line"));
+        lines.push('\n');
+    }
+    write(root, memory::AFFILIATIONS_PATH, &lines);
+    let collective = memory::execute(root, "collective", None, None).expect("collective");
+    assert_eq!(collective["stewardship"], "stewardless", "{collective}");
+
+    let (report, index) = project_index(root);
+    let fold = fold_of(&report, "feedback_umbrella.md");
+    assert_eq!(fold["state"], "pending", "{fold}");
+    assert!(
+        fold["reason"].as_str().unwrap().contains("stewardless"),
+        "{fold}"
+    );
+    assert!(row(&index, "feedback_theirs.md").is_some(), "{index}");
+}
+
+#[test]
+fn a_fold_over_an_uncontributed_entry_itself_or_a_cycle_is_refused() {
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+
+    // Not contributed: the entry exists, but no contribution does.
+    memory_entry(root, "feedback_loose", "Never imported.", None, "");
+    let refused = contribute_entry(
+        root,
+        "feedback_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_loose]\n",
+    );
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .unwrap()
+            .contains("not contributed"),
+        "{refused}"
+    );
+
+    // Itself.
+    let refused = contribute_entry(
+        root,
+        "feedback_selfish",
+        CURATOR_SESSION,
+        "supersedes: [feedback_selfish]\n",
+    );
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert!(
+        refused["reason"].as_str().unwrap().contains("itself"),
+        "{refused}"
+    );
+
+    // A cycle: a folds b; then b is re-imported folding a.
+    contribute_entry(root, "feedback_b", CURATOR_SESSION, "");
+    let a = contribute_entry(
+        root,
+        "feedback_a",
+        CURATOR_SESSION,
+        "supersedes: [feedback_b]\n",
+    );
+    assert_eq!(a["state"], "contributed", "{a}");
+    let file = memory_entry(
+        root,
+        "feedback_b",
+        "The claim of feedback_b, now folding a.",
+        None,
+        "supersedes: [feedback_a]\n",
+    );
+    witness(root, &file, CURATOR_SESSION, "2099-01-01T01:00:00Z");
+    let out = import_plain(root, &file, None, None).expect("reports per entry");
+    let refused = &out["entries"][0];
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert!(
+        refused["reason"].as_str().unwrap().contains("cycle"),
+        "{refused}"
+    );
+
+    // A block list is refused by name rather than read as nothing.
+    let refused = contribute_entry(
+        root,
+        "feedback_block_list",
+        CURATOR_SESSION,
+        "supersedes:\n  - feedback_b\n",
+    );
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert!(
+        refused["reason"].as_str().unwrap().contains("inline list"),
+        "{refused}"
+    );
+}

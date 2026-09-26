@@ -67,6 +67,10 @@ OTHER = "feedback_other_entry.md"
 #   PROJECT_VERB=0  -> refuses like a binary that predates the verb
 #   SLOW=1          -> sleeps past the caller's timeout
 #   OMIT_ROW=1      -> renders an index WITHOUT the just-edited entry's row
+#   SUPERSEDED=<md> -> renders WITHOUT that entry's row and reports it in `supersededRows`, as
+#                      the native projection does for a member of an EFFECTIVE supersession
+#                      (SUPERSEDED_UNREPORTED=1 omits the row but reports nothing)
+#   ADVISORY=<line> -> the projection's `advisory` (a pending fold's approval command)
 # and a row renders only for an entry that HAS a contribution request, exactly as the native
 # projection renders only contributions.
 # `flow memory attribution <dir>` answers per entry from $FIXTURE_ROOT/attribution.json (entry ->
@@ -140,6 +144,8 @@ for path in sorted(glob.glob(os.path.join(contrib, "*.json"))):
     name = os.path.basename(path)[:-5] + ".md"
     if name == os.environ["ENTRY_NAME"] and os.environ.get("OMIT_ROW") == "1":
         continue
+    if name == os.environ.get("SUPERSEDED"):
+        continue
     rows.append("- [%s](%s) - a row\\n" % (name[:-3], name))
 text = "".join(rows)
 if "--out" in argv:
@@ -150,7 +156,10 @@ if "--out" in argv:
 print(json.dumps({"bytes": len(text.encode()), "entries": len(rows) - 1,
                   "budget": {"state": "ok", "bound": "memory-index-bytes-ceiling@1"},
                   "unloadedRows": [], "wrote": argv[argv.index("--out") + 1] if "--out" in argv
-                  else None}))
+                  else None,
+                  "supersededRows": [os.environ["SUPERSEDED"]] if os.environ.get("SUPERSEDED")
+                  and os.environ.get("SUPERSEDED_UNREPORTED") != "1" else [],
+                  "advisory": [os.environ["ADVISORY"]] if os.environ.get("ADVISORY") else []}))
 '''
 
 WRITER = "writer-session"
@@ -338,6 +347,35 @@ class RouterCase(unittest.TestCase):
         self.assertIn(ENTRY, r.stdout)
         self.assertFalse((self.root / ".eprfs/status/.memory-index-probe.md").exists(),
                          "the scratch render was left behind")
+
+    def test_a_row_folded_by_an_effective_supersession_is_excused_by_the_install_guard(self):
+        """The one new excuse: the projection names the rows an EFFECTIVE fold hides
+        (`supersededRows`), and only those may leave the index. The same omission unreported is
+        still refused — a pending fold hides nothing, so it excuses nothing."""
+        (self.root / ".claude" / "memory" / "MEMORY.md").write_text(
+            f"- [fixture]({ENTRY}) - a row\n- [other]({OTHER}) - another row\n")
+        before = self.index()
+        r = self.run_hook(SUPERSEDED=OTHER, SUPERSEDED_UNREPORTED="1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.index(), before, "an unexcused drop was installed")
+        self.assertIn("UNCHANGED", r.stdout)
+
+        r = self.run_hook(SUPERSEDED=OTHER,
+                          ADVISORY="[supersession] feedback_umbrella.md is pending: epr flow "
+                                   "note --on bafk --kind verdict --verdict approved")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"]({ENTRY})", self.index())
+        self.assertNotIn(f"]({OTHER})", self.index(),
+                         "the superseded row survived the install")
+        self.assertNotIn("UNCHANGED", r.stdout)
+        # The native verb's advisory is relayed verbatim, approval command and all.
+        self.assertIn("--kind verdict --verdict approved", r.stdout)
+
+        # Editing the superseded member itself: its row is owed to no one, so it is not carried.
+        r = self.run_hook(edited=OTHER, SUPERSEDED=OTHER)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("UNCHANGED", r.stdout)
+        self.assertNotIn(f"]({OTHER})", self.index())
 
     # 5 — the harness witnesses, the native verb decides, the harness imports ─────────────────
     def test_every_edit_is_witnessed_with_the_exact_bytes_and_the_hook_session(self):

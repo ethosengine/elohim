@@ -391,6 +391,16 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
                 let as_of = attribution.as_of().unwrap_or_default();
                 let (_, author) =
                     claim_as_of_bound(&root, Some(&session), &as_of, &governance.reference.path)?;
+                if let Some(contributor) =
+                    edited_by_another(&root, &contributions_rel, rel, &author)
+                {
+                    return Err(refused(format!(
+                        "{} was contributed by {contributor}, and its current bytes were written \
+                         by {author} (session {session}) — a contribution is never re-authored by \
+                         another participant",
+                        rel_str(rel)
+                    )));
+                }
                 resolved.push(EntryAct {
                     author,
                     session: Some(session),
@@ -423,6 +433,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         let rel = dir_rel.join(&file);
+        let mut supersession = Value::Null;
         let outcome = one(
             &root,
             &rel,
@@ -435,6 +446,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
             act,
             &acts,
             opts,
+            &mut supersession,
         )?;
         match &outcome {
             Outcome::Contributed(event) => {
@@ -458,6 +470,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
             "reason": match &outcome { Outcome::Refused { reason, .. } => json!(reason), _ => Value::Null },
             "indexedToday": match &outcome { Outcome::Refused { indexed, .. } => json!(indexed), _ => Value::Null },
             "contribution": match &outcome { Outcome::Contributed(v) => v["resource"].clone(), _ => Value::Null },
+            "supersession": match &outcome { Outcome::Refused { .. } => Value::Null, _ => supersession },
         }));
     }
 
@@ -499,6 +512,7 @@ fn one(
     act: &EntryAct,
     acts: &Acts,
     opts: &Options,
+    supersession: &mut Value,
 ) -> FlowResult<Outcome> {
     let author = act.author.as_str();
     if let Some(reason) = private_reason(rel) {
@@ -541,6 +555,16 @@ fn one(
 
     let row = entries::row_from_frontmatter(file, &fm);
     let name = entries::clean_line(fm.get("name"));
+    // An umbrella's `supersedes:`, each named entry resolved to its CURRENT contribution.
+    let supersedes = match superseded(root, &fm, file, contributions_rel, acts) {
+        Ok(refs) => refs,
+        Err(reason) => {
+            return Ok(Outcome::Refused {
+                reason,
+                indexed: Some(fm.indexed()),
+            })
+        }
+    };
     let contribution = Contribution {
         version: 1,
         collective: collective_ref.clone(),
@@ -572,7 +596,7 @@ fn one(
             },
             reach: source_reach,
         }],
-        supersedes: vec![],
+        supersedes,
         contradicts: vec![],
         imported: Some(Imported {
             display: bounded(&row.title, 256),
@@ -587,6 +611,9 @@ fn one(
     let request_rel =
         contributions_rel.join(format!("{}.json", file.strip_suffix(".md").unwrap_or(file)));
     let request_text = format!("{}\n", serde_json::to_string_pretty(&contribution)?);
+    if !contribution.supersedes.is_empty() {
+        *supersession = fold_report(root, &contribution, &request_text);
+    }
 
     // Already recorded? Ask the plane before touching anything. This is what makes a second run a
     // true no-op rather than a dedupe that still opened the store 229 times.
@@ -625,6 +652,113 @@ fn one(
         },
     )?;
     Ok(Outcome::Contributed(event))
+}
+
+/// The contributions an umbrella's frontmatter `supersedes:` names, each resolved to its CURRENT
+/// contribution (request path + raw CID) — or the named reason the declaration is refused: a
+/// named entry that is not contributed, the umbrella itself, or a cycle.
+fn superseded(
+    root: &Path,
+    fm: &entries::Frontmatter,
+    file: &str,
+    contributions_rel: &Path,
+    acts: &Acts,
+) -> Result<Vec<FileRef>, String> {
+    let Some(names) = super::supersession::declared(&fm.fields)? else {
+        return Ok(Vec::new());
+    };
+    let own = file.strip_suffix(".md").unwrap_or(file);
+    let own_request = rel_str(&contributions_rel.join(format!("{own}.json")));
+    let mut refs = Vec::new();
+    for name in names {
+        if name == own {
+            return Err(format!(
+                "`supersedes:` names the umbrella itself ({name}); an entry cannot supersede itself"
+            ));
+        }
+        let request = rel_str(&contributions_rel.join(format!("{name}.json")));
+        let not_contributed = |why: &str| {
+            format!(
+                "`supersedes:` names {name}, which is not contributed ({why}); only a \
+                 contribution can be superseded — import it first"
+            )
+        };
+        let Ok(text) = std::fs::read_to_string(root.join(&request)) else {
+            return Err(not_contributed(&format!(
+                "no contribution request at {request}"
+            )));
+        };
+        let Ok(member) = serde_json::from_str::<Contribution>(&text) else {
+            return Err(not_contributed(&format!("{request} is not a contribution")));
+        };
+        if !acts.holds(&text, &member) {
+            return Err(not_contributed(&format!(
+                "{request} has no attributed contribution act"
+            )));
+        }
+        if super::supersession::reaches(root, &request, &own_request) {
+            return Err(format!(
+                "`supersedes:` names {name}, whose own supersession chain reaches this umbrella — \
+                 a cycle never takes effect, and is refused"
+            ));
+        }
+        refs.push(FileRef {
+            path: request,
+            cid: BlobCid::compute_raw(text.as_bytes()).to_string(),
+        });
+    }
+    Ok(refs)
+}
+
+/// What an umbrella's import says about its fold: effective at once when every member is the
+/// curator's own work, else pending until a distinct Steward approves — with the exact command.
+fn fold_report(root: &Path, umbrella: &Contribution, request_text: &str) -> Value {
+    let resource = crate::flow::body_cid(request_text).to_string();
+    let authors: Vec<Option<String>> = umbrella
+        .supersedes
+        .iter()
+        .map(|m| {
+            std::fs::read_to_string(root.join(&m.path))
+                .ok()
+                .and_then(|t| serde_json::from_str::<Contribution>(&t).ok())
+                .map(|c| c.author)
+        })
+        .collect();
+    let same = authors.iter().all(|a| {
+        a.as_deref()
+            .is_some_and(|a| super::supersession::same_author(a, &umbrella.author))
+    });
+    json!({
+        "supersedes": umbrella.supersedes,
+        "resource": resource,
+        "state": if same { "effective" } else { "pending" },
+        "basis": same.then_some("same-author"),
+        "reason": (!same).then(|| format!(
+            "it folds contributions by another author; it takes effect once an active Steward who \
+             is not its curator ({}) approves the umbrella's contribution",
+            umbrella.author
+        )),
+        "approve": (!same).then(|| super::supersession::approval_command(&resource)),
+    })
+}
+
+/// The existing contributor of `rel`, when it is not `writer` and its contribution does not already
+/// cover the entry's current bytes: the current bytes are another participant's edit.
+fn edited_by_another(
+    root: &Path,
+    contributions_rel: &Path,
+    rel: &Path,
+    writer: &str,
+) -> Option<String> {
+    let stem = rel.file_stem()?.to_string_lossy().to_string();
+    let text =
+        std::fs::read_to_string(root.join(contributions_rel).join(format!("{stem}.json"))).ok()?;
+    let prior = serde_json::from_str::<Contribution>(&text).ok()?;
+    if prior.author == writer {
+        return None;
+    }
+    let current = BlobCid::compute_raw(&std::fs::read(root.join(rel)).ok()?).to_string();
+    (!prior.sources.iter().any(|s| s.resource.cid == current)).then_some(prior.author)
 }
 
 /// Whether the request already on disk is these same bytes under an EARLIER author — i.e. the
@@ -1307,9 +1441,7 @@ pub fn attribution(root: &Path, opts: &Options) -> FlowResult<Value> {
             .collect(),
         Named::Entries { files, .. } => files.clone(),
     };
-    let contributions = root.join(normalized(
-        opts.contributions.unwrap_or(DEFAULT_CONTRIBUTIONS_DIR),
-    )?);
+    let contributions = normalized(opts.contributions.unwrap_or(DEFAULT_CONTRIBUTIONS_DIR))?;
     super::attribution::report(root, &rels, &contributions)
 }
 

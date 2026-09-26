@@ -18,6 +18,10 @@
 //!   a structured observation on `memory-index-drift@1` through the ordinary note verb. The fold's
 //!   reason pins the exact unloaded SET, so the same drift appended twice is one record and a
 //!   changed drift is a new one.
+//! * **Consolidation is governed, never silent.** An umbrella's `supersedes:` folds its members'
+//!   rows out only when the fold is EFFECTIVE (see `supersession.rs`): at once for the curator's
+//!   own work, else after a distinct Steward's approving verdict. Until then both stay indexed and
+//!   the umbrella's row says the fold is pending; the report names the approval command.
 //! * **Writing is opt-in.** With no `--out` the command reports and writes no index. A projection
 //!   that silently overwrote its target every time it was asked a question would be the same defect
 //!   in a new place.
@@ -28,6 +32,7 @@ use std::path::{Path, PathBuf};
 use eprfs_agent::memory::Contribution;
 use serde_json::{json, Value};
 
+use super::supersession;
 use super::validation::Reader;
 use super::{entries, import, refused, Options};
 use crate::flow::measures::{default_measures, default_policies, Bound, MeasureRef, Registry};
@@ -54,7 +59,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     )
     .to_path_buf();
 
-    let (rows, population) = collect(&root, &contributions_rel)?;
+    let (rows, population, folds) = collect(&mut lead, &contributions_rel)?;
     let text = entries::render(&rows);
     let bytes = text.len();
 
@@ -85,13 +90,35 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         (None, _) => "undeclared",
     };
 
+    // One line per fold awaiting a Steward's verdict, naming the exact approval command.
+    let advisory: Vec<String> = folds
+        .iter()
+        .filter(|f| !f.effective())
+        .map(|f| {
+            format!(
+                "[supersession] {} folds {} contribution(s) and is pending a Steward's verdict — \
+                 its members stay indexed until an active Steward who is not its curator ({}) \
+                 approves: {}",
+                f.umbrella,
+                f.members.len(),
+                f.author,
+                supersession::approval_command(&f.resource)
+            )
+        })
+        .collect();
+
     let mut wrote = Value::Null;
     if named && state == "over-hard" {
         let b = bound.as_ref().expect("over-hard implies a resolved bound");
+        let pending = if advisory.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", advisory.join(" "))
+        };
         return Err(refused(format!(
             "projected index is {bytes} bytes, {} the hard watermark {} declared by `{}` \
              ({}) — refusing to write. Consolidate entries (umbrella or graduate) rather than \
-             raising the bound.",
+             raising the bound.{pending}",
             b.compare.crossed_phrase(),
             b.hard.unwrap_or_default(),
             b.id,
@@ -127,6 +154,11 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         "indexUnloaded": unloaded.as_ref().map(Vec::len),
         "unloadedRows": unloaded,
         "fold": fold,
+        // The rows an EFFECTIVE supersession folds out, and every fold's standing. A pending fold
+        // names the one command that makes it effective; its members stay indexed until then.
+        "supersededRows": superseded_rows(&folds),
+        "supersession": folds.iter().map(supersession::Fold::report).collect::<Vec<_>>(),
+        "advisory": advisory,
         "wrote": wrote,
         "standing": "Derived view. The contributions are the record; this index is regenerable \
                      from them and carries no acceptance of any claim it lists.",
@@ -138,20 +170,34 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
 /// A `.json` that does not parse as a contribution, carries no `imported` provenance, or has no
 /// attributed contribution observation in the flow plane is not a contribution — it is a file
 /// someone left in a directory, and it does not get to add a row to what every session loads.
-fn collect(root: &Path, dir: &Path) -> FlowResult<(Vec<entries::IndexRow>, Value)> {
+fn collect(
+    reader: &mut Reader,
+    dir: &Path,
+) -> FlowResult<(Vec<entries::IndexRow>, Value, Vec<supersession::Fold>)> {
+    let root = reader.root.clone();
     let absolute = root.join(dir);
     let mut rows = Vec::new();
-    let (mut total, mut unattributed, mut opted_out) = (0usize, 0usize, 0usize);
+    let (mut total, mut unattributed, mut opted_out, mut superseded) =
+        (0usize, 0usize, 0usize, 0usize);
     if !absolute.is_dir() {
         return Ok((
             rows,
-            json!({"contributions": 0, "unattributed": 0, "optedOut": 0}),
+            json!({"contributions": 0, "unattributed": 0, "optedOut": 0, "superseded": 0}),
+            Vec::new(),
         ));
     }
     // ONE scan of the flow plane for the whole directory: see `ContributionActs`. Asking per
     // contribution is what made this projection a 113-second command. Opened after the early
     // return, so a repository with no contributions never reads the plane at all.
-    let acts = super::ContributionActs::open(root)?;
+    let acts = super::ContributionActs::open(&root)?;
+    // The supersession folds, from the same scan (it carries the verdicts too).
+    let folds = supersession::load(reader, dir, &acts);
+    let hidden = supersession::hidden(&folds);
+    let pending: std::collections::BTreeSet<String> = folds
+        .iter()
+        .filter(|f| !f.effective())
+        .map(|f| f.request.clone())
+        .collect();
     let mut files: Vec<PathBuf> = std::fs::read_dir(&absolute)?
         .filter_map(Result::ok)
         .map(|e| e.path())
@@ -175,6 +221,17 @@ fn collect(root: &Path, dir: &Path) -> FlowResult<(Vec<entries::IndexRow>, Value
             opted_out += 1;
             continue;
         }
+        // Folded out by an EFFECTIVE supersession: the contribution and its file are untouched,
+        // recall and attribution still see it; only the index row is the umbrella's now.
+        let request = dir
+            .join(path.file_name().unwrap_or_default())
+            .to_string_lossy()
+            .replace('\\', "/");
+        let raw = eprfs_core::BlobCid::compute_raw(text.as_bytes()).to_string();
+        if hidden.get(&request).is_some_and(|(cid, _)| *cid == raw) {
+            superseded += 1;
+            continue;
+        }
         // Authorship is shown where the row is: a steward-of-record contribution says so on its
         // own line, so no session reads the human as having written what they only stand for.
         let steward_of_record = contribution
@@ -189,6 +246,12 @@ fn collect(root: &Path, dir: &Path) -> FlowResult<(Vec<entries::IndexRow>, Value
         } else {
             contribution.claim
         };
+        // A fold awaiting a Steward's verdict says so on the umbrella's own row.
+        let desc = if pending.contains(&request) {
+            format!("{} {desc}", supersession::PENDING_LABEL)
+        } else {
+            desc
+        };
         rows.push(entries::IndexRow {
             file: provenance.file,
             title: contribution.imported.map(|i| i.display).unwrap_or_default(),
@@ -198,8 +261,23 @@ fn collect(root: &Path, dir: &Path) -> FlowResult<(Vec<entries::IndexRow>, Value
     rows.sort_by_key(|row| entries::sort_key(&row.file));
     Ok((
         rows,
-        json!({"contributions": total, "unattributed": unattributed, "optedOut": opted_out}),
+        json!({"contributions": total, "unattributed": unattributed, "optedOut": opted_out,
+               "superseded": superseded}),
+        folds,
     ))
+}
+
+/// The entry files an EFFECTIVE fold hides — the rows the harness's install guard excuses.
+fn superseded_rows(folds: &[supersession::Fold]) -> Vec<String> {
+    let mut files: Vec<String> = folds
+        .iter()
+        .filter(|f| f.effective())
+        .flat_map(|f| f.members.iter().filter(|m| m.current))
+        .filter_map(|m| m.file.clone())
+        .collect();
+    files.sort();
+    files.dedup();
+    files
 }
 
 /// Append the unloaded-row fold, once per distinct unloaded SET.
