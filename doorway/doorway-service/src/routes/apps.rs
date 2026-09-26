@@ -182,8 +182,10 @@ pub async fn handle_app_request(state: Arc<AppState>, path: &str) -> Response<Fu
         }
     }
 
-    // No cache or no blob_hash — direct proxy (existing behaviour)
-    forward_app_request_with_header(&storage_url, path, "BYPASS").await
+    // No cache or no blob_hash — direct proxy, of the parsed file (a directory URL
+    // has already been resolved to its index.html).
+    let parsed_path = format!("/apps/{slug}/{file_path}");
+    forward_app_request_with_header(&storage_url, &parsed_path, "BYPASS").await
 }
 
 /// Parse `/apps/{slug}/{file_path...}` into (slug, file_path).
@@ -210,8 +212,16 @@ fn parse_app_path(path: &str) -> Option<(&str, &str)> {
         }
     };
 
-    if slug.is_empty() || file_path.is_empty() {
+    if slug.is_empty() {
         return None;
+    }
+
+    // A directory URL names the app's front page, as it does on any web server:
+    // `/apps/{slug}/` is the address a visitor opens, and the page's relative
+    // asset paths resolve under it. (Bare `/apps/{slug}` stays refused — serving
+    // the page there would resolve its relative assets one level too high.)
+    if file_path.is_empty() {
+        return Some((slug, "index.html"));
     }
 
     Some((slug, file_path))
@@ -690,8 +700,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_app_path_empty() {
-        assert!(parse_app_path("/apps/my-app/").is_none());
+    fn test_parse_app_path_directory_serves_index() {
+        let (slug, file_path) = parse_app_path("/apps/my-app/").unwrap();
+        assert_eq!(slug, "my-app");
+        assert_eq!(file_path, "index.html");
     }
 
     #[test]
