@@ -8,7 +8,7 @@ metadata:
   title: Editorial loops invent design on normative docs
   type: feedback
   originSessionId: 5c45be19-a450-4d6a-b68d-bb9c809bb2f1
-  modified: 2026-09-23T10:36:55.336Z
+  modified: 2026-09-26T23:09:24.892Z
 cites:
   - genesis/docs/content/elohim-protocol/.epr-meta
   - .epr-meta/elohim/packages/agents/blind-reader.json
@@ -38,5 +38,13 @@ missing design. The README (a routing document) converged; the canon did not.
   verbatim.
 - Keep rulings explicit up front (vocabulary, what runs vs designed, which shape is normative); the
   editors follow rulings well and improvise badly.
+
+**Also true of a2o stories (2026-09-26, N6 app-bundle story + client-resilience):** every round came
+back READY, yet each fresh reader found a new 4–5 small interpretability points (N6, 6 rounds, c/i/p:
+0/5/3, 1/5/2, 1/1/3, 0/4/3, 1/4/2, 0/5/2). Rounds 1–3 bought real fixes; later rounds only shuffled.
+Cap a2o story loops at ~3 rounds once READY with 0 correctness, then batch the rest into ONE deferral
+question; fix only what touches the claim (the operator chose "fix the two that matter, defer the
+rest"). Before writing vocabulary a reader asks for, read the code — the "staging candidate beneath
+the earned head" rule came from `select_staging_candidate`, not invention.
 - Related: [[feedback_readability_edit_by_codex_or_gemini]], [[feedback_verify_the_measure_before_the_ranking]],
   [[feedback_sealed_decisions_must_not_outrun_evidence]].
