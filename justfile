@@ -433,13 +433,16 @@ mesh action="status" *args:
       # recovery harness drives, reachable through the verb so a shift never has to know the script.
       conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
       storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
+      # Re-exec one doorway (a | b | c) on the binary now at its path, with its captured env —
+      # how a rebuilt doorway reaches the running household without a full mesh restart.
+      doorway-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" doorway-restart {{ args }} ;;
       # The sign-in portal (doorway-app `ng serve` on THRESHOLD_PORT) is shed by the
       # workspace RAM guard like any other fat node process and nothing supervises it.
       # `just test mesh-browser` refuses to start without it, and this is the arm that
       # brings it back — no other mesh component is touched.
       portal-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" portal-restart ;;
       join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
-      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
+      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|doorway-restart <a|b|c>|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.

@@ -1661,19 +1661,26 @@ happ_bundle_freshness() { # <mode>
     # (a) wasm vs source — mirrors assert_binary_newer_than_source's shape,
     # messages and override style, one level down the pipeline (coordinator
     # wasm rather than the storage/doorway --bin artifact).
-    local stale_w="" stale_ts=""
+    # Each wasm is judged against ITS OWN crate (zomes/<wasm name>) when that directory
+    # exists: a coordinator-only change must not mark the untouched integrity wasm stale.
+    # Judged against the whole zomes dir, it did — and cargo, rightly, will not rebuild an
+    # integrity crate whose source did not move (false REFUSED, 2026-09-26).
+    local stale_w="" stale_ts="" stale_src_ts="" stale_dir=""
     if [ -n "$src_ts" ]; then
       for w in "${paths[@]}"; do
         [ -f "$w" ] || continue
-        local wts; wts="$(stat -c %Y "$w")"
-        if [ "$wts" -lt "$src_ts" ] && { [ -z "$stale_ts" ] || [ "$wts" -lt "$stale_ts" ]; }; then
-          stale_w="$(basename "$w")"; stale_ts="$wts"
+        local wts crate wsrc; wts="$(stat -c %Y "$w")"
+        crate="$zdir/$(basename "$w" .wasm)"
+        if [ -d "$REPO_ROOT/$crate" ]; then wsrc="$(_happ_newest_tracked_mtime "$crate")"; else crate="$zdir"; wsrc="$src_ts"; fi
+        [ -n "$wsrc" ] || continue
+        if [ "$wts" -lt "$wsrc" ] && { [ -z "$stale_ts" ] || [ "$wts" -lt "$stale_ts" ]; }; then
+          stale_w="$(basename "$w")"; stale_ts="$wts"; stale_src_ts="$wsrc"; stale_dir="$crate"
         fi
       done
     fi
     if [ -n "$stale_w" ]; then
-      local head_h; head_h="$(git -C "$REPO_ROOT" log -1 --format=%h -- "$REPO_ROOT/$zdir" 2>/dev/null)"
-      local detail="$name coordinator wasm ($stale_w) is STALE: built $(_happ_fmt_ts "$stale_ts"), newest tracked source under $zdir was modified $(_happ_fmt_ts "$src_ts") (HEAD ${head_h:-?})"
+      local head_h; head_h="$(git -C "$REPO_ROOT" log -1 --format=%h -- "$REPO_ROOT/$stale_dir" 2>/dev/null)"
+      local detail="$name coordinator wasm ($stale_w) is STALE: built $(_happ_fmt_ts "$stale_ts"), newest tracked source under $stale_dir was modified $(_happ_fmt_ts "$stale_src_ts") (HEAD ${head_h:-?})"
       if [ "${MESH_ALLOW_STALE_HAPP:-0}" = "1" ]; then
         echo "WARN hApp bundle: $detail — MESH_ALLOW_STALE_HAPP=1, proceeding with the stale coordinator on purpose"
       else

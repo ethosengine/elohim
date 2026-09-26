@@ -51,6 +51,7 @@ just dev package app/elohim-app # build, check and package an Angular EPR app lo
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
 just mesh status              # local multi-peer mesh
 just mesh storage-restart <peer…> | conductors-restart   # restart arms (export MESH_TRANSPORT_BACKEND for the run; MESH_HAPP_PATH installs the deployed bundle)
+just mesh doorway-restart <a|b|c>  # re-exec one doorway on the binary now at its path, with its captured env — how a rebuilt doorway (`cargo build --bin doorway` in the pool slot) reaches the running household
 just mesh join-peer <fresh-name>  # stage an organic late joiner on the RUNNING mesh (no incumbent restart; receipt: genesis/a2o/scripts/late-joiner-receipt.ts)
 MESH_TRANSPORT_BACKEND=dual just mesh start  # storage Track-2 mode: libp2p | dual | iroh
 MESH_CONDUCTOR_LAUNCH=ark just mesh start  # conductors run as children of an `ark` (tevah envelope; ARK_BIN = the elohim pool debug slot) — readiness checks the running executable; failed readiness and SIGKILL leave death witnesses in <peer>/ark/ (ark witness ls --berth <peer>/ark/berth.json)
