@@ -8,11 +8,11 @@ A physical porch has an address (so people can find you), a door (so people can 
 
 ## Why Doorway Exists
 
-Holochain gives us agent-centric identity, content-addressed data, and cryptographic validation at the edges. What it doesn't give us is a URL. The web still runs on HTTP, DNS, and TLS. Billions of people navigate by typing addresses into browsers. Doorway is where those two worlds meet.
+Holochain, a framework for peer-to-peer applications, gives us agent-centric identity, content-addressed data, and cryptographic validation at the edges. What it doesn't give us is a URL. The web still runs on HTTP, DNS, and TLS. Billions of people navigate by typing addresses into browsers. Doorway is where those two worlds meet.
 
 But a bridge can become a bottleneck — or worse, a chokepoint. Traditional federated systems (Mastodon, email) solve this by making instances authoritative for their users. If your instance goes down, you lose access to your data. If your admin decides to censor you, your content disappears.
 
-Doorway refuses this bargain. A doorway is a **projection** of the DHT and peer fabric, not an authority over it. Your identity is your cryptographic key, not your doorway account. Your content lives in the distributed hash table, validated by DNA rules (Holochain's name for an app's validation logic) that no single operator controls. If a doorway misbehaves, you walk to the next one — or configure your own.
+Doorway refuses this bargain. A doorway is a **projection** of the distributed hash table (DHT) and peer fabric, not an authority over it. Your identity is your cryptographic key, not your doorway account. Your content lives in the distributed hash table, validated by DNA rules (Holochain's name for an app's validation logic) that no single operator controls. If a doorway misbehaves, you walk to the next one — or configure your own.
 
 Running your own sounds like freedom until you're the one on call. Anyone who has self-hosted or run a fediverse instance knows three things wear you down: keeping it up, keeping it running, and answering for what it serves. Doorway is designed so that none of them falls on you alone.
 
@@ -20,7 +20,7 @@ Running your own sounds like freedom until you're the one on call. Anyone who ha
 
 **Operations without the toil.** Every doorway runs with an [elohim operator](../genesis/docs/content/elohim-protocol/resilience/README.md): an AI agent that does the job a household IT person would do, if the household had one. Its inference doesn't have to run on the doorway's own box. It tells you when a disk is wearing out, when to order more RAM, when a service tech should come out, and when a disaster means the whole box needs replacing. When your doorway is carrying more than its share, it renegotiates the balance with your neighbors. Hosting becomes a joy, not a chore.
 
-**Serving with responsibility held in trust.** A doorway doesn't dodge responsibility for what it serves. It owns it honestly. Responsibility is held in trust upstream, through governance negotiated among the people involved, and [reach is earned before anything spreads](../genesis/docs/content/elohim-protocol/values-forward.md), so what arrives at your doorway has already been governed. You are not an unpaid moderator standing alone, answerable for whatever your instance carries. The hardest cases, like [CSAM detection](../genesis/research/witnessed-harm-limit-research-2026-08-09.md), are met with real care rather than promises, and the safety intelligence every network needs lives in the commons, not on your shoulders.
+**Serving with responsibility held in trust.** A doorway doesn't dodge responsibility for what it serves. It owns it honestly. Responsibility is held in trust upstream, through governance negotiated among the people involved, and [reach is earned before anything spreads](../genesis/docs/content/elohim-protocol/values-forward.md): content starts in the small circle where it belongs and earns a wider audience by proving its value there, so what arrives at your doorway has already been governed. You are not an unpaid moderator standing alone, answerable for whatever your instance carries. The hardest cases, like [CSAM detection](../genesis/research/witnessed-harm-limit-research-2026-08-09.md), are met with real care rather than promises, and the safety intelligence every network needs lives in the commons, not on your shoulders.
 
 Attribution is held upstream too. The network doesn't borrow an outside copyright filter; it holds itself to a higher bar. Every contributor is recognized, and what their labor produced is theirs, [held in trust](../genesis/docs/content/elohim-protocol/shefa.md) until they claim it, even if they haven't joined yet. Beyond that, knowledge becomes [a true commons, the common inheritance of all humanity](../genesis/docs/content/elohim-protocol/values-forward.md), held in trust and in love. The network stakes that claim on stewardship of the tie that binds us all, not on anyone's landed claims. Your role and your right to take part are protected by the protocol's constitutional contract, not by the goodwill of whoever runs the next server over.
 
@@ -28,7 +28,7 @@ Attribution is held upstream too. The network doesn't borrow an outside copyrigh
 
 **A doorway into stewardship.** A doorway is also where people first discover the network, and it is built as a flywheel, not a destination. Someone arriving from the ordinary web starts with a hosted account, and while they stay there, they live under the familiar architecture of the legacy web: the doorway holds their keys, and their standing rests on its care. That is the honest cost of a front door. It is also a cost that can't grow into a platform, and the network's shape is why. Elohim is built from [holons](../genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md#2-what-holonic-was-always-supposed-to-mean): wholes that are also parts, like a household within a village. Every member of a holon is [a full participant](../genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md#6-the-hard-constraints-stated-once), carrying a share of its memory and gossip. A hosted person is a full participant running on the doorway's own hardware, so each one costs the doorway real memory and bandwidth, and a doorway can carry dozens of people, not millions. Hosting is unscalable by design: a hosted account is a place to start, not a couch to settle into.
 
-The hosted person feels that cost too. Their trust contract with the doorway operator carries a price, paid to the operator, and it climbs the more they lean on it. That rising curve is the flywheel. The doorway's real work is to graduate them onto their own devices, holding their own keys, into the full agency and standing of a member of their community and a participant in the commons: the freedom and value that can only be realized through trust. Every graduation lightens the doorway's load and adds a steward to the network ([the graduation flywheel](doorway-service/SCALING.md#the-graduation-flywheel)). Some of those stewards will open the next doorway.
+The hosted person feels that cost too. Their trust contract with the doorway operator carries a price, paid to the operator, and it climbs the more they lean on it. It may begin as a free tier and be paid in money or in a share of what they contribute, but it is never hidden. The relationship is [kept as an open economic record](../genesis/docs/content/elohim-protocol/shefa.md), so the cost that data brokers once buried in fine print becomes plain, and meaningful to the person paying it. That rising curve is the flywheel. The doorway's real work is to graduate them onto their own devices, holding their own keys, into the full agency and standing of a member of their community and a participant in the commons: the freedom and value that can only be realized through trust. Every graduation lightens the doorway's load and adds a steward to the network ([the graduation flywheel](doorway-service/SCALING.md#the-graduation-flywheel)). Some of those stewards will open the next doorway.
 
 ## What a Doorway Steward Does
 
@@ -38,7 +38,7 @@ A doorway steward for a PTA, a church, a co-op, or a neighborhood is doing the s
 
 ### The Steward's Own Identity
 
-The steward is also a human in the network. Their identity lives in the conductor pool alongside hosted users — same DNA, same DHT participation. The only difference is that they control the hardware. They are the first peer in their own doorway.
+The steward is also a human in the network. Their identity lives in the conductor pool (the Holochain runtime that runs each person's share of the network) alongside hosted users — same DNA, same DHT participation. The only difference is that they control the hardware. They are the first peer in their own doorway.
 
 ## How Content Reaches the World
 
@@ -58,7 +58,7 @@ Doorways federate with each other, but the federation is fundamentally different
 |-|----------------------|-------------------|
 | **Authority** | Instance owns user data | DHT owns all data |
 | **Lock-in** | Users tied to home instance | Users switch doorways freely |
-| **Replication** | Instance-to-instance (O(n^2)) | DHT gossip (automatic) |
+| **Replication** | Instance-to-instance only (O(n^2)) | Hybrid: DHT gossip carries authority and trust up from the holons below; doorway-to-doorway projection meets the scale of the legacy web |
 | **Validation** | Trust between instances | Cryptographic, edge-enforced |
 | **Identity** | Instance-relative (@user@host) | Agent keys (portable) |
 | **Censorship** | Switch instances, lose history | Switch doorways, keep everything |
