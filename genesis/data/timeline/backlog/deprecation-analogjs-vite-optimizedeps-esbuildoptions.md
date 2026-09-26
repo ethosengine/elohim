@@ -3,7 +3,7 @@ id: "backlog-deprecation-analogjs-vite-optimizedeps-esbuildoptions"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "@analogjs/vite-plugin-angular sets optimizeDeps.esbuildOptions; Vite 7.3 deprecates it in favour of optimizeDeps.rolldownOptions"
+title: "@analogjs/vite-plugin-angular emits optimizeDeps.esbuildOptions because its vite peer resolves to 7.3.1 while vitest 4.1 runs Vite 8"
 slug: "deprecation-analogjs-vite-optimizedeps-esbuildoptions"
 written: "2026-09-24"
 author: "deprecation-triage"
@@ -11,13 +11,17 @@ status: "backlog"
 priority: "low"
 deprecation_status: blocked
 severity: low
-fingerprints: ["612e34199acb"]
+fingerprints: ["612e34199acb", "8a122f0ee621"]
 relatedNodeIds: []
-tags: [deprecation, vite, analogjs, vite-plugin-angular, lamad, vitest]
+tags: [deprecation, vite, vite-8, rolldown, analogjs, vite-plugin-angular, vitest, lamad, elohim-app, elohim-library, peer-dependency]
 cites:
   - app/lamad/vite.config.ts
   - app/lamad/package.json
+  - app/elohim-app/package.json
+  - app/elohim-library/package.json
+  - pnpm-workspace.yaml
   - pnpm-lock.yaml
+  - https://vite.dev/guide/migration
 ---
 
 ## What is deprecated
@@ -26,66 +30,82 @@ cites:
 [vite] warning: `optimizeDeps.esbuildOptions` option was specified by "@analogjs/vite-plugin-angular" plugin. This option is deprecated, please use `optimizeDeps.rolldownOptions` instead.
 ```
 
-Captured from `pnpm exec vitest run --config vite.config.ts` in `app/lamad`
-(`fp 612e34199acb`).
+This warning has been captured twice so far:
+
+- `612e34199acb`, from `pnpm exec vitest run --config vite.config.ts` in
+  `app/lamad`.
+- `8a122f0ee621` (2026-09-25), the same text behind Vite's time-of-day
+  logger prefix (`1:34:35 PM [vite] warning: …`). That prefix is part of the
+  line the sentinel hashes, so every timestamped emission gets a new
+  fingerprint. This is recorded as Class 13 in
+  `deprecation-sentinel-redundant-capture-surfaces.md`.
 
 ## Usage inventory
 
-`app/lamad/vite.config.ts` does **not** set `optimizeDeps.esbuildOptions`
-itself — the app config only passes `{ tsconfig: 'tsconfig.spec.json' }` to
-the `angular()` plugin factory. The option is set **inside the plugin**:
+None of our own configs set `optimizeDeps.esbuildOptions`. The plugin sets it
+at `@analogjs/vite-plugin-angular@2.6.4` `src/lib/utils/plugin-config.js:90`:
 
 ```
-node_modules/.pnpm/@analogjs+vite-plugin-angular@2.6.4.../src/lib/utils/plugin-config.js:90
-            ...(vite.rolldownVersion ? { rolldownOptions } : { esbuildOptions }),
+...(vite.rolldownVersion ? { rolldownOptions } : { esbuildOptions }),
 ```
 
-`@analogjs/vite-plugin-angular@2.6.4` already branches on
-`vite.rolldownVersion` — it only emits the legacy `esbuildOptions` key when
-the installed Vite is the classic (non-rolldown) build, which is exactly the
-resolved version here (`vite@7.3.1`, no `rolldownVersion`). So the plugin's
-own conditional is doing the "right" thing for a pre-rolldown Vite, and Vite
-7.3.1 is nonetheless emitting the option as deprecated on that branch —
-Vite's own migration timeline has moved ahead of what 2.6.4's branch expects.
+**The cause is peer-resolution skew in our lockfile, not an upstream bug.**
+(This corrects the 2026-09-24 reading of the same entry.) Here is how the
+versions resolve, checked with `require.resolve` from `app/lamad` on
+2026-09-26:
 
-This is not our config to change: no other Angular workspace in the
-monorepo (`app/elohim-app`, `app/elohim-library`) sets
-`optimizeDeps.esbuildOptions` either, and all three resolve the same
-`@analogjs/vite-plugin-angular@2.6.4` via `pnpm-lock.yaml`.
+| Consumer | Resolves `vite` to |
+|---|---|
+| `vitest@4.1.11`, which runs the tests | **8.1.5** (Rolldown build, which has `rolldownVersion`) |
+| `@analogjs/vite-plugin-angular@2.6.4`, which calls `vite.rolldownVersion` | **7.3.1** (no `rolldownVersion`) |
+
+The plugin checks the Vite it imports (7.3.1), sees no `rolldownVersion`, and
+emits the legacy key. Vite 8, which actually runs, then flags that key as
+deprecated. The plugin's peer range already allows `vite ^6 || ^7 || ^8`.
+
+The skew comes from our own declarations:
+
+- `app/elohim-app/package.json`: `"vite": "^7.3.1"` next to `"vitest": "^4.1.0"`.
+- `app/elohim-library/package.json`: `"vite": "^7.3.1"` next to `"vitest": "^4.1.0"`.
+- `app/lamad/package.json` declares no `vite`, so its plugin instance takes
+  the 7.x peer that the workspace hoists.
+
+The lockfile holds six `@analogjs/vite-plugin-angular@2.6.4` peer variants,
+alongside `vite@6.4.1`, `7.3.1` and `8.1.5`.
 
 ## Migration path
 
-Track `@analogjs/vite-plugin-angular` releases past `2.6.4` for a build that
-either stops setting `esbuildOptions` on the classic Vite branch or adopts
-`rolldownOptions` unconditionally. No changelog entry confirming a fix has
-been located yet (bounded search, 2026-09-24); re-check on the next
-dependency-bump pass.
+Have the plugin resolve the same Vite that vitest runs:
+
+1. Bump `"vite"` from `^7.3.1` to `^8.1.5` in `app/elohim-app/package.json`
+   and `app/elohim-library/package.json`. Add `"vite": "^8.1.5"` as a
+   devDependency in `app/lamad/package.json`, so the plugin peer in each
+   workspace is 8.x.
+2. Run `pnpm install`, then check that every `@analogjs/vite-plugin-angular`
+   peer variant in `pnpm-lock.yaml` points at `vite@8.1.5`.
+3. Check whether anything still depends on `vite@7`. The
+   `@angular-devkit/build-angular@19.2.22` / `@angular/build` dev-server
+   chain may pin its own `vite`. That pin is separate and can stay.
+4. Verify: `pnpm exec vitest run --config vite.config.ts` in `app/lamad`,
+   `app/elohim-app` and `app/elohim-library`. Each must be green with no
+   `optimizeDeps.esbuildOptions` banner. Then run `just gate` for the three
+   projects, plus an `ng build` in `app/elohim-app`, because Vite 8 moves
+   dependency optimization to Rolldown.
 
 ## Current decision
 
-**Blocked**, for two independent reasons:
+**Blocked.** The fix is a major-version bump (Vite 7 to 8) of a first-party
+devDependency in two workspaces, plus a lockfile change. Under the triage
+agent's hard rule, that needs an operator-started dependency pass, not a
+background agent working in a shared worktree. The plan above is ready to
+run as written.
 
-1. **Upstream, not ours.** The deprecated option is set inside the
-   `@analogjs/vite-plugin-angular` package itself; there is no local config
-   to migrate. A fix requires an upstream release.
-2. **This run's constraint.** A household serving-receipt proof was live in
-   this workspace for the triage session that canonicalized this entry, and
-   `pnpm-lock.yaml` / `pnpm-workspace.yaml` were explicitly off-limits for
-   that session (a dependency-version change would invalidate the receipt's
-   source identity mid-run). Any real fix here is a version bump, so it
-   waits for a session where the lockfile is writable.
-
-Cosmetic and harmless in the meantime — it is a dev-time Vite warning about
-its own internal option migration, not a runtime behavior change; the vitest
-suite it was captured from runs and passes regardless.
-
-The sentinel will suppress further dispatch on `612e34199acb` (ledger status:
-blocked). Re-check when `@analogjs/vite-plugin-angular` is next bumped: if the
-new version stops emitting the warning, delete the ledger fingerprint and
-this entry; if it still does, re-confirm the same upstream-only disposition
-and fold the new fingerprint in here.
+The warning is cosmetic in the meantime. The suites it comes from run and
+pass. The sentinel will not dispatch again on `612e34199acb` or
+`8a122f0ee621` (both ledger rows are `blocked`). A new timestamped emission
+can still mint a new fingerprint until Class 13 is normalized. When that
+happens, fold the fingerprint in here.
 
 ## Verification
 
-N/A — not fixed (blocked on an upstream release + this session's lockfile
-constraint).
+N/A. Not fixed; blocked on the Vite 8 devDependency alignment above.

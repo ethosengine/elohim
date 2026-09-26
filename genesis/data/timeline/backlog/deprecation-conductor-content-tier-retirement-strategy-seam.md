@@ -11,7 +11,7 @@ status: "backlog"
 priority: "medium"
 deprecation_status: blocked
 severity: medium
-fingerprints: ["d35a955ce973", "1bad960b8fcd", "00673a950e70"]
+fingerprints: ["d35a955ce973", "1bad960b8fcd", "00673a950e70", "365d2205aaf8"]
 relatedNodeIds: []
 tags: [deprecation, angular, elohim-app, lamad, elohim-service, content-resolver, connection-strategy, conductor, tauri, direct-mode]
 cites:
@@ -52,9 +52,9 @@ the **library** layer that actually feeds the recommended replacement API.
 | `app/elohim-app/src/app/elohim/services/content-resolver.service.ts:103-113` | `STANDARD_SOURCES.conductor` narrowed to `['identity','attestation','point-balance']`, carries the `@deprecated` block |
 | `…/content-resolver.service.ts:640-647` | `isSourceReady()` hard-returns `false` for `conductor` — unconditional, ignores registered availability |
 | `…/content-resolver.service.ts:664, 755, 817` | all three `case 'conductor':` fetch arms return `null` / empty `Map` |
-| `app/elohim-app/…/data-loader.service.ts:282,287` | registers `conductor`, then immediately `setSourceAvailable('conductor', false)` |
+| `app/elohim-app/…/data-loader.service.ts:293` (the disable call; it was at :287) | registers `conductor`, then immediately `setSourceAvailable('conductor', false)` |
 | `app/lamad/src/app/services/content-resolver.service.ts` (same line numbers) | identical copy — the two resolver files differ **only** in two import paths |
-| `app/lamad/src/app/services/data-loader.service.ts:293,298` | identical register-then-disable pair |
+| `app/lamad/src/app/services/data-loader.service.ts:299` (the disable call; it was at :298) | identical register-then-disable pair |
 
 **Library layer — retirement NOT applied.** All three `IConnectionStrategy`
 implementations still declare a `conductor` source carrying the *full* content
@@ -124,6 +124,13 @@ Secondary, non-blocking constraint recorded on 2026-07-30: both
 active concurrent `LearningPath → PathView` rename sweep in the shared worktree
 on `feat/angular22-node24`. Any run that picks this up should re-check
 `git status` on the five app-layer files first and commit path-limited.
+
+2026-09-26: folded in `365d2205aaf8`. It is the same
+`setSourceAvailable('conductor', false); // Conductor deprecated for content`
+line, captured again when an agent ran `grep -n` over `app/elohim-app` and hit
+it at its new offset `293:`. That is the sentinel's Class 3 instability (a
+`grep -n` line-number prefix changes the fingerprint), not a new concern. The
+decision above is unchanged.
 
 ## Verification
 

@@ -3,7 +3,7 @@ id: "backlog-deprecation-sentinel-redundant-capture-surfaces"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix), Class 4 (aggregate-banner drift), and Class 12 (nested ledger-row echo) remain after Guards J/K/N/O/P/Q/R/A2 and the Class-5 pid fix landed"
+title: "deprecation-sentinel fingerprint instability — Class 3 (grep -n prefix), Class 4 (aggregate-banner drift), Class 12 (nested ledger-row echo; Guard V verified, awaiting operator), Class 13 (logger time prefix) and Class 14 (indented commit-body bullets) remain after Guards J/K/N/O/P/Q/R/A2 and the Class-5 pid fix landed"
 slug: "deprecation-sentinel-redundant-capture-surfaces"
 written: "2026-07-30"
 author: "deprecation-triage"
@@ -673,6 +673,94 @@ stasis sweep should re-query `status=open AND ts > <last commit of this
 entry>` for the same JSON-row / verbatim-prose shape before assuming this
 class is quiet.
 
+**Class 12, 2026-09-26: Guard V is drafted and verified, but landing it is
+blocked on permission.** Three dispatched fingerprints were more ledger rows
+from this class, all minted in one hook invocation by a `find … | grep -rn
+"DagStore…" --include=*.rs` command that never read the ledger:
+`a8e1be6852a7` (row `2f8079b72c5a`, which is itself an echo of an echo),
+`04048201c4fd` (row `8a122f0ee621`, bare), and `80be1525cdb4` (row
+`365d2205aaf8` with a `+` in front, one second after that row was written).
+The `+`-prefixed form of a row that had just been appended fits the
+diff-leak mechanism recorded above. The triage run refined the regex and
+checked it against a harness at the Class-5 standard, which ran against the
+live hook module without modifying it:
+
+```python
+# Guard V: a re-serialized ledger ROW (backlog Class 12). Keyed on the
+# row's STRUCTURE (the sentinel's own key order ts, fp, class, plus a
+# 12-hex fp and a class pinned to the two values the sentinel writes).
+# Tolerates a grep -n/cat -n line-number prefix, a diff +/- marker, and
+# backslash-escaped quotes when a row is nested in another row.
+ECHO_LEDGER_ROW_SHAPE_RE = re.compile(
+    r"^(?:\d+(?::|\t|\s+)\s*)?[+-]?\s*"
+    r'\{\\*"ts\\*":\s*\\*"[^"\\]*\\*",\s*'
+    r'\\*"fp\\*":\s*\\*"[0-9a-f]{12}\\*",\s*'
+    r'\\*"class\\*":\s*\\*"(?:deprecation|security)\\*"'
+)
+# in _is_echo_line, directly after Guard A:
+    if ECHO_LEDGER_ROW_SHAPE_RE.match(line):
+        return True
+```
+
+Harness results, 2026-09-26:
+
+- **26/26 fixtures pass, 0 failures.** The 11 must-dismiss cases were the
+  three dispatched rows verbatim plus these wrappers: bare, `+`, `-`, `440:`,
+  `440\t`, indented `cat -n`, escaped-nested, and a security-class row. The
+  15 must-capture cases were all still captured: pnpm/npm `warn deprecated`,
+  rustc `use of deprecated`, Node `DEP0040`, the Vitest `DEPRECATED:` banner,
+  the timestamped vite line, a pnpm ndjson warn object, JSON records carrying
+  a `ts` key, a non-hex `fp`, a foreign `class`, or a reordered `fp`/`ts`
+  pair, a `+#[deprecated]` diff-add, both GitHub/npm vulnerability banners,
+  and an npm-audit GHSA JSON row.
+- **Full replay of the 444-row ledger:** the guard newly dismisses 39 rows
+  (25 `false-positive`, 14 `open`). All 39 are ledger-row-shaped, and 0 are
+  anything else.
+
+The run's `Edit` that wired the guard into `_is_echo_line` was **denied by
+the auto-mode permission classifier as self-modification**. That differs from
+the earlier Class 1/2 blocker, which was an unrelated denial that did not
+reproduce. The part-applied constant was reverted, so the hook is unchanged.
+The patch above is ready to paste. Applying it needs an operator (or an
+operator-approved session). The harness is the scratchpad script
+`guard_v_harness.py`, and it can be rebuilt from the fixture list above.
+
+Rows dispositioned `false-positive` in this run, every one ledger-row-shaped
+with its inner fingerprint recorded elsewhere: the three dispatched rows, plus
+`2f8079b72c5a`, `fd9a39cb50c9`, `155c720137ef`, `328a7877b818`,
+`7c1f1cdc7afb`, `85dd402ec065`, `f5909139a538`, `a54fd0b693fa`,
+`fa35dbb19f98`, `55782defa140`, `f207d97618a3` and `2074e4fc6daf`. The last
+three wrap `150a65ac4654`, `7f9d5faa2d6b` and `e733e0037750`, which were
+dispositioned in the same pass. Those three are `cat -n` reads of the
+Dependabot remediation comments in `pnpm-workspace.yaml` (`44\t  # GHSA-…`).
+That is Guard H2's remediation-annotation class, and it reached the ledger
+only because H2's `ECHO_COMMENT_OPENER_RE` does not allow for a `cat -n`
+line-number prefix. This is the same prefix defect as Class 3, on the
+security channel.
+
+**Class 13 (observed 2026-09-25, recorded, not fixed): a time-of-day logger
+prefix.** Vite's logger can prefix each line with a wall-clock time
+(`1:34:35 PM [vite] warning: …`, fingerprint `8a122f0ee621`). The same warning
+without the prefix is `612e34199acb`. The prefix is hashed as part of the
+line, so **every timestamped emission mints a new fingerprint**, one per
+second. The fix is to normalize this in `fingerprint()`, the way Class 5
+strips the Node pid. A candidate is
+`re.sub(r"^\d{1,2}:\d{2}:\d{2}\s*(?:[AP]M)?\s+", "", norm)`. It needs a
+must-capture harness, and it needs the same operator approval as Guard V
+because it edits the same hook.
+
+**Class 14 (observed 2026-09-26, recorded, not fixed): Guard C misreads
+commit-body bullets as diff hunks.** Guard C keeps `+`/`-` lines from a
+`git show`/`git log` read, on the reasoning that those are diff hunks. But
+`main()` strips each line before the guards run, so an indented commit-body
+bullet (`    - a real " WARN  deprecated glob@7.2.3 …"`) also arrives as
+`- …` and gets captured. This run minted two fingerprints that way by
+reading commit `df2fff69d` (`0d573d7e3d3f`, `41dfa35aef3c`, both
+`false-positive`). Candidate fix: pass the unstripped line into
+`_is_echo_line` and treat a line as a hunk only when its `+`/`-` marker is in
+column 0. Git indents message bodies by four spaces, and hunk markers are
+never indented. Same approval blocker.
+
 ### Recorded, not fixed — Guard E eats first-party tool *runtime* warnings
 
 Surfaced by Guard Q's harness and **pre-existing** (Guard E, unchanged by this
@@ -851,6 +939,14 @@ shape) is drafted but **not verified against an adversarial-negative harness**
 at the standard every other guard in this file was held to before landing —
 that harness, plus the harder bare-prose half of the class (`2d92046d3c66`),
 are the owed work. Classes 3, 4, and 12 are now the entire remaining concern.
+**Update 2026-09-26:** Guard V's harness is now done (26/26 fixtures, 0
+collateral across the 444-row replay). Wiring it in is **blocked on operator
+approval**, because the permission classifier denies the edit to
+`.claude/hooks/deprecation-sentinel.py` as self-modification. The patch in
+the Class 12 section is ready to paste. Two narrow classes were added the
+same day, both waiting on that approval: **Class 13** (the vite time-of-day
+prefix) and **Class 14** (Guard C's hunk exemption applied to indented
+commit-body bullets).
 
 Classes 9–11 landed from a single dispatch whose entire finding was that a
 Python `DEAD_WORDS = {…, "deprecated", …}` set literal is not a deprecation.
@@ -1233,8 +1329,17 @@ pass:
    concurrent session's Bash command — that is a harness/context-assembly
    question, not a sentinel-regex one, and it is what the bare-prose half of
    the class (`2d92046d3c66`) needs before it can be closed.
+   **Harness done 2026-09-26. What remains is the operator applying the
+   paste-ready patch**, because an agent edit to the hook is denied as
+   self-modification. After landing, re-run the harness and delete the 39
+   ledger-row-shaped rows it retires. The guard dismisses those shapes
+   before they are fingerprinted, so the rows serve no further purpose.
+4. **Class 13**: normalize the time-of-day prefix in `fingerprint()`, then
+   fold any new timestamped fingerprints into the owning entry.
+5. **Class 14**: key Guard C's hunk exemption on the unstripped line's
+   column-0 marker.
 
-Delete this entry when all three are discharged.
+Delete this entry when all five are discharged.
 
 Two thirds of the original trigger are already discharged. Guards J/K: a fresh
 `pnpm install` in a changed workspace now mints exactly ONE fingerprint per
