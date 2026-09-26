@@ -202,3 +202,19 @@ adoption shift. Items 6 and 7 are live non-converging loops on the household mes
 are the cheapest wins (bounded, no design decision required) — a "does the contested declaration
 already stand" check and a backoff on held reanchor candidates. Items 1–2 are the design-owning
 work; item 8 is a ready-to-review draft that shortens the eventual carried-record path.
+
+## 2026-09-26 — items 1 and 3 landed on `dev` (sprint 1.4); fleet reading owed after the push
+
+- **Item 1 (carried-record adoption)** — redesigned as story 1.4b and landed as `f2ffa5df4` (zome, coordinator-only)
+  + `06e9587f8` (storage), holding the four shapes the reverted attempt did not: the receiver verifies carried
+  evidence **read-only** (`verify_carried_head_evidence`, admitted only on authoring standing over a held root);
+  the author's publish **mints its own election**, so no receiver re-mints an ordering; the courier path is
+  **bounded and memoised** (`RefusalMemo`); and **the bytes come before the move** on every path (courier,
+  AdoptLocal, and — `0fd34e4ed` — the sweep's obey arm). The station step reads 701–1873 ms across six household
+  runs (was 47–59 s, or never). Design: `genesis/a2o/reports/recovery/serving-edge-20260926/story-1.4b-r-design.md`.
+- **Election tiebreak** — `18354ca53`: the SQL ordering now carries the winning link hash, so an exact
+  (tier, clock) tie converges instead of stalling.
+- **Item 3 (pure-iroh apply raises no trigger)** — `34336f041`: one gate for whichever plane applies content; all
+  three iroh apply sites offer through the shared `reverse_project`, and a pure-iroh node requests missing bytes
+  over the iroh fetch leg.
+- Items 2 and 4–8 are untouched by this sprint and stay open.

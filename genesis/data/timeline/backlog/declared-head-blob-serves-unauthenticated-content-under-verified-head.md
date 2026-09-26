@@ -59,3 +59,11 @@ story 1.4c. Review: `genesis/a2o/reports/recovery/serving-edge-20260920/codex-re
 Sibling, distinct mechanism: `torn-row-never-selected-for-repair.md` (SQL-row selection) and
 `head-authority-carried-with-content-sync-unit.md` (carried-record adoption redesign). Habit:
 `doorway/doorway-service/.epr-meta/doorway-failover.habit.md`.
+
+## 2026-09-26 — fixed on `dev` by `06e9587f8` (story 1.4c); fleet reading owed after the push
+
+The serve path no longer consults the sync doc's `blobHash` for a row with a verified declared head: the C3
+doc-blob preference (`declared_head_served_blob`, `SyncManager::declared_head_blob`) is gone from `http.rs` and
+`sync/mod.rs`, and `read_head_blob_hash` / `doc_head_action_hash` survive only as test helpers. A head moves only
+with the pointer its own proven record names, and only once those bytes are held. The row keeps its status until
+the fleet serves the same bytes from both doorways (seam 6 `OK`), which only a post-push reading can show.

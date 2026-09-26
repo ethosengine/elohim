@@ -183,6 +183,17 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   `ADVISORY-SAME-HEAD-DIFFERENT-BYTES`) cannot be healed by this sweep until it heals independently of code: both
   doorways answered `UNREADABLE-HEAD-RECORD reason=cell-disabled` in #1474, so this node's own conductor cannot
   yet produce the record the sweep reads FROM — it is waiting on cell health, not on this landing.
+  *Sprint 1.4 landed on `dev` 2026-09-26 (fleet reading owed after the push):* **1.4b** redesigned after a second
+  review (genesis/a2o/reports/recovery/serving-edge-20260926/story-1.4b-r-design.md) — no doc key; operator ruling:
+  the author's publish mints its own election, and a sibling verifies courier-carried evidence read-only, admitted
+  only on authoring standing (root author or its delegate) over a root it holds (`f2ffa5df4`, `06e9587f8`). Bytes
+  come before the move on every adoption path (courier, AdoptLocal, sweep obey arm — `0fd34e4ed`). **1.4c** (the
+  serve path's doc-blob preference) is removed in `06e9587f8`. The SQL ordering carries the election's link-hash
+  tiebreak (`18354ca53`); an iroh-only peer raises the adoption trigger (`34336f041`); **T-3**'s honesty field
+  shipped as `anchorMatchesHead` — named for the anchor check it is, not the byte check `pointerFromDeclaredHead`
+  would claim (`31438f8d4`). Household: the station passes 6/6 at 701–1873 ms (was 47–59 s, or never). Still
+  frontier: steward/affiliation roles as standing (they live in eprfs, not verifiable in wasm); composite peers do
+  not fall through on `Timeout`.
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
