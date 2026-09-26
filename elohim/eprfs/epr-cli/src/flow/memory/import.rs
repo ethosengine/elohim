@@ -510,6 +510,12 @@ fn one(
         return Ok(Outcome::refused("entry is not UTF-8"));
     };
     let fm = entries::parse(&text);
+    if let Some(why) = &fm.malformed {
+        return Ok(Outcome::Refused {
+            reason: format!("malformed frontmatter — {why}"),
+            indexed: Some(fm.indexed()),
+        });
+    }
     for key in ["name", "description"] {
         if fm.get(key).trim().is_empty() {
             return Ok(Outcome::Refused {

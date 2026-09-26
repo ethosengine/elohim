@@ -25,6 +25,26 @@
 //!
 //! A caller's `--as-of` is not evidence. It must agree with (1) or (2) where they exist, and it
 //! cannot rescue an ambiguous entry.
+//!
+//! When several witnesses carry the entry's current bytes, the EARLIEST wins: the first session
+//! to produce those bytes is their author, and a later identical re-save by another session
+//! never takes them over (the hook does not even witness a write that changes nothing).
+//!
+//! Frontmatter the parser cannot read without guessing — a block scalar with an empty body
+//! followed by a line that is either its unindented body or a new key — is MALFORMED: the entry
+//! is refused, never read either way.
+//!
+//! ## The boundary: an honesty fence, not a proof
+//!
+//! Every input here is SELF-REPORT among cooperating participants: an entry's
+//! `originSessionId`/`modified` are bytes its writer (or anyone after) can type, a witness line
+//! is appended by the harness but lives in a plain file anyone can append to, and an actor claim
+//! is the actor's own statement. Within that fence this module prevents ACCIDENTAL
+//! misattribution — the wrong session, a later claim, a drifted mtime, a quoted key, a re-save.
+//! It does not, and cannot, prevent DELIBERATE forgery: a participant who writes a false origin,
+//! a backdated `modified`, or a fabricated witness line is attributed as they claim. That is
+//! closed only by device-signed acts (the `Signed` records the actor plane already carries for a
+//! human's claim), where the proof is a signature over the act, not a line in a file.
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
@@ -144,11 +164,11 @@ impl Evidence {
             .any(|(_, c)| c.session == session))
     }
 
-    /// The latest witness of exactly these bytes at this path.
+    /// The EARLIEST witness of exactly these bytes at this path: the first session to produce
+    /// the bytes authored them; a later identical re-save by another session never takes over.
     fn witness(&self, rel: &str, sha: &str) -> Option<&Witness> {
         self.witnesses
             .iter()
-            .rev()
             .find(|w| w.path == rel && w.sha256 == sha)
     }
 }
@@ -162,6 +182,8 @@ pub(super) struct Attribution {
     pub written: Written,
     /// The claim held at the PROVEN write instant; `None` when ambiguous or none existed yet.
     pub claim: Option<(cid::Cid, String, AsOfBasis)>,
+    /// Frontmatter that cannot be read without guessing (see [`entries::Frontmatter::malformed`]).
+    malformed: Option<String>,
     has_claim: bool,
     first_claim: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -267,6 +289,7 @@ pub(super) fn resolve(
         session,
         written,
         claim,
+        malformed: fm.malformed.clone(),
         has_claim,
         first_claim,
     })
@@ -285,6 +308,9 @@ impl Attribution {
     /// `Ok` when a witnessed agent (or claimed participant) authored the entry; otherwise the
     /// named reason it is unattributable.
     pub fn verdict(&self) -> Result<(), String> {
+        if let Some(why) = &self.malformed {
+            return Err(format!("its frontmatter is malformed: {why}"));
+        }
         let Some(session) = self.session_id() else {
             return Err("no originSessionId and no harness write witness names its writer".into());
         };
@@ -320,6 +346,10 @@ impl Attribution {
     /// stand for the entry as steward of record: it has no origin session; or that session never
     /// claimed; or its PROVEN write predates that session's first claim. Live mtime never admits.
     pub fn steward_of_record(&self) -> Result<(), String> {
+        if let Some(why) = &self.malformed {
+            // Its origin cannot be read, so an agent author cannot be ruled out.
+            return Err(format!("its frontmatter is malformed: {why}"));
+        }
         let Some(session) = self.session_id() else {
             return Ok(());
         };

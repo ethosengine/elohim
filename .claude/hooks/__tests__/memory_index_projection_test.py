@@ -337,6 +337,37 @@ class RouterCase(unittest.TestCase):
         self.assertEqual(seen[0]["session"], WRITER)
         self.assertTrue(seen[0]["observedAt"].endswith("Z"), seen[0])
 
+    def test_a_no_op_resave_is_not_witnessed_so_the_first_writer_stays_earliest(self):
+        """Session A writes; session B re-saves the SAME bytes: no second witness, so the earliest
+        (and only) witness of those bytes still names A. A real change by B is witnessed."""
+        self.run_hook(session="session-a")
+        self.run_hook(session="session-b")
+        seen = self.witnesses()
+        self.assertEqual([w["session"] for w in seen], ["session-a"], seen)
+        (self.root / ".claude" / "memory" / ENTRY).write_text("---\nname: changed by b\n---\n")
+        self.run_hook(session="session-b")
+        self.assertEqual([w["session"] for w in self.witnesses()], ["session-a", "session-b"])
+
+    def test_trimming_keeps_the_first_witness_of_every_uncontributed_entry(self):
+        self.orphan(OTHER)  # OTHER has no contribution; ENTRY does
+        log = self.root / ".eprfs" / "status" / "memory-writes.jsonl"
+        line = lambda name, sha, session, at: json.dumps(
+            {"path": f".claude/memory/{name}", "sha256": sha, "session": session,
+             "observedAt": at}, sort_keys=True) + "\n"
+        lines = [line(OTHER, "orphan-sha", "first-writer", "2026-09-25T10:00:00.000Z"),
+                 line(OTHER, "orphan-sha", "later-writer", "2026-09-25T10:05:00.000Z")]
+        lines += [line(ENTRY, f"sha-{i}", "w", f"2026-09-25T11:{i:02d}:00.000Z")
+                  for i in range(10)]
+        log.write_text("".join(lines))
+        self.mod.trim_witnesses(self.root, max_lines=5, keep=3)
+        kept = [json.loads(l) for l in log.read_text().splitlines()]
+        # The orphan's FIRST witness survives (the later duplicate does not); the contributed
+        # entry's old lines are trimmed to the tail.
+        self.assertEqual(kept[0]["session"], "first-writer", kept)
+        self.assertEqual([k for k in kept if k["path"].endswith(OTHER)], [kept[0]])
+        self.assertEqual(len(kept), 1 + 3, kept)
+        self.assertEqual([k["sha256"] for k in kept[1:]], ["sha-7", "sha-8", "sha-9"])
+
     def test_an_unimported_entry_is_imported_by_the_harness_with_no_caller_assertions(self):
         self.orphan(ENTRY)
         started = time.monotonic()

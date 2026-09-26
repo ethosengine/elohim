@@ -235,6 +235,7 @@ def project_native(binary: str, root: Path, out_rel: str, timeout: int | None = 
 # admissible for steward of record. Two parsers once disagreed; there is one now.
 
 MEMORY_REL = ".claude/memory"
+CONTRIBUTIONS_REL = ".eprfs/status/memory/contributions"
 ACTORS_REL = ".eprfs/status/actors.jsonl"
 WITNESS_REL = ".eprfs/status/memory-writes.jsonl"
 LOG_REL = ".eprfs/status/memory-import.log.jsonl"
@@ -278,24 +279,83 @@ def log(root: Path, **record) -> None:
                     LOG_MAX, LOG_KEEP)
 
 
-def witness(root: Path, target: Path, session: str | None) -> str | None:
+def _witness_lines(path: Path) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8").splitlines(keepends=True)
+    except OSError:
+        return []
+
+
+def _uncontributed(root: Path, rel: str) -> bool:
+    return not (root / CONTRIBUTIONS_REL / f"{Path(rel).stem}.json").is_file()
+
+
+def trim_witnesses(root: Path, max_lines: int = WITNESS_MAX, keep: int = WITNESS_KEEP) -> None:
+    """Past `max_lines`, keep the last `keep` — and, from the part that would be dropped, the
+    FIRST witness of every (path, sha256) whose entry has no contribution yet. The earliest
+    witness of an orphan's bytes names its author (see `attribution`), so trimming must never be
+    what makes an uncontributed entry unattributable. Never raises."""
+    path = root / WITNESS_REL
+    lines = _witness_lines(path)
+    if len(lines) <= max_lines:
+        return
+    head, tail = lines[:-keep], lines[-keep:]
+    preserved, seen = [], set()
+    for line in head:
+        try:
+            w = json.loads(line)
+            key = (w["path"], w["sha256"])
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+            continue
+        if key in seen or not _uncontributed(root, key[0]):
+            continue
+        seen.add(key)
+        preserved.append(line)
+    try:
+        tmp = path.with_suffix(".trim")
+        tmp.write_text("".join(preserved + tail), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def witness(root: Path, target: Path, session: str | None,
+            max_lines: int = WITNESS_MAX, keep: int = WITNESS_KEEP) -> str | None:
     """The harness's write witness, appended AT the edit moment: `{path, sha256, session,
     observedAt}` of the entry's exact bytes. The harness's own record — not an agent narrating —
     and the only write time the import trusts after the entry's own `modified`: a live mtime
-    drifts forward (a checkout, a re-save) and could make a LATER claim look current."""
+    drifts forward (a checkout, a re-save) and could make a LATER claim look current.
+
+    A write that changes nothing is not witnessed: when the bytes equal the last witnessed sha for
+    this path, no line is added, so an identical re-save by another session leaves the first
+    writer's witness the earliest (and only) one for those bytes."""
     if not session:
         return None
     try:
         data = target.read_bytes()
     except OSError:
         return None
+    rel = f"{MEMORY_REL}/{target.name}"
+    sha = hashlib.sha256(data).hexdigest()
+    path = root / WITNESS_REL
+    for line in reversed(_witness_lines(path)):
+        try:
+            w = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(w, dict) and w.get("path") == rel:
+            if w.get("sha256") == sha:
+                return None  # a no-op write: its bytes are already witnessed
+            break
     observed = _now()
-    _append_bounded(root / WITNESS_REL, json.dumps({
-        "path": f"{MEMORY_REL}/{target.name}",
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "session": session,
-        "observedAt": observed,
-    }, sort_keys=True), WITNESS_MAX, WITNESS_KEEP)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"path": rel, "sha256": sha, "session": session,
+                                 "observedAt": observed}, sort_keys=True) + "\n")
+    except OSError:
+        return None
+    trim_witnesses(root, max_lines, keep)
     return observed
 
 

@@ -2042,3 +2042,96 @@ fn steward_of_record_admits_a_write_proven_to_predate_the_first_claim() {
         "{message}"
     );
 }
+
+// ── the final round: column-0 block bodies, the earliest witness ────────────────────────────────
+
+/// A top-level block scalar with an EMPTY body, followed by a column-0 line that reads like a key:
+/// YAML says new key, an author who forgot to indent meant body. Attribution rests on which, so
+/// the entry is refused as malformed — never read either way. With a real indented body, the
+/// column-0 line that follows it is unambiguously a key, and is followed.
+#[test]
+fn a_column_zero_line_after_an_empty_block_scalar_is_malformed_never_guessed() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+    actor::claim_recorded_at(root, ORCHESTRATOR, "real-session", "2026-09-25T10:00:00Z")
+        .expect("claim");
+    let ambiguous = ".claude/memory/feedback_ambiguous_block.md";
+    write(
+        root,
+        ambiguous,
+        "---\nname: feedback_ambiguous_block\ndescription: A block with no indented body.\n\
+         details: |\noriginSessionId: real-session\nmetadata:\n  type: feedback\n  \
+         modified: 2026-09-25T11:00:00Z\n---\n",
+    );
+    let report = attribution_of(root, ambiguous);
+    assert_eq!(report["attributable"], false, "{report}");
+    assert_eq!(report["stewardOfRecordAdmissible"], false, "{report}");
+    assert!(
+        report["reason"].as_str().unwrap().contains("malformed"),
+        "{report}"
+    );
+    let err = import_plain(root, ambiguous, None, None).expect_err("never guessed");
+    assert!(err.to_string().contains("malformed"), "{err}");
+    let err = stand(root, "human-session", &[ambiguous]).expect_err("never stood for either");
+    assert!(err.to_string().contains("malformed"), "{err}");
+    // The directory form refuses it by name too.
+    let swept = memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(".claude/memory"),
+            session: Some(SESSION),
+            ..Options::default()
+        },
+    )
+    .expect("the directory form reports per entry");
+    let refused = swept["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["entry"] == ambiguous)
+        .expect("the entry is reported");
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert!(refused["reason"].as_str().unwrap().contains("malformed"));
+
+    // An indented body ends at the column-0 line — which is then a real, unambiguous key.
+    let clear = ".claude/memory/feedback_clear_block.md";
+    write(
+        root,
+        clear,
+        "---\nname: feedback_clear_block\ndescription: A block with a body.\n\
+         details: |\n  originSessionId: quoted-session\noriginSessionId: real-session\n\
+         metadata:\n  type: feedback\n  modified: 2026-09-25T11:00:00Z\n---\n",
+    );
+    let report = attribution_of(root, clear);
+    assert_eq!(report["session"], "real-session", "{report}");
+    import_plain(root, clear, None, None).expect("follows the real key");
+    assert_eq!(author_of(root, "feedback_clear_block"), ORCHESTRATOR);
+}
+
+/// The first session to produce an entry's bytes authored them. A later IDENTICAL re-save by
+/// another session (a no-op write the hook no longer even witnesses) never takes them over.
+#[test]
+fn the_earliest_witness_of_the_bytes_is_the_author_not_a_later_identical_resave() {
+    let dir = repo();
+    let root = dir.path();
+    actor::claim_recorded_at(root, ORCHESTRATOR, "session-a", "2026-09-25T09:00:00Z")
+        .expect("claim a");
+    actor::claim_recorded_at(root, SUBAGENT, "session-b", "2026-09-25T09:00:00Z").expect("claim b");
+    let file = ".claude/memory/feedback_resaved.md";
+    write(
+        root,
+        file,
+        "---\nname: feedback_resaved\ndescription: Written by A, re-saved unchanged by B.\n\
+         metadata:\n  type: feedback\n---\n",
+    );
+    witness(root, file, "session-a", "2026-09-25T10:00:00Z");
+    witness(root, file, "session-b", "2026-09-25T11:00:00Z");
+    let report = attribution_of(root, file);
+    assert_eq!(report["session"], "session-a", "{report}");
+    assert_eq!(report["writtenAt"], "2026-09-25T10:00:00.000Z", "{report}");
+    import_plain(root, file, None, None).expect("imports under its first writer");
+    assert_eq!(author_of(root, "feedback_resaved"), ORCHESTRATOR);
+    assert_eq!(last_provider(root), ORCHESTRATOR);
+}

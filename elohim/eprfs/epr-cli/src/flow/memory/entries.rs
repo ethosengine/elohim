@@ -51,6 +51,11 @@ pub const MISSING_DESC: &str =
 pub struct Frontmatter {
     pub fields: BTreeMap<String, String>,
     pub metadata: BTreeMap<String, String>,
+    /// Set when the frontmatter cannot be read without guessing: a block scalar (`key: |`, `>`, …)
+    /// whose body is EMPTY, followed by a line at or left of the key's indent. YAML reads that line
+    /// as a new key; an author who forgot to indent meant it as the body. Attribution rests on
+    /// which, so the entry is refused as malformed rather than read either way.
+    pub malformed: Option<String>,
 }
 
 impl Frontmatter {
@@ -137,18 +142,33 @@ pub fn parse(text: &str) -> Frontmatter {
     };
 
     let mut metadata_open = false;
-    // The indent of a `metadata:` key whose value is a block scalar (`|`, `|-`, `>`, …): every
-    // deeper line is that scalar's BODY, never a key. Without this a body quoting
-    // `originSessionId: x` would be read as the entry's own origin — and attribution rests on it.
-    let mut block_body: Option<usize> = None;
+    // The open block scalar (`|`, `|-`, `>`, …), at the top level or inside `metadata:`: its key's
+    // indent, its key, and whether an indented body line has been seen. Every line indented DEEPER
+    // than the key is the scalar's BODY, never a key — without this a body quoting
+    // `originSessionId: x` would be read as the entry's own origin, and attribution rests on it.
+    // The body ends at the next non-blank line at or left of the key's indent; if the body was
+    // EMPTY by then, that line is ambiguous (see [`Frontmatter::malformed`]).
+    let mut block: Option<(usize, String, bool)> = None;
     for line in &lines[1..end] {
         let stripped = line.trim_end();
-        if let Some(indent) = block_body {
-            let this = stripped.len() - stripped.trim_start().len();
-            if stripped.is_empty() || this > indent {
+        let indent = stripped.len() - stripped.trim_start().len();
+        if let Some((key_indent, key, seen_body)) = block.take() {
+            if stripped.is_empty() {
+                block = Some((key_indent, key, seen_body));
                 continue;
             }
-            block_body = None;
+            if indent > key_indent {
+                block = Some((key_indent, key, true));
+                continue;
+            }
+            if !seen_body && fm.malformed.is_none() {
+                fm.malformed = Some(format!(
+                    "block scalar `{key}:` has no indented body, and the line after it — \
+                     `{}` — could be its unindented body or a new key; refused rather than read \
+                     either way",
+                    stripped.trim()
+                ));
+            }
         }
         if stripped.is_empty() {
             metadata_open = false;
@@ -160,6 +180,9 @@ pub fn parse(text: &str) -> Frontmatter {
             // `type:` sits after a column-0 `id:` interrupts the block — reads as having no
             // `metadata.type` and is refused by name rather than silently half-read.
             metadata_open = false;
+            if value.starts_with('|') || value.starts_with('>') {
+                block = Some((0, key.to_string(), false));
+            }
             if value == "|" {
                 // Block scalar: the oracle skips it rather than reading the first line.
                 continue;
@@ -176,7 +199,7 @@ pub fn parse(text: &str) -> Frontmatter {
         if metadata_open {
             if let Some((key, value)) = indented_kv(stripped) {
                 if value.starts_with('|') || value.starts_with('>') {
-                    block_body = Some(stripped.len() - stripped.trim_start().len());
+                    block = Some((indent, key.to_string(), false));
                     continue;
                 }
                 fm.metadata
