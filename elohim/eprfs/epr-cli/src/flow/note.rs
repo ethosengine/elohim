@@ -778,6 +778,41 @@ fn note_with_options_guard(
     observation: Option<&Observation>,
     guard: impl FnOnce(&Attribution) -> FlowResult<()>,
 ) -> FlowResult<NoteOutcome> {
+    note_with_claim_guard(
+        root,
+        on,
+        kind,
+        reason,
+        switched_to,
+        closes,
+        verdict,
+        actor,
+        options,
+        observation,
+        None,
+        guard,
+    )
+}
+
+/// [`note_with_options_guard`] with the session's claim optionally PINNED: `as_of` names the
+/// exact claim (CID and identity) that was current in the session when the noted act was
+/// performed. Without it the session arm reads the session's latest claim; with it, a claim
+/// appended later in the same session (a subagent persona, say) cannot take the act.
+#[allow(clippy::too_many_arguments)]
+fn note_with_claim_guard(
+    root: &Path,
+    on: &str,
+    kind: NoteKind,
+    reason: &str,
+    switched_to: Option<&str>,
+    closes: Option<&str>,
+    verdict: Option<&str>,
+    actor: &NoteActor,
+    options: &super::acceptance::AcceptanceOptions,
+    observation: Option<&Observation>,
+    as_of: Option<(Cid, String)>,
+    guard: impl FnOnce(&Attribution) -> FlowResult<()>,
+) -> FlowResult<NoteOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
     // Argument shape first, so a malformed invocation never even opens the store. The KIND is
@@ -818,6 +853,16 @@ fn note_with_options_guard(
     })?;
 
     let mut attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
+    if let Some((cid, identity)) = as_of {
+        // Only the session arm is re-pinned; its steward and source slots stay as resolved.
+        if attribution.claim_cid.is_none() {
+            return Err(FlowError::InvalidArguments(
+                "a pinned claim needs the session arm: the session has no registered claim".into(),
+            ));
+        }
+        attribution.claim_cid = Some(cid);
+        attribution.actor = Some(identity);
+    }
     if options.purpose.as_deref() == Some("acceptance") {
         let (pin, identity) = actor
             .session
@@ -991,6 +1036,46 @@ pub(crate) fn note_for_session(
             {
                 return Err(FlowError::InvalidArguments(
                     "author differs from registered session claim".into(),
+                ));
+            }
+            Ok(())
+        },
+    )
+}
+
+/// [`note_for_session`] attributed to the claim that was current in `session` when the act was
+/// performed (`as_of`: its CID and identity), not to the session's latest claim. The caller
+/// resolves that claim ([`elohim_epr_rea::ActorStore::current_for_at`]); this leg records it.
+pub(crate) fn note_for_session_as_of(
+    root: &Path,
+    on: &str,
+    kind: &str,
+    reason: &str,
+    session: &str,
+    as_of: (Cid, String),
+    expected_author: Option<&str>,
+) -> FlowResult<NoteOutcome> {
+    note_with_claim_guard(
+        root,
+        on,
+        NoteKind::parse(kind)?,
+        reason,
+        None,
+        None,
+        None,
+        &NoteActor {
+            as_ref: None,
+            session: Some(session.into()),
+        },
+        &super::acceptance::AcceptanceOptions::default(),
+        None,
+        Some(as_of),
+        |attribution| {
+            if expected_author
+                .is_some_and(|expected| attribution.actor.as_deref() != Some(expected))
+            {
+                return Err(FlowError::InvalidArguments(
+                    "author differs from the session claim current as of the act".into(),
                 ));
             }
             Ok(())

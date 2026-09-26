@@ -146,6 +146,7 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
                 &session,
                 device.as_ref(),
                 under.as_deref(),
+                None,
             )?;
             print_outcome(opts.json, &outcome, ClaimOutcome::render)
         }
@@ -386,7 +387,18 @@ pub fn claim_with_device(
     session: &str,
     device: Option<&DeviceKey>,
 ) -> ActorResult<ClaimOutcome> {
-    claim_bound(root, claimed, session, device, None)
+    claim_bound(root, claimed, session, device, None, None)
+}
+
+/// [`claim`] recorded at a caller-supplied wall-clock instant rather than now — the seam tests and
+/// replays use to place a claim exactly. The instant is RFC3339; nothing else changes.
+pub fn claim_recorded_at(
+    root: &Path,
+    claimed: &str,
+    session: &str,
+    recorded_at: &str,
+) -> ActorResult<ClaimOutcome> {
+    claim_bound(root, claimed, session, None, None, Some(recorded_at))
 }
 
 /// `epr actor claim … --under <path>`: the claim, bound to the collective of record for `path`
@@ -398,7 +410,7 @@ pub fn claim_under(
     session: &str,
     under: &str,
 ) -> ActorResult<ClaimOutcome> {
-    claim_bound(root, claimed, session, None, Some(under))
+    claim_bound(root, claimed, session, None, Some(under), None)
 }
 
 fn claim_bound(
@@ -407,6 +419,7 @@ fn claim_bound(
     session: &str,
     device: Option<&DeviceKey>,
     under: Option<&str>,
+    recorded_at: Option<&str>,
 ) -> ActorResult<ClaimOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
@@ -444,15 +457,34 @@ fn claim_bound(
         claim = claim.bound_to(&declaration)?;
     }
     let collective = claim.collective_of_record().to_string();
-    let record = ActorRecord::Claim(claim);
+    // The claim's own dating stays the tree's (`claimed_at`); `recorded_at` is the wall-clock
+    // instant it is recorded, so two claims made against one HEAD can still be ordered against
+    // an act performed between them. The caller supplies it — `elohim-epr-rea` reads no clock.
+    let recorded_at = recorded_at
+        .map(str::to_string)
+        .unwrap_or_else(|| chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+    let base = claim.clone();
+    let claim = claim.recorded_at(&recorded_at)?;
+
+    let mut store = SidecarActorStore::open(root)?.transaction()?;
+    let prior = store.current_for(session)?;
+    // A re-claim of what is ALREADY current is a no-op — and "the same claim" ignores only the
+    // instant it was recorded: re-stamping an unchanged claim would re-address it and move its
+    // recording forward, crediting later acts' as-of reads with a claim made earlier.
+    let unchanged = prior.as_ref().filter(|(_, current)| {
+        let mut current = current.clone();
+        current.recorded_at = None;
+        current == base
+    });
+    let record = match unchanged {
+        Some((_, current)) => ActorRecord::Claim(current.clone()),
+        None => ActorRecord::Claim(claim),
+    };
     let record_cid = record.cid()?;
     let signed = match device {
         Some(key) if is_human => Some(sign_record(&record_cid, key)?),
         _ => None,
     };
-
-    let mut store = SidecarActorStore::open(root)?.transaction()?;
-    let prior = store.current_for(session)?;
 
     // Idempotence is scoped to "is this ALREADY what's current for the session", not to "does
     // this CID appear anywhere in the log". In an append-only log whose read rule is

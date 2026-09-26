@@ -175,10 +175,24 @@ fn collect(root: &Path, dir: &Path) -> FlowResult<(Vec<entries::IndexRow>, Value
             opted_out += 1;
             continue;
         }
+        // Authorship is shown where the row is: a steward-of-record contribution says so on its
+        // own line, so no session reads the human as having written what they only stand for.
+        let steward_of_record = contribution
+            .uncertainty
+            .iter()
+            .any(|line| line.starts_with(super::import::STEWARD_OF_RECORD));
+        let desc = if steward_of_record {
+            format!(
+                "[steward of record: {}] {}",
+                contribution.author, contribution.claim
+            )
+        } else {
+            contribution.claim
+        };
         rows.push(entries::IndexRow {
             file: provenance.file,
             title: contribution.imported.map(|i| i.display).unwrap_or_default(),
-            desc: contribution.claim,
+            desc,
         });
     }
     rows.sort_by_key(|row| entries::sort_key(&row.file));

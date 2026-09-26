@@ -47,8 +47,12 @@ pub struct Options<'a> {
     pub input: Option<&'a str>,
     /// The registered session whose actor claim attributes any write.
     pub session: Option<&'a str>,
-    /// The positional argument — today, `import`'s source directory.
+    /// The positional argument — `import`'s source directory, or its first entry file.
     pub target: Option<&'a str>,
+    /// Positional arguments after the first. Only `import` takes them: its file-scoped form
+    /// (`import <entry.md>… --session ID`) names each entry, so an import by one session never
+    /// sweeps up entries another session wrote. Every other operation refuses a second argument.
+    pub more_targets: Vec<&'a str>,
     /// Where contribution requests live; defaults to [`import::DEFAULT_CONTRIBUTIONS_DIR`].
     pub contributions: Option<&'a str>,
     /// Plan without writing: no request files, no events, no index.
@@ -78,6 +82,15 @@ pub struct Options<'a> {
     /// This device's key, loaded (never minted) for `affiliate` to sign with when it is enrolled
     /// for the sponsor.
     pub device: Option<&'a crate::device_key::DeviceKey>,
+    /// `import <entry.md>… --as-of RFC3339` — when the named entries were written. Each is then
+    /// authored by the claim current in the session AT that instant, never by a later one; it is
+    /// threaded to `contribute`, whose note is pinned to that same claim. Refused elsewhere.
+    pub as_of: Option<&'a str>,
+    /// `import <entry.md>… --session S --steward-of-record` — the standing human stands for
+    /// entries no witnessed agent authored (operator ruling). Admitted only for an active,
+    /// non-fixture human Steward and only for entries unattributable by the as-of rule; the
+    /// contribution then carries the `authorship: steward-of-record` slot. Refused elsewhere.
+    pub steward_of_record: bool,
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
@@ -109,7 +122,10 @@ pub fn usage() -> String {
          project       project a contribution receipt, or --index the memory index\n  \
          feedback      file governed feedback on a contribution\n  \
          graduate      rehearse repository locality for a contribution (a distinct Steward approves)\n  \
-         import        adopt an authored directory of requests\n  \
+         import        adopt an authored directory of requests, or name entry files to import\n                   \
+                   only those, attributed to --session's own claim (never a fallback); --as-of T\n                   \
+                   takes the claim held at T; --steward-of-record lets a standing human Steward\n                   \
+                   stand for entries no witnessed agent authored\n  \
          migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n                    \
                    (--session ID [--basis LINE] [--contributions DIR] [--dry-run])\n  \
          recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n  \
@@ -149,9 +165,13 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         let key = args[i].as_str();
         if !key.starts_with("--") {
             if opts.target.is_some() {
-                return Err(refused(format!("unexpected second argument {key}")));
+                if operation != "import" {
+                    return Err(refused(format!("unexpected second argument {key}")));
+                }
+                opts.more_targets.push(key);
+            } else {
+                opts.target = Some(key);
             }
-            opts.target = Some(key);
             i += 1;
             continue;
         }
@@ -179,6 +199,11 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                 i += 1;
                 continue;
             }
+            "--steward-of-record" => {
+                opts.steward_of_record = true;
+                i += 1;
+                continue;
+            }
             _ => {}
         }
         let value = args
@@ -197,6 +222,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             "--role" => opts.role = Some(value.as_str()),
             "--standing" => opts.standing = Some(value.as_str()),
             "--acts-for" => opts.acts_for = Some(value.as_str()),
+            "--as-of" => opts.as_of = Some(value.as_str()),
             _ => return Err(refused(format!("unknown option {key}"))),
         }
         i += 2;
@@ -268,6 +294,17 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
     if operation == "import" {
         return import::run(root, opts);
     }
+    if opts.steward_of_record {
+        return Err(refused(
+            "--steward-of-record belongs to import's entry form alone",
+        ));
+    }
+    if opts.as_of.is_some() && operation != "contribute" {
+        return Err(refused("--as-of belongs to import's entry form alone"));
+    }
+    if let Some(extra) = opts.more_targets.first() {
+        return Err(refused(format!("unexpected second argument {extra}")));
+    }
     if operation == "project" && opts.index {
         return index::run(root, opts);
     }
@@ -317,12 +354,26 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
             reader.require_current(&assertion.collective, &governance)?;
             reader.owned_by(&file.reference.path, &governance)?;
             reader.allowed(&file.reference.path, assertion.reach, &collective)?;
-            reader.require_bound(session, &governance)?;
+            // The claim that authors this act: the one current AS OF the entry's writing when
+            // import supplied an instant, else the session's latest.
+            let as_of = match opts.as_of {
+                Some(at) => Some(import::claim_as_of_bound(
+                    &reader.root,
+                    session,
+                    at,
+                    &governance.reference.path,
+                )?),
+                None => {
+                    reader.require_bound(session, &governance)?;
+                    None
+                }
+            };
             let event = record(
                 &reader,
                 &file.reference,
                 input,
                 session,
+                as_of,
                 Some(&assertion.author),
                 "observation",
                 &format!(
@@ -404,6 +455,7 @@ pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<
                 &feedback.target,
                 &feedback.target.path,
                 session,
+                None,
                 None,
                 "correction",
                 &format!(
@@ -554,11 +606,13 @@ fn method_cid() -> String {
     BlobCid::compute_raw(bytes.as_bytes()).to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn record(
     reader: &Reader,
     expected: &FileRef,
     target: &str,
     session: Option<&str>,
+    as_of: Option<(Cid, String)>,
     expected_author: Option<&str>,
     kind: &str,
     reason: &str,
@@ -573,8 +627,20 @@ fn record(
         refused("write needs a registered --session; identity remains a local claim")
     })?;
     reader.sidecar(".eprfs/status/actors.jsonl")?;
-    let outcome =
-        note::note_for_session(&reader.root, target, kind, reason, session, expected_author)?;
+    let outcome = match as_of {
+        Some(claim) => note::note_for_session_as_of(
+            &reader.root,
+            target,
+            kind,
+            reason,
+            session,
+            claim,
+            expected_author,
+        )?,
+        None => {
+            note::note_for_session(&reader.root, target, kind, reason, session, expected_author)?
+        }
+    };
     Ok(serde_json::to_value(outcome)?)
 }
 

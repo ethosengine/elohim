@@ -97,9 +97,48 @@ pub struct ActorClaim {
     /// byte-identically to one made before this field existed, so no claim is re-addressed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collective: Option<String>,
+    /// The wall-clock instant the claim was RECORDED (RFC3339), supplied by the caller.
+    ///
+    /// `claimed_at` dates the tree the claim was made against, so two claims made against one
+    /// HEAD share an instant and cannot be ordered against an act performed between them. This
+    /// field orders them. `None` is a legacy claim, recorded before the field existed; the same
+    /// additive discipline as `definition_cid` keeps every such claim at its original address.
+    /// This crate still reads no clock: the caller supplies the instant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recorded_at: Option<String>,
+}
+
+/// Which instant [`ActorStore::current_for_at`] ordered a claim by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsOfBasis {
+    /// The claim carries `recorded_at`, the instant it was recorded.
+    Recorded,
+    /// A LEGACY claim with no `recorded_at`: ordered by `claimed_at`, the HEAD time it was made
+    /// against — which ties with any other claim made against the same tree.
+    LegacyClaimedAt,
 }
 
 impl ActorClaim {
+    /// Stamp the instant this claim is recorded. Supplied by the caller; refused when blank.
+    pub fn recorded_at(mut self, at: &str) -> Result<Self> {
+        let at = at.trim();
+        if at.is_empty() {
+            return Err(FabricError::Decode(
+                "actor claim recorded_at is blank — omit it rather than record no instant".into(),
+            ));
+        }
+        self.recorded_at = Some(at.to_string());
+        Ok(self)
+    }
+
+    /// The instant this claim orders by, and on which basis.
+    pub fn ordering_instant(&self) -> (&str, AsOfBasis) {
+        match self.recorded_at.as_deref() {
+            Some(at) => (at, AsOfBasis::Recorded),
+            None => (&self.claimed_at, AsOfBasis::LegacyClaimedAt),
+        }
+    }
+
     /// Bind this claim to a collective of record by its declaration path.
     ///
     /// The path's SHAPE is the caller's to resolve (only a caller that can read the tree knows
@@ -189,6 +228,7 @@ impl ActorClaim {
             claimed_at: claimed_at.to_string(),
             definition_cid,
             collective: None,
+            recorded_at: None,
         })
     }
 
@@ -674,6 +714,33 @@ pub trait ActorStore {
             .into_iter()
             .rfind(|(_, claim)| claim.session == session))
     }
+
+    /// Who was acting in `session` AS OF an instant: the last claim appended for it whose
+    /// ordering instant the caller's `not_after` admits (`instant <= at`, decided by the caller).
+    ///
+    /// The ordering instant is `recorded_at` — when the claim was recorded — and only for a
+    /// LEGACY claim, recorded before that field existed, `claimed_at` (the HEAD time it was made
+    /// against). The basis is returned with the claim so a caller can say which it was: a
+    /// legacy basis cannot order two claims made against one tree.
+    ///
+    /// This module never reads a clock and never parses one: comparing two instants is the
+    /// caller's decision, exactly as dating a claim is. `None` means no claim existed yet at that
+    /// instant — never a fall-forward to a later claim, which would credit an act to a participant
+    /// who had not yet claimed when it was performed.
+    fn current_for_at(
+        &self,
+        session: &str,
+        not_after: &dyn Fn(&str) -> bool,
+    ) -> Result<Option<(Cid, ActorClaim, AsOfBasis)>> {
+        Ok(self
+            .claims()?
+            .into_iter()
+            .rfind(|(_, claim)| claim.session == session && not_after(claim.ordering_instant().0))
+            .map(|(cid, claim)| {
+                let basis = claim.ordering_instant().1;
+                (cid, claim, basis)
+            }))
+    }
 }
 
 /// In-memory store — tests and short-lived reads.
@@ -1112,6 +1179,111 @@ mod tests {
 
     // ── golden ──────────────────────────────────────────────────────────────────────────
 
+    /// A claim line as the live sidecar holds it, written before `recorded_at` existed. Its
+    /// stored CID must still be the CID of its payload: the field is additive, and a legacy line
+    /// must keep its address byte for byte.
+    #[test]
+    fn a_legacy_claim_line_keeps_its_cid_after_recorded_at() {
+        let line = r#"{"cid":"bafyreibkgt5yfgfvnyqfpjpbpoqmtgqdxjatti4iefeawxfq3ntmhlepwq","record":{"kind":"claim","claimed":"agent:orchestrator@claude-opus-5-5","session":"0ca6c494-abc4-4dac-a4ac-bb7badb7b4a0","claimedAt":"2026-09-25T20:29:40Z"}}"#;
+        let value: serde_json::Value = serde_json::from_str(line).unwrap();
+        let record: ActorRecord = serde_json::from_value(value["record"].clone()).unwrap();
+        let ActorRecord::Claim(claim) = &record else {
+            panic!("a claim line");
+        };
+        assert_eq!(
+            claim.recorded_at, None,
+            "a legacy line carries no recorded_at"
+        );
+        assert_eq!(
+            record.cid().unwrap().to_string(),
+            value["cid"].as_str().unwrap(),
+            "the additive field re-addressed a legacy claim"
+        );
+        assert_eq!(
+            serde_json::to_value(&record).unwrap(),
+            value["record"],
+            "a legacy claim no longer round-trips to its own bytes"
+        );
+        // A recorded claim is a DIFFERENT record: the instant is information, not decoration.
+        let recorded = ActorRecord::Claim(
+            claim
+                .clone()
+                .recorded_at("2026-09-25T20:31:02.117Z")
+                .unwrap(),
+        );
+        assert_ne!(recorded.cid().unwrap(), record.cid().unwrap());
+        assert!(
+            claim.clone().recorded_at("  ").is_err(),
+            "a blank instant is refused"
+        );
+    }
+
+    /// Two claims against ONE HEAD share `claimed_at`, so only `recorded_at` can order them
+    /// against an act performed between them. Legacy claims (no `recorded_at`) still order by
+    /// `claimed_at` and say so.
+    #[test]
+    fn current_for_at_orders_by_recorded_at_and_names_legacy_claims() {
+        let head = "2026-09-25T20:00:00Z";
+        // RFC3339 UTC in one shape, so text order is time order for this fixture.
+        fn at(c: &'static str) -> impl Fn(&str) -> bool {
+            move |t: &str| t <= c
+        }
+        let mut store = MemoryActorStore::new();
+        store
+            .append(ActorRecord::Claim(
+                ActorClaim::new("agent:orchestrator@opus-5", "s1", head, None)
+                    .unwrap()
+                    .recorded_at("2026-09-25T20:10:00Z")
+                    .unwrap(),
+            ))
+            .unwrap();
+        store
+            .append(ActorRecord::Claim(
+                ActorClaim::new("agent:scribe@opus-5", "s1", head, None)
+                    .unwrap()
+                    .recorded_at("2026-09-25T20:30:00Z")
+                    .unwrap(),
+            ))
+            .unwrap();
+        // An entry written at 20:20, between the two recordings: the EARLIER claim.
+        let between = at("2026-09-25T20:20:00Z");
+        let (_, current, basis) = store.current_for_at("s1", &between).unwrap().unwrap();
+        assert_eq!(current.claimed.0, "agent:orchestrator@opus-5");
+        assert_eq!(basis, AsOfBasis::Recorded);
+        // After both: the later one. Before both: none, never a fall-forward.
+        let after = at("2026-09-25T20:40:00Z");
+        assert_eq!(
+            store
+                .current_for_at("s1", &after)
+                .unwrap()
+                .unwrap()
+                .1
+                .claimed
+                .0,
+            "agent:scribe@opus-5"
+        );
+        let before = at("2026-09-25T20:05:00Z");
+        assert!(store.current_for_at("s1", &before).unwrap().is_none());
+
+        // Legacy-only claims behave exactly as before, and are named as legacy.
+        let mut legacy = MemoryActorStore::new();
+        legacy
+            .append(ActorRecord::Claim(claim("agent:orchestrator@opus-5", "s2")))
+            .unwrap();
+        legacy
+            .append(ActorRecord::Claim(claim("agent:scribe@opus-5", "s2")))
+            .unwrap();
+        let (_, latest, basis) = legacy
+            .current_for_at("s2", &at("2026-09-30T00:00:00Z"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            latest.claimed.0, "agent:scribe@opus-5",
+            "the legacy tie still goes to the later"
+        );
+        assert_eq!(basis, AsOfBasis::LegacyClaimedAt);
+    }
+
     /// Pinned so the canonical dag-cbor encoding of an `ActorClaim` can never silently drift
     /// (mirrors `note::tests::note_event_cid_is_stable`). Every field is a literal, so this
     /// golden is independent of git, the clock, and the tree. A change here re-addresses every
@@ -1127,6 +1299,7 @@ mod tests {
                     .to_string(),
             ),
             collective: None,
+            recorded_at: None,
         };
         let cid = atom_cid(&claim).expect("cid");
         assert_eq!(

@@ -560,11 +560,18 @@ fn actor(as_ref: &str) -> NoteActor {
 fn register_worker(root: &Path, session: &str, identity: &str) -> String {
     use elohim_epr_rea::{ActorClaim, ActorRecord};
     let (_, date) = elohim_epr_cli::flow::head_commit_provenance(root).unwrap();
-    let expected = ActorRecord::Claim(ActorClaim::new(identity, session, &date, None).unwrap())
-        .cid()
-        .unwrap()
-        .to_string();
-    elohim_epr_cli::actor::claim(root, identity, session).unwrap();
+    // The CLI records the instant a claim is made; the oracle pins it to the same bytes.
+    let recorded = "2026-09-26T00:00:00.000Z";
+    let expected = ActorRecord::Claim(
+        ActorClaim::new(identity, session, &date, None)
+            .unwrap()
+            .recorded_at(recorded)
+            .unwrap(),
+    )
+    .cid()
+    .unwrap()
+    .to_string();
+    elohim_epr_cli::actor::claim_recorded_at(root, identity, session, recorded).unwrap();
     expected
 }
 

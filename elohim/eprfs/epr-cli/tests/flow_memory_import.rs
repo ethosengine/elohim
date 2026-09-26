@@ -1262,3 +1262,570 @@ fn a_misattributed_migration_act_is_corrected_by_a_re_run() {
     let projected = project(root, Options::default()).expect("index projects");
     assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
 }
+
+// ── the entry form: per entry, never per importer ───────────────────────────────────────────────
+
+fn import_entries(
+    root: &Path,
+    session: &str,
+    files: &[&str],
+) -> elohim_epr_cli::flow::FlowResult<serde_json::Value> {
+    memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: files.first().copied(),
+            more_targets: files[1..].to_vec(),
+            session: Some(session),
+            ..Options::default()
+        },
+    )
+}
+
+fn author_of(root: &Path, stem: &str) -> String {
+    let text = std::fs::read_to_string(
+        root.join(format!(".eprfs/status/memory/contributions/{stem}.json")),
+    )
+    .expect("contribution");
+    let c: serde_json::Value = serde_json::from_str(&text).expect("json");
+    c["author"].as_str().expect("author").to_string()
+}
+
+/// The harness imports what ONE session wrote under THAT session. Two sessions wrote into the same
+/// directory; each import names only its own entries, and each entry lands under its writer —
+/// even when the writer is a session that has since been followed by another claim.
+#[test]
+fn the_entry_form_imports_only_the_named_entries_under_their_writers_claim() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    // A LATER session claims; SESSION (the fixture's first) is now a past session.
+    actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+
+    let beta = import_entries(root, SECOND_SESSION, &[".claude/memory/project_beta.md"])
+        .expect("the second session imports its own entry");
+    assert_eq!(beta["form"], "entries");
+    assert_eq!(beta["directory"], ".claude/memory");
+    assert_eq!(beta["counts"]["entries"], 1, "{beta}");
+    assert_eq!(beta["counts"]["contributed"], 1, "{beta}");
+    assert_eq!(beta["counts"]["eventsAppended"], 1, "{beta}");
+    let names: Vec<String> = contributions(root).into_iter().map(|(n, _)| n).collect();
+    assert_eq!(
+        names,
+        vec!["project_beta.json".to_string()],
+        "an entry-form import swept up entries it did not name"
+    );
+    assert_eq!(author_of(root, "project_beta"), SECOND_AUTHOR);
+
+    // The past session's entries, imported under the past session: its own claim, not the latest.
+    let rest = import_entries(
+        root,
+        SESSION,
+        &[
+            ".claude/memory/reference_gamma.md",
+            ".claude/memory/feedback_alpha.md",
+            ".claude/memory/feedback_alpha.md",
+        ],
+    )
+    .expect("the past session imports its own entries");
+    assert_eq!(rest["counts"]["entries"], 2, "duplicates collapse: {rest}");
+    assert_eq!(rest["counts"]["contributed"], 2, "{rest}");
+    assert_eq!(author_of(root, "feedback_alpha"), AUTHOR);
+    assert_eq!(author_of(root, "reference_gamma"), AUTHOR);
+    assert_eq!(author_of(root, "project_beta"), SECOND_AUTHOR);
+
+    // A directory sweep afterwards finds nothing to do and re-authors nothing.
+    let events_before = events(root);
+    let sweep = import(root, ".claude/memory");
+    assert_eq!(sweep["form"], "directory");
+    assert_eq!(sweep["counts"]["skipped"], 3, "{sweep}");
+    assert_eq!(events(root), events_before);
+    assert_eq!(author_of(root, "project_beta"), SECOND_AUTHOR);
+
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
+    assert_eq!(projected["entries"], 3, "{projected}");
+}
+
+/// No fallback: a session that never claimed has no author to offer, and the entry form will not
+/// borrow one — not even this device's witnessed standing human, which the directory form accepts.
+#[test]
+fn the_entry_form_refuses_a_session_that_never_claimed_and_writes_nothing() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    let keys = TempDir::new().expect("keys");
+    let key_file = witnessed(root, &keys);
+    let events_before = events(root);
+
+    let out = epr(
+        root,
+        &key_file,
+        &[
+            "flow",
+            "memory",
+            "import",
+            ".claude/memory/feedback_alpha.md",
+            "--session",
+            "never-claimed-session",
+            "--json",
+        ],
+    );
+    assert!(
+        !out.status.success(),
+        "an entry-form import borrowed an author for an unclaimed session: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("registered no actor claim") && stderr.contains("unattributable"),
+        "the refusal names why and what the entry stays: {stderr}"
+    );
+    assert!(
+        !root.join(".eprfs/status/memory/contributions").exists(),
+        "a refused entry-form import wrote a request"
+    );
+    assert_eq!(events(root), events_before, "a refused import wrote an act");
+}
+
+#[test]
+fn the_entry_form_names_entries_of_one_directory_and_never_the_index() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    write(
+        root,
+        ".claude/memory/MEMORY.md",
+        "- [x](feedback_alpha.md) - row\n",
+    );
+    write(
+        root,
+        ".claude/other/feedback_delta.md",
+        "---\nname: feedback_delta\ndescription: d.\nmetadata:\n  type: feedback\n---\n",
+    );
+
+    let index = import_entries(root, SESSION, &[".claude/memory/MEMORY.md"])
+        .expect_err("the projection is never an entry");
+    assert!(index.to_string().contains("MEMORY.md"), "{index}");
+
+    let spread = import_entries(
+        root,
+        SESSION,
+        &[
+            ".claude/memory/feedback_alpha.md",
+            ".claude/other/feedback_delta.md",
+        ],
+    )
+    .expect_err("one import names one directory's entries");
+    assert!(spread.to_string().contains("span"), "{spread}");
+
+    let missing = import_entries(
+        root,
+        SESSION,
+        &[
+            ".claude/memory/absent.md",
+            ".claude/memory/feedback_alpha.md",
+        ],
+    )
+    .expect_err("a missing entry is refused, not skipped");
+    assert!(missing.to_string().contains("not a file"), "{missing}");
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+}
+
+#[test]
+fn a_second_positional_is_still_refused_outside_import() {
+    let dir = repo();
+    let root = dir.path();
+    let err = memory::execute_with(
+        root,
+        "pin",
+        &Options {
+            input: Some(".epr-meta/collective.json"),
+            target: Some("a"),
+            more_targets: vec!["b"],
+            ..Options::default()
+        },
+    )
+    .expect_err("only import takes more than one positional");
+    assert!(
+        err.to_string().contains("unexpected second argument b"),
+        "{err}"
+    );
+}
+
+// ── as of the writing: the claim current WHEN the entry was written ─────────────────────────────
+
+const ORCHESTRATOR: &str = "agent:orchestrator@fixture";
+const SUBAGENT: &str = "agent:scribe@fixture";
+const SHARED_SESSION: &str = "one-session-two-personas";
+
+/// Append a claim dated `at` (a claim is dated by its caller; the fixture dates it outright).
+fn claim_at(root: &Path, claimed: &str, session: &str, at: &str) {
+    use elohim_epr_rea::{ActorClaim, ActorRecord, ActorStore, SidecarActorStore};
+    let claim = ActorClaim::new(claimed, session, at, None).expect("claim shape");
+    SidecarActorStore::open(root)
+        .expect("actor store")
+        .append(ActorRecord::Claim(claim))
+        .expect("append");
+}
+
+fn import_as_of(
+    root: &Path,
+    session: &str,
+    at: &str,
+    files: &[&str],
+) -> elohim_epr_cli::flow::FlowResult<serde_json::Value> {
+    memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: files.first().copied(),
+            more_targets: files[1..].to_vec(),
+            session: Some(session),
+            as_of: Some(at),
+            ..Options::default()
+        },
+    )
+}
+
+/// The act's provider in the flow plane, not just the request's author slot: the note leg must
+/// agree with the request, or the projection would not count the contribution at all.
+fn last_provider(root: &Path) -> String {
+    last_event(root)["record"]["provider"]
+        .as_str()
+        .expect("provider")
+        .to_string()
+}
+
+#[test]
+fn a_subagent_claiming_later_never_takes_the_orchestrators_earlier_entry() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    claim_at(root, ORCHESTRATOR, SHARED_SESSION, "2026-09-25T10:00:00Z");
+    // The subagent claims LATER in the same session: it is now the session's latest claim.
+    claim_at(root, SUBAGENT, SHARED_SESSION, "2026-09-25T12:00:00Z");
+
+    let out = import_as_of(
+        root,
+        SHARED_SESSION,
+        "2026-09-25T11:30:00.250Z",
+        &[".claude/memory/feedback_alpha.md"],
+    )
+    .expect("the orchestrator's entry imports under the orchestrator");
+    assert_eq!(out["counts"]["contributed"], 1, "{out}");
+    assert_eq!(author_of(root, "feedback_alpha"), ORCHESTRATOR);
+    assert_eq!(
+        last_provider(root),
+        ORCHESTRATOR,
+        "the act fell forward to the later claim"
+    );
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
+}
+
+#[test]
+fn an_entry_written_before_any_claim_is_unattributable() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    claim_at(root, ORCHESTRATOR, SHARED_SESSION, "2026-09-25T10:00:00Z");
+    let events_before = events(root);
+
+    let err = import_as_of(
+        root,
+        SHARED_SESSION,
+        "2026-09-25T09:59:59.999Z",
+        &[".claude/memory/feedback_alpha.md"],
+    )
+    .expect_err("no claim existed yet; the later one must not be borrowed");
+    let message = err.to_string();
+    assert!(
+        message.contains("no actor claim as of") && message.contains("unattributable"),
+        "{message}"
+    );
+    assert!(
+        message.contains("2026-09-25T10:00:00Z"),
+        "names the first claim: {message}"
+    );
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+    assert_eq!(events(root), events_before);
+}
+
+#[test]
+fn two_claims_bracketing_two_entries_give_each_entry_its_own_claim() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    claim_at(root, ORCHESTRATOR, SHARED_SESSION, "2026-09-25T10:00:00Z");
+    claim_at(root, SUBAGENT, SHARED_SESSION, "2026-09-25T12:00:00Z");
+
+    import_as_of(
+        root,
+        SHARED_SESSION,
+        "2026-09-25T13:00:00+01:00", // 12:00Z — exactly at the second claim: it counts
+        &[".claude/memory/project_beta.md"],
+    )
+    .expect("the later entry imports under the later claim");
+    assert_eq!(author_of(root, "project_beta"), SUBAGENT);
+    assert_eq!(last_provider(root), SUBAGENT);
+
+    import_as_of(
+        root,
+        SHARED_SESSION,
+        "2026-09-25T11:59:59Z",
+        &[".claude/memory/feedback_alpha.md"],
+    )
+    .expect("the earlier entry imports under the earlier claim");
+    assert_eq!(author_of(root, "feedback_alpha"), ORCHESTRATOR);
+    assert_eq!(last_provider(root), ORCHESTRATOR);
+
+    // And the directory form refuses an instant it cannot honour per entry.
+    let err = memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(".claude/memory"),
+            session: Some(SHARED_SESSION),
+            as_of: Some("2026-09-25T11:00:00Z"),
+            ..Options::default()
+        },
+    )
+    .expect_err("--as-of is the entry form's");
+    assert!(err.to_string().contains("entry form"), "{err}");
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
+}
+
+// ── recorded_at: ordering two claims made against ONE tree ──────────────────────────────────────
+
+fn actor_lines(root: &Path) -> Vec<serde_json::Value> {
+    std::fs::read_to_string(root.join(".eprfs/status/actors.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| serde_json::from_str(l).expect("actor line"))
+        .collect()
+}
+
+#[test]
+fn two_claims_against_one_head_are_ordered_by_when_they_were_recorded() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    actor::claim_recorded_at(root, ORCHESTRATOR, "same-head", "2026-09-25T20:10:00Z")
+        .expect("first claim");
+    actor::claim_recorded_at(root, SUBAGENT, "same-head", "2026-09-25T20:30:00Z")
+        .expect("second claim");
+    let claims: Vec<serde_json::Value> = actor_lines(root)
+        .into_iter()
+        .filter(|l| l["record"]["session"] == "same-head")
+        .collect();
+    assert_eq!(claims.len(), 2);
+    assert_eq!(
+        claims[0]["record"]["claimedAt"], claims[1]["record"]["claimedAt"],
+        "both claims were made against the same HEAD — claimedAt alone cannot order them"
+    );
+    assert_eq!(claims[1]["record"]["recordedAt"], "2026-09-25T20:30:00Z");
+
+    // Written at 20:20, between the two recordings: the EARLIER claim authors it.
+    import_as_of(
+        root,
+        "same-head",
+        "2026-09-25T20:20:00Z",
+        &[".claude/memory/feedback_alpha.md"],
+    )
+    .expect("the entry between the claims imports under the earlier one");
+    assert_eq!(author_of(root, "feedback_alpha"), ORCHESTRATOR);
+    assert_eq!(last_provider(root), ORCHESTRATOR);
+}
+
+#[test]
+fn re_claiming_the_current_identity_appends_nothing() {
+    let dir = repo();
+    let root = dir.path();
+    let before = actor_lines(root).len();
+    // `repo()` claimed AUTHOR under SESSION a moment ago; the same claim again is a no-op, even
+    // though its recording instant would differ.
+    let again = actor::claim(root, AUTHOR, SESSION).expect("re-claim");
+    assert!(
+        !again.appended,
+        "an unchanged re-claim was re-stamped and appended"
+    );
+    assert_eq!(actor_lines(root).len(), before);
+    // A CLI claim records its instant.
+    let claim = actor_lines(root)
+        .into_iter()
+        .find(|l| l["record"]["session"] == SESSION)
+        .expect("the claim");
+    assert!(
+        claim["record"]["recordedAt"].is_string(),
+        "a new claim carries recordedAt: {claim}"
+    );
+}
+
+// ── steward of record (operator ruling) ─────────────────────────────────────────────────────────
+
+const STANDING_HUMAN: &str = "human:matthew"; // Standing Steward in the real affiliations sidecar
+const FIXTURE_HUMAN: &str = "human:adam"; // Fixture Steward in the same sidecar
+
+fn plant_entry(root: &Path, stem: &str, origin: Option<&str>, modified: &str) {
+    let origin = origin
+        .map(|o| format!("  originSessionId: {o}\n"))
+        .unwrap_or_default();
+    write(
+        root,
+        &format!(".claude/memory/{stem}.md"),
+        &format!(
+            "---\nname: {stem}\ndescription: The operator's ruling {stem}.\nmetadata:\n  type: feedback\n{origin}  modified: {modified}\n---\n\nbody\n"
+        ),
+    );
+}
+
+fn stand(
+    root: &Path,
+    session: &str,
+    files: &[&str],
+) -> elohim_epr_cli::flow::FlowResult<serde_json::Value> {
+    memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: files.first().copied(),
+            more_targets: files[1..].to_vec(),
+            session: Some(session),
+            steward_of_record: true,
+            ..Options::default()
+        },
+    )
+}
+
+#[test]
+fn steward_of_record_refuses_an_agent_session() {
+    let dir = repo();
+    let root = dir.path();
+    plant_entry(root, "feedback_ruling", None, "2026-09-25T09:00:00Z");
+    let err = stand(root, SESSION, &[".claude/memory/feedback_ruling.md"])
+        .expect_err("an agent never stands as steward of record");
+    assert!(err.to_string().contains("not a human participant"), "{err}");
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+}
+
+#[test]
+fn steward_of_record_refuses_a_fixture_steward() {
+    let dir = repo();
+    let root = dir.path();
+    plant_entry(root, "feedback_ruling", None, "2026-09-25T09:00:00Z");
+    actor::claim(root, FIXTURE_HUMAN, "fixture-human-session").expect("claim");
+    let err = stand(
+        root,
+        "fixture-human-session",
+        &[".claude/memory/feedback_ruling.md"],
+    )
+    .expect_err("a fixture human cannot stand for real fruit");
+    assert!(err.to_string().contains("FIXTURE"), "{err}");
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+}
+
+#[test]
+fn steward_of_record_refuses_an_entry_with_a_witnessable_author() {
+    let dir = repo();
+    let root = dir.path();
+    // SESSION claimed AUTHOR in `repo()`; this entry was written (per its frontmatter) after.
+    plant_entry(
+        root,
+        "feedback_authored",
+        Some(SESSION),
+        "2099-01-01T00:00:00Z",
+    );
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+    let events_before = events(root);
+    let err = stand(
+        root,
+        "human-session",
+        &[".claude/memory/feedback_authored.md"],
+    )
+    .expect_err("a real author is never overridden");
+    let message = err.to_string();
+    assert!(
+        message.contains("witnessable author")
+            && message.contains(SESSION)
+            && message.contains(AUTHOR),
+        "names the session and its claim: {message}"
+    );
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+    assert_eq!(events(root), events_before);
+}
+
+#[test]
+fn steward_of_record_admits_an_unattributable_entry_and_labels_it() {
+    let dir = repo();
+    let root = dir.path();
+    plant_entry(
+        root,
+        "feedback_ruling",
+        Some("never-claimed-session"),
+        "2026-09-25T09:00:00Z",
+    );
+    plant_entry(root, "project_no_origin", None, "2026-09-25T09:00:00Z");
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+
+    let out = stand(
+        root,
+        "human-session",
+        &[
+            ".claude/memory/feedback_ruling.md",
+            ".claude/memory/project_no_origin.md",
+        ],
+    )
+    .expect("the standing human stands for unattributable entries");
+    assert_eq!(out["counts"]["contributed"], 2, "{out}");
+
+    let text = std::fs::read_to_string(
+        root.join(".eprfs/status/memory/contributions/feedback_ruling.json"),
+    )
+    .expect("contribution");
+    let c: serde_json::Value = serde_json::from_str(&text).expect("json");
+    assert_eq!(c["author"], STANDING_HUMAN);
+    let slot = c["uncertainty"]
+        .as_array()
+        .expect("uncertainty")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .find(|s| s.starts_with("authorship: steward-of-record"))
+        .expect("the authorship slot")
+        .to_string();
+    assert!(
+        slot.contains("does not say human:matthew wrote it"),
+        "{slot}"
+    );
+    assert!(
+        slot.contains("Origin session: never-claimed-session"),
+        "{slot}"
+    );
+    let no_origin = std::fs::read_to_string(
+        root.join(".eprfs/status/memory/contributions/project_no_origin.json"),
+    )
+    .expect("contribution");
+    assert!(no_origin.contains("Origin session: none recorded"));
+    assert_eq!(last_provider(root), STANDING_HUMAN);
+
+    // The label is shown where authorship is read: the projected index row.
+    project(
+        root,
+        Options {
+            out: Some(".claude/memory/MEMORY.md"),
+            ..Options::default()
+        },
+    )
+    .expect("index projects");
+    let index = std::fs::read_to_string(root.join(".claude/memory/MEMORY.md")).expect("index");
+    let row = index
+        .lines()
+        .find(|l| l.contains("](feedback_ruling.md)"))
+        .expect("a row");
+    assert!(
+        row.contains("[steward of record: human:matthew]"),
+        "the row does not say who stands for it: {row}"
+    );
+}

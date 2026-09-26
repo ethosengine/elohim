@@ -82,7 +82,7 @@ pub mod walk;
 pub use actor::SidecarActorStore;
 pub use actor::{
     parse_acting_participant, parse_agent_ref, parse_participant_ref, record_signing_message,
-    ActorClaim, ActorRecord, ActorStore, ActorWitness, MemoryActorStore, ParticipantRef,
+    ActorClaim, ActorRecord, ActorStore, ActorWitness, AsOfBasis, MemoryActorStore, ParticipantRef,
     RecordSignature, SignatureVerifier, ROOT_COLLECTIVE_DECLARATION,
 };
 pub use epistemic::{

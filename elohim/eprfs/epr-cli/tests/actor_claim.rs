@@ -28,11 +28,22 @@ fn governance_pins_the_exact_claim_across_workers_and_supersession() {
     let dir = fixture();
     let root = dir.path();
     let (_, date) = elohim_epr_cli::flow::head_commit_provenance(root).unwrap();
+    // A claim records the wall-clock instant it was made (`recordedAt`); the oracle pins one so
+    // the expected address is computed from exactly the bytes the CLI appends.
+    const RECORDED: &str = "2026-09-26T00:00:00.000Z";
+    let claim = |root: &Path, identity: &str, session: &str| {
+        elohim_epr_cli::actor::claim_recorded_at(root, identity, session, RECORDED)
+    };
     let expected = |session: &str, identity: &str| {
-        ActorRecord::Claim(ActorClaim::new(identity, session, &date, None).unwrap())
-            .cid()
-            .unwrap()
-            .to_string()
+        ActorRecord::Claim(
+            ActorClaim::new(identity, session, &date, None)
+                .unwrap()
+                .recorded_at(RECORDED)
+                .unwrap(),
+        )
+        .cid()
+        .unwrap()
+        .to_string()
     };
     let decision = |session: Option<&str>| {
         let mut args = vec!["--path".into(), "README.md".into()];
