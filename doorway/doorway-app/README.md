@@ -6,8 +6,8 @@ Operator dashboard for doorway stewards. In the Elohim Protocol, doorways are co
 
 - **Operator Dashboard** -- Real-time node health, cluster metrics, resource utilization, and custodian network status via WebSocket. Displays both technical metrics (CPU, memory, storage, bandwidth) and human-scale metrics (trust scores, humans served, impact scores, steward tiers).
 - **Federation** -- View federated doorway peers and P2P connections across the network.
-- **Graduation Pipeline** -- Track users progressing from hosted accounts toward full stewardship (registered, hosted, graduating, steward).
-- **User Management** -- Administer accounts, quotas, and permissions for hosted users.
+- **Graduation Pipeline** -- Track people on their way from hosted accounts to stewardship of their own keys and devices (registered, hosted, graduating, steward). Graduation is the doorway's purpose: a hosted account is a starting point, not a destination.
+- **Hosted Accounts** -- Care for hosted accounts, quotas, and permissions while people are still on the doorway's keys.
 - **Account Self-Service** -- Users can view their own agency pipeline progress and usage.
 
 ## Routes
