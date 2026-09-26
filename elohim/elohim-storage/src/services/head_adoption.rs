@@ -2503,6 +2503,10 @@ async fn try_carried_election_supply(
     }
 }
 
+// Eight arguments, one over clippy's line: the byte presence joined the seven
+// it already took, and each is a distinct authority the arm consults — the same
+// reasoning `stamp_declared_head_mode` records for its own allow.
+#[allow(clippy::too_many_arguments)]
 async fn try_obey_visible_election(
     hc: &Arc<HcClient>,
     pool: &DbPool,
