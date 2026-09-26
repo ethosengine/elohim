@@ -2408,6 +2408,62 @@ fn a_same_author_fold_hides_its_members_at_once_and_touches_none_of_their_bytes(
 }
 
 #[test]
+fn another_build_of_the_curators_own_role_is_another_author_so_the_fold_waits() {
+    // The same-author bypass grants a fold with no Steward review, so it is exact identity:
+    // a sibling build of the curator's role is a different participant (review of 98decb42f).
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    actor::claim_recorded_at(
+        root,
+        "agent:librarian@another-build",
+        "sibling-session",
+        "2026-09-25T09:00:00Z",
+    )
+    .expect("sibling build");
+    contribute_entry(root, "feedback_sibling", "sibling-session", "");
+    let umbrella = contribute_entry(
+        root,
+        "feedback_sibling_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_sibling]\n",
+    );
+    assert_eq!(umbrella["supersession"]["state"], "pending", "{umbrella}");
+    let (_, index) = project_index(root);
+    assert!(row(&index, "feedback_sibling.md").is_some(), "{index}");
+}
+
+#[test]
+fn a_same_author_fold_cannot_bury_a_pending_cross_author_umbrella() {
+    let dir = repo();
+    let root = dir.path();
+    fold_claims(root);
+    contribute_entry(root, "feedback_theirs", WRITER_SESSION, "");
+    let pending = contribute_entry(
+        root,
+        "feedback_pending_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_theirs]\n",
+    );
+    assert_eq!(pending["supersession"]["state"], "pending", "{pending}");
+    // The curator folds its OWN pending umbrella: same author, effective at once — but the
+    // pending umbrella's row (and its member's) must stay visible until a Steward rules.
+    let outer = contribute_entry(
+        root,
+        "feedback_outer_umbrella",
+        CURATOR_SESSION,
+        "supersedes: [feedback_pending_umbrella]\n",
+    );
+    assert_eq!(outer["supersession"]["state"], "effective", "{outer}");
+    let (_, index) = project_index(root);
+    assert!(
+        row(&index, "feedback_pending_umbrella.md").is_some(),
+        "{index}"
+    );
+    assert!(row(&index, "feedback_theirs.md").is_some(), "{index}");
+}
+
+#[test]
 fn a_cross_author_fold_stays_pending_until_a_distinct_steward_approves() {
     let dir = repo();
     let root = dir.path();

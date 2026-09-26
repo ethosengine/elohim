@@ -32,7 +32,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use eprfs_agent::memory::{agent_role, Contribution};
+use eprfs_agent::memory::Contribution;
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 
@@ -42,10 +42,13 @@ use super::{steward_approval, ContributionActs};
 /// The label the projected row of a pending umbrella carries, spelled once.
 pub(super) const PENDING_LABEL: &str = "[supersession pending a Steward's verdict]";
 
-/// Whether two contribution authors are the same author: the exact participant, or two builds of
-/// one agent role — the sense [`eprfs_agent::memory::Affiliation::same_author_as`] gives it.
+/// Whether a fold's member and its umbrella share an author, for GRANTING the same-author
+/// bypass: the exact participant only. [`eprfs_agent::memory::Affiliation::same_author_as`]'s
+/// role-wide match (any build of a role is any other) is deliberately over-inclusive for
+/// REFUSING self-approval; used to grant a fold with no Steward review it would let one agent
+/// role fold another invocation's work unreviewed (review of 98decb42f).
 pub(super) fn same_author(a: &str, b: &str) -> bool {
-    a == b || matches!((agent_role(a), agent_role(b)), (Some(x), Some(y)) if x == y)
+    a == b
 }
 
 /// The exact command a distinct Steward runs to approve the fold resting on `resource`.
@@ -353,14 +356,22 @@ fn standing(
 
 /// The contributions an EFFECTIVE fold hides: request path → (pinned raw CID, umbrella entry).
 /// Only a member still carrying the pinned bytes is hidden.
+/// A member that is itself a PENDING umbrella is never hidden: its pending row and approval
+/// advisory must stay visible, or a trivial same-author fold could quietly bury a cross-author
+/// fold still waiting on a Steward (review of 98decb42f).
 pub(super) fn hidden(folds: &[Fold]) -> BTreeMap<String, (String, String)> {
+    let pending: std::collections::BTreeSet<&str> = folds
+        .iter()
+        .filter(|f| !f.effective())
+        .map(|f| f.request.as_str())
+        .collect();
     folds
         .iter()
         .filter(|f| f.effective())
         .flat_map(|f| {
             f.members
                 .iter()
-                .filter(|m| m.current)
+                .filter(|m| m.current && !pending.contains(m.path.as_str()))
                 .map(move |m| (m.path.clone(), (m.cid.clone(), f.umbrella.clone())))
         })
         .collect()
