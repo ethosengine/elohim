@@ -661,8 +661,11 @@ def fleetWriteReady(List<String> doorwayEprUrls, List<Map> bundles, String admin
     def specs = bundles.collect { b -> "${b.slug}:${b.kind ?: 'browser'}:${b.distDir}" }.join(' ')
     def urls = doorwayEprUrls.collect { u -> "'${u}'" }.join(' ')
     def rc = 0
+    // The intent's commit becomes the App baseline the orchestrator re-dispatches, so it is the
+    // full SHA; gitCommitHash is build.env's 8-char tag hash (#1728's intent was unusable).
+    def intentCommit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
     withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "READINESS_OUT=${resultFile}",
-             "DEPLOY_INTENT_OUT=${env.WORKSPACE}/${intentFile}", "DEPLOY_INTENT_COMMIT=${gitCommitHash ?: ''}",
+             "DEPLOY_INTENT_OUT=${env.WORKSPACE}/${intentFile}", "DEPLOY_INTENT_COMMIT=${intentCommit}",
              "DEPLOY_INTENT_ENV=${env.BRANCH_NAME ?: 'dev'}", "DEPLOY_INTENT_BUNDLES=${specs}"]) {
         sh "rm -f '${resultFile}' '${env.WORKSPACE}/${intentFile}'"
         rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/fleet-write-readiness.sh' ${urls}")
