@@ -97,7 +97,8 @@ import { E2EWorld } from '../../src/framework/world.js';
 // Then steps read from here. This chapter's sibling-visit step below records
 // its real observation into the SAME slot so those steps see it, rather than
 // each chapter keeping a private, unsynchronized capture store.
-import { visitInBrowser } from './epr-app-deliverability.helpers.js';
+import { siblingWorseThanPrimary } from './apex-transition.compare.js';
+import { visitInBrowser, type BrowserVisit } from './epr-app-deliverability.helpers.js';
 import {
   chaosAuthorReceipt,
   type ChaosAuthorReceipt,
@@ -326,6 +327,8 @@ interface ApexTransitionState {
   realAppBaselineOptionalNegatives?: Map<string, Set<string>>;
   /** Browser console errors observed before the fault, by serving owner. */
   realAppBaselineConsoleErrors?: Map<string, Set<string>>;
+  /** The primary's own browser reading of the landing page, before the shed. */
+  primaryBrowser?: BrowserVisit;
 }
 
 const states = new WeakMap<E2EWorld, ApexTransitionState>();
@@ -1298,7 +1301,8 @@ Then(
 
 Given(
   'a new visitor reaches the declared landing page through one owned public name',
-  { timeout: FIRST_VISIT_TIMEOUT_MS },
+  // The primary's own browser reading rides on the raw visit: its 45-second deadline plus margin.
+  { timeout: FIRST_VISIT_TIMEOUT_MS + 60_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = beginScenario(this);
     const owners = Object.values(state.authority.owners);
@@ -1333,6 +1337,9 @@ Given(
     state.siblingEntryBeforeFault = memberFor(doc, state.siblingOwner);
     state.declaredHeadAtVisit = head.headActionHash;
     state.buildStampAtVisit = stampOf(versionFile.text);
+    // The primary's own browser reading, same declared head, before the shed: the sibling is held
+    // to what this browser saw, not to a corpus neither doorway was seeded with.
+    state.primaryBrowser = await visitInBrowser(`${visit.origin}/`);
   }
 );
 
@@ -1427,7 +1434,20 @@ Then(
     // protocol, not the harness. The landing hero answers it for now with a click-to-load facade.
     // genesis/data/timeline/backlog/legacy-web-content-projected-inward.md
     assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
-    assert.deepEqual(browser.httpErrors, [], 'sibling browser HTTP errors');
+    // Held to the primary's own reading: an HTTP error every household doorway returns alike
+    // (the landing's unseeded epic links, genesis/data/timeline/backlog/
+    // household-landing-links-unseeded-epics.md) is not a failover regression; one the primary
+    // did not have is.
+    const worse = siblingWorseThanPrimary(
+      state.primaryBrowser?.httpErrors ?? [],
+      browser.httpErrors
+    );
+    const worseLine = worse.map(e => `${e.status} ${e.url}`).join(', ');
+    assert.deepEqual(
+      worse,
+      [],
+      `sibling browser HTTP errors the primary did not have (${worseLine})`
+    );
     assert.ok(browser.rootPresent, 'sibling browser saw no app-root');
     assert.ok(browser.bootstrapReady, 'sibling browser did not bootstrap its entry script');
     assert.ok(browser.rootText.trim().length > 0, 'sibling browser booted an empty app root');
