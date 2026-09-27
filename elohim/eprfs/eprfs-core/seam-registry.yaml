@@ -1,0 +1,163 @@
+# Additive codec recomputation for local byte verification. No tree format or
+# authority/election surface is introduced by this decision point.
+seamRegistryVersion: 1
+crate: eprfs-core
+crateRoot: elohim/eprfs/eprfs-core
+seamLocus: >
+  BlobCid addressing is the artifact-neutral byte-integrity contract. Codec
+  recomputation preserves an already-declared CID codec for local drift checks;
+  it never decides which content version or release head is authoritative.
+decisionPoints:
+  - name: recompute_for_codec
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/address.rs
+      modulePath: eprfs_core::address::BlobCid::recompute_for_codec
+    summary: >
+      Recompute raw or DAG-CBOR CID bytes under the requested CID's codec, returning
+      None for every unsupported codec.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          This is byte addressing on the local custody/projection plane, not
+          reach, release-head selection or standing.
+      - id: C1
+        status: n-a
+        justification: It selects no locally authored candidate or release head.
+      - id: C2
+        status: n-a
+        justification: It imposes no version order or authority clock.
+      - id: C3
+        status: n-a
+        justification: It is a pure byte computation, not a state machine.
+      - id: C4
+        status: answered
+        justification: >
+          Unsupported codec returns None; supported codecs return a recomputed CID
+          even when its digest does not match the expected CID.
+      - id: C5
+        status: partial
+        justification: >
+          It permits local digest re-derivation, but it does not authenticate
+          signatures, lineage, standing or any carried authority claim.
+      - id: C6a
+        status: partial
+        justification: >
+          Hashing is linear in the supplied bytes but this API declares no maximum
+          blob size or execution budget; callers own their input limits.
+      - id: C6b
+        status: n-a
+        justification: The function is pure and has no replayed effect.
+      - id: C7
+        status: n-a
+        justification: It advertises no remote capability or inventory.
+      - id: C8
+        status: n-a
+        justification: It emits no operational decision or metric; caller observes None.
+      - id: C9
+        status: n-a
+        justification: It references no agent or key lineage.
+      - id: C10
+        status: answered
+        justification: >
+          Existing DAG-CBOR and raw CIDs retain their declared codec; the
+          independent raw golden vector and unsupported-codec test pin the contract.
+      - id: C11
+        status: n-a
+        justification: It schedules no external load or retry.
+      - id: C12
+        status: n-a
+        justification: It authorizes no publication, execution or peer action.
+      - id: C13
+        status: n-a
+        justification: The byte-integrity floor does not vary by authority tier.
+      - id: C14
+        status: partial
+        justification: >
+          Unsupported codec is explicit as None, but this pure helper emits no
+          durable witness; callers must record their own refusal outcome.
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/address.rs
+        testName: recompute_preserves_requested_codec_and_external_raw_vector
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/address.rs
+        testName: verifies_fails_closed_on_unknown_codec
+        kind: unit
+    notes: >
+      The method is additive to BlobCid; serde and canonical bytes are unchanged.
+      It does not introduce a canonical tree or attest to release authority.
+  - name: validate
+    kind: verdict-fn
+    sourceLocation:
+      file: src/projection.rs
+      modulePath: eprfs_core::projection::ProjectionManifest::validate
+    summary: >
+      Recheck every projection path with ProjectionPath::new before materialization;
+      ProjectionPath deserialization uses that same constructor and retains the
+      existing string wire format.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          This is local projection lexical-path validation, not content authority
+          or filesystem containment.
+      - id: C1
+        status: n-a
+        justification: No head or candidate is selected.
+      - id: C2
+        status: n-a
+        justification: No version order is changed.
+      - id: C3
+        status: n-a
+        justification: Validation is a preflight predicate, not a state machine.
+      - id: C4
+        status: answered
+        justification: Absolute, parent, empty and current-directory paths refuse explicitly.
+      - id: C5
+        status: partial
+        justification: A relative path is checked, but this does not authenticate its manifest.
+      - id: C6a
+        status: partial
+        justification: The pass is linear in entries with no manifest-size budget here.
+      - id: C6b
+        status: n-a
+        justification: Validation has no replayed side effect.
+      - id: C7
+        status: partial
+        justification: One decoded projection is guarded; safe whole-tree restore is unfinished.
+      - id: C8
+        status: partial
+        justification: Invalid paths return an error but no typed aggregate metric.
+      - id: C9
+        status: n-a
+        justification: No agent or key lineage is examined.
+      - id: C10
+        status: answered
+        justification: Valid paths retain their string serialization and round trip.
+      - id: C11
+        status: n-a
+        justification: No external load or retry is scheduled.
+      - id: C12
+        status: n-a
+        justification: No publication, execution or peer action is authorized.
+      - id: C13
+        status: n-a
+        justification: The local path rule does not vary by authority tier.
+      - id: C14
+        status: partial
+        justification: Refusal is explicit but no durable witness is emitted.
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/projection.rs
+        testName: serialized_projection_paths_obey_constructor_invariants
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/projection.rs
+        testName: manifest_revalidates_paths_before_materialization
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/tests/materialization_integrity.rs
+        testName: serialized_escape_cannot_write_outside_projection_root
+        kind: integration
+    notes: >
+      This closes the serialized traversal bypass only. Existing symlink ancestors
+      and filesystem races can still redirect writes; symlink replacement and
+      complete-tree promotion are not atomic in this slice.

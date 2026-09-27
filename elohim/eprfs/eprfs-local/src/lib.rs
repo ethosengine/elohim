@@ -3,8 +3,8 @@
 use std::path::{Path, PathBuf};
 
 use eprfs_core::{
-    BlobPresence, EntryKind, EprfsError, EprfsStorage, FetchPolicy, MaterializationPolicy,
-    ProjectionAwareness, ProjectionEntry, ProjectionManifest, Result,
+    BlobCid, BlobHandle, BlobPresence, EntryKind, EprfsError, EprfsStorage, FetchPolicy,
+    MaterializationPolicy, ProjectionAwareness, ProjectionEntry, ProjectionManifest, Result,
 };
 use eprfs_host::{Capability, HostProfile, SymlinkMode};
 
@@ -72,6 +72,22 @@ where
         write_file(&status_dir.join("entries.jsonl"), &entries).await
     }
 
+    /// A storage handle is an untrusted claim until both its named CID and bytes match the
+    /// requested CID. Keep this before every file or symlink destination write.
+    async fn fetch_verified_blob(
+        &self,
+        requested: &BlobCid,
+        policy: FetchPolicy,
+    ) -> Result<BlobHandle> {
+        let handle = self.storage.fetch_blob(requested, policy).await?;
+        if handle.cid != *requested || !requested.verifies(&handle.bytes) {
+            return Err(EprfsError::Storage(format!(
+                "blob integrity verification failed for {requested}"
+            )));
+        }
+        Ok(handle)
+    }
+
     async fn materialize_entry(
         &self,
         entry: &ProjectionEntry,
@@ -94,16 +110,14 @@ where
                 match self.storage.has_blob(blob).await? {
                     BlobPresence::Local => {
                         let handle = self
-                            .storage
-                            .fetch_blob(blob, FetchPolicy::LocalOnly)
+                            .fetch_verified_blob(blob, FetchPolicy::LocalOnly)
                             .await?;
                         self.write_link(&path, &handle.bytes, report).await?;
                     }
                     BlobPresence::Remote | BlobPresence::Unknown => match policy {
                         MaterializationPolicy::FetchMissing => {
                             let handle = self
-                                .storage
-                                .fetch_blob(blob, FetchPolicy::FetchIfMissing)
+                                .fetch_verified_blob(blob, FetchPolicy::FetchIfMissing)
                                 .await?;
                             self.write_link(&path, &handle.bytes, report).await?;
                             report.files_fetched += 1;
@@ -133,8 +147,7 @@ where
                 match self.storage.has_blob(blob).await? {
                     BlobPresence::Local => {
                         let handle = self
-                            .storage
-                            .fetch_blob(blob, FetchPolicy::LocalOnly)
+                            .fetch_verified_blob(blob, FetchPolicy::LocalOnly)
                             .await?;
                         write_file(&path, &handle.bytes).await?;
                         if self.host.executable_bits == Capability::Supported {
@@ -145,8 +158,7 @@ where
                     BlobPresence::Remote | BlobPresence::Unknown => match policy {
                         MaterializationPolicy::FetchMissing => {
                             let handle = self
-                                .storage
-                                .fetch_blob(blob, FetchPolicy::FetchIfMissing)
+                                .fetch_verified_blob(blob, FetchPolicy::FetchIfMissing)
                                 .await?;
                             write_file(&path, &handle.bytes).await?;
                             if self.host.executable_bits == Capability::Supported {
@@ -363,7 +375,7 @@ mod tests {
     async fn materializes_local_file() {
         let storage = MemoryStorage::default();
         storage
-            .insert_blob(BlobCid::compute(b"bafk-test"), Bytes::from_static(b"hello"))
+            .insert_blob(BlobCid::compute(b"hello"), Bytes::from_static(b"hello"))
             .await;
 
         let manifest = ProjectionManifest {
@@ -373,7 +385,7 @@ mod tests {
             },
             entries: vec![ProjectionEntry::file(
                 ProjectionPath::new("README.md").unwrap(),
-                BlobCid::compute(b"bafk-test"),
+                BlobCid::compute(b"hello"),
             )],
             metadata: serde_json::Value::Null,
         };
@@ -404,7 +416,7 @@ mod tests {
         let storage = MemoryStorage::default();
         storage
             .insert_blob(
-                BlobCid::compute(b"target-blob"),
+                BlobCid::compute(b"actual.txt"),
                 Bytes::from_static(b"actual.txt"),
             )
             .await;
@@ -419,7 +431,7 @@ mod tests {
                 kind: EntryKind::Symlink,
                 source: None,
                 epr: None,
-                blob: Some(BlobCid::compute(b"target-blob")),
+                blob: Some(BlobCid::compute(b"actual.txt")),
                 size_bytes: Some(10),
                 executable: false,
                 status: ProjectionStatus::Unknown,
@@ -452,7 +464,7 @@ mod tests {
         let storage = MemoryStorage::default();
         storage
             .insert_blob(
-                BlobCid::compute(b"target-blob"),
+                BlobCid::compute(b"actual.txt"),
                 Bytes::from_static(b"actual.txt"),
             )
             .await;
@@ -467,7 +479,7 @@ mod tests {
                 kind: EntryKind::Symlink,
                 source: None,
                 epr: None,
-                blob: Some(BlobCid::compute(b"target-blob")),
+                blob: Some(BlobCid::compute(b"actual.txt")),
                 size_bytes: Some(10),
                 executable: false,
                 status: ProjectionStatus::Unknown,

@@ -110,10 +110,16 @@ impl BlobCid {
     /// An unrecognized codec fails closed — a fingerprint we cannot recompute is an unverified
     /// claim, never a passing one.
     pub fn verifies(&self, bytes: &[u8]) -> bool {
+        self.recompute_for_codec(bytes).as_ref() == Some(self)
+    }
+
+    /// Recompute the fingerprint of bytes with this CID's declared codec. Returns `None` for
+    /// unsupported codecs so a caller cannot turn an unknown format into a passing projection.
+    pub fn recompute_for_codec(&self, bytes: &[u8]) -> Option<Self> {
         match self.0.codec() {
-            RAW_CODEC => Self::compute_raw(bytes).0 == self.0,
-            DAG_CBOR_CODEC => Self::compute(bytes).0 == self.0,
-            _ => false,
+            RAW_CODEC => Some(Self::compute_raw(bytes)),
+            DAG_CBOR_CODEC => Some(Self::compute(bytes)),
+            _ => None,
         }
     }
 
@@ -252,6 +258,20 @@ mod tests {
 
         // Same bytes, different codec tag — neither may verify as the other.
         assert_ne!(raw, cbor);
+    }
+
+    #[test]
+    fn recompute_preserves_requested_codec_and_external_raw_vector() {
+        let raw =
+            BlobCid::parse("bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e").unwrap();
+        assert_eq!(raw.recompute_for_codec(b"hello world"), Some(raw));
+
+        let cbor =
+            BlobCid::parse("bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e").unwrap();
+        assert_eq!(cbor.recompute_for_codec(b"hello world"), Some(cbor));
+
+        let unsupported = BlobCid(Cid::new_v1(0x70, Code::Sha2_256.digest(b"hello world")));
+        assert_eq!(unsupported.recompute_for_codec(b"hello world"), None);
     }
 
     // An unrecognized codec must fail closed. Verification is the tamper-detection primitive; a

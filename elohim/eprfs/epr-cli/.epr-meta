@@ -37,6 +37,11 @@ matching labels. Revalidation and contested states preserve what another agent m
 This is a local proof of governance over bytes. Crossing the peer boundary requires independent
 receiver verification and earned authority; an appointment in this checkout cannot confer them.
 
+The native developer through-line reuses `epr flow` for intent, commitment, actor
+attribution, review, acceptance and gates. A developer journal in brit is an adapter
+to these existing records, not a second ledger. This crate does not interpret Git
+index/OIDs/worktrees or elect a release from storage possession.
+
 `covers: subtree` claims the whole `elohim-epr-cli` crate: the `epr` sources under `src/` (where
 `src/.epr-meta` adds the recall-seam rule) and the integration tests under `tests/`. Those tests
 exercise the `epr flow` verbs, and their `*_parity` gates hold the native readers to the recorded
