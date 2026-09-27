@@ -17,6 +17,23 @@
 # keeps its existing doorway-set lane only. Any apex lane remains an explicit
 # operator-owned flip.
 #
+# APEX POSTURE (campaign story 2.3)
+# ---------------------------------
+# ACTIVE (applied by every edge deploy): this leg owns the apex `elohim.host`
+# EXCLUSIVELY (`--record-name elohim.host`, drift-gated — an external write is
+# re-asserted within ~30s and logged `exclusive record DRIFTED`).
+# STAGED, NOT APPLIED: APEX-MULTI-A — both legs contribute an owner-stamped A
+# record to `elohim.host` through the shared-record grammar
+# (`--shared-record elohim.host=shem` here, `=operations` on the sibling), and
+# this leg's exclusive name moves to `turn-shem.elohim.host`. The exact args are
+# the commented `APEX-MULTI-A` blocks beside each beacon container below.
+# The flip is operator-gated and ORDERED — this leg first, then operations, then
+# the serving probe — because an exclusive claim left on either side clobbers
+# the other leg's shared record every cycle. Order, expected log lines, shed
+# drill and rollback: genesis/docs/content/elohim-protocol/architecture/2026-09-26-apex-multi-a-failover-runbook.md.
+# genesis/orchestrator/manifests/infra/alpha-relay-addr-beacons.yaml re-homes
+# these same lanes and must move IN THE SAME CHANGE (its APEX OWNERSHIP header).
+#
 # THIS PHASE IS 3478-FIRST: no tls-listening-port, no turns:, no :443/:5349,
 # no cert-manager Certificate. IPv6 is scaffolded (commented) but dormant.
 #
@@ -235,6 +252,21 @@ spec:
             - "doorways.elohim.host"
             - "--record-owner"
             - "shem"
+            # APEX-MULTI-A (STAGED — operator flip, NOT applied; runbook step 3).
+            # Phase 1: change the `--record-name` value above from
+            # "elohim.host" to "turn-shem.elohim.host" (a shared lane may not also be
+            # this leg's exclusive name), and replace the four legacy lane
+            # lines above with:
+            #   - "--shared-record"
+            #   - "doorways.elohim.host=shem"
+            #   - "--shared-record"
+            #   - "elohim.host=shem"
+            # Phase 2 (after both legs' phase 1): add the serving probe, so a
+            # shedding doorway withdraws this leg from BOTH shared names
+            # (leave after 3 non-200s at 15s, rejoin after 2 x 200):
+            #   - "--serving-probe-url"
+            #   - "http://elohim-doorway-alpha-b.elohim-alpha.svc.cluster.local:8080/health"
+            # Keep beacon-init and the beacon sidecar identical in every phase.
           env:
             # The one-shot DNS sync at pod start needs the CF token too — without it
             # (and without the cloudflare sink above) beacon-init published only the
@@ -332,6 +364,20 @@ spec:
             - "doorways.elohim.host"
             - "--record-owner"
             - "shem"
+            # APEX-MULTI-A (STAGED — operator flip, NOT applied; runbook step 3).
+            # Phase 1: change the `--record-name` value above from
+            # "elohim.host" to "turn-shem.elohim.host" (a shared lane may not also be
+            # this leg's exclusive name), and replace the four legacy lane
+            # lines above with:
+            #   - "--shared-record"
+            #   - "doorways.elohim.host=shem"
+            #   - "--shared-record"
+            #   - "elohim.host=shem"
+            # Phase 2 (after both legs' phase 1): add the serving probe, so a
+            # shedding doorway withdraws this leg from BOTH shared names
+            # (leave after 3 non-200s at 15s, rejoin after 2 x 200):
+            #   - "--serving-probe-url"
+            #   - "http://elohim-doorway-alpha-b.elohim-alpha.svc.cluster.local:8080/health"
             # coturn has no config-reload signal for external-ip; the sidecar
             # shares the pod's process namespace (shareProcessNamespace: true
             # above), so SIGTERM-ing the turnserver process is enough — the
