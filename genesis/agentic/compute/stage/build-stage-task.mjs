@@ -14,10 +14,11 @@
  *     --provider <key> --out <dir> [--runtime-image sha256:<64 hex>] [--executor <path>]
  *     [--writable <path>]... [--repo-root <path>] [--cpu-millis N] [--memory-bytes N]
  *     [--timeout-seconds N]
+ *   build-stage-task.mjs check-delegable --feature <path> [--mesh-dir <dir>]
  */
-import { chmod, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { run } from "../common.mjs";
 // S3.0 — the honest artifact: the requester's own SUT identity rides in the stage so the
@@ -121,6 +122,102 @@ export function defaultWritablePaths(repoRoot, env = process.env) {
   ];
 }
 
+// ---- delegability: what the guest (an unprivileged UID) cannot do -------------------------
+// A stage runs as the provider's guest UID, which by design cannot read another UID's
+// /proc/<pid>/{environ,exe,fd} (the ptrace boundary) and so cannot own or inspect the
+// household's root-launched processes. a2o declares process ownership in STEP CODE, not in a
+// feature tag (`@requires:owned-substrate` also marks read-only lanes that pass as a guest,
+// e.g. doorway-fixture-readiness), so the assessment reads the step modules bound to the
+// feature: `<slug>.steps.ts` / `<slug>.helpers.ts`, or any step module naming the feature's
+// path literally (a hook scoped by gherkinDocument.uri — epr-app-deliverability.steps.ts binds
+// epr-app-channel-isolation that way). A miss is no worse than before: the guest fails at run.
+const PROCESS_SIGNALS = [
+  {
+    kind: "processControl",
+    re: /assert(?:\.[A-Za-z]+)?\(\s*[\w.]*\.processControl\b|requireProcessControl\(\)/g,
+    what: () => "requires fixture.processControl (launches/owns household processes)",
+  },
+  {
+    kind: "proc-read",
+    re: /\/proc\/\$\{[^}]+\}\/(environ|exe|fd)\b/g,
+    what: (m) => `reads /proc/<pid>/${m[1]} of a household process`,
+  },
+];
+
+// Scratch roots a fixture writes under $MESH_DIR — the guest write-set a feature needs beyond
+// defaultWritablePaths. Derived per feature, never granted to every stage.
+const FIXTURE_WRITE_SETS = [
+  {
+    fixture: "owned-doorway-pair", // src/framework/fixtures/owned-doorway-pair.ts mkdtemps here
+    re: /\b(?:startOwnedDoorwayPair|OwnedDoorwayPair)\b/,
+    paths: (meshDir) => [join(meshDir, "scenarios")],
+  },
+];
+
+async function listStepModules(dir) {
+  const found = [];
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+  for (const entry of entries) {
+    if (entry.name === "__tests__" || entry.name === "node_modules") continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...(await listStepModules(full)));
+    else if (entry.name.endsWith(".ts")) found.push(full);
+  }
+  return found;
+}
+
+/**
+ * Returns { delegable, kind, headline, evidence: [{file, line, kind, what}], fixtureWritable }.
+ * `feature` is relative to genesis/a2o (or absolute); `meshDir` roots fixtureWritable.
+ */
+export async function assessDelegability({
+  feature,
+  a2oDir = A2O_DIR,
+  meshDir = join(REPO_ROOT, "genesis", "local-dev", "household-dowell"),
+}) {
+  const featureRel = isAbsolute(feature) ? relative(a2oDir, feature) : feature;
+  const slug = basename(featureRel).replace(/\.feature$/, "");
+  // steps/<feature-dir>/<slug>.* (or steps/<slug>.*): a same-named module in ANOTHER dir
+  // (steps/federation/name-routing.steps.ts vs features/dataplane/name-routing) is not bound.
+  const featureDir = dirname(featureRel).replace(/^features\/?/, "");
+  const evidence = [];
+  const fixtures = new Set();
+  for (const file of await listStepModules(join(a2oDir, "steps"))) {
+    const text = await readFile(file, "utf8");
+    const stepDir = relative(join(a2oDir, "steps"), dirname(file));
+    const bound =
+      (basename(file).startsWith(`${slug}.`) && (stepDir === featureDir || stepDir === "")) ||
+      text.includes(featureRel);
+    if (!bound) continue;
+    const rel = relative(a2oDir, file);
+    for (const signal of PROCESS_SIGNALS) {
+      for (const m of text.matchAll(signal.re)) {
+        const line = text.slice(0, m.index).split("\n").length;
+        evidence.push({ file: rel, line, kind: signal.kind, what: signal.what(m) });
+      }
+    }
+    for (const set of FIXTURE_WRITE_SETS) if (set.re.test(text)) fixtures.add(set);
+  }
+  const fixtureWritable = [...fixtures].flatMap((set) => set.paths(meshDir));
+  const kind = evidence.some((e) => e.kind === "processControl")
+    ? "processControl"
+    : evidence.length
+      ? "proc-read"
+      : null;
+  const headline =
+    kind === "processControl"
+      ? `${featureRel} owns processes (processControl) — not delegatable to a guest; run it locally`
+      : kind === "proc-read"
+        ? `${featureRel} reads household processes' /proc (another UID's environ/exe) — not delegatable to a guest; run it locally`
+        : null;
+  return { delegable: kind === null, kind, headline, evidence, fixtureWritable };
+}
+
 /**
  * Builds one stage into `out`: stage-runner.sh (binary), <basename>.feature (dna), task.json.
  * Returns the emitted envelope object plus the derived stage metadata.
@@ -152,6 +249,14 @@ export async function buildStageTask({
   const featureBytes = await readFile(featureAbs);
   const featureText = featureBytes.toString("utf8");
   const featureSha256 = createHash("sha256").update(featureBytes).digest("hex");
+
+  // Refuse before anything is written or spent: a process-owning lane cannot run as a guest.
+  const meshDir = env.MESH_DIR || join(repoRoot, "genesis", "local-dev", "household-dowell");
+  const delegability = await assessDelegability({ feature, a2oDir, meshDir });
+  if (!delegability.delegable)
+    throw new Error(
+      [delegability.headline, ...delegability.evidence.map(formatEvidence)].join("\n"),
+    );
 
   const scenarioNames = parseScenarioNames(featureText);
   if (scenarioNames.length === 0)
@@ -186,7 +291,10 @@ export async function buildStageTask({
   // 3. render stage-runner.template.sh -> <out>/stage-runner.sh, mode 0755
   const resolvedNodeBin = nodeBin || (await which("node", "/usr/local/bin/node"));
   const resolvedJustBin = justBin || (await which("just", "/usr/local/bin/just"));
-  const writable = writablePaths || defaultWritablePaths(repoRoot, env);
+  const writable = writablePaths || [
+    ...defaultWritablePaths(repoRoot, env),
+    ...delegability.fixtureWritable,
+  ];
   const featureRel = feature; // already relative to genesis/a2o, as the runner expects
   const template = await readFile(TEMPLATE_PATH, "utf8");
   const rendered = template
@@ -292,6 +400,10 @@ export async function buildStageTask({
   };
 }
 
+export function formatEvidence(e) {
+  return `  evidence: genesis/a2o/${e.file}:${e.line} ${e.what}`;
+}
+
 export function expectedTestsFor(testPrefix, scenarioSlugs) {
   return scenarioSlugs.map((slug) => `${testPrefix}::${slug}`);
 }
@@ -353,6 +465,18 @@ function intArg(value) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  // `check-delegable --feature <f> [--mesh-dir <d>]`: measure.sh's pre-submit refusal. Prints
+  // the assessment as JSON on stdout; exit 3 when the guest cannot run the feature.
+  if (argv[0] === "check-delegable") {
+    const args = parseArgs(argv.slice(1));
+    const result = await assessDelegability({
+      feature: args.feature,
+      ...(args["mesh-dir"] ? { meshDir: resolve(args["mesh-dir"]) } : {}),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.delegable) process.exitCode = 3;
+    return;
+  }
   const args = parseArgs(argv);
   const writable = args.writable
     ? Array.isArray(args.writable)

@@ -4,10 +4,11 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import {
   A2O_DIR,
+  assessDelegability,
   buildStageTask,
   parseFeatureConcern,
   parseScenarioNames,
@@ -19,7 +20,7 @@ const execFileP = promisify(execFile);
 
 const EXECUTOR =
   process.env.COMPUTE_EXECUTOR ||
-  "/projects/.cargo-target-pool/family/dev/elohim__rakia/dev/debug/compute-executor";
+  "/projects/.cargo-target-pool/family/dev/elohim__rakia/debug/compute-executor"; // = measure.sh PINNED_EXECUTOR
 const FEATURE = "features/dataplane/federation-version-convergence.feature";
 const REQUESTER = "uhCAkTestRequesterKey";
 const PROVIDER = "uhCAkTestProviderKey";
@@ -206,6 +207,11 @@ test("inner household publication is disabled and the inner berth claim is attri
 
   const runner = await readFile(result.runnerPath, "utf8");
   assert.match(runner, /export A2O_POST_REPORT=0/);
+  // The inner household sprint report stays in guest scratch — never reports/sprint-report-
+  // household-*.json, which t2-receipt.sh accepts by mtime as the pre-push T2 receipt.
+  assert.match(runner, /export A2O_SPRINT_REPORT_JSON="\$SCRATCH\//);
+  assert.match(runner, /export A2O_SPRINT_REPORT_MD="\$SCRATCH\//);
+  assert.ok(runner.indexOf("A2O_SPRINT_REPORT_JSON") < runner.indexOf('"$JUST_BIN" test mesh'));
   assert.match(runner, /export BERTH_SESSION="stage:/);
   assert.match(runner, /export BERTH_CLASS="verify"/);
 
@@ -328,4 +334,132 @@ test("a provider whose tree has drifted from the pinned sut refuses STAGE-PRECON
       return true;
     },
   );
+});
+
+// Round 2 (2026-09-27, rung H run 1/2 on epr-app-deliverability): the framing step wrote the
+// whole base64 report with process.stdout.write and then called process.exit() synchronously.
+// On a pipe, node's stdout is asynchronous, so the tail of a large write was dropped at exit —
+// the frame stopped at exactly 73728 bytes (72 KiB) with no END sentinel, and the requester
+// read "stdout.log did not carry a framed ELOHIM STAGE REPORT". A report well past 72 KiB must
+// round-trip byte-for-byte, END marker and summary line included, through a real pipe.
+test("a >72 KiB cucumber report round-trips through the framed stage report with its END marker", async (t) => {
+  const out = await mkdtemp(join(tmpdir(), "stage-build-bigframe-"));
+  t.after(() => rm(out, { recursive: true, force: true }));
+  const scratch = await mkdtemp(join(tmpdir(), "stage-build-bigframe-tmp-"));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+
+  const featureText = await readFile(join(A2O_DIR, FEATURE), "utf8");
+  const [scenarioName] = parseScenarioNames(featureText);
+  // ~256 KiB of step output: comfortably past the 72 KiB truncation point, base64 ~340 KiB.
+  const report = JSON.stringify([
+    {
+      uri: FEATURE,
+      elements: [
+        {
+          type: "scenario",
+          name: scenarioName,
+          steps: Array.from({ length: 64 }, (_, i) => ({
+            name: `step ${i}`,
+            result: { status: "passed" },
+            output: ["x".repeat(4096)],
+          })),
+        },
+      ],
+    },
+  ]);
+  assert.ok(report.length > 200 * 1024, "the fixture report must exceed the old 72 KiB cut");
+  const reportFixture = join(scratch, "fixture-report.json");
+  await writeFile(reportFixture, report);
+  // Stand-in for `just test mesh <feature>`: writes the fixture to CUCUMBER_JSON_REPORT.
+  const fakeJust = join(scratch, "just");
+  await writeFile(fakeJust, `#!/bin/sh\ncp '${reportFixture}' "$CUCUMBER_JSON_REPORT"\n`, {
+    mode: 0o755,
+  });
+
+  const result = await buildStageTask({
+    feature: FEATURE,
+    requester: REQUESTER,
+    provider: PROVIDER,
+    out,
+    execute: stubExecute(),
+    runtimeImage: "sha256:" + "0".repeat(64),
+    nodeBin: process.execPath,
+    justBin: fakeJust,
+    writablePaths: [out],
+  });
+
+  const { stdout } = await execFileP(result.runnerPath, [], {
+    timeout: 120000,
+    maxBuffer: 16 * 1024 * 1024,
+    env: { ...process.env, TMPDIR: scratch },
+  });
+  const begin = "-----BEGIN ELOHIM STAGE REPORT-----\n";
+  const end = "\n-----END ELOHIM STAGE REPORT-----\n";
+  const from = stdout.indexOf(begin);
+  const to = stdout.indexOf(end);
+  assert.ok(from >= 0, "the BEGIN sentinel must be present");
+  assert.ok(to > from, `the END sentinel must survive the exit (stdout was ${stdout.length} bytes)`);
+  const decoded = Buffer.from(stdout.slice(from + begin.length, to), "base64").toString("utf8");
+  assert.equal(decoded, report, "the framed report must decode to the exact report bytes");
+  assert.match(stdout, /test result: ok\. 1 passed; 0 failed/);
+});
+
+// Round 2 (2026-09-27): a stage runs as an unprivileged guest UID. A feature whose step code
+// asserts fixture.processControl (owns mongod/doorways) or reads another UID's /proc/<pid>/
+// {environ,exe,fd} cannot pass there; the builder refuses it, naming the step evidence, and a
+// fixture's scratch root under $MESH_DIR joins the write-set only for the features that use it.
+test("assessDelegability: process-owning and /proc-reading lanes refuse; read-only lanes stay delegable", async () => {
+  const meshDir = "/mesh";
+  const deliverability = await assessDelegability({
+    feature: "features/dataplane/epr-app-deliverability.feature",
+    meshDir,
+  });
+  assert.equal(deliverability.delegable, false);
+  assert.equal(deliverability.kind, "processControl");
+  assert.equal(
+    deliverability.headline,
+    "features/dataplane/epr-app-deliverability.feature owns processes (processControl) — not delegatable to a guest; run it locally",
+  );
+  assert.deepEqual(deliverability.fixtureWritable, ["/mesh/scenarios"]);
+
+  // Bound through the hook that names its path (isDeliverabilityFeature), not by file name.
+  const isolation = await assessDelegability({
+    feature: "features/dataplane/epr-app-channel-isolation.feature",
+    meshDir,
+  });
+  assert.equal(isolation.kind, "processControl");
+  assert.ok(isolation.evidence.some((e) => e.file === "steps/dataplane/epr-app-deliverability.steps.ts"));
+
+  const naming = await assessDelegability({ feature: "features/dataplane/name-routing.feature", meshDir });
+  assert.equal(naming.kind, "proc-read");
+  assert.ok(
+    naming.evidence.every((e) => e.file.startsWith("steps/dataplane/")),
+    "a same-named module in another steps dir is not bound",
+  );
+
+  for (const feature of [
+    "features/dataplane/doorway-fixture-readiness.feature",
+    "features/dataplane/federation-version-convergence.feature",
+  ]) {
+    const result = await assessDelegability({ feature, meshDir });
+    assert.equal(result.delegable, true, feature);
+    assert.deepEqual(result.fixtureWritable, []);
+  }
+});
+
+test("buildStageTask refuses a process-owning feature before writing anything", async (t) => {
+  const out = join(await mkdtemp(join(tmpdir(), "stage-build-refuse-")), "never-created");
+  t.after(() => rm(dirname(out), { recursive: true, force: true }));
+  await assert.rejects(
+    buildStageTask({
+      feature: "features/dataplane/epr-app-deliverability.feature",
+      requester: REQUESTER,
+      provider: PROVIDER,
+      out,
+      execute: stubExecute(),
+      runtimeImage: "sha256:" + "0".repeat(64),
+    }),
+    /owns processes \(processControl\) — not delegatable to a guest; run it locally\n  evidence: genesis\/a2o\/steps\/dataplane\//,
+  );
+  await assert.rejects(readFile(join(out, "task.json")), { code: "ENOENT" });
 });

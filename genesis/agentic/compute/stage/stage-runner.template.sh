@@ -97,6 +97,11 @@ cd "$REPO" || refuse "cannot cd $REPO"
 # household-lane sprint-report side effect here would carry the PROVIDER's workspace key, a
 # claim this run has no standing to make.
 export A2O_POST_REPORT=0
+# ...nor leave one on disk: the inner lane writes reports/sprint-report-household-<run>.json by
+# default, and genesis/orchestrator/scripts/t2-receipt.sh takes ANY such file's mtime as the
+# pre-push T2 receipt — so a guest run (UID 65534, 2026-09-25 and 2026-09-27) minted one.
+export A2O_SPRINT_REPORT_JSON="$SCRATCH/sprint-report-stage.json"
+export A2O_SPRINT_REPORT_MD="$SCRATCH/sprint-report-stage.md"
 # So the inner mesh berth claim is attributable to this stage, not to whatever ambient
 # session (or none) launched the guest process.
 export BERTH_SESSION="stage:$STAGE_NAME"
@@ -128,7 +133,9 @@ process.stdout.write("\n-----BEGIN ELOHIM STAGE REPORT-----\n");
 process.stdout.write(Buffer.from(fs.readFileSync(process.env.REPORT)).toString("base64")+"\n");
 process.stdout.write("-----END ELOHIM STAGE REPORT-----\n");
 process.stdout.write(`\ntest result: ${failed?"FAILED":"ok"}. ${want.length-failed} passed; ${failed} failed; 0 ignored; 0 measured; 0 filtered out\n`);
-process.exit(failed?101:0);
+// exitCode, never process.exit(): on a pipe node stdout is asynchronous, and exit() drops the
+// unflushed tail of the base64 frame (observed: cut at exactly 72 KiB, no END sentinel).
+process.exitCode = failed ? 101 : 0;
 ' "$TEST_PREFIX" "${SCENARIOS[@]}"
 node_rc=$?
 if [ "$rc" -ne 0 ] || [ "$node_rc" -ne 0 ]; then exit 101; fi

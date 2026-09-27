@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -16,7 +16,10 @@ import { tmpdir } from "node:os";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MEASURE_SH = resolve(HERE, "measure.sh");
 const REPO_ROOT = resolve(HERE, "..", "..", "..");
-const FEATURE_A2O_RELATIVE = "features/dataplane/accountable-correction.feature";
+// A delegable lane (no processControl, no /proc reads). accountable-correction was the baseline
+// until round 2 (2026-09-27): its helpers read a household process's /proc/<pid>/environ, which
+// the guest UID cannot, and measure.sh now refuses it before submit.
+const FEATURE_A2O_RELATIVE = "features/dataplane/doorway-fixture-readiness.feature";
 const FEATURE_GENESIS_A2O_PREFIXED = `genesis/a2o/${FEATURE_A2O_RELATIVE}`;
 const FEATURE_REPO_ABSOLUTE = resolve(REPO_ROOT, "genesis/a2o", FEATURE_A2O_RELATIVE);
 
@@ -160,4 +163,80 @@ test("--on adam still refuses (unprovisioned) and now names COMPUTE_SLICE_* as w
       return true;
     },
   );
+});
+
+// Round 2 (2026-09-27): epr-app-deliverability spent two grant slots to learn in 12 s that its
+// Before hook asserts fixture.processControl and pins root's mongod via /proc/<pid>/exe — which
+// the guest UID cannot read. It must refuse before the env block, the chmod lines or a submit.
+for (const feature of [
+  "features/dataplane/epr-app-deliverability.feature",
+  "features/dataplane/epr-app-channel-isolation.feature",
+]) {
+  test(`${feature} refuses before submit: owns processes (processControl), not delegatable`, () => {
+    assert.throws(
+      () => runDry([feature]),
+      (error) => {
+        assert.equal(error.status, 2);
+        const stderr = error.stderr.toString();
+        assert.ok(
+          stderr.includes(
+            `measure: ${feature} owns processes (processControl) — not delegatable to a guest; run it locally`,
+          ),
+          stderr,
+        );
+        assert.match(stderr, /evidence: genesis\/a2o\/steps\/dataplane\/epr-app-deliverability\.steps\.ts:\d+ requires fixture\.processControl/);
+        assert.equal(error.stdout.toString(), "", "nothing (no chmod lines) before the refusal");
+        return true;
+      },
+    );
+  });
+}
+
+test("a /proc-reading lane (name-routing) refuses before submit with its evidence line", () => {
+  assert.throws(
+    () => runDry(["features/dataplane/name-routing.feature"]),
+    (error) => {
+      assert.equal(error.status, 2);
+      assert.match(error.stderr.toString(), /reads household processes' \/proc .* not delegatable to a guest; run it locally/);
+      assert.match(error.stderr.toString(), /name-routing\.steps\.ts:\d+ reads \/proc\/<pid>\/environ/);
+      return true;
+    },
+  );
+});
+
+// Round 2: mesh start / prologue enrolls each peer in a release channel, and elohim-storage
+// rewrites runtime-config.toml by temp file + rename(2) — a new 0644 inode — so the guest's o+w
+// grant lapses silently. The preflight must name that cause, not only "not writable".
+test("a runtime-config.toml reset to 0644 by the storage's rename-rewrite is named as the cause", () => {
+  const mesh = mkdtempSync(join(tmpdir(), "measure-mesh-"));
+  const reports = mkdtempSync(join(tmpdir(), "measure-reports-"));
+  try {
+    chmodSync(mesh, 0o755);
+    chmodSync(reports, 0o777);
+    mkdirSync(join(mesh, "compute", "worker-jessica"), { recursive: true });
+    writeFileSync(join(mesh, "compute", "grant-jessica.json"), "{}\n");
+    writeFileSync(join(mesh, "compute", "grant-jessica.action-hash"), "uhCkkTestGrant");
+    writeFileSync(join(mesh, "compute", "worker-jessica", "worker.pid"), String(process.pid));
+    for (const peer of ["matthew", "jessica", "james"]) {
+      mkdirSync(join(mesh, peer), { mode: 0o755 });
+      chmodSync(join(mesh, peer), 0o755);
+      writeFileSync(join(mesh, peer, "runtime-config.toml"), 'ELOHIM_RELEASE_CHANNELS = ""\n', { mode: 0o644 });
+    }
+    const env = { MESH_DIR: mesh, MEASURE_REPORTS_DIR: reports };
+    assert.throws(
+      () => runDry([FEATURE_A2O_RELATIVE], env),
+      (error) => {
+        assert.equal(error.status, 2);
+        const stderr = error.stderr.toString();
+        assert.match(stderr, /cause: \S+\/matthew\/runtime-config\.toml is mode 644 .*rename\(2\).*drops the o\+w grant/);
+        assert.match(error.stdout.toString(), /chmod o\+w \S+\/james\/runtime-config\.toml/);
+        return true;
+      },
+    );
+    for (const peer of ["matthew", "jessica", "james"]) chmodSync(join(mesh, peer, "runtime-config.toml"), 0o646);
+    assert.doesNotMatch(runDry([FEATURE_A2O_RELATIVE], env), /chmod o\+w/);
+  } finally {
+    rmSync(mesh, { recursive: true, force: true });
+    rmSync(reports, { recursive: true, force: true });
+  }
 });

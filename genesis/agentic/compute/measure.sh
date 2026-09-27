@@ -362,7 +362,22 @@ guest_writable() { # <path>
   fi
 }
 
-check_writable_or_refuse() {
+# The cause a bare "not writable" hides for runtime-config.toml: elohim-storage rewrites it by
+# temp file + rename(2) (elohim/elohim-settings/src/runtime_config.rs set_key) whenever a peer is
+# enrolled in a release channel — `just mesh start`/prologue and every a2o `follow` ceremony. The
+# new inode is created under the storage's umask (0644), so every enrollment silently withdraws
+# the o+w grant. Re-applying the grant at hc-mesh.sh launch would not hold (the rewrite lands
+# after launch), so the grant stays an explicit operator act and the preflight names why it lapsed.
+explain_lapsed_grant() { # <path>
+  case "$1" in
+    */runtime-config.toml)
+      printf 'measure: cause: %s is mode %s (rewritten %s) — elohim-storage replaces it by temp file + rename(2) on every release-channel enrollment (mesh start / prologue / a2o follow), and the new inode drops the o+w grant; re-grant with the chmod line\n' \
+        "$1" "$(stat -c '%a' "$1" 2>/dev/null || echo '?')" "$(date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '?')" >&2
+      ;;
+  esac
+}
+
+check_writable_or_refuse() { # [extra-path...] — fixture-derived write-set (build-stage-task check-delegable)
   local reports_dir="$MEASURE_REPORTS_DIR"
   # path, recursive(0|1) pairs — recursive only for console/, whose EXISTING entries (not just
   # new ones) are re-touched by common.steps.ts run after run.
@@ -376,6 +391,10 @@ check_writable_or_refuse() {
   local peer
   for peer in matthew jessica james; do
     targets+=("$MESH_DIR/$peer/runtime-config.toml" 0)
+  done
+  local extra
+  for extra in "$@"; do
+    targets+=("$extra" 0)
   done
 
   echo "measure: the guest (UID 65534) needs write access to:"
@@ -391,6 +410,7 @@ check_writable_or_refuse() {
       echo "  chmod o+w $path"
     fi
     echo "measure: not writable (as guest UID 65534): $path" >&2
+    explain_lapsed_grant "$path"
     missing=1
   done
   [ "$missing" -eq 0 ] || refuse 2 "run the chmod lines above, then retry"
@@ -446,6 +466,23 @@ cmd_run_feature() {
   [ -n "$feature" ] || refuse 2 "usage: measure.sh <feature-path> [--on jessica|adam] [--gap <id>]"
   feature="$(resolve_feature_arg "$feature")"
 
+  # Refuse before any grant slot, chmod line or submit: the guest is an unprivileged UID and
+  # cannot own or read the household's processes (build-stage-task.mjs assessDelegability).
+  local assessment assess_rc=0
+  assessment="$(node "$BUILD_STAGE_MJS" check-delegable --feature "$feature" --mesh-dir "$MESH_DIR")" || assess_rc=$?
+  if [ "$assess_rc" -eq 3 ]; then
+    node -e '
+      const r = JSON.parse(process.argv[1]);
+      process.stderr.write(`measure: ${r.headline}\n`);
+      for (const e of r.evidence) process.stderr.write(`  evidence: genesis/a2o/${e.file}:${e.line} ${e.what}\n`);
+    ' "$assessment"
+    exit 2
+  elif [ "$assess_rc" -ne 0 ]; then
+    refuse 2 "could not assess whether $feature is delegatable (build-stage-task.mjs check-delegable exit $assess_rc)"
+  fi
+  local -a fixture_writable=()
+  mapfile -t fixture_writable < <(node -e 'for (const p of JSON.parse(process.argv[1]).fixtureWritable) console.log(p)' "$assessment")
+
   resolve_executor
 
   local grant_dir grant_file grant_hash_file
@@ -478,7 +515,7 @@ cmd_run_feature() {
   # A real, non-destructive preflight — runs under MEASURE_DRY_RUN too, so a dry run still
   # tells the truth about whether the guest is currently blocked, rather than previewing a
   # command that would refuse the moment it actually ran.
-  check_writable_or_refuse
+  check_writable_or_refuse "${fixture_writable[@]}"
 
   if dry_run; then
     print_env_block
