@@ -4771,3 +4771,230 @@ decisionPoints:
       live household mesh — no unit test drives spawn_doorbell_ringer's loop body directly (it
       is a tokio::spawn'd infinite loop over live network I/O; the pure per-decision pieces it
       calls, RingMutes and clamp_retry_after, ARE unit-tested above).
+
+  - name: served_under_standing
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/name_routing/standing.rs
+      modulePath: services::name_routing::standing::served_under_standing
+      line: 267
+    summary: >
+      Decides what this doorway does for a request whose Host is a public name, from the
+      beacon-written membership document for that name (holder = first member), this doorway's
+      identity (declared origins; owner only when no origin is declared), the names it stands for
+      (DOORWAY_PUBLIC_NAMES), what the request allows (relayable read, refusable path) and the
+      served-bundle comparison against the holder. Empty member list and holder serve; a listed
+      non-holder serves only on an equal served bundle, else relays one hop to the holder; a
+      withdrawn doorway that stands for the name relays; anyone else answers 421 naming the
+      listed members, except on operational paths. A Host that names no known public name is
+      out of the rule (None) and dispatch is unchanged.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral (C) decision over a one-second re-read of membership documents and the
+          existing coherence advertisements; it creates no persisted entity, DHT entry or head.
+      - id: C1
+        status: answered
+        justification: >
+          A doorway recognises its own entry by its declared origins, and matches on owner only
+          when it declares none, so a foreign origin under a same-named owner is never "self".
+      - id: C2
+        status: answered
+        justification: >
+          Refusal narrows only to non-candidates on refusable paths; an empty member list and a
+          withdrawn candidate never widen into a 421 of their own name.
+      - id: C3
+        status: answered
+        justification: >
+          A withdrawn candidate or a lagging member relays to the current holder and, if the
+          holder does not answer, serves its own bytes: the name stays up.
+      - id: C4
+        status: answered
+        justification: >
+          An unreadable membership directory reads as no public names, so the rule fails open to
+          the pre-rule behaviour and never manufactures a refusal from a read failure.
+      - id: C5
+        status: answered
+        justification: >
+          Sameness is judged on the served bundle each side advertises (absent on either side is
+          Differs), never on the EPR id alone, so a lagging member cannot serve as "same".
+      - id: C6a
+        status: answered
+        justification: >
+          One document lookup and at most one head comparison per request; the relay is bounded
+          to one hop by the existing federation hop header.
+      - id: C6b
+        status: n-a
+        justification: The decision is read-only; the relay it may trigger is a GET with no effect.
+      - id: C7
+        status: answered
+        justification: >
+          Unit tests pin every branch and integration tests drive the real listener through the
+          same wrapper serve_connection uses, including the x-elohim-served-by stamp.
+      - id: C8
+        status: partial
+        justification: >
+          Refusals and relays log with doorway_public_name_misdirected_total /
+          doorway_public_name_relay_total counter labels; no Prometheus series is registered yet.
+      - id: C9
+        status: n-a
+        justification: No agent, doorway or content identity is minted or rewritten.
+      - id: C10
+        status: answered
+        justification: >
+          The additive declaredHead coherence field is optional and excluded from the routing
+          digest; peers without it read as unknown head, which relays rather than serving as same.
+      - id: C11
+        status: n-a
+        justification: No queue, retry loop or externally imposed budget is introduced.
+      - id: C12
+        status: answered
+        justification: >
+          A relay forwards the visitor's own credentials to the holder, whose serving-eligibility
+          fold still decides; the name decision cannot grant access.
+      - id: C13
+        status: n-a
+        justification: No authority stage or graduation is introduced or changed.
+      - id: C14
+        status: answered
+        justification: >
+          Every public-name answer names the doorway whose bytes it carries in x-elohim-served-by,
+          so a relay, a fallback serve or a refusal is witnessed on the response itself.
+    contractTests:
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_host_that_is_no_public_name_is_not_this_rule
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_the_holder_serves_its_name
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_member_with_the_same_head_serves_under_its_own_contract
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_member_behind_the_holder_relays_to_it
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_member_request_that_cannot_relay_is_served_here
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_head_agreement_needs_both_declared_heads_equal
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_withdrawn_candidate_relays_to_the_holder
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_withdrawn_candidate_with_no_holder_serves
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_an_empty_member_list_never_refuses
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_non_candidate_refuses_and_names_the_members
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_non_candidate_still_answers_its_operational_paths
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_owner_matches_self_only_when_no_origin_is_declared
+        kind: unit
+      - path: doorway/doorway-service/src/routes/coherence.rs
+        testName: name_routing_declared_head_rides_beside_the_digest_not_inside_it
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_without_a_membership_dir_nothing_changes
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_the_doorways_own_origin_is_not_a_public_name
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_a_name_this_doorway_does_not_stand_for_is_421_naming_members
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_the_holder_answers_its_name_and_names_itself
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_a_withdrawn_candidate_serves_when_the_holder_is_unreachable
+        kind: integration
+    notes: >
+      Household proof: genesis/a2o/features/dataplane/name-routing.feature
+      (@concern:served-under-standing, @act:i), joined through the served-under-standing habit's
+      checks. The relay-when-behind and withdrawn-candidate branches are unit/integration-proven
+      only; the household cannot stage them on demand.
+
+  - name: NameDecision
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/services/name_routing/standing.rs
+      modulePath: services::name_routing::standing::NameDecision
+      line: 222
+    summary: >
+      Serve / Relay(holder) / Refuse { name, member_of, members } — the served_under_standing
+      outcome the request path acts on (dispatch as usual, one-hop relay with own-bytes
+      fallback, or a no-store 421 JSON body naming the listed members).
+    concernIds:
+      - id: C0
+        status: n-a
+        justification: An in-memory outcome value; nothing is stored.
+      - id: C1
+        status: n-a
+        justification: Carries no identity decision of its own; served_under_standing makes it.
+      - id: C2
+        status: answered
+        justification: >
+          Refuse carries the listed members, so a refusal always says where the name IS served
+          rather than dead-ending the client.
+      - id: C3
+        status: answered
+        justification: >
+          Relay names the holder; its consumer serves own bytes when the holder does not answer.
+      - id: C4
+        status: n-a
+        justification: No read happens at this type; read failures are resolved before it exists.
+      - id: C5
+        status: n-a
+        justification: Content identity is compared upstream in head_agreement, not carried here.
+      - id: C6a
+        status: n-a
+        justification: A value type does no work.
+      - id: C6b
+        status: n-a
+        justification: A value type has no effect to repeat.
+      - id: C7
+        status: answered
+        justification: >
+          The 421 body built from Refuse is pinned by a unit test that asserts the members array
+          and by an integration test through the real listener.
+      - id: C8
+        status: n-a
+        justification: Observability is on the decision's consumer, registered on served_under_standing.
+      - id: C9
+        status: n-a
+        justification: No identity is minted or rewritten.
+      - id: C10
+        status: n-a
+        justification: A crate-internal type; its only wire form is the 421 JSON body.
+      - id: C11
+        status: n-a
+        justification: No budget or queue.
+      - id: C12
+        status: n-a
+        justification: No consent decision; the holder's eligibility fold still decides access.
+      - id: C13
+        status: n-a
+        justification: No authority stage.
+      - id: C14
+        status: answered
+        justification: >
+          Each variant maps to a response that names the doorway that produced it
+          (x-elohim-served-by), so the outcome is witnessed on the wire.
+    contractTests:
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_the_refusal_is_a_421_naming_members
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing/standing.rs
+        testName: name_routing_a_member_behind_the_holder_relays_to_it
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: name_routing_a_name_this_doorway_does_not_stand_for_is_421_naming_members
+        kind: integration
