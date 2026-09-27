@@ -47,3 +47,10 @@ the C4 honest-absence class applied to the instrument itself.
    kinds or extend the schema enum with `state-transition` (and say why a fifth kind is a kind, not a
    costume). Changing another agent's registered `kind` is a classification judgment, not a typo fix —
    the implementing agent correctly left it alone.
+
+**Also needed (2026-09-27, one-head-delivered sprint Task F3 follow-up):** the seam census still has no
+pre-push caller today — `placement-audit.py` retired 2026-09-11, and the doorway federation-coherence
+seam rows added by Task F3 (commit `dff521af5`) landed with no automated check reading them. Source:
+`.superpowers/sdd/2026-09-26-one-head-delivered-sprint-plan/progress.md` ("Task F3: follow-up committed
+dff521af5 (seam rows + checks entry); note: the seam census has no pre-push caller today (placement-audit
+retired 2026-09-11) — recorded, not fixed").
