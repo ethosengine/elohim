@@ -264,8 +264,11 @@ describe("orchestrator dispatch sends RUN_CLASS to every downstream", () => {
 });
 
 describe("edge declares RUN_CLASS and reads verify as validate-only", () => {
-  test("RUN_CLASS is a declared string parameter defaulting to build", () => {
-    assert.match(edge, /string\(\s*name: 'RUN_CLASS',\s*defaultValue: 'build'/);
+  test("RUN_CLASS is a declared string parameter; empty (manual) reads as build", () => {
+    // Empty, not 'build': an orchestrator-sent build|deploy leaves Dataplane
+    // Validation to the validate-only sibling (Lane C3); a manual run keeps it
+    // inline. computeValidateOnly (below) still coalesces empty to build.
+    assert.match(edge, /string\(\s*name: 'RUN_CLASS',\s*defaultValue: ''/);
   });
 
   test("computeValidateOnly coalesces the param and treats verify as validate-only", () => {

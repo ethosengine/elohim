@@ -668,6 +668,47 @@ def holdBarrierConsumers(List ran, Map results, Map pipelineBaselines) {
 }
 
 /**
+ * Dataplane Validation, off the delivery path (one-head-delivered sprint, Lane
+ * C3). Edge #1486 spent 45 min measuring the fleet it had just rolled, ended
+ * `FLEET-CHURNING … DID NOT MEASURE`, and app and genesis waited behind it. A
+ * deploy-bearing edge run now skips the stage and ends its description with
+ * `Dataplane Validation: owed by sibling run` (owesValidationToSibling in
+ * elohim/holochain/Jenkinsfile → validationOwed here). After the level's
+ * verdicts are in, this fires the strict validate-only edge run beside the
+ * next level: fire-and-forget, so app and genesis start at once.
+ *
+ * The deploy run's verdict no longer contains the measurement; the sibling's
+ * does (validate-only reds are FAILURE there) and it archives the same
+ * reports. It is a measurement, not a delivery: nothing is written to results
+ * or baselines, and edge's abortPrevious lets the next deploy supersede it.
+ * Never fired for an edge run that was refused, validate-only (below deploy or
+ * [edge:validate-only]), skipped, fire-and-forget, failed, or that owes nothing.
+ * barrierParams are not forwarded: the sibling rolls nothing, so it waits for
+ * no DNA verdict; crossRepoParams is empty for this monorepo job.
+ */
+def dispatchValidationSibling(List ran, Map results) {
+    def edge = results['elohim-edge']
+    if (!ran.contains('elohim-edge') || !edge?.success || edge.skipped || edge.dispatched) return
+    if (edge.deployRefused || !edge.validationOwed) return
+    if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || runClassBelowDeploy(runClassFor('elohim-edge', env.PIPELINE_RUN_CLASSES))) return
+    def config = getPipelineMetadata('elohim-edge')
+    String job = "${config.jenkinsJob ?: 'elohim-edge'}/${config.jenkinsBranch ?: env.BRANCH_NAME}"
+    try {
+        def sibling = build(job: job, wait: false, propagate: false, parameters: [
+            booleanParam(name: 'VALIDATE_ONLY', value: true),
+            stringParam(name: 'RUN_CLASS', value: 'verify'),
+            booleanParam(name: 'FORCE_BUILD', value: false),
+            booleanParam(name: 'FORCE_DEPLOY', value: false),
+            booleanParam(name: 'DEPLOY_ONLY', value: false)
+        ])
+        echo "🧪 elohim-edge #${edge.buildNumber} deployed; Dataplane Validation owed — sibling ${job} ${sibling?.absoluteUrl ?: '(queued)'} (fire-and-forget: a measurement, not a delivery)"
+    } catch (Exception e) {
+        if (e instanceof InterruptedException) throw e   // an abort of this run stays an abort
+        echo "⚠️ elohim-edge: Dataplane Validation sibling not queued (${e.message}) — the fleet is unmeasured; run [edge:validate-only]"
+    }
+}
+
+/**
  * Transitive consumers of `failed`, from the same dependsOn source
  * groupByDependencyLevel reads (getPipelineMetadata) — no shell-out, since the
  * orchestrator checkout has no node_modules. Reference semantics:
@@ -959,7 +1000,10 @@ def dispatchResult(Object result, boolean waited) {
         // Edge publishes a refused deploy (DNA verdict or budget) as a
         // description starting `DEPLOY-REFUSED:` (edgeRunDescription), so an
         // UNSTABLE that delivered nothing is told apart from an ordinary one.
-        deployRefused: (result.description ?: '').toString().startsWith('DEPLOY-REFUSED:')
+        deployRefused: (result.description ?: '').toString().startsWith('DEPLOY-REFUSED:'),
+        // Edge skipped Dataplane Validation on a deploy-bearing run and says so
+        // (edgeRunDescription); dispatchValidationSibling pays the debt.
+        validationOwed: (result.description ?: '').toString().contains('Dataplane Validation: owed by sibling run')
     ]
 }
 
@@ -2853,6 +2897,7 @@ spec:
 
                             // Fail forward (row 19): a failure dooms only its transitive consumers.
                             failedPipelines.addAll(doomDependents(runnable, pipelines, results, pipelineBaselines))
+                            dispatchValidationSibling(runnable, results)
 
                             // Checkpoint every completed level. The per-pipeline map above
                             // is local to this stage, so a run killed mid-level by the

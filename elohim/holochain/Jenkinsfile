@@ -239,14 +239,47 @@ def awaitDnaVerdict() {
  * This run's build description. A refused deploy leads with `DEPLOY-REFUSED:`
  * — the orchestrator's dispatchResult reads that prefix (deployRefused) to
  * hold this run's baseline, so the post-always summary keeps it first.
+ * A deploy-bearing run that skipped Dataplane Validation (owesValidationToSibling)
+ * ends with `Dataplane Validation: owed by sibling run`, so nobody reads the
+ * absent measurement as green; dispatchResult reads it (validationOwed) and
+ * the orchestrator fires the validate-only sibling (dispatchValidationSibling).
+ * A validation run whose fleet never settled leads with `DATAPLANE: DID NOT
+ * MEASURE (<reason>)` (runDataplaneValidation) — a no-measure, never a red.
  */
 def edgeRunDescription() {
-    def summary = [
+    def parts = [
         env.HAPP_AVAILABLE == 'true' ? 'hApp:OK' : 'hApp:NO',
         env.IMAGES_PUSHED == 'true' ? 'Push:OK' : 'Push:Skip',
         env.EDGE_NODE_HEALTHY == 'true' ? 'Deploy:OK' : 'Deploy:?'
-    ].join(' | ')
-    return env.DEPLOY_REFUSED == 'true' ? "DEPLOY-REFUSED: ${env.DEPLOY_REFUSED_REASON} | ${summary}" : summary
+    ]
+    if (env.DATAPLANE_VALIDATION == 'owed-by-sibling') { parts << 'Dataplane Validation: owed by sibling run' }
+    def summary = parts.join(' | ')
+    return env.DEPLOY_REFUSED == 'true' ? "DEPLOY-REFUSED: ${env.DEPLOY_REFUSED_REASON} | ${summary}" :
+        (env.DATAPLANE_NO_MEASURE ? "DATAPLANE: DID NOT MEASURE (${env.DATAPLANE_NO_MEASURE}) | ${summary}" : summary)
+}
+
+/**
+ * Dataplane Validation's class rule (one-head-delivered sprint, Lane C3). An
+ * orchestrator-dispatched run that rolls the fleet (RUN_CLASS build|deploy)
+ * no longer measures it inline: edge #1486 (RUN_CLASS=build) spent 45 min in
+ * the stage and ended `FLEET-CHURNING … DID NOT MEASURE` while app and genesis
+ * waited behind it. The orchestrator fires the strict validate-only edge run
+ * as a fire-and-forget sibling instead, so this deploy run's verdict no longer
+ * contains the measurement — the sibling's does (validate-only reds are
+ * FAILURE, runDataplaneValidation) and it archives the same reports.
+ *
+ * Empty RUN_CLASS (the declared default: a manual or legacy dispatch), a run
+ * with no UpstreamCause (manual, even with RUN_CLASS=build: no sibling would
+ * pay the debt) and the sub-deploy classes measure here, as before. Called LAST in the stage's
+ * `when` allOf, which short-circuits, so the debt is recorded only when the
+ * stage would otherwise have run here (never after a refused deploy).
+ */
+def owesValidationToSibling(String runClass) {
+    if (!(runClass in ['build', 'deploy'])) return false
+    if (currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause').isEmpty()) return false
+    env.DATAPLANE_VALIDATION = 'owed-by-sibling'
+    echo "Dataplane Validation: owed by sibling run — RUN_CLASS=${runClass} rolls the fleet; the orchestrator dispatches the validate-only edge run beside app and genesis"
+    return true
 }
 
 /**
@@ -462,7 +495,16 @@ def runMeshQuiesceMeasure() {
  *    printed); [edge:validate-only] recording runs stay strict (FAILURE),
  *    because a validate-only run exists to record a verdict and a swallowed
  *    red there is a lie. Same shape as the T2 receipt leg in
- *    .husky/pre-push.bash (T2_RECEIPT=strict).
+ *    .husky/pre-push.bash (T2_RECEIPT=strict);
+ *  - a fleet that never settled is a NO-MEASURE, not a red (museum trap #1).
+ *    run-dataplane-validation.sh exits 3 for it AND for a zero-scenario run;
+ *    only the former prints its DID NOT MEASURE banner. Since Lane C3 every
+ *    orchestrator measurement is a strict sibling fired inside the post-roll
+ *    churn window, so a strict no-measure ends NOT_BUILT with the description
+ *    `DATAPLANE: DID NOT MEASURE (<reason>)` — ci-harvest reads NOT_BUILT as
+ *    skipped, never as a failure fingerprint. Real reds and zero-scenario
+ *    runs keep FAILURE (strict) / UNSTABLE (inline). NOT_BUILT is applied
+ *    last, after the served-shell gate, so it never masks that gate's FAILURE.
  */
 def runDataplaneValidation() {
     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -471,12 +513,17 @@ def runDataplaneValidation() {
     // 2700 s gate + cucumber + report must fit inside this bound; 55 min leaves
     // room inside the pipeline-global limit for the deploy stages that follow.
     def strict = isValidateOnly()
+    String log = "${env.WORKSPACE}/.dataplane-validation.log"
+    String noMeasure = null
     def body = {
+        int rc = 0
         timeout(time: 55, unit: 'MINUTES') {
             withEnv(["E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host", "QUIESCE_DEADLINE_SECS=2700"]) {
-                sh "bash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh'"
+                rc = sh(returnStatus: true, script: "#!/bin/bash\nset -o pipefail\nbash '${env.WORKSPACE}/scripts/ci/run-dataplane-validation.sh' 2>&1 | tee '${log}'")
             }
         }
+        noMeasure = (rc == 3) ? dataplaneNoMeasureReason(readFile(log)) : null
+        if (rc != 0 && !noMeasure) { error("run-dataplane-validation.sh exited ${rc}") }
     }
     if (strict) {
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') { body() }
@@ -500,6 +547,22 @@ def runDataplaneValidation() {
     if (!shellFailures.isEmpty()) {
         error("Served shell does not boot through ${shellFailures.join(', ')} — see the ✗ lines above (doorway, declared head, asset, x-elohim-bundle marker).")
     }
+    if (noMeasure) {
+        env.DATAPLANE_NO_MEASURE = noMeasure
+        currentBuild.description = edgeRunDescription()
+        if (strict) { currentBuild.result = 'NOT_BUILT' } else { unstable("Dataplane Validation did not measure: ${noMeasure}") }
+    }
+}
+
+/**
+ * The reason line of run-dataplane-validation.sh's DID NOT MEASURE banner, or
+ * null when its exit 3 was the zero-scenario / unreadable-count guard (a red).
+ */
+@NonCPS
+def dataplaneNoMeasureReason(String log) {
+    if (!(log ?: '').contains('=== Dataplane Validation: DID NOT MEASURE ===')) return null
+    def line = log.readLines().find { it.startsWith('Fleet-quiesce gate exited') }
+    return (line ?: 'fleet-quiesce gate did not settle').trim()
 }
 
 /**
@@ -1064,8 +1127,10 @@ def sequencedConductorPlan(List humans) {
  * that is museum trap #1's discipline applied to a deploy predicate: a
  * no-measure outcome is not a failure verdict. The unsettled peer is recorded
  * in the roll summary and Dataplane Validation's fleet-quiesce gate judges the
- * fleet afterwards. Any other exit is an implementation/environment failure:
- * mark the build UNSTABLE and return false so the caller halts later peers.
+ * fleet afterwards — for an orchestrator deploy, in the validate-only sibling
+ * run the orchestrator fires beside app and genesis (owesValidationToSibling).
+ * Any other exit is an implementation/environment failure: mark the build
+ * UNSTABLE and return false so the caller halts later peers.
  */
 def runPeerRollGate(Map humanConfig, String gatesLeft, String stateFile) {
     def storageUrl = "http://${humanConfig.resourcePrefix}.${humanConfig.namespace}.svc.cluster.local:8090"
@@ -2299,8 +2364,8 @@ spec:
         )
         string(
             name: 'RUN_CLASS',
-            defaultValue: 'build',
-            description: 'build|deploy|verify|measure|profile (orchestrator-derived). Below deploy = validate-only.'
+            defaultValue: '',
+            description: 'build|deploy|verify|measure|profile (orchestrator-derived). Below deploy = validate-only. Empty = manual build, validated inline.'
         )
         string(name: 'DNA_RUN_ID', defaultValue: '', description: 'Orchestrator-set DNA run; the deploy waits for its verdict')
         string(name: 'HAPP_CANDIDATE_TAG', defaultValue: '', description: 'Orchestrator-set hApp candidate tag this run packages')
@@ -3083,10 +3148,9 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             }
         }
 
-        // Advisory @dataplane cucumber suite — bash body in scripts/ci/run-dataplane-validation.sh.
-        // catchError->UNSTABLE: red concerns and zero-scenario measurements surface
-        // without blocking the orchestrator cascade; zero scenarios is never SUCCESS.
-        // Flip to FAILURE once all concerns go green on dev.
+        // @dataplane cucumber suite — bash body in scripts/ci/run-dataplane-validation.sh.
+        // A deploy-bearing orchestrator run skips it (owesValidationToSibling);
+        // the validate-only sibling measures, strict. Inline runs stay UNSTABLE-only.
         stage('Dataplane Validation') {
             when {
                 allOf {
@@ -3109,6 +3173,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                         expression { params.FORCE_BUILD }
                         expression { isValidateOnly() }
                     }
+                    expression { isValidateOnly() || !owesValidationToSibling(params.RUN_CLASS) }
                 }
             }
             steps {

@@ -310,3 +310,150 @@ describe("edge validate-only stage allowlist", () => {
     );
   });
 });
+
+// ── Lane C3 (one-head-delivered sprint): Dataplane Validation leaves the
+// delivery path. Edge #1486 spent 45 min in the stage on its deploy run and
+// ended `FLEET-CHURNING … DID NOT MEASURE` while app and genesis waited. A
+// deploy-bearing orchestrator run now skips the stage and says so; the
+// orchestrator fires the strict validate-only edge run as a fire-and-forget
+// sibling. Source-asserted: running the Groovy needs a controller.
+
+function topLevelDef(text, name) {
+  const at = text.search(new RegExp(`^def\\s+${name}\\s*\\(`, "m"));
+  assert.notEqual(at, -1, `top-level def ${name}() is missing`);
+  return balancedBlock(text, text.indexOf("{", at));
+}
+
+function stageBlock(text, name) {
+  const at = text.indexOf(`stage('${name}') {`);
+  assert.notEqual(at, -1, `stage '${name}' is missing`);
+  return balancedBlock(text, text.indexOf("{", at));
+}
+
+function whenOf(stage) {
+  const at = stage.indexOf("when {");
+  assert.notEqual(at, -1, "stage has no when block");
+  return balancedBlock(stage, stage.indexOf("{", at));
+}
+
+describe("Dataplane Validation runs beside app and genesis (Lane C3)", () => {
+  const dvWhen = whenOf(stageBlock(edge, "Dataplane Validation"));
+
+  test("edge: the stage's when names RUN_CLASS and skips a deploy-bearing class", () => {
+    assert.match(
+      dvWhen,
+      /expression \{ isValidateOnly\(\) \|\| !owesValidationToSibling\(params\.RUN_CLASS\) \}/,
+    );
+    // Evaluated LAST inside allOf (which short-circuits), so the debt is
+    // recorded only when every other condition would have run the stage here.
+    const allOf = balancedBlock(dvWhen, dvWhen.indexOf("{", dvWhen.indexOf("allOf")));
+    const lastLine = allOf.trim().split("\n").pop().trim();
+    assert.match(lastLine, /owesValidationToSibling\(params\.RUN_CLASS\)/);
+    assert.ok(
+      allOf.indexOf("DEPLOY_REFUSED") < allOf.indexOf("owesValidationToSibling"),
+      "a refused deploy must short-circuit before the class rule records a debt",
+    );
+  });
+
+  test("edge: build|deploy owe the measurement; empty (manual) and sub-deploy classes measure here", () => {
+    const rule = topLevelDef(edge, "owesValidationToSibling");
+    assert.match(rule, /!\(runClass in \['build', 'deploy'\]\)\) return false/);
+    assert.match(rule, /env\.DATAPLANE_VALIDATION = 'owed-by-sibling'/);
+    // Manual/legacy runs keep today's behaviour: the declared default is empty,
+    // and computeValidateOnly still coalesces it to build.
+    assert.match(edge, /string\(\s*name: 'RUN_CLASS',\s*defaultValue: ''/);
+    assert.match(topLevelDef(edge, "computeValidateOnly"), /params\.RUN_CLASS \?: 'build'/);
+  });
+
+  test("edge: the deploy run's description says the measurement is owed, after the DEPLOY-REFUSED prefix logic", () => {
+    const desc = topLevelDef(edge, "edgeRunDescription");
+    assert.match(desc, /Dataplane Validation: owed by sibling run/);
+    assert.match(desc, /env\.DATAPLANE_VALIDATION == 'owed-by-sibling'/);
+    assert.match(desc, /env\.DEPLOY_REFUSED == 'true' \? "DEPLOY-REFUSED: \$\{env\.DEPLOY_REFUSED_REASON\} \| \$\{summary\}" :/);
+  });
+
+  test("edge: only an orchestrator (UpstreamCause) dispatch owes the measurement; a manual run measures inline", () => {
+    const rule = topLevelDef(edge, "owesValidationToSibling");
+    const cause = rule.indexOf("currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause').isEmpty()) return false");
+    assert.ok(cause !== -1, "a run with no UpstreamCause must return false");
+    assert.ok(cause < rule.indexOf("env.DATAPLANE_VALIDATION = 'owed-by-sibling'"), "the cause check precedes the debt");
+  });
+
+  test("edge: a strict no-measure (fleet never settled) is NOT_BUILT, never FAILURE; reds and zero scenarios stay red", () => {
+    const body = topLevelDef(edge, "runDataplaneValidation");
+    // The script's status is read, not thrown: exit 3 is split by its banner.
+    assert.match(body, /rc = sh\(returnStatus: true, script: "#!\/bin\/bash\\nset -o pipefail\\nbash '\$\{env\.WORKSPACE\}\/scripts\/ci\/run-dataplane-validation\.sh' 2>&1 \| tee '\$\{log\}'"\)/);
+    assert.match(body, /noMeasure = \(rc == 3\) \? dataplaneNoMeasureReason\(readFile\(log\)\) : null/);
+    assert.match(body, /if \(rc != 0 && !noMeasure\) \{ error\("run-dataplane-validation\.sh exited \$\{rc\}"\) \}/);
+    // Strict reds still end FAILURE inside the validate-only catchError.
+    assert.match(body, /if \(strict\) \{\s*catchError\(buildResult: 'FAILURE', stageResult: 'FAILURE'\) \{ body\(\) \}/);
+    // NOT_BUILT is applied after the served-shell gate, so it never masks its FAILURE.
+    const shellGate = body.indexOf("Served shell does not boot through");
+    const notBuilt = body.indexOf("currentBuild.result = 'NOT_BUILT'");
+    assert.ok(shellGate !== -1 && notBuilt > shellGate, "NOT_BUILT comes after the served-shell gate");
+    assert.match(body, /if \(strict\) \{ currentBuild\.result = 'NOT_BUILT' \} else \{ unstable\(/);
+    assert.match(body, /env\.DATAPLANE_NO_MEASURE = noMeasure\s*\n\s*currentBuild\.description = edgeRunDescription\(\)/);
+    assert.match(topLevelDef(edge, "edgeRunDescription"), /"DATAPLANE: DID NOT MEASURE \(\$\{env\.DATAPLANE_NO_MEASURE\}\) \| \$\{summary\}"/);
+  });
+
+  test("edge: the no-measure banner the Jenkinsfile reads is printed only on the quiesce path", () => {
+    const banner = "=== Dataplane Validation: DID NOT MEASURE ===";
+    const reason = topLevelDef(edge, "dataplaneNoMeasureReason");
+    assert.ok(reason.includes(banner), "the Jenkinsfile keys the no-measure on the script's banner");
+    assert.match(reason, /startsWith\('Fleet-quiesce gate exited'\)/);
+    assert.equal(runDataplaneValidation.split(banner).length, 2, "the script prints the banner exactly once");
+    const bannerAt = runDataplaneValidation.indexOf(banner);
+    assert.ok(bannerAt < runDataplaneValidation.indexOf("cucumber-js"), "banner is on the pre-cucumber quiesce path");
+    assert.ok(runDataplaneValidation.includes('echo "Fleet-quiesce gate exited ${QUIESCE_EXIT}'), "the reason line the Jenkinsfile quotes");
+    // The zero-scenario guard also exits 3 but never prints the banner: it stays a red.
+    const zero = runDataplaneValidation.indexOf("0 dataplane scenarios ran");
+    assert.ok(zero > bannerAt && !runDataplaneValidation.slice(zero).includes(banner));
+  });
+
+  test("orchestrator: exactly one VALIDATE_ONLY=true dispatch, fire-and-forget", () => {
+    const hits = orchestrator.match(/booleanParam\(name: 'VALIDATE_ONLY', value: true\)/g) ?? [];
+    assert.equal(hits.length, 1, "exactly one sibling dispatch carries VALIDATE_ONLY=true");
+    const sibling = topLevelDef(orchestrator, "dispatchValidationSibling");
+    assert.match(sibling, /booleanParam\(name: 'VALIDATE_ONLY', value: true\)/);
+    const call = sibling.slice(sibling.indexOf("build("));
+    assert.match(call, /wait: false/);
+    assert.match(call, /propagate: false/);
+    assert.doesNotMatch(call, /waitForStart|waitForBuild/);
+    assert.match(sibling, /stringParam\(name: 'RUN_CLASS', value: 'verify'\)/);
+    assert.match(sibling, /booleanParam\(name: 'FORCE_BUILD', value: false\)/);
+    assert.match(sibling, /booleanParam\(name: 'FORCE_DEPLOY', value: false\)/);
+    assert.match(sibling, /booleanParam\(name: 'DEPLOY_ONLY', value: false\)/);
+    // A measurement, not a delivery: never recorded as a result or a baseline.
+    assert.doesNotMatch(sibling, /results\[[^\]]+\]\s*=|pipelineBaselines|recordPipelineResult/);
+  });
+
+  test("orchestrator: the sibling is fired after each level's verdicts, not per branch", () => {
+    const doom = orchestrator.indexOf("failedPipelines.addAll(doomDependents(runnable, pipelines, results, pipelineBaselines))");
+    const fire = orchestrator.indexOf("dispatchValidationSibling(runnable, results)");
+    const checkpoint = orchestrator.indexOf("archivePipelineBaselines('execute')");
+    assert.ok(doom !== -1 && fire > doom && fire < checkpoint, "sibling fires after doomDependents, before the level checkpoint");
+    assert.equal(orchestrator.split("dispatchValidationSibling(runnable, results)").length, 2, "one call site");
+  });
+
+  test("orchestrator: never on a refused, validate-only, skipped or unowed edge run", () => {
+    const sibling = topLevelDef(orchestrator, "dispatchValidationSibling");
+    const guards = sibling.slice(0, sibling.indexOf("build("));
+    for (const guard of [
+      /!ran\.contains\('elohim-edge'\)/,
+      /!edge\?\.success/,
+      /edge\.skipped/,
+      /edge\.dispatched/,
+      /edge\.deployRefused/,
+      /!edge\.validationOwed/,
+      /env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'/,
+      /runClassBelowDeploy\(runClassFor\('elohim-edge', env\.PIPELINE_RUN_CLASSES\)\)/,
+    ]) {
+      assert.match(guards, guard);
+    }
+    // validationOwed is read from the edge run's own description — one contract home.
+    assert.match(
+      topLevelDef(orchestrator, "dispatchResult"),
+      /validationOwed: \(result\.description \?: ''\)\.toString\(\)\.contains\('Dataplane Validation: owed by sibling run'\)/,
+    );
+  });
+});
