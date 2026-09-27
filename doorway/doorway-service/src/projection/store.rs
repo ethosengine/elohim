@@ -146,6 +146,10 @@ impl ProjectionStore {
             doc! { "author": 1 },
             doc! { "doc_id": 1 },
             doc! { "search_tokens": 1 },
+            // Edge lookups by endpoint (`cache_refresh`: an atom's refresh or
+            // eviction finds the cached Relationship docs that touch it).
+            doc! { "data.sourceId": 1 },
+            doc! { "data.targetId": 1 },
         ];
 
         for index_doc in indexes {

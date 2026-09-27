@@ -52,3 +52,9 @@ for every one of those routes (all were 200 before); commons rows unchanged.
 - `relationships/graph/{commonsId}` can walk into an intimate neighbour.
 - The body route's peer-fetch fallback (no local row) still serves without a reach check.
 - The doorway manifest has no `public_if_reach` on `/head` and `/schedule` (storage is the authority; left as is).
+
+## Sibling: the doorway's DHT-signal cache writer (2026-09-27)
+The doorway's projection engine (`doorway-service/src/projection/engine.rs`) writes whatever the
+DNA signals into the `/api/v1/cache` store with no reach check, while the new event refresher and
+the boot warm stream only cache commons/public rows. A signal for an intimate atom could land in the
+anonymous cache. Found by the doorway cache-refresh work (F22).
