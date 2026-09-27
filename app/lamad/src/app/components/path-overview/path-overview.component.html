@@ -151,7 +151,7 @@
                       <!-- Module Header -->
                       <div class="module-header">
                         <div class="module-header-left">
-                          <h4 class="module-title">{{ modIdx + 1 }}. {{ mod.module.title }}</h4>
+                          <h4 class="module-title">{{ mod.heading }}</h4>
                           @if (mod.module.optional) {
                             <span class="optional-badge small">Optional</span>
                           }
@@ -201,48 +201,52 @@
                         <!-- Sections -->
                         <div class="module-sections">
                           @for (sec of mod.sections; track sec.section.id; let secIdx = $index) {
-                            <div class="section-card">
-                              <!-- Section Header - clickable link to lesson view -->
-                              <button
-                                type="button"
-                                class="section-header section-link"
-                                (click)="
-                                  goToSection(
-                                    $safeNavigationMigration(sec.concepts.at(0)?.conceptId)
-                                  )
-                                "
-                              >
-                                <div class="section-header-left">
-                                  <h5 class="section-title">
-                                    {{ sec.section.title }}
-                                  </h5>
-                                  @if (sec.section.optional) {
-                                    <span class="optional-badge tiny">Optional</span>
-                                  }
-                                </div>
-                                <div class="section-header-right">
-                                  @if (sec.section.estimatedDuration) {
-                                    <span class="duration-badge tiny">
-                                      {{ sec.section.estimatedDuration }}
-                                    </span>
-                                  }
-                                  <span class="section-meta">
-                                    {{ sec.completedConcepts }}/{{ sec.totalConcepts }}
-                                  </span>
-                                  <!-- Mini progress indicator -->
-                                  <div class="section-mini-progress">
-                                    <div
-                                      class="section-mini-fill"
-                                      [style.width.%]="sec.completionPercentage"
-                                    ></div>
+                            <div class="section-card" [class.own-lesson]="mod.isOwnLesson">
+                              <!-- Section Header - clickable link to lesson view.
+                                   A module that IS its own lesson already shows this
+                                   title and description in the module header. -->
+                              @if (!mod.isOwnLesson) {
+                                <button
+                                  type="button"
+                                  class="section-header section-link"
+                                  (click)="
+                                    goToSection(
+                                      $safeNavigationMigration(sec.concepts.at(0)?.conceptId)
+                                    )
+                                  "
+                                >
+                                  <div class="section-header-left">
+                                    <h5 class="section-title">
+                                      {{ sec.section.title }}
+                                    </h5>
+                                    @if (sec.section.optional) {
+                                      <span class="optional-badge tiny">Optional</span>
+                                    }
                                   </div>
-                                  <span class="section-arrow">→</span>
-                                </div>
-                              </button>
+                                  <div class="section-header-right">
+                                    @if (sec.section.estimatedDuration) {
+                                      <span class="duration-badge tiny">
+                                        {{ sec.section.estimatedDuration }}
+                                      </span>
+                                    }
+                                    <span class="section-meta">
+                                      {{ sec.completedConcepts }}/{{ sec.totalConcepts }}
+                                    </span>
+                                    <!-- Mini progress indicator -->
+                                    <div class="section-mini-progress">
+                                      <div
+                                        class="section-mini-fill"
+                                        [style.width.%]="sec.completionPercentage"
+                                      ></div>
+                                    </div>
+                                    <span class="section-arrow">→</span>
+                                  </div>
+                                </button>
+                              }
 
                               <!-- Section Body - concept list -->
                               <div class="section-body">
-                                @if (sec.section.description) {
+                                @if (sec.section.description && !mod.isOwnLesson) {
                                   <p class="section-description">
                                     {{ sec.section.description }}
                                   </p>

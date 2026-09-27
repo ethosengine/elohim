@@ -134,26 +134,26 @@ export class ProjectionAPIService {
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
-      this.env.holochain?.authUrl ?? this.env.holochain?.appUrl ?? this.deployedOriginFallback();
+      this.env.holochain?.authUrl ??
+      this.env.holochain?.appUrl ??
+      this.env.doorwayUrl ??
+      this.sameOriginFallback();
     const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
     return `${httpUrl}/api/v1/cache`;
   }
 
   /**
-   * The lamad app has a single environment.ts (no fileReplacements), so the
-   * env never names a doorway URL in deployed builds. Deployed lamad is a
-   * SPA blob served BY a doorway, which also fronts /api/v1/cache — so
-   * same-origin is the correct cache base there. localhost:8080 stays the
-   * local-dev fallback. (Root cause of the deep-link/mastery e2e cluster:
-   * the blob bundle called http://localhost:8080/api/v1/cache/* from
-   * alpha.elohim.host — ERR_CONNECTION_REFUSED on every content fetch.)
+   * The cache is fronted by the same doorway every other lamad read goes
+   * through, so the bundle's resolved doorway URL (`env.doorwayUrl`, set in
+   * app.config from the serving origin) is the base. Without one, same-origin
+   * is correct: lamad is a SPA blob served BY a doorway (deployed or
+   * household), and `ng serve` proxies /api to one. `http://localhost:8080`
+   * remains only for a render with no window; in the browser it named no
+   * running service — on the household doorway (:8888) every projection read
+   * failed with ERR_CONNECTION_REFUSED before falling back to /db.
    */
-  private deployedOriginFallback(): string {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-      return origin;
-    }
-    return 'http://localhost:8080';
+  private sameOriginFallback(): string {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080';
   }
 
   /** API key for authenticated requests */

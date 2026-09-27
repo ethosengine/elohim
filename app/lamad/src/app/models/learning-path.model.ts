@@ -474,6 +474,27 @@ function collectSteps(sections: PathSection[], stepOffset: number): PathStep[] {
 }
 
 /**
+ * The path author's own display title for a content ref within a section
+ * subtree (`items[].title`), or undefined when the author gave none.
+ *
+ * Step rows must show this title first: the path body is the teacher's
+ * editorial arrangement, so its wording wins over the referenced content's
+ * title and over any id-derived fallback.
+ */
+export function findItemTitle(section: PathSection, contentId: string): string | undefined {
+  for (const item of section.items ?? []) {
+    if (item.title && resolveRef(item.ref) === contentId) {
+      return item.title;
+    }
+  }
+  for (const child of section.sections ?? []) {
+    const title = findItemTitle(child, contentId);
+    if (title) return title;
+  }
+  return undefined;
+}
+
+/**
  * Enrich a raw section from JSON body with backward-compat fields.
  */
 function enrichSection(raw: Section, index: number): PathSection {

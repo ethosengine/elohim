@@ -8,6 +8,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 import { LAMAD_EPR_RESOLVER, LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { of } from 'rxjs';
+import { GovernanceApiService } from '@elohim/service';
 import { vi, Mock } from 'vitest';
 
 // Mock the shared exploration sidebar. Lesson-view delegates the entire
@@ -51,6 +52,7 @@ describe('LessonViewComponent', () => {
   let component: LessonViewComponent;
   let fixture: ComponentFixture<LessonViewComponent>;
   let rendererRegistrySpy: any;
+  let governanceApiSpy: { getMechanismSelection: Mock; getAccumulationStatus: Mock };
 
   const mockContent: ContentNode = {
     id: 'test-concept',
@@ -79,12 +81,21 @@ describe('LessonViewComponent', () => {
       getRenderer: vi.fn(),
     };
     rendererRegistrySpy.getRenderer.mockReturnValue(null);
+    governanceApiSpy = {
+      getMechanismSelection: vi.fn().mockResolvedValue({ level: 1, renderTarget: 'angular' }),
+      getAccumulationStatus: vi.fn().mockResolvedValue({
+        readyForSensemaking: false,
+        controversyDetected: false,
+        settled: true,
+      }),
+    };
 
     await TestBed.configureTestingModule({
       imports: [LessonViewComponent],
       providers: [
         provideHttpClient(),
         { provide: RendererRegistryService, useValue: rendererRegistrySpy },
+        { provide: GovernanceApiService, useValue: governanceApiSpy },
         {
           provide: LAMAD_EPR_RESOLVER,
           useValue: {
@@ -127,6 +138,42 @@ describe('LessonViewComponent', () => {
 
     fixture = TestBed.createComponent(LessonViewComponent);
     component = fixture.componentInstance;
+  });
+
+  describe('governance gateway', () => {
+    // The Lit gateway shows "Loading governance..." until handed a selection;
+    // the lesson must hand it the substrate's views or it never resolves.
+    it('binds the substrate mechanism selection and accumulation status', async () => {
+      fixture.componentRef.setInput('content', mockContent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(governanceApiSpy.getMechanismSelection).toHaveBeenCalledWith('content', 'test-concept');
+      const gateway = (fixture.nativeElement as HTMLElement).querySelector(
+        'elohim-feedback-mechanism-gateway'
+      ) as (HTMLElement & { selection: unknown; accumulationStatus: unknown; loading: boolean }) | null;
+      expect(gateway).toBeTruthy();
+      expect(gateway!.selection).toEqual({ level: 1, renderTarget: 'angular' });
+      expect(gateway!.accumulationStatus).toEqual({
+        readyForSensemaking: false,
+        controversyDetected: false,
+        settled: true,
+      });
+      expect(gateway!.loading).toBe(false);
+    });
+
+    it('omits the gateway when no governance view resolves', async () => {
+      governanceApiSpy.getMechanismSelection.mockRejectedValue(new Error('down'));
+      fixture.componentRef.setInput('content', mockContent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('elohim-feedback-mechanism-gateway')
+      ).toBeNull();
+    });
   });
 
   it('should create', () => {

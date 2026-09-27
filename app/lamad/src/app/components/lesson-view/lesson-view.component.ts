@@ -45,6 +45,8 @@ import {
 import { ExplorationSidebarComponent } from '../exploration-sidebar/exploration-sidebar.component';
 
 import type { EprHead, EprRelationship } from '@elohim/storage-client';
+import { GovernanceApiService } from '@elohim/service';
+import type { AccumulationStatus, MechanismSelection } from 'elohim-core';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
 // import { InlineQuizComponent, InlineQuizCompletionEvent } from '../../quiz-engine';
 
@@ -182,11 +184,18 @@ interface InlineQuizCompletionEvent {
         }
         -->
 
-        <!-- Feedback Mechanism Gateway (governance at the point of content) -->
-        <elohim-feedback-mechanism-gateway
-          [attr.entity-type]="'content'"
-          [attr.entity-id]="content.id"
-        ></elohim-feedback-mechanism-gateway>
+        <!-- Feedback Mechanism Gateway (governance at the point of content).
+             The element renders "Loading governance..." until it is handed a
+             selection, so it is bound here and absent when none resolves. -->
+        @if (governanceLoading || mechanismSelection) {
+          <elohim-feedback-mechanism-gateway
+            [attr.entity-type]="'content'"
+            [attr.entity-id]="content.id"
+            [selection]="mechanismSelection"
+            [accumulationStatus]="accumulationStatus"
+            [loading]="governanceLoading"
+          ></elohim-feedback-mechanism-gateway>
+        }
 
         @if (eprRelationships.length > 0) {
           <elohim-epr-relationships-panel
@@ -476,6 +485,13 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   eprRelationships: EprRelationship[] = [];
 
+  private readonly governanceApi = inject(GovernanceApiService);
+
+  /** Substrate governance views bound to <elohim-feedback-mechanism-gateway>. */
+  mechanismSelection: MechanismSelection | null = null;
+  accumulationStatus: AccumulationStatus | null = null;
+  governanceLoading = false;
+
   private readonly sanitizer = inject(DomSanitizer);
   private descriptionCache: { source: string; html: string | null } | null = null;
 
@@ -494,6 +510,7 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
       setTimeout(() => this.loadRenderer(), 0);
       // Load EPR relationships (protocol-level relationships from EPR Head)
       this.loadEprRelationships(this.content.id);
+      this.loadGovernanceViews(this.content.id);
     }
     // Handle refresh trigger (for focused view mode)
     if (changes['refreshKey'] && !changes['refreshKey'].firstChange) {
@@ -720,6 +737,45 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(head => {
         this.eprRelationships = (head?.relationships ?? []) as EprRelationship[];
+        this.cdr.markForCheck();
+      });
+  }
+
+  /**
+   * Fetch the substrate's mechanism selection and accumulation status for this
+   * content (the backend decides both; this only binds them to the element).
+   * .then/.catch rather than native await — see content-viewer's
+   * loadGovernanceViews for the zone.js phantom-rejection reason.
+   */
+  private loadGovernanceViews(contentId: string): void {
+    this.governanceLoading = true;
+    this.mechanismSelection = null;
+    this.accumulationStatus = null;
+    Promise.all([
+      this.governanceApi.getMechanismSelection('content', contentId),
+      this.governanceApi.getAccumulationStatus('content', contentId),
+    ])
+      .then(([mechanismView, accumulationView]) => {
+        if (this.content?.id !== contentId) return; // navigated on
+        this.mechanismSelection = {
+          level: mechanismView.level as 0 | 1 | 2,
+          renderTarget: mechanismView.renderTarget as 'angular' | 'psephos',
+        };
+        this.accumulationStatus = {
+          readyForSensemaking: accumulationView.readyForSensemaking,
+          controversyDetected: accumulationView.controversyDetected,
+          settled: accumulationView.settled,
+        };
+      })
+      .catch(() => {
+        // Governance views are supplemental — the gateway is simply not shown.
+        if (this.content?.id !== contentId) return;
+        this.mechanismSelection = null;
+        this.accumulationStatus = null;
+      })
+      .finally(() => {
+        if (this.content?.id !== contentId) return;
+        this.governanceLoading = false;
         this.cdr.markForCheck();
       });
   }
