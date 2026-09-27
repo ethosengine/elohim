@@ -670,7 +670,7 @@ brit_advisory() {
   REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
   # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
   if git rev-parse --verify origin/dev >/dev/null 2>&1; then
-    REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --target origin/dev 2>/dev/null || true
+    REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --since origin/dev || true
   fi
 }
 
