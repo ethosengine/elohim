@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "cid",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-agent"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -499,14 +499,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-host"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "eprfs-meta"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eprfs-core",
  "serde",
