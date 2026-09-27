@@ -21,7 +21,13 @@
 #   12-13. the branch gate: a non-dev branch is skipped green with no publish;
 #      dev proceeds;
 #   14. a bind that never reads back as elected → exit 2 channel-bind-not-elected;
-#   15. the script's own failure → exit 2 internal-error (exit 1 = cannot-boot only).
+#   15. the script's own failure → exit 2 internal-error (exit 1 = cannot-boot only);
+#   16. the existence probe answered 503 catching-up, then 404 → re-probed, and the
+#      create proceeds;
+#   17. the existence probe answered a plain 503 → exit 2 channel-create-failed,
+#      no create;
+#   18. a half-created channel (row 200, /head 404) → the ceremony's create runs
+#      (it resumes the notarize) and APP-RELEASE-CHANNEL-RESUMED, then publish.
 #
 # publish-app-release.sh and verify-app-adoption.sh are stubbed at their
 # documented seams (APP_RELEASE_PUBLISH_SCRIPT, APP_RELEASE_VERIFY_SCRIPT), and
@@ -71,7 +77,12 @@ esac
 SH
 
 # The doorway: GET /db/content/<channel> answers 200 once <root>/channel-exists
-# exists; GET /db/content/<slug> serves <root>/rows/<slug>.json; else 404.
+# exists; GET /db/content/<channel>/head names a headActionHash once
+# <root>/channel-notarized exists (else 404, as storage answers a row with no
+# notarized head); GET /db/content/<slug> serves <root>/rows/<slug>.json; else
+# 404. A channel read answers 503 catching-up while <root>/catching-up holds a
+# count above 0 (each answer decrements it), and a plain 503 while
+# <root>/plain-503 exists.
 mkdir -p "${TEST_ROOT}/rows"
 cat > "${TEST_ROOT}/doorway.mjs" <<'JS'
 import http from 'node:http';
@@ -80,6 +91,24 @@ const [port, root] = process.argv.slice(2);
 http.createServer((req, res) => {
   const id = decodeURIComponent(req.url).replace(/^\/db\/content\//, '');
   const row = `${root}/rows/${id}.json`;
+  const json = (status, value) => {
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(value));
+  };
+  const countFile = `${root}/catching-up`;
+  const pending = fs.existsSync(countFile) ? Number(fs.readFileSync(countFile, 'utf8')) : 0;
+  if (id.startsWith('runtime:') && pending > 0) {
+    fs.writeFileSync(countFile, String(pending - 1));
+    return json(503, { status: 'catching-up', retryAfter: 1, cause: 'upstream' });
+  }
+  if (id.startsWith('runtime:') && fs.existsSync(`${root}/plain-503`)) {
+    return json(503, { error: 'Conductor bridge unavailable' });
+  }
+  if (id.startsWith('runtime:') && id.endsWith('/head')) {
+    return fs.existsSync(`${root}/channel-notarized`)
+      ? json(200, { headActionHash: 'uhCkkChannelHead' })
+      : json(404, { error: 'no notarized head declared for this content' });
+  }
   if (id.startsWith('runtime:') && fs.existsSync(`${root}/channel-exists`)) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{}');
@@ -108,7 +137,9 @@ write_tsx_stub() {
 #!/bin/bash
 echo "tsx $*" >> "${STUB_LOG}"
 case "$*" in
-  *" channel create "*) : > "${STUB_ROOT}/channel-exists"; echo '{"verb":"channel create"}' ;;
+  *" channel create "*)
+    : > "${STUB_ROOT}/channel-exists"; : > "${STUB_ROOT}/channel-notarized"
+    echo '{"verb":"channel create"}' ;;
   *" channel bind "*)
     set -- $*; shift 3
     printf '{"id":"%s","metadata":{"releaseChannel":"%s"}}' "$1" "$2" > "${STUB_ROOT}/rows/$1.json"
@@ -194,7 +225,7 @@ set +e; bash "${SCRIPT}" "${DOORWAY}" "${TEST_ROOT}/m.json" >/dev/null 2>&1; rc=
 echo "ok 6 - a missing peer list is a usage error (exit 64)"
 
 # 7. steward act on an absent channel with unbound slugs → create, bind each slug once, then publish.
-rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}"/rows/*.json
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}/channel-notarized" "${TEST_ROOT}"/rows/*.json
 echo '{"id":"elohim-host-landing","metadata":{}}' > "${TEST_ROOT}/rows/elohim-host-landing.json"
 echo '{"id":"lamad-spa","metadata":{"releaseChannel":"runtime:app-bundle:other:x"}}' > "${TEST_ROOT}/rows/lamad-spa.json"
 set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
@@ -226,7 +257,7 @@ grep -qx "APP-RELEASE-CHANNEL-ALREADY-BOUND slugs=elohim-host-landing,lamad-spa"
 echo "ok 8 - the steward act on an existing, bound channel creates and binds nothing"
 
 # 9. no steward act + 404 → no create; publish's own absent-channel refusal stands.
-rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists"
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}/channel-notarized"
 set +e; out="$(STUB_PUBLISH=refused STUB_VERIFY=adopted run)"; rc=$?; set -e
 [ "$rc" -eq 2 ] || fail "no-create+404: expected exit 2, got $rc: $out"
 ! grep -q '^tsx ' "${TEST_ROOT}/stub.log" || fail "no-create+404: nothing is created without the steward act"
@@ -235,7 +266,7 @@ grep -q "^APP-RELEASE-STAGE refused=APP-RELEASE-REFUSED reason=channel-absent" <
 echo "ok 9 - without the steward act an absent channel is publish's own refusal"
 
 # 10. the ceremony's create fails → exit 2, channel-create-failed, nothing bound or published.
-rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists"
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}/channel-notarized"
 printf '#!/bin/bash\necho "tsx $*" >> "${STUB_LOG}"\necho "release-ceremony: POST /db/content/bulk returned 503" >&2\nexit 1\n' > "${TEST_ROOT}/tsx.sh"
 set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
 [ "$rc" -eq 2 ] || fail "create failed: expected exit 2, got $rc: $out"
@@ -245,7 +276,7 @@ grep -q "^APP-RELEASE-STAGE refused=channel-create-failed channel=runtime:app-bu
 echo "ok 10 - a failed channel create refuses (exit 2) before anything is bound or published"
 
 # 11. the ceremony's bind fails → exit 2, channel-bind-failed, nothing published.
-rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}"/rows/*.json; : > "${TEST_ROOT}/channel-exists"
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}"/rows/*.json; : > "${TEST_ROOT}/channel-exists"; : > "${TEST_ROOT}/channel-notarized"
 printf '#!/bin/bash\necho "tsx $*" >> "${STUB_LOG}"\necho "channel bind: no content elohim-host-landing behind the doorway" >&2\nexit 1\n' > "${TEST_ROOT}/tsx.sh"
 set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
 [ "$rc" -eq 2 ] || fail "bind failed: expected exit 2, got $rc: $out"
@@ -274,7 +305,7 @@ echo "ok 13 - the dev branch publishes on its channel"
 
 # 14. a bind that exits 0 but never READS BACK naming the channel (a staging bind
 #     out-voted by an earned head) → exit 2 channel-bind-not-elected, nothing published.
-rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}"/rows/*.json; : > "${TEST_ROOT}/channel-exists"
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}"/rows/*.json; : > "${TEST_ROOT}/channel-exists"; : > "${TEST_ROOT}/channel-notarized"
 echo '{"id":"elohim-host-landing","metadata":{}}' > "${TEST_ROOT}/rows/elohim-host-landing.json"
 printf '#!/bin/bash\necho "tsx $*" >> "${STUB_LOG}"\necho "{\\"verb\\":\\"channel bind\\",\\"tier\\":\\"staging\\"}"\n' > "${TEST_ROOT}/tsx.sh"
 set +e; out="$(VISIBLE_SECS=2 POLL_SECS=1 APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
@@ -291,3 +322,48 @@ set +e; out="$(APP_RELEASE_STAGE_OUT=/nonexistent-dir/stage.out bash "${SCRIPT}"
 [ "$rc" -eq 2 ] || fail "internal error: expected exit 2, got $rc: $out"
 grep -q "^APP-RELEASE-STAGE refused=internal-error line=[0-9]" <<<"$out" || fail "internal error: expected the internal-error line: $out"
 echo "ok 15 - an internal failure is exit 2 (internal-error), never the cannot-boot exit 1"
+
+# 16. the existence probe answered catching-up twice (a doorway just restarted),
+#     then 404 → re-probed within the bound, and the create proceeds.
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}/channel-notarized" "${TEST_ROOT}"/rows/*.json
+for slug in elohim-host-landing lamad-spa; do
+  printf '{"id":"%s","metadata":{"releaseChannel":"runtime:app-bundle:alpha:dev"}}' "${slug}" > "${TEST_ROOT}/rows/${slug}.json"
+done
+echo 2 > "${TEST_ROOT}/catching-up"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run 2>"${TEST_ROOT}/err")"; rc=$?; set -e
+[ "$rc" -eq 0 ] || fail "catching-up then 404: expected exit 0, got $rc: $out $(cat "${TEST_ROOT}/err")"
+[ "$(grep -c '503 catching-up — re-probing' "${TEST_ROOT}/err")" -eq 2 ] \
+  || fail "catching-up then 404: expected two re-probe lines: $(cat "${TEST_ROOT}/err")"
+grep -q ' channel create runtime:app-bundle:alpha:dev ' "${TEST_ROOT}/stub.log" \
+  || fail "catching-up then 404: the create ran: $(cat "${TEST_ROOT}/stub.log")"
+grep -qx "APP-RELEASE-CHANNEL-CREATED channel=runtime:app-bundle:alpha:dev" <<<"$out" \
+  || fail "catching-up then 404: expected the CREATED line: $out"
+rm -f "${TEST_ROOT}/catching-up"
+echo "ok 16 - a catching-up existence probe is re-probed, and a 404 after it creates the channel"
+
+# 17. a plain 503 (no catching-up body) on the existence probe is final.
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-exists" "${TEST_ROOT}/channel-notarized"
+: > "${TEST_ROOT}/plain-503"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run 2>"${TEST_ROOT}/err")"; rc=$?; set -e
+rm -f "${TEST_ROOT}/plain-503"
+[ "$rc" -eq 2 ] || fail "plain 503: expected exit 2, got $rc: $out"
+grep -q "^APP-RELEASE-STAGE refused=channel-create-failed channel=runtime:app-bundle:alpha:dev status=503 " \
+  <<<"$(tail -n1 <<<"$out")" || fail "plain 503: expected the channel-create-failed summary: $out"
+! grep -q 're-probing' "${TEST_ROOT}/err" || fail "plain 503: no re-probe: $(cat "${TEST_ROOT}/err")"
+[ ! -s "${TEST_ROOT}/stub.log" ] || fail "plain 503: nothing is created or published: $(cat "${TEST_ROOT}/stub.log")"
+echo "ok 17 - a plain 503 on the existence probe refuses (exit 2) without a create"
+
+# 18. a half-created channel (App #1731: the row landed, the notarize did not) →
+#     the ceremony's create runs to resume it, RESUMED, then publish.
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-notarized"
+: > "${TEST_ROOT}/channel-exists"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
+[ "$rc" -eq 0 ] || fail "half-created: expected exit 0, got $rc: $out"
+grep -q "release-ceremony.ts channel create runtime:app-bundle:alpha:dev --reach commons --transport doorway --doorway ${DOORWAY}\$" \
+  "${TEST_ROOT}/stub.log" || fail "half-created: the ceremony's create ran to resume it: $(cat "${TEST_ROOT}/stub.log")"
+grep -qx "APP-RELEASE-CHANNEL-RESUMED channel=runtime:app-bundle:alpha:dev" <<<"$out" \
+  || fail "half-created: expected the RESUMED line: $out"
+! grep -q '^APP-RELEASE-CHANNEL-EXISTS ' <<<"$out" || fail "half-created: a half-created channel is not EXISTS: $out"
+[ "$(line_of 'channel create')" -lt "$(line_of '^[0-9]*:publish ')" ] \
+  || fail "half-created: resume, then publish: $(cat "${TEST_ROOT}/stub.log")"
+echo "ok 18 - a half-created channel is resumed (notarized), not skipped as existing"

@@ -744,7 +744,7 @@ def appChannelCreateRequested() {
 // Parse app-release-stage.sh's APP-* lines into outcomes: release|published
 // (published | current | skipped — no channel for this branch | refused),
 // release|cid, release|detail (the summary line), adopt|<peer> (adopted |
-// pending | cannot-boot), and release|channel (created) / release|bound (slugs=…)
+// pending | cannot-boot), and release|channel (created | resumed) / release|bound (slugs=…)
 // when an [app:channel-create] run did the steward act. Plain loops: CPS-safe.
 def recordReleaseOutcomes(String text, int rc, Map outcomes) {
     def published = 'refused'
@@ -752,6 +752,7 @@ def recordReleaseOutcomes(String text, int rc, Map outcomes) {
         if (line.startsWith('APP-RELEASE-PUBLISHED ')) { published = 'published' }
         if (line.startsWith('APP-RELEASE-CURRENT ')) { published = 'current' }
         if (line.startsWith('APP-RELEASE-CHANNEL-CREATED ')) { outcomes['release|channel'] = 'created' }
+        if (line.startsWith('APP-RELEASE-CHANNEL-RESUMED ')) { outcomes['release|channel'] = 'resumed' }
         if (line.startsWith('APP-RELEASE-CHANNEL-BOUND ')) { outcomes['release|bound'] = line.substring(26) }
         if (line.startsWith('APP-RELEASE-STAGE skipped=')) { published = 'skipped' }
         def fields = line.tokenize(' ')

@@ -24,8 +24,13 @@
 #
 # STEWARD ACT. Only when APP_RELEASE_CHANNEL_CREATE=1 (the Jenkinsfile sets it
 # for a tip commit carrying [app:channel-create]), before publishing, in order:
-#   1. the channel answers 404 behind the doorway →
+#   1. the channel answers 404 behind the doorway, OR its row answers 200 while
+#      its /head names no notarized headActionHash (half-created: a create whose
+#      notarize failed — the ceremony resumes it) →
 #        release-ceremony.ts channel create <channel> --reach commons --transport doorway --doorway <url>
+#      Every existence/head probe re-probes while the doorway answers 503
+#      {"status":"catching-up"}, bounded by APP_RELEASE_CHANNEL_VISIBLE_SECS; any
+#      other status than 200/404 refuses channel-create-failed.
 #   2. every slug in APP_RELEASE_BUNDLES whose record does not name the channel →
 #        release-ceremony.ts channel bind <slug> <channel> --transport doorway --doorway <url>
 #      A release refused `app_slug_not_bound_to_channel` is never retried, so the
@@ -35,6 +40,7 @@
 #
 # Output: everything the composed scripts print, then ONE summary line:
 #   APP-RELEASE-CHANNEL-CREATED channel=<id> | APP-RELEASE-CHANNEL-EXISTS channel=<id>
+#   APP-RELEASE-CHANNEL-RESUMED channel=<id>  (a half-created channel, now notarized)
 #   APP-RELEASE-CHANNEL-BOUND slugs=<a,b> | APP-RELEASE-CHANNEL-ALREADY-BOUND slugs=<a,b>
 #                                             (steward act only, before the publish)
 #   APP-RELEASE-STAGE skipped=branch-<name>-has-no-channel
@@ -132,18 +138,80 @@ fi
 
 # ── the steward act: create the channel, bind the slugs (only when asked) ────
 if [ "${APP_RELEASE_CHANNEL_CREATE:-0}" = "1" ]; then
-    status="$(content_status "${CHANNEL}")"
-    case "${status}" in
-        200) say "APP-RELEASE-CHANNEL-EXISTS channel=${CHANNEL}" ;;
-        404)
-            crc=0
-            cout="$("${TSX}" "${CEREMONY}" channel create "${CHANNEL}" \
-                --reach commons --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || crc=$?
-            say "${cout}"
-            if [ "${crc}" -ne 0 ]; then
-                say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} exit=${crc} $(last_line "${cout}")"
+    body="$(mktemp)"
+    trap 'rm -f "${body}"' EXIT
+    # The doorway's "ask again shortly": 503 whose JSON says status catching-up
+    # (its upstream is still catching up, e.g. right after a doorway restart).
+    catching_up() {
+        grep -Eq '"status"[[:space:]]*:[[:space:]]*"catching-up"' "$1" 2>/dev/null
+    }
+    # GET <doorway>/db/content/<path>, re-probed while the doorway answers
+    # catching-up, bounded by APP_RELEASE_CHANNEL_VISIBLE_SECS. Prints the settled
+    # status; the settled body lands in ${body}. Any other answer is final.
+    settled_status() {
+        local deadline st
+        deadline=$(( $(date +%s) + ${APP_RELEASE_CHANNEL_VISIBLE_SECS:-60} ))
+        while :; do
+            : > "${body}"
+            st="$(content_status "$1" "${body}")"
+            if [ "${st}" != "503" ] || ! catching_up "${body}" || [ "$(date +%s)" -ge "${deadline}" ]; then
+                break
+            fi
+            echo "app-release-stage: GET /db/content/$1 503 catching-up — re-probing" >&2
+            sleep "${APP_RELEASE_READBACK_POLL_SECS:-3}"
+        done
+        printf '%s' "${st}"
+    }
+    # yes when the settled body names a notarized head.
+    names_head() {
+        "${NODE_BIN}" -e '
+            const fs = require("fs");
+            try { const b = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                  if (b && typeof b.headActionHash === "string" && b.headActionHash) process.stdout.write("yes"); }
+            catch {}' "${body}"
+    }
+    # The ceremony's channel create: creates an absent channel, and RESUMES one
+    # whose row exists with no notarized head (a create whose notarize failed).
+    run_create() {
+        local crc=0 cout
+        cout="$("${TSX}" "${CEREMONY}" channel create "${CHANNEL}" \
+            --reach commons --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || crc=$?
+        say "${cout}"
+        if [ "${crc}" -ne 0 ]; then
+            say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} exit=${crc} $(last_line "${cout}")"
+            exit 2
+        fi
+    }
+    # Read-your-write after a create or resume: the channel's head is notarized.
+    await_notarized() {
+        local deadline
+        deadline=$(( $(date +%s) + ${APP_RELEASE_CHANNEL_VISIBLE_SECS:-60} ))
+        until [ "$(settled_status "${CHANNEL}/head")" = "200" ] && [ "$(names_head)" = "yes" ]; do
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+                say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} the create exited 0 but ${DOORWAY} serves no notarized head for the channel"
                 exit 2
             fi
+            sleep "${APP_RELEASE_READBACK_POLL_SECS:-3}"
+        done
+    }
+
+    status="$(settled_status "${CHANNEL}")"
+    case "${status}" in
+        200)
+            hstatus="$(settled_status "${CHANNEL}/head")"
+            if [ "${hstatus}" = "200" ] && [ "$(names_head)" = "yes" ]; then
+                say "APP-RELEASE-CHANNEL-EXISTS channel=${CHANNEL}"
+            elif [ "${hstatus}" = "200" ] || [ "${hstatus}" = "404" ]; then
+                # Half-created: the row exists, the notary holds no head for it.
+                run_create
+                await_notarized
+                say "APP-RELEASE-CHANNEL-RESUMED channel=${CHANNEL}"
+            else
+                say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} head-status=${hstatus} (whether the channel is notarized could not be read through ${DOORWAY})"
+                exit 2
+            fi ;;
+        404)
+            run_create
             deadline=$(( $(date +%s) + ${APP_RELEASE_CHANNEL_VISIBLE_SECS:-60} ))
             until [ "$(content_status "${CHANNEL}")" = "200" ]; do
                 if [ "$(date +%s)" -ge "${deadline}" ]; then
@@ -167,8 +235,6 @@ if [ "${APP_RELEASE_CHANNEL_CREATE:-0}" = "1" ]; then
         say "APP-RELEASE-STAGE refused=channel-bind-failed channel=${CHANNEL} APP_RELEASE_BUNDLES names no slug to bind"
         exit 2
     fi
-    body="$(mktemp)"
-    trap 'rm -f "${body}"' EXIT
     # yes when the slug's record, as the doorway serves it, names the channel.
     slug_bound() {
         : > "${body}"

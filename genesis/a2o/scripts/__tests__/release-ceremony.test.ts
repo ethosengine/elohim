@@ -35,6 +35,7 @@ import {
   doorwayBindPatch,
   doorwayPublishRefusal,
   doorwayTransportRefusal,
+  isCatchingUp,
   mergeReleaseBinding,
   readAdoptedRelease,
   RELEASE_CHANNEL_KEY,
@@ -447,7 +448,11 @@ describe('channel bind --transport doorway — the PATCH body', () => {
 });
 
 /** A fake doorway: records every request, answers from a small content table. */
-function fakeDoorway(rows: Record<string, Record<string, unknown>>, patchStatus = 200) {
+function fakeDoorway(
+  rows: Record<string, Record<string, unknown>>,
+  patchStatus = 200,
+  override?: (method: string, url: string) => { status: number; body: unknown } | undefined
+) {
   const requests: { method: string; url: string; key: string; body: string }[] = [];
   const server = createServer((req, res) => {
     let body = '';
@@ -464,6 +469,8 @@ function fakeDoorway(rows: Record<string, Record<string, unknown>>, patchStatus 
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(value));
       };
+      const scripted = override?.(req.method ?? '', url);
+      if (scripted) return reply(scripted.status, scripted.body);
       if (req.method === 'POST' && url === '/db/content/bulk') {
         for (const row of JSON.parse(body) as Record<string, unknown>[]) rows[String(row.id)] = row;
         return reply(200, { created: 1 });
@@ -488,12 +495,15 @@ function fakeDoorway(rows: Record<string, Record<string, unknown>>, patchStatus 
 const CEREMONY = fileURLToPath(new URL('../release-ceremony.ts', import.meta.url));
 const TSX = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
 
-function ceremony(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+function ceremony(
+  args: string[],
+  env: Record<string, string> = {}
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise(resolve => {
     execFile(
       TSX,
       [CEREMONY, ...args],
-      { env: { ...process.env, STORAGE_API_KEY_ADMIN: 'k-admin' } },
+      { env: { ...process.env, STORAGE_API_KEY_ADMIN: 'k-admin', ...env } },
       (err, stdout, stderr) => {
         resolve({ code: err ? Number((err as { code?: number }).code ?? 1) : 0, stdout, stderr });
       }
@@ -632,5 +642,209 @@ describe('channel create / bind over the doorway — the writes, end to end', ()
     assert.equal(refused.code, 2);
     assert.equal(refused.stderr.trim().split('\n').length, 1, refused.stderr);
     assert.match(refused.stderr, /promote has no doorway transport/);
+  });
+});
+
+// App #1731 (2026-09-27): right after edge #1488 restarted both doorways, the
+// channel create's notarize PATCH answered 503 {"status":"catching-up",
+// "retryAfter":2} — the conductor upstream was still catching up — and the
+// ceremony treated the doorway's "ask again in 2 s" as final. A catching-up
+// 503 is transient (bounded by RELEASE_CEREMONY_RETRY_SECS); every other
+// answer stays final.
+describe('--transport doorway — a catching-up 503 is retried, anything else is final', () => {
+  const CHANNEL = ALPHA_DEV_CHANNEL;
+  const CATCHING = 'catching-up';
+  const CATCHING_UP = {
+    status: 503,
+    body: { status: CATCHING, retryAfter: 1, cause: 'upstream', circuit: 'closed' },
+  };
+  const create = async (doorway: string, env: Record<string, string> = {}) =>
+    ceremony(['channel', 'create', CHANNEL, TRANSPORT_FLAG, 'doorway', '--doorway', doorway], env);
+
+  it('names only the catching-up 503 transient', () => {
+    assert.equal(isCatchingUp(503, { status: CATCHING, retryAfter: 2 }), true);
+    assert.equal(isCatchingUp(503, { error: 'Conductor bridge unavailable' }), false);
+    assert.equal(isCatchingUp(503, CATCHING), false);
+    assert.equal(isCatchingUp(503, null), false);
+    assert.equal(isCatchingUp(502, { status: CATCHING }), false);
+    assert.equal(isCatchingUp(200, { status: CATCHING }), false);
+  });
+
+  it('a notarize PATCH answered catching-up once is retried and the create succeeds', async () => {
+    let refusals = 1;
+    const { server, requests } = fakeDoorway({}, 200, (method, url) => {
+      if (method === 'PATCH' && url === `/db/content/${CHANNEL}` && refusals > 0) {
+        refusals -= 1;
+        return CATCHING_UP;
+      }
+      return undefined;
+    });
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const created = await create(doorway);
+      assert.equal(created.code, 0, created.stderr);
+      assert.deepEqual(
+        requests.filter(r => r.method !== 'GET').map(r => `${r.method} ${r.url}`),
+        ['POST /db/content/bulk', `PATCH /db/content/${CHANNEL}`, `PATCH /db/content/${CHANNEL}`]
+      );
+      const retryLines = created.stderr.split('\n').filter(l => l.includes(CATCHING));
+      assert.equal(retryLines.length, 1, created.stderr);
+      assert.match(
+        retryLines[0],
+        new RegExp(
+          String.raw`^release-ceremony: PATCH /db/content/${encodeURIComponent(CHANNEL)} 503 catching-up — retry in 1s \(\d+\.\ds/120s\)$`
+        )
+      );
+      assert.equal(JSON.parse(created.stdout).actionHash, `uhCkkHead-${CHANNEL}`);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a doorway that stays catching-up past the budget fails, naming the body and the elapsed time', async () => {
+    const { server, requests } = fakeDoorway({}, 200, (method, url) =>
+      method === 'PATCH' && url === `/db/content/${CHANNEL}` ? CATCHING_UP : undefined
+    );
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const created = await create(doorway, { RELEASE_CEREMONY_RETRY_SECS: '3' });
+      assert.notEqual(created.code, 0);
+      const last = created.stderr.trim().split('\n').pop() ?? '';
+      assert.match(
+        last,
+        /^release-ceremony: channel create: PATCH .* returned 503: \{"status":"catching-up".*still catching-up after (\d+\.\d)s \(budget 3s, \d+ retries\)$/
+      );
+      const elapsed = Number(/after (\d+\.\d)s/.exec(last)?.[1]);
+      assert.ok(elapsed >= 2.9 && elapsed < 10, `elapsed ${elapsed}s within a 3 s budget`);
+      const patches = requests.filter(r => r.method === 'PATCH').length;
+      assert.ok(patches >= 3 && patches <= 5, `${patches} PATCH attempts inside 3 s`);
+      assert.ok(
+        !requests.some(r => r.url.endsWith('/head')),
+        'no head is read after a refused notarize'
+      );
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a 503 without the catching-up body is final — one attempt, no retry line', async () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      [LANDING]: { id: LANDING, reach: 'commons', metadata: {} },
+    };
+    const { server, requests } = fakeDoorway(rows, 503);
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const bound = await ceremony([
+        'channel',
+        'bind',
+        LANDING,
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.notEqual(bound.code, 0);
+      assert.equal(requests.filter(r => r.method === 'PATCH').length, 1);
+      assert.ok(!bound.stderr.includes('catching-up — retry'), bound.stderr);
+      assert.match(
+        bound.stderr.trim().split('\n').pop() ?? '',
+        /^release-ceremony: channel bind: PATCH .* returned 503: \{"error":"Conductor bridge unavailable"\}$/
+      );
+    } finally {
+      server.close();
+    }
+  });
+});
+
+// App #1731 left the alpha channel half-created: its bulk POST landed, its
+// notarize PATCH was refused catching-up. The projection row answers 200 while
+// its `/head` answers 404 (storage: "no notarized head declared"). A re-run
+// must RESUME that create — re-send the notarize PATCH — not refuse "already
+// exists" forever, and a notarized channel must still refuse.
+describe('channel create --transport doorway — resumes a half-created channel', () => {
+  const CHANNEL = ALPHA_DEV_CHANNEL;
+  const halfCreated = () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      [CHANNEL]: { id: CHANNEL, reach: 'commons', metadata: {} },
+    };
+    let notarized = false;
+    return fakeDoorway(rows, 200, (method, url) => {
+      if (method === 'PATCH' && url === `/db/content/${CHANNEL}`) notarized = true;
+      if (method === 'GET' && url === `/db/content/${CHANNEL}/head` && !notarized) {
+        return { status: 404, body: { error: 'no notarized head declared for this content' } };
+      }
+      return undefined;
+    });
+  };
+
+  it('an existing row with no notarized head skips the bulk POST, sends the notarize PATCH, exits 0', async () => {
+    const { server, requests } = halfCreated();
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const resumed = await ceremony([
+        'channel',
+        'create',
+        CHANNEL,
+        '--reach',
+        'commons',
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.equal(resumed.code, 0, resumed.stderr);
+      assert.deepEqual(
+        requests.filter(r => r.method !== 'GET').map(r => `${r.method} ${r.url}`),
+        [`PATCH /db/content/${CHANNEL}`]
+      );
+      assert.deepEqual(JSON.parse(requests.find(r => r.method === 'PATCH')?.body ?? '{}'), {
+        reach: 'commons',
+      });
+      assert.match(
+        resumed.stderr,
+        new RegExp(
+          `^release-ceremony: channel ${CHANNEL} exists un-notarized — resuming notarize$`,
+          'm'
+        )
+      );
+      const out = JSON.parse(resumed.stdout);
+      assert.equal(out.resumed, true);
+      assert.equal(out.actionHash, `uhCkkHead-${CHANNEL}`);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a notarized channel still refuses "already exists" and writes nothing', async () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      [CHANNEL]: { id: CHANNEL, reach: 'commons', metadata: {} },
+    };
+    const { server, requests } = fakeDoorway(rows);
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const again = await ceremony([
+        'channel',
+        'create',
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.notEqual(again.code, 0);
+      assert.ok(
+        requests.every(r => r.method === 'GET'),
+        'nothing is written'
+      );
+      assert.match(again.stderr.trim().split('\n').pop() ?? '', /already exists behind/);
+    } finally {
+      server.close();
+    }
   });
 });

@@ -1005,6 +1005,80 @@ async function doorwayRequest(
   return { status: response.status, body };
 }
 
+/** The doorway's "ask again shortly" answer: a 503 whose JSON body says
+ * `status: "catching-up"` (the upstream conductor/storage is still catching up,
+ * e.g. just after a doorway restart). It is the only transient answer — every
+ * other status, and a 503 without that body, is final. */
+export function isCatchingUp(status: number, body: unknown): boolean {
+  return (
+    status === 503 &&
+    body !== null &&
+    typeof body === 'object' &&
+    (body as { status?: unknown }).status === 'catching-up'
+  );
+}
+
+const RETRY_BUDGET_DEFAULT_SECS = 120;
+const RETRY_WAIT_CAP_SECS = 30;
+
+function retryBudgetSecs(): number {
+  const raw = process.env.RELEASE_CEREMONY_RETRY_SECS;
+  const parsed = raw === undefined || raw === '' ? Number.NaN : Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : RETRY_BUDGET_DEFAULT_SECS;
+}
+
+/**
+ * `doorwayRequest`, retrying the doorway's catching-up 503 (see `isCatchingUp`):
+ * sleep `max(retryAfter, 1)` s (capped at 30 s, and at what is left of the
+ * budget) and send the same request again, for at most
+ * `RELEASE_CEREMONY_RETRY_SECS` (default 120) per request. One stderr line per
+ * retry. When the budget runs out it throws, naming the last body and the
+ * elapsed time; any other answer is returned to the caller unchanged.
+ */
+export async function doorwayRequestWithRetry(
+  label: string,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  budgetSecs: number = retryBudgetSecs()
+): Promise<{ status: number; body: any }> {
+  const method = (init.method ?? 'GET').toUpperCase();
+  const path = (() => {
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return url;
+    }
+  })();
+  const started = Date.now();
+  let retries = 0;
+  for (;;) {
+    const result = await doorwayRequest(url, init, timeoutMs);
+    if (!isCatchingUp(result.status, result.body)) return result;
+    const elapsedSecs = (Date.now() - started) / 1000;
+    const remaining = budgetSecs - elapsedSecs;
+    const asked = Number(result.body?.retryAfter);
+    const wait = Math.min(
+      Math.max(Number.isFinite(asked) ? asked : 1, 1),
+      RETRY_WAIT_CAP_SECS,
+      remaining
+    );
+    if (wait <= 0) {
+      throw new Error(
+        `${label}: ${method} ${url} returned ${result.status}: ${JSON.stringify(result.body)} — ` +
+          `still catching-up after ${elapsedSecs.toFixed(1)}s ` +
+          `(budget ${budgetSecs}s, ${retries} ${retries === 1 ? 'retry' : 'retries'})`
+      );
+    }
+    retries += 1;
+    console.error(
+      `release-ceremony: ${method} ${path} 503 catching-up — retry in ${Math.round(wait * 10) / 10}s ` +
+        `(${elapsedSecs.toFixed(1)}s/${budgetSecs}s)`
+    );
+    await new Promise(resolve => setTimeout(resolve, wait * 1000));
+  }
+}
+
 function doorwayBase(flags: Flags): string {
   const doorway = (flags.doorway ?? process.env.RELEASE_DOORWAY_URL ?? '').replace(/\/$/, '');
   if (!doorway) throw new Error('--transport doorway needs --doorway <url>');
@@ -1060,33 +1134,63 @@ export function doorwayBindPatch(
 async function cmdChannelCreateViaDoorway(channelId: string, flags: Flags, timeoutMs: number) {
   warnUnlessChannelIdConvention(channelId);
   const doorway = doorwayBase(flags);
-  const reach = flags.reach ?? 'commons';
+  let reach = flags.reach ?? 'commons';
   assertReach(reach);
   const discipline = parseJsonArg(flags.discipline);
   const base = `${doorway}/db/content/${encodeURIComponent(channelId)}`;
 
-  const existing = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
-  if (existing.status < 300) {
-    throw new Error(`channel create: '${channelId}' already exists behind ${doorway}`);
-  }
-  if (existing.status !== 404) {
-    throw new Error(`channel create: GET ${base} returned ${existing.status}`);
-  }
-  // The storage create is a projection row; the reach-carrying PATCH below is
-  // what notarizes it (an unanchored row is published through the peer's
-  // conductor — create_content), the same record the admin-WS transport writes.
-  const root = channelRootRecord(channelId, reach, discipline, new Date().toISOString());
-  const created = await doorwayRequest(
-    `${doorway}/db/content/bulk`,
-    { method: 'POST', headers: { 'x-schema-version': '1' }, body: JSON.stringify([root]) },
+  const existing = await doorwayRequestWithRetry(
+    VERB_CHANNEL_CREATE,
+    base,
+    { method: 'GET' },
     timeoutMs
   );
-  if (created.status >= 300) {
-    throw new Error(
-      `channel create: POST /db/content/bulk returned ${created.status}: ${JSON.stringify(created.body)}`
+  let resumed = false;
+  if (existing.status < 300) {
+    // A create whose notarize PATCH failed (App #1731: the doorway answered
+    // catching-up) leaves the projection row with no notarized head. That
+    // channel is half-created, not taken: resume it by re-sending the notarize
+    // PATCH, never by refusing "already exists" forever.
+    const standing = await doorwayRequestWithRetry(
+      VERB_CHANNEL_CREATE,
+      `${base}/head`,
+      { method: 'GET' },
+      timeoutMs
     );
+    if (standing.status < 300 && standing.body?.headActionHash) {
+      throw new Error(`channel create: '${channelId}' already exists behind ${doorway}`);
+    }
+    if (standing.status >= 300 && standing.status !== 404) {
+      throw new Error(
+        `channel create: '${channelId}' exists but GET ${base}/head returned ${standing.status} — ` +
+          `cannot tell whether it is notarized`
+      );
+    }
+    if (typeof existing.body?.reach === 'string') reach = existing.body.reach;
+    assertReach(reach);
+    console.error(`release-ceremony: channel ${channelId} exists un-notarized — resuming notarize`);
+    resumed = true;
+  } else if (existing.status === 404) {
+    // The storage create is a projection row; the reach-carrying PATCH below is
+    // what notarizes it (an unanchored row is published through the peer's
+    // conductor — create_content), the same record the admin-WS transport writes.
+    const root = channelRootRecord(channelId, reach, discipline, new Date().toISOString());
+    const created = await doorwayRequestWithRetry(
+      VERB_CHANNEL_CREATE,
+      `${doorway}/db/content/bulk`,
+      { method: 'POST', headers: { 'x-schema-version': '1' }, body: JSON.stringify([root]) },
+      timeoutMs
+    );
+    if (created.status >= 300) {
+      throw new Error(
+        `channel create: POST /db/content/bulk returned ${created.status}: ${JSON.stringify(created.body)}`
+      );
+    }
+  } else {
+    throw new Error(`channel create: GET ${base} returned ${existing.status}`);
   }
-  const notarized = await doorwayRequest(
+  const notarized = await doorwayRequestWithRetry(
+    VERB_CHANNEL_CREATE,
     base,
     { method: 'PATCH', body: JSON.stringify({ reach }) },
     timeoutMs
@@ -1096,7 +1200,12 @@ async function cmdChannelCreateViaDoorway(channelId: string, flags: Flags, timeo
       `channel create: PATCH ${base} (notarize) returned ${notarized.status}: ${JSON.stringify(notarized.body)}`
     );
   }
-  const head = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const head = await doorwayRequestWithRetry(
+    VERB_CHANNEL_CREATE,
+    `${base}/head`,
+    { method: 'GET' },
+    timeoutMs
+  );
   console.log(
     JSON.stringify(
       {
@@ -1107,6 +1216,7 @@ async function cmdChannelCreateViaDoorway(channelId: string, flags: Flags, timeo
         actionHash: head.body?.headActionHash ?? null,
         reach,
         discipline,
+        ...(resumed ? { resumed: true } : {}),
       },
       null,
       2
@@ -1124,7 +1234,7 @@ async function cmdChannelBindViaDoorway(
   const verb = channelId === null ? VERB_CHANNEL_UNBIND : VERB_CHANNEL_BIND;
   const doorway = doorwayBase(flags);
   const base = `${doorway}/db/content/${encodeURIComponent(slug)}`;
-  const existing = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
+  const existing = await doorwayRequestWithRetry(verb, base, { method: 'GET' }, timeoutMs);
   if (existing.status === 404) throw new Error(`${verb}: no content '${slug}' behind ${doorway}`);
   if (existing.status >= 300) throw new Error(`${verb}: GET ${base} returned ${existing.status}`);
   const patch = doorwayBindPatch(existing.body, channelId);
@@ -1134,7 +1244,8 @@ async function cmdChannelBindViaDoorway(
     );
     process.exit(0);
   }
-  const patched = await doorwayRequest(
+  const patched = await doorwayRequestWithRetry(
+    verb,
     base,
     { method: 'PATCH', body: JSON.stringify(patch) },
     timeoutMs
@@ -1147,11 +1258,17 @@ async function cmdChannelBindViaDoorway(
   // The bound version must BECOME the slug's head (a heal preserves the head
   // it already obeys). A doorway holds no earned authority, so it declares
   // staging — the same tier publish --transport doorway declares.
-  const authored = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const authored = await doorwayRequestWithRetry(
+    verb,
+    `${base}/head`,
+    { method: 'GET' },
+    timeoutMs
+  );
   const headActionHash: string | undefined = authored.body?.headActionHash;
   if (!headActionHash)
     throw new Error(`${verb}: GET ${base}/head named no headActionHash after the PATCH`);
-  const declare = await doorwayRequest(
+  const declare = await doorwayRequestWithRetry(
+    verb,
     `${base}/canonical-head`,
     { method: 'POST', body: JSON.stringify({ headActionHash }) },
     timeoutMs
@@ -1179,7 +1296,7 @@ async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutM
   if (!channelId) throw new Error(`publish: manifest at ${manifestPath} has no channelId`);
   const base = `${doorway}/db/content/${encodeURIComponent(channelId)}`;
 
-  const channel = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
+  const channel = await doorwayRequestWithRetry('publish', base, { method: 'GET' }, timeoutMs);
   if (channel.status === 404) {
     throw new Error(
       `publish: channel '${channelId}' does not exist behind ${doorway} — a steward runs ` +
@@ -1191,7 +1308,12 @@ async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutM
   }
   const reach = typeof channel.body?.reach === 'string' ? channel.body.reach : 'commons';
 
-  const head = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const head = await doorwayRequestWithRetry(
+    'publish',
+    `${base}/head`,
+    { method: 'GET' },
+    timeoutMs
+  );
   const refusal = doorwayPublishRefusal(head.status < 300 ? head.body : null, manifest);
   if (refusal) throw new Error(`publish refused — ${refusal}`);
 
@@ -1199,7 +1321,8 @@ async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutM
   // write on the storage peer, and a release must be a NOTARIZED version. A
   // reach-carrying PATCH is re-authored through the peer's conductor
   // (`patch_needs_conductor`), which is what mints the release version.
-  const patch = await doorwayRequest(
+  const patch = await doorwayRequestWithRetry(
+    'publish',
     base,
     {
       method: 'PATCH',
@@ -1215,12 +1338,18 @@ async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutM
       `publish: PATCH ${base} returned ${patch.status}: ${JSON.stringify(patch.body)}`
     );
   }
-  const authored = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const authored = await doorwayRequestWithRetry(
+    'publish',
+    `${base}/head`,
+    { method: 'GET' },
+    timeoutMs
+  );
   const releaseCid: string | undefined = authored.body?.headActionHash;
   if (!releaseCid) {
     throw new Error(`publish: GET ${base}/head named no headActionHash after the PATCH`);
   }
-  const declare = await doorwayRequest(
+  const declare = await doorwayRequestWithRetry(
+    'publish',
     `${base}/canonical-head`,
     { method: 'POST', body: JSON.stringify({ headActionHash: releaseCid }) },
     timeoutMs
