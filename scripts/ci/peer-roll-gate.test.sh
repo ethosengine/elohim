@@ -11,10 +11,13 @@
 # the gate decides on the convergence leg alone.
 #
 #   a. converged:true on a newer sweep      → exit 0, converged (unchanged)
-#   b. divergentAnchor 41,41,41, PRE=41     → exit 0, settled-at-baseline
+#   b. divergentAnchor 41 → 41, PRE=41      → ONE measured fresh sweep releases,
+#                                              settled-at-baseline (exit 0)
 #   c. divergentAnchor 41,41,41, PRE=30     → keeps waiting, exit 3 at deadline
 #   d. no PRE_DIVERGENT line                → today's behaviour, exit 3
 #   e. UNMEASURED sweeps (divergentAnchor 0, peersAsked 0), PRE=41 → HOLD, exit 3
+#   f. tolerance (ROLL_BASELINE_TOLERANCE default 2): now = pre+2 releases,
+#      now = pre+3 holds
 set -euo pipefail
 
 REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
@@ -109,16 +112,17 @@ grep -q 'RELEASED after .* converge=converged(fresh-sweep 1->2)' "${LOG}" \
   || { cat "${LOG}"; fail '(a) converged reading must release as converged'; }
 if grep -q 'settled-at-baseline(' "${LOG}"; then fail '(a) converged must win over settled-at-baseline'; fi
 
-# ── b. 41 → 41 → 41 with PRE_DIVERGENT=41 → exit 0 `settled-at-baseline` ────
-{ pr false 0 41 1; pr false 0 41 2; pr false 0 41 3; } > "${TEST_ROOT}/seq/b"
+# ── b. 41 → 41 with PRE_DIVERGENT=41 → ONE fresh measured sweep releases ────
+# (edge #1487: the fleet sweeps every ~5 min, so a second sweep never fits a
+# ~450s fair share — one measured sweep is the evidence the window can hold.)
+{ pr false 0 41 1; pr false 0 41 2; } > "${TEST_ROOT}/seq/b"
 printf 'BUDGET_LEFT=60\nPRE_DIVERGENT_james=41\nPRE_HEALED_james=12\nPRE_DIVERGENT_matthew=9\nPRE_HEALED_matthew=3\n' \
   > "${TEST_ROOT}/state-b"
 run_gate b james 15
 [ "${RC}" -eq 0 ] || { cat "${LOG}"; fail "(b) peer back at its pre-roll baseline should exit 0, got ${RC}"; }
-grep -q 'pre-roll baseline — divergentAnchor=41 healedTotal=12' "${LOG}" || fail '(b) pre-roll baseline not announced'
-grep -q 'at-baseline-confirming(divergentAnchor pre=41 now=41, fresh sweeps 1/2)' "${LOG}" \
-  || { cat "${LOG}"; fail '(b) one fresh sweep must not release — two are required'; }
-grep -q 'RELEASED after .* converge=settled-at-baseline(divergentAnchor pre=41 now=41, sweeps +2)' "${LOG}" \
+grep -q 'pre-roll baseline — divergentAnchor=41 healedTotal=12 .*settled-at-baseline is ON (tolerance 2)' "${LOG}" \
+  || fail '(b) pre-roll baseline not announced'
+grep -q 'RELEASED after .* converge=settled-at-baseline(divergentAnchor pre=41 now=41 tol=2, sweeps +1)' "${LOG}" \
   || { cat "${LOG}"; fail '(b) settled-at-baseline release line missing or drifted'; }
 if grep -q 'converged' "${LOG}" "${TEST_ROOT}/state-b.summary"; then
   cat "${LOG}"; fail '(b) settled-at-baseline must never be called converged'
@@ -137,7 +141,7 @@ run_gate c susan 5
 [ "${RC}" -eq 3 ] || { cat "${LOG}"; fail "(c) divergence above the pre-roll baseline must hold to deadline (exit 3), got ${RC}"; }
 grep -q 'DEADLINE 5s reached' "${LOG}" || fail '(c) deadline not logged'
 grep -q 'no-movement(healed 0->0, divergentAnchor 41->41' "${LOG}" || fail '(c) holding reading not recorded'
-if grep -q 'settled-at-baseline(\|at-baseline-confirming(' "${LOG}"; then fail '(c) settle branch fired above the baseline'; fi
+if grep -q 'settled-at-baseline(' "${LOG}"; then fail '(c) settle branch fired above the baseline'; fi
 
 # ── d. no PRE_DIVERGENT line → today's behaviour, no new branch ─────────────
 { pr false 0 41 1; pr false 0 41 2; pr false 0 41 3; } > "${TEST_ROOT}/seq/d"
@@ -146,7 +150,7 @@ run_gate d gertrude 5
 [ "${RC}" -eq 3 ] || { cat "${LOG}"; fail "(d) without a pre-roll reading the gate must behave as before (exit 3), got ${RC}"; }
 grep -q 'pre-roll baseline — none recorded; settled-at-baseline is OFF' "${LOG}" || fail '(d) OFF banner missing'
 grep -q 'no-movement(healed 0->0, divergentAnchor 41->41' "${LOG}" || fail '(d) no-movement reading not recorded'
-if grep -q 'settled-at-baseline(\|at-baseline-confirming(' "${LOG}"; then fail '(d) settle branch fired with no pre-roll reading'; fi
+if grep -q 'settled-at-baseline(' "${LOG}"; then fail '(d) settle branch fired with no pre-roll reading'; fi
 
 # ── e. UNMEASURED sweeps (db unavailable) never count as at-baseline ───────
 # ReaDiscovery::empty() publishes sweeps+1 with divergentAnchor=0 and
@@ -156,6 +160,23 @@ printf 'PRE_DIVERGENT_adam=41\nPRE_HEALED_adam=5\n' > "${TEST_ROOT}/state-e"
 run_gate e adam 5
 [ "${RC}" -eq 3 ] || { cat "${LOG}"; fail "(e) unmeasured sweeps must HOLD to deadline (exit 3), got ${RC}"; }
 grep -q 'unmeasured-sweep(peersAsked=0, divergentAnchor 41->0' "${LOG}" || { cat "${LOG}"; fail '(e) unmeasured sweep not named'; }
-if grep -q 'settled-at-baseline(\|at-baseline-confirming(' "${LOG}"; then fail '(e) an unmeasured sweep counted toward settled-at-baseline'; fi
+if grep -q 'settled-at-baseline(' "${LOG}"; then fail '(e) an unmeasured sweep counted toward settled-at-baseline'; fi
 
-echo 'peer-roll-gate: converged kept, settled-at-baseline releases at the pre-roll baseline, holds above it, absent reading unchanged, unmeasured sweeps hold'
+# ── f. tolerance: now = pre+2 releases, now = pre+3 holds ───────────────────
+# Default ROLL_BASELINE_TOLERANCE=2 = the quiesce gate's actionable tolerance
+# (edge #1487 held james at now=61 against pre=60).
+{ pr false 0 41 1; pr false 0 43 2; } > "${TEST_ROOT}/seq/f-in"
+printf 'PRE_DIVERGENT_james=41\n' > "${TEST_ROOT}/state-f-in"
+run_gate f-in james 10
+[ "${RC}" -eq 0 ] || { cat "${LOG}"; fail "(f) now = pre+2 must release inside the tolerance, got ${RC}"; }
+grep -q 'RELEASED after .* converge=settled-at-baseline(divergentAnchor pre=41 now=43 tol=2, sweeps +1)' "${LOG}" \
+  || { cat "${LOG}"; fail '(f) pre+2 release line missing or drifted'; }
+
+{ pr false 0 41 1; pr false 0 44 2; } > "${TEST_ROOT}/seq/f-out"
+printf 'PRE_DIVERGENT_james=41\n' > "${TEST_ROOT}/state-f-out"
+run_gate f-out james 5
+[ "${RC}" -eq 3 ] || { cat "${LOG}"; fail "(f) now = pre+3 must hold to deadline (exit 3), got ${RC}"; }
+grep -q 'no-movement(healed 0->0, divergentAnchor 41->44' "${LOG}" || { cat "${LOG}"; fail '(f) pre+3 holding reading not recorded'; }
+if grep -q 'settled-at-baseline(' "${LOG}"; then fail '(f) pre+3 released outside the tolerance'; fi
+
+echo 'peer-roll-gate: converged kept, settled-at-baseline releases at the pre-roll baseline, holds above it, absent reading unchanged, unmeasured sweeps hold, tolerance pre+2 in / pre+3 out'

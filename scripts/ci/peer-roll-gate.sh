@@ -41,13 +41,20 @@
 #    55->55)` burned 450-599s on four of six peers. That divergence is not the
 #    roll's debt. When scripts/ci/pre-roll-reading.sh recorded
 #    `PRE_DIVERGENT_<peer>=<n>` in <state-file> before this deploy touched the
-#    peer, the peer is also released once, on >=2 DISTINCT sweeps strictly
-#    newer than the post-restart baseline, divergentAnchor <= PRE_DIVERGENT and
-#    healedTotal >= the baseline's. It is printed as
-#    `settled-at-baseline(divergentAnchor pre=<p> now=<n>, sweeps +<k>)` and is
-#    never called converged: the standing divergence is still measured by the
-#    validate-only Dataplane Validation run. No PRE_DIVERGENT line (reading
-#    absent or unreachable) = this branch does not exist for the peer.
+#    peer, the peer is also released on ONE MEASURED sweep (peersAsked > 0)
+#    strictly newer than the post-restart baseline with
+#      divergentAnchor <= PRE_DIVERGENT + ROLL_BASELINE_TOLERANCE
+#    and healedTotal >= the baseline's. It is printed as
+#    `settled-at-baseline(divergentAnchor pre=<p> now=<n> tol=<t>, sweeps +<k>)`
+#    and is never called converged: the standing divergence is still measured
+#    by the validate-only Dataplane Validation run. No PRE_DIVERGENT line
+#    (reading absent or unreachable) = this branch does not exist for the peer.
+#    ONE sweep, not two: the fleet's sweep cadence is ~5 min, so a second
+#    sweep never fits a ~450s fair share (edge #1487: susan pre=56 now=55 sat
+#    at 1/2 from 181s to its deadline). The tolerance (default 2) is the
+#    quiesce gate's own actionable-divergence tolerance (divergent_actionable
+#    <= 2): edge #1487 held james at now=61 against pre=60. An UNMEASURED sweep
+#    (db unavailable: divergentAnchor 0, peersAsked 0) never counts.
 #
 # 2. CFS THROTTLE, from Prometheus, on this peer's CONDUCTOR container only:
 #      rate(container_cpu_cfs_throttled_periods_total{...}[5m])
@@ -100,6 +107,9 @@
 #   ROLL_THROTTLE_MAX           throttle ratio ceiling (default 0.9)
 #   ROLL_THROTTLE_WINDOW        rate window (default 5m)
 #   ROLL_CURL_TIMEOUT_SECS      per-request timeout (default 20)
+#   ROLL_BASELINE_TOLERANCE     settled-at-baseline slack over PRE_DIVERGENT
+#                               (default 2 = the quiesce gate's actionable
+#                               divergence tolerance)
 #
 # Exit codes:
 #   0 — peer settled, roll released to the next peer
@@ -143,6 +153,7 @@ POLL_SECS="${ROLL_POLL_SECS:-30}"
 THROTTLE_MAX="${ROLL_THROTTLE_MAX:-0.9}"
 WINDOW="${ROLL_THROTTLE_WINDOW:-5m}"
 CURL_TIMEOUT="${ROLL_CURL_TIMEOUT_SECS:-20}"
+BASELINE_TOL="${ROLL_BASELINE_TOLERANCE:-2}"
 
 require_positive_integer() {
   local name="$1" value="$2"
@@ -165,6 +176,7 @@ require_positive_integer ROLL_PEER_MIN_DEADLINE_SECS "$MIN_DEADLINE"
 require_nonnegative_integer ROLL_SEQUENCE_DEADLINE_SECS "$SEQ_BUDGET"
 require_positive_integer ROLL_POLL_SECS "$POLL_SECS"
 require_positive_integer ROLL_CURL_TIMEOUT_SECS "$CURL_TIMEOUT"
+require_nonnegative_integer ROLL_BASELINE_TOLERANCE "$BASELINE_TOL"
 require_positive_integer gates-remaining "$GATES_REMAINING"
 
 SUMMARY_FILE="${STATE_FILE}.summary"
@@ -218,7 +230,7 @@ DEADLINE=$(awk -v budget="$BUDGET_LEFT" -v gates="$gates_left" \
 
 log "gate opening — deadline=${DEADLINE}s (ceiling=${PEER_DEADLINE}s, budget-left=${BUDGET_LEFT}s over ${gates_left} remaining gate(s), floor=${MIN_DEADLINE}s) poll=${POLL_SECS}s throttle-max=${THROTTLE_MAX} window=${WINDOW}"
 if [ -n "$PRE_DIVERGENT" ]; then
-  log "pre-roll baseline — divergentAnchor=${PRE_DIVERGENT} healedTotal=${PRE_HEALED:-?} (before this deploy touched the peer); settled-at-baseline is ON"
+  log "pre-roll baseline — divergentAnchor=${PRE_DIVERGENT} healedTotal=${PRE_HEALED:-?} (before this deploy touched the peer); settled-at-baseline is ON (tolerance ${BASELINE_TOL})"
 else
   log "pre-roll baseline — none recorded; settled-at-baseline is OFF (converged/healing legs only)"
 fi
@@ -257,10 +269,6 @@ THROTTLE_QUERY="rate(container_cpu_cfs_throttled_periods_total{namespace=\"${NAM
 base_healed=""
 base_divergent=""
 base_sweeps=""
-# settled-at-baseline needs >=2 DISTINCT fresh sweeps in a row at/below the
-# pre-roll divergence; a poll that re-reads the same sweep does not count.
-settle_seen=0
-settle_last_sweep=""
 
 last_summary="no-observation"
 outcome="DEADLINE"
@@ -384,7 +392,6 @@ PYEOF
       # Counters went backwards: the peer's process restarted under us. Two
       # process lifetimes are not comparable — re-anchor, never subtract.
       base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
-      settle_seen=0; settle_last_sweep=""
       converge_why="counter-reset-reanchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
     elif [ "$sweeps" -le "$base_sweeps" ]; then
       converge_why="awaiting-fresh-sweep(baseline=${base_sweeps},current=${sweeps})"
@@ -395,22 +402,13 @@ PYEOF
       converge_ok=1
       converge_why="healing(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
     elif [ -n "$PRE_DIVERGENT" ] && [ "$measured_sweep" != "1" ]; then
-      # Absence of evidence is not settlement: an unmeasured sweep breaks the
-      # settle streak exactly like a fresh sweep above the baseline.
-      settle_seen=0; settle_last_sweep=""
+      # Absence of evidence is not settlement: an unmeasured sweep observed
+      # nothing, so its divergentAnchor=0 may never release the peer.
       converge_why="unmeasured-sweep(peersAsked=0, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps}) — not counted toward settled-at-baseline"
-    elif [ -n "$PRE_DIVERGENT" ] && [ "$measured_sweep" = "1" ] && [ "$divergent" -le "$PRE_DIVERGENT" ] && [ "$healed" -ge "$base_healed" ]; then
-      if [ -z "$settle_last_sweep" ] || [ "$sweeps" -gt "$settle_last_sweep" ]; then
-        settle_seen=$((settle_seen + 1)); settle_last_sweep="$sweeps"
-      fi
-      if [ "$settle_seen" -ge 2 ]; then
-        converge_ok=1
-        converge_why="settled-at-baseline(divergentAnchor pre=${PRE_DIVERGENT} now=${divergent}, sweeps +$((sweeps - base_sweeps)))"
-      else
-        converge_why="at-baseline-confirming(divergentAnchor pre=${PRE_DIVERGENT} now=${divergent}, fresh sweeps ${settle_seen}/2)"
-      fi
+    elif [ -n "$PRE_DIVERGENT" ] && [ "$measured_sweep" = "1" ] && [ "$divergent" -le $((PRE_DIVERGENT + BASELINE_TOL)) ] && [ "$healed" -ge "$base_healed" ]; then
+      converge_ok=1
+      converge_why="settled-at-baseline(divergentAnchor pre=${PRE_DIVERGENT} now=${divergent} tol=${BASELINE_TOL}, sweeps +$((sweeps - base_sweeps)))"
     else
-      settle_seen=0; settle_last_sweep=""
       converge_why="no-movement(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
     fi
   fi
