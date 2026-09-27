@@ -130,6 +130,42 @@ struct UpdateContentWithMetadataInput {
     pub metadata_json: Option<String>,
 }
 
+/// Mirrors `lamad_types::UpdateContentInput` WITH the body / format / tags
+/// patch (content-body-travels). A separate mirror so the narrower shapes above
+/// stay live proofs that the omitted keys still decode via `#[serde(default)]`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UpdateContentBodyInput {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+}
+
+/// Mirrors the body-bearing subset of `lamad_types::Content`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WireContentBody {
+    pub id: String,
+    pub content_type: String,
+    pub title: String,
+    pub content: String,
+    pub content_format: String,
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub content_size_bytes: Option<u64>,
+}
+
+/// Mirrors `lamad_types::ContentOutput` with the body-bearing content subset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ContentBodyOutput {
+    pub action_hash: ActionHash,
+    pub content: WireContentBody,
+}
+
 /// Mirrors `content_store::DeclareContentHeadInput` (notary-authority Leg 1).
 /// The zome field is `Option<ActionHashB64>` (string-wire-safe); this mirror
 /// carries `Option<String>` and passes the canonical base64 form so the
@@ -464,6 +500,136 @@ async fn content_publishes_and_retrieves_by_id() -> Result<()> {
     assert_eq!(by_hash.content.id, "test-1");
     assert_eq!(by_hash.content.content_type, "concept");
 
+    Ok(())
+}
+
+/// content-body-travels: `update_content` carries a changed inline body (with
+/// format and tags) into a NEW signed version; the id resolves to that version,
+/// untouched fields keep their values, and an inline-only entry's size follows
+/// the body it describes.
+#[tokio::test(flavor = "multi_thread")]
+async fn update_content_carries_a_changed_body() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+    let zome = cell.zome("content_store");
+
+    let created: ContentBodyOutput = conductor
+        .call(&zome, "create_content", test_content("body-1"))
+        .await;
+    let new_body = "## Psalm 13\n\nHow long, O LORD?\n".to_string();
+    let updated: ContentBodyOutput = conductor
+        .call(
+            &zome,
+            "update_content",
+            UpdateContentBodyInput {
+                id: "body-1".to_string(),
+                content: Some(new_body.clone()),
+                content_format: Some("markdown".to_string()),
+                tags: Some(vec!["bible".to_string()]),
+                content_type: None,
+            },
+        )
+        .await;
+    assert_ne!(updated.action_hash, created.action_hash, "a new version");
+    assert_eq!(updated.content.content, new_body);
+    assert_eq!(updated.content.tags, vec!["bible".to_string()]);
+    assert_eq!(
+        updated.content.content_size_bytes,
+        Some(new_body.len() as u64),
+        "an inline-only entry's size follows its body"
+    );
+    assert_eq!(
+        updated.content.title, created.content.title,
+        "untouched fields keep their values"
+    );
+
+    let by_id: Option<ContentBodyOutput> = conductor
+        .call(
+            &zome,
+            "get_content_by_id",
+            QueryByIdInput {
+                id: "body-1".to_string(),
+            },
+        )
+        .await;
+    let by_id = by_id.expect("get_content_by_id returned None");
+    assert_eq!(by_id.action_hash, updated.action_hash);
+    assert_eq!(by_id.content.content, new_body);
+    Ok(())
+}
+
+/// F17: `update_content` carries a changed content TYPE and tags into a new
+/// signed version (a recomposed atom is retyped in place), and refuses a move
+/// into the attestation class, whose supersession has its own law.
+#[tokio::test(flavor = "multi_thread")]
+async fn update_content_carries_a_changed_type_and_tags() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+    let zome = cell.zome("content_store");
+
+    let created: ContentBodyOutput = conductor
+        .call(&zome, "create_content", test_content("type-1"))
+        .await;
+    assert_eq!(created.content.content_type, "concept");
+    let updated: ContentBodyOutput = conductor
+        .call(
+            &zome,
+            "update_content",
+            UpdateContentBodyInput {
+                id: "type-1".to_string(),
+                content: None,
+                content_format: None,
+                tags: Some(vec!["fct".to_string(), "recomposed".to_string()]),
+                content_type: Some("discussion".to_string()),
+            },
+        )
+        .await;
+    assert_ne!(updated.action_hash, created.action_hash, "a new version");
+    assert_eq!(updated.content.content_type, "discussion");
+    assert_eq!(
+        updated.content.tags,
+        vec!["fct".to_string(), "recomposed".to_string()]
+    );
+    assert_eq!(updated.content.content, created.content.content, "body untouched");
+
+    let by_id: Option<ContentBodyOutput> = conductor
+        .call(
+            &zome,
+            "get_content_by_id",
+            QueryByIdInput {
+                id: "type-1".to_string(),
+            },
+        )
+        .await;
+    let by_id = by_id.expect("get_content_by_id returned None");
+    assert_eq!(by_id.action_hash, updated.action_hash);
+    assert_eq!(by_id.content.content_type, "discussion");
+
+    let crossing: std::result::Result<ContentBodyOutput, _> = conductor
+        .call_fallible(
+            &zome,
+            "update_content",
+            UpdateContentBodyInput {
+                id: "type-1".to_string(),
+                content: None,
+                content_format: None,
+                tags: None,
+                content_type: Some("attestation:recovery-approval".to_string()),
+            },
+        )
+        .await;
+    assert!(
+        crossing.is_err(),
+        "an ordinary update must not move an entry into the attestation class"
+    );
     Ok(())
 }
 

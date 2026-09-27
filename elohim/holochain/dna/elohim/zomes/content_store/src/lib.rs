@@ -2579,6 +2579,40 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     if let Some(v) = input.reach {
         content.reach = v;
     }
+    // BODY (content-body-travels): a changed inline body is a new signed
+    // version of the entry, so it rides the same update the other peers adopt
+    // from — never an unauthenticated sync-doc field. For an inline-only entry
+    // (no blob pointer) the size tracks the body it describes, unless the
+    // caller stated one explicitly; a blob-backed entry's size describes the
+    // blob and is left alone.
+    if let Some(v) = input.content {
+        if content.blob_cid.is_none() && input.content_size_bytes.is_none() {
+            content.content_size_bytes = Some(v.len() as u64);
+        }
+        content.content = v;
+    }
+    if let Some(v) = input.content_format {
+        content.content_format = v;
+    }
+    if let Some(v) = input.tags {
+        content.tags = v;
+    }
+    // TYPE (F17): a recomposed atom is retyped in place, as a new signed
+    // version. `prepare_content_for_storage` below refuses an unknown type.
+    // Attestation and governance-action entries carry their own supersession
+    // law (integrity floor 7 binds a successor to its predecessor's type), so
+    // an ordinary update may neither enter nor leave those classes.
+    if let Some(v) = input.content_type {
+        let special = |t: &str| t.starts_with("attestation:") || t.starts_with("governance-action:");
+        if v != content.content_type && (special(&v) || special(&content.content_type)) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "update_content: content_type '{}' -> '{}' crosses the attestation / \
+                 governance-action class; supersede those entries through their own flow",
+                content.content_type, v
+            ))));
+        }
+        content.content_type = v;
+    }
     content.updated_at = format!("{:?}", sys_time()?);
 
     // 4. Re-run prepare/validate against the mutated content (sets

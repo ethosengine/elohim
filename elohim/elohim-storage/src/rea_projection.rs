@@ -979,16 +979,27 @@ pub fn handle_rea_signal(
             let size_i32 = content
                 .content_size_bytes
                 .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+            // Own-conductor commit: the entry is conductor-verified, so its
+            // body, tags and authored edges are the version's
+            // (content-body-travels, F16, F17).
             let patch = ContentProjectionPatch {
-                blob_cid: content.blob_cid,
+                blob_cid: content.blob_cid.clone(),
                 content_size_bytes: size_i32,
                 title: Some(content.title),
                 description: Some(content.description),
                 content_type: Some(content.content_type),
                 content_format: Some(content.content_format),
                 reach: Some(content.reach),
-                metadata_json: Some(content.metadata_json),
-            };
+                metadata_json: Some(content.metadata_json.clone()),
+                ..Default::default()
+            }
+            .carry_verified_version(
+                &content.id,
+                &content.content,
+                content.blob_cid.as_deref(),
+                &content.tags,
+                &content.metadata_json,
+            );
             // HEAD-ELECTION: the async own-conductor commit signal stamps the
             // ANCHOR only — it is NOT a declaration channel.
             //

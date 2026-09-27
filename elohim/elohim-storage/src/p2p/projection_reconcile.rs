@@ -3217,6 +3217,7 @@ async fn witness_ghost_anchors(
                 description: None,
                 content_body: None,
                 content_format: None,
+                content_type: None,
                 metadata: None,
                 tags: None,
                 reach: None,
@@ -6598,7 +6599,18 @@ pub(crate) fn project_authenticated_content_head(
         content_format: Some(c.content_format.clone()),
         reach: reach_patch,
         metadata_json: Some(c.metadata_json.clone()),
-    };
+        ..Default::default()
+    }
+    // The conductor authenticated this head's entry; its body, tags and
+    // authored edges are the version's (content-body-travels, F16, F17).
+    // Never sourced from sync docs.
+    .carry_verified_version(
+        &c.id,
+        &c.content,
+        c.blob_cid.as_deref(),
+        &c.tags,
+        &c.metadata_json,
+    );
     // Canonical-aware stamp mode: a CANONICAL answer (the conductor verified
     // the cross-root canonical record) may fill an undeclared row, refresh the
     // same head, or MOVE a declared row FORWARD (provably newer declared_at) —

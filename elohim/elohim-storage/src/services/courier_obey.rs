@@ -367,14 +367,23 @@ pub(crate) fn patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
         content_format: Some(c.content_format.clone()),
         reach: Some(c.reach.clone()),
         metadata_json: Some(c.metadata_json.clone()),
+        ..Default::default()
     }
+    .carry_verified_version(
+        &c.id,
+        &c.content,
+        c.blob_cid.as_deref(),
+        &c.tags,
+        &c.metadata_json,
+    )
 }
 
 /// The patch a head MOVE carries from a proven record: the version's pointer,
-/// size and metadata (which names its server bundle) — and nothing that could
-/// narrow `reach` or rewrite identity fields, exactly as the adopt path's
-/// T-1 move does (`head_adoption::adopt_local`). The RC-4 non-narrowing guard
-/// lives on the projection, not here.
+/// size and metadata (which names its server bundle), its body, type, format,
+/// tags and authored edges — and nothing that could narrow `reach` or rewrite
+/// the title/description identity fields, exactly as the adopt path's T-1 move
+/// does (`head_adoption::adopt_local`). The RC-4 non-narrowing guard lives on
+/// the projection, not here.
 pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
     ContentProjectionPatch {
         blob_cid: c.blob_cid.clone(),
@@ -382,8 +391,20 @@ pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch
             .content_size_bytes
             .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
         metadata_json: Some(c.metadata_json.clone()),
+        // The version moves with its pointer: body, type (a recomposed atom is
+        // retyped in place — F17), format, tags and edges (F16) are the
+        // version, not identity, and none of them can narrow reach.
+        content_type: Some(c.content_type.clone()),
+        content_format: Some(c.content_format.clone()),
         ..Default::default()
     }
+    .carry_verified_version(
+        &c.id,
+        &c.content,
+        c.blob_cid.as_deref(),
+        &c.tags,
+        &c.metadata_json,
+    )
 }
 
 /// Would adopting `content` leave this row's previous blob pointer standing
@@ -978,6 +999,46 @@ mod tests {
         assert_eq!(
             bytes_needed(&entry),
             vec!["sha256-browser", "sha256-server"]
+        );
+    }
+
+    /// content-body-travels / F16 / F17: a proven head record projects its
+    /// version — body, type, tags and authored edges — on both the
+    /// fill/refresh patch and the head-MOVE patch. An empty inline body on a
+    /// blob-backed version clears the column; with no blob pointer it
+    /// preserves it.
+    #[test]
+    fn a_proven_version_carries_its_body() {
+        let entry = |body: &str, blob: Option<&str>| -> ContentEntry {
+            serde_json::from_value(serde_json::json!({
+                "id": ID, "content_type": "discussion", "title": "t", "description": "",
+                "content": body, "content_format": "markdown", "reach": "commons",
+                "tags": ["fct"], "blob_cid": blob,
+                "metadata_json": r#"{"relationships":[{"type":"relates","targetId":"b","role":"anchor"}]}"#,
+            }))
+            .unwrap()
+        };
+        let body = Some(Some("## Psalm 13\n\nHow long?\n".to_string()));
+        let proven = entry("## Psalm 13\n\nHow long?\n", None);
+        for patch in [patch_from_proven(&proven), move_patch_from_proven(&proven)] {
+            assert_eq!(patch.content_body, body);
+            assert_eq!(patch.content_type.as_deref(), Some("discussion"));
+            assert_eq!(patch.tags, Some(vec!["fct".to_string()]));
+            let edges = patch.relationships.expect("the entry states edges");
+            assert_eq!(edges.len(), 1);
+            assert_eq!(edges[0].relationship_type, "RELATES_TO");
+            assert_eq!(edges[0].role.as_deref(), Some("anchor"));
+        }
+        assert_eq!(patch_from_proven(&entry("", None)).content_body, None);
+        assert_eq!(move_patch_from_proven(&entry("", None)).content_body, None);
+        assert_eq!(
+            patch_from_proven(&entry("", Some("bafkreiblob"))).content_body,
+            Some(None),
+            "a version that moved its bytes behind a blob clears the stale inline body"
+        );
+        assert_eq!(
+            move_patch_from_proven(&entry("", Some("bafkreiblob"))).content_body,
+            Some(None)
         );
     }
 }

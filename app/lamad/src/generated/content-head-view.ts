@@ -18,6 +18,10 @@ export interface ContentHeadView {
    */
   declared: boolean;
   /**
+   * true iff this peer's projection records that the election standing behind the declared HEAD is EARNED (content_store::select_canonical_winner's earned tier — a steward's earned canonical, which beats any staging declaration regardless of recency); false when no earned election is known here (a staging/unmarked election, or none recorded). A pipeline seed update can never become canonical over an earned head, so a seeder reads this and leaves stewarded atoms alone. Additive: absent from older serving nodes; a reader treats absence as not-known-earned.
+   */
+  earned: boolean;
+  /**
    * The DHT anchor for the resolved row when notarized; null when the HEAD answer rests only on a declared head with no anchor yet.
    */
   dhtAnchorHash?: string | null;

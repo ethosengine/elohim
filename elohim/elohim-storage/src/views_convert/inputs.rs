@@ -67,7 +67,7 @@ impl From<CreateRelationshipInputView> for CreateRelationshipInput {
             is_bidirectional: false,
             provenance_chain_json: None,
             governance_layer: None,
-            reach: "commons".to_string(),
+            reach: v.reach,
             metadata_json: serialize_json_opt(&v.metadata),
         }
     }

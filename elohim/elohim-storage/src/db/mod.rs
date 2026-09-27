@@ -17,6 +17,7 @@
 //! - `content_tags` - Tag index for fast lookup
 
 // Diesel modules with app scoping
+pub mod authored_edges;
 pub mod cache_queries;
 pub mod content_diesel;
 pub mod context;

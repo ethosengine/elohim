@@ -192,6 +192,7 @@ fn content_head_view_matches_schema() {
         head_action_hash: "uhCkkDECLAREDHEAD0123456789012345678901234567890123456789012"
             .to_string(),
         declared: true,
+        earned: true,
         dht_anchor_hash: Some(
             "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
         ),
@@ -218,6 +219,7 @@ fn content_head_view_matches_schema() {
         head_action_hash: "uhCkkANCHOR0123456789012345678901234567890123456789012345678"
             .to_string(),
         declared: false,
+        earned: false,
         dht_anchor_hash: Some(
             "uhCkkANCHOR0123456789012345678901234567890123456789012345678".to_string(),
         ),
@@ -6929,4 +6931,59 @@ fn content_search_view_rejects_snake_case() {
         !content_search_accepts(&nested),
         "a snake_case nested key is refused"
     );
+}
+
+// ── CreateRelationshipInput (POST /db/relationships[/bulk]) ──────────────
+
+/// The edge input carries `reach` (the SOURCE atom's reach — F16): a wire
+/// instance that the schema accepts deserializes into the Rust input view and
+/// reaches the store with that reach; an absent reach stays absent (a new edge
+/// defaults to commons, an existing edge keeps its tier). The schema refuses
+/// an unknown reach tier and an unknown key.
+#[test]
+fn create_relationship_input_matches_schema_and_carries_reach() {
+    use elohim_storage::db::relationships_diesel::CreateRelationshipInput;
+    use elohim_views::CreateRelationshipInputView;
+
+    let schema = "inputs/create-relationship-input.schema.json";
+    assert_source_of_truth_declared(
+        &load_schema(schema),
+        "create-relationship-input.schema.json",
+    );
+
+    let wire = serde_json::json!({
+        "id": "rel-0123456789abcdef0123456789abcdef",
+        "schemaVersion": 1,
+        "sourceId": "love-map-matthew-jessica",
+        "targetId": "fct-bible-psalm-13",
+        "relationshipType": "RELATES_TO",
+        "confidence": 1.0,
+        "inferenceSource": "explicit",
+        "reach": "intimate",
+        "metadata": { "role": "anchor" }
+    });
+    validate_against_schema(schema, &wire);
+    let view: CreateRelationshipInputView = serde_json::from_value(wire).unwrap();
+    assert_eq!(view.reach.as_deref(), Some("intimate"));
+    let input: CreateRelationshipInput = view.into();
+    assert_eq!(input.reach.as_deref(), Some("intimate"));
+    assert_eq!(input.metadata_json.as_deref(), Some(r#"{"role":"anchor"}"#));
+
+    let bare = serde_json::json!({
+        "sourceId": "a", "targetId": "b", "relationshipType": "RELATES_TO"
+    });
+    validate_against_schema(schema, &bare);
+    let input: CreateRelationshipInput =
+        serde_json::from_value::<CreateRelationshipInputView>(bare)
+            .unwrap()
+            .into();
+    assert_eq!(input.reach, None);
+
+    let compiled = jsonschema::validator_for(&load_schema(schema)).unwrap();
+    for bad in [
+        serde_json::json!({"sourceId": "a", "targetId": "b", "relationshipType": "X", "reach": "everyone"}),
+        serde_json::json!({"sourceId": "a", "targetId": "b", "relationshipType": "X", "source_id": "a"}),
+    ] {
+        assert!(!compiled.is_valid(&bad), "schema must refuse {bad}");
+    }
 }

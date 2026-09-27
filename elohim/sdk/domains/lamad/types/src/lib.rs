@@ -63,7 +63,7 @@ pub struct CreateContentInput {
 /// The HTTP wire surface and storage diesel column use `blob_hash` semantically
 /// meaning the same thing; the service layer (ContentService::update_via_conductor)
 /// translates between the two.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct UpdateContentInput {
     pub id: String,
@@ -84,6 +84,29 @@ pub struct UpdateContentInput {
     /// `reach_patch_refusal` lifts in step). Absent → reach unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reach: Option<String>,
+    /// Inline content BODY patch (the entry's `content` field). A changed body
+    /// on an already-anchored row is a new signed version: it travels to every
+    /// peer inside the notarized entry, never as an unauthenticated sync-doc
+    /// field. Absent → body unchanged. Additive, `serde(default)`: an old
+    /// caller omits the key, an old coordinator ignores it (coordinator-only —
+    /// the integrity zome never sees this type, so the DNA hash does not move).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Content format patch (e.g. `markdown`). Absent → unchanged. Validated by
+    /// the coordinator's `prepare_content_for_storage` like every other field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_format: Option<String>,
+    /// Tags patch — REPLACES the entry's tags when present. Absent → unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    /// Content TYPE patch (e.g. `exercise` → `discussion`). A recomposed atom
+    /// is retyped in place; the new type is a new signed version other peers
+    /// adopt from the entry. Absent → unchanged. Validated by the coordinator's
+    /// `prepare_content_for_storage` (must be a known content type); the
+    /// coordinator refuses moving an entry into or out of the attestation /
+    /// governance-action classes, whose supersession has its own law.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
 }
 
 /// Content wire type. Mirrors the integrity zome's Content entry type.
@@ -1030,9 +1053,7 @@ mod tests {
             blob_cid: Some("sha256-deadbeefcafe".to_string()),
             content_size_bytes: Some(2_048),
             content_hash: Some("sha256-deadbeefcafe".to_string()),
-            title: None,
-            description: None,
-            metadata_json: None,
+            ..Default::default()
         };
 
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
@@ -1052,11 +1073,7 @@ mod tests {
         let input = UpdateContentInput {
             id: "x".to_string(),
             blob_cid: Some("h".to_string()),
-            content_size_bytes: None,
-            content_hash: None,
-            title: None,
-            description: None,
-            metadata_json: None,
+            ..Default::default()
         };
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: UpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
@@ -1071,6 +1088,51 @@ mod tests {
         assert!(as_str.contains("blob_cid"));
         assert!(!as_str.contains("title"));
         assert!(!as_str.contains("content_size_bytes"));
+        assert!(!as_str.contains("content_format"));
+        assert!(!as_str.contains("tags"));
+        assert!(!as_str.contains("content_type"));
+    }
+
+    /// The body/format/tags patch is ADDITIVE on the wire: an old caller's
+    /// bytes (no `content` key) decode on the new struct with the body absent,
+    /// and a new caller's bytes decode on an old-shaped coordinator struct that
+    /// lacks the field (it is ignored, not refused).
+    #[test]
+    fn update_content_input_body_patch_is_wire_compatible_both_ways() {
+        #[derive(Serialize, Deserialize)]
+        struct OldUpdateContentInput {
+            id: String,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            reach: Option<String>,
+        }
+
+        let old = OldUpdateContentInput {
+            id: "psalm".into(),
+            reach: Some("commons".into()),
+        };
+        let decoded: UpdateContentInput =
+            rmp_serde::from_slice(&rmp_serde::to_vec_named(&old).unwrap()).unwrap();
+        assert_eq!(decoded.reach.as_deref(), Some("commons"));
+        assert!(decoded.content.is_none());
+        assert!(decoded.tags.is_none());
+
+        let new = UpdateContentInput {
+            id: "psalm".into(),
+            reach: Some("commons".into()),
+            content: Some("## Psalm 13\n\nHow long?\n".into()),
+            content_format: Some("markdown".into()),
+            tags: Some(vec!["bible".into()]),
+            content_type: Some("discussion".into()),
+            ..Default::default()
+        };
+        let bytes = rmp_serde::to_vec_named(&new).unwrap();
+        let round: UpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(round.content.as_deref(), Some("## Psalm 13\n\nHow long?\n"));
+        assert_eq!(round.tags.as_deref(), Some(&["bible".to_string()][..]));
+        assert_eq!(round.content_type.as_deref(), Some("discussion"));
+        assert!(decoded.content_type.is_none());
+        let on_old: OldUpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(on_old.id, "psalm");
     }
 
     #[test]

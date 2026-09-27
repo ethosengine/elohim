@@ -2110,12 +2110,27 @@ fn adopt_local(
     // head also cannot mutate metadata, while a fill or same-head refresh can
     // project the verified entry. A fallback (canonical=false) never gets this
     // authority; CRDT metadata remains unauthenticated and unused here.
-    let mut verified_patch = head
-        .canonical
-        .then(|| content_diesel::ContentProjectionPatch {
+    let mut verified_patch = head.canonical.then(|| {
+        // The verified entry's version — body, type, format, tags and the
+        // authored edges its metadata states — travels with its metadata
+        // under the same guarded stamp (fill, move, or same-head refresh —
+        // the last heals a row adopted before these were carried). Type is
+        // a version field, not identity: a recomposed atom is retyped in
+        // place (F17). Reach stays out (RC-4, below).
+        content_diesel::ContentProjectionPatch {
             metadata_json: Some(head.content.metadata_json.clone()),
+            content_type: Some(head.content.content_type.clone()),
+            content_format: Some(head.content.content_format.clone()),
             ..Default::default()
-        });
+        }
+        .carry_verified_version(
+            &head.content.id,
+            &head.content.content,
+            head.content.blob_cid.as_deref(),
+            &head.content.tags,
+            &head.content.metadata_json,
+        )
+    });
     let is_move_or_fill = local_declared != Some(head.head_action_hash.as_str());
     if head.canonical && is_move_or_fill {
         // T-1 (story 1.4a): a fill or genuine move already has the complete
@@ -3925,7 +3940,15 @@ async fn declare_peer_head(
                 content_format: Some(c.content_format.clone()),
                 reach: Some(c.reach.clone()),
                 metadata_json: Some(c.metadata_json.clone()),
-            };
+                ..Default::default()
+            }
+            .carry_verified_version(
+                &c.id,
+                &c.content,
+                c.blob_cid.as_deref(),
+                &c.tags,
+                &c.metadata_json,
+            );
             let stamped = pool.get().map_err(|e| e.to_string()).and_then(|mut conn| {
                 content_diesel::stamp_declared_head_mode(
                     &mut conn,
@@ -4210,6 +4233,153 @@ mod tests {
         .expect("read content")
         .expect("content exists")
         .server_blob_hash
+    }
+
+    fn body(pool: &DbPool, id: &str) -> Option<String> {
+        let mut conn = pool.get().expect("connection");
+        content_diesel::get_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            id,
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read content")
+        .expect("content exists")
+        .content_body
+    }
+
+    /// content-body-travels: a CANONICAL answer's entry carries the version's
+    /// body onto the row — on a fill and on a same-head refresh (which heals a
+    /// row adopted before bodies were carried). A FALLBACK answer never writes
+    /// it, and an older canonical answer cannot put an old body back.
+    #[test]
+    fn canonical_head_adoption_carries_the_version_body() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "psalm", "{}");
+        let mut head = wire(true);
+        head.content.id = "psalm".to_string();
+        head.content.content = "## Psalm 13\n\nHow long?\n".to_string();
+        // A complete election ordering, so the fill records it and an OLDER
+        // canonical answer is provably older (the monotonic guard's input).
+        head.canonical_declared_at = Some(1);
+        head.canonical_earned = Some(false);
+
+        assert_eq!(
+            adopt_local(&pool, &ctx, "psalm", &head, None),
+            AdoptOutcome::Adopted
+        );
+        assert_eq!(
+            body(&pool, "psalm").as_deref(),
+            Some("## Psalm 13\n\nHow long?\n"),
+            "a canonical fill projects the version's body"
+        );
+
+        let head_hash = head.head_action_hash.to_string();
+        head.content.content = "## Psalm 13\n\nHow long, O LORD?\n".to_string();
+        adopt_local(&pool, &ctx, "psalm", &head, Some(&head_hash));
+        assert_eq!(
+            body(&pool, "psalm").as_deref(),
+            Some("## Psalm 13\n\nHow long, O LORD?\n"),
+            "a same-head canonical refresh heals the body"
+        );
+
+        let mut fallback = head.clone();
+        fallback.canonical = false;
+        fallback.content.content = "unverified".to_string();
+        adopt_local(&pool, &ctx, "psalm", &fallback, Some(&head_hash));
+        assert_eq!(
+            body(&pool, "psalm").as_deref(),
+            Some("## Psalm 13\n\nHow long, O LORD?\n"),
+            "a fallback answer has no authority over the body"
+        );
+
+        let mut older = head.clone();
+        older.head_action_hash = crate::signals::HoloHashB64("uhCkkOlderCanonicalHead".to_string());
+        older.canonical_declared_at = Some(0);
+        older.canonical_earned = Some(false);
+        older.content.content = "old body".to_string();
+        adopt_local(&pool, &ctx, "psalm", &older, Some(&head_hash));
+        assert_eq!(
+            body(&pool, "psalm").as_deref(),
+            Some("## Psalm 13\n\nHow long, O LORD?\n"),
+            "an older canonical answer cannot put an old body back"
+        );
+    }
+
+    /// F16 / F17: a CANONICAL adoption carries the rest of the version — the
+    /// retyped content type, the tags and the authored edges the entry's
+    /// metadata states (at the row's reach). A FALLBACK answer carries none of
+    /// it.
+    #[test]
+    fn canonical_head_adoption_carries_type_tags_and_edges() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "atom", "{}");
+        let mut head = wire(true);
+        head.content.id = "atom".to_string();
+        head.content.content_type = "discussion".to_string();
+        head.content.tags = vec!["fct".to_string()];
+        head.content.metadata_json = serde_json::json!({"relationships": [
+            {"type": "RELATES_TO", "targetId": "t1", "role": "anchor"},
+            {"type": "contains", "targetId": "t2"},
+        ]})
+        .to_string();
+        head.canonical_declared_at = Some(1);
+        head.canonical_earned = Some(false);
+        assert_eq!(
+            adopt_local(&pool, &ctx, "atom", &head, None),
+            AdoptOutcome::Adopted
+        );
+        let read = |pool: &DbPool| {
+            let mut conn = pool.get().expect("connection");
+            let row = content_diesel::get_content_with_tags(
+                &mut conn,
+                &ctx,
+                "atom",
+                content_diesel::MinTrust::Invisible,
+            )
+            .unwrap()
+            .unwrap();
+            let edges = crate::db::relationships_diesel::get_outgoing_relationships(
+                &mut conn, &ctx, "atom", None,
+            )
+            .unwrap();
+            (row, edges)
+        };
+        let (row, edges) = read(&pool);
+        assert_eq!(row.content.content_type, "discussion");
+        assert_eq!(row.tags, vec!["fct".to_string()]);
+        let mut kinds: Vec<_> = edges
+            .iter()
+            .map(|e| {
+                (
+                    e.relationship_type.clone(),
+                    e.target_id.clone(),
+                    e.reach.clone(),
+                )
+            })
+            .collect();
+        kinds.sort();
+        assert_eq!(
+            kinds,
+            vec![
+                ("CONTAINS".into(), "t2".into(), "commons".into()),
+                ("RELATES_TO".into(), "t1".into(), "commons".into()),
+            ]
+        );
+
+        let head_hash = head.head_action_hash.to_string();
+        let mut fallback = head.clone();
+        fallback.canonical = false;
+        fallback.content.content_type = "exercise".to_string();
+        fallback.content.tags = vec![];
+        fallback.content.metadata_json = r#"{"relationships":[]}"#.to_string();
+        adopt_local(&pool, &ctx, "atom", &fallback, Some(&head_hash));
+        let (row, edges) = read(&pool);
+        assert_eq!(row.content.content_type, "discussion", "fallback: no type");
+        assert_eq!(row.tags, vec!["fct".to_string()], "fallback: no tags");
+        assert_eq!(edges.len(), 2, "fallback: no edges");
     }
 
     #[test]

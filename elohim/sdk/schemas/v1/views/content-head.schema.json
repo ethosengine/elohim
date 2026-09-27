@@ -5,7 +5,7 @@
   "description": "The notary-declared HEAD of a content id's version DAG (HEAD-election, Plan C3 / notary-authority Leg 3). Returned by GET/POST /db/content/{id}/head. Source of truth: DHT (Notarized HEAD election, Category A). Projected from the content row's notary markers; the surface exists only for a row carrying a notary answer (a declared head OR a DHT anchor).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contentId", "headActionHash", "declared", "trust"],
+  "required": ["contentId", "headActionHash", "declared", "earned", "trust"],
   "properties": {
     "contentId": {
       "type": "string",
@@ -18,6 +18,10 @@
     "declared": {
       "type": "boolean",
       "description": "true iff an explicit declared HEAD was set (an author moved the HEAD via the declare authority); false when the answer is the DHT-anchor fallback (the single-author implicit head)."
+    },
+    "earned": {
+      "type": "boolean",
+      "description": "true iff this peer's projection records that the election standing behind the declared HEAD is EARNED (content_store::select_canonical_winner's earned tier — a steward's earned canonical, which beats any staging declaration regardless of recency); false when no earned election is known here (a staging/unmarked election, or none recorded). A pipeline seed update can never become canonical over an earned head, so a seeder reads this and leaves stewarded atoms alone. Additive: absent from older serving nodes; a reader treats absence as not-known-earned."
     },
     "dhtAnchorHash": {
       "type": ["string", "null"],

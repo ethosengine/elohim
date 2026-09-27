@@ -7,6 +7,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::authored_edges::AUTHORED_PROVENANCE_JSON;
 use super::context::AppContext;
 use super::diesel_schema::relationships;
 use super::models::{current_timestamp, NewRelationship, Relationship};
@@ -34,10 +35,26 @@ pub struct CreateRelationshipInput {
     pub provenance_chain_json: Option<String>,
     #[serde(default)]
     pub governance_layer: Option<String>,
-    #[serde(default = "default_reach")]
-    pub reach: String,
+    /// The edge's reach. `Some` sets it on insert AND on an upsert of an
+    /// existing edge; `None` inserts at `commons` and leaves an existing edge's
+    /// reach untouched.
+    ///
+    /// This layer writes what it is given. The HTTP write routes never hand it a
+    /// caller's value: `RelationshipService` derives it from the SOURCE row
+    /// (a stated reach may only narrow it; an unknown source writes the most
+    /// restrictive tier) — an edge is never more open than the atom that
+    /// authored it.
+    #[serde(default)]
+    pub reach: Option<String>,
     #[serde(default)]
     pub metadata_json: Option<String>,
+}
+
+impl CreateRelationshipInput {
+    /// The reach a NEW row is written at.
+    fn insert_reach(&self) -> &str {
+        self.reach.as_deref().unwrap_or("commons")
+    }
 }
 
 fn default_confidence() -> f32 {
@@ -46,8 +63,28 @@ fn default_confidence() -> f32 {
 fn default_inference_source() -> String {
     "explicit".to_string()
 }
-fn default_reach() -> String {
-    "commons".to_string()
+
+/// Apply an explicitly stated reach to the (h_app_id, source, target, type)
+/// edge a create/upsert just wrote. No-op when the input stated none.
+fn set_explicit_reach(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    input: &CreateRelationshipInput,
+) -> Result<(), StorageError> {
+    let Some(ref reach) = input.reach else {
+        return Ok(());
+    };
+    diesel::update(
+        relationships::table
+            .filter(relationships::h_app_id.eq(&ctx.h_app_id))
+            .filter(relationships::source_id.eq(&input.source_id))
+            .filter(relationships::target_id.eq(&input.target_id))
+            .filter(relationships::relationship_type.eq(&input.relationship_type)),
+    )
+    .set(relationships::reach.eq(reach))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Set edge reach failed: {}", e)))?;
+    Ok(())
 }
 
 /// Query parameters for listing relationships - camelCase for URL params
@@ -65,10 +102,32 @@ pub struct RelationshipQuery {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
+    /// Server-set, never from the URL: when `Some`, only edges BOTH of whose
+    /// endpoints are readable at one of these reaches are listed — an endpoint
+    /// with a local content row by that row's reach, an endpoint with none by
+    /// the edge's own reach AND only when the edge was projected from a
+    /// verified source head (`authored_edges::unknown_endpoint_reach`; a POSTed
+    /// edge vouches for no unknown id). The read route sets it for a caller who can read
+    /// only open tiers, so a page is filtered in SQL (its count and offsets
+    /// never reveal a hidden edge). The per-edge reach filter still runs.
+    #[serde(skip)]
+    pub readable_reaches: Option<Vec<String>>,
 }
 
 fn default_limit() -> i64 {
     100
+}
+
+/// Hard ceiling on one page of `list_relationships` (the corpus-wide list is
+/// reachable without a `contentId`).
+pub const MAX_LIST_LIMIT: i64 = 500;
+
+impl RelationshipQuery {
+    /// The page bounds actually applied: limit in `1..=MAX_LIST_LIMIT`, offset
+    /// never negative.
+    pub fn clamped_page(&self) -> (i64, i64) {
+        (self.limit.clamp(1, MAX_LIST_LIMIT), self.offset.max(0))
+    }
 }
 
 /// Result of bulk operation
@@ -151,10 +210,44 @@ pub fn list_relationships(
         base_query = base_query.filter(relationships::confidence.ge(min_conf));
     }
 
+    if let Some(ref reaches) = query.readable_reaches {
+        use super::diesel_schema::content;
+        let readable_ids = || {
+            content::table
+                .filter(content::h_app_id.eq(ctx.h_app_id.clone()))
+                .filter(content::reach.eq_any(reaches.clone()))
+                .select(content::id)
+        };
+        let held_ids = || {
+            content::table
+                .filter(content::h_app_id.eq(ctx.h_app_id.clone()))
+                .select(content::id)
+        };
+        // An endpoint with no local row is readable only through an edge a
+        // verified head stated (the marker), at that edge's reach.
+        let vouched = || {
+            relationships::reach
+                .eq_any(reaches.clone())
+                .and(relationships::provenance_chain_json.eq(AUTHORED_PROVENANCE_JSON))
+        };
+        base_query = base_query
+            .filter(
+                relationships::source_id
+                    .eq_any(readable_ids())
+                    .or(relationships::source_id.ne_all(held_ids()).and(vouched())),
+            )
+            .filter(
+                relationships::target_id
+                    .eq_any(readable_ids())
+                    .or(relationships::target_id.ne_all(held_ids()).and(vouched())),
+            );
+    }
+
+    let (limit, offset) = query.clamped_page();
     base_query
-        .order(relationships::created_at.desc())
-        .limit(query.limit)
-        .offset(query.offset)
+        .order((relationships::created_at.desc(), relationships::id.asc()))
+        .limit(limit)
+        .offset(offset)
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
@@ -233,7 +326,10 @@ pub fn create_relationship(
     ctx: &AppContext,
     input: CreateRelationshipInput,
 ) -> Result<Relationship, StorageError> {
-    let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     let new_rel = NewRelationship {
         id: &id,
@@ -247,7 +343,7 @@ pub fn create_relationship(
         inverse_relationship_id: None,
         provenance_chain_json: input.provenance_chain_json.as_deref(),
         governance_layer: input.governance_layer.as_deref(),
-        reach: &input.reach,
+        reach: input.insert_reach(),
         metadata_json: input.metadata_json.as_deref(),
     };
 
@@ -266,10 +362,15 @@ pub fn create_relationship(
             relationships::inference_source.eq(&input.inference_source),
             relationships::is_bidirectional.eq(if input.is_bidirectional { 1 } else { 0 }),
             relationships::metadata_json.eq(input.metadata_json.as_deref()),
+            // A write that is not the verified projection un-marks the row
+            // (see `authored_edges::AUTHORED_PROVENANCE_JSON`); the next
+            // verified adoption re-marks it.
+            relationships::provenance_chain_json.eq(input.provenance_chain_json.as_deref()),
             relationships::updated_at.eq(current_timestamp()),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    set_explicit_reach(conn, ctx, &input)?;
 
     get_relationship(conn, ctx, &id)?
         .ok_or_else(|| StorageError::Internal("Failed to retrieve created relationship".into()))
@@ -310,7 +411,7 @@ pub fn create_bidirectional(
             inverse_relationship_id: Some(&inverse_id),
             provenance_chain_json: input.provenance_chain_json.as_deref(),
             governance_layer: input.governance_layer.as_deref(),
-            reach: &input.reach,
+            reach: input.insert_reach(),
             metadata_json: input.metadata_json.as_deref(),
         };
 
@@ -332,7 +433,7 @@ pub fn create_bidirectional(
             inverse_relationship_id: Some(&forward_id),
             provenance_chain_json: input.provenance_chain_json.as_deref(),
             governance_layer: input.governance_layer.as_deref(),
-            reach: &input.reach,
+            reach: input.insert_reach(),
             metadata_json: input.metadata_json.as_deref(),
         };
 
@@ -390,7 +491,7 @@ pub fn bulk_create_relationships(
                 inverse_relationship_id: None,
                 provenance_chain_json: input.provenance_chain_json.as_deref(),
                 governance_layer: input.governance_layer.as_deref(),
-                reach: &input.reach,
+                reach: input.insert_reach(),
                 metadata_json: input.metadata_json.as_deref(),
             };
 
@@ -408,9 +509,15 @@ pub fn bulk_create_relationships(
                     relationships::inference_source.eq(&input.inference_source),
                     relationships::is_bidirectional.eq(if input.is_bidirectional { 1 } else { 0 }),
                     relationships::metadata_json.eq(input.metadata_json.as_deref()),
+                    // Un-marks a verified-projection row; see `create_relationship`.
+                    relationships::provenance_chain_json.eq(input.provenance_chain_json.as_deref()),
                 ))
                 .execute(conn)
-            {
+                .and_then(|n| {
+                    set_explicit_reach(conn, ctx, &input)
+                        .map(|_| n)
+                        .map_err(|e| diesel::result::Error::QueryBuilderError(e.to_string().into()))
+                }) {
                 Ok(_) => {
                     if exists {
                         updated += 1;
@@ -613,7 +720,7 @@ pub(crate) mod test_harness {
             is_bidirectional: false,
             provenance_chain_json: None,
             governance_layer: None,
-            reach: "commons".to_string(),
+            reach: Some("commons".to_string()),
             metadata_json: None,
         };
         create_relationship(conn, ctx, input).expect("insert relationship");
@@ -751,7 +858,7 @@ mod tests {
             is_bidirectional: false,
             provenance_chain_json: None,
             governance_layer: None,
-            reach: "commons".to_string(),
+            reach: Some("commons".to_string()),
             metadata_json: None,
         };
 
@@ -778,7 +885,7 @@ mod tests {
             is_bidirectional: false,
             provenance_chain_json: None,
             governance_layer: None,
-            reach: "commons".to_string(),
+            reach: Some("commons".to_string()),
             metadata_json: None,
         };
         create_relationship(&mut conn, &lamad_ctx, input).unwrap();

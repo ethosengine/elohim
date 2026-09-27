@@ -29,6 +29,19 @@ headActionHash: string,
  */
 declared: boolean, 
 /**
+ * `true` iff this peer's projection records that the election standing
+ * behind the declared HEAD is EARNED (`content_store::select_canonical_winner`'s
+ * earned tier — a steward's earned canonical, which beats any staging
+ * declaration regardless of recency). `false` = no earned election is
+ * known here: a staging/unmarked election, or none recorded.
+ *
+ * Why it is on the wire: a pipeline seed update can never become
+ * canonical over an earned head (the substrate heals back to it), so a
+ * seeder reads this and leaves stewarded atoms alone. Absent on serving
+ * nodes that predate it — a reader treats absence as "not known earned".
+ */
+earned: boolean, 
+/**
  * The DHT anchor for the resolved row, when notarized. `None` when the HEAD
  * answer rests only on a declared head with no anchor yet.
  */

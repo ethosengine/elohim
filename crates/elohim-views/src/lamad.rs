@@ -102,6 +102,17 @@ pub struct ContentHeadView {
     /// moved the HEAD via the declare authority); `false` when the answer is the
     /// DHT-anchor fallback (the single-author implicit head).
     pub declared: bool,
+    /// `true` iff this peer's projection records that the election standing
+    /// behind the declared HEAD is EARNED (`content_store::select_canonical_winner`'s
+    /// earned tier — a steward's earned canonical, which beats any staging
+    /// declaration regardless of recency). `false` = no earned election is
+    /// known here: a staging/unmarked election, or none recorded.
+    ///
+    /// Why it is on the wire: a pipeline seed update can never become
+    /// canonical over an earned head (the substrate heals back to it), so a
+    /// seeder reads this and leaves stewarded atoms alone. Absent on serving
+    /// nodes that predate it — a reader treats absence as "not known earned".
+    pub earned: bool,
     /// The DHT anchor for the resolved row, when notarized. `None` when the HEAD
     /// answer rests only on a declared head with no anchor yet.
     pub dht_anchor_hash: Option<String>,
@@ -330,6 +341,11 @@ pub struct UpdateContentInputView {
     pub content_body: Option<String>,
     #[serde(default)]
     pub content_format: Option<String>,
+    /// Content type (e.g. `discussion`). On an anchored row a changed type is a
+    /// new signed version: it re-notarizes through the conductor and travels to
+    /// every peer inside the entry they adopt.
+    #[serde(default)]
+    pub content_type: Option<String>,
     /// Shallow-merged into existing metadata: only keys present in this object are updated.
     #[serde(default)]
     pub metadata: Option<JsonVal>,
