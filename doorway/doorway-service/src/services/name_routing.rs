@@ -36,6 +36,8 @@
 //! is answered with the local verdict and never forwarded again, so a cycle of
 //! doorways cannot amplify one client request into a storm.
 
+pub mod standing;
+
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -306,6 +308,9 @@ pub struct HolderContract {
     /// coherence peer: routable by name, never by commitment reference.
     pub commitment_id: Option<String>,
     pub epr_id: Option<String>,
+    /// The declared head the holder advertised for this mount
+    /// (`EprHeadFingerprint::declared_head`). `None` = the holder stated none.
+    pub declared_head: Option<String>,
 }
 
 impl HolderContract {
@@ -318,7 +323,14 @@ impl HolderContract {
             host: None,
             commitment_id: None,
             epr_id: None,
+            declared_head: None,
         }
+    }
+
+    /// Carry the declared head the holder advertised for this mount.
+    pub fn with_declared_head(mut self, declared_head: Option<String>) -> Self {
+        self.declared_head = declared_head;
+        self
     }
 
     pub fn with_projection(
@@ -345,6 +357,8 @@ pub struct NameHolder {
     pub host: Option<String>,
     pub commitment_id: Option<String>,
     pub epr_id: Option<String>,
+    /// See [`HolderContract::declared_head`].
+    pub declared_head: Option<String>,
     pub liveness: HolderLiveness,
     /// How this holder is reached. [`RelayMode::Proxy`] for every holder today.
     pub relay_mode: RelayMode,
@@ -537,6 +551,7 @@ pub fn fold_candidate_holders(
                     host: contract.host.clone(),
                     commitment_id: contract.commitment_id.clone(),
                     epr_id: contract.epr_id.clone(),
+                    declared_head: contract.declared_head.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -615,6 +630,7 @@ pub fn fold_all_holders(
                     host: contract.host.clone(),
                     commitment_id: contract.commitment_id.clone(),
                     epr_id: contract.epr_id.clone(),
+                    declared_head: contract.declared_head.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -1118,6 +1134,7 @@ impl NameRouteTable {
                 host: contract.host.clone(),
                 commitment_id: contract.commitment_id.clone(),
                 epr_id: contract.epr_id.clone(),
+                declared_head: contract.declared_head.clone(),
                 liveness: liveness
                     .get(&contract.doorway_id)
                     .copied()
@@ -1658,6 +1675,7 @@ mod tests {
             host: None,
             commitment_id: None,
             epr_id: None,
+            declared_head: None,
             liveness,
             relay_mode: RelayMode::Proxy,
             shed_weight: WEIGHT_UNCONSTRAINED,

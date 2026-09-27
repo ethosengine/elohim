@@ -283,6 +283,29 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_URL")]
     pub doorway_url: Option<String>,
 
+    /// Directory of public-name membership documents (`<name>.json`, one per
+    /// public name, each listing the origins eligible to serve it — the
+    /// household's relay-addr-beacon `file` sink writes them). When set, a
+    /// request whose `Host` is one of those names is answered only if this
+    /// doorway is a member (it matches its entry by `DOORWAY_URL` /
+    /// `DOORWAY_URLS`, or by owner == `DOORWAY_ID` when it declares no origin)
+    /// or stands for the name (`DOORWAY_PUBLIC_NAMES`): a member serves or
+    /// relays to the name's holder, a withdrawn candidate relays, anyone else
+    /// answers 421, and every such response carries
+    /// `x-elohim-served-by: <doorway id>`. Unset = no public-name rule
+    /// (see `services::name_routing::standing`).
+    #[arg(long, env = "DOORWAY_MEMBERSHIP_DIR")]
+    pub membership_dir: Option<std::path::PathBuf>,
+
+    /// The public names this doorway STANDS FOR — the names whose membership
+    /// its beacon leg competes for (comma-separated). A doorway that stands for
+    /// a name but is momentarily withdrawn from its membership document relays
+    /// requests for it to the name's holder instead of refusing them; only a
+    /// doorway that neither is a member nor stands for the name answers 421.
+    /// Read only when `DOORWAY_MEMBERSHIP_DIR` is set.
+    #[arg(long, env = "DOORWAY_PUBLIC_NAMES", value_delimiter = ',')]
+    pub public_names: Vec<String>,
+
     /// Additional public gateway addresses for this same doorway identity.
     /// Lower list positions receive higher priority in the signed registration.
     #[arg(long, env = "DOORWAY_URLS", value_delimiter = ',')]

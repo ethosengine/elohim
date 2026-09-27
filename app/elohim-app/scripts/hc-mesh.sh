@@ -4690,6 +4690,8 @@ EOF
     env "${gw_a[@]}" "${tls_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
+    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
+    DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-a-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4746,6 +4748,8 @@ EOF
     env "${gw_b[@]}" "${tls_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
+    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
+    DOORWAY_PUBLIC_NAMES="$([ "$MESH_MEMBERSHIP" = "1" ] && membership_names | paste -sd, -)" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-b-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
@@ -4816,6 +4820,7 @@ EOF
     env "${gw_c[@]}" "${tls_c[@]}" \
     DOORWAY_ID="${DOORWAY_C_ID:-gamma-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_C_HEALTH_PORT" \
+    DOORWAY_MEMBERSHIP_DIR="$([ "$MESH_MEMBERSHIP" = "1" ] && echo "$MESH_DIR/membership")" \
     DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-c-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-c" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \

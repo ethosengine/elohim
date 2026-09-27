@@ -58,6 +58,20 @@ pub struct EprHeadFingerprint {
     /// legacy any-host contract; absent decodes empty during a rolling deploy.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hostnames: Vec<String>,
+    /// The DECLARED HEAD this doorway currently serves at this mount: the
+    /// browser bundle blob address its bundle-heads reconciler last read from
+    /// its storage for this EPR on this contract's channel. `None` when this
+    /// doorway has observed no head for it (not a bundle app, or not yet
+    /// reconciled). Read by a sibling that is a member of the same public name
+    /// to decide whether it may serve that name itself or must hand the
+    /// request to the holder (`name_routing::standing`).
+    ///
+    /// **Deliberately OUTSIDE the routing digest** ([`mint_head_set_digest`]
+    /// clears it): the digest says which routes a doorway holds, and a head
+    /// move is not a route change — it must not fire the doorbell or a
+    /// coherence divergence alarm on every publish.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_head: Option<String>,
 }
 
 /// This doorway's full routing-table fingerprint. `digest` is a content-stable
@@ -107,8 +121,16 @@ pub fn mint_head_set_digest(heads: &mut [EprHeadFingerprint]) -> String {
             .then(a.commitment_id.cmp(&b.commitment_id))
             .then(a.hostnames.cmp(&b.hostnames))
     });
+    // The declared head is served beside the route, never part of it.
+    let routes: Vec<EprHeadFingerprint> = heads
+        .iter()
+        .map(|head| EprHeadFingerprint {
+            declared_head: None,
+            ..head.clone()
+        })
+        .collect();
     // dag-cbor of this string-only fingerprint set is infallible.
-    let preimage = serde_ipld_dagcbor::to_vec(&*heads)
+    let preimage = serde_ipld_dagcbor::to_vec(&routes)
         .expect("dag-cbor encode of EprHeadFingerprint set is infallible");
     let mh = Code::Sha2_256.digest(&preimage);
     Cid::new_v1(DAG_CBOR_CODEC, mh).to_string()
@@ -121,14 +143,30 @@ pub fn router_fingerprint(
     doorway_id: &str,
     build_id: Option<&str>,
 ) -> CoherenceManifest {
+    router_fingerprint_with_heads(router, doorway_id, build_id, |_| None)
+}
+
+/// [`router_fingerprint`], with each head's `declared_head` filled from
+/// `declared_head_of` (the served manifest reads the bundle-heads store). The
+/// digest is identical either way — see [`EprHeadFingerprint::declared_head`].
+pub fn router_fingerprint_with_heads(
+    router: &EprRouter,
+    doorway_id: &str,
+    build_id: Option<&str>,
+    declared_head_of: impl Fn(&elohim_views::projection::EprProjectionView) -> Option<String>,
+) -> CoherenceManifest {
     let mut heads: Vec<EprHeadFingerprint> = router
         .projections()
         .into_iter()
-        .map(|projection| EprHeadFingerprint {
-            url_path: projection.url_path,
-            epr_id: projection.epr_id,
-            commitment_id: Some(projection.commitment_id),
-            hostnames: projection.hostnames,
+        .map(|projection| {
+            let declared_head = declared_head_of(&projection);
+            EprHeadFingerprint {
+                url_path: projection.url_path,
+                epr_id: projection.epr_id,
+                commitment_id: Some(projection.commitment_id),
+                hostnames: projection.hostnames,
+                declared_head,
+            }
         })
         .collect();
     // Single shared mint (sorts `heads` in place + returns the CIDv1 digest).
@@ -422,6 +460,19 @@ pub fn should_recompute_self_manifest(cached: Option<&(u64, CoherenceManifest)>,
     }
 }
 
+/// The declared head this doorway serves for one projection: its bundle-heads
+/// store's browser head for (EPR, the contract's channel). ONE definition, used
+/// both for what this doorway advertises and for what it compares against a
+/// holder's advertisement, so the two sides can never read different fields.
+pub fn declared_head_for(
+    bundle_heads: &crate::render::bundle_heads::BundleHeadStore,
+    projection: &elohim_views::projection::EprProjectionView,
+) -> Option<String> {
+    bundle_heads
+        .get_channel(&projection.epr_id, projection.channel)
+        .and_then(|observed| observed.browser)
+}
+
 /// `GET /api/v1/federation/coherence` — this edge's self-fingerprint. The single
 /// missing primitive the diagnostic asked for: per-edge head state externally
 /// inspectable. The `digest` is a CIDv1 dag-cbor (see `router_fingerprint`);
@@ -436,10 +487,12 @@ pub async fn handle_federation_coherence(state: Arc<AppState>) -> Response<Full<
         .unwrap_or_else(|| "unknown".to_string());
     // Process-constant build commit — hoisted into a LazyLock so it is computed
     // once, not per request (it is the same value every time).
-    let manifest = router_fingerprint(
+    let bundle_heads = state.renderer_registry.bundle_heads();
+    let manifest = router_fingerprint_with_heads(
         state.epr_router.as_ref(),
         &doorway_id,
         Some(SELF_BUILD_COMMIT.as_str()),
+        |projection| declared_head_for(&bundle_heads, projection),
     );
     match serde_json::to_string(&manifest) {
         Ok(json) => Response::builder()
@@ -527,6 +580,34 @@ mod tests {
     }
 
     #[test]
+    fn name_routing_declared_head_rides_beside_the_digest_not_inside_it() {
+        let head = |declared: Option<&str>| EprHeadFingerprint {
+            url_path: "/".into(),
+            epr_id: "elohim-host-landing".into(),
+            commitment_id: Some("project-epr-a".into()),
+            hostnames: Vec::new(),
+            declared_head: declared.map(str::to_string),
+        };
+        let mut none = vec![head(None)];
+        let mut one = vec![head(Some("sha256-aaa"))];
+        let mut two = vec![head(Some("sha256-bbb"))];
+        let digest = mint_head_set_digest(&mut none);
+        assert_eq!(digest, mint_head_set_digest(&mut one));
+        assert_eq!(digest, mint_head_set_digest(&mut two));
+        assert_eq!(
+            one[0].declared_head.as_deref(),
+            Some("sha256-aaa"),
+            "the head is kept"
+        );
+        let wire = serde_json::to_value(&one[0]).unwrap();
+        assert_eq!(wire["declaredHead"], "sha256-aaa");
+        assert!(serde_json::to_value(&none[0])
+            .unwrap()
+            .get("declaredHead")
+            .is_none());
+    }
+
+    #[test]
     fn different_heads_produce_different_digest() {
         let a = EprRouter::new();
         a.replace_all(vec![sample_projection("/lamad", "epr-AAA")]);
@@ -563,6 +644,7 @@ mod tests {
                 epr_id: (*epr_id).to_string(),
                 commitment_id: Some(format!("test-{epr_id}")),
                 hostnames: Vec::new(),
+                declared_head: None,
             })
             .collect();
         // Shared mint sorts `heads` in place and returns the CIDv1 digest.

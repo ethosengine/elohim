@@ -392,6 +392,12 @@ pub struct AppState {
     /// See `crate::services::name_routing`.
     pub name_routes: Arc<crate::services::name_routing::NameRouteTable>,
 
+    /// This doorway's current reading of the public-name membership documents
+    /// (`DOORWAY_MEMBERSHIP_DIR`). Empty = no public-name rule. Category C,
+    /// re-read every second, never persisted. See
+    /// `crate::services::name_routing::standing`.
+    pub public_names: Arc<crate::services::name_routing::standing::PublicNameRegistry>,
+
     /// Materialized `/sitemap.xml` cache (spec §7.5): `(generation, xml)`.
     /// Served when the cached generation still matches `epr_router.generation()`;
     /// otherwise re-materialized from the routing table + commons ids and
@@ -840,6 +846,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
+            public_names: Arc::new(
+                crate::services::name_routing::standing::PublicNameRegistry::new(),
+            ),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -966,6 +975,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
+            public_names: Arc::new(
+                crate::services::name_routing::standing::PublicNameRegistry::new(),
+            ),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1107,6 +1119,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
+            public_names: Arc::new(
+                crate::services::name_routing::standing::PublicNameRegistry::new(),
+            ),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1268,6 +1283,9 @@ impl AppState {
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
             name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
+            public_names: Arc::new(
+                crate::services::name_routing::standing::PublicNameRegistry::new(),
+            ),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -2267,6 +2285,31 @@ fn spawn_health_listener(
 }
 
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
+    // Public-name membership (campaign story 2.2): read ONCE before the first
+    // request can arrive, so a doorway never answers a public name from an
+    // empty reading, then refreshed in the background.
+    // An empty value (hc-mesh.sh under MESH_MEMBERSHIP=0) is the same as unset.
+    if let Some(dir) = state
+        .args
+        .membership_dir
+        .clone()
+        .filter(|dir| !dir.as_os_str().is_empty())
+    {
+        crate::services::name_routing::standing::warn_if_blind(
+            &self_origins(&state.args),
+            &self_doorway_id(&state.args),
+        );
+        crate::services::name_routing::standing::warn_if_standing_for_nothing(
+            &state.args.public_names,
+            &self_doorway_id(&state.args),
+        );
+        crate::services::name_routing::standing::start_membership_refresh(
+            Arc::clone(&state.public_names),
+            dir,
+        )
+        .await;
+    }
+
     let listener = TcpListener::bind(state.args.listen).await?;
 
     info!(
@@ -2498,7 +2541,7 @@ where
             // instrument into the outage it exists to prevent.
             let hop_started = std::time::Instant::now();
             let hop_route_class = crate::metrics::classify_route(req.method(), req.uri().path());
-            let response = handle_request(state, addr, req).await?;
+            let response = handle_request_under_names(state, addr, req).await?;
             let hop_elapsed = hop_started.elapsed();
             let hop_outcome = if response.status().is_success() {
                 "ok"
@@ -7145,6 +7188,7 @@ mod name_relay_request_tests {
             host: None,
             commitment_id: None,
             epr_id: None,
+            declared_head: None,
             liveness: HolderLiveness::Serving,
             relay_mode: RelayMode::Proxy,
             shed_weight: WEIGHT_UNCONSTRAINED,
@@ -7382,6 +7426,168 @@ mod name_relay_request_tests {
     }
 }
 
+/// This doorway's federation id — the one `x-elohim-served-by` names under a
+/// public name. Same fallback the relay tier uses.
+fn self_doorway_id(args: &Args) -> String {
+    args.doorway_id
+        .clone()
+        .unwrap_or_else(|| args.node_id.to_string())
+}
+
+/// The origins this doorway declares for itself — how it recognises its own
+/// entry in an origin-keyed membership document.
+fn self_origins(args: &Args) -> Vec<String> {
+    args.doorway_url
+        .iter()
+        .chain(args.doorway_urls.iter())
+        .filter(|origin| !origin.trim().is_empty())
+        .cloned()
+        .collect()
+}
+
+/// Apply `standing::served_under_standing` to one request.
+///
+/// Returns `Some(response)` for a refusal (421) and for a relay the holder
+/// actually answered; `None` means "dispatch below as usual" — not a public
+/// name, a member serving under its own contract, or a relay whose holder did
+/// not answer (this doorway then serves its own bytes rather than nothing: the
+/// name staying up outranks its freshness).
+async fn answer_under_name_standing(
+    state: &Arc<AppState>,
+    is_get: bool,
+    is_upgrade: bool,
+    path: &str,
+    query: Option<&str>,
+    ctx: &RelayContext,
+) -> Option<Response<Full<Bytes>>> {
+    use crate::services::name_routing::standing::{
+        head_agreement, misdirected_response, normalize_names, same_origin, served_under_standing,
+        NameDecision, RequestShape, SelfIdentity,
+    };
+    use crate::services::name_routing::{
+        build_relayed_response, relay_one_hop, relay_precondition, HolderLiveness, NameHolder,
+        RelayChannel, RelayMode, RelayTrigger, RelayVerdict, RouteKey, WEIGHT_UNCONSTRAINED,
+    };
+
+    let membership = state.public_names.snapshot();
+    if membership.is_empty() {
+        return None;
+    }
+    let self_id = self_doorway_id(&state.args);
+    let origins = self_origins(&state.args);
+    let candidate_names = normalize_names(&state.args.public_names);
+    let me = SelfIdentity {
+        doorway_id: &self_id,
+        origins: &origins,
+        candidate_names: &candidate_names,
+    };
+    let shape = RequestShape {
+        relayable: relay_precondition(
+            is_get,
+            is_service_path(path),
+            ctx.hop_seen,
+            RelayTrigger::LessSpecificThanHolder,
+        ),
+        // The admission / declared-shed allow-list: health, `.well-known`,
+        // federation, admin, websocket upgrades. These always answer.
+        refusable: !routes::admin_dev::dev_shed_exempt(path, admission_exempt(path, is_upgrade)),
+    };
+    let key = RouteKey::new(ctx.host.as_deref(), path);
+    // The holder's contract for this (host, path), if it has reached this
+    // doorway's name-route table: its advertised declared head, and its id.
+    let holder_contract = |holder: &crate::services::name_routing::standing::PublicNameMember| {
+        state
+            .name_routes
+            .holders_for(&key, &self_id)
+            .into_iter()
+            .find(|contract| same_origin(&contract.origin, &holder.origin))
+    };
+    let decision = served_under_standing(ctx.host.as_deref(), &membership, &me, shape, |holder| {
+        let own = state
+            .epr_router
+            .dispatch(ctx.host.as_deref(), path)
+            .and_then(|projection| {
+                crate::routes::coherence::declared_head_for(
+                    &state.renderer_registry.bundle_heads(),
+                    &projection,
+                )
+            });
+        let theirs = holder_contract(holder).and_then(|contract| contract.declared_head);
+        head_agreement(own.as_deref(), theirs.as_deref())
+    })?;
+
+    match decision {
+        NameDecision::Serve => None,
+        NameDecision::Refuse {
+            name,
+            member_of,
+            members,
+        } => {
+            info!(
+                name = %name,
+                counter = "doorway_public_name_misdirected_total",
+                "public name: this doorway does not stand for it — 421"
+            );
+            Some(misdirected_response(&name, &self_id, &member_of, &members))
+        }
+        NameDecision::Relay(holder) => {
+            // Reach the holder at the origin its membership entry names. Its
+            // federation id comes from its advertised contract when that has
+            // reached this doorway; otherwise the entry's owner slug stands in.
+            let target = holder_contract(&holder).unwrap_or_else(|| NameHolder {
+                doorway_id: holder.owner.clone(),
+                origin: holder.origin.trim_end_matches('/').to_string(),
+                url_path: "/".to_string(),
+                host: ctx.host.clone(),
+                commitment_id: None,
+                epr_id: None,
+                declared_head: None,
+                liveness: HolderLiveness::default(),
+                relay_mode: RelayMode::Proxy,
+                shed_weight: WEIGHT_UNCONSTRAINED,
+            });
+            let outcome = relay_one_hop(
+                std::slice::from_ref(&target),
+                RelayChannel::Public,
+                |target| {
+                    let client = RELAY_CLIENT.clone();
+                    let path = path.to_string();
+                    let query = query.map(|q| q.to_string());
+                    let ctx = ctx.clone();
+                    async move {
+                        fetch_from_holder(&client, &target, &path, query.as_deref(), &ctx).await
+                    }
+                },
+            )
+            .await;
+            match outcome.verdict {
+                RelayVerdict::Served {
+                    doorway_id,
+                    origin,
+                    reply,
+                } => {
+                    info!(
+                        path = %path,
+                        holder = %doorway_id,
+                        owner = %holder.owner,
+                        counter = "doorway_public_name_relay_total",
+                        "public name: handed to the holder (head differs, or this doorway is withdrawn)"
+                    );
+                    Some(build_relayed_response(&origin, &doorway_id, reply))
+                }
+                RelayVerdict::AllFailed { .. } | RelayVerdict::NoCandidates => {
+                    warn!(
+                        path = %path,
+                        owner = %holder.owner,
+                        "public name: holder did not answer — serving this doorway's own bytes"
+                    );
+                    None
+                }
+            }
+        }
+    }
+}
+
 /// **The wired forward.** Returns `Some(response)` only when a sibling doorway
 /// holding a live contract for this name actually served it; `None` means the
 /// caller keeps its OWN response byte-for-byte — a failed relay never masks a
@@ -7492,6 +7698,44 @@ async fn relay_by_name(
         }
         RelayVerdict::NoCandidates => None,
     }
+}
+
+/// [`handle_request`], with story 2.2's provenance stamp: a response to a
+/// PUBLIC-NAME request names the doorway whose bytes it carries in
+/// `x-elohim-served-by`, whatever path produced it (serve, relay, shed,
+/// refusal). Stamped here, at the one exit, so no early return inside
+/// `handle_request` can forget it. With no membership configured this is
+/// exactly `handle_request`.
+async fn handle_request_under_names(
+    state: Arc<AppState>,
+    addr: SocketAddr,
+    req: Request<Incoming>,
+) -> Result<Response<BoxBody>, hyper::Error> {
+    let public_name_served_by = {
+        let membership = state.public_names.snapshot();
+        if membership.is_empty() {
+            None
+        } else {
+            let host = req
+                .headers()
+                .get(hyper::header::HOST)
+                .and_then(|v| v.to_str().ok());
+            membership
+                .document(host)
+                .map(|_| self_doorway_id(&state.args))
+        }
+    };
+    let mut response = handle_request(state, addr, req).await?;
+    if let Some(self_id) = public_name_served_by {
+        let served_by =
+            crate::services::name_routing::standing::served_by_for_response(&response, &self_id);
+        if let Ok(v) = hyper::header::HeaderValue::from_str(&served_by) {
+            response
+                .headers_mut()
+                .insert(crate::services::name_routing::SERVED_BY_HEADER, v);
+        }
+    }
+    Ok(response)
 }
 
 /// Route incoming HTTP requests
@@ -7642,6 +7886,25 @@ async fn handle_request(
     // The dispatch match below MOVES `state` into its arms; hold an Arc for the
     // post-match relay (cheap refcount bump, not a state copy).
     let relay_state = Arc::clone(&state);
+
+    // ── Public-name standing (serving-edge campaign story 2.2) ────────────────
+    // After the membrane, the declared-shed fixture and admission — a doorway
+    // that is shedding still answers its shed — and before any dispatch: a name
+    // this doorway is not a member of is refused here, and a member whose head
+    // is behind the holder's hands the request to the holder. `None` = serve
+    // below exactly as before (not a public name, or a member serving it).
+    if let Some(response) = answer_under_name_standing(
+        &state,
+        is_get,
+        hyper_tungstenite::is_upgrade_request(&req),
+        &path,
+        relay_query.as_deref(),
+        &relay_ctx,
+    )
+    .await
+    {
+        return Ok(to_boxed(response));
+    }
 
     // A refusal's relative project-epr record belongs to the exact doorway
     // whose current advertised contract named it. Resolve that one holder
@@ -12168,7 +12431,7 @@ mod root_projection_shadow_regression_tests {
                     let io = TokioIo::new(stream);
                     let service = service_fn(move |req: Request<Incoming>| {
                         let state = Arc::clone(&state);
-                        async move { handle_request(state, peer_addr, req).await }
+                        async move { handle_request_under_names(state, peer_addr, req).await }
                     });
                     let _ = http1::Builder::new().serve_connection(io, service).await;
                 });
@@ -12225,6 +12488,136 @@ mod root_projection_shadow_regression_tests {
         .await
         .unwrap_or_else(|_| panic!("PUT {path} did not answer within 5s"))
         .unwrap_or_else(|e| panic!("PUT {path} transport error: {e}"))
+    }
+
+    // ── Story 2.2: public-name standing through a real listener ────────────
+
+    fn state_with_public_names(
+        extra_args: &[&str],
+        documents: Vec<crate::services::name_routing::standing::PublicNameDocument>,
+    ) -> Arc<AppState> {
+        let mut argv = vec![
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--doorway-id",
+            "self-doorway",
+            "--doorway-url",
+            "http://self.test",
+        ];
+        argv.extend_from_slice(extra_args);
+        let state = AppState::new(Args::parse_from(argv));
+        state.epr_router.replace_all(vec![root_projection()]);
+        state.public_names.install(
+            crate::services::name_routing::standing::PublicNameMembership::from_documents(
+                documents,
+            ),
+        );
+        Arc::new(state)
+    }
+
+    fn name_doc(
+        name: &str,
+        members: &[(&str, &str)],
+    ) -> crate::services::name_routing::standing::PublicNameDocument {
+        crate::services::name_routing::standing::PublicNameDocument {
+            name: name.to_string(),
+            members: members
+                .iter()
+                .map(
+                    |(owner, origin)| crate::services::name_routing::standing::PublicNameMember {
+                        owner: owner.to_string(),
+                        origin: origin.to_string(),
+                    },
+                )
+                .collect(),
+        }
+    }
+
+    const SERVED_BY: &str = crate::services::name_routing::SERVED_BY_HEADER;
+
+    #[tokio::test]
+    async fn name_routing_without_a_membership_dir_nothing_changes() {
+        let addr = spawn_test_doorway(state_with_root_projection()).await;
+        let response = get_as_host(addr, "/api/v1/federation/coherence", "elohim.local").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().get(SERVED_BY).is_none());
+        let root = get_as_host(addr, "/", "elohim.local").await;
+        assert_ne!(root.status(), StatusCode::MISDIRECTED_REQUEST);
+        assert!(root.headers().get(SERVED_BY).is_none());
+    }
+
+    #[tokio::test]
+    async fn name_routing_the_doorways_own_origin_is_not_a_public_name() {
+        let state = state_with_public_names(
+            &[],
+            vec![name_doc("elohim.local", &[("other", "http://other.test")])],
+        );
+        let addr = spawn_test_doorway(state).await;
+        let own = addr.to_string();
+        let response = get_as_host(addr, "/", &own).await;
+        assert_ne!(response.status(), StatusCode::MISDIRECTED_REQUEST);
+        assert!(response.headers().get(SERVED_BY).is_none());
+    }
+
+    #[tokio::test]
+    async fn name_routing_a_name_this_doorway_does_not_stand_for_is_421_naming_members() {
+        let state = state_with_public_names(
+            &[],
+            vec![name_doc(
+                "elohim.local",
+                &[("alpha", "http://alpha.test"), ("apex", "http://apex.test")],
+            )],
+        );
+        let addr = spawn_test_doorway(state).await;
+        let response = get_as_host(addr, "/", "elohim.local").await;
+        assert_eq!(response.status(), StatusCode::MISDIRECTED_REQUEST);
+        assert_eq!(response.headers()[SERVED_BY], "self-doorway");
+        let body: serde_json::Value = response.json().await.expect("421 body is JSON");
+        assert_eq!(body["name"], "elohim.local");
+        assert_eq!(
+            body["members"],
+            serde_json::json!([
+                {"owner": "alpha", "origin": "http://alpha.test"},
+                {"owner": "apex", "origin": "http://apex.test"}
+            ])
+        );
+        // Operational surfaces answer whatever Host the caller used.
+        let coherence = get_as_host(addr, "/api/v1/federation/coherence", "elohim.local").await;
+        assert_eq!(coherence.status(), StatusCode::OK);
+        assert_eq!(coherence.headers()[SERVED_BY], "self-doorway");
+    }
+
+    #[tokio::test]
+    async fn name_routing_the_holder_answers_its_name_and_names_itself() {
+        let state = state_with_public_names(
+            &[],
+            vec![name_doc(
+                "elohim.local",
+                &[("self", "http://self.test/"), ("apex", "http://apex.test")],
+            )],
+        );
+        let addr = spawn_test_doorway(state).await;
+        let response = get_as_host(addr, "/api/v1/federation/coherence", "Elohim.Local:8889").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[SERVED_BY], "self-doorway");
+        let root = get_as_host(addr, "/", "elohim.local").await;
+        assert_ne!(root.status(), StatusCode::MISDIRECTED_REQUEST);
+        assert_eq!(root.headers()[SERVED_BY], "self-doorway");
+    }
+
+    #[tokio::test]
+    async fn name_routing_a_withdrawn_candidate_serves_when_the_holder_is_unreachable() {
+        // The holder's origin refuses connections, so the one hop fails and
+        // this doorway answers itself instead of refusing its own name.
+        let state = state_with_public_names(
+            &["--public-names", "elohim.local"],
+            vec![name_doc("elohim.local", &[("apex", "http://127.0.0.1:1")])],
+        );
+        let addr = spawn_test_doorway(state).await;
+        let response = get_as_host(addr, "/", "elohim.local").await;
+        assert_ne!(response.status(), StatusCode::MISDIRECTED_REQUEST);
+        assert_eq!(response.headers()[SERVED_BY], "self-doorway");
     }
 
     #[tokio::test]

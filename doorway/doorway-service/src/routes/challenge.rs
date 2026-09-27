@@ -607,6 +607,12 @@ async fn relay_challenge_post(
                 crate::services::name_routing::SERVED_BY_HEADER,
                 holder.origin.clone(),
             )
+            // Marks the answer as the holder's, so a public-name stamp names
+            // the holder rather than relabelling it as this courier's.
+            .header(
+                crate::services::name_routing::NAME_ROUTE_HEADER,
+                format!("relay:{}", holder.doorway_id),
+            )
             .body(Full::new(Bytes::from(bytes.to_vec())))
             .unwrap_or_else(|_| not_found(epr_id, Some(self_id)));
     }
