@@ -241,6 +241,37 @@ def _unmeasured(report):
     return isinstance(asked, int) and not isinstance(asked, bool) and asked == 0
 
 
+def _distinct_sweeps(reports):
+    """Collapse RUNS of reports that carry the same `sweeps` value into ONE observation (the
+    last of each run). The self-report is published once per completed sweep, so N polls that
+    land between two sweep completions re-read ONE published sweep — they are one witness, not
+    N. "Sustained >= LAG_POLLS" must mean LAG_POLLS sweeps, never one sweep read LAG_POLLS
+    times.
+
+    This is an EQUALITY test between adjacent samples, not counter arithmetic, so it keeps the
+    multi-process lesson in `_projector_lag` (a non-monotonic 88, 109, 21 stays three
+    observations); it is the same "the sweep counter must MOVE" rule the unmeasured arm has
+    carried since 2026-09-26, now applied to the measured arm too.
+
+    WHY (measured 2026-09-27, fp 6cdded115d74, alpha/matthew): after a storage restart the
+    fresh process published sweep 5 (`pending 48, failed 3, converged false`) and the next
+    sweep took long enough that polls 201-203 — three SessionStart polls minutes apart — all
+    read that one byte-identical report. The measured arm filed "healed NOTHING ... over 5-5
+    sweeps"; sweep 6 published `converged: true` before triage could re-fetch. The 2026-09-24
+    filing of 79f357281ca5 already showed two polls inside one sweep (159, 160) and named this
+    risk for matthew; this is it happening in full. A report without an int `sweeps` is kept
+    as its own observation (field-presence-tolerant — `_heals_nothing` rejects it anyway)."""
+    out = []
+    for r in reports:
+        sw = r.get("sweeps")
+        if (out and isinstance(sw, int) and not isinstance(sw, bool)
+                and out[-1].get("sweeps") == sw):
+            out[-1] = r
+        else:
+            out.append(r)
+    return out
+
+
 def _projector_lag(node, samples):
     """Projector exhaustion: lagSeconds over threshold, or the projector is SWEEPING AND
     HEALING NOTHING, across LAG_POLLS polls. Absent `projector` => no signal.
@@ -318,8 +349,8 @@ def _projector_lag(node, samples):
                 return finding(f"observed NOTHING (peersAsked 0 over {min(sweeps)}-"
                                f"{max(sweeps)} sweeps, converged=false)")
             return None
-        measured = [r for r in (_reconcile_report(s) for s in samples)
-                    if r is not None and not _unmeasured(r)][-LAG_POLLS:]
+        measured = _distinct_sweeps([r for r in (_reconcile_report(s) for s in samples)
+                                     if r is not None and not _unmeasured(r)])[-LAG_POLLS:]
         if len(measured) == LAG_POLLS and all(_heals_nothing(r) for r in measured):
             sweeps = [r["sweeps"] for r in measured]
             return finding(f"healed NOTHING (healedTotal 0 over {min(sweeps)}-{max(sweeps)} "
