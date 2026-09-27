@@ -147,12 +147,12 @@ describe('reachReconcileTargets', () => {
 });
 
 describe('deferToSteward', () => {
-  const update = {
-    kind: 'update' as const,
+  const update: SeedDecision = {
+    kind: 'update',
     id: 'fct-module-01-church-dilemma',
     seedHash: 'sha256-new',
-    via: 'seedHash' as const,
-    patch: {},
+    via: 'seedHash',
+    patch: { title: 'The Church Dilemma', tags: [], metadata: {} },
     unpatchable: [],
   };
 

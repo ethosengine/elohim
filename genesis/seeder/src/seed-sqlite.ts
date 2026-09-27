@@ -770,16 +770,18 @@ const UPDATE_CONCURRENCY = 8;
  * bounded (≤5s) P2P resolve for the id — the cost of a read-miss here.
  */
 /**
- * GET /db/content/{id}/head — whether a steward earned the row's canonical head.
- * Read only for rows the repository has changed. Any failure reads as "not
- * earned", so the seeder falls back to its normal update (which storage itself
- * refuses to let outrank an earned head).
+ * GET /db/content/{id}/head?election=live — whether a steward earned the row's
+ * canonical head, resolved by the peer's own conductor rather than the peer's cached
+ * column (a peer that adopted the head through an unordered path can hold a stale
+ * "not earned"). Read only for rows the repository has changed. Any failure reads
+ * as "not earned", so the seeder falls back to its normal update (which storage
+ * itself refuses to let outrank an earned head).
  */
 async function lookupStoredHead(id: string): Promise<StoredHead | undefined> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
   try {
-    const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}/head`, {
+    const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}/head?election=live`, {
       signal: controller.signal,
     });
     if (response.status !== 200) return undefined;
