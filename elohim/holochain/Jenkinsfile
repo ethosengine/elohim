@@ -156,6 +156,100 @@ def fetchHappFromHarbor(String destPath, String version = null) {
 }
 
 /**
+ * The hApp tag this run packages — resolved once, then reused by every stage
+ * that fetches it (env.HAPP_SOURCE_TAG), so the edge image and the installer
+ * image never carry different bytes.
+ *
+ * Standalone run (no HAPP_CANDIDATE_TAG): the floating tag, as before.
+ * Orchestrator run beside the DNA job (genesis/orchestrator/Jenkinsfile
+ * BARRIER_PAIRS): wait for the DNA job's per-commit candidate
+ * (scripts/ci/await-happ-candidate.sh, bounded at 2400 s) and package exactly
+ * those bytes. A candidate still absent at the deadline marks the run
+ * UNSTABLE and falls back to the floating tag — loudly, never silently.
+ * Deploying is gated separately on the DNA verdict (awaitDnaVerdict).
+ */
+def resolveHappSourceTag() {
+    if (env.HAPP_SOURCE_TAG) { return env.HAPP_SOURCE_TAG }
+    String tag = getHappFloatingTag()
+    String candidate = params.HAPP_CANDIDATE_TAG ?: ''
+    if (candidate) {
+        int rc = 1
+        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+            rc = sh(script: "bash '${env.WORKSPACE}/scripts/ci/await-happ-candidate.sh' '${candidate}' 2400", returnStatus: true)
+        }
+        if (rc == 0) {
+            tag = candidate
+        } else {
+            unstable("hApp candidate ${candidate} absent (await exit ${rc}) — packaging the floating ${tag} instead; DNA run ${params.DNA_RUN_ID ?: '?'} never published it")
+            echo "⚠️⚠️  FALLBACK: this edge build packages elohim-happ:${tag}, NOT the candidate ${candidate} of the DNA run it was started beside"
+        }
+    }
+    env.HAPP_SOURCE_TAG = tag
+    return tag
+}
+
+/** Fetch the hApp this run packages (resolveHappSourceTag) into destPath. */
+def fetchEdgeHapp(String destPath) {
+    String tag = resolveHappSourceTag()
+    echo "hApp source: elohim-happ:${tag} (expected HAPP_VERSION ${parseVersionFile()['HAPP_VERSION'] ?: 'unknown'})"
+    return fetchHappFromHarbor(destPath, tag)
+}
+
+/**
+ * The DNA verdict barrier (Review Focus 4 of the one-head-delivered plan):
+ * the orchestrator starts this edge run beside the DNA job, so edge may
+ * already have built against the DNA's candidate hApp when the DNA sweettest
+ * goes red. A fleet never rolls on an unattested DNA: the deploy waits for
+ * the DNA run it was handed and refuses unless that run ended SUCCESS —
+ * UNSTABLE, NOT_BUILT, ABORTED and FAILURE all refuse.
+ * propagateAbort:false — aborting this edge run never aborts the DNA run.
+ *
+ * The wait spends this run's own 240-minute budget (options timeout). After a
+ * SUCCESS verdict the deploy starts only if the time left still covers the roll
+ * plus validation (scripts/ci/edge-deploy-budget.sh): 115 min = the alpha roll
+ * (56 min, edge #1463) + the Dataplane Validation bound (55 min) = 111, plus 4
+ * because the helper floors elapsed time to whole minutes and the stages
+ * between the verdict and the roll take a minute or two. A killed roll leaves
+ * mixed images; a refused deploy is named and re-selected next push: the
+ * refusal is published as a `DEPLOY-REFUSED:` build description
+ * (edgeRunDescription), which the orchestrator reads to hold this run's baseline.
+ *
+ * Every deploy stage (Alpha, Staging, Prod) opens with it; Dataplane
+ * Validation is skipped after a refusal (env.DEPLOY_REFUSED).
+ */
+def awaitDnaVerdict() {
+    if (!params.DNA_RUN_ID) { return true }   // standalone/manual edge run: today's behaviour
+    if (env.DNA_VERDICT) { return env.DEPLOY_REFUSED != 'true' }   // every deploy stage asks; one wait, one line
+    def dna = waitForBuild(runId: params.DNA_RUN_ID, propagate: false, propagateAbort: false)
+    env.DNA_VERDICT = dna.result
+    env.DEPLOY_REFUSED = 'true'
+    env.DEPLOY_REFUSED_REASON = "DNA run ${params.DNA_RUN_ID} ended ${dna.result}"
+    currentBuild.description = edgeRunDescription()
+    if (dna.result != 'SUCCESS') { unstable("deploy refused: DNA run ${params.DNA_RUN_ID} ended ${dna.result} — a fleet never rolls on an unattested DNA"); return false }
+    int budget = sh(script: "bash '${env.WORKSPACE}/scripts/ci/edge-deploy-budget.sh' ${currentBuild.startTimeInMillis} 240 115", returnStatus: true)
+    env.DEPLOY_REFUSED_REASON = "DNA verdict too late for the 240-min budget"
+    currentBuild.description = edgeRunDescription()
+    if (budget != 0) { unstable("deploy refused: DNA run ${params.DNA_RUN_ID} verdict came too late for this run's 240-min budget (edge-deploy-budget.sh exit ${budget})"); return false }
+    env.DEPLOY_REFUSED = 'false'
+    currentBuild.description = edgeRunDescription()
+    return true
+}
+
+/**
+ * This run's build description. A refused deploy leads with `DEPLOY-REFUSED:`
+ * — the orchestrator's dispatchResult reads that prefix (deployRefused) to
+ * hold this run's baseline, so the post-always summary keeps it first.
+ */
+def edgeRunDescription() {
+    def summary = [
+        env.HAPP_AVAILABLE == 'true' ? 'hApp:OK' : 'hApp:NO',
+        env.IMAGES_PUSHED == 'true' ? 'Push:OK' : 'Push:Skip',
+        env.EDGE_NODE_HEALTHY == 'true' ? 'Deploy:OK' : 'Deploy:?'
+    ].join(' | ')
+    return env.DEPLOY_REFUSED == 'true' ? "DEPLOY-REFUSED: ${env.DEPLOY_REFUSED_REASON} | ${summary}" : summary
+}
+
+/**
  * Federation-peer public-boundary health (alpha-b / elohim.host), non-blocking.
  * Every post-deploy probe used to point at the PRIMARY only, so a deploy that
  * left the federation peer publicly unhealthy was invisible (the alpha-b APPLY
@@ -2208,6 +2302,8 @@ spec:
             defaultValue: 'build',
             description: 'build|deploy|verify|measure|profile (orchestrator-derived). Below deploy = validate-only.'
         )
+        string(name: 'DNA_RUN_ID', defaultValue: '', description: 'Orchestrator-set DNA run; the deploy waits for its verdict')
+        string(name: 'HAPP_CANDIDATE_TAG', defaultValue: '', description: 'Orchestrator-set hApp candidate tag this run packages')
     }
 
     options {
@@ -2636,23 +2732,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building Edge Node image: ${IMAGE_TAG}"
 
-                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
-                            echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappFromHarbor('elohim/holochain/edgenode/elohim.happ')
+                            def haveHapp = fetchEdgeHapp('elohim/holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
-                                // DNA version awareness (Sprint 5)
-                                def versionMap = parseVersionFile()
-                                def expectedHappVersion = versionMap['HAPP_VERSION'] ?: 'unknown'
-                                def happTag = getHappFloatingTag()
-                                echo """
-    ═══════════════════════════════════════════
-    DNA ARTIFACT INFO
-    ═══════════════════════════════════════════
-    Expected HAPP_VERSION: ${expectedHappVersion}
-    Fetched via tag:       ${happTag}
-    ═══════════════════════════════════════════"""
-
                                 env.HAPP_AVAILABLE = 'true'
                                 sh """#!/bin/bash
                                     set -euo pipefail
@@ -2698,9 +2780,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building hApp Installer image: ${IMAGE_TAG}"
 
-                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
-                            echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappFromHarbor('elohim/holochain/edgenode/scripts/elohim.happ')
+                            def haveHapp = fetchEdgeHapp('elohim/holochain/edgenode/scripts/elohim.happ')
 
                             if (haveHapp) {
                                 sh """#!/bin/bash
@@ -2835,6 +2915,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
+                        if (!awaitDnaVerdict()) { return }
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
@@ -3010,6 +3091,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.DEPLOY_REFUSED != 'true' }
                     anyOf {
                         branch 'dev'
                         allOf {
@@ -3055,6 +3137,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             steps {
                 container('builder') {
                     script {
+                        if (!awaitDnaVerdict()) { return }
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
@@ -3122,6 +3205,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
             steps {
                 container('builder') {
                     script {
+                        if (!awaitDnaVerdict()) { return }
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
@@ -3269,11 +3353,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
 
                 echo summary
 
-                currentBuild.description = [
-                    env.HAPP_AVAILABLE == 'true' ? 'hApp:OK' : 'hApp:NO',
-                    env.IMAGES_PUSHED == 'true' ? 'Push:OK' : 'Push:Skip',
-                    env.EDGE_NODE_HEALTHY == 'true' ? 'Deploy:OK' : 'Deploy:?'
-                ].join(' | ')
+                currentBuild.description = edgeRunDescription()
             }
         }
         success {

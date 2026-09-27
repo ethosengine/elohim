@@ -411,8 +411,37 @@ def orderByDependencies(pipelineList) {
 }
 
 /**
+ * Producer → consumer pairs whose dependency is a BARRIER INSIDE the consumer,
+ * not a job-level wait (one-head-delivered sprint, Lane C2). elohim-edge
+ * declares dependsOn elohim-holochain for two real needs: the packed hApp
+ * (its build-edge-image step depends only on elohim-holochain:build-happ) and
+ * the DNA verdict before a fleet roll. The DNA job publishes a per-commit
+ * candidate hApp before its sweettest (scripts/ci/push-happ-candidate.sh); edge
+ * waits for that tag (scripts/ci/await-happ-candidate.sh) and, at
+ * `Deploy Edge Node - Alpha`, for the DNA run's verdict (awaitDnaVerdict). So
+ * both start in the SAME level and the orchestrator hands edge the DNA run ID
+ * and the candidate tag (barrierParams). The level still ends only when both
+ * finish, so every later level (app, genesis) sees DNA's verdict as before.
+ *
+ * Declared here, not in build-manifest.json: both the orchestrator manifest
+ * schema and the rakia source schema (elohim/rakia/schemas/v1) forbid
+ * additional properties and type dependsOn items as plain strings.
+ * pipeline-budget.test.mjs reads this map from this file to price the chain.
+ */
+@Field Map BARRIER_PAIRS = ['elohim-holochain': 'elohim-edge']
+
+/** The barrier producer whose consumer is `consumer`, or null. */
+@NonCPS
+def barrierProducerOf(String consumer) {
+    return BARRIER_PAIRS.find { it.value == consumer }?.key
+}
+
+/**
  * Group pipelines into dependency levels for parallel execution.
- * Pipelines in the same level have no dependencies on each other.
+ * Pipelines in the same level have no dependencies on each other, except a
+ * BARRIER_PAIRS producer and its consumer: the consumer's readiness ignores
+ * that producer, and the producer is held until its selected consumer is
+ * ready, so the pair always shares a level.
  * Genesis is excluded (always runs last after all builds succeed).
  * Reads dependency metadata from build-manifest.json via getPipelineMetadata().
  */
@@ -422,11 +451,18 @@ def groupByDependencyLevel(pipelineList) {
     def placed = [] as Set
 
     while (placed.size() < nonGenesis.size()) {
-        def currentLevel = nonGenesis.findAll { name ->
+        def ready = nonGenesis.findAll { name ->
             if (placed.contains(name)) return false
-            def deps = getPipelineMetadata(name).dependsOn ?: []
+            def deps = (getPipelineMetadata(name).dependsOn ?: []) - [barrierProducerOf(name)]
             deps.every { dep -> !nonGenesis.contains(dep) || placed.contains(dep) }
         }
+        // Hold a barrier producer back until its consumer joins it; if the
+        // consumer can never be placed, the producer still runs (never dropped).
+        def currentLevel = ready.findAll { name ->
+            def consumer = BARRIER_PAIRS[name]
+            !consumer || !nonGenesis.contains(consumer) || ready.contains(consumer)
+        }
+        if (currentLevel.isEmpty()) currentLevel = ready
         if (currentLevel.isEmpty()) break
         levels.add(currentLevel)
         placed.addAll(currentLevel)
@@ -584,7 +620,12 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
  * this level; the caller still ends the run FAILURE.
  */
 def doomDependents(List ran, List pipelines, Map results, Map pipelineBaselines) {
-    def levelFailed = ran.findAll { !results[it]?.success }
+    holdBarrierConsumers(ran, results, pipelineBaselines)
+    // A consumer skipped because its barrier producer failed to start is
+    // SKIPPED-BY-UPSTREAM-FAILURE: that producer is the failure, counted once —
+    // but only when the producer really is failed here; otherwise the skip counts.
+    def failedHere = ran.findAll { !results[it]?.success }
+    def levelFailed = failedHere.findAll { results[it]?.result != 'SKIPPED-BY-UPSTREAM-FAILURE' || !failedHere.contains(results[it]?.upstream) }
     if (!levelFailed) return []
     // Checkpoint BEFORE the fallible doom walk: a throw below degrades to the
     // old fail-fast with every verdict and baseline already handed to post.
@@ -599,6 +640,31 @@ def doomDependents(List ran, List pipelines, Map results, Map pipelineBaselines)
     env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
     echo "❌ ${levelFailed.join(', ')} failed — dooming ${doomed ?: 'nothing'}; unrelated pipelines continue"
     return levelFailed
+}
+
+/**
+ * A BARRIER_PAIRS consumer dispatched with its producer's run ID (result
+ * barrierRun) that REFUSED its deploy ends UNSTABLE, which recordPipelineResult
+ * reads as delivered. Put its baseline back to the pre-level value so the next
+ * push re-selects it. Refused means either:
+ *   · deployRefused — edge published `DEPLOY-REFUSED:` (DNA verdict not
+ *     SUCCESS, or a SUCCESS verdict too late for its own budget); or
+ *   · the producer's verdict is not SUCCESS (UNSTABLE included, which
+ *     dispatchResult counts as success) — edge never rolls on that, even if it
+ *     never reached a deploy stage to say so.
+ * A consumer that ran standalone (no barrierRun) is left alone: it deployed.
+ * env.PIPELINE_BASELINES still holds the previous level's checkpoint here —
+ * doomDependents calls this before any checkpoint write of its own.
+ */
+def holdBarrierConsumers(List ran, Map results, Map pipelineBaselines) {
+    BARRIER_PAIRS.each { producer, consumer ->
+        def c = results[consumer]
+        if (!ran.contains(producer) || !c?.barrierRun || !c?.success) return
+        if (!c.deployRefused && results[producer]?.result == 'SUCCESS') return
+        def before = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+        if (before.containsKey(consumer)) { pipelineBaselines[consumer] = before[consumer] } else { pipelineBaselines.remove(consumer) }
+        echo "⏸️ ${consumer}: baseline held — it refused its deploy (${producer} ${results[producer]?.result}, deployRefused=${c.deployRefused == true})"
+    }
 }
 
 /**
@@ -889,7 +955,11 @@ def dispatchResult(Object result, boolean waited) {
         result: result.result,
         duration: result.duration,
         url: result.absoluteUrl,
-        buildNumber: result.number
+        buildNumber: result.number,
+        // Edge publishes a refused deploy (DNA verdict or budget) as a
+        // description starting `DEPLOY-REFUSED:` (edgeRunDescription), so an
+        // UNSTABLE that delivered nothing is told apart from an ordinary one.
+        deployRefused: (result.description ?: '').toString().startsWith('DEPLOY-REFUSED:')
     ]
 }
 
@@ -960,7 +1030,7 @@ def needsDetachedDependencyBarrier(String producer, List selectedPipelines) {
  * run. The installed Pipeline Build Step exposes waitForStart,
  * RunWrapper.externalizableId, and waitForBuild(propagateAbort:false).
  */
-def awaitDetachedBuild(String jobName, String jobBranch, List buildParams) {
+def awaitDetachedBuild(String jobName, String jobBranch, List buildParams, Map barrierRuns = null, String name = null) {
     def started = build(
         job: "${jobName}/${jobBranch}",
         waitForStart: true,
@@ -970,11 +1040,106 @@ def awaitDetachedBuild(String jobName, String jobBranch, List buildParams) {
     if (!started?.externalizableId) {
         error "Detached dependency '${jobName}/${jobBranch}' started without a durable run ID"
     }
+    // A BARRIER_PAIRS producer hands its durable run ID to the consumer's
+    // branch in the same level (barrierParams) the moment it has one.
+    if (barrierRuns?.containsKey(name)) barrierRuns[name] = started.externalizableId
     return waitForBuild(
         runId: started.externalizableId,
         propagate: false,
         propagateAbort: false
     )
+}
+
+/**
+ * The BARRIER_PAIRS producers in a level whose consumer is in the same level,
+ * as producer → null. The producer's branch fills the slot with its durable run
+ * ID, or with a marker when it never got one (BARRIER_NOT_PROVISIONED from
+ * triggerPipeline's "No item named" branch, BARRIER_FAILED_START from
+ * triggerInLevel's finally for anything else). The consumer's branch waits for
+ * the slot (triggerInLevel) before it dispatches.
+ */
+@Field String BARRIER_FAILED_START = 'FAILED-TO-START'
+@Field String BARRIER_NOT_PROVISIONED = 'NOT_PROVISIONED'
+@Field long BARRIER_START_WAIT_MS = 60L * 60 * 1000
+
+def barrierRunsIn(List runnable) {
+    def slots = [:]
+    BARRIER_PAIRS.each { producer, consumer ->
+        if (runnable.contains(producer) && runnable.contains(consumer)) slots[producer] = null
+    }
+    return slots
+}
+
+/** The producer run ID in a slot, or null for an empty slot or a marker. */
+@NonCPS
+def barrierRunId(Object slot) {
+    String v = slot?.toString()
+    return (v && v != BARRIER_FAILED_START && v != BARRIER_NOT_PROVISIONED) ? v : null
+}
+
+/**
+ * One member of a PARALLEL level (the whole branch body, so nothing a branch
+ * does can leave a barrier slot unfilled).
+ *
+ * Producer: dispatched as usual; the `finally` writes BARRIER_FAILED_START when
+ * it never reached a run ID (a throw before or inside build(waitForStart), an
+ * abort in the queue), which releases its consumer.
+ *
+ * Consumer: waits (bounded, BARRIER_START_WAIT_MS) for its producer's slot.
+ *   run ID          → dispatched with DNA_RUN_ID + HAPP_CANDIDATE_TAG (barrierParams);
+ *                     the result carries barrierRun so holdBarrierConsumers can
+ *                     hold its baseline if the producer's verdict is not SUCCESS.
+ *   NOT_PROVISIONED → the producer job does not exist: the consumer runs standalone,
+ *                     exactly as a run without a producer does.
+ *   anything else   → NOT dispatched: SKIPPED-BY-UPSTREAM-FAILURE. A consumer that
+ *                     ran standalone here would roll the fleet on a DNA that
+ *                     never ran at all.
+ */
+def triggerInLevel(String name, List pipelines, List changedFiles, Map barrierRuns) {
+    try {
+        String producer = barrierProducerOf(name)
+        String runId = null
+        if (producer && barrierRuns?.containsKey(producer)) {
+            long deadline = System.currentTimeMillis() + BARRIER_START_WAIT_MS
+            waitUntil(quiet: true) { barrierRuns[producer] != null || System.currentTimeMillis() > deadline }
+            if (barrierRuns[producer] == null) {
+                // The producer may still start and even succeed later: this is a
+                // failure of THIS dispatch, counted in levelFailed, dooming dependents.
+                echo "❌ ${name}: not dispatched — ${producer} had no run ID within ${BARRIER_START_WAIT_MS / 60000} min"
+                return [success: false, result: 'SKIPPED-PRODUCER-NOT-STARTED', upstream: producer]
+            }
+            runId = barrierRunId(barrierRuns[producer])
+            if (!runId && barrierRuns[producer] != BARRIER_NOT_PROVISIONED) {
+                echo "⏭️ ${name}: not dispatched — ${producer} failed to start (${barrierRuns[producer]})"
+                return [success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: producer]
+            }
+        }
+        def dependencyBarrier = needsDetachedDependencyBarrier(name, pipelines)
+        def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier, barrierRuns)
+        if (runId) result.barrierRun = runId
+        return result
+    } finally {
+        if (barrierRuns?.containsKey(name) && barrierRuns[name] == null) barrierRuns[name] = BARRIER_FAILED_START
+    }
+}
+
+/**
+ * The two parameters that move a consumer's dependency inside it: DNA_RUN_ID
+ * (the producer run whose verdict gates the consumer's deploy) and
+ * HAPP_CANDIDATE_TAG (the per-commit hApp the producer publishes before its
+ * tests: `candidate-<commit8>`, the same `git rev-parse HEAD | cut -c1-8` value
+ * the DNA pipeline stamps as GIT_COMMIT_HASH). Empty when this consumer has no
+ * producer run beside it — the consumer then runs exactly as a standalone run
+ * does (floating hApp, no verdict wait). triggerInLevel has already waited
+ * for the slot.
+ */
+def barrierParams(String consumer, Map barrierRuns) {
+    String producer = barrierProducerOf(consumer)
+    String runId = producer ? barrierRunId(barrierRuns?.get(producer)) : null
+    if (!runId) return []
+    String tag = "candidate-${(env.GIT_COMMIT_FULL ?: '').take(8)}"
+    echo "🔗 ${consumer} starts beside ${producer} ${runId}: packages ${tag}, deploys only on its SUCCESS"
+    return [stringParam(name: 'DNA_RUN_ID', value: runId), stringParam(name: 'HAPP_CANDIDATE_TAG', value: tag)]
 }
 
 /**
@@ -1014,7 +1179,7 @@ String changedPathsParam(List changedFiles) {
     return ''
 }
 
-def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = [], boolean dependencyBarrier = false) {
+def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = [], boolean dependencyBarrier = false, Map barrierRuns = null) {
     def config = getPipelineMetadata(name)
     if (!config.jenkinsPath) {
         error "Cannot dispatch pipeline '${name}': no jenkinsPath in its build-manifest.json"
@@ -1098,9 +1263,11 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
             buildParams.add(booleanParam(name: 'RESET_STORAGE', value: resetStorage))
         }
 
+        buildParams.addAll(barrierParams(name, barrierRuns))
+
         def result
         if (detachedBarrier) {
-            result = awaitDetachedBuild(jobName, jobBranch, buildParams)
+            result = awaitDetachedBuild(jobName, jobBranch, buildParams, barrierRuns, name)
         } else {
             result = build(
                 job: "${jobName}/${jobBranch}",
@@ -1123,6 +1290,7 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // See .claude/shifts/2026-05-17T15-57-rca-orchestrator-963-graph-failure
         // for the RCA that motivated this branch.
         if (e.message?.contains('No item named')) {
+            if (barrierRuns?.containsKey(name) && barrierRuns[name] == null) barrierRuns[name] = BARRIER_NOT_PROVISIONED
             return [
                 success: true,
                 skipped: true,
@@ -2224,7 +2392,8 @@ spec:
 
     options {
         // Longest-chain sum of downstream budgets + own stages; see pipeline-budget.test.mjs.
-        timeout(time: 780, unit: 'MINUTES')
+        // 630 = conductor 90 → max(DNA, edge) 240 → app 180 → genesis 90, +30 (BARRIER_PAIRS; was 780).
+        timeout(time: 630, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
@@ -2655,6 +2824,7 @@ spec:
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
                             def runnable = undoomedInLevel(level, results)
+                            def barrierRuns = barrierRunsIn(runnable)
                             if (runnable.size() == 1) {
                                 def name = runnable[0]
                                 echo "🔨 Building: ${name}"
@@ -2672,9 +2842,8 @@ spec:
                                 runnable.each { name ->
                                     parallelBuilds[name] = {
                                         echo "🔨 Building: ${name}"
-                                        // wait=null → auto-derive per longRunning
-                                        def dependencyBarrier = needsDetachedDependencyBarrier(name, pipelines)
-                                        def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier)
+                                        // wait=null → auto-derive per longRunning (inside triggerInLevel)
+                                        def result = triggerInLevel(name, pipelines, changedFiles, barrierRuns)
                                         results[name] = result
                                         recordPipelineResult(name, result, pipelineBaselines)
                                     }

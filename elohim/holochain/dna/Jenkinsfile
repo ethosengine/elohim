@@ -199,6 +199,32 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
     }
 }
 
+/**
+ * Publish this build's packed hApp as `elohim-happ:candidate-<commit8>` right
+ * after `Build DNA`, before the sweettest (scripts/ci/push-happ-candidate.sh).
+ * The orchestrator starts elohim-edge beside this job and hands it the same
+ * tag (HAPP_CANDIDATE_TAG); edge packages these bytes as soon as they exist
+ * and refuses to DEPLOY until this run ends SUCCESS (awaitDnaVerdict). The
+ * floating tags still move only at `Push to Harbor`, after the sweettest.
+ *
+ * A failed candidate publish never fails the DNA build: edge then waits out
+ * its bounded deadline, goes UNSTABLE and falls back to the floating tag,
+ * loudly — the same bytes it fetched before this barrier existed.
+ * Runs with cwd = elohim/holochain/dna/elohim (elohim.happ, dna-hashes.actual).
+ */
+def pushHappCandidate(String commit) {
+    withCredentials([usernamePassword(
+        credentialsId: 'harbor-robot-registry',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+    )]) {
+        int rc = sh(script: "bash '${env.WORKSPACE}/scripts/ci/push-happ-candidate.sh' '${commit}'", returnStatus: true)
+        if (rc != 0) {
+            echo "⚠️  hApp candidate publish exited ${rc} — edge (if started beside this run) will wait out its deadline and fall back to the floating tag"
+        }
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -716,6 +742,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             }
 
                             def props = loadBuildVars()
+                            pushHappCandidate(props.GIT_COMMIT_HASH ?: '')
 
                             echo """
                             ═══════════════════════════════════════════════════════════

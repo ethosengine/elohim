@@ -203,6 +203,193 @@ describe('long-running dependency completion barrier', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// Barrier pair: edge starts beside DNA; the hApp candidate and the DNA
+// verdict are barriers INSIDE edge (one-head-delivered Lane C2)
+// ══════════════════════════════════════════════════════════════════
+
+describe('DNA → edge barrier pair', () => {
+  const orchestrator = readFileSync(resolve(__dirname, 'Jenkinsfile'), 'utf8');
+  const edge = readFileSync(resolve(ROOT, 'elohim/holochain/Jenkinsfile'), 'utf8');
+  const dna = readFileSync(resolve(ROOT, 'elohim/holochain/dna/Jenkinsfile'), 'utf8');
+  const fn = (text, name) => {
+    const at = text.indexOf(`def ${name}(`);
+    assert.ok(at >= 0, `def ${name}( must exist`);
+    return text.slice(at, text.indexOf('\n}\n', at) + 2);
+  };
+  const stage = (text, name) => {
+    const at = text.indexOf(`stage('${name}')`);
+    assert.ok(at >= 0, `stage '${name}' must exist`);
+    return text.slice(at, text.indexOf("\n        stage('", at + 1));
+  };
+
+  test('the pair is declared once, in the orchestrator, and dependsOn still names it', () => {
+    assert.match(orchestrator, /^@Field Map BARRIER_PAIRS = \['elohim-holochain': 'elohim-edge'\]$/m);
+    assert.ok(loadPipelineRegistry(ROOT).get('elohim-edge').dependsOn.includes('elohim-holochain'),
+      'edge keeps its declared dependency — the barrier changes WHERE it is enforced, not WHETHER');
+  });
+
+  test('leveling puts the pair in one level: the consumer ignores its producer, the producer waits for its consumer', () => {
+    const level = fn(orchestrator, 'groupByDependencyLevel');
+    assert.match(level, /dependsOn \?: \[\]\) - \[barrierProducerOf\(name\)\]/);
+    assert.match(level, /ready\.contains\(consumer\)/);
+    assert.match(level, /if \(currentLevel\.isEmpty\(\)\) currentLevel = ready/,
+      'a producer whose consumer can never be placed still runs');
+  });
+
+  test('the parallel level hands the producer run ID and candidate tag to the consumer', () => {
+    assert.match(orchestrator, /def barrierRuns = barrierRunsIn\(runnable\)/);
+    assert.match(orchestrator, /triggerPipeline\(name, env\.BRANCH_NAME, null, changedFiles, dependencyBarrier, barrierRuns\)/);
+    const params = fn(orchestrator, 'barrierParams');
+    assert.match(params, /stringParam\(name: 'DNA_RUN_ID', value: runId\)/);
+    assert.match(params, /stringParam\(name: 'HAPP_CANDIDATE_TAG', value: tag\)/);
+    assert.match(params, /"candidate-\$\{\(env\.GIT_COMMIT_FULL \?: ''\)\.take\(8\)\}"/,
+      'the tag is candidate-<commit8>, the DNA pipeline\'s own GIT_COMMIT_HASH shape');
+    assert.match(fn(orchestrator, 'awaitDetachedBuild'), /barrierRuns\[name\] = started\.externalizableId/);
+  });
+
+  test('every parallel branch runs through triggerInLevel, whose finally always fills a producer slot (M1)', () => {
+    assert.match(orchestrator, /def result = triggerInLevel\(name, pipelines, changedFiles, barrierRuns\)/);
+    const level = fn(orchestrator, 'triggerInLevel');
+    assert.ok(level.indexOf('try {') < level.indexOf('barrierProducerOf(name)'),
+      'the whole branch body is inside the try — a throw before dispatch still releases the consumer');
+    assert.match(level, /\} finally \{\n\s*if \(barrierRuns\?\.containsKey\(name\) && barrierRuns\[name\] == null\) barrierRuns\[name\] = BARRIER_FAILED_START/);
+    assert.match(level, /waitUntil\(quiet: true\) \{ barrierRuns\[producer\] != null \|\| System\.currentTimeMillis\(\) > deadline \}/,
+      'the consumer wait is bounded');
+    assert.match(orchestrator, /^@Field long BARRIER_START_WAIT_MS = 60L \* 60 \* 1000$/m);
+  });
+
+  test('I1: a producer that failed to start SKIPS its consumer; only a missing job runs it standalone', () => {
+    const level = fn(orchestrator, 'triggerInLevel');
+    assert.match(level,
+      /if \(!runId && barrierRuns\[producer\] != BARRIER_NOT_PROVISIONED\) \{[\s\S]*?return \[success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: producer\]/);
+    assert.ok(level.indexOf("'SKIPPED-BY-UPSTREAM-FAILURE'") < level.indexOf('triggerPipeline('),
+      'the skip returns before any dispatch');
+    const trigger = fn(orchestrator, 'triggerPipeline');
+    const noItem = trigger.slice(trigger.indexOf("contains('No item named')"));
+    assert.match(noItem.slice(0, 300), /barrierRuns\[name\] = BARRIER_NOT_PROVISIONED/,
+      'only the "No item named" branch marks NOT_PROVISIONED');
+    const runIdOf = fn(orchestrator, 'barrierRunId');
+    assert.match(runIdOf, /v != BARRIER_FAILED_START && v != BARRIER_NOT_PROVISIONED/, 'markers are never a run ID');
+    assert.match(fn(orchestrator, 'barrierParams'), /if \(!runId\) return \[\]/);
+  });
+
+  test('I1/N2: a skip is excluded from levelFailed only when its upstream failed here', () => {
+    const doom = fn(orchestrator, 'doomDependents');
+    assert.match(doom, /def failedHere = ran\.findAll \{ !results\[it\]\?\.success \}/);
+    const cond = doom.match(/def levelFailed = failedHere\.findAll \{ (.+) \}\n/)[1];
+    // Evaluate the exact Groovy condition (safe-navigation mapped to JS).
+    const counted = new Function('it', 'results', 'failedHere',
+      `return ${cond.replace(/\?\./g, '?.').replace(/failedHere\.contains\(/g, 'failedHere.includes(')}`);
+    const results = {
+      dnaRed: { success: false, result: 'FAILURE' },
+      edgeSkip: { success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: 'dnaRed' },
+      dnaGreen: { success: true, result: 'SUCCESS' },
+      edgeOrphan: { success: false, result: 'SKIPPED-BY-UPSTREAM-FAILURE', upstream: 'dnaGreen' },
+      edgeLate: { success: false, result: 'SKIPPED-PRODUCER-NOT-STARTED', upstream: 'dnaGreen' },
+    };
+    const failedHere = ['dnaRed', 'edgeSkip', 'edgeOrphan', 'edgeLate'];
+    assert.deepEqual(failedHere.filter((it) => counted(it, results, failedHere)), ['dnaRed', 'edgeOrphan', 'edgeLate'],
+      'the producer failure counts once; a skip whose producer did not fail here counts, and so does a wait timeout');
+  });
+
+  test('N2: a producer-start timeout is its own counted result, never SKIPPED-BY-UPSTREAM-FAILURE', () => {
+    const level = fn(orchestrator, 'triggerInLevel');
+    assert.match(level,
+      /if \(barrierRuns\[producer\] == null\) \{[\s\S]*?return \[success: false, result: 'SKIPPED-PRODUCER-NOT-STARTED', upstream: producer\]/);
+    assert.ok(level.indexOf("'SKIPPED-PRODUCER-NOT-STARTED'") < level.indexOf("'SKIPPED-BY-UPSTREAM-FAILURE'"),
+      'the timeout is classified before the failed-start marker');
+  });
+
+  test('I2: the consumer baseline is held whenever the producer verdict is not SUCCESS (UNSTABLE included)', () => {
+    const doom = fn(orchestrator, 'doomDependents');
+    assert.ok(doom.indexOf('holdBarrierConsumers(ran, results, pipelineBaselines)') < doom.indexOf('if (!levelFailed) return []'),
+      'the hold runs even when nothing failed — an UNSTABLE producer counts as success');
+    const hold = fn(orchestrator, 'holdBarrierConsumers');
+    assert.match(hold, /if \(!c\.deployRefused && results\[producer\]\?\.result == 'SUCCESS'\) return/);
+    assert.match(hold, /!c\?\.barrierRun/, 'a standalone consumer deployed — never held');
+    assert.match(hold, /pipelineBaselines\[consumer\] = before\[consumer\]/);
+    assert.match(fn(orchestrator, 'triggerInLevel'), /if \(runId\) result\.barrierRun = runId/);
+  });
+
+  test('edge declares both params and gates the Alpha deploy on the DNA verdict (Review Focus 4)', () => {
+    assert.match(edge, /string\(name: 'DNA_RUN_ID', defaultValue: ''/);
+    assert.match(edge, /string\(name: 'HAPP_CANDIDATE_TAG', defaultValue: ''/);
+    const verdict = fn(edge, 'awaitDnaVerdict');
+    assert.match(verdict, /if \(!params\.DNA_RUN_ID\) \{ return true \}/);
+    assert.match(verdict, /waitForBuild\(runId: params\.DNA_RUN_ID, propagate: false, propagateAbort: false\)/);
+    assert.match(verdict, /if \(dna\.result != 'SUCCESS'\) \{ unstable\([^)]*\); return false \}/);
+    assert.ok(verdict.indexOf("env.DEPLOY_REFUSED = 'true'") < verdict.indexOf("if (dna.result != 'SUCCESS')") &&
+      verdict.indexOf("env.DEPLOY_REFUSED = 'false'") > verdict.indexOf('edge-deploy-budget.sh'),
+      'refused until both the verdict and the budget pass');
+    assert.match(stage(edge, 'Deploy Edge Node - Alpha'),
+      /script \{\n\s*if \(!awaitDnaVerdict\(\)\) \{ return \}\n/,
+      'the verdict is the FIRST statement of the deploy body; a refusal skips the whole deploy');
+  });
+
+  test('N1: a deploy refused after a SUCCESS verdict (budget) is published and held', () => {
+    assert.match(fn(orchestrator, 'dispatchResult'),
+      /deployRefused: \(result\.description \?: ''\)\.toString\(\)\.startsWith\('DEPLOY-REFUSED:'\)/);
+    const describe = fn(edge, 'edgeRunDescription');
+    assert.match(describe, /env\.DEPLOY_REFUSED == 'true' \? "DEPLOY-REFUSED: \$\{env\.DEPLOY_REFUSED_REASON\}/);
+    assert.match(edge, /^\s*currentBuild\.description = edgeRunDescription\(\)$/m,
+      'the post-always summary keeps the refusal prefix instead of overwriting it');
+    assert.doesNotMatch(edge, /currentBuild\.description = \[/, 'no second description writer drops the prefix');
+    const verdict = fn(edge, 'awaitDnaVerdict');
+    assert.ok(verdict.indexOf('currentBuild.description = edgeRunDescription()') < verdict.indexOf('if (budget != 0)'),
+      'the budget refusal is published before it returns');
+    // The hold decision, evaluated: budget refusal after DNA SUCCESS is held;
+    // an ordinary UNSTABLE edge beside a green DNA is not.
+    const cond = fn(orchestrator, 'holdBarrierConsumers').match(/if \((!c\.deployRefused && results\[producer\]\?\.result == 'SUCCESS')\) return/)[1];
+    const skipsHold = new Function('c', 'results', 'producer', `return ${cond}`);
+    const green = { dna: { result: 'SUCCESS' } };
+    assert.equal(skipsHold({ deployRefused: true }, green, 'dna'), false, 'budget refusal → held');
+    assert.equal(skipsHold({ deployRefused: false }, green, 'dna'), true, 'ordinary UNSTABLE beside green DNA → delivered');
+    assert.equal(skipsHold({ deployRefused: false }, { dna: { result: 'UNSTABLE' } }, 'dna'), false, 'UNSTABLE DNA → held');
+  });
+
+  test('M5: the verdict gate refuses every DNA result except SUCCESS', () => {
+    // Groovy cannot run here; the refusal condition is a plain string compare,
+    // so evaluate the exact expression from the Jenkinsfile over every result.
+    const cond = fn(edge, 'awaitDnaVerdict').match(/if \((dna\.result != 'SUCCESS')\) \{ unstable/)[1];
+    const refuses = new Function('dna', `return ${cond}`);
+    for (const result of ['FAILURE', 'UNSTABLE', 'ABORTED', 'NOT_BUILT', null, undefined]) {
+      assert.equal(refuses({ result }), true, `DNA ${result} must refuse the deploy`);
+    }
+    assert.equal(refuses({ result: 'SUCCESS' }), false);
+  });
+
+  test('I3: the deploy starts only with budget left; M2: validation skips after a refusal', () => {
+    assert.match(fn(edge, 'awaitDnaVerdict'),
+      /edge-deploy-budget\.sh' \$\{currentBuild\.startTimeInMillis\} 240 115", returnStatus: true\)/);
+    assert.match(fn(edge, 'awaitDnaVerdict'), /if \(env\.DNA_VERDICT\) \{ return env\.DEPLOY_REFUSED != 'true' \}/);
+    assert.match(stage(edge, 'Dataplane Validation'), /expression \{ env\.DEPLOY_REFUSED != 'true' \}/);
+    for (const name of ['Deploy Edge Node - Staging', 'Deploy Edge Node - Prod']) {
+      assert.match(stage(edge, name), /script \{\n\s*if \(!awaitDnaVerdict\(\)\) \{ return \}\n/, `${name} gates on the verdict`);
+    }
+  });
+
+  test('edge packages the candidate, bounded, and falls back loudly', () => {
+    const resolveTag = fn(edge, 'resolveHappSourceTag');
+    assert.match(resolveTag, /await-happ-candidate\.sh' '\$\{candidate\}' 2400"/);
+    assert.match(resolveTag, /if \(rc == 0\) \{\n\s*tag = candidate/);
+    assert.match(resolveTag, /unstable\(/);
+    assert.match(resolveTag, /FALLBACK/);
+    assert.match(resolveTag, /env\.HAPP_SOURCE_TAG = tag/, 'one resolution per run: both images carry the same bytes');
+    for (const name of ['Build Edge Node Image', 'Build hApp Installer']) {
+      assert.match(stage(edge, name), /fetchEdgeHapp\('/, `${name} fetches through the candidate barrier`);
+    }
+  });
+
+  test('DNA publishes the candidate inside Build DNA, after the stash, before any test stage', () => {
+    const build = stage(dna, 'Build DNA');
+    assert.ok(build.indexOf("stash name: 'happ-bundle'") < build.indexOf('pushHappCandidate(props.GIT_COMMIT_HASH'),
+      'the candidate is pushed after the happ is packed and stashed');
+    assert.match(fn(dna, 'pushHappCandidate'), /push-happ-candidate\.sh/);
+    assert.doesNotMatch(fn(dna, 'pushHappCandidate'), /dev-latest|floatingTag/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pre-push guard: no references to deleted orchestrator-strategy module
 // ══════════════════════════════════════════════════════════════════
 

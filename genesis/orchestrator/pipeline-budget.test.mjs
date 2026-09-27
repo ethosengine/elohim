@@ -18,6 +18,14 @@
  * manifest field is added, because the authoritative build-manifest schema is
  * the operator-owned rakia source schema.
  *
+ * BARRIER_PAIRS (orchestrator Jenkinsfile, one-head-delivered Lane C2): a
+ * producer → consumer dependency that lives INSIDE the consumer as barriers
+ * (the happ candidate and the DNA verdict for elohim-holochain → elohim-edge).
+ * The orchestrator starts the pair in the same level, so the pair costs
+ * max(producer, consumer), not their sum: DNA → edge → app → genesis
+ * (240+240+180+90) became conductor → max(DNA, edge) → app → genesis
+ * (90+240+180+90). The map is read from the Jenkinsfile — one source.
+ *
  * Run: node --test genesis/orchestrator/pipeline-budget.test.mjs
  */
 
@@ -70,21 +78,43 @@ function budgets() {
   return { registry, own, unreadable };
 }
 
-/** Longest dependency chain by summed own budget, over dispatchable pipelines. */
-export function longestChain(registry, own) {
+/** `@Field Map BARRIER_PAIRS = ['producer': 'consumer', …]` → Map(producer → consumer). */
+export function barrierPairs(jenkinsfileText) {
+  const decl = jenkinsfileText.match(/^@Field Map BARRIER_PAIRS = \[([^\]]*)\]/m);
+  if (!decl) return new Map();
+  return new Map([...decl[1].matchAll(/'([^']+)'\s*:\s*'([^']+)'/g)].map((m) => [m[1], m[2]]));
+}
+
+/**
+ * Longest dependency chain by summed own budget, over dispatchable pipelines.
+ * A barrier producer (barriers: producer → consumer) starts in its consumer's
+ * level, after the consumer's other dependencies: the pair costs the longer
+ * of the two, never their sum.
+ */
+export function longestChain(registry, own, barriers = new Map()) {
   const memo = new Map();
   const visit = (name, stack = new Set()) => {
     if (memo.has(name)) return memo.get(name);
     if (stack.has(name)) throw new Error(`dependsOn cycle through ${name}`);
     stack.add(name);
     let best = { minutes: 0, chain: [] };
+    let span = { minutes: own.get(name) ?? 0, label: name };
     for (const dep of registry.get(name)?.dependsOn ?? []) {
       if (!own.has(dep)) continue;
       const sub = visit(dep, stack);
+      if (barriers.get(dep) === name) {
+        // Its own upstream still precedes the level; its budget runs beside ours.
+        const depOwn = own.get(dep) ?? 0;
+        const upstream = { minutes: sub.minutes - depOwn, chain: sub.chain.slice(0, -1) };
+        if (upstream.minutes > best.minutes) best = upstream;
+        if (depOwn > span.minutes) span = { minutes: depOwn, label: span.label };
+        span.label = `max(${dep}, ${name})`;
+        continue;
+      }
       if (sub.minutes > best.minutes) best = sub;
     }
     stack.delete(name);
-    const result = { minutes: best.minutes + (own.get(name) ?? 0), chain: [...best.chain, name] };
+    const result = { minutes: best.minutes + span.minutes, chain: [...best.chain, span.label] };
     memo.set(name, result);
     return result;
   };
@@ -126,11 +156,37 @@ test('every dispatchable pipeline owns a wall-clock budget in its Jenkinsfile', 
   );
 });
 
+test('barrierPairs reads the orchestrator map; a barrier pair costs max, not sum', () => {
+  assert.deepEqual(
+    [...barrierPairs("x\n@Field Map BARRIER_PAIRS = ['p': 'c', 'q':'d']\ny")],
+    [['p', 'c'], ['q', 'd']]
+  );
+  assert.equal(barrierPairs('no map here').size, 0);
+  const registry = new Map([
+    ['up', { dependsOn: [] }],
+    ['p', { dependsOn: [] }],
+    ['c', { dependsOn: ['p', 'up'] }],
+    ['app', { dependsOn: ['c'] }],
+  ]);
+  const own = new Map([['up', 90], ['p', 240], ['c', 200], ['app', 180]]);
+  assert.equal(longestChain(registry, own).minutes, 240 + 200 + 180);
+  const barriered = longestChain(registry, own, new Map([['p', 'c']]));
+  assert.equal(barriered.minutes, 90 + 240 + 180);
+  assert.deepEqual(barriered.chain, ['up', 'max(p, c)', 'app']);
+});
+
+test('elohim-holochain → elohim-edge is a barrier pair in the orchestrator', () => {
+  const { registry } = budgets();
+  const text = readFileSync(resolve(ROOT, registry.get(ORCHESTRATOR).jenkinsPath), 'utf8');
+  assert.equal(barrierPairs(text).get('elohim-holochain'), 'elohim-edge');
+});
+
 test("the orchestrator's budget covers the longest dependency chain, so it never times out a downstream", () => {
   const { registry, own, unreadable } = budgets();
   const orchestrator = registry.get(ORCHESTRATOR);
-  const ceiling = ownTimeoutMinutes(readFileSync(resolve(ROOT, orchestrator.jenkinsPath), 'utf8'));
-  const longest = longestChain(registry, own);
+  const orchestratorText = readFileSync(resolve(ROOT, orchestrator.jenkinsPath), 'utf8');
+  const ceiling = ownTimeoutMinutes(orchestratorText);
+  const longest = longestChain(registry, own, barrierPairs(orchestratorText));
   const required = longest.minutes + ORCHESTRATOR_OWN_STAGES_MINUTES;
   assert.ok(
     ceiling >= required,
