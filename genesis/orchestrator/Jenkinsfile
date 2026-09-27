@@ -581,6 +581,13 @@ def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
             // the intent in the level checkpoint for the deploy-pending pass.
             echo "⏸️ ${name}: UNSTABLE — readiness refused the deploy; baseline HELD, pendingDeploy ${pending.intentCid} recorded for the deploy-pending pass"
             pipelineBaselines['__pendingDeploy__'] = pending
+        } else if (result.deployRefused) {
+            // Any pipeline publishing `DEPLOY-REFUSED:` (edge, App) delivered
+            // nothing: hold the baseline so the next push re-selects it.
+            echo "⏸️ ${name}: UNSTABLE — DEPLOY-REFUSED, delivered nothing; baseline HELD"
+            // As a red re-dispatch: the held baseline re-selects it, so the intent
+            // is dropped rather than re-dispatched into the same refusal daily.
+            if (name == env.PENDING_DEPLOY_DISPATCH) pipelineBaselines.remove('__pendingDeploy__')
         } else {
             echo "${result.unstable ? '⚠️' : '✅'} ${name}: ${result.unstable ? 'UNSTABLE' : 'SUCCESS'} (${result.duration / 1000}s)"
             pipelineBaselines[name] = env.GIT_COMMIT_FULL

@@ -630,7 +630,9 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
     // rollback. Natively CI publishes ONE release through ONE write-ready doorway
     // and each peer adopts it by election (publishReleaseAndVerifyAdoption).
     def bundles = appBundles()
-    def legacy = (params.APP_DELIVERY_LEGACY ?: false)
+    // Only dev has a release channel, so main/staging keep the per-host path until
+    // each environment has its own channel (follow-up: a channel per environment).
+    def legacy = (params.APP_DELIVERY_LEGACY ?: false) || ((env.BRANCH_NAME ?: 'dev') != 'dev')
     def outcomes = [:]
     try {
         if (!legacy) {
@@ -689,17 +691,14 @@ def appReleasePeers() {
 // gate; 3 (a peer not adopted inside the bound) and 2 (refused) are UNSTABLE.
 // Bash body: scripts/ci/app-release-stage.sh (CPS 64KB — no heredoc here).
 def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey, String gitCommitHash, List<Map> bundles, Map outcomes) {
-    // Only dev has a release channel (runtime:app-bundle:alpha:dev); on any other
-    // branch the stage script prints skipped=branch-<name>-has-no-channel and
-    // exits 0, so the readiness probe is not run for a publish that cannot happen.
+    // Only dev has a release channel (runtime:app-bundle:alpha:dev) and every other
+    // branch is routed to the legacy path, so this runs on dev only;
+    // app-release-stage.sh keeps its own skipped=branch-<name>-has-no-channel guard.
     def branch = env.BRANCH_NAME ?: 'dev'
-    def ready = doorwayEprUrls
-    if (branch == 'dev') {
-        if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes, true)) {
-            return
-        }
-        ready = outcomes['readiness|doorways']
+    if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes, true)) {
+        return
     }
+    def ready = outcomes['readiness|doorways']
     def manifest = "${env.WORKSPACE}/app-release-manifest.json"
     def stageOut = "${env.WORKSPACE}/.ci-app-release-stage.txt"
     def started = System.currentTimeMillis()
@@ -727,6 +726,10 @@ def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey
     if (rc == 3) {
         unstable("App release ${outcomes['release|cid']} published; a peer has not adopted inside the bound (delivered, not yet proven) — ${outcomes['release|detail']}")
     } else if (rc != 0) {
+        // Delivered nothing: the DEPLOY-REFUSED: prefix makes the orchestrator
+        // hold App's baseline (dispatchResult.deployRefused), as edge does.
+        def prior = currentBuild.description
+        currentBuild.description = "DEPLOY-REFUSED: ${outcomes['release|detail']}${prior ? ' | ' + prior : ''}"
         unstable("App release refused (exit ${rc}) — ${outcomes['release|detail']}")
     }
 }

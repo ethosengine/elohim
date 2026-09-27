@@ -97,7 +97,10 @@ import { E2EWorld } from '../../src/framework/world.js';
 // Then steps read from here. This chapter's sibling-visit step below records
 // its real observation into the SAME slot so those steps see it, rather than
 // each chapter keeping a private, unsynchronized capture store.
-import { siblingWorseThanPrimary } from './apex-transition.compare.js';
+import {
+  primaryErrorsOutsideCorpusGap,
+  siblingWorseThanPrimary,
+} from './apex-transition.compare.js';
 import { visitInBrowser, type BrowserVisit } from './epr-app-deliverability.helpers.js';
 import {
   chaosAuthorReceipt,
@@ -1340,6 +1343,14 @@ Given(
     // The primary's own browser reading, same declared head, before the shed: the sibling is held
     // to what this browser saw, not to a corpus neither doorway was seeded with.
     state.primaryBrowser = await visitInBrowser(`${visit.origin}/`);
+    const primaryBroken = primaryErrorsOutsideCorpusGap(state.primaryBrowser.httpErrors);
+    const brokenLine = primaryBroken.map(e => `${e.status} ${e.url}`).join(', ');
+    assert.deepEqual(
+      primaryBroken,
+      [],
+      `primary browser (${visit.origin}) had HTTP errors outside the /epr-head/ 404 corpus-gap class ` +
+        `(${brokenLine}) — no baseline to hold the sibling to`
+    );
   }
 );
 
@@ -1434,10 +1445,9 @@ Then(
     // protocol, not the harness. The landing hero answers it for now with a click-to-load facade.
     // genesis/data/timeline/backlog/legacy-web-content-projected-inward.md
     assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
-    // Held to the primary's own reading: an HTTP error every household doorway returns alike
-    // (the landing's unseeded epic links, genesis/data/timeline/backlog/
-    // household-landing-links-unseeded-epics.md) is not a failover regression; one the primary
-    // did not have is.
+    // Held to the primary's own reading: only a /epr-head/ 404 the primary also had (the
+    // landing's unseeded epic links, genesis/data/timeline/backlog/
+    // household-landing-links-unseeded-epics.md) is forgiven; every other error fails.
     const worse = siblingWorseThanPrimary(
       state.primaryBrowser?.httpErrors ?? [],
       browser.httpErrors
@@ -1446,7 +1456,7 @@ Then(
     assert.deepEqual(
       worse,
       [],
-      `sibling browser HTTP errors the primary did not have (${worseLine})`
+      `sibling browser HTTP errors outside the /epr-head/ 404s the primary shared (${worseLine})`
     );
     assert.ok(browser.rootPresent, 'sibling browser saw no app-root');
     assert.ok(browser.bootstrapReady, 'sibling browser did not bootstrap its entry script');

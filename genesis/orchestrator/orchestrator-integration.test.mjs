@@ -347,6 +347,40 @@ describe('DNA → edge barrier pair', () => {
     assert.equal(skipsHold({ deployRefused: false }, { dna: { result: 'UNSTABLE' } }, 'dna'), false, 'UNSTABLE DNA → held');
   });
 
+  test('I-1: a refused App publish is published DEPLOY-REFUSED and its baseline is held (any pipeline)', () => {
+    const app = readFileSync(resolve(ROOT, 'Jenkinsfile'), 'utf8');
+    const publish = fn(app, 'publishReleaseAndVerifyAdoption');
+    const pending = publish.slice(publish.indexOf('if (rc == 3) {'), publish.indexOf('} else if (rc != 0) {'));
+    const refused = publish.slice(publish.indexOf('} else if (rc != 0) {'));
+    assert.doesNotMatch(pending, /DEPLOY-REFUSED/, 'exit 3 (published, adoption pending) stays a plain UNSTABLE');
+    assert.match(refused, /currentBuild\.description = "DEPLOY-REFUSED: \$\{outcomes\['release\|detail'\]\}\$\{prior \? ' \| ' \+ prior : ''\}"/,
+      'the refusal leads the description and composes with any prior one');
+    assert.ok(refused.indexOf('currentBuild.description') < refused.indexOf('unstable('), 'published before UNSTABLE');
+    assert.doesNotMatch(app, /currentBuild\.description = (?!"DEPLOY-REFUSED)/, 'no other App description writer drops the prefix');
+    // The orchestrator branch, evaluated in order: a deployRefused UNSTABLE never
+    // reaches the advancing branch, whichever pipeline sent it.
+    const record = fn(orchestrator, 'recordPipelineResult');
+    const held = record.slice(record.indexOf('} else if (result.deployRefused) {'), record.indexOf('} else {', record.indexOf('} else if (result.deployRefused) {')));
+    assert.ok(held.length > 0, 'recordPipelineResult has a deployRefused branch');
+    assert.doesNotMatch(held, /pipelineBaselines\[name\] =/, 'the refusal branch must not advance the baseline');
+    assert.doesNotMatch(held, /barrierRun|BARRIER_PAIRS/, 'the hold is not limited to barrier consumers');
+    assert.match(held, /if \(name == env\.PENDING_DEPLOY_DISPATCH\) pipelineBaselines\.remove\('__pendingDeploy__'\)/,
+      'a refused deploy-pending re-dispatch drops the intent (the held baseline re-selects it) — no daily re-dispatch loop');
+    assert.ok(record.indexOf('pending != null') < record.indexOf('result.deployRefused') &&
+      record.indexOf('result.deployRefused') < record.indexOf('pipelineBaselines[name] = env.GIT_COMMIT_FULL\n            if (name =='),
+      'readiness refusal first, then DEPLOY-REFUSED, then the delivered branch');
+  });
+
+  test('I-2: main/staging App builds keep the legacy per-host path (no channel there)', () => {
+    const app = readFileSync(resolve(ROOT, 'Jenkinsfile'), 'utf8');
+    const expr = app.match(/def legacy = (.+)\n/)[1];
+    const legacy = new Function('params', 'env', `return ${expr.replace(/\?:/g, '||')}`);
+    assert.equal(legacy({}, { BRANCH_NAME: 'dev' }), false, 'dev publishes natively');
+    assert.equal(legacy({}, {}), false, 'an unnamed branch reads as dev');
+    assert.equal(legacy({ APP_DELIVERY_LEGACY: true }, { BRANCH_NAME: 'dev' }), true, 'rollback param');
+    for (const b of ['main', 'staging']) assert.equal(legacy({}, { BRANCH_NAME: b }), true, `${b} → legacy`);
+  });
+
   test('M5: the verdict gate refuses every DNA result except SUCCESS', () => {
     // Groovy cannot run here; the refusal condition is a plain string compare,
     // so evaluate the exact expression from the Jenkinsfile over every result.
