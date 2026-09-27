@@ -372,11 +372,27 @@ describe("Dataplane Validation runs beside app and genesis (Lane C3)", () => {
     assert.match(desc, /env\.DEPLOY_REFUSED == 'true' \? "DEPLOY-REFUSED: \$\{env\.DEPLOY_REFUSED_REASON\} \| \$\{summary\}" :/);
   });
 
-  test("edge: only an orchestrator (UpstreamCause) dispatch owes the measurement; a manual run measures inline", () => {
+  test("edge: only an orchestrator (upstream-cause) dispatch owes the measurement; a manual run measures inline", () => {
     const rule = topLevelDef(edge, "owesValidationToSibling");
-    const cause = rule.indexOf("currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause').isEmpty()) return false");
-    assert.ok(cause !== -1, "a run with no UpstreamCause must return false");
-    assert.ok(cause < rule.indexOf("env.DATAPLANE_VALIDATION = 'owed-by-sibling'"), "the cause check precedes the debt");
+    // Edge #1487: the build step records BuildUpstreamCause, and the exact-class
+    // String overload of getBuildCauses matched nothing — the stage ran inline.
+    assert.doesNotMatch(rule, /getBuildCauses\(\s*['"]/, "never the exact-class String overload");
+    assert.match(
+      rule,
+      /def upstream = currentBuild\.getBuildCauses\(\)\.find \{ c -> \(\(c\?\._class \?: ''\) as String\)\.contains\('UpstreamCause'\) \}/,
+    );
+    const guard = rule.indexOf("if (!upstream) return false");
+    assert.ok(guard !== -1, "a run with no upstream cause must return false");
+    assert.ok(guard < rule.indexOf("env.DATAPLANE_VALIDATION = 'owed-by-sibling'"), "the cause check precedes the debt");
+    // The debt is announced with its class and upstream, so a fleet reading is unambiguous.
+    assert.match(
+      rule,
+      /echo "Dataplane Validation: owed by sibling run \(class \$\{runClass\}, upstream \$\{upstream\.upstreamProject/,
+    );
+    // Evaluate the matcher over #1487's recorded cause and a manual cause.
+    const matches = (c) => ((c?._class ?? "") + "").includes("UpstreamCause");
+    assert.equal(matches({ _class: "org.jenkinsci.plugins.workflow.support.steps.build.BuildUpstreamCause" }), true);
+    assert.equal(matches({ _class: "hudson.model.Cause$UserIdCause" }), false);
   });
 
   test("edge: a strict no-measure (fleet never settled) is NOT_BUILT, never FAILURE; reds and zero scenarios stay red", () => {

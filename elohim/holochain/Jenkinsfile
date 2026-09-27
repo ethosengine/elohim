@@ -269,16 +269,25 @@ def edgeRunDescription() {
  * FAILURE, runDataplaneValidation) and it archives the same reports.
  *
  * Empty RUN_CLASS (the declared default: a manual or legacy dispatch), a run
- * with no UpstreamCause (manual, even with RUN_CLASS=build: no sibling would
- * pay the debt) and the sub-deploy classes measure here, as before. Called LAST in the stage's
- * `when` allOf, which short-circuits, so the debt is recorded only when the
- * stage would otherwise have run here (never after a refused deploy).
+ * with no upstream cause (manual, even with RUN_CLASS=build: no sibling would
+ * pay the debt) and the sub-deploy classes measure here, as before. Called
+ * LAST in the stage's `when` allOf, which short-circuits, so the debt is
+ * recorded only when the stage would otherwise have run here (never after a
+ * refused deploy).
+ *
+ * The upstream cause is matched by class NAME over every cause, as Check
+ * Trigger does. The orchestrator's build step records
+ * org.jenkinsci.plugins.workflow.support.steps.build.BuildUpstreamCause, and
+ * RunWrapper.getBuildCauses(String) filters on the exact `_class`, so asking it
+ * for hudson.model.Cause$UpstreamCause came back empty on edge #1487
+ * (orchestrator #1914): the stage ran inline and no sibling was owed.
  */
 def owesValidationToSibling(String runClass) {
     if (!(runClass in ['build', 'deploy'])) return false
-    if (currentBuild.getBuildCauses('hudson.model.Cause$UpstreamCause').isEmpty()) return false
+    def upstream = currentBuild.getBuildCauses().find { c -> ((c?._class ?: '') as String).contains('UpstreamCause') }
+    if (!upstream) return false
     env.DATAPLANE_VALIDATION = 'owed-by-sibling'
-    echo "Dataplane Validation: owed by sibling run — RUN_CLASS=${runClass} rolls the fleet; the orchestrator dispatches the validate-only edge run beside app and genesis"
+    echo "Dataplane Validation: owed by sibling run (class ${runClass}, upstream ${upstream.upstreamProject ?: '?'} #${upstream.upstreamBuild ?: '?'})"
     return true
 }
 
