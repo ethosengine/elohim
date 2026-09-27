@@ -116,13 +116,20 @@ class ParticipantStandingCase(unittest.TestCase):
             capture_output=True, text=True, env=env, timeout=30,
         )
 
-    def line(self, result) -> str:
+    def lines(self, result) -> list[str]:
         self.assertEqual(result.returncode, 0, result.stderr)
         out = json.loads(result.stdout)
         ctx = out["hookSpecificOutput"]["additionalContext"]
         self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "SessionStart")
-        self.assertEqual(len(ctx.splitlines()), 1, ctx)
-        return ctx
+        return ctx.splitlines()
+
+    def line(self, result) -> str:
+        """The participant line: always the first; a steward-of-record ask may follow it."""
+        lines = self.lines(result)
+        self.assertIn(len(lines), (1, 2), lines)
+        if len(lines) == 2:
+            self.assertTrue(lines[1].startswith("steward of record: human:"), lines)
+        return lines[0]
 
     def calls(self) -> list[list[str]]:
         if not self.log.exists():
@@ -241,6 +248,20 @@ class ParticipantStandingCase(unittest.TestCase):
         r = self.run_hook({"session_id": "sess-h"}, claimed={"sess-h": "human:matthew"})
         self.assertEqual(self.line(r),
                          "participant: human:matthew (session claim 2026-09-24)")
+
+    def test_a_standing_human_is_asked_to_affirm_steward_of_record(self):
+        # Operator ruling 2026-09-26: affirmed once per session, never assumed — the hook only
+        # names the question and what a yes runs; it claims nothing itself.
+        r = self.run_hook({"session_id": "sess-h"}, claimed={"sess-h": "human:matthew"})
+        lines = self.lines(r)
+        self.assertEqual(len(lines), 2, lines)
+        self.assertTrue(lines[1].startswith("steward of record: human:matthew? — ask the operator ONCE"))
+        self.assertIn("--steward-of-record", lines[1])
+        self.assertIn("Never overrides a real author.", lines[1])
+
+    def test_no_steward_ask_without_a_standing_human(self):
+        r = self.run_hook({"session_id": "sess-b"}, current=UNWITNESSED)
+        self.assertEqual(len(self.lines(r)), 1)
 
     def test_a_failing_binary_is_unknown_not_unwitnessed(self):
         broken = self.tmp / "bin" / "broken-epr"

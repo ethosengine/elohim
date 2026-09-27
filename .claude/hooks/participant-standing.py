@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Participant Standing — one SessionStart line naming the human this device stands for.
+Participant Standing — one SessionStart line naming the human this device stands for, followed
+(only when that human has standing) by the steward-of-record ask: the operator affirms once per
+session that they stand for memory entries no agent author can be witnessed for (ruling
+2026-09-26). The hook asks; it never claims.
 
 Hook Type: SessionStart (synchronous)
 
@@ -150,6 +153,27 @@ def participant_line(project_dir: str, session) -> str:
     return _standing_line(body)
 
 
+def steward_prompt(line: str):
+    """The steward-of-record ask that follows a standing human, or None.
+
+    Operator ruling 2026-09-26: while one developer works here, they stand as steward of record
+    for memory entries no agent author can be witnessed for — but it is AFFIRMED each session,
+    never assumed. This hook still only reads: it names the one question to ask and what to run
+    on a yes; the affirming is the operator's, in the conversation.
+    """
+    prefix = "participant: human:"
+    if not line.startswith(prefix):
+        return None
+    subject = line[len("participant: "):].split(" ", 1)[0]
+    return (
+        f"steward of record: {subject}? — ask the operator ONCE this session to affirm (one "
+        f"question). On yes, an unattributable memory entry imports under them: epr flow memory "
+        f"import <entry> --session steward-of-record --steward-of-record (then epr flow memory "
+        f"project --index --budget memory-index-bytes@1 --out .claude/memory/MEMORY.md). On no, "
+        f"leave it for its author. Never overrides a real author."
+    )
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -166,6 +190,9 @@ def main() -> None:
         line = participant_line(project_dir, session)
     except Exception as e:  # fail-open, but spoken
         line = f"participant: (unknown — {type(e).__name__})"
+    steward = steward_prompt(line)
+    if steward:
+        line = f"{line}\n{steward}"
     print(json.dumps({
         "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": line}
     }))

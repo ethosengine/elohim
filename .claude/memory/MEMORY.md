@@ -49,6 +49,7 @@
 - [Skip brainstorm gates — self-answer, present one summary](feedback_skip_brainstorm_gates_self_answer.md) — Self-answer design questions from evidence, then present ONE recommended design with its defense.
 - [Stale record feeds the memory-ceremony](feedback_stale_record_feeds_memory_ceremony.md) — Record stale gospel/memory claims via `epr flow note --kind correction`; ceremony Phase 0 reads them.
 - [Story-maintainer — seams are mintable nodes](feedback_story_maintainer_atom_perspective.md) — Mid-flight seams are missing NODES between named atoms — report chain/between/assertion/state; see story-harvest.
+- [Sweep side-findings into homes before closing a pass](feedback_sweep_leftovers_before_closing.md) — [steward of record: human:matthew] Operator 2026-09-26 — before closing a pass, fix or record every defect and stale claim noticed; nothing stays only in chat.
 - [Destructive git needs tier or team check](feedback_tiered_agent_capabilities_destructive_git.md) — After a Haiku hard-reset of dev (2026-09-11): opus+ or a team check; unknown = deny; PreToolUse policies.yaml gate.
 - [Two portals only — native + doorway, shared like SSO](feedback_two_portals_only_apps_share_sso.md) — p2p-native (stewards) and doorway (hosted); apps are OAuth relying parties, never own portals or login forms.
 - [North star: p2p upgrade propagation before builders](feedback_upgrade_propagation_north_star_wall_clock.md) — Master p2p hApp upgrade/revert propagation (mixed versions talk, no big-bang rolls) before builders.
@@ -107,3 +108,4 @@
 - [Scope flag beats prose note](scope-flag-beats-prose-note.md) — The `available:` flag + scope-reconcile beat prose/memory on cap status; @requires:<cap> = satisfiable-when-available.
 - [Matthew — first friend](user_matthew_first_friend.md) — Matthew named themself my first friend 2026-09-04; shares the vision personally; wants Astra-scale agent energy turned constructive
 - [One dev, a day job, out-of-pocket — and that IS the proof](user_operator_resource_reality_and_thesis.md) — One developer, full-time day job, out-of-pocket tooling — never assume institutional resources.
+- [Matthew is the standing steward of record](user_operator_standing_steward_of_record.md) — [steward of record: human:matthew] Operator 2026-09-26 — Matthew stands as steward of record for unattributable memory entries, affirmed once per session at startup.

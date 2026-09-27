@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "user-operator-standing-steward-of-record",
+  "claim": "Operator 2026-09-26 — Matthew stands as steward of record for unattributable memory entries, affirmed once per session at startup.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/user_operator_standing_steward_of_record.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 4750a644-a508-47ec-9220-8a193f383cf6."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/user_operator_standing_steward_of_record.md",
+        "cid": "bafkreigmwaufik6ejnmvofcz346yikf75y326nk7ugmsssenzgykt2dyye"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Matthew is the standing steward of record",
+    "file": "user_operator_standing_steward_of_record.md",
+    "scopePath": ".claude/memory/user_operator_standing_steward_of_record.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "user",
+    "indexed": true
+  }
+}
