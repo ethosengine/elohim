@@ -20,14 +20,16 @@ rules:
       source or a tree CID. Git submodule pins, OIDs,
       index and worktree interpretation belong in brit's Git bridge; build recipes and
       hApp/Cargo packaging belong in rakia adapters. Migrate brit's BritCid
-      through eprfs-core's planned tag-42 BlobLink only with byte/CID conformance;
+      through eprfs-core's explicit tag-42 BlobLink only with byte/CID conformance;
       a direct BlobCid alias can change serialized bytes. Preserve EprMeta v1 bytes.
 ---
 
 # eprfs-core — portable tree contract
 
-`address.rs` already provides codec-aware `BlobCid` addressing; `projection.rs` describes
-local projection entries. The immutable shared tree in the approved native developer
+`address.rs` provides codec-aware `BlobCid` addressing and the explicit `BlobLink` wire
+wrapper (tag-42 in DAG-CBOR, strings in JSON); existing `BlobCid` serialization is unchanged.
+The wrapper is additive: consumers and registry versions have not migrated.
+`projection.rs` describes local projection entries. The immutable shared tree in the approved native developer
 through-line is planned work, not an existing `ProjectionManifest` capability. Its bytes
 must be stable across artifact adapters. A CID proves bytes, not publication standing or
 which release head was elected; those decisions remain with content governance.
