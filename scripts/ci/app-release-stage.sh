@@ -52,11 +52,24 @@
 #   APP-RELEASE-STAGE refused=channel-bind-not-elected channel=<id> slug=<slug> …
 #   APP-RELEASE-STAGE refused=internal-error line=<n>   (this script's own failure)
 #   APP-RELEASE-STAGE refused=<publish's last line | verify-exit-N | no-release-line>
+#   APP-RELEASE-STAGE not-ready=upstream-catching-up doorway=<url> elapsed=<s>
+#
+# NOT READY (exit 5). When the ceremony's last line (a create, a bind or the
+# publish — for the publish, the line before publish-app-release.sh's own
+# APP-RELEASE-REFUSED) reads `still catching-up after <n>s`, its
+# RELEASE_CEREMONY_RETRY_SECS budget ran out on the doorway's 503 catching-up.
+# That is a READINESS condition, not a refused release: fleet-write-readiness.sh
+# proves serving + a storage PUT, while a notarize/bind/publish needs the
+# conductor path, and a storage projector flaps caughtUp for minutes at a time
+# (App #1732: FLEET-READY alpha, then 120 s of catching-up on the notarize PATCH).
+# The stage writes a deploy intent (DEPLOY_INTENT_OUT) the orchestrator's
+# deploy-pending pass re-dispatches on, and exits 5 — never 2.
 #
 # Exit: 0 delivered+adopted, or skipped (no channel for this branch) · 1 refused
 #   (the release cannot boot on a peer — the Jenkinsfile turns this into a hard
 #   FAILURE) · 2 refused (channel create/bind, publish, or an adoption measure
 #   that could not run) · 3 delivered, not yet proven (adoption bound elapsed)
+#   · 5 not ready (the upstream was still catching up; deferred, intent written)
 #   · 64 usage.
 #
 # Env:
@@ -74,6 +87,14 @@
 #   APP_RELEASE_TSX             the tsx runner (default <repo>/node_modules/.bin/tsx)
 #   APP_RELEASE_NODE            node for the one JSON question per answer (default node;
 #                               python is not on this path — scripts/ci/.epr-meta)
+#   DEPLOY_INTENT_OUT           on exit 5, write the deploy intent here (the shape
+#                               fleet-write-readiness.sh writes, plus "elect":"one" —
+#                               this path publishes through ONE doorway — and
+#                               "phase":"release"); unset: no intent
+#   DEPLOY_INTENT_COMMIT        the intent's full commit (default: git HEAD of this repo)
+#   DEPLOY_INTENT_ENV           the intent's env (default APP_RELEASE_BRANCH, else dev)
+#   DEPLOY_INTENT_DOORWAYS      whitespace-separated doorways the re-dispatch probes
+#                               (default the one doorway named)
 #   APP_RELEASE_PUBLISH_SCRIPT  seam for tests (default publish-app-release.sh beside this)
 #   APP_RELEASE_VERIFY_SCRIPT   seam for tests (default verify-app-adoption.sh beside this)
 #   and everything publish-app-release.sh / verify-app-adoption.sh read
@@ -121,6 +142,48 @@ say() {
 
 last_line() {
     printf '%s\n' "$1" | grep -v '^[[:space:]]*$' | tail -n1 || true
+}
+
+json_str() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="$(printf '%s' "${s}" | tr -d '\000-\037')"
+    printf '"%s"' "${s}"
+}
+
+# The deferral's deploy intent: the fields timer-dispatch.mjs readinessRefusal
+# requires (kind, full commit, doorways, a non-empty notReady), elect one.
+write_deferral_intent() {
+    local out="${DEPLOY_INTENT_OUT:-}" ra="$1" commit doorways="" sep="" d
+    [ -n "${out}" ] || return 0
+    commit="${DEPLOY_INTENT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)}"
+    for d in ${DEPLOY_INTENT_DOORWAYS:-${DOORWAY}}; do
+        doorways+="${sep}$(json_str "${d%/}")"; sep=","
+    done
+    {
+        printf '{"kind":"deploy-intent","version":1,"elect":"one","phase":"release",'
+        printf '"commit":%s,' "$(json_str "${commit}")"
+        printf '"env":%s,' "$(json_str "${DEPLOY_INTENT_ENV:-${APP_RELEASE_BRANCH:-dev}}")"
+        printf '"doorway":%s,"face":"upstream-catching-up","retryAfter":%s,' "$(json_str "${DOORWAY%/}")" "${ra}"
+        printf '"doorways":[%s],"notReady":[{"doorway":%s,"face":"upstream-catching-up","retryAfter":%s}],' \
+            "${doorways}" "$(json_str "${DOORWAY%/}")" "${ra}"
+        printf '"bundles":[],"recordedAt":%s}\n' "$(json_str "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")"
+    } > "${out}.tmp.$$" 2>/dev/null && mv -f "${out}.tmp.$$" "${out}" \
+        || echo "app-release-stage: could not write the deploy intent to ${out}" >&2
+}
+
+# Exit 5 (NOT READY, see the header) when the ceremony's last line says its
+# catching-up budget ran out; otherwise return, and the caller refuses as before.
+defer_if_catching_up() {
+    local last elapsed ra
+    last="$(printf '%s\n' "$1" | grep -v -e '^[[:space:]]*$' -e '^APP-RELEASE-REFUSED ' | tail -n1 || true)"
+    elapsed="$(printf '%s\n' "${last}" | sed -n 's/.*still catching-up after \([0-9][0-9]*\).*/\1/p')"
+    [ -n "${elapsed}" ] || return 0
+    ra="$(printf '%s\n' "${last}" | sed -n 's/.*"retryAfter":\([0-9][0-9]*\).*/\1/p')"
+    write_deferral_intent "${ra:-2}"
+    say "APP-RELEASE-STAGE not-ready=upstream-catching-up doorway=${DOORWAY%/} elapsed=${elapsed}"
+    exit 5
 }
 
 # GET <doorway>/db/content/<id>: prints the status; the body lands in $2 when given.
@@ -178,6 +241,7 @@ if [ "${APP_RELEASE_CHANNEL_CREATE:-0}" = "1" ]; then
             --reach commons --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || crc=$?
         say "${cout}"
         if [ "${crc}" -ne 0 ]; then
+            defer_if_catching_up "${cout}"
             say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} exit=${crc} $(last_line "${cout}")"
             exit 2
         fi
@@ -253,6 +317,7 @@ if [ "${APP_RELEASE_CHANNEL_CREATE:-0}" = "1" ]; then
             --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || brc=$?
         say "${bout}"
         if [ "${brc}" -ne 0 ]; then
+            defer_if_catching_up "${bout}"
             say "APP-RELEASE-STAGE refused=channel-bind-failed channel=${CHANNEL} slug=${slug} exit=${brc} $(last_line "${bout}")"
             exit 2
         fi
@@ -285,6 +350,7 @@ prc=0
 out="$(bash "${PUBLISH}" "${DOORWAY}" "${MANIFEST}" 2>&1)" || prc=$?
 say "${out}"
 if [ "${prc}" -ne 0 ]; then
+    defer_if_catching_up "${out}"
     last="$(last_line "${out}")"
     say "APP-RELEASE-STAGE refused=${last:-publish-exit-${prc}}"
     exit 2

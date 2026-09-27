@@ -568,9 +568,21 @@ export function intentViolation(intent) {
  * deploy report (emitAppDeployJunit: classname elohim-app.deploy.<env>).
  */
 export function readinessCase(junitText) {
+  return junitCase(junitText, /\bname="readiness"/);
+}
+
+/**
+ * 'refused' | 'passed' | 'absent' — the native path's `release.publish via
+ * <doorway>` testcase, which fails when the release was deferred.
+ */
+export function releasePublishCase(junitText) {
+  return junitCase(junitText, /\bname="release\.publish\b/);
+}
+
+function junitCase(junitText, name) {
   const testcase = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
   for (const m of String(junitText).matchAll(testcase)) {
-    if (!/\bname="readiness"/.test(m[1])) continue;
+    if (!name.test(m[1])) continue;
     return /<failure\b/.test(m[2] ?? '') ? 'refused' : 'passed';
   }
   return 'absent';
@@ -583,6 +595,12 @@ export function readinessCase(junitText) {
  * deletes any leftover before probing). The junit report corroborates: when it
  * is readable and its `readiness` case is absent or passed, this is not a
  * refusal and the App delivered as before.
+ *
+ * An intent with `phase: "release"` is the native path's DEFERRAL
+ * (app-release-stage.sh exit 5): readiness passed, then the ceremony spent its
+ * catching-up budget on the conductor path (App #1732). Its corroborating case
+ * is `release.publish`, failing, not `readiness`; it holds and re-dispatches
+ * exactly as a readiness refusal does.
  *
  * Never throws.
  *
@@ -605,12 +623,13 @@ export function readinessRefusal({ result, intentText = null, junitText = null, 
   if (bad !== null) {
     return { hold: false, reason: `${INTENT_FILE} ${bad} — the refusal cannot be re-dispatched` };
   }
+  const deferred = intent.phase === 'release';
   if (typeof junitText === 'string') {
-    const seen = readinessCase(junitText);
+    const seen = deferred ? releasePublishCase(junitText) : readinessCase(junitText);
     if (seen !== 'refused') {
       return {
         hold: false,
-        reason: `the junit readiness case is ${seen} — the intent is not a refusal of this build`,
+        reason: `the junit ${deferred ? 'release.publish' : 'readiness'} case is ${seen} — the intent is not a refusal of this build`,
       };
     }
   }
@@ -620,7 +639,9 @@ export function readinessRefusal({ result, intentText = null, junitText = null, 
     .join('; ');
   return {
     hold: true,
-    reason: `readiness refused the deploy (${faces})`,
+    reason: deferred
+      ? `the release was deferred, upstream not ready (${faces})`
+      : `readiness refused the deploy (${faces})`,
     pendingDeploy: {
       commit: intent.commit,
       intentCid: cid,
@@ -628,6 +649,7 @@ export function readinessRefusal({ result, intentText = null, junitText = null, 
       doorways: [...intent.doorways],
       notReady: intent.notReady,
       elect: intent.elect === 'one' ? 'one' : 'all',
+      ...(deferred ? { phase: 'release' } : {}),
       build: build === null || build === undefined ? null : String(build),
       recordedAt: typeof intent.recordedAt === 'string' ? intent.recordedAt : null,
     },

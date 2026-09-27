@@ -689,6 +689,11 @@ def appReleasePeers() {
 // write-ready, and this publishes through the first ready one. Exit 1 (a peer
 // judged the release unable to boot) is a hard FAILURE, as the legacy broken|
 // gate; 3 (a peer not adopted inside the bound) and 2 (refused) are UNSTABLE.
+// Exit 5 (the ceremony's catching-up budget ran out on the conductor path behind
+// a FLEET-READY doorway, App #1732) is a readiness deferral, not a refusal: the
+// stage wrote deploy-intent.json (elect one, phase release), so it takes the
+// readiness refusal's tail — the intent holds the baseline, no DEPLOY-REFUSED:
+// (an exit 5 with no intent file falls to the refusal below, so it is still held).
 // Bash body: scripts/ci/app-release-stage.sh (CPS 64KB — no heredoc here).
 def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey, String gitCommitHash, List<Map> bundles, Map outcomes) {
     // Only dev has a release channel (runtime:app-bundle:alpha:dev) and every other
@@ -712,7 +717,11 @@ def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey
     }
     withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "APP_RELEASE_BUNDLES=${appReleaseBundles(bundles)}",
              "APP_RELEASE_STAGE_OUT=${stageOut}", "APP_RELEASE_CHANNEL_CREATE=${createChannel ? '1' : '0'}",
-             "APP_RELEASE_BRANCH=${branch}"]) {
+             "APP_RELEASE_BRANCH=${branch}", "DEPLOY_INTENT_OUT=${env.WORKSPACE}/deploy-intent.json",
+             "DEPLOY_INTENT_ENV=${branch}", "DEPLOY_INTENT_DOORWAYS=${doorwayEprUrls.join(' ')}",
+             // push-delivers-within-budget: a 5-min bounded wait on catching-up is cheaper than a
+             // ~9-min re-dispatch, and the stage still defers in seconds once it is spent.
+             "RELEASE_CEREMONY_RETRY_SECS=300"]) {
         sh "rm -f '${stageOut}' '${manifest}' '${manifest}.publish.json'"
         rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/app-release-stage.sh' '${ready[0]}' '${manifest}' '${appReleasePeers()}'")
     }
@@ -725,6 +734,9 @@ def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey
     }
     if (rc == 3) {
         unstable("App release ${outcomes['release|cid']} published; a peer has not adopted inside the bound (delivered, not yet proven) — ${outcomes['release|detail']}")
+    } else if (rc == 5 && fileExists('deploy-intent.json')) {
+        archiveArtifacts(artifacts: 'deploy-intent.json', allowEmptyArchive: true)
+        unstable("app release deferred: upstream catching-up on ${ready[0]}; re-dispatch when ready")
     } else if (rc != 0) {
         // Delivered nothing: the DEPLOY-REFUSED: prefix makes the orchestrator
         // hold App's baseline (dispatchResult.deployRefused), as edge does.
@@ -742,7 +754,8 @@ def appChannelCreateRequested() {
 }
 
 // Parse app-release-stage.sh's APP-* lines into outcomes: release|published
-// (published | current | skipped — no channel for this branch | refused),
+// (published | current | skipped — no channel for this branch | refused |
+// deferred — upstream not ready, exit 5),
 // release|cid, release|detail (the summary line), adopt|<peer> (adopted |
 // pending | cannot-boot), and release|channel (created | resumed) / release|bound (slugs=…)
 // when an [app:channel-create] run did the steward act. Plain loops: CPS-safe.
@@ -755,6 +768,7 @@ def recordReleaseOutcomes(String text, int rc, Map outcomes) {
         if (line.startsWith('APP-RELEASE-CHANNEL-RESUMED ')) { outcomes['release|channel'] = 'resumed' }
         if (line.startsWith('APP-RELEASE-CHANNEL-BOUND ')) { outcomes['release|bound'] = line.substring(26) }
         if (line.startsWith('APP-RELEASE-STAGE skipped=')) { published = 'skipped' }
+        if (line.startsWith('APP-RELEASE-STAGE not-ready=')) { published = 'deferred' }
         def fields = line.tokenize(' ')
         if (fields.size() < 2) { continue }
         if (fields[0] == 'APP-RELEASE-STAGE') {
@@ -768,7 +782,7 @@ def recordReleaseOutcomes(String text, int rc, Map outcomes) {
         if (fields[0] == 'APP-CANNOT-BOOT') { outcomes["adopt|${fields[1]}".toString()] = 'cannot-boot' }
     }
     outcomes['release|published'] = published
-    outcomes['release|delivered'] = [0: (published == 'published' ? 'adopted' : published), 1: 'cannot-boot', 3: 'pending'][rc] ?: 'refused'
+    outcomes['release|delivered'] = [0: (published == 'published' ? 'adopted' : published), 1: 'cannot-boot', 3: 'pending', 5: 'deferred'][rc] ?: 'refused'
     if (!outcomes['release|detail']) { outcomes['release|detail'] = "app-release-stage.sh exited ${rc} with no summary line" }
 }
 
@@ -985,7 +999,7 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     // release.adopt per peer — the peer's own adoption report, not a host write.
     if (outcomes.containsKey('release|published')) {
         cases << [name: "release.publish via ${outcomes['release|doorway']}".toString(), kind: 'release',
-                  passed: outcomes['release|published'] != 'refused', ms: outcomes['ms|release'],
+                  passed: !['refused', 'deferred'].contains(outcomes['release|published']), ms: outcomes['ms|release'],
                   detail: outcomes['release|detail'] ?: '']
         for (k in outcomes.keySet().findAll { it.startsWith('adopt|') }) {
             cases << [name: "release.adopt ${k.substring(6)}".toString(), kind: 'adopt',

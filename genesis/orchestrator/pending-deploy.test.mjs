@@ -37,6 +37,7 @@ import {
   readinessCase,
   readinessRefusal,
   readRefusalEvidence,
+  releasePublishCase,
 } from './timer-dispatch.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -261,6 +262,62 @@ describe('pendingDeployPass — re-dispatch is an event, never a poll', () => {
     const legacy = await pendingDeployPass(withPending(), stubDeps({ rc: 3, lines: mixed }));
     assert.equal(legacy.dispatch, false);
     assert.match(legacy.logLines[0], /held — fleet not write-ready/);
+  });
+
+  test('a release deferral (elect "one", phase "release") holds and re-dispatches on ANY FLEET-READY — the #1732 shape', async () => {
+    // The intent app-release-stage.sh writes on exit 5: readiness PASSED, then the
+    // ceremony spent its catching-up budget on the notarize PATCH.
+    const deferText =
+      JSON.stringify({
+        kind: 'deploy-intent',
+        version: 1,
+        elect: 'one',
+        phase: 'release',
+        commit: COMMIT,
+        env: 'dev',
+        doorway: 'https://alpha.elohim.host',
+        face: 'upstream-catching-up',
+        retryAfter: 2,
+        doorways: ['https://alpha.elohim.host', 'https://elohim.host'],
+        notReady: [{ doorway: 'https://alpha.elohim.host', face: 'upstream-catching-up', retryAfter: 2 }],
+        bundles: [],
+        recordedAt: '2026-09-27T08:35:00Z',
+      }) + '\n';
+    const junitDeferred = [
+      '<testsuite name="elohim-app.deploy.dev" tests="2" failures="1">',
+      '  <testcase classname="elohim-app.deploy.dev" name="readiness" time="1.1"/>',
+      '  <testcase classname="elohim-app.deploy.dev" name="release.publish via https://alpha.elohim.host" time="301.0"><failure message="APP-RELEASE-STAGE not-ready=upstream-catching-up doorway=https://alpha.elohim.host elapsed=300" type="release"/></testcase>',
+      '</testsuite>',
+    ].join('\n');
+    assert.equal(releasePublishCase(junitDeferred), 'refused');
+    const recorded = readinessRefusal({ result: 'UNSTABLE', intentText: deferText, junitText: junitDeferred, build: 1732 });
+    assert.equal(recorded.hold, true, recorded.reason);
+    assert.match(recorded.reason, /release was deferred/);
+    const deferred = recorded.pendingDeploy;
+    assert.equal(deferred.elect, 'one');
+    assert.equal(deferred.phase, 'release');
+    assert.equal(deferred.intentCid, intentCid(deferText));
+    // A delivered native release (release.publish passed) with a stray intent never holds.
+    const delivered = readinessRefusal({
+      result: 'UNSTABLE',
+      intentText: deferText,
+      junitText: junitDeferred.replace(/><failure[^>]*\/><\/testcase>/, '/>'),
+    });
+    assert.equal(delivered.hold, false);
+    assert.match(delivered.reason, /release\.publish case is passed/);
+
+    const baselines = { __global__: GLOBAL, elohim: GLOBAL, [PENDING_DEPLOY_KEY]: deferred };
+    const mixed = 'FLEET-NOT-READY https://alpha.elohim.host face=catching-up retryAfter=60\nFLEET-READY https://elohim.host\n';
+    const deps = stubDeps({ rc: 3, lines: mixed });
+    const out = await pendingDeployPass({ ...withPending(), baselines }, deps);
+    assert.equal(out.dispatch, true);
+    assert.deepEqual(deps.probes, [['https://alpha.elohim.host', 'https://elohim.host']]);
+    assert.match(out.logLines[0], /a doorway is write-ready and the intent elects one/);
+    const none = await pendingDeployPass(
+      { ...withPending(), baselines },
+      stubDeps({ rc: 3, lines: 'FLEET-NOT-READY https://alpha.elohim.host face=catching-up retryAfter=60\n' }),
+    );
+    assert.equal(none.dispatch, false);
   });
 
   test('no intent ⇒ nothing: no probe, no log line', async () => {

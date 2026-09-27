@@ -28,6 +28,10 @@
 #      no create;
 #   18. a half-created channel (row 200, /head 404) → the ceremony's create runs
 #      (it resumes the notarize) and APP-RELEASE-CHANNEL-RESUMED, then publish.
+#   19-21. the ceremony's catching-up budget ran out (its last line reads `still
+#      catching-up after <n>s`) on the create, the bind, or the publish → exit 5
+#      `not-ready=upstream-catching-up`, a deploy intent (elect one, phase release)
+#      the orchestrator re-dispatches on, nothing (further) published — App #1732.
 #
 # publish-app-release.sh and verify-app-adoption.sh are stubbed at their
 # documented seams (APP_RELEASE_PUBLISH_SCRIPT, APP_RELEASE_VERIFY_SCRIPT), and
@@ -55,6 +59,9 @@ echo "  · elohim-host-landing (browser): sha256-aaa (1K)"
 case "${STUB_PUBLISH}" in
     published) echo "APP-RELEASE-PUBLISHED channel=runtime:app-bundle:alpha:dev release=bafyRelease1" ;;
     current)   echo "APP-RELEASE-CURRENT channel=runtime:app-bundle:alpha:dev release=uhCkkCurrent1" ;;
+    catching-up)
+        echo 'release-ceremony: publish: PATCH http://d/db/content/runtime:app-bundle:alpha:dev returned 503: {"status":"catching-up","retryAfter":2,"cause":"upstream"} — still catching-up after 300.4s (budget 300s, 150 retries)' >&2
+        echo "APP-RELEASE-REFUSED reason=publish channel=runtime:app-bundle:alpha:dev — see the ceremony's output above" >&2; exit 2 ;;
     refused)   echo "APP-RELEASE-REFUSED reason=channel-absent channel=runtime:app-bundle:alpha:dev — a steward runs 'release-ceremony.ts channel create runtime:app-bundle:alpha:dev' once" >&2; exit 2 ;;
 esac
 SH
@@ -367,3 +374,64 @@ grep -qx "APP-RELEASE-CHANNEL-RESUMED channel=runtime:app-bundle:alpha:dev" <<<"
 [ "$(line_of 'channel create')" -lt "$(line_of '^[0-9]*:publish ')" ] \
   || fail "half-created: resume, then publish: $(cat "${TEST_ROOT}/stub.log")"
 echo "ok 18 - a half-created channel is resumed (notarized), not skipped as existing"
+
+# 19-21. the ceremony's catching-up budget spent → exit 5 NOT READY, an intent, no publish.
+CATCHING='release-ceremony: channel create: PATCH http://d/db/content/runtime:app-bundle:alpha:dev returned 503: {"status":"catching-up","retryAfter":7,"cause":"upstream","circuit":"closed","errorStreak":0} — still catching-up after 120.3s (budget 120s, 60 retries)'
+INTENT="${TEST_ROOT}/deploy-intent.json"
+COMMIT_SHA=7d27b04c788302827c4f65fad34802e5952875aa
+defer_run() {
+    DEPLOY_INTENT_OUT="${INTENT}" DEPLOY_INTENT_COMMIT="${COMMIT_SHA}" \
+    DEPLOY_INTENT_DOORWAYS="${DOORWAY}/ https://doorway.elohim.host" run
+}
+assert_deferred() {  # <case> <rc> <out> <elapsed> <retryAfter>
+    [ "$2" -eq 5 ] || fail "$1: expected exit 5, got $2: $3"
+    [ "$(tail -n1 <<<"$3")" = "APP-RELEASE-STAGE not-ready=upstream-catching-up doorway=${DOORWAY} elapsed=${4}" ] \
+      || fail "$1: expected the not-ready summary last: $3"
+    grep -qx "APP-RELEASE-STAGE not-ready=upstream-catching-up doorway=${DOORWAY} elapsed=${4}" "${TEST_ROOT}/stage.out" \
+      || fail "$1: the not-ready line reaches APP_RELEASE_STAGE_OUT"
+    ! grep -q '^APP-RELEASE-STAGE refused=' <<<"$3" || fail "$1: a deferral is not a refusal: $3"
+    node -e '
+      const i = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+      const want = { kind: "deploy-intent", elect: "one", phase: "release", commit: process.argv[2], env: "dev" };
+      for (const [k, v] of Object.entries(want)) if (i[k] !== v) throw new Error(`${k}=${JSON.stringify(i[k])}`);
+      if (JSON.stringify(i.doorways) !== JSON.stringify([process.argv[3], "https://doorway.elohim.host"])) throw new Error(`doorways=${i.doorways}`);
+      const n = i.notReady;
+      if (n.length !== 1 || n[0].doorway !== process.argv[3] || n[0].face !== "upstream-catching-up" || n[0].retryAfter !== Number(process.argv[4]) || i.retryAfter !== n[0].retryAfter) throw new Error(`notReady=${JSON.stringify(n)}`);
+    ' "${INTENT}" "${COMMIT_SHA}" "${DOORWAY}" "$5" || fail "$1: the deploy intent's shape: $(cat "${INTENT}")"
+}
+
+# 19. the create (resuming a half-created channel) spends the budget.
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}/channel-notarized" "${INTENT}"
+: > "${TEST_ROOT}/channel-exists"
+printf '%s\n' "${CATCHING}" > "${TEST_ROOT}/catching.txt"
+printf '#!/bin/bash\necho "tsx $*" >> "${STUB_LOG}"\necho "release-ceremony: PATCH /db/content/x 503 catching-up — retry in 7s (0.0s/120s)" >&2\ncat "${STUB_ROOT}/catching.txt" >&2\nexit 1\n' > "${TEST_ROOT}/tsx.sh"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted defer_run)"; rc=$?; set -e
+assert_deferred "create catching-up" "$rc" "$out" 120 7
+grep -q ' channel create ' "${TEST_ROOT}/stub.log" || fail "create catching-up: the create ran"
+! grep -q -e '^publish ' -e 'channel bind' -e '^verify ' "${TEST_ROOT}/stub.log" \
+  || fail "create catching-up: nothing is bound, published or measured: $(cat "${TEST_ROOT}/stub.log")"
+echo "ok 19 - a create whose catching-up budget ran out is NOT READY (exit 5, intent), not refused"
+
+# 19b. no DEPLOY_INTENT_OUT → still exit 5, no intent written.
+rm -f "${INTENT}"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted run)"; rc=$?; set -e
+[ "$rc" -eq 5 ] && [ ! -e "${INTENT}" ] || fail "no intent out: expected exit 5 and no intent, got $rc: $out"
+echo "ok 19b - without DEPLOY_INTENT_OUT the deferral writes no intent (exit 5)"
+
+# 20. the bind spends the budget.
+rm -f "${TEST_ROOT}/stub.log" "${TEST_ROOT}"/rows/*.json "${INTENT}"
+: > "${TEST_ROOT}/channel-notarized"
+printf '#!/bin/bash\necho "tsx $*" >> "${STUB_LOG}"\nsed "s/channel create/channel bind/" "${STUB_ROOT}/catching.txt" >&2\nexit 1\n' > "${TEST_ROOT}/tsx.sh"
+set +e; out="$(APP_RELEASE_CHANNEL_CREATE=1 STUB_PUBLISH=published STUB_VERIFY=adopted defer_run)"; rc=$?; set -e
+assert_deferred "bind catching-up" "$rc" "$out" 120 7
+grep -q ' channel bind ' "${TEST_ROOT}/stub.log" || fail "bind catching-up: the bind ran"
+! grep -q '^publish ' "${TEST_ROOT}/stub.log" || fail "bind catching-up: nothing is published"
+echo "ok 20 - a bind whose catching-up budget ran out is NOT READY (exit 5, intent)"
+write_tsx_stub
+
+# 21. the publish spends the budget (the ceremony's line precedes publish's own REFUSED).
+rm -f "${TEST_ROOT}/stub.log" "${INTENT}"
+set +e; out="$(STUB_PUBLISH=catching-up STUB_VERIFY=adopted defer_run)"; rc=$?; set -e
+assert_deferred "publish catching-up" "$rc" "$out" 300 2
+! grep -q '^verify ' "${TEST_ROOT}/stub.log" || fail "publish catching-up: no adoption measure"
+echo "ok 21 - a publish whose catching-up budget ran out is NOT READY (exit 5, intent)"
