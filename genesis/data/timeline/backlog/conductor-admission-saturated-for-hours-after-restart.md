@@ -171,3 +171,30 @@ Whether a timed-out HTTP handler continues its remaining work is unmeasured.
 - current state: budget mismatch and repeated authoring are code-proven; the actual
   blocking phase of #1719 is unmeasured. Do not re-PUT just to diagnose it, and do not
   treat the cell-membership observation cure as a fix for this ingestion contract.
+
+## 2026-09-27 — still standing on matthew-alpha; same 503 face, App #1731-#1733
+
+`.claude/shifts/notarize-503-diagnosis-2026-09-27.md` (read-only, code at dev tip 580adbd64):
+admission capacity 5, `in_flight` 5/5 for 5+ hours on matthew-alpha; mean permit hold 50-60 s
+across infrastructure/mishpat/content_store, the same websocket-deadline shape as above. About
+790 conductor call timeouts in 3 h, led by `get_latest_peer_status_for_agent`,
+`resolve_content_head_local`, `record_peer_status`. `create_content` 9/9 dropped and
+`update_content` 307/307 dropped since pod start — zero notarized writes have completed inside
+the doorway's 12 s proxy window. The adoption controller answers `conductor_unavailable` for
+14-17 consecutive sweeps. All 5 cells are live (this is not CellDisabled); `/db/p2p/conductor-diagnostics`
+shows non-empty `blocked_message_counts` toward `relay.elohim.host` peers, and adam's own storage
+answers `refused` (503) on `elohim.host`'s `/health/serving`.
+
+Blocks: the native app-release channel notarize PATCH refuses/defers (App #1731-#1733; orchestrator
+#1914-#1917), which in turn blocks the N6 fleet leg and the doorway-failover same-head clause.
+
+Leading hypothesis (unproven, matches this file's still-open "what follows if it is grants /
+chain length" question): the ~60 s zome calls are DHT gets/publishes reaching authorities that
+cannot be reached — adam's storage refused, relay peers blocked — not a fresh capacity ceiling.
+
+Operator options named in the diagnosis: heal matthew-alpha's conductor and the adam side so
+permits actually drain (the only change that clears the condition); a longer doorway proxy
+deadline for conductor-bearing writes, or a storage-side detached notarize (spawn-and-await so a
+client-side timeout doesn't abandon the zome call), are code follow-ups that only help once the
+conductor answers inside 12-60 s — neither helps while the 5 s admission shed dominates. Raising
+`ELOHIM_CONDUCTOR_PERMITS` is not recommended, per this file's design-decision note above.
