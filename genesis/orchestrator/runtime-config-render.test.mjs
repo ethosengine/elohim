@@ -201,16 +201,20 @@ test("alpha humans WITH the field render the real workspace channel line at thei
   // (james to canary, then matthew/jessica to apply on the bootstrap pair) is
   // a later data change the operator flips after Task 4's first
   // workspace->alpha receipt, not minted here.
-  // 2026-09-26 (one-head-delivered sprint Lane D, Task D3): the alpha serving
-  // pair (doorway A -> matthew, doorway B -> jessica) flips the app-bundle
-  // channel to =apply -- the household proof (app-bundle-elected-delivery
-  // 6/6 twice, 2026-09-26) is green and the deployed storage (edge #1486)
-  // lists app-bundle among its applyVehicles. See $appBundleChannelComment.
-  const appBundleApply = `,${APP_BUNDLE_CHANNEL_ID}=apply`;
+  // 2026-09-26/27 (one-head-delivered sprint Lane D, Task D3, fix round 1):
+  // the alpha serving pair (doorway A -> matthew, doorway B -> jessica) flips
+  // the app-bundle channel to =canary, NOT =apply -- =apply adopts only an
+  // EARNED (promoted) head (release_adoption/state.rs:86-100) and CI never
+  // promotes one; =canary applies a verified STAGING head, which is what the
+  // household proof exercises (app-bundle-elected-delivery.steps.ts
+  // mode: 'canary', 6/6 twice, 2026-09-26) and what "alpha IS the canary"
+  // means. The deployed storage (edge #1486) lists app-bundle among its
+  // applyVehicles. See $appBundleChannelComment.
+  const appBundleCanary = `,${APP_BUNDLE_CHANNEL_ID}=canary`;
   for (const [name, mode, extra] of [
     ["james", "canary", ""],
-    ["matthew", "observe", appBundleApply],
-    ["jessica", "observe", appBundleApply],
+    ["matthew", "observe", appBundleCanary],
+    ["jessica", "observe", appBundleCanary],
     ["adam", "observe", ""],
     ["gertrude", "observe", ""],
     ["susan", "observe", ""],
@@ -232,10 +236,16 @@ test("alpha humans WITH the field render the real workspace channel line at thei
     );
   }
 
-  // adam never follows the app-bundle channel -- the apply flip is scoped to
-  // the serving pair (matthew, jessica) only.
+  // adam never follows the app-bundle channel -- the canary flip is scoped
+  // to the serving pair (matthew, jessica) only.
+  const adamChannels = humanNamed("adam").runtimeConfig?.ELOHIM_RELEASE_CHANNELS ?? "";
   assert.doesNotMatch(
-    humanNamed("adam").runtimeConfig?.ELOHIM_RELEASE_CHANNELS ?? "",
+    adamChannels,
+    /runtime:app-bundle:alpha:dev=canary/,
+    "adam: does not follow app-bundle at canary",
+  );
+  assert.doesNotMatch(
+    adamChannels,
     /runtime:app-bundle:alpha:dev=apply/,
     "adam: does not follow app-bundle at apply",
   );
