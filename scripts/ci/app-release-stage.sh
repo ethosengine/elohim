@@ -1,0 +1,244 @@
+#!/bin/bash
+# app-release-stage.sh — the App pipeline's ONE native delivery step: publish this
+# build's bundles as one release through ONE doorway, then measure adoption per
+# peer. Never a per-host write (native-delivery N6 fleet leg; the retired per-host
+# path is stageSpaBlobs + authorHeadOnce in the root Jenkinsfile, kept behind
+# APP_DELIVERY_LEGACY for one release as rollback).
+#
+# Usage: app-release-stage.sh <doorway-url> <manifest-out> <peer>[,<peer>...]
+#
+# Composes two scripts, each with its own tests:
+#   publish-app-release.sh <doorway-url> <manifest-out>
+#       APP-RELEASE-PUBLISHED channel=<id> release=<cid>  → measure adoption of <cid>
+#       APP-RELEASE-CURRENT channel=<id> release=<cid>    → nothing new to publish
+#         (idempotent by CONTENT); adoption of the current release is STILL
+#         measured, so a rebuild re-proves a peer that had not adopted yet
+#       exit 2                                            → refused
+#   verify-app-adoption.sh <doorway-url> <cid> <peer>...
+#       0 every peer adopted · 1 a peer refused app_bundle_cannot_boot · 3 bound elapsed
+#
+# BRANCH GATE. Only the dev branch has a release channel (runtime:app-bundle:
+# alpha:dev). APP_RELEASE_BRANCH names the pipeline's branch; any value other
+# than `dev` prints `skipped=branch-<name>-has-no-channel` and exits 0 with no
+# publish. Unset (a household or hand run) means no gate.
+#
+# STEWARD ACT. Only when APP_RELEASE_CHANNEL_CREATE=1 (the Jenkinsfile sets it
+# for a tip commit carrying [app:channel-create]), before publishing, in order:
+#   1. the channel answers 404 behind the doorway →
+#        release-ceremony.ts channel create <channel> --reach commons --transport doorway --doorway <url>
+#   2. every slug in APP_RELEASE_BUNDLES whose record does not name the channel →
+#        release-ceremony.ts channel bind <slug> <channel> --transport doorway --doorway <url>
+#      A release refused `app_slug_not_bound_to_channel` is never retried, so the
+#      binding must precede the first publish — and is only done when each newly
+#      bound slug READS BACK naming the channel on two consecutive reads within
+#      APP_RELEASE_CHANNEL_VISIBLE_SECS (else refused channel-bind-not-elected).
+#
+# Output: everything the composed scripts print, then ONE summary line:
+#   APP-RELEASE-CHANNEL-CREATED channel=<id> | APP-RELEASE-CHANNEL-EXISTS channel=<id>
+#   APP-RELEASE-CHANNEL-BOUND slugs=<a,b> | APP-RELEASE-CHANNEL-ALREADY-BOUND slugs=<a,b>
+#                                             (steward act only, before the publish)
+#   APP-RELEASE-STAGE skipped=branch-<name>-has-no-channel
+#   APP-RELEASE-STAGE released=<cid> adopted=<peer,...>
+#   APP-RELEASE-STAGE released=<cid> adopted=<peer,...> pending=<peer,...>
+#   APP-RELEASE-STAGE refused=app_bundle_cannot_boot
+#   APP-RELEASE-STAGE refused=channel-create-failed channel=<id> …
+#   APP-RELEASE-STAGE refused=channel-bind-failed channel=<id> slug=<slug> …
+#   APP-RELEASE-STAGE refused=channel-bind-not-elected channel=<id> slug=<slug> …
+#   APP-RELEASE-STAGE refused=internal-error line=<n>   (this script's own failure)
+#   APP-RELEASE-STAGE refused=<publish's last line | verify-exit-N | no-release-line>
+#
+# Exit: 0 delivered+adopted, or skipped (no channel for this branch) · 1 refused
+#   (the release cannot boot on a peer — the Jenkinsfile turns this into a hard
+#   FAILURE) · 2 refused (channel create/bind, publish, or an adoption measure
+#   that could not run) · 3 delivered, not yet proven (adoption bound elapsed)
+#   · 64 usage.
+#
+# Env:
+#   APP_RELEASE_STAGE_OUT       also write every APP-* line to this file (the
+#                               Jenkinsfile parses it into junit outcomes)
+#   APP_RELEASE_BRANCH          the pipeline branch (the gate above)
+#   APP_RELEASE_CHANNEL_CREATE  1 = the steward act above. Unset: an absent channel
+#                               is publish-app-release.sh's own refusal, unchanged.
+#   APP_RELEASE_CHANNEL_VISIBLE_SECS
+#                               after a create, how long the channel may take to become
+#                               readable through the doorway (default 60 — read-your-
+#                               write, never a wait on the fleet)
+#   APP_RELEASE_READBACK_POLL_SECS
+#                               spacing of the bind read-back (default 3)
+#   APP_RELEASE_TSX             the tsx runner (default <repo>/node_modules/.bin/tsx)
+#   APP_RELEASE_NODE            node for the one JSON question per answer (default node;
+#                               python is not on this path — scripts/ci/.epr-meta)
+#   APP_RELEASE_PUBLISH_SCRIPT  seam for tests (default publish-app-release.sh beside this)
+#   APP_RELEASE_VERIFY_SCRIPT   seam for tests (default verify-app-adoption.sh beside this)
+#   and everything publish-app-release.sh / verify-app-adoption.sh read
+#   (STORAGE_API_KEY_ADMIN, APP_RELEASE_CHANNEL, APP_RELEASE_BUNDLES, …).
+set -euo pipefail
+
+if [ "$#" -ne 3 ] || [ -z "$3" ]; then
+    echo "usage: app-release-stage.sh <doorway-url> <manifest-out> <peer>[,<peer>...]" >&2
+    exit 64
+fi
+# Exit 1 means ONE thing — a peer judged the release unable to boot (the
+# Jenkinsfile turns it into a hard FAILURE). Any other failed command is this
+# script's own fault: refuse it as exit 2, naming the line, never a bare 1.
+internal_error() {
+    trap - ERR
+    set +e
+    echo "APP-RELEASE-STAGE refused=internal-error line=$1"
+    if [ -n "${APP_RELEASE_STAGE_OUT:-}" ]; then
+        echo "APP-RELEASE-STAGE refused=internal-error line=$1" >> "${APP_RELEASE_STAGE_OUT}" 2>/dev/null
+    fi
+    exit 2
+}
+trap 'internal_error "${LINENO}"' ERR
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HERE}/../.." && pwd)"
+DOORWAY="$1"
+MANIFEST="$2"
+read -r -a PEERS <<<"${3//,/ }"
+PUBLISH="${APP_RELEASE_PUBLISH_SCRIPT:-${HERE}/publish-app-release.sh}"
+VERIFY="${APP_RELEASE_VERIFY_SCRIPT:-${HERE}/verify-app-adoption.sh}"
+TSX="${APP_RELEASE_TSX:-${REPO_ROOT}/node_modules/.bin/tsx}"
+NODE_BIN="${APP_RELEASE_NODE:-node}"
+CEREMONY="${REPO_ROOT}/genesis/a2o/scripts/release-ceremony.ts"
+CHANNEL="${APP_RELEASE_CHANNEL:-runtime:app-bundle:alpha:dev}"
+STAGE_OUT="${APP_RELEASE_STAGE_OUT:-}"
+[ -n "${STAGE_OUT}" ] && : > "${STAGE_OUT}"
+
+# Print, and keep every machine line (APP-*) for the Jenkinsfile's junit.
+say() {
+    printf '%s\n' "$1"
+    if [ -n "${STAGE_OUT}" ]; then
+        printf '%s\n' "$1" | grep -E '^APP-' >> "${STAGE_OUT}" || true
+    fi
+}
+
+last_line() {
+    printf '%s\n' "$1" | grep -v '^[[:space:]]*$' | tail -n1 || true
+}
+
+# GET <doorway>/db/content/<id>: prints the status; the body lands in $2 when given.
+content_status() {
+    curl -sS -o "${2:-/dev/null}" -w '%{http_code}' -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
+        --max-time 30 "${DOORWAY%/}/db/content/$1" 2>/dev/null || echo 000
+}
+
+# ── branch gate ─────────────────────────────────────────────────────────────
+BRANCH="${APP_RELEASE_BRANCH:-}"
+if [ -n "${BRANCH}" ] && [ "${BRANCH}" != "dev" ]; then
+    say "APP-RELEASE-STAGE skipped=branch-${BRANCH//[^A-Za-z0-9._-]/-}-has-no-channel"
+    exit 0
+fi
+
+# ── the steward act: create the channel, bind the slugs (only when asked) ────
+if [ "${APP_RELEASE_CHANNEL_CREATE:-0}" = "1" ]; then
+    status="$(content_status "${CHANNEL}")"
+    case "${status}" in
+        200) say "APP-RELEASE-CHANNEL-EXISTS channel=${CHANNEL}" ;;
+        404)
+            crc=0
+            cout="$("${TSX}" "${CEREMONY}" channel create "${CHANNEL}" \
+                --reach commons --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || crc=$?
+            say "${cout}"
+            if [ "${crc}" -ne 0 ]; then
+                say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} exit=${crc} $(last_line "${cout}")"
+                exit 2
+            fi
+            deadline=$(( $(date +%s) + ${APP_RELEASE_CHANNEL_VISIBLE_SECS:-60} ))
+            until [ "$(content_status "${CHANNEL}")" = "200" ]; do
+                if [ "$(date +%s)" -ge "${deadline}" ]; then
+                    say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} the create exited 0 but the channel is not readable through ${DOORWAY}"
+                    exit 2
+                fi
+                sleep 3
+            done
+            say "APP-RELEASE-CHANNEL-CREATED channel=${CHANNEL}" ;;
+        *)
+            say "APP-RELEASE-STAGE refused=channel-create-failed channel=${CHANNEL} status=${status} (its existence could not be read through ${DOORWAY})"
+            exit 2 ;;
+    esac
+
+    slugs=()
+    for spec in ${APP_RELEASE_BUNDLES:-}; do
+        slug="${spec%%:*}"
+        case " ${slugs[*]:-} " in *" ${slug} "*) : ;; *) slugs+=("${slug}") ;; esac
+    done
+    if [ "${#slugs[@]}" -eq 0 ]; then
+        say "APP-RELEASE-STAGE refused=channel-bind-failed channel=${CHANNEL} APP_RELEASE_BUNDLES names no slug to bind"
+        exit 2
+    fi
+    body="$(mktemp)"
+    trap 'rm -f "${body}"' EXIT
+    # yes when the slug's record, as the doorway serves it, names the channel.
+    slug_bound() {
+        : > "${body}"
+        [ "$(content_status "$1" "${body}")" = "200" ] || return 0
+        "${NODE_BIN}" -e '
+            const fs = require("fs");
+            try { const b = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                  if (b && b.metadata && b.metadata.releaseChannel === process.argv[2]) process.stdout.write("yes"); }
+            catch {}' "${body}" "${CHANNEL}"
+    }
+    newly=()
+    for slug in "${slugs[@]}"; do
+        [ "$(slug_bound "${slug}")" = "yes" ] && continue
+        brc=0
+        bout="$("${TSX}" "${CEREMONY}" channel bind "${slug}" "${CHANNEL}" \
+            --transport doorway --doorway "${DOORWAY%/}" 2>&1)" || brc=$?
+        say "${bout}"
+        if [ "${brc}" -ne 0 ]; then
+            say "APP-RELEASE-STAGE refused=channel-bind-failed channel=${CHANNEL} slug=${slug} exit=${brc} $(last_line "${bout}")"
+            exit 2
+        fi
+        newly+=("${slug}")
+    done
+    for slug in "${newly[@]}"; do
+        deadline=$(( $(date +%s) + ${APP_RELEASE_CHANNEL_VISIBLE_SECS:-60} ))
+        seen=0
+        while [ "${seen}" -lt 2 ]; do
+            if [ "$(slug_bound "${slug}")" = "yes" ]; then seen=$(( seen + 1 )); else seen=0; fi
+            [ "${seen}" -ge 2 ] && break
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+                say "APP-RELEASE-STAGE refused=channel-bind-not-elected channel=${CHANNEL} slug=${slug} the bind exited 0 but ${DOORWAY} does not serve the slug bound to the channel (an earned head out-votes a staging bind — promote it, then re-run); nothing published"
+                exit 2
+            fi
+            sleep "${APP_RELEASE_READBACK_POLL_SECS:-3}"
+        done
+    done
+    if [ "${#newly[@]}" -gt 0 ]; then
+        say "APP-RELEASE-CHANNEL-BOUND slugs=$(IFS=,; echo "${newly[*]}")"
+    else
+        say "APP-RELEASE-CHANNEL-ALREADY-BOUND slugs=$(IFS=,; echo "${slugs[*]}")"
+    fi
+fi
+
+# ── publish ─────────────────────────────────────────────────────────────────
+# stderr is folded in: publish-app-release.sh prints its REFUSED line there, and
+# that line is what the refusal summary must name.
+prc=0
+out="$(bash "${PUBLISH}" "${DOORWAY}" "${MANIFEST}" 2>&1)" || prc=$?
+say "${out}"
+if [ "${prc}" -ne 0 ]; then
+    last="$(last_line "${out}")"
+    say "APP-RELEASE-STAGE refused=${last:-publish-exit-${prc}}"
+    exit 2
+fi
+line="$(printf '%s\n' "${out}" | grep -E '^APP-RELEASE-(PUBLISHED|CURRENT) ' | tail -n1 || true)"
+cid="${line##*release=}"
+if [ -z "${line}" ] || [ -z "${cid}" ] || [ "${cid}" = "unknown" ]; then
+    say "APP-RELEASE-STAGE refused=no-release-line (publish exited 0 without naming a release)"
+    exit 2
+fi
+
+# ── measure adoption (a CURRENT release too: a rebuild re-proves a lagging peer) ─
+rc=0
+vout="$(bash "${VERIFY}" "${DOORWAY}" "${cid}" "${PEERS[@]}")" || rc=$?
+say "${vout}"
+adopted="$(printf '%s\n' "${vout}" | sed -n 's/^APP-ADOPTED \([^ ]*\).*/\1/p' | paste -sd, -)"
+pending="$(printf '%s\n' "${vout}" | sed -n 's/^APP-NOT-ADOPTED \([^ ]*\).*/\1/p' | paste -sd, -)"
+case "${rc}" in
+    0) say "APP-RELEASE-STAGE released=${cid} adopted=${adopted}"; exit 0 ;;
+    1) say "APP-RELEASE-STAGE refused=app_bundle_cannot_boot"; exit 1 ;;
+    3) say "APP-RELEASE-STAGE released=${cid} adopted=${adopted} pending=${pending}"; exit 3 ;;
+    *) say "APP-RELEASE-STAGE refused=verify-exit-${rc}"; exit 2 ;;
+esac

@@ -538,8 +538,9 @@ def resolveDoorwayEprUrls() {
     // only resolved inside the elohim-alpha namespace; build pods in the
     // jenkins namespace got curl exit 6 — see App #1457.
     //
-    // Alpha cluster has TWO storage backends — matthew (alpha.elohim.host) +
-    // adam (elohim.host). Each must carry the SPA blob BYTES (bytes don't
+    // Alpha cluster serves through TWO doorways — doorway A (alpha.elohim.host) +
+    // doorway B (elohim.host); the alpha serving pair behind them is matthew +
+    // jessica, the pair appReleasePeers() names. Each must carry the SPA blob BYTES (bytes do not
     // auto-replicate P2P yet — legitimate per-host load-spread), but the
     // notarized blobHash HEAD is authored ONCE via a live conductor bridge and
     // gossips to every peer (authorHeadOnce) — NOT a per-storage write (that
@@ -623,15 +624,20 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
     // as success); a bundle a peer judged BROKEN and a shell that cannot boot are
     // hard FAILURE. The credential-missing guard stays upstream
     // (resolveStorageAdminKey).
-    def bundles = [
-        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing"],
-        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", kind: "server", ssrPath: "/"],
-        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa"],
-        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", kind: "server", ssrPath: "/lamad/path/elohim-protocol", ssrHeading: "Elohim Protocol: Living Documentation"],
-    ]
+    //
+    // NATIVE PATH (default; native-delivery N6). The phases above are the RETIRED
+    // per-host path, kept behind APP_DELIVERY_LEGACY for exactly one release as
+    // rollback. Natively CI publishes ONE release through ONE write-ready doorway
+    // and each peer adopts it by election (publishReleaseAndVerifyAdoption).
+    def bundles = appBundles()
+    def legacy = (params.APP_DELIVERY_LEGACY ?: false)
     def outcomes = [:]
     try {
-        if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes)) {
+        if (!legacy) {
+            publishReleaseAndVerifyAdoption(doorwayEprUrls, adminKey, gitCommitHash, bundles, outcomes)
+            return
+        }
+        if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes, false)) {
             return
         }
         // Past the precondition the readiness wait is TAIL tolerance only. The
@@ -642,9 +648,124 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
         }
     } finally {
         // In a finally so a refused, BROKEN or unbootable deploy still reports
-        // every phase that ran, with its time.
-        emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, bundles, outcomes)
+        // every phase that ran, with its time. The native path has no per-host
+        // legs, so it reports only readiness + its release.* legs.
+        emitAppDeployJunit((env.BRANCH_NAME ?: 'dev'), doorwayEprUrls, legacy ? bundles : [], outcomes)
     }
+}
+
+// The App's bundles — the ONE list both delivery paths read (stageSpaBlobs /
+// authorHeadOnce per host; appReleaseBundles for the native release). mount is
+// the URL mount the release manifest records per app (publish-app-release.sh).
+def appBundles() {
+    return [
+        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/browser", slug: "elohim-host-landing", mount: "/"],
+        [distDir: "${env.WORKSPACE}/app/elohim-app/dist/elohim-app/server",  slug: "elohim-host-landing", mount: "/", kind: "server", ssrPath: "/"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/browser",           slug: "lamad-spa", mount: "/lamad/"],
+        [distDir: "${env.WORKSPACE}/app/lamad/dist/lamad/server",            slug: "lamad-spa", mount: "/lamad/", kind: "server", ssrPath: "/lamad/path/elohim-protocol", ssrHeading: "Elohim Protocol: Living Documentation"],
+    ]
+}
+
+// APP_RELEASE_BUNDLES for publish-app-release.sh: whitespace-separated
+// <slug>:<kind>:<dist-dir>[:<mount>], formatted from appBundles().
+def appReleaseBundles(List<Map> bundles) {
+    return bundles.collect { b -> "${b.slug}:${b.kind ?: 'browser'}:${b.distDir}${b.mount ? ':' + b.mount : ''}" }.join(' ')
+}
+
+// The peers whose adoption the native path measures: the alpha serving pair
+// behind doorway A / B (verify-app-adoption.sh reads each one's own report
+// through the publishing doorway). A constant, not a param: which peers must
+// adopt is a property of the fleet, not of a build.
+def appReleasePeers() {
+    return 'matthew,jessica'
+}
+
+// Native path (native-delivery N6): one release, peers adopt. The retired per-host
+// path stays behind APP_DELIVERY_LEGACY for exactly one release as rollback.
+// Readiness changes meaning here: election needs ONE writable doorway, so the
+// same single probe (fleetWriteReady, electOne) refuses only when NO doorway is
+// write-ready, and this publishes through the first ready one. Exit 1 (a peer
+// judged the release unable to boot) is a hard FAILURE, as the legacy broken|
+// gate; 3 (a peer not adopted inside the bound) and 2 (refused) are UNSTABLE.
+// Bash body: scripts/ci/app-release-stage.sh (CPS 64KB — no heredoc here).
+def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey, String gitCommitHash, List<Map> bundles, Map outcomes) {
+    // Only dev has a release channel (runtime:app-bundle:alpha:dev); on any other
+    // branch the stage script prints skipped=branch-<name>-has-no-channel and
+    // exits 0, so the readiness probe is not run for a publish that cannot happen.
+    def branch = env.BRANCH_NAME ?: 'dev'
+    def ready = doorwayEprUrls
+    if (branch == 'dev') {
+        if (!fleetWriteReady(doorwayEprUrls, bundles, adminKey, gitCommitHash, outcomes, true)) {
+            return
+        }
+        ready = outcomes['readiness|doorways']
+    }
+    def manifest = "${env.WORKSPACE}/app-release-manifest.json"
+    def stageOut = "${env.WORKSPACE}/.ci-app-release-stage.txt"
+    def started = System.currentTimeMillis()
+    def rc = 0
+    // Creating the channel (and binding the app slugs to it, before the first
+    // release) is a recorded steward act carried by the push: only a tip commit
+    // carrying [app:channel-create] lets this run do it.
+    def createChannel = appChannelCreateRequested()
+    if (createChannel) {
+        echo "[app:channel-create] on the tip commit — app-release-stage.sh creates the release channel if absent and binds the unbound app slugs"
+    }
+    withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "APP_RELEASE_BUNDLES=${appReleaseBundles(bundles)}",
+             "APP_RELEASE_STAGE_OUT=${stageOut}", "APP_RELEASE_CHANNEL_CREATE=${createChannel ? '1' : '0'}",
+             "APP_RELEASE_BRANCH=${branch}"]) {
+        sh "rm -f '${stageOut}' '${manifest}' '${manifest}.publish.json'"
+        rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/app-release-stage.sh' '${ready[0]}' '${manifest}' '${appReleasePeers()}'")
+    }
+    outcomes['ms|release'] = System.currentTimeMillis() - started
+    outcomes['release|doorway'] = ready[0]
+    recordReleaseOutcomes(fileExists(stageOut) ? readFile(stageOut) : '', rc, outcomes)
+    archiveArtifacts(artifacts: 'app-release-manifest.json*', allowEmptyArchive: true)
+    if (rc == 1) {
+        error("Deploy refused: the release cannot boot on a peer — ${outcomes['release|detail']}. The peer judged the bytes; fix the build, do not re-run.")
+    }
+    if (rc == 3) {
+        unstable("App release ${outcomes['release|cid']} published; a peer has not adopted inside the bound (delivered, not yet proven) — ${outcomes['release|detail']}")
+    } else if (rc != 0) {
+        unstable("App release refused (exit ${rc}) — ${outcomes['release|detail']}")
+    }
+}
+
+// True when the tip commit message carries [app:channel-create] (case-insensitive),
+// read the way the orchestrator reads [edge:validate-only] from the tip.
+def appChannelCreateRequested() {
+    def tip = sh(script: 'git log -1 --format=%B', returnStdout: true).trim()
+    return (tip =~ /(?i)\[app:channel-create\]/).find()
+}
+
+// Parse app-release-stage.sh's APP-* lines into outcomes: release|published
+// (published | current | skipped — no channel for this branch | refused),
+// release|cid, release|detail (the summary line), adopt|<peer> (adopted |
+// pending | cannot-boot), and release|channel (created) / release|bound (slugs=…)
+// when an [app:channel-create] run did the steward act. Plain loops: CPS-safe.
+def recordReleaseOutcomes(String text, int rc, Map outcomes) {
+    def published = 'refused'
+    for (line in text.readLines()) {
+        if (line.startsWith('APP-RELEASE-PUBLISHED ')) { published = 'published' }
+        if (line.startsWith('APP-RELEASE-CURRENT ')) { published = 'current' }
+        if (line.startsWith('APP-RELEASE-CHANNEL-CREATED ')) { outcomes['release|channel'] = 'created' }
+        if (line.startsWith('APP-RELEASE-CHANNEL-BOUND ')) { outcomes['release|bound'] = line.substring(26) }
+        if (line.startsWith('APP-RELEASE-STAGE skipped=')) { published = 'skipped' }
+        def fields = line.tokenize(' ')
+        if (fields.size() < 2) { continue }
+        if (fields[0] == 'APP-RELEASE-STAGE') {
+            outcomes['release|detail'] = line
+            for (f in fields) {
+                if (f.startsWith('released=')) { outcomes['release|cid'] = f.substring(9) }
+            }
+        }
+        if (fields[0] == 'APP-ADOPTED') { outcomes["adopt|${fields[1]}".toString()] = 'adopted' }
+        if (fields[0] == 'APP-NOT-ADOPTED') { outcomes["adopt|${fields[1]}".toString()] = 'pending' }
+        if (fields[0] == 'APP-CANNOT-BOOT') { outcomes["adopt|${fields[1]}".toString()] = 'cannot-boot' }
+    }
+    outcomes['release|published'] = published
+    outcomes['release|delivered'] = [0: (published == 'published' ? 'adopted' : published), 1: 'cannot-boot', 3: 'pending'][rc] ?: 'refused'
+    if (!outcomes['release|detail']) { outcomes['release|detail'] = "app-release-stage.sh exited ${rc} with no summary line" }
 }
 
 // Phase 0 — the readiness PRECONDITION (native-delivery sprint Lane A2). One
@@ -654,7 +775,14 @@ def stageAndVerifyAllBundles(List<String> doorwayEprUrls, String adminKey, Strin
 // doorway), go UNSTABLE, return false — no seed, no author, no wait. Exit 2 = the
 // probe could not judge: proceed, because an unproven NO must not block a deploy
 // the tail-tolerance ladder can still land. Returns true to proceed.
-def fleetWriteReady(List<String> doorwayEprUrls, List<Map> bundles, String adminKey, String gitCommitHash, Map outcomes) {
+//
+// electOne (the native path, native-delivery N6): election needs ONE writable
+// doorway, not all of them, so the SAME single probe run is read per doorway
+// (readyDoorways) and refuses only when none is electable; the electable
+// doorways land in outcomes['readiness|doorways'], in order. The legacy path
+// passes false and keeps the all-or-nothing rule (app #1727-#1729 refused on
+// `FLEET-NOT-READY https://elohim.host face=storage-refused` with alpha READY).
+def fleetWriteReady(List<String> doorwayEprUrls, List<Map> bundles, String adminKey, String gitCommitHash, Map outcomes, boolean electOne) {
     def started = System.currentTimeMillis()
     def resultFile = "${env.WORKSPACE}/.ci-fleet-readiness.txt"
     def intentFile = 'deploy-intent.json'
@@ -671,19 +799,61 @@ def fleetWriteReady(List<String> doorwayEprUrls, List<Map> bundles, String admin
         rc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/scripts/ci/fleet-write-readiness.sh' ${urls}")
     }
     outcomes['ms|readiness'] = System.currentTimeMillis() - started
-    def lines = fileExists(resultFile) ? readFile(resultFile).trim().replace('\n', '; ') : ''
-    if (rc != 3) {
-        outcomes['readiness'] = (rc == 0) ? 'ready' : 'unknown'
+    def raw = fileExists(resultFile) ? readFile(resultFile).trim() : ''
+    def lines = raw.replace('\n', '; ')
+    def proceed = (rc != 3)
+    if (electOne) {
+        def electable = readyDoorways(doorwayEprUrls, rc, raw)
+        outcomes['readiness|doorways'] = electable
+        proceed = !electable.isEmpty()
+        if (proceed && rc != 0) { outcomes['readiness|detail'] = lines }
+    }
+    if (proceed) {
+        outcomes['readiness'] = (rc == 0) ? 'ready' : (rc == 3 ? 'partial' : 'unknown')
         if (rc != 0) {
-            echo "fleetWriteReady: the probe could not judge (exit ${rc}) — proceeding on the tail-tolerance ladder: ${lines}"
+            echo "fleetWriteReady: exit ${rc} (${outcomes['readiness']}) — proceeding${electOne ? ' via ' + outcomes['readiness|doorways'][0] : ' on the tail-tolerance ladder'}: ${lines}"
         }
         return true
     }
     outcomes['readiness'] = 'refused'
     outcomes['readiness|detail'] = lines
+    if (electOne) { markIntentElectOne(intentFile) }
     archiveArtifacts(artifacts: intentFile, allowEmptyArchive: true)
     unstable("Fleet not write-ready — ${lines}. Deploy refused in seconds (no seed, no author, no wait); ${intentFile} archived for the re-dispatch once the fleet is writable.")
     return false
+}
+
+// The native path's refused intent carries "elect": "one" — the orchestrator's
+// deploy-pending pass (timer-dispatch.mjs) then re-dispatches when ANY doorway is
+// FLEET-READY, the same rule this path refuses by; an intent without the field
+// (the legacy path) keeps the every-doorway-ready rule. Plain string ops: the
+// intent is one JSON object, and no JSON step is assumed on the agent.
+def markIntentElectOne(String intentFile) {
+    if (!fileExists(intentFile)) { return }
+    def text = readFile(intentFile).trim()
+    if (text.startsWith('{') && text.length() > 2 && !text.contains('"elect"')) {
+        writeFile(file: intentFile, text: '{"elect":"one",' + text.substring(1) + '\n')
+    }
+}
+
+// The native path's read of ONE fleet-write-readiness.sh run (its per-doorway
+// lines — `FLEET-READY <origin>` / `FLEET-NOT-READY <origin> face=…` /
+// `FLEET-READINESS-UNKNOWN <origin> reason=…`): the READY origins in order, then
+// the UNKNOWN ones (an unproven NO must not block, exactly as exit 2 proceeds on
+// the legacy path). Empty only when every doorway answered NOT READY. A run that
+// printed no line and did not say NOT READY (exit 2: usage, a crash) falls back
+// to the doorways in their failover order. Pure: no steps, no probe of its own.
+def readyDoorways(List<String> doorwayEprUrls, int rc, String raw) {
+    def ready = []
+    def unknown = []
+    for (line in raw.readLines()) {
+        def f = line.tokenize(' ')
+        if (f.size() < 2) { continue }
+        if (f[0] == 'FLEET-READY') { ready << f[1] }
+        if (f[0] == 'FLEET-READINESS-UNKNOWN') { unknown << f[1] }
+    }
+    if (ready.isEmpty() && unknown.isEmpty() && rc != 3) { return doorwayEprUrls }
+    return ready + unknown
 }
 
 // Phases 1-5 behind the precondition. Own def = own CPS method (keeps the caller
@@ -807,6 +977,17 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     if (readiness == 'refused') {
         bundles = []
     }
+    // Native path (publishReleaseAndVerifyAdoption): release.publish once, then
+    // release.adopt per peer — the peer's own adoption report, not a host write.
+    if (outcomes.containsKey('release|published')) {
+        cases << [name: "release.publish via ${outcomes['release|doorway']}".toString(), kind: 'release',
+                  passed: outcomes['release|published'] != 'refused', ms: outcomes['ms|release'],
+                  detail: outcomes['release|detail'] ?: '']
+        for (k in outcomes.keySet().findAll { it.startsWith('adopt|') }) {
+            cases << [name: "release.adopt ${k.substring(6)}".toString(), kind: 'adopt',
+                      passed: outcomes[k] == 'adopted', ms: outcomes['ms|release'], detail: outcomes[k]]
+        }
+    }
     // publish.seed: one per (host, bundle). Passed => the blob bytes landed on
     // that backend (recorded true inside stageSpaBlobs on clean return).
     doorwayEprUrls.each { url ->
@@ -879,8 +1060,8 @@ def emitAppDeployJunit(String envName, List<String> doorwayEprUrls, List<Map> bu
     archiveArtifacts(artifacts: reportFile, allowEmptyArchive: true)
     junit(testResults: reportFile, allowEmptyResults: true)
     def timings = []
-    for (p in ['readiness', 'publish.seed', 'publish.author', 'converge.declare', 'verify.mounts', 'verify.projected', 'verify.shell']) {
-        def key = (p == 'readiness') ? 'ms|readiness' : "time|${p}".toString()
+    for (p in ['readiness', 'release', 'publish.seed', 'publish.author', 'converge.declare', 'verify.mounts', 'verify.projected', 'verify.shell']) {
+        def key = (p == 'readiness' || p == 'release') ? "ms|${p}".toString() : "time|${p}".toString()
         if (outcomes.containsKey(key)) { timings << "${p}=${junitSecs(outcomes[key])}s" }
     }
     echo "App delivery for ${safeEnv}: ${cases.size() - failed}/${cases.size()} legs passed; phase wall-clock: ${timings.join(' ')}"
@@ -914,6 +1095,12 @@ def appDeployFailureMessage(String kind, String name, def detail) {
     }
     if (kind == 'projhead') {
         return "Projected-head probe '${name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
+    }
+    if (kind == 'release') {
+        return "App release '${name}' refused — ${detail}. scripts/ci/app-release-stage.sh names the refusal (channel absent → a steward runs release-ceremony.ts channel create once; a packager or publish failure → its output above)."
+    }
+    if (kind == 'adopt') {
+        return "Peer adoption '${name}' is ${detail}: the release is published but this peer's own adoption report (GET /db/p2p/adoption?peer=…) did not apply it inside VERIFY_ADOPTION_BUDGET_SECS — delivered, not yet proven. cannot-boot is a hard FAILURE."
     }
     if (kind == 'shell') {
         return "Served-shell gate '${name}' failed: the shell does not boot through this doorway/mount (scripts/ci/verify-served-shell.sh) — see the ✗ lines for the asset and the x-elohim-bundle marker."
@@ -1029,6 +1216,7 @@ spec:
             description: 'No-op for this pipeline. Accepted so the orchestrator can propagate the flag uniformly; orchestrator skips triggering elohim-app when DEPLOY_ONLY=true.'
         )
         string(name: 'RUN_CLASS', defaultValue: 'build', description: 'Run class the orchestrator derived (build|deploy|verify|measure|profile). Declared; nothing gates on it yet.')
+        booleanParam(name: 'APP_DELIVERY_LEGACY', defaultValue: false, description: 'Use the retired per-host stageSpaBlobs path (rollback only, one release)')
     }
 
     // No triggers - orchestrator handles all webhook events

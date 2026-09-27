@@ -522,6 +522,12 @@ export function partitionViolation(planned, dispatch, skipped) {
 //      dispatches the App with RUN_CLASS=deploy and DEPLOY_ONLY=true, added
 //      after the already-built filter (so the filter never judges it). Not
 //      ready, cannot judge, or a wave that is about to roll the fleet: held.
+//      An intent the NATIVE path refused carries `elect: "one"` (one release
+//      through ONE writable doorway, peers adopt by election — the App refuses
+//      only when NO doorway is ready), so it re-dispatches as soon as ANY
+//      doorway answers FLEET-READY; an intent without the field (the legacy
+//      per-host path) keeps the every-doorway-ready rule. App #1727–#1729 is the
+//      shape: elohim.host storage-refused while alpha was READY.
 //   3. A delivered App (SUCCESS, or UNSTABLE that is not a readiness refusal)
 //      clears the key; a re-dispatch that goes red drops it (the red is the
 //      verdict, and the next push touching the App re-selects it).
@@ -621,6 +627,7 @@ export function readinessRefusal({ result, intentText = null, junitText = null, 
       env: typeof intent.env === 'string' ? intent.env : '',
       doorways: [...intent.doorways],
       notReady: intent.notReady,
+      elect: intent.elect === 'one' ? 'one' : 'all',
       build: build === null || build === undefined ? null : String(build),
       recordedAt: typeof intent.recordedAt === 'string' ? intent.recordedAt : null,
     },
@@ -703,6 +710,24 @@ export async function pendingDeployPass(state = {}, deps = defaultDeps()) {
   }
   const rc = typeof probed?.rc === 'number' ? probed.rc : null;
   const lines = String(probed?.lines ?? '').trim().replace(/\n+/g, '; ');
+  // Election needs ONE writable doorway: a native intent dispatches on any
+  // FLEET-READY line, whatever the others answered (the probe's exit is 3 or 2
+  // then, never 0). The App itself publishes through the first ready doorway.
+  const electOne = pending.elect === 'one';
+  const anyReady = /^FLEET-READY\s/m.test(String(probed?.lines ?? ''));
+  if (electOne && anyReady && rc !== 0) {
+    return {
+      dispatch: true,
+      pending,
+      probeRc: rc,
+      logLines: [
+        say(
+          `🚀 ${what} — a doorway is write-ready and the intent elects one (${lines}); dispatching ${app} ` +
+            'RUN_CLASS=deploy DEPLOY_ONLY=true (exempt from the already-built filter)',
+        ),
+      ],
+    };
+  }
   if (rc === 0) {
     return {
       dispatch: true,

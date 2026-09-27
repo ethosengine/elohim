@@ -228,6 +228,41 @@ describe('pendingDeployPass — re-dispatch is an event, never a poll', () => {
     assert.match(out.logLines[0], /held — fleet not write-ready: FLEET-NOT-READY/);
   });
 
+  test('a native intent (elect: "one") dispatches when ANY doorway is ready — the #1727–#1729 shape', async () => {
+    const nativeText = JSON.stringify({ elect: 'one', ...JSON.parse(INTENT_TEXT) }) + '\n';
+    const native = readinessRefusal({
+      result: 'UNSTABLE',
+      intentText: nativeText,
+      junitText: JUNIT_REFUSED,
+      build: 1728,
+    }).pendingDeploy;
+    assert.equal(native.elect, 'one');
+    const mixed = [
+      'FLEET-NOT-READY https://elohim.host face=storage-refused retryAfter=60',
+      'FLEET-READY https://alpha.elohim.host',
+      '',
+    ].join('\n');
+    const baselines = { __global__: GLOBAL, elohim: GLOBAL, [PENDING_DEPLOY_KEY]: native };
+    const out = await pendingDeployPass({ ...withPending(), baselines }, stubDeps({ rc: 3, lines: mixed }));
+    assert.equal(out.dispatch, true);
+    assert.equal(out.probeRc, 3);
+    assert.match(out.logLines[0], /a doorway is write-ready and the intent elects one/);
+    assert.match(out.logLines[0], /RUN_CLASS=deploy DEPLOY_ONLY=true/);
+
+    // Every doorway NOT READY: still held, native or not.
+    const none = await pendingDeployPass(
+      { ...withPending(), baselines },
+      stubDeps({ rc: 3, lines: 'FLEET-NOT-READY https://elohim.host face=storage-refused retryAfter=60\n' }),
+    );
+    assert.equal(none.dispatch, false);
+
+    // A legacy intent (no elect field) keeps the every-doorway-ready rule.
+    assert.equal(PENDING.elect, 'all');
+    const legacy = await pendingDeployPass(withPending(), stubDeps({ rc: 3, lines: mixed }));
+    assert.equal(legacy.dispatch, false);
+    assert.match(legacy.logLines[0], /held — fleet not write-ready/);
+  });
+
   test('no intent ⇒ nothing: no probe, no log line', async () => {
     for (const baselines of [{}, { __global__: GLOBAL }, { [PENDING_DEPLOY_KEY]: null }]) {
       const deps = stubDeps();

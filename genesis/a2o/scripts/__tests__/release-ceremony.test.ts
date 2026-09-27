@@ -23,13 +23,18 @@
  * string fields are copied in; no other repo/fleet fact is assumed.
  */
 import { strict as assert } from 'node:assert';
+import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   ADOPTION_PATH,
   assertAdmissibleOverEarnedHead,
+  channelRootRecord,
+  doorwayBindPatch,
   doorwayPublishRefusal,
+  doorwayTransportRefusal,
   mergeReleaseBinding,
   readAdoptedRelease,
   RELEASE_CHANNEL_KEY,
@@ -308,8 +313,12 @@ describe('assertAdmissibleOverEarnedHead — D-A: runsTarget counts as adopted',
 // Slice 2 (native-delivery Lane N) — channel bind and the doorway transport
 // ---------------------------------------------------------------------------
 
+const ALPHA_DEV_CHANNEL = 'runtime:app-bundle:alpha:dev';
+const LANDING = 'elohim-host-landing';
+const TRANSPORT_FLAG = '--transport';
+
 describe('channel bind — the slug elects itself by its release channel', () => {
-  const CHANNEL = 'runtime:app-bundle:alpha:dev';
+  const CHANNEL = ALPHA_DEV_CHANNEL;
 
   it('sets the binding and carries every other key unchanged', () => {
     const merged = JSON.parse(
@@ -366,5 +375,262 @@ describe('publish --transport doorway — the lineage pre-flight', () => {
       { envelope: { lineageParentCid: 'uhCkkSomethingElse' } }
     );
     assert.ok(refusal.startsWith('lineage_parent_mismatch'), refusal);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// channel create / bind --transport doorway (native-delivery N6 fleet leg): the
+// one-time steward acts CI carries on an [app:channel-create] push.
+// ---------------------------------------------------------------------------
+
+describe('--transport doorway — which verbs carry it', () => {
+  it('admits the verbs with a doorway path, and the default transport', () => {
+    for (const [verb, sub] of [
+      ['channel', 'create'],
+      ['channel', 'bind'],
+      ['channel', 'unbind'],
+      ['publish', undefined],
+    ] as const) {
+      assert.equal(doorwayTransportRefusal(verb, sub, 'doorway'), '');
+      assert.equal(doorwayTransportRefusal(verb, sub, 'admin-ws'), '');
+      assert.equal(doorwayTransportRefusal(verb, sub, undefined), '');
+    }
+  });
+
+  it('refuses a verb with no doorway path instead of falling back to a conductor admin port', () => {
+    for (const verb of ['promote', 'revert', 'status', 'attestations']) {
+      const refusal = doorwayTransportRefusal(verb, undefined, 'doorway');
+      assert.ok(refusal.startsWith(`${verb} has no doorway transport`), refusal);
+    }
+    assert.match(
+      doorwayTransportRefusal('channel', 'create', 'carrier-pigeon'),
+      /expects admin-ws or doorway/
+    );
+  });
+});
+
+describe('channel bind --transport doorway — the PATCH body', () => {
+  const CHANNEL = ALPHA_DEV_CHANNEL;
+
+  it("binds with the slug's own reach riding along (the notarizing PATCH)", () => {
+    assert.deepEqual(
+      doorwayBindPatch({ reach: 'public', metadata: { serverBlobHash: 's' } }, CHANNEL),
+      {
+        reach: 'public',
+        metadata: { [RELEASE_CHANNEL_KEY]: CHANNEL },
+      }
+    );
+    assert.deepEqual(doorwayBindPatch({ metadata: null }, CHANNEL), {
+      reach: 'commons',
+      metadata: { [RELEASE_CHANNEL_KEY]: CHANNEL },
+    });
+  });
+
+  it('is idempotent: an already-bound slug needs no write, an unbound slug no unbind', () => {
+    assert.equal(
+      doorwayBindPatch({ reach: 'commons', metadata: { releaseChannel: CHANNEL } }, CHANNEL),
+      null
+    );
+    assert.equal(doorwayBindPatch({ reach: 'commons', metadata: {} }, null), null);
+  });
+
+  it('unbinds by writing the key null (the storage merges metadata key by key), and refuses a non-channel id', () => {
+    assert.deepEqual(
+      doorwayBindPatch({ reach: 'commons', metadata: { releaseChannel: CHANNEL } }, null),
+      {
+        reach: 'commons',
+        metadata: { [RELEASE_CHANNEL_KEY]: null },
+      }
+    );
+    assert.throws(() => doorwayBindPatch({ metadata: {} }, 'app-bundle-dev'));
+  });
+});
+
+/** A fake doorway: records every request, answers from a small content table. */
+function fakeDoorway(rows: Record<string, Record<string, unknown>>, patchStatus = 200) {
+  const requests: { method: string; url: string; key: string; body: string }[] = [];
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => (body += chunk));
+    req.on('end', () => {
+      const url = decodeURIComponent(req.url ?? '');
+      requests.push({
+        method: req.method ?? '',
+        url,
+        key: String(req.headers['x-api-key'] ?? ''),
+        body,
+      });
+      const reply = (status: number, value: unknown) => {
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(value));
+      };
+      if (req.method === 'POST' && url === '/db/content/bulk') {
+        for (const row of JSON.parse(body) as Record<string, unknown>[]) rows[String(row.id)] = row;
+        return reply(200, { created: 1 });
+      }
+      const m = /^\/db\/content\/([^/]+)(\/head|\/canonical-head)?$/.exec(url);
+      if (!m || !rows[m[1]]) return reply(404, { error: 'not found' });
+      if (m[2] === '/head') return reply(200, { headActionHash: `uhCkkHead-${m[1]}` });
+      if (m[2] === '/canonical-head') return reply(200, { canonical: true });
+      if (req.method === 'PATCH' && patchStatus >= 300) {
+        return reply(patchStatus, { error: 'Conductor bridge unavailable' });
+      }
+      if (req.method === 'PATCH') {
+        const patch = JSON.parse(body) as { metadata?: Record<string, unknown> };
+        rows[m[1]].metadata = { ...(rows[m[1]].metadata as object), ...(patch.metadata ?? {}) };
+      }
+      return reply(200, rows[m[1]]);
+    });
+  });
+  return { server, requests };
+}
+
+const CEREMONY = fileURLToPath(new URL('../release-ceremony.ts', import.meta.url));
+const TSX = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
+
+function ceremony(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise(resolve => {
+    execFile(
+      TSX,
+      [CEREMONY, ...args],
+      { env: { ...process.env, STORAGE_API_KEY_ADMIN: 'k-admin' } },
+      (err, stdout, stderr) => {
+        resolve({ code: err ? Number((err as { code?: number }).code ?? 1) : 0, stdout, stderr });
+      }
+    );
+  });
+}
+
+describe('channel create / bind over the doorway — the writes, end to end', () => {
+  const CHANNEL = ALPHA_DEV_CHANNEL;
+
+  it('create POSTs the channel root, notarizes it with a reach PATCH, then bind PATCHes and declares staging', async () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      [LANDING]: {
+        id: LANDING,
+        reach: 'commons',
+        metadata: { serverBlobHash: 's' },
+      },
+    };
+    const { server, requests } = fakeDoorway(rows);
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const created = await ceremony([
+        'channel',
+        'create',
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.equal(created.code, 0, created.stderr);
+      const writes = requests.filter(r => r.method !== 'GET');
+      assert.deepEqual(
+        writes.map(r => `${r.method} ${r.url}`),
+        ['POST /db/content/bulk', `PATCH /db/content/${CHANNEL}`]
+      );
+      const [root] = JSON.parse(writes[0].body);
+      assert.deepEqual(root, {
+        ...channelRootRecord(CHANNEL, 'commons', {}, root.metadata.createdAt),
+      });
+      assert.deepEqual(JSON.parse(writes[1].body), { reach: 'commons' });
+      assert.ok(
+        requests.every(r => r.key === 'k-admin'),
+        'every request carries STORAGE_API_KEY_ADMIN'
+      );
+
+      requests.length = 0;
+      const bound = await ceremony([
+        'channel',
+        'bind',
+        LANDING,
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.equal(bound.code, 0, bound.stderr);
+      assert.deepEqual(
+        requests.filter(r => r.method !== 'GET').map(r => `${r.method} ${r.url}`),
+        [
+          'PATCH /db/content/elohim-host-landing',
+          'POST /db/content/elohim-host-landing/canonical-head',
+        ]
+      );
+      assert.equal(JSON.parse(bound.stdout).tier, 'staging');
+      assert.equal(
+        rows[LANDING].metadata &&
+          (rows[LANDING].metadata as Record<string, unknown>).serverBlobHash,
+        's'
+      );
+
+      requests.length = 0;
+      const again = await ceremony([
+        'channel',
+        'bind',
+        LANDING,
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.equal(again.code, 0, again.stderr);
+      assert.equal(JSON.parse(again.stdout).alreadyBound, true);
+      assert.ok(
+        requests.every(r => r.method === 'GET'),
+        'an already-bound slug is not re-written'
+      );
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a doorway 5xx on the bind PATCH exits non-zero, names the reason last, and declares no head', async () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      [LANDING]: { id: LANDING, reach: 'commons', metadata: {} },
+    };
+    const { server, requests } = fakeDoorway(rows, 503);
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const doorway = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const bound = await ceremony([
+        'channel',
+        'bind',
+        LANDING,
+        CHANNEL,
+        TRANSPORT_FLAG,
+        'doorway',
+        '--doorway',
+        doorway,
+      ]);
+      assert.notEqual(bound.code, 0);
+      assert.ok(
+        !requests.some(r => r.url.endsWith('/canonical-head')),
+        'no canonical-head is declared after a refused PATCH'
+      );
+      const last = bound.stderr.trim().split('\n').pop() ?? '';
+      assert.match(last, /^release-ceremony: channel bind: PATCH .* returned 503/);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a verb with no doorway path refuses --transport doorway with exit 2 and one line', async () => {
+    const refused = await ceremony([
+      'promote',
+      CHANNEL,
+      'uhCkkX',
+      TRANSPORT_FLAG,
+      'doorway',
+      '--doorway',
+      'http://127.0.0.1:9',
+    ]);
+    assert.equal(refused.code, 2);
+    assert.equal(refused.stderr.trim().split('\n').length, 1, refused.stderr);
+    assert.match(refused.stderr, /promote has no doorway transport/);
   });
 });

@@ -98,6 +98,7 @@
  *   channel create <channelId> [--reach <tier>] [--discipline <json|path>]
  *   channel bind <slug> <channelId>
  *   channel unbind <slug>
+ *   channel create|bind|unbind ... --transport doorway --doorway <url>   (CI: over the doorway)
  *   publish <manifest.json> [--adoption-url <storage base url>]
  *   publish <manifest.json> --transport doorway --doorway <url>
  *   promote <channelId> <releaseCid> [--delegation <file>]
@@ -142,6 +143,9 @@ const APP_ID = 'elohim';
 const ROLE = 'lamad'; // the role name carrying the content_store cell — same as the oracle
 const ZOME = 'content_store';
 const DEFAULT_TIMEOUT_MS = 5_000;
+const VERB_CHANNEL_CREATE = 'channel create';
+const VERB_CHANNEL_BIND = 'channel bind';
+const VERB_CHANNEL_UNBIND = 'channel unbind';
 
 // Local household mesh port scheme (app/elohim-app/scripts/hc-mesh.sh):
 // admin_port(i) = 4444 + 10i, app_port(i) = 4445 + 10i. i=0 matthew, 1 jessica, 2 james.
@@ -180,6 +184,12 @@ Verbs:
                         declared the slug's head (earned where this peer holds the authority,
                         else staging)
   channel unbind <slug> the same act removing the binding — the slug is its own head again
+  channel create|bind|unbind ... --transport doorway --doorway <url>
+                        the CI transport for the one-time steward acts: create POSTs the
+                        channel root to /db/content/bulk and notarizes it with a reach PATCH;
+                        bind PATCHes {reach, metadata.releaseChannel} (idempotent) and declares
+                        it staging. X-API-Key from STORAGE_API_KEY_ADMIN. Any other verb
+                        refuses --transport doorway (exit 2) — never a silent admin-port fallback
   publish <manifest.json> [--adoption-url <storage base url>]
   publish <manifest.json> --transport doorway --doorway <url>
                         the CI transport: PATCH /db/content/<channelId> (the manifest rides
@@ -574,6 +584,30 @@ async function resolveElectionOnPeer(peer: PeerConfig, channelId: string, timeou
 // Verbs
 // =============================================================================
 
+/**
+ * The channel root (spec §3): ONE record shape for both transports. The admin-WS
+ * transport maps it onto the zome's create_content payload; the doorway
+ * transport POSTs it to /db/content/bulk (the storage view's camelCase fields).
+ */
+export function channelRootRecord(
+  channelId: string,
+  reach: string,
+  discipline: Record<string, unknown>,
+  createdAt: string
+) {
+  return {
+    id: channelId,
+    title: `Release channel: ${channelId}`,
+    description: `Runtime release channel (${channelId}) — spec §3 channel root.`,
+    contentType: 'concept',
+    contentFormat: 'markdown',
+    contentBody: `# ${channelId}\n\nRelease channel root. See metadata for reach and adoption discipline.`,
+    tags: ['release-channel'],
+    reach,
+    metadata: { kind: 'release-channel', channelId, reach, discipline, createdAt },
+  };
+}
+
 async function cmdChannelCreate(
   channelId: string,
   flags: Flags,
@@ -589,24 +623,18 @@ async function cmdChannelCreate(
   const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
   console.log(`${actingPeer.name} agent (channel root author): ${conn.agent}`);
 
-  const metadata = {
-    kind: 'release-channel',
-    channelId,
-    reach,
-    discipline,
-    createdAt: new Date().toISOString(),
-  };
+  const root = channelRootRecord(channelId, reach, discipline, new Date().toISOString());
   const payload = {
-    id: channelId,
-    content_type: 'concept',
-    title: `Release channel: ${channelId}`,
-    description: `Runtime release channel (${channelId}) — spec §3 channel root.`,
-    content: `# ${channelId}\n\nRelease channel root. See metadata for reach and adoption discipline.`,
-    content_format: 'markdown',
-    tags: ['release-channel'],
+    id: root.id,
+    content_type: root.contentType,
+    title: root.title,
+    description: root.description,
+    content: root.contentBody,
+    content_format: root.contentFormat,
+    tags: root.tags,
     related_node_ids: [],
-    reach,
-    metadata_json: JSON.stringify(metadata),
+    reach: root.reach,
+    metadata_json: JSON.stringify(root.metadata),
   };
 
   let created: any;
@@ -618,7 +646,7 @@ async function cmdChannelCreate(
     );
   }
   const result = {
-    verb: 'channel create',
+    verb: VERB_CHANNEL_CREATE,
     channelId,
     actingPeer: actingPeer.name,
     actionHash: toB64(created.action_hash),
@@ -862,7 +890,7 @@ async function cmdChannelBind(
   peers: PeerConfig[],
   timeoutMs: number
 ) {
-  const verb = channelId === null ? 'channel unbind' : 'channel bind';
+  const verb = channelId === null ? VERB_CHANNEL_UNBIND : VERB_CHANNEL_BIND;
   const actingPeer = resolveActingPeer(flags, peers);
   const conn = await conductor(actingPeer.name, actingPeer.admin, actingPeer.app, timeoutMs);
   const existing: any = await conn.call('get_content_by_id', { id: slug });
@@ -975,6 +1003,172 @@ async function doorwayRequest(
     /* keep the text */
   }
   return { status: response.status, body };
+}
+
+function doorwayBase(flags: Flags): string {
+  const doorway = (flags.doorway ?? process.env.RELEASE_DOORWAY_URL ?? '').replace(/\/$/, '');
+  if (!doorway) throw new Error('--transport doorway needs --doorway <url>');
+  return doorway;
+}
+
+/**
+ * `--transport doorway` is carried only by the verbs that have a doorway path;
+ * every other verb REFUSES it (one line, exit 2) rather than silently falling
+ * back to a localhost conductor admin port. Returns the refusal line, or ''.
+ */
+export function doorwayTransportRefusal(
+  verb: string,
+  subverb: string | undefined,
+  transport: string | undefined
+): string {
+  if (transport === undefined) return '';
+  const name = subverb ? `${verb} ${subverb}` : verb;
+  if (transport !== 'doorway' && transport !== 'admin-ws') {
+    return `${name} --transport expects admin-ws or doorway, got ${transport}`;
+  }
+  const doorwayVerbs = [VERB_CHANNEL_CREATE, VERB_CHANNEL_BIND, VERB_CHANNEL_UNBIND, 'publish'];
+  if (transport === 'doorway' && !doorwayVerbs.includes(name)) {
+    return `${name} has no doorway transport (only ${doorwayVerbs.join(', ')}) — refusing rather than falling back to a conductor admin port`;
+  }
+  return '';
+}
+
+/**
+ * The doorway bind's PATCH body, or null when the slug already names exactly
+ * this binding (idempotent). `reach` rides along so the storage peer
+ * re-notarizes through its conductor (`patch_needs_conductor`) — a
+ * metadata-only PATCH is a diesel-direct write the DHT would revert. The
+ * storage merges `metadata` into the existing object key by key, so only the
+ * binding moves; an unbind writes the key as null.
+ */
+export function doorwayBindPatch(
+  existing: { reach?: unknown; metadata?: unknown } | null,
+  channelId: string | null
+): { reach: string; metadata: Record<string, unknown> } | null {
+  const metadata =
+    existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
+      ? (existing.metadata as Record<string, unknown>)
+      : {};
+  // Validates the channel id exactly as the admin-WS bind does.
+  mergeReleaseBinding(JSON.stringify(metadata), channelId);
+  const current = metadata[RELEASE_CHANNEL_KEY] ?? null;
+  if (current === channelId) return null;
+  const reach = typeof existing?.reach === 'string' ? existing.reach : 'commons';
+  return { reach, metadata: { [RELEASE_CHANNEL_KEY]: channelId } };
+}
+
+async function cmdChannelCreateViaDoorway(channelId: string, flags: Flags, timeoutMs: number) {
+  warnUnlessChannelIdConvention(channelId);
+  const doorway = doorwayBase(flags);
+  const reach = flags.reach ?? 'commons';
+  assertReach(reach);
+  const discipline = parseJsonArg(flags.discipline);
+  const base = `${doorway}/db/content/${encodeURIComponent(channelId)}`;
+
+  const existing = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
+  if (existing.status < 300) {
+    throw new Error(`channel create: '${channelId}' already exists behind ${doorway}`);
+  }
+  if (existing.status !== 404) {
+    throw new Error(`channel create: GET ${base} returned ${existing.status}`);
+  }
+  // The storage create is a projection row; the reach-carrying PATCH below is
+  // what notarizes it (an unanchored row is published through the peer's
+  // conductor — create_content), the same record the admin-WS transport writes.
+  const root = channelRootRecord(channelId, reach, discipline, new Date().toISOString());
+  const created = await doorwayRequest(
+    `${doorway}/db/content/bulk`,
+    { method: 'POST', headers: { 'x-schema-version': '1' }, body: JSON.stringify([root]) },
+    timeoutMs
+  );
+  if (created.status >= 300) {
+    throw new Error(
+      `channel create: POST /db/content/bulk returned ${created.status}: ${JSON.stringify(created.body)}`
+    );
+  }
+  const notarized = await doorwayRequest(
+    base,
+    { method: 'PATCH', body: JSON.stringify({ reach }) },
+    timeoutMs
+  );
+  if (notarized.status >= 300) {
+    throw new Error(
+      `channel create: PATCH ${base} (notarize) returned ${notarized.status}: ${JSON.stringify(notarized.body)}`
+    );
+  }
+  const head = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  console.log(
+    JSON.stringify(
+      {
+        verb: VERB_CHANNEL_CREATE,
+        transport: 'doorway',
+        doorway,
+        channelId,
+        actionHash: head.body?.headActionHash ?? null,
+        reach,
+        discipline,
+      },
+      null,
+      2
+    )
+  );
+  process.exit(0);
+}
+
+async function cmdChannelBindViaDoorway(
+  slug: string,
+  channelId: string | null,
+  flags: Flags,
+  timeoutMs: number
+) {
+  const verb = channelId === null ? VERB_CHANNEL_UNBIND : VERB_CHANNEL_BIND;
+  const doorway = doorwayBase(flags);
+  const base = `${doorway}/db/content/${encodeURIComponent(slug)}`;
+  const existing = await doorwayRequest(base, { method: 'GET' }, timeoutMs);
+  if (existing.status === 404) throw new Error(`${verb}: no content '${slug}' behind ${doorway}`);
+  if (existing.status >= 300) throw new Error(`${verb}: GET ${base} returned ${existing.status}`);
+  const patch = doorwayBindPatch(existing.body, channelId);
+  if (patch === null) {
+    console.log(
+      JSON.stringify({ verb, transport: 'doorway', slug, channelId, alreadyBound: true }, null, 2)
+    );
+    process.exit(0);
+  }
+  const patched = await doorwayRequest(
+    base,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+    timeoutMs
+  );
+  if (patched.status >= 300) {
+    throw new Error(
+      `${verb}: PATCH ${base} returned ${patched.status}: ${JSON.stringify(patched.body)}`
+    );
+  }
+  // The bound version must BECOME the slug's head (a heal preserves the head
+  // it already obeys). A doorway holds no earned authority, so it declares
+  // staging — the same tier publish --transport doorway declares.
+  const authored = await doorwayRequest(`${base}/head`, { method: 'GET' }, timeoutMs);
+  const headActionHash: string | undefined = authored.body?.headActionHash;
+  if (!headActionHash)
+    throw new Error(`${verb}: GET ${base}/head named no headActionHash after the PATCH`);
+  const declare = await doorwayRequest(
+    `${base}/canonical-head`,
+    { method: 'POST', body: JSON.stringify({ headActionHash }) },
+    timeoutMs
+  );
+  if (declare.status >= 300) {
+    throw new Error(
+      `${verb}: POST ${base}/canonical-head returned ${declare.status}: ${JSON.stringify(declare.body)}`
+    );
+  }
+  console.log(
+    JSON.stringify(
+      { verb, transport: 'doorway', doorway, slug, channelId, headActionHash, tier: 'staging' },
+      null,
+      2
+    )
+  );
+  process.exit(0);
 }
 
 async function cmdPublishViaDoorway(manifestPath: string, flags: Flags, timeoutMs: number) {
@@ -1449,28 +1643,36 @@ async function main() {
   const conductorCsv = flags.conductors ?? process.env.PEER_CONDUCTOR_PORTS ?? DEFAULT_CONDUCTORS;
   const peers = parseConductors(conductorCsv);
 
+  const transportRefusal = doorwayTransportRefusal(verb, subverb, flags.transport);
+  if (transportRefusal) {
+    console.error(`release-ceremony: ${transportRefusal}`);
+    process.exit(2);
+  }
+  const viaDoorway = flags.transport === 'doorway';
+
   if (verb === 'channel' && subverb === 'create') {
     const [channelId] = positionals;
     if (!channelId)
       throw new Error(
         'usage: channel create <channelId> [--reach <tier>] [--discipline <json|path>]'
       );
-    await cmdChannelCreate(channelId, flags, peers, timeoutMs);
+    if (viaDoorway) await cmdChannelCreateViaDoorway(channelId, flags, timeoutMs);
+    else await cmdChannelCreate(channelId, flags, peers, timeoutMs);
   } else if (verb === 'channel' && subverb === 'bind') {
     const [slug, channelId] = positionals;
     if (!slug || !channelId) throw new Error('usage: channel bind <slug> <channelId>');
-    await cmdChannelBind(slug, channelId, flags, peers, timeoutMs);
+    if (viaDoorway) await cmdChannelBindViaDoorway(slug, channelId, flags, timeoutMs);
+    else await cmdChannelBind(slug, channelId, flags, peers, timeoutMs);
   } else if (verb === 'channel' && subverb === 'unbind') {
     const [slug] = positionals;
     if (!slug) throw new Error('usage: channel unbind <slug>');
-    await cmdChannelBind(slug, null, flags, peers, timeoutMs);
+    if (viaDoorway) await cmdChannelBindViaDoorway(slug, null, flags, timeoutMs);
+    else await cmdChannelBind(slug, null, flags, peers, timeoutMs);
   } else if (verb === 'publish') {
     const [manifestPath] = positionals;
     if (!manifestPath) throw new Error('usage: publish <manifest.json>');
-    if (flags.transport === 'doorway') {
+    if (viaDoorway) {
       await cmdPublishViaDoorway(manifestPath, flags, timeoutMs);
-    } else if (flags.transport && flags.transport !== 'admin-ws') {
-      throw new Error(`publish --transport expects admin-ws or doorway, got ${flags.transport}`);
     } else {
       await cmdPublish(manifestPath, flags, peers, timeoutMs);
     }
@@ -1505,7 +1707,11 @@ async function main() {
 // that import.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(e => {
+    // The stack for a reader, then the message LAST: a caller that names the
+    // refusal by the final line (app-release-stage.sh) quotes the reason, not a
+    // stack frame.
     console.error(String(e?.stack ?? e).slice(0, 2000));
+    console.error(`release-ceremony: ${String(e?.message ?? e).split('\n')[0]}`);
     process.exit(1);
   });
 }
