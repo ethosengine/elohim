@@ -87,6 +87,91 @@ decisionPoints:
     notes: >
       The method is additive to BlobCid; serde and canonical bytes are unchanged.
       It does not introduce a canonical tree or attest to release authority.
+  - name: BlobLink
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/address.rs
+      modulePath: eprfs_core::address::BlobLink
+    summary: >
+      Represent an existing BlobCid as a DAG-CBOR tag-42 link in canonical
+      fields and as a validated CID string on human-readable surfaces.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          This is immutable content addressing and byte representation, not
+          head selection, transport reach, or publication standing.
+      - id: C1
+        status: n-a
+        justification: It elects no candidate or release head.
+      - id: C2
+        status: n-a
+        justification: It changes no declared head or version order.
+      - id: C3
+        status: n-a
+        justification: Serialization is pure and has no state loop.
+      - id: C4
+        status: answered
+        justification: >
+          Malformed JSON CIDs and CBOR text in a link position return decode
+          errors; the negative contract test pins both refusals.
+      - id: C5
+        status: partial
+        justification: >
+          Tag 42 establishes link structure only. The wrapper does not fetch or
+          verify referenced bytes, provenance, signatures, or standing.
+      - id: C6a
+        status: partial
+        justification: >
+          CID parsing has a bounded address shape, but this type imposes no
+          enclosing CBOR or JSON input-size budget; callers must do so.
+      - id: C6b
+        status: n-a
+        justification: This pure codec has no replayed side effect.
+      - id: C7
+        status: partial
+        justification: >
+          Local tag-42 interoperability is pinned by a fixed vector, but the
+          wrapper advertises no remote inventory or serve guarantee.
+      - id: C8
+        status: partial
+        justification: >
+          Decode failures are returned through serde errors; this type emits no
+          aggregate operational metric.
+      - id: C9
+        status: n-a
+        justification: A content CID carries no agent or key lineage.
+      - id: C10
+        status: answered
+        justification: >
+          Frozen old BlobCid string CBOR and JSON forms remain unchanged; new
+          BlobLink tag-42 CBOR and string JSON forms are explicitly pinned, and
+          old CBOR text is refused when a link is required.
+      - id: C11
+        status: n-a
+        justification: The codec schedules no external load or retry.
+      - id: C12
+        status: n-a
+        justification: A parsed CID authorizes no publication, execution, or peer action.
+      - id: C13
+        status: n-a
+        justification: The byte format is the same at every declared network stage.
+      - id: C14
+        status: partial
+        justification: >
+          Decode refusal is returned but no durable witness is emitted; the
+          enclosing caller must record its own outcome.
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/address.rs
+        testName: blob_link_has_explicit_human_and_canonical_forms
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/address.rs
+        testName: blob_link_rejects_wrong_cbor_representation_and_invalid_json
+        kind: unit
+    notes: >
+      This is a wire wrapper over BlobCid, not a new persistent entity. It adds
+      no DHT entry, head-plane cost, route, transport, or authority. Existing
+      BlobCid fields and EprMeta v1 bytes are not migrated by this addition.
   - name: validate
     kind: verdict-fn
     sourceLocation:

@@ -13,7 +13,7 @@ pub mod meta;
 pub mod projection;
 pub mod storage;
 
-pub use address::{BlobCid, EprRef, ProjectionId};
+pub use address::{BlobCid, BlobLink, EprRef, ProjectionId};
 pub use attestation::{AttestationDraft, AttestationKind};
 pub use awareness::{
     BytePresence, EprCard, EprResiliency, LocalOverlayStatus, PeerVisibility, ProjectionAwareness,

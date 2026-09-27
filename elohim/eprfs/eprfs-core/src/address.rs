@@ -2,7 +2,7 @@ use std::fmt;
 
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Protocol-level reference to an EPR record — the permanent, human-readable **identity** (a slug,
 /// e.g. `epr:content-name`). Identity is the slug; the **fingerprint** is a [`BlobCid`].
@@ -149,6 +149,62 @@ impl TryFrom<String> for BlobCid {
     }
 }
 
+/// A CID in a canonical DAG-CBOR link position. This is the same address as
+/// [`BlobCid`], not a second identity or a claim that the referenced bytes were
+/// fetched or verified. Its wire representation is deliberately different:
+/// DAG-CBOR uses IPLD tag 42, while human-readable formats such as JSON use the
+/// existing validated CID string. Callers choose this type only for link fields;
+/// changing an existing `BlobCid` field to `BlobLink` changes its canonical bytes.
+///
+/// This codec does not bound an enclosing document or record a decode refusal.
+/// Callers must bound input size and witness failures at their own boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BlobLink(BlobCid);
+
+impl BlobLink {
+    pub fn as_blob_cid(&self) -> &BlobCid {
+        &self.0
+    }
+}
+
+impl From<BlobCid> for BlobLink {
+    fn from(cid: BlobCid) -> Self {
+        Self(cid)
+    }
+}
+
+impl From<BlobLink> for BlobCid {
+    fn from(link: BlobLink) -> Self {
+        link.0
+    }
+}
+
+impl Serialize for BlobLink {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.0.serialize(serializer)
+        } else {
+            self.0.as_cid().serialize(serializer)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for BlobLink {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            BlobCid::deserialize(deserializer).map(Self)
+        } else {
+            Cid::deserialize(deserializer).map(|cid| Self(BlobCid(cid)))
+        }
+    }
+}
+
 /// Stable identifier for a local projection of an EPR-backed tree — a local **name** (slug), not a
 /// content hash. Stays a string for the same reason [`EprRef`] does.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -168,6 +224,68 @@ impl ProjectionId {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Independently frozen from CIDv1 bytes (01 55 12 20 + SHA-256("hello world"))
+    // wrapped as DAG-CBOR tag 42 / byte-string(37) / 00 + CID. This expected
+    // value must not be generated through BlobLink or the serializer under test.
+    const RAW_HELLO_LINK_CBOR: [u8; 41] = [
+        0xd8, 0x2a, 0x58, 0x25, 0x00, 0x01, 0x55, 0x12, 0x20, 0xb9, 0x4d, 0x27, 0xb9, 0x93, 0x4d,
+        0x3e, 0x08, 0xa5, 0x2e, 0x52, 0xd7, 0xda, 0x7d, 0xab, 0xfa, 0xc4, 0x84, 0xef, 0xe3, 0x7a,
+        0x53, 0x80, 0xee, 0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9,
+    ];
+    const RAW_HELLO_CID: &str = "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e";
+
+    #[test]
+    fn blob_link_has_explicit_human_and_canonical_forms() {
+        let blob_cid = BlobCid::parse(RAW_HELLO_CID).unwrap();
+        let link = BlobLink::from(blob_cid.clone());
+
+        assert_eq!(
+            serde_json::to_string(&link).unwrap(),
+            format!("\"{RAW_HELLO_CID}\"")
+        );
+        assert_eq!(
+            serde_json::from_str::<BlobLink>(&format!("\"{RAW_HELLO_CID}\"")).unwrap(),
+            link
+        );
+        assert_eq!(
+            serde_ipld_dagcbor::to_vec(&link).unwrap(),
+            RAW_HELLO_LINK_CBOR
+        );
+        assert_eq!(
+            serde_ipld_dagcbor::from_slice::<BlobLink>(&RAW_HELLO_LINK_CBOR).unwrap(),
+            link
+        );
+
+        // The pre-existing BlobCid CBOR and JSON string contract remains intact.
+        let mut old_cbor = vec![0x78, 0x3b];
+        old_cbor.extend_from_slice(RAW_HELLO_CID.as_bytes());
+        assert_eq!(serde_ipld_dagcbor::to_vec(&blob_cid).unwrap(), old_cbor);
+        assert_eq!(
+            serde_json::to_string(&blob_cid).unwrap(),
+            format!("\"{RAW_HELLO_CID}\"")
+        );
+        assert_eq!(BlobCid::from(link), blob_cid);
+    }
+
+    #[test]
+    fn blob_link_rejects_wrong_cbor_representation_and_invalid_json() {
+        let mut old_cbor = vec![0x78, 0x3b];
+        old_cbor.extend_from_slice(RAW_HELLO_CID.as_bytes());
+        assert!(serde_ipld_dagcbor::from_slice::<BlobLink>(&old_cbor).is_err());
+
+        let mut wrong_sentinel = RAW_HELLO_LINK_CBOR;
+        wrong_sentinel[4] = 0x01;
+        assert!(serde_ipld_dagcbor::from_slice::<BlobLink>(&wrong_sentinel).is_err());
+
+        let mut wrong_tag = RAW_HELLO_LINK_CBOR;
+        wrong_tag[1] = 0x2b;
+        assert!(serde_ipld_dagcbor::from_slice::<BlobLink>(&wrong_tag).is_err());
+
+        let truncated = &RAW_HELLO_LINK_CBOR[..RAW_HELLO_LINK_CBOR.len() - 1];
+        assert!(serde_ipld_dagcbor::from_slice::<BlobLink>(truncated).is_err());
+        assert!(serde_json::from_str::<BlobLink>("\"not-a-cid\"").is_err());
+    }
 
     // The canonical-format pin (mirrors elohim/epr/tests/cid_vectors.rs). If this drifts, eprfs
     // fingerprints stop matching the protocol's content-addressing — the whole reason to use a CID.
