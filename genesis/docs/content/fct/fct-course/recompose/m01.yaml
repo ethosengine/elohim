@@ -1,0 +1,50 @@
+# Module 1 — The Church Dilemma. What the prose cannot carry: the mastery check and
+# the reflection. Mark the one correct choice with a trailing " *".
+quiz:
+  - q: "In the attention economy, what is the product being sold?"
+    choices:
+      - "The apps and devices people buy"
+      - "The content creators publish"
+      - "Human attention, sold to advertisers *"
+      - "Subscriptions to premium features"
+    hints:
+      - "If you are not paying for the product, ask what is being paid for."
+    bloom: remember
+  - q: "The Ledger of Harms names addiction, isolation, outrage, misinformation and polarization. How does the course ask us to see them?"
+    choices:
+      - "As five separate problems, each needing its own ministry"
+      - "As one interconnected system of human downgrading *"
+      - "As the fault of individual bad actors in the industry"
+      - "As problems outside the church that we can help others with"
+    bloom: understand
+  - q: "Deuteronomy 6 binds God's words on hands and foreheads. What question does the module draw from that?"
+    choices:
+      - "Whether Christians should use devices at all"
+      - "Whether we will wear an attention technology"
+      - "Whose attention technology we wear, since we will wear one *"
+      - "How to fit Scripture reading into screen time"
+    bloom: analyze
+  - q: "Why does the course begin with lament rather than solutions?"
+    choices:
+      - "Because nothing can be done about the crisis"
+      - "Because lament is faith refusing to lie: honest complaint that turns toward hope *"
+      - "Because solutions are the pastor's job, not the class's"
+      - "Because the crisis is too complex to understand yet"
+    hints:
+      - "Psalm 13 moves from 'How long, Lord?' to 'But I trust in your unfailing love.'"
+    bloom: understand
+  - q: "Which of these is a commitment in the class covenant?"
+    choices:
+      - "We will identify the people most responsible for the crisis"
+      - "We will stay neutral observers of the technology debate"
+      - "We extend grace and refuse scapegoats *"
+      - "We will avoid discussing our own church's habits"
+    bloom: remember
+reflections:
+  - title: "Your line of lament"
+    prompt: "In the pattern of Psalm 13, write one honest sentence of complaint to God about how the race for attention has shaped your week, your household or your church. Begin 'How long, Lord...'. Do not resolve it yet."
+    placeholder: "How long, Lord..."
+    criteria:
+      - "Names something concrete from the writer's own life or church"
+      - "Addresses God directly, as the psalm does"
+    bloom: evaluate

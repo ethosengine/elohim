@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-03-problem-well-stated-reflection",
+  "contentType": "assessment",
+  "title": "The problem, in one sentence",
+  "description": "State the problem this course is about in one sentence, as it shows up in your own community. Then name one 'third way' design principle, beyond both control and chaos, your community could try.",
+  "content": [
+    {
+      "id": "fct-module-03-problem-well-stated-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "",
+              "question": "State the problem this course is about in one sentence, as it shows up in your own community. Then name one 'third way' design principle, beyond both control and chaos, your community could try.",
+              "scoringCriteria": [
+                {
+                  "text": "The problem statement is specific to the writer's community"
+                },
+                {
+                  "text": "The principle is neither top-down control nor leaving it to chance"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-reflection",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "create",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m03.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-3",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 3,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 1",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 {
   "id": "fct-media-11-book-directed",
-  "contentType": "collective",
-  "title": "directed",
+  "contentType": "documentary",
+  "reach": "commons",
+  "title": "13th (directed by Ava DuVernay)",
   "description": "Book by Ava Du",
-  "content": "# directed\n\n**Author:** Ava Du\n**Format:** book",
+  "content": "# 13th (directed by Ava DuVernay)\n\n**Author:** Ava Du\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/v1/Module 12 - Supporting Fairness and Justice.md",
   "tags": [
@@ -27,7 +28,7 @@
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "Document",
   "openGraphMetadata": {
-    "ogTitle": "directed",
+    "ogTitle": "13th (directed by Ava DuVernay)",
     "ogDescription": "Book by Ava Du",
     "ogType": "website",
     "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-directed",

@@ -71,6 +71,12 @@ export class RelationshipRemapLedger {
     const key = `${c.authored} → ${c.type} (${c.via})`;
     this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
   }
+  /** Authored types that were not already manifest ids (alias + fallback remaps). */
+  total(): number {
+    let n = 0;
+    for (const c of this.counts.values()) n += c;
+    return n;
+  }
   summary(): string | null {
     if (this.counts.size === 0) return null;
     return [...this.counts.entries()]

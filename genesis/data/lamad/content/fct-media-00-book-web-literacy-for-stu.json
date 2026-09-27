@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-web-literacy-for-stu",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "Web Literacy for Student Fact-Checkers",
   "description": "Book by Mike Caulfield",
   "content": "# Web Literacy for Student Fact-Checkers\n\n**Author:** Mike Caulfield\n**Format:** book",

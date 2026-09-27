@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-04-scaling-wisdom-lane-households",
+  "contentType": "practice",
+  "title": "Households: The Wisdom Gap & the Conditions for Trust",
+  "description": "Households  Audit your home against the three trust conditions.",
+  "content": "## Households\n\nAudit your home against the three trust conditions. Repeat interactions: is there a daily table, a weekly ritual? Win-wins: do chores and decisions have a shape where everyone can gain? Low miscommunication: is there a regular, unhurried time when misunderstandings get repaired? Choose the weakest condition and strengthen it this week.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

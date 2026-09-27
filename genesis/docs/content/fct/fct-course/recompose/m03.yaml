@@ -1,0 +1,46 @@
+# Module 3 — A Problem Well Stated.
+quiz:
+  - q: "Which is one of Schmachtenberger's three generators of existential risk?"
+    choices:
+      - "Too little technology"
+      - "Inadequate collective sense-making and choice-making *"
+      - "Lack of government regulation"
+      - "The decline of church attendance"
+    bloom: remember
+  - q: "The course translates each generator into a church expression. What does 'rivalrous dynamics' become?"
+    choices:
+      - "Denominational splits"
+      - "The worship-experience arms race *"
+      - "Budget disputes"
+      - "Competition between small groups"
+    bloom: understand
+  - q: "What pattern does 1 Samuel 8 show when Israel demands a king?"
+    choices:
+      - "Trading agency for god-like power, with the costs read aloud in advance *"
+      - "God refusing to let the people choose"
+      - "Samuel seizing power for himself"
+      - "Israel lacking the information to decide well"
+    hints:
+      - "Samuel read them exactly what a king would take. They chose it anyway."
+    bloom: analyze
+  - q: "What standard does Scripture set for power, according to Luke 12:48 and James 3:1?"
+    choices:
+      - "Power should be avoided entirely"
+      - "Responsibility grows with what we are entrusted with *"
+      - "Power belongs only to those who earn it"
+      - "Leaders are judged less strictly than others"
+    bloom: understand
+  - q: "The module closes by naming the real deficit. What is it?"
+    choices:
+      - "Information"
+      - "Money"
+      - "Wisdom, and the trust that lets wisdom travel between us *"
+      - "Technology"
+    bloom: understand
+reflections:
+  - title: "The problem, in one sentence"
+    prompt: "State the problem this course is about in one sentence, as it shows up in your own community. Then name one 'third way' design principle, beyond both control and chaos, your community could try."
+    criteria:
+      - "The problem statement is specific to the writer's community"
+      - "The principle is neither top-down control nor leaving it to chance"
+    bloom: create

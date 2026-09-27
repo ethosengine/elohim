@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-the-organized-mind",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "The Organized Mind",
   "description": "Book by Daniel Levitin",
   "content": "# The Organized Mind\n\n**Author:** Daniel Levitin\n**Format:** book",

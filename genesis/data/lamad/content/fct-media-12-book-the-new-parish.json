@@ -1,6 +1,7 @@
 {
   "id": "fct-media-12-book-the-new-parish",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "The New Parish",
   "description": "Book by Paul Sparks",
   "content": "# The New Parish\n\n**Author:** Paul Sparks\n**Format:** book",

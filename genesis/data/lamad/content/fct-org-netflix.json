@@ -1,6 +1,7 @@
 {
   "id": "fct-org-netflix",
   "contentType": "collective",
+  "reach": "commons",
   "title": "Netflix",
   "description": "Streaming Service referenced in FCT",
   "content": "# Netflix\n\n**Type:** streaming-service\n\n",

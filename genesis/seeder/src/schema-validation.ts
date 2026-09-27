@@ -17,17 +17,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { ALL_CONTENT_TYPES } from './generated/schema-enums.js';
+
 // =============================================================================
 // Content Schema (matches what seed files should contain)
 // =============================================================================
 
-const VALID_CONTENT_TYPES = [
-  // DNA-notarized types
-  'epic', 'concept', 'lesson', 'scenario', 'assessment', 'resource',
-  'reflection', 'discussion', 'exercise', 'example', 'reference', 'article',
-  // Storage-only types (see protocol schema _storageOnly annotation)
-  'human', 'role',
-];
+// The protocol schema's content-type enum (elohim/sdk/schemas/v1/enums/content-type.schema.json),
+// projected by schema:codegen. A hand-kept copy here drifted: it lacked practice, quiz and
+// simulation, which the manifest and the protocol both define.
+const VALID_CONTENT_TYPES: string[] = [...ALL_CONTENT_TYPES];
 
 // Content Format Architecture:
 // - DNA stores metadata including `contentFormat` as a hint for clients

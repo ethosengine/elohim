@@ -1,0 +1,49 @@
+# Module 2 — Systems Thinking.
+quiz:
+  - q: "Which is a complex system rather than a merely complicated one?"
+    choices:
+      - "A watch"
+      - "A car engine"
+      - "A congregation *"
+      - "A computer"
+    hints:
+      - "Complicated systems have knowable rules; complex systems adapt, and prediction fails."
+    bloom: understand
+  - q: "What engagement technique fits a complex system?"
+    choices:
+      - "Sense, analyze, respond"
+      - "Probe, sense, respond: small experiments, watch what changes, adapt *"
+      - "Plan everything in advance, then execute"
+      - "Find the one part to optimize"
+    bloom: apply
+  - q: "In 1 Corinthians 12, where does the health of the Body lie?"
+    choices:
+      - "In its strongest member"
+      - "In the relationships among diverse parts *"
+      - "In making every part the same"
+      - "In optimizing the most visible part"
+    bloom: understand
+  - q: "Josiah's reform ended child sacrifice to Moloch. In systems terms, what did it change?"
+    choices:
+      - "The hearts of each individual parent, one by one"
+      - "The payoffs of the game, so no one had to sacrifice to keep up *"
+      - "The laws about temple worship only"
+      - "Nothing structural; it was a personal example"
+    hints:
+      - "A multipolar trap is one where everyone loses by playing, but anyone who stops alone loses more."
+    bloom: analyze
+  - q: "If our habits are fingerprints of the systems we live inside, what is the course's advice for changing a habit?"
+    choices:
+      - "Resolve to try harder"
+      - "Redesign the system that produces the habit *"
+      - "Find someone to blame for it"
+      - "Wait for the technology to change"
+    bloom: apply
+reflections:
+  - title: "One habit, one system"
+    prompt: "Name one of your own habits with technology. What system produces it (incentives, defaults, the people around you)? Describe one change to that system, not to your willpower, that would make a different habit the easy one."
+    criteria:
+      - "Names a specific habit"
+      - "Identifies what in the surrounding system produces it"
+      - "Proposes a change to the system rather than a resolution to try harder"
+    bloom: create

@@ -16,8 +16,8 @@ export interface ConceptMetadata {
   bloomsLevel?: string;
   /** Reference to source document */
   sourceDoc?: string;
-  /** Inline relationship declarations from import */
-  relationships?: { type?: string; targetId?: string }[];
+  /** The atom's authored edges. They ride the atom's signed entry, so they travel, version and disappear with the head that states them; each peer projects its relationship table from them */
+  relationships?: { type?: string; targetId?: string; role?: string }[];
   /** Decentralized identifier for the concept */
   did?: string;
   /** Open Graph metadata for social sharing */

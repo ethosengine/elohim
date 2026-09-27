@@ -1,0 +1,101 @@
+{
+  "id": "fct-module-04-scaling-wisdom-mind-the-gap",
+  "contentType": "assessment",
+  "title": "Mind the Gap",
+  "description": "What does the world need? Who are you, at your core? Imagine a life that matches those priorities. How big is the gap between that life and yours, and what is one cause of it? (This returns in Module 14; keep your answer.)",
+  "content": [
+    {
+      "id": "fct-module-04-scaling-wisdom-mind-the-gap",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "",
+              "question": "What does the world need? Who are you, at your core? Imagine a life that matches those priorities. How big is the gap between that life and yours, and what is one cause of it? (This returns in Module 14; keep your answer.)",
+              "scoringCriteria": [
+                {
+                  "text": "Names what the writer believes the world needs"
+                },
+                {
+                  "text": "Names at least one concrete cause of the gap"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-04-scaling-wisdom-mind-the-gap",
+        "assessesContentId": "fct-module-04-scaling-wisdom",
+        "bloomsLevel": "evaluate",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

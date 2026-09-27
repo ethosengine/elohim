@@ -61,3 +61,24 @@ fix needs one deliberate change with the pipeline verified against it, not a
    request) and that a full App-pipeline deploy stays green with enforcement on.
 3. Regression: an a2o scenario asserting unauthenticated POST
    `/db/content/{id}/canonical-head` returns 401 on both doorways.
+
+## 2026-09-27: the content body joined this channel
+`PATCH /db/content/{id}` still checks no caller identity before re-notarizing through the storage
+node's agent. That already let a caller move a row's `reach` and `blobHash`; since the coordinator
+update now carries the body, format and tags (and a body-only PATCH on an anchored row routes
+through the conductor), it also lets a caller replace the body that peer serves. Network-wide, the
+earned-head election still refuses a version its root author didn't declare, so another peer keeps
+serving the author's body; the exposure is the row on the peer that took the PATCH. Found by the
+code review of the body-carry change (FCT v2 recomposition, 2026-09-27). The cure is this item's:
+enforce `auth_required` on storage write routes, so only a steward of the atom can PATCH it.
+
+## 2026-09-27 (later): the graph joined it too
+Authored edges now ride an atom's signed metadata and each peer replaces the atom's `explicit`
+edges from the adopted head. So an unauthenticated `PATCH {"metadata":{"relationships":[]}}` on a
+peer re-signs the entry there with no edges and removes that atom's outbound graph on that peer
+(a lesson detached from its course, a prerequisite chain hidden). Bounded to the patched atom's own
+`explicit` rows; it forges no other agent's signature and the earned-head election keeps other
+peers on the author's version. Same cure: only a steward of the atom may PATCH it. The sibling
+`POST /db/relationships` route is equally unauthenticated; its caller-stated edge reach is being
+clamped to the source atom's reach (code review, FCT v2 recomposition), but the route still needs
+the same authorization.

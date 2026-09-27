@@ -13,6 +13,19 @@
  *   LIMIT - Maximum items to seed (optional, for testing)
  *   DRY_RUN - If "true", validate but don't write (optional)
  *   SKIP_BLOB_UPLOAD - Skip uploading blobs (for debugging)
+ *   SEED_IDS - Comma-separated content/path ids; when set, only those rows are
+ *              seeded (every phase, blobs included). For scoped verification.
+ *
+ * Idempotent: each row is read back first and written only when it is missing
+ * or genuinely changed (metadata.seedHash, see seed-idempotency.ts). A run
+ * over current content writes nothing and re-signs nothing; the per-phase
+ * `Seed summary [...]` line reports inserted/updated/unchanged/unverified/failed.
+ * DRY_RUN still reads (to report the decisions) but never writes.
+ *
+ * Phase 3 seeds the content graph: every typed edge a content atom authors
+ * (`buildRelationshipInputs`) is read back per source and written only when
+ * missing or changed (`decideRelationshipAction`); SEED_IDS scopes edges by
+ * their SOURCE atom.
  */
 
 import * as fs from 'fs';
@@ -20,15 +33,10 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
-import { CONTENT_FORMATS } from './validation-constants.js';
-import { ALL_STEP_TYPES, REACH_OPENNESS, isReach } from './generated/schema-enums.js';
+import { REACH_OPENNESS, isReach } from './generated/schema-enums.js';
 import { earnedReach } from './reach-resolver.js';
-import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
-import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
-import type { Section, Item } from './generated/body-types.js';
 import { waitForDrain } from './wait-for-drain.js';
-import { applyPathThumbnail } from './path-thumbnail.js';
 import { recordBlobUploadOutcome } from './blob-upload-result.js';
 import { computeCid } from './doorway-client.js';
 import {
@@ -39,6 +47,35 @@ import {
   seedNetworkStakes,
   stakesDeclarationLogLine,
 } from './corpus-trust.js';
+import {
+  buildContentInput,
+  buildPathInput,
+  buildRelationshipInputs,
+  contentBodyFor,
+  countItems,
+  normalizeContentFormat,
+  type ConceptJson,
+  type PathJson,
+  type RelationshipInput,
+} from './content-input.js';
+import { RelationshipRemapLedger } from './relationship-vocabulary.js';
+import {
+  addTally,
+  decideRelationshipAction,
+  decideSeedAction,
+  deferToSteward,
+  emptyTally,
+  formatTally,
+  reachReconcileTargets,
+  withSeedHash,
+  type ContentFieldPatch,
+  type SeedDecision,
+  type SeedTally,
+  type StoredContentRow,
+  type StoredHead,
+  type StoredLookup,
+  type StoredRelationshipRow,
+} from './seed-idempotency.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +93,14 @@ const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === '
 const SKIP_BLOB_UPLOAD = process.env.SKIP_BLOB_UPLOAD === 'true' || args.includes('--skip-blob-upload');
 const USE_ACCOUNT_PACKAGES = args.includes('--use-account-packages') || process.env.USE_ACCOUNT_PACKAGES === 'true';
 const ACCOUNT_PACKAGES_DIR = process.env.ACCOUNT_PACKAGES_DIR || path.join(GENESIS_DIR, 'data', 'account-packages');
+const SEED_IDS: Set<string> | null = process.env.SEED_IDS
+  ? new Set(process.env.SEED_IDS.split(',').map(id => id.trim()).filter(Boolean))
+  : null;
+
+/** True when the SEED_IDS scope (if any) includes this id. */
+function inSeedScope(id: string): boolean {
+  return SEED_IDS === null || SEED_IDS.has(id);
+}
 
 // ============================================================================
 // Canonical Human Registry (single source of truth: humans.json)
@@ -76,175 +121,6 @@ const VALID_HUMAN_IDS = loadValidHumanIds();
 
 // Content formats that require blob upload
 const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
-
-// ============================================================================
-// Value Normalizers (map legacy/variant values to valid backend enums)
-// ============================================================================
-
-/** Map legacy/variant content formats to canonical values accepted by elohim-storage */
-function normalizeContentFormat(format: string | undefined): ContentFormat {
-  if (!format) return 'markdown';
-
-  const normalized = format.toLowerCase();
-
-  // Map variants to canonical values
-  const mappings: Record<string, ContentFormat> = {
-    'perseus-quiz-json': 'perseus',
-    'perseus-quiz': 'perseus',
-    'quiz-json': 'perseus',
-    'sophia-moment-json': 'sophia',
-    'sophia-quiz-json': 'sophia',
-    'sophia-mastery': 'sophia',
-    'sophia-discovery': 'sophia',
-    'md': 'markdown',
-    'htm': 'html',
-    'txt': 'text',
-  };
-
-  if (mappings[normalized]) return mappings[normalized];
-  // Validate against the auto-generated constants from healing.rs
-  if ((CONTENT_FORMATS as readonly string[]).includes(normalized)) return normalized as ContentFormat;
-
-  // Default to markdown for unknown formats
-  console.warn(`   ⚠️ Unknown contentFormat '${format}', defaulting to 'markdown'`);
-  return 'markdown';
-}
-
-/** Map a step type to an Item role for the epr-composite body schema.
- * Step types (content, assess, video, etc.) are a different concept from
- * Item roles (step, checkpoint, optional, reflection). */
-function stepTypeToItemRole(stepType: string | undefined): Item['role'] {
-  switch (stepType) {
-    case 'assess':
-    case 'quiz':
-      return 'checkpoint';
-    case 'reflection':
-    case 'discuss':
-      return 'reflection';
-    default:
-      return 'step';
-  }
-}
-
-/** Map legacy/variant step types to schema-canonical values.
- * ALL_STEP_TYPES imported from generated schema-enums (single source of truth). */
-function normalizeStepType(stepType: string | undefined): string {
-  if (!stepType) return 'content';
-
-  const normalized = stepType.toLowerCase();
-
-  // Map legacy values to schema-canonical values
-  const mappings: Record<string, string> = {
-    'learn': 'content',
-    'reading': 'read',
-    'quiz': 'assess',
-    'assessment': 'assess',
-    'discussion': 'reflection',
-    'project': 'practice',
-    'resource': 'external',
-    'test': 'assess',
-    'watch': 'video',
-  };
-
-  const mapped = mappings[normalized] || normalized;
-  if ((ALL_STEP_TYPES as readonly string[]).includes(mapped)) return mapped;
-
-  console.warn(`   ⚠️ Unknown stepType '${stepType}', defaulting to 'content'`);
-  return 'content';
-}
-
-// ============================================================================
-// Types — from protocol schema (generated by codegen-ts.mjs)
-// ============================================================================
-// CreateContentInput imported from ./generated/create-content-input.js
-// Already has ContentType, ContentFormat, Reach enum types — no narrowing needed.
-
-// ============================================================================
-// JSON file types from data/lamad/
-// ============================================================================
-
-interface ConceptJson {
-  id: string;
-  title: string;
-  content?: string | object;
-  contentFormat?: string;
-  contentType?: string;
-  reach?: string;           // Authored reach grade (floor — overrides may only raise)
-  description?: string;
-  summary?: string;
-  sourcePath?: string;
-  relatedNodeIds?: string[];
-  tags?: string[];
-  estimatedMinutes?: number;
-  thumbnailUrl?: string;
-  metadata?: Record<string, unknown>;
-  // Blob references for html5-app and large content
-  blobHash?: string;       // Pre-computed hash (camelCase from JSON) — legacy sha256-<hex> /blob key
-  blob_hash?: string;      // Alternative snake_case format
-  blobCid?: string;        // Canonical CIDv1 (bafkrei… raw codec) address for the blob bytes
-  entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
-  stewardedBy?: Array<{ humanId: string; affinity: number; role: string }>;
-}
-
-interface PathJson {
-  id: string;
-  title: string;
-  description?: string;
-  purpose?: string;
-  pathType?: string;
-  difficulty?: string;
-  estimatedDuration?: string;
-  estimatedMinutes?: number;
-  thumbnailUrl?: string;
-  thumbnailAlt?: string;
-  version?: string;
-  reach?: string;           // Authored reach grade (preferred over visibility)
-  visibility?: string;      // Legacy fallback when reach is absent
-  tags?: string[];
-  chapters?: ChapterJson[];
-  conceptIds?: string[];
-}
-
-interface ChapterJson {
-  id: string;
-  title: string;
-  description?: string;
-  order?: number;
-  estimatedDuration?: string;
-  modules?: ModuleJson[];
-  conceptIds?: string[];
-  steps?: StepJson[];  // Direct steps in chapter (know-thyself format)
-}
-
-interface StepJson {
-  order?: number;
-  stepType?: string;
-  resourceId?: string;
-  title?: string;
-  stepTitle?: string;
-  stepNarrative?: string;
-  learningObjectives?: string[];
-  optional?: boolean;
-  completionCriteria?: string[];
-  estimatedTime?: string;
-}
-
-interface ModuleJson {
-  id: string;
-  title: string;
-  description?: string;
-  order?: number;
-  sections?: SectionJson[];
-}
-
-interface SectionJson {
-  id: string;
-  title: string;
-  description?: string;
-  order?: number;
-  estimatedMinutes?: number;
-  conceptIds?: string[];
-}
 
 // ============================================================================
 // Utilities
@@ -441,21 +317,6 @@ function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; ha
   return { data, hash, mimeType };
 }
 
-/**
- * Format a concept ID into a human-readable title.
- * Converts kebab-case to Title Case.
- * Examples:
- *   "manifesto" → "Manifesto"
- *   "quiz-manifesto-foundations" → "Quiz Manifesto Foundations"
- *   "elohim-lamad" → "Elohim Lamad"
- */
-function formatConceptTitle(conceptId: string): string {
-  return conceptId
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 // ============================================================================
 // Content Loading
 // ============================================================================
@@ -484,6 +345,7 @@ function loadContentFiles(): ConceptJson[] {
         console.warn(`   Skipping ${file}: missing id or title`);
         continue;
       }
+      if (!inSeedScope(json.id)) continue;
 
       concepts.push(json);
     } catch (err) {
@@ -561,15 +423,13 @@ function loadReachOverrides(): Map<string, string> {
 let reachOverrides: Map<string, string> | null = null;
 
 /**
- * Resolve the effective reach for a content item under the inverted burden.
- *
- * Default is `private` — content earns openness, it is not granted it. An
- * authored value (from the content JSON) and/or an account-package archetype
- * advisory may RAISE reach; the most-open candidate wins (delegated to
- * earnedReach, which HARD-FAILS on any non-canonical value). Advisories never
- * drag an authored grade down — earnedReach picks the more-open of the two.
+ * The account-package archetype advisory for a content item (only with
+ * --use-account-packages). Reach itself is resolved by `buildContentInput`
+ * under the inverted burden: default `private`; the authored value and this
+ * advisory may RAISE it; the most-open candidate wins (earnedReach, which
+ * HARD-FAILS on any non-canonical value).
  */
-function getReachForContent(contentId: string, authoredReach?: string): Reach {
+function advisoryReachFor(contentId: string): string | undefined {
   let advisory: string | undefined;
 
   if (USE_ACCOUNT_PACKAGES) {
@@ -590,7 +450,7 @@ function getReachForContent(contentId: string, authoredReach?: string): Reach {
     advisory = reachOverrides.get(contentId);
   }
 
-  return earnedReach({ authored: authoredReach, advisory });
+  return advisory;
 }
 
 /**
@@ -632,26 +492,16 @@ export async function deriveContentAnchor(input: {
   return computeCid(bytes);
 }
 
-/**
- * Canonical content-body serialization for a content seed JSON: a string
- * `content` is used verbatim; an object `content` is JSON.stringify'd.
- *
- * Exported because the body bytes are the FIRST input to `deriveContentAnchor`
- * — anything computing a content's anchor CID out of band (seed-epr-atom.ts
- * derives it for the landing atom's knowledge leg) must use this exact rule or
- * it addresses a CID no seeded row carries. One rule, one place.
- */
-export function contentBodyFor(json: Pick<ConceptJson, 'content'>): string | undefined {
-  if (!json.content) return undefined;
-  return typeof json.content === 'string' ? json.content : JSON.stringify(json.content);
-}
+// The body rule lives with the one input builder (content-input.ts);
+// re-exported because seed-epr-atom.ts reads it from here.
+export { contentBodyFor };
 
 /**
  * Build the `deriveContentAnchor` input for a raw content seed JSON, mirroring
- * exactly what `transformContent` feeds it during a seed run.
+ * exactly what `buildContentInput` feeds it during a seed run.
  *
  * CAVEAT: the live seed path injects `blobHash` from `uploadedContentBlobs`
- * (see the `transformContent` call site) AFTER building this input; a raw
+ * (see the `buildContentInput` call site) AFTER building this input; a raw
  * file can't see that. `deriveContentAnchor` prefers `contentBody`, so this
  * only matters for a content JSON with NO inline `content` that relies on an
  * uploaded blob — for such a file this helper's anchor would silently diverge
@@ -671,40 +521,6 @@ export function contentAnchorInput(json: ConceptJson): {
     contentBody: contentBodyFor(json),
     blobHash: json.blobHash ?? json.blob_hash ?? undefined,
     blobCid: json.blobCid ?? undefined,
-  };
-}
-
-function transformContent(json: ConceptJson): CreateContentInput {
-  // Serialize content body to string
-  const contentBody = contentBodyFor(json);
-  let contentSizeBytes: number | undefined;
-  if (contentBody !== undefined) {
-    contentSizeBytes = Buffer.byteLength(contentBody, 'utf-8');
-  }
-
-  // Build typed metadata (ConceptMetadata from generated schema types)
-  const metadata: ConceptMetadata = {};
-  if (json.metadata) Object.assign(metadata, json.metadata);
-  if (json.estimatedMinutes) metadata.estimatedMinutes = json.estimatedMinutes;
-  if (json.thumbnailUrl) metadata.thumbnailUrl = json.thumbnailUrl;
-  if (json.relatedNodeIds?.length) metadata.relatedNodeIds = json.relatedNodeIds;
-  if (json.summary) metadata.summary = json.summary;
-
-  return {
-    id: json.id,
-    title: json.title,
-    schemaVersion: 1,
-    description: json.description || undefined,
-    contentType: (json.contentType ?? 'concept') as ContentType,
-    contentFormat: normalizeContentFormat(json.contentFormat),
-    contentBody: contentBody ?? undefined,
-    blobHash: json.blobHash ?? json.blob_hash ?? undefined,
-    blobCid: json.blobCid ?? undefined,
-    contentSizeBytes: contentSizeBytes,
-    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    reach: getReachForContent(json.id, json.reach),
-    createdBy: undefined,
-    tags: json.tags || [],
   };
 }
 
@@ -736,6 +552,7 @@ function loadPathFiles(): PathJson[] {
         console.warn(`   Skipping ${file}: missing id or title`);
         continue;
       }
+      if (!inSeedScope(json.id)) continue;
 
       paths.push(json);
     } catch (err) {
@@ -744,137 +561,6 @@ function loadPathFiles(): PathJson[] {
   }
 
   return paths;
-}
-
-// Section/Item replaced by generated Section/Item from body-types.ts.
-// Both seeder and Angular use the same types from epr-composite-body.schema.json.
-
-/**
- * Convert path JSON chapters into the sections tree format.
- * Handles three input shapes:
- * 1. chapters -> modules -> sections -> conceptIds (elohim-protocol)
- * 2. chapters -> steps (governance paths, bdd-smoke-tests)
- * 3. flat conceptIds (no chapters)
- */
-function chaptersToSections(json: PathJson): Section[] {
-  // Handle flat conceptIds (no chapters)
-  if ((!json.chapters || json.chapters.length === 0) && json.conceptIds?.length) {
-    return [{
-      id: `${json.id}-default`,
-      title: json.title,
-      description: json.description,
-      level: 'unit',
-      items: json.conceptIds.map(id => ({
-        ref: id,
-        role: 'step',
-        title: formatConceptTitle(id),
-      })),
-    }];
-  }
-
-  if (!json.chapters) return [];
-
-  return json.chapters.map((chapter, ci) => {
-    const section: Section = {
-      id: chapter.id,
-      title: chapter.title,
-      description: chapter.description,
-      level: 'unit',
-      estimatedDuration: chapter.estimatedDuration,
-    };
-
-    // Shape 1: chapters -> modules -> sections -> conceptIds
-    if (chapter.modules?.length) {
-      section.sections = [];
-      for (const mod of chapter.modules) {
-        if (mod.sections) {
-          for (const sec of mod.sections) {
-            section.sections.push({
-              id: sec.id,
-              title: sec.title ?? mod.title,
-              description: sec.description,
-              level: 'lesson',
-              items: (sec.conceptIds ?? []).map(id => ({
-                ref: id,
-                role: 'step',
-                title: formatConceptTitle(id),
-              })),
-            });
-          }
-        }
-      }
-      return section;
-    }
-
-    // Shape 2: chapters -> steps (flat)
-    if (chapter.steps?.length) {
-      section.items = chapter.steps.map(step => {
-        const item: Item = {
-          ref: step.resourceId ?? '',
-          role: stepTypeToItemRole(normalizeStepType(step.stepType)),
-          title: step.stepTitle || step.title || formatConceptTitle(step.resourceId ?? ''),
-        };
-        if (step.stepNarrative) item.narrative = step.stepNarrative;
-        if (step.learningObjectives) item.learningObjectives = step.learningObjectives;
-        if (step.completionCriteria) {
-          // Legacy step data stores completionCriteria as string[]; map first to body schema shape
-          item.completionCriteria = Array.isArray(step.completionCriteria)
-            ? { type: step.completionCriteria[0] as 'view' | 'score' | 'time' | 'interaction' }
-            : step.completionCriteria as unknown as Item['completionCriteria'];
-        }
-        return item;
-      });
-      return section;
-    }
-
-    // Shape 2b: chapters -> conceptIds (flat)
-    if (chapter.conceptIds?.length) {
-      section.items = chapter.conceptIds.map(id => ({
-        ref: id,
-        role: 'step',
-        title: formatConceptTitle(id),
-      }));
-      return section;
-    }
-
-    return section;
-  });
-}
-
-/**
- * Transform a path JSON file into a CreateContentInput for /db/content/bulk.
- * Chapters/modules/sections/conceptIds -> recursive RawSection[] tree with RawItem[] leaves.
- * This is the format parsePathView() in learning-path.model.ts expects.
- */
-function transformPathToContent(json: PathJson): CreateContentInput {
-  const sections = chaptersToSections(json);
-
-  // Build typed metadata (PathMetadata from generated schema types)
-  const metadata: PathMetadata = {};
-  if (json.pathType) metadata.pathType = json.pathType;
-  if (json.difficulty) metadata.difficulty = json.difficulty;
-  if (json.estimatedDuration) metadata.estimatedDuration = json.estimatedDuration;
-  if (json.estimatedMinutes) metadata.estimatedDuration = `${json.estimatedMinutes} minutes`;
-  if (json.version) metadata.version = json.version;
-  if (json.purpose) metadata.purpose = json.purpose;
-  if (json.thumbnailUrl) metadata.thumbnailUrl = json.thumbnailUrl;
-  if (json.thumbnailAlt) metadata.thumbnailAlt = json.thumbnailAlt;
-
-  const contentBody = JSON.stringify({ sections });
-
-  return {
-    id: json.id,
-    title: json.title,
-    schemaVersion: 1,
-    description: json.description || undefined,
-    contentType: 'path',
-    contentFormat: 'epr-composite',
-    contentBody,
-    contentSizeBytes: Buffer.byteLength(contentBody, 'utf-8'),
-    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-    reach: earnedReach({ authored: json.reach ?? json.visibility, advisory: undefined }),
-    tags: json.tags || [],
-  };
 }
 
 // ============================================================================
@@ -968,36 +654,28 @@ async function seedContent(items: CreateContentInput[]): Promise<{ inserted: num
 }
 
 /**
- * Reconcile the authored `reach` onto already-present rows via PATCH.
+ * Re-notarize the authored `reach` onto rows whose stored reach differs.
  *
- * Provenance is now carried at CREATE time via `dhtAnchorHash` in the bulk
- * POST body (see `deriveContentAnchor` above) — a content-derived CIDv1 that
- * satisfies the `require_provenance` read gate honestly, without asserting a
- * DHT publication that never happened. This function's sole remaining job is
- * reach reconciliation:
+ * Callers pass ONLY the gated targets (`reachReconcileTargets`): updated rows
+ * whose stored reach differs from the authored one. A reach PATCH routes through
+ * the conductor and re-authors the entry (update_entry) — it re-signs — so it
+ * is never sent for an inserted row (written with the authored reach), an
+ * unchanged row, or a row the seeder could not read. It used to be sent for
+ * EVERY id in every batch on every run; that was the reseal.
  *
- * `/db/content/bulk` is strict skip-on-exists (content_diesel.rs
- * bulk_create_content — never UPDATEs), so a row seeded before its authored
- * reach changed keeps the stale value forever (the manifesto reach=null gap —
- * authored floor `commons` computed by the seeder but never written on
- * re-seed). Carrying `reach` here makes re-seeds reconcile the authored value
- * idempotently without wiping content.
+ * Provenance itself is carried at CREATE time via `dhtAnchorHash` in the bulk
+ * POST body (see `deriveContentAnchor`); pre-existing NULL-provenance rows are
+ * NOT healed here (`UpdateContentInputView` does not expose `dhtAnchorHash`).
  *
- * NOTE: pre-existing NULL-provenance rows (seeded before the dhtAnchorHash
- * create-path fix) are NOT healed by this path — `UpdateContentInputView` in
- * storage does not expose `dhtAnchorHash`. Those rows will pass the gate once
- * the p2p drain stamps `p2p_published_at` when peers are available.
- *
- * Best-effort: a failed PATCH is logged but does not abort seeding. Mirrors
- * seedContent's batch/catch structure.
+ * Best-effort: a failed PATCH is logged but does not abort seeding.
  */
 async function stampProvenance(
   items: Array<{ id: string; reach?: string | null }>,
-): Promise<{ stamped: number; failed: number }> {
+): Promise<{ stamped: number; failed: number; skipped: number }> {
   // Filter to only items that carry a reach value — nothing to PATCH otherwise.
   const reachItems = items.filter(item => Boolean(item.reach));
   if (DRY_RUN || reachItems.length === 0) {
-    return { stamped: DRY_RUN ? reachItems.length : 0, failed: 0 };
+    return { stamped: DRY_RUN ? reachItems.length : 0, failed: 0, skipped: 0 };
   }
 
   let stamped = 0;
@@ -1068,17 +746,410 @@ async function stampProvenance(
     );
   }
 
-  return { stamped, failed };
+  return { stamped, failed, skipped: reachCircuitSkipped };
 }
 
-/** Count total items across a sections tree (for logging) */
-function countItems(sections: Section[]): number {
-  let count = 0;
-  for (const s of sections) {
-    count += s.items?.length ?? 0;
-    if (s.sections) count += countItems(s.sections);
+// ============================================================================
+// Idempotent seeding — read back, decide, write only what changed
+// ============================================================================
+
+const LOOKUP_CONCURRENCY = 16;
+const LOOKUP_TIMEOUT_MS = 20_000;
+const LOOKUP_MAX_ATTEMPTS = 3;
+const UPDATE_CONCURRENCY = 8;
+
+/**
+ * Read one row back: GET /db/content/{id} (no identity).
+ *
+ * 200 → found; 404 → missing (absent, or present below the serving floor —
+ * the bulk insert then skips it); any other 4xx (the reach gate's 403 for
+ * rows above `public`, device policy, prerequisite gate) → unreadable, left
+ * untouched; network / 5xx → retried, then error.
+ *
+ * NOTE: a 404 on this route also triggers the peer's demand auto-pin and a
+ * bounded (≤5s) P2P resolve for the id — the cost of a read-miss here.
+ */
+/**
+ * GET /db/content/{id}/head — whether a steward earned the row's canonical head.
+ * Read only for rows the repository has changed. Any failure reads as "not
+ * earned", so the seeder falls back to its normal update (which storage itself
+ * refuses to let outrank an earned head).
+ */
+async function lookupStoredHead(id: string): Promise<StoredHead | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}/head`, {
+      signal: controller.signal,
+    });
+    if (response.status !== 200) return undefined;
+    const body = (await response.json()) as { earned?: unknown; earnedBy?: unknown };
+    return {
+      earned: body.earned === true,
+      earnedBy: typeof body.earnedBy === 'string' ? body.earnedBy : undefined,
+    };
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
   }
-  return count;
+}
+
+async function lookupStoredRow(id: string): Promise<StoredLookup> {
+  let lastMessage = 'unknown failure';
+  for (let attempt = 0; attempt < LOOKUP_MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    let status: number | null = null;
+    let bodyText = '';
+    try {
+      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+        signal: controller.signal,
+      });
+      status = response.status;
+      bodyText = await response.text();
+      if (status === 200) {
+        const row = JSON.parse(bodyText) as StoredContentRow;
+        if (!row || typeof row !== 'object' || row.id !== id || typeof row.title !== 'string') {
+          return { kind: 'error', message: `GET ${id}: unexpected body shape` };
+        }
+        return { kind: 'found', row };
+      }
+      if (status === 404) return { kind: 'missing' };
+      if (status >= 400 && status < 500 && status !== 429) {
+        let requiredReach: string | undefined;
+        try {
+          requiredReach = (JSON.parse(bodyText) as { requiredReach?: string }).requiredReach;
+        } catch {
+          /* non-JSON refusal body */
+        }
+        return { kind: 'unreadable', status, requiredReach };
+      }
+      lastMessage = `GET ${id}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
+    } catch (err) {
+      lastMessage = `GET ${id}: ${err instanceof Error ? err.message : String(err)}`;
+      bodyText = lastMessage;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!isRetryable(status, bodyText) || attempt === LOOKUP_MAX_ATTEMPTS - 1) break;
+    await backoffSleep(attempt);
+  }
+  return { kind: 'error', message: lastMessage };
+}
+
+/** Run `fn` over `items` with at most `limit` in flight, preserving order. */
+async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
+ * PATCH the authored, non-notarized fields of a changed row (diesel path:
+ * title/description/contentBody/contentFormat/tags + metadata merge incl. the
+ * new seedHash). Never carries reach/blobHash — see ContentFieldPatch.
+ */
+async function patchContentFields(id: string, patch: ContentFieldPatch): Promise<string | null> {
+  let lastErr = 'unknown failure';
+  for (let attempt = 0; attempt < LOOKUP_MAX_ATTEMPTS; attempt++) {
+    let status: number | null = null;
+    let bodyText = '';
+    try {
+      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      status = response.status;
+      if (response.ok) return null;
+      bodyText = await response.text();
+      lastErr = `PATCH ${id}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
+    } catch (err) {
+      lastErr = `PATCH ${id}: ${err instanceof Error ? err.message : String(err)}`;
+      bodyText = lastErr;
+    }
+    if (!isRetryable(status, bodyText) || attempt === LOOKUP_MAX_ATTEMPTS - 1) break;
+    await backoffSleep(attempt);
+  }
+  return lastErr;
+}
+
+/**
+ * Seed one batch idempotently: read every row back, decide per row, then
+ * insert the missing (stamped with seedHash), update the changed, and leave
+ * the current and the unreadable alone. Reach is re-notarized only for updated
+ * rows whose stored reach differs.
+ */
+async function seedBatchIdempotent(
+  inputs: CreateContentInput[],
+): Promise<{ tally: SeedTally; errors: string[] }> {
+  const tally = emptyTally();
+  const errors: string[] = [];
+
+  const lookups = await mapBounded(inputs, LOOKUP_CONCURRENCY, input => lookupStoredRow(input.id));
+  const firstPass: SeedDecision[] = inputs.map((input, i) => decideSeedAction(input, lookups[i]));
+  // A changed row whose head a steward earned is the steward's to change.
+  const decisions: SeedDecision[] = await mapBounded(firstPass, LOOKUP_CONCURRENCY, async d =>
+    d.kind === 'update' ? deferToSteward(d, await lookupStoredHead(d.id)) : d,
+  );
+  const inputById = new Map(inputs.map(input => [input.id, input]));
+
+  const toInsert: CreateContentInput[] = [];
+  const toUpdate: Array<Extract<SeedDecision, { kind: 'update' }>> = [];
+  for (const d of decisions) {
+    switch (d.kind) {
+      case 'insert':
+        toInsert.push(withSeedHash(inputById.get(d.id)!, d.seedHash));
+        break;
+      case 'update':
+        toUpdate.push(d);
+        break;
+      case 'unchanged':
+        tally.unchanged++;
+        break;
+      case 'unverified':
+        tally.unverified++;
+        break;
+      case 'stewarded':
+        tally.stewarded++;
+        console.log(
+          `     = ${d.id}: changed in the repository, but its head was earned` +
+            `${d.earnedBy ? ` by ${d.earnedBy}` : ''} — left for steward-publish`,
+        );
+        break;
+      case 'failed':
+        tally.failed++;
+        errors.push(d.message);
+        break;
+    }
+  }
+  for (const d of toUpdate) {
+    const note = d.reachPatch ? ` reach→${d.reachPatch}` : '';
+    const unpatchable = d.unpatchable.length ? ` (not patchable, left as stored: ${d.unpatchable.join(', ')})` : '';
+    console.log(`     ~ ${d.id}: changed (${d.via})${note}${unpatchable}`);
+  }
+
+  if (DRY_RUN) {
+    tally.inserted += toInsert.length;
+    tally.updated += toUpdate.length;
+    return { tally, errors };
+  }
+
+  if (toInsert.length > 0) {
+    const result = await seedContent(toInsert);
+    tally.inserted += result.inserted;
+    // Read back as missing but already present: the row exists below the
+    // external serving floor (no provenance yet). Bulk create never updates, so
+    // it is left as it is — the seeder could not read it to compare.
+    tally.unverified += result.skipped;
+    tally.failed += result.errors.length;
+    errors.push(...result.errors);
+  }
+
+  const updated = new Set<string>();
+  await mapBounded(toUpdate, UPDATE_CONCURRENCY, async d => {
+    tally.patches++;
+    const err = await patchContentFields(d.id, d.patch);
+    if (err) {
+      tally.failed++;
+      errors.push(err);
+      return;
+    }
+    tally.updated++;
+    updated.add(d.id);
+  });
+
+  const reachTargets = reachReconcileTargets(toUpdate).filter(t => updated.has(t.id));
+  if (reachTargets.length > 0) {
+    const stamp = await stampProvenance(reachTargets);
+    tally.patches += stamp.stamped + stamp.failed;
+    if (stamp.failed + stamp.skipped > 0) {
+      console.warn(`     reach re-notarization: ${stamp.stamped} ok, ${stamp.failed} failed, ${stamp.skipped} skipped`);
+    }
+  }
+
+  return { tally, errors };
+}
+
+// ============================================================================
+// Content-graph edges — read back per source, write only what changed
+// ============================================================================
+
+/**
+ * Outgoing-edge page size per source. Storage clamps a list page to 500
+ * (`MAX_LIST_LIMIT` in elohim-storage relationships_diesel.rs) and caps an atom's
+ * authored edges at 256, so one page holds every edge a source can author.
+ */
+const RELATIONSHIP_LIST_LIMIT = 500;
+const RELATIONSHIP_WRITE_BATCH = 500;
+
+type RelationshipLookup = { kind: 'ok'; rows: StoredRelationshipRow[] } | { kind: 'error'; message: string };
+
+/** Storage keys an edge on (source, target, type); so does the seeder. */
+const edgeKey = (e: { relationshipType: string; targetId: string }) => `${e.relationshipType}|${e.targetId}`;
+
+/** GET /db/relationships?contentId={id}&direction=outgoing — the edges this source already has. */
+async function listOutgoingRelationships(sourceId: string): Promise<RelationshipLookup> {
+  const url =
+    `${STORAGE_URL}/db/relationships?contentId=${encodeURIComponent(sourceId)}` +
+    `&direction=outgoing&limit=${RELATIONSHIP_LIST_LIMIT}`;
+  let lastMessage = 'unknown failure';
+  for (let attempt = 0; attempt < LOOKUP_MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    let status: number | null = null;
+    let bodyText = '';
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      status = response.status;
+      bodyText = await response.text();
+      if (status === 200) {
+        const body = JSON.parse(bodyText) as { items?: StoredRelationshipRow[]; limit?: number };
+        // Storage falls back to a zero-limit default query when it cannot parse
+        // the query string — that would read as "no edges" and rewrite them all.
+        if (!Array.isArray(body.items) || body.limit !== RELATIONSHIP_LIST_LIMIT) {
+          return { kind: 'error', message: `GET relationships ${sourceId}: unexpected body (limit=${body.limit})` };
+        }
+        return { kind: 'ok', rows: body.items.filter(r => r.sourceId === sourceId) };
+      }
+      lastMessage = `GET relationships ${sourceId}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
+    } catch (err) {
+      lastMessage = `GET relationships ${sourceId}: ${err instanceof Error ? err.message : String(err)}`;
+      bodyText = lastMessage;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!isRetryable(status, bodyText) || attempt === LOOKUP_MAX_ATTEMPTS - 1) break;
+    await backoffSleep(attempt);
+  }
+  return { kind: 'error', message: lastMessage };
+}
+
+/** POST /db/relationships/bulk — storage upserts on (source, target, type). */
+async function bulkCreateRelationships(
+  items: RelationshipInput[],
+): Promise<{ created: number; updated: number; errors: string[] }> {
+  const MAX_ATTEMPTS = 6;
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    let status: number | null = null;
+    let bodyText = '';
+    try {
+      const response = await fetch(`${STORAGE_URL}/db/relationships/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
+        body: JSON.stringify(items),
+      });
+      status = response.status;
+      if (response.ok) {
+        const data = await response.json();
+        assertResponseShape<{ created: number; updated: number; errors: string[] }>(
+          data, ['created', 'updated', 'errors'], '/db/relationships/bulk',
+        );
+        return data;
+      }
+      bodyText = await response.text();
+      lastErr = new Error(`HTTP ${status}: ${bodyText}`);
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      bodyText = lastErr.message;
+    }
+    if (!isRetryable(status, bodyText) || attempt === MAX_ATTEMPTS - 1) break;
+    await backoffSleep(attempt);
+  }
+  throw lastErr ?? new Error('bulkCreateRelationships: unknown failure');
+}
+
+interface RelationshipTally {
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  /** Stored reach differs from the source atom's — the bulk route cannot carry reach (reported, never written). */
+  reachUncarried: number;
+}
+
+function formatRelationshipTally(t: RelationshipTally, remaps: RelationshipRemapLedger): string {
+  const remapSummary = remaps.summary();
+  return (
+    `Seed summary [relationships]: inserted=${t.inserted} updated=${t.updated} ` +
+    `unchanged=${t.unchanged} failed=${t.failed} reachUncarried=${t.reachUncarried} ` +
+    `remapped=${remaps.total()}${remapSummary ? ` (${remapSummary})` : ''}`
+  );
+}
+
+/**
+ * Seed every edge the given atoms author: read each source's outgoing edges,
+ * decide per edge, bulk-upsert only the missing and changed ones.
+ */
+async function seedRelationships(
+  concepts: ConceptJson[],
+  remaps: RelationshipRemapLedger,
+): Promise<{ tally: RelationshipTally; errors: string[] }> {
+  const tally: RelationshipTally = { inserted: 0, updated: 0, unchanged: 0, failed: 0, reachUncarried: 0 };
+  const errors: string[] = [];
+
+  const bySource = concepts
+    .map(c => ({ id: c.id, edges: buildRelationshipInputs(c, { advisoryReach: advisoryReachFor(c.id), remaps }) }))
+    .filter(s => s.edges.length > 0);
+  const edgeCount = bySource.reduce((n, s) => n + s.edges.length, 0);
+  console.log(`   ${formatCount(edgeCount)} edges authored by ${formatCount(bySource.length)} atoms`);
+
+  const lookups = await mapBounded(bySource, LOOKUP_CONCURRENCY, s => listOutgoingRelationships(s.id));
+  const toWrite: RelationshipInput[] = [];
+  let plannedInserts = 0;
+  bySource.forEach((source, i) => {
+    const lookup = lookups[i];
+    if (lookup.kind === 'error') {
+      tally.failed += source.edges.length;
+      errors.push(lookup.message);
+      return;
+    }
+    const stored = new Map(lookup.rows.map(r => [edgeKey(r), r]));
+    for (const edge of source.edges) {
+      const decision = decideRelationshipAction(edge, stored.get(edgeKey(edge)));
+      if (decision.kind !== 'insert' && decision.reachDiffers) tally.reachUncarried++;
+      if (decision.kind === 'unchanged') {
+        tally.unchanged++;
+        continue;
+      }
+      if (decision.kind === 'insert') {
+        plannedInserts++;
+      } else {
+        console.log(`     ~ ${edge.sourceId} -${edge.relationshipType}-> ${edge.targetId}: changed (${decision.changed.join(', ')})`);
+      }
+      toWrite.push(edge);
+    }
+  });
+
+  if (DRY_RUN) {
+    tally.inserted += plannedInserts;
+    tally.updated += toWrite.length - plannedInserts;
+    return { tally, errors };
+  }
+
+  for (let i = 0; i < toWrite.length; i += RELATIONSHIP_WRITE_BATCH) {
+    const batch = toWrite.slice(i, i + RELATIONSHIP_WRITE_BATCH);
+    try {
+      const result = await bulkCreateRelationships(batch);
+      tally.inserted += result.created;
+      tally.updated += result.updated;
+      tally.failed += result.errors.length;
+      errors.push(...result.errors);
+    } catch (err) {
+      tally.failed += batch.length;
+      errors.push(`relationships batch ${i / RELATIONSHIP_WRITE_BATCH + 1}: ${err}`);
+    }
+  }
+  return { tally, errors };
 }
 
 async function getStats(): Promise<{ contentCount: number; uniqueTags: number }> {
@@ -1130,8 +1201,8 @@ async function main() {
   }
 
   const timer = new Timer();
-  let totalInserted = 0;
-  let totalSkipped = 0;
+  let contentTally: SeedTally = emptyTally();
+  let pathTally: SeedTally = emptyTally();
   let totalErrors: string[] = [];
 
   // Map to store uploaded blob hashes for content (id -> hash)
@@ -1279,12 +1350,13 @@ async function main() {
 
     console.log(`\nTransforming content...`);
     const contentInputs = await Promise.all(content.map(async c => {
-      const input = transformContent(c);
-      // Add blob_hash if we uploaded one for this content
-      const blobHash = uploadedContentBlobs.get(c.id);
-      if (blobHash) {
-        input.blobHash = blobHash;
-      }
+      // One builder (content-input.ts) — the steward publish path builds the
+      // same input, so both agree on the seed hash. The linked blob hash is the
+      // one Phase 0 verified or uploaded.
+      const input = buildContentInput(c, {
+        advisoryReach: advisoryReachFor(c.id),
+        blobHash: uploadedContentBlobs.get(c.id),
+      });
       // Attach a content-derived CIDv1 anchor so the row satisfies the
       // require_provenance read gate at ingest (honest alternative to the
       // p2pPublishedAt false-stamp on hub-optional/peer-starved stacks).
@@ -1317,24 +1389,17 @@ async function main() {
       const batch = contentInputs.slice(i, i + BATCH_SIZE);
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       try {
-        const result = await seedContent(batch);
-        totalInserted += result.inserted;
-        totalSkipped += result.skipped;
-        totalErrors.push(...result.errors);
-
-        // Stamp p2pPublishedAt so the seeded rows pass the provenance read gate
-        // even on peerless household/local stacks (the DHT-anchor gap). Stamp
-        // every id in the batch — already-present rows (skipped) re-stamp
-        // harmlessly (PATCH is idempotent), and we don't get a per-id inserted
-        // list back from the bulk endpoint. Carries authored reach so re-seeds
-        // reconcile it onto skipped rows (bulk create never updates).
-        const stamp = await stampProvenance(batch.map(c => ({ id: c.id, reach: c.reach })));
-        const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
-
-        console.log(`   Batch ${batchNum}/${totalBatches}: ${result.inserted} inserted, ${result.skipped} skipped${stampNote}`);
+        const { tally, errors } = await seedBatchIdempotent(batch);
+        contentTally = addTally(contentTally, tally);
+        totalErrors.push(...errors);
+        console.log(
+          `   Batch ${batchNum}/${totalBatches}: ${tally.inserted} inserted, ${tally.updated} updated, ` +
+          `${tally.unchanged} unchanged, ${tally.unverified} unverified, ${tally.failed} failed`,
+        );
       } catch (err) {
         console.error(`   Batch ${batchNum}/${totalBatches} failed: ${err}`);
         totalErrors.push(`Batch ${batchNum}: ${err}`);
+        contentTally.failed += batch.length;
       }
       // Brief pause between batches to avoid SQLite "database is locked" errors
       if (i + BATCH_SIZE < contentInputs.length) {
@@ -1365,16 +1430,15 @@ async function main() {
 
     console.log(`\nTransforming paths to content nodes...`);
     const pathContentInputs = await Promise.all(paths.map(async p => {
-      const input = transformPathToContent(p);
       const thumbnailHash =
         p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)
           ? uploadedThumbnails.get(p.thumbnailUrl)
           : undefined;
-      const withThumbnail = applyPathThumbnail(input, thumbnailHash);
+      const input = buildPathInput(p, { thumbnailHash });
       // Attach a content-derived CIDv1 anchor for the path row (same
       // require_provenance gate applies to paths seeded as content nodes).
-      withThumbnail.dhtAnchorHash = await deriveContentAnchor(withThumbnail);
-      return withThumbnail;
+      input.dhtAnchorHash = await deriveContentAnchor(input);
+      return input;
     }));
 
     // Count steps for logging
@@ -1388,21 +1452,46 @@ async function main() {
 
     console.log(`\nSeeding paths to database...`);
     try {
-      const result = await seedContent(pathContentInputs);
-      totalInserted += result.inserted;
-      totalSkipped += result.skipped;
-      totalErrors.push(...result.errors);
-      // Paths are content too — stamp provenance so they clear the read gate.
-      const stamp = await stampProvenance(pathContentInputs.map(p => ({ id: p.id, reach: p.reach })));
-      const stampNote = stamp.failed > 0 ? `, ${stamp.failed} stamp-failed` : '';
-      console.log(`   ${result.inserted} paths inserted, ${result.skipped} skipped${stampNote}`);
+      const { tally, errors } = await seedBatchIdempotent(pathContentInputs);
+      pathTally = addTally(pathTally, tally);
+      totalErrors.push(...errors);
     } catch (err) {
       console.error(`   Path seeding failed: ${err}`);
       totalErrors.push(`Paths: ${err}`);
+      pathTally.failed += pathContentInputs.length;
     }
 
     console.log(`\nPath seeding complete in ${pathTimer.elapsed()}`);
   }
+
+  // ========================================
+  // Phase 3: Seed the content graph (typed edges)
+  // ========================================
+  let relationshipTally: RelationshipTally | null = null;
+  const relationshipRemaps = new RelationshipRemapLedger();
+  if (!PATHS_ONLY) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`Phase 3: Seeding Relationships`);
+    console.log(`${'='.repeat(70)}`);
+
+    const relTimer = new Timer();
+    let sources = loadContentFiles();
+    if (LIMIT > 0 && sources.length > LIMIT) sources = sources.slice(0, LIMIT);
+    try {
+      const { tally, errors } = await seedRelationships(sources, relationshipRemaps);
+      relationshipTally = tally;
+      totalErrors.push(...errors);
+    } catch (err) {
+      console.error(`   Relationship seeding failed: ${err}`);
+      totalErrors.push(`Relationships: ${err}`);
+    }
+    console.log(`\nRelationship seeding complete in ${relTimer.elapsed()}`);
+  }
+
+  const runTally = addTally(contentTally, pathTally);
+  const totalInserted = runTally.inserted;
+  // Present on the peer after this run, not newly inserted (was: bulk "skipped").
+  const totalSkipped = runTally.updated + runTally.unchanged + runTally.unverified;
 
   // ========================================
   // Wait for P2P drain
@@ -1453,9 +1542,10 @@ async function main() {
     console.log(`\nCould not get final stats: ${err}`);
   }
 
-  console.log(`\nSeeding results:`);
-  console.log(`   Total inserted: ${formatCount(totalInserted)}`);
-  console.log(`   Total skipped: ${formatCount(totalSkipped)}`);
+  console.log(`\nSeeding results:${DRY_RUN ? ' (DRY RUN — decisions only, nothing written)' : ''}`);
+  if (!PATHS_ONLY) console.log(`   ${formatTally('content', contentTally)}`);
+  if (!CONTENT_ONLY) console.log(`   ${formatTally('paths', pathTally)}`);
+  if (relationshipTally) console.log(`   ${formatRelationshipTally(relationshipTally, relationshipRemaps)}`);
   console.log(`   Total errors: ${totalErrors.length}`);
   console.log(`   Total time: ${timer.elapsed()}`);
 

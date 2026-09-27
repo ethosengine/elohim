@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-post-truth",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "Post-Truth",
   "description": "Book by Lee Mc",
   "content": "# Post-Truth\n\n**Author:** Lee Mc\n**Format:** book",

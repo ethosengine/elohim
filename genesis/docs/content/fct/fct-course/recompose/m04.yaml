@@ -1,0 +1,48 @@
+# Module 4 — The Wisdom Gap & the Conditions for Trust. Its lab is the Evolution
+# of Trust simulation, which many other stories also depend on.
+labs:
+  - evolution-of-trust
+labTitles:
+  evolution-of-trust: "Lab: The Evolution of Trust"
+labNarratives:
+  evolution-of-trust: "Play it, don't just read about it: when does trust pay, and what makes it collapse?"
+quiz:
+  - q: "Why does wisdom, unlike information, only scale through trust?"
+    choices:
+      - "Because wisdom is secret"
+      - "Because wisdom travels through relationships, and people only receive it from those they trust *"
+      - "Because information is always false"
+      - "Because wisdom requires expensive tools"
+    bloom: understand
+  - q: "Which is one of the three conditions for the evolution of trust?"
+    choices:
+      - "One-time interactions between strangers"
+      - "Zero-sum games where one side must lose"
+      - "Repeat interactions *"
+      - "Perfect communication with no mistakes"
+    hints:
+      - "The other two are possible win-wins, and low miscommunication covered by forgiveness."
+    bloom: remember
+  - q: "What does 'the game defines the players' mean for a church?"
+    choices:
+      - "People cannot change"
+      - "Our environment can work against trust, so we redesign the game, not just exhort the players *"
+      - "Churches should compete harder"
+      - "Games have no place in church life"
+    bloom: analyze
+  - q: "What posture does 'shrewd as snakes, innocent as doves' describe?"
+    choices:
+      - "Building trust among wolves without becoming one *"
+      - "Avoiding the world entirely"
+      - "Using the world's tactics for good ends"
+      - "Trusting everyone equally"
+    bloom: understand
+reflections:
+  - id: mind-the-gap
+    title: "Mind the Gap"
+    prompt: "What does the world need? Who are you, at your core? Imagine a life that matches those priorities. How big is the gap between that life and yours, and what is one cause of it? (This returns in Module 14; keep your answer.)"
+    criteria:
+      - "Names what the writer believes the world needs"
+      - "Names at least one concrete cause of the gap"
+    bloom: evaluate
+    time: "15 minutes"

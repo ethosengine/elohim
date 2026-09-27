@@ -71,7 +71,7 @@ const GENERATED_ENUMS_RS = path.join(
   'generated_enums.rs',
 );
 
-/** Normalization mappings from seed-sqlite.ts that map variant formats to canonical */
+/** Normalization mappings from content-input.ts (normalizeContentFormat) that map variant formats to canonical */
 const FORMAT_MAPPINGS: Record<string, string> = {
   'perseus-quiz-json': 'perseus',
   'perseus-quiz': 'perseus',

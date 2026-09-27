@@ -1,39 +1,59 @@
 {
   "id": "fct-module-04-scaling-wisdom-discussion",
-  "contentType": "exercise",
-  "title": "Discussion: Setting the Stage: Scaling Wisdom",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** Jesus' Wisdom in Kingdom Theology: Examples and Discussion\n\n Key Examples:\n\n1\\. \\*\\*The Sermon on the Mount\\*\\* (Matthew 5-7)  \n   \\- Jesus reinterprets and deepens Old Testament laws, emphasizing the spirit of the law over literal observance.  \n   \\- He presents a new understanding of righteousness based on inner transformation rather than outward compliance.\n\n2\\. \\*\\*Parable of the Good Samaritan\\*\\* (Luke 10:25-37)  \n   \\- Jesus expands the concept of \"neighbor\" beyond cultural and ethnic boundaries.  \n   \\- He demonstrates that wisdom and righteousness are found in compassionate action, not just knowledge of the law.\n\n3\\. \\*\\*Teachings on Servant Leadership\\*\\* (Mark 10:42-45)  \n   \\- Jesus inverts worldly power structures, teaching that true greatness in His Kingdom comes through serving others.  \n   \\- This wisdom challenges conventional understanding of power and responsibility.\n\n4\\. \\*\\*Parable of the Talents\\*\\* (Matthew 25:14-30)  \n   \\- Jesus teaches about the responsibility that comes with gifts and resources.  \n   \\- This parable illustrates how expanding responsibility in God's Kingdom involves faithful stewardship and productive use of what we're given.\n\n5\\. \\*\\*Jesus' Response to Pharisees about Taxes\\*\\* (Matthew 22:15-22)  \n   \\- Jesus wisely navigates a political trap, providing insight into the relationship between earthly and divine authority.  \n   \\- His response, \"Give to Caesar what is Caesar's, and to God what is God's,\" demonstrates wisdom in balancing worldly and spiritual responsibilities.\n\n\\#\\# Discussion Question:\n\nConsider Jesus' teachings on wisdom and responsibility in His Kingdom theology, alongside what we've learned about righteous leadership in the Old Testament and our modern challenges with technology and information systems. How might Jesus' approach to expanding responsibility and scaling wisdom inform our work as Christian technologists? \n\nSpecifically:  \n\\- How can we design digital systems that embody the spirit of Jesus' teachings, emphasizing inner transformation and compassionate action over mere compliance or engagement metrics?  \n\\- In what ways can we apply Jesus' model of servant leadership to our roles in developing and managing technology platforms?  \n\\- How might Jesus' parable of the talents guide our approach to stewarding the powerful technological tools at our disposal?  \n\\- Given Jesus' ability to wisely navigate complex social and political situations, how can we create technologies that help users do the same in our increasingly complex digital landscape?\n\nReflect on how these principles could reshape our approach to scaling wisdom through technology while remaining true to our calling as followers of Christ.\n\nActivity: Mind the Gap \\- What does the World Need? Who are you, at your core? Imagine a life that matches those Priorities. How big is the Gap?  Reflect for a moment on the cause of the gap.\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentType": "discussion",
+  "title": "Discussion: The Wisdom Gap & the Conditions for Trust",
+  "description": "Discussion & Activity  Jesus' Kingdom wisdom.",
+  "content": "## Discussion & Activity\n\n**Jesus' Kingdom wisdom.** Survey five moments briefly: the Sermon on the Mount (spirit over letter, inner transformation over compliance); the Good Samaritan (wisdom as compassionate action across boundaries); servant leadership in Mark 10:42-45 (power inverted); the Parable of the Talents (responsibility scaling with gifts); and \"give to Caesar what is Caesar's\" (navigating a political trap without joining either side). Then discuss:\n\n1. How can we design digital and church systems that reward inner transformation and compassionate action rather than mere compliance or engagement?\n2. Where does Jesus' servant-leadership model directly contradict how our platforms and programs currently distribute power?\n3. Given Jesus' shrewd navigation of rivalrous traps, what would technology that helps ordinary people do the same look like?\n\n**Activity — Mind the Gap.** In silence: What does the world need? Who are you, at your core? Imagine a life that matches those priorities. How big is the gap — and what is causing it? Share one cause with a partner. (This exercise returns in Module 14; keep your notes.)",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "setting-stage"
-  ],
-  "relatedNodeIds": [
-    "fct-module-04-scaling-wisdom"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-04-scaling-wisdom",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-14-ready-to-act",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.196730",
-  "updatedAt": "2025-12-24T03:05:26.173Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Setting the Stage: Scaling Wisdom",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Setting the Stage: Scaling Wisdom - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +68,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

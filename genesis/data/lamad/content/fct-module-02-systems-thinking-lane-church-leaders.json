@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-02-systems-thinking-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: Systems Thinking",
+  "description": "Church leaders  See the church's own decline systemically.",
+  "content": "## Church leaders\n\nSee the church's own decline systemically. Much of what presents as spiritual decline was preceded by middle-class decline, individualized risk, and rising inequality squeezing the institutions that grew from healthier economic soil. Systemic responses belong on the church's agenda: transit, pedestrian, and bike access to campus and high-quality land use; pathways to household formation for young families; addressing real structural inequities in vocational training and higher education; job placement and career development as ministry. The church that tends the soil will not need to force the growth.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

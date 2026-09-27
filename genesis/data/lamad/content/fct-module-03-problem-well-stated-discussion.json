@@ -1,39 +1,59 @@
 {
   "id": "fct-module-03-problem-well-stated-discussion",
-  "contentType": "exercise",
+  "contentType": "discussion",
   "title": "Discussion: A Problem Well Stated",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** What are you asking for of \"church\" and the leaders who run this institution?   \nWhat expectations are you setting for yourself as a part of the body of christ?\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "description": "Discussion & Activity  1.",
+  "content": "## Discussion & Activity\n\n1. **Name our arms races.** In groups, list concrete places your congregation competes for attention. Which would Samuel read aloud as \"what the king will take\"?\n2. **The mirror questions.** What are you asking of \"church\" and the leaders who run this institution? What expectations are you setting for *yourself* as part of the Body of Christ? (These two questions expose whether we relate to church as consumers or as members.)\n3. **Externalities inventory.** Return to the Joe Christian provocation. Where do our charity and our politics offload costs onto the very people we say we serve? Keep this list — Module 6 gives it a formal framework.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m03.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-03-problem-well-stated"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-3",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-03-problem-well-stated",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 3,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 1",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.196173",
-  "updatedAt": "2025-12-24T03:05:26.172Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: A Problem Well Stated",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: A Problem Well Stated - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +68,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

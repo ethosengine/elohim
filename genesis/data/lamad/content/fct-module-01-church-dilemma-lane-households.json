@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-01-church-dilemma-lane-households",
+  "contentType": "practice",
+  "title": "Households: The Church Dilemma",
+  "description": "Households  Run a one-week attention audit.",
+  "content": "## Households\n\nRun a one-week attention audit. When do screens appear at the table, in the car, in the first and last thirty minutes of the day? Observe without legislating — the household conversation comes in Movement II.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "practice-lane",
+    "audience": "households"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "fct-module-03-problem-well-stated-homework",
+  "contentType": "practice",
+  "title": "Homework: A Problem Well Stated",
+  "description": "Homework  Complete FHT Module 1: Setting the Stage (continued from Module 2's assignment).",
+  "content": "## Homework\n\nComplete FHT Module 1: *Setting the Stage* (continued from Module 2's assignment). One assignment; bring your one-sentence problem statement to class.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m03.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-3",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 3,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 1",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

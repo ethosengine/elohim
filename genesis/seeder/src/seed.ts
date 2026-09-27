@@ -335,6 +335,7 @@ const timer = new PerformanceTimer();
 // Seeder is at: elohim/genesis/seeder/src/seed.ts
 import { fileURLToPath } from 'url';
 import { RelationshipRemapLedger, canonicalRelationshipType } from './relationship-vocabulary.js';
+import { buildRelationshipInputs, type RelationshipInput } from './content-input.js';
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
 const GENESIS_DIR = path.resolve(SEEDER_DIR, '..'); // Go up from seeder/ to genesis/
@@ -1373,66 +1374,16 @@ async function seedViaDoorway(): Promise<SeedResult> {
       console.log(`\n🔗 Extracting relationships from content...`);
       const remapLedger = new RelationshipRemapLedger();
 
-      // Extract relationships from content items
-      const relationships: Array<{
-        schemaVersion?: number;
-        sourceId: string;
-        targetId: string;
-        relationshipType: string;
-        confidence: number;
-        inferenceSource: string;
-      }> = [];
-
-      // Track seen relationships to avoid duplicates
-      const seen = new Set<string>();
-
+      // One edge builder (content-input.ts) for both seeders: it reads the RAW
+      // concept JSON (top-level relationships, legacy metadata.relationships,
+      // relatedNodeIds), canonicalizes types, carries the authored role in the
+      // edge metadata and the source row's reach on the edge.
+      const conceptById = new Map(filteredConcepts.map(({ concept }) => [concept.id, concept]));
+      const relationships: RelationshipInput[] = [];
       for (const item of itemsToSeed) {
-        const meta = (item.metadata ?? {}) as Record<string, unknown>;
-
-        // Extract from relatedNodeIds in metadata (simple RELATES_TO relationships)
-        const relatedNodeIds = meta.relatedNodeIds as string[] | undefined;
-        if (relatedNodeIds && relatedNodeIds.length > 0) {
-          for (const targetId of relatedNodeIds) {
-            const key = `${item.id}:${targetId}:RELATES_TO`;
-            if (!seen.has(key) && item.id !== targetId) {
-              seen.add(key);
-              relationships.push({
-                schemaVersion: 1,
-                sourceId: item.id,
-                targetId: targetId,
-                relationshipType: 'RELATES_TO',
-                confidence: 1.0,
-                inferenceSource: 'explicit',
-              });
-            }
-          }
-        }
-
-        // Extract from relationships array in metadata (typed relationships)
-        if (Array.isArray(meta.relationships)) {
-          for (const rel of meta.relationships as Array<Record<string, unknown>>) {
-            const targetId = (rel.target || rel.targetId || rel.target_id) as string | undefined;
-            // Authored types are prose-shaped (`extends`, `prereq`); storage accepts
-            // only the manifest vocabulary — canonicalize, count remaps, never drop.
-            const canonical = canonicalRelationshipType(rel.type || rel.relationship_type);
-            remapLedger.note(canonical);
-            const relType = canonical.type;
-            if (targetId && item.id !== targetId) {
-              const key = `${item.id}:${targetId}:${relType}`;
-              if (!seen.has(key)) {
-                seen.add(key);
-                relationships.push({
-                  schemaVersion: 1,
-                  sourceId: item.id,
-                  targetId: targetId,
-                  relationshipType: relType,
-                  confidence: (rel.confidence as number) ?? 1.0,
-                  inferenceSource: (rel.inference_source as string) || 'explicit',
-                });
-              }
-            }
-          }
-        }
+        const concept = conceptById.get(item.id);
+        if (!concept) continue;
+        relationships.push(...buildRelationshipInputs(concept, { reach: item.reach, remaps: remapLedger }));
       }
 
       if (relationships.length > 0) {

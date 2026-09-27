@@ -1,0 +1,288 @@
+{
+  "id": "fct-module-04-scaling-wisdom-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: The Wisdom Gap & the Conditions for Trust",
+  "description": "Mastery check for Module 4, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-04-scaling-wisdom-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why does wisdom, unlike information, only scale through trust?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Because wisdom is secret",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q1-c0"
+                },
+                {
+                  "content": "Because wisdom travels through relationships, and people only receive it from those they trust",
+                  "correct": true,
+                  "id": "fct-module-04-scaling-wisdom-q1-c1"
+                },
+                {
+                  "content": "Because information is always false",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q1-c2"
+                },
+                {
+                  "content": "Because wisdom requires expensive tools",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-04-scaling-wisdom-quiz",
+        "assessesContentId": "fct-module-04-scaling-wisdom",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which is one of the three conditions for the evolution of trust?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "One-time interactions between strangers",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q2-c0"
+                },
+                {
+                  "content": "Zero-sum games where one side must lose",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q2-c1"
+                },
+                {
+                  "content": "Repeat interactions",
+                  "correct": true,
+                  "id": "fct-module-04-scaling-wisdom-q2-c2"
+                },
+                {
+                  "content": "Perfect communication with no mistakes",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "The other two are possible win-wins, and low miscommunication covered by forgiveness.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-04-scaling-wisdom-quiz",
+        "assessesContentId": "fct-module-04-scaling-wisdom",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does 'the game defines the players' mean for a church?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "People cannot change",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q3-c0"
+                },
+                {
+                  "content": "Our environment can work against trust, so we redesign the game, not just exhort the players",
+                  "correct": true,
+                  "id": "fct-module-04-scaling-wisdom-q3-c1"
+                },
+                {
+                  "content": "Churches should compete harder",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q3-c2"
+                },
+                {
+                  "content": "Games have no place in church life",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-04-scaling-wisdom-quiz",
+        "assessesContentId": "fct-module-04-scaling-wisdom",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What posture does 'shrewd as snakes, innocent as doves' describe?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Building trust among wolves without becoming one",
+                  "correct": true,
+                  "id": "fct-module-04-scaling-wisdom-q4-c0"
+                },
+                {
+                  "content": "Avoiding the world entirely",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q4-c1"
+                },
+                {
+                  "content": "Using the world's tactics for good ends",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q4-c2"
+                },
+                {
+                  "content": "Trusting everyone equally",
+                  "correct": false,
+                  "id": "fct-module-04-scaling-wisdom-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-04-scaling-wisdom-quiz",
+        "assessesContentId": "fct-module-04-scaling-wisdom",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 4
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

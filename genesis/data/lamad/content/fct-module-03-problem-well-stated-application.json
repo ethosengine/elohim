@@ -1,38 +1,69 @@
 {
   "id": "fct-module-03-problem-well-stated-application",
-  "contentType": "exercise",
-  "title": "Application: A Problem Well Stated",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** \\* Success cannot be defined by attention, high-production value worship \"experiences\", or programs. The \"Attractional Church\" model is largely a commercial success but a failure in that it has metastasized what is in lika a tumor or an autoimmune disease, in the development of a healthy body of Christianity. \n\n\\* The Messages we get on a Sunday are filtered through what we the audience want to hear, Preachers are subject to audience capture, conflict of interest, and bias. Consider balancing career-preaching with traveling ministers of the Word, who can have independence from our congregation to be honest with our community when we need to hear hard truths existentially important to our successful formation of a faith community.   What other models of faith community could we explore, to reduce the due influences of our culture on our epistemic community.\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: A Problem Well Stated",
+  "description": "Application — Three Lanes  - Tech workers: Take the three generators to work.",
+  "content": "## Application — Three Lanes\n\n- **Tech workers:** Take the three generators to work. Which one is your product or org most exposed to — an arms race, an externality, or broken sense-making? Write the one-sentence problem statement for it; a problem well stated is half solved.\n- **Households:** Name your household's arms races — activities, achievements, appearances kept up \"to be like the nations.\" Choose one to state plainly at the dinner table this week.\n- **Church leaders:** Success cannot be defined by attention, production value, or programs. Audit where the attractional model — church growth by staging ever-more-compelling experiences — has metastasized in your context, and note where Sunday's message is filtered by audience capture. Consider counterweights that restore honest speech — such as balancing career preaching with visiting ministers who are independent enough to say hard, existentially important truths.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m03.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-03-problem-well-stated"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-3",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-03-problem-well-stated",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 3,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 1",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-03-problem-well-stated-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.196190",
-  "updatedAt": "2025-12-26T21:04:01.828Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: A Problem Well Stated",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: A Problem Well Stated - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -47,17 +78,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

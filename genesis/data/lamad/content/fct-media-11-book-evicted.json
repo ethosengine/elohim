@@ -1,6 +1,7 @@
 {
   "id": "fct-media-11-book-evicted",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "Evicted",
   "description": "Book by Matthew Desmond",
   "content": "# Evicted\n\n**Author:** Matthew Desmond\n**Format:** book",
