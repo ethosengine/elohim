@@ -6,7 +6,7 @@
   "triggersGenesis": false,
   "cascades": false,
   "dependsOn": [],
-  "description": "EPRFS — EPR-governed filesystem projection substrate (eprfs-core/host/local/meta/storage library crates + the eprfs-agent adapter). Publishes the library crates to the internal Nexus 'elohim' registry on main.",
+  "description": "EPRFS — EPR-governed filesystem projection substrate (eprfs-core/host/local/meta/storage library crates + the eprfs-agent adapter). Publishes the library crates to the internal Nexus 'elohim' registry on dev and main.",
   "steps": {
     "rust-build-test": {
       "description": "fmt + clippy + nextest for the eprfs workspace (5 library crates + the eprfs-agent adapter)",
@@ -18,10 +18,13 @@
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/Cargo.toml",
+          ".cargo/config.toml",
           "bridges/did/Cargo.toml",
           "bridges/did/did-bridge/**",
           "bridges/did/did-types/**",
-          "scripts/ci/cargo-publish-eprfs.sh"
+          "scripts/ci/cargo-publish-eprfs.sh",
+          "scripts/ci/publish_eprfs.py",
+          "scripts/ci/test_publish_eprfs.py"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]
       },

@@ -36,6 +36,8 @@
             rustToolchain
             pkg-config
             openssl
+            # The eprfs publisher uses tomllib in this shared CI devShell.
+            python311
           ];
 
           # Native crate — the Holochain WASM getrandom flag must NOT leak in

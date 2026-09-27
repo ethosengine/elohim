@@ -137,9 +137,26 @@ spec:
       }
     }
 
+    // This is a build-only helper: it never runs in the bash-only deploy
+    // container. Exercise it under the same Nix shell that runs publication.
+    stage('Publish safety — tests') {
+      when { expression { env.PIPELINE_SKIPPED != 'true' } }
+      steps {
+        container('builder') {
+          sh '''
+            nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
+              set -euo pipefail
+              python3 -c "import sys, tomllib; assert sys.version_info >= (3, 11)"
+              PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$WORKSPACE/scripts/ci" -p test_publish_eprfs.py
+            '
+          '''
+        }
+      }
+    }
+
     // Publish the eprfs LIBRARY crates to the internal Nexus registry on dev
-    // and main (crate versions are immutable either way — the script is
-    // idempotent + 409-safe, a no-op unless the workspace version was bumped,
+    // and main (crate versions are immutable either way — the script verifies
+    // the published bytes before skipping an existing version,
     // so dev publishes each version once and main is a no-op re-run). dev
     // publishing lets registry consumers (brit) build against eprfs without
     // waiting on a dev→main promotion. Excludes the eprfs-agent binary
@@ -160,6 +177,8 @@ spec:
             sh '''
               nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
                 set -euo pipefail
+                export CARGO_TARGET_DIR=/tmp/eprfs-publish-target
+                python3 -c "import sys, tomllib; assert sys.version_info >= (3, 11)"
                 bash "$WORKSPACE/scripts/ci/cargo-publish-eprfs.sh"
               '
             '''
