@@ -452,7 +452,7 @@ fn scenario_caps(text: &str) -> Vec<String> {
 /// `@act:i @requires:owned-substrate` is exercised ONLY via the Act I lane, where owned-substrate is
 /// available; gating it on the default lane's deliberate withholding would be a false HELD.
 fn effective_available(path: &Path, text: &str, sub: &Substrate) -> BTreeSet<String> {
-    if !path.extension().is_some_and(|e| e == "feature") {
+    if path.extension().is_none_or(|e| e != "feature") {
         return sub.available.clone();
     }
     let Some(act) = env_scope::feature_act(text) else {
@@ -480,7 +480,7 @@ fn scope_verdict(
         .collect();
 
     // Stations exist only for markdown docs; a `.feature` is one artifact, not a station list.
-    if !path.extension().is_some_and(|e| e == "feature") {
+    if path.extension().is_none_or(|e| e != "feature") {
         let slug = gaps::slug_for(path);
         let decomposition = gaps::decompose(&slug, text, doc_req.clone());
         // The station path is taken only when there is SCOPE INFORMATION to resolve — a doc-level

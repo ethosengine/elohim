@@ -335,12 +335,10 @@ fn commitment_evidence(
             let (_, _, decision, error) = leaves[0];
             if error.is_some() {
                 "revalidation-required"
+            } else if slot(decision, "verdict:") == Some("changes-requested") {
+                "changes-requested"
             } else {
-                if slot(decision, "verdict:") == Some("changes-requested") {
-                    "changes-requested"
-                } else {
-                    "accepted"
-                }
+                "accepted"
             }
         };
     }
