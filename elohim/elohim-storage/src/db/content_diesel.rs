@@ -1097,21 +1097,6 @@ pub fn mirror_committed_reach(
     id: &str,
     reach: &str,
 ) -> Result<(), StorageError> {
-    set_row_reach(conn, ctx, id, reach)?;
-    super::authored_edges::narrow_edges_of_source(conn, ctx, id, reach)?;
-    Ok(())
-}
-
-/// The one write that moves a content row's reach. Shared by the own-commit
-/// mirror above and the earned-adoption widening below, so "a row's reach
-/// changed" is one statement whichever channel moved it; each caller re-states
-/// the row's edges in the same transaction.
-fn set_row_reach(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-    id: &str,
-    reach: &str,
-) -> Result<(), StorageError> {
     use super::models::current_timestamp;
     diesel::update(
         content::table
@@ -1123,55 +1108,9 @@ fn set_row_reach(
         content::updated_at.eq(current_timestamp()),
     ))
     .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Set row reach failed: {e}")))?;
+    .map_err(|e| StorageError::Internal(format!("Mirror committed reach failed: {e}")))?;
+    super::authored_edges::narrow_edges_of_source(conn, ctx, id, reach)?;
     Ok(())
-}
-
-/// F19 — WIDEN an existing row to the reach its adopted EARNED head states, and
-/// re-stamp the row's authored edges (the verified-source-head projection;
-/// edge reach = source reach) to it, on the caller's connection — so inside the
-/// caller's transaction. Returns whether the row widened.
-///
-/// Called only by [`stamp_declared_head_mode`] for a `HealCanonical` stamp that
-/// APPLIED under an EARNED election (root author, a device carrying the root
-/// author's delegation, or the bootstrap steward — `declare_earned_canonical_head`),
-/// with `reach` read off the conductor-verified entry. That is the peer
-/// adopting the steward's signed grade: a row stamped `private` long ago by an
-/// old seeder default opens when the steward publishes it at `commons`.
-///
-/// Widen-only, deliberately. NARROWING is not applied by adoption: a narrower
-/// reach arriving on a heal would evict the row from the distribution-safe
-/// inventory (RC-4, `projection_reconcile::reach_patch_would_narrow`), and the
-/// own-commit channel (`mirror_committed_reach`) owns legitimate narrowing.
-/// Both words must be RECOGNIZED tiers: an unknown word cannot be ordered, so it
-/// moves nothing in either direction.
-pub(crate) fn widen_to_adopted_earned_reach(
-    conn: &mut SqliteConnection,
-    ctx: &AppContext,
-    id: &str,
-    reach: &str,
-) -> Result<bool, StorageError> {
-    use crate::epr_service::recognized_reach_level_index as level;
-    let Some(incoming) = level(reach) else {
-        return Ok(false);
-    };
-    let stored: Option<String> = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::id.eq(id))
-        .select(content::reach)
-        .first(conn)
-        .optional()
-        .map_err(|e| StorageError::Internal(format!("Adopted reach read failed: {e}")))?;
-    let Some(stored_level) = stored.as_deref().and_then(level) else {
-        return Ok(false);
-    };
-    // Lower index = more open (`commons` 0 … `private` 5).
-    if incoming >= stored_level {
-        return Ok(false);
-    }
-    set_row_reach(conn, ctx, id, reach)?;
-    super::authored_edges::restamp_authored_edges_of_source(conn, ctx, id, reach)?;
-    Ok(true)
 }
 
 /// Replace `id`'s authored edges with the verified list, at the row's CURRENT
@@ -1291,9 +1230,7 @@ pub(crate) fn apply_content_patch_fields(
     // these reads them off a conductor-verified entry (the CRDT reverse
     // projection and the release vehicle leave them `None`), so a retyped atom
     // is retyped on every peer that adopts its head. Reach stays insert-only
-    // here (see `reach_mirror_after_renotarize`); the one adoption that moves
-    // it — an EARNED head, widen-only — is `stamp_declared_head_mode`'s
-    // (`widen_to_adopted_earned_reach`, F19).
+    // here (see `reach_mirror_after_renotarize`).
     if let Some(ref v) = patch.content_type {
         diesel::update(
             content::table
@@ -2188,7 +2125,7 @@ pub fn stamp_declared_head_mode(
     canonical_ordering: Option<CanonicalOrdering>,
 ) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
-    let (outcome, widened) = conn.transaction(|conn| {
+    let outcome = conn.transaction(|conn| {
         stamp_declared_head_mode_transaction(
             conn,
             ctx,
@@ -2200,18 +2137,13 @@ pub fn stamp_declared_head_mode(
             canonical_ordering,
         )
     })?;
-    let moved =
-        outcome == StampOutcome::Stamped || (outcome == StampOutcome::Refreshed && carries_pointer);
-    if moved {
+    if outcome == StampOutcome::Stamped || (outcome == StampOutcome::Refreshed && carries_pointer) {
         bump_pointer_generation();
-    }
-    // Announce the move to everything outside this process that follows
-    // content: the doorway's live tail (`content.updated`) and this row's sync
-    // doc. Without it a head adopted by the trigger, courier or sweep stays
-    // invisible to the doorway until a poll or a doorbell, and the visitor is
-    // served the previous version's page. A widened reach (F19) is announced
-    // too: the row's audience grew even when its head and pointer stayed put.
-    if moved || widened {
+        // Announce the move to everything outside this process that follows
+        // content: the doorway's live tail (`content.updated`) and this row's
+        // sync doc. Without it a head adopted by the trigger, courier or sweep
+        // stays invisible to the doorway until a poll or a doorbell, and the
+        // visitor is served the previous version's page.
         crate::rea_projection::notify_content_touched(id);
     }
     Ok(outcome)
@@ -2243,7 +2175,7 @@ fn stamp_declared_head_mode_transaction(
     patch: Option<ContentProjectionPatch>,
     mode: StampMode,
     canonical_ordering: Option<CanonicalOrdering>,
-) -> Result<(StampOutcome, bool), StorageError> {
+) -> Result<StampOutcome, StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
@@ -2275,7 +2207,7 @@ fn stamp_declared_head_mode_transaction(
         stored_canonical_earned,
         stored_canonical_link,
     ) = match existing {
-        None => return Ok((StampOutcome::NoRow, false)),
+        None => return Ok(StampOutcome::NoRow),
         Some(row) => row,
     };
 
@@ -2305,7 +2237,7 @@ fn stamp_declared_head_mode_transaction(
         StampMode::LegacySignal => {
             if moving_declared_row && stored_ordering.is_some() {
                 crate::metrics::inc_projection_refused_stale(StaleReason::StoredNull.label());
-                return Ok((StampOutcome::SkippedStale, false));
+                return Ok(StampOutcome::SkippedStale);
             }
             // T-2 (story 1.4a): decline a MOVE that carries no patch at all — a
             // bare declaration with no content evidence behind it. THE RULE IS
@@ -2316,12 +2248,12 @@ fn stamp_declared_head_mode_transaction(
             // `StaleReason::PointerAbsent`.
             if moving_declared_row && patch.is_none() {
                 crate::metrics::inc_projection_refused_stale(StaleReason::PointerAbsent.label());
-                return Ok((StampOutcome::SkippedStale, false));
+                return Ok(StampOutcome::SkippedStale);
             }
         }
         StampMode::GapFill => {
             if moving_declared_row {
-                return Ok((StampOutcome::SkippedDeclared, false));
+                return Ok(StampOutcome::SkippedDeclared);
             }
         }
         StampMode::HealCanonical => {
@@ -2335,7 +2267,7 @@ fn stamp_declared_head_mode_transaction(
                 // clock comparison) stop being indistinguishable.
                 if let Err(reason) = canonical_move_verdict(canonical_ordering, stored_ordering) {
                     crate::metrics::inc_projection_refused_stale(reason.label());
-                    return Ok((StampOutcome::SkippedStale, false));
+                    return Ok(StampOutcome::SkippedStale);
                 }
                 // T-2 (story 1.4a): the ordering verdict just ALLOWED this move,
                 // but a move that carries no patch at all is still declined —
@@ -2345,7 +2277,7 @@ fn stamp_declared_head_mode_transaction(
                     crate::metrics::inc_projection_refused_stale(
                         StaleReason::PointerAbsent.label(),
                     );
-                    return Ok((StampOutcome::SkippedStale, false));
+                    return Ok(StampOutcome::SkippedStale);
                 }
             } else if same_declared_head {
                 // A delayed signal for this SAME head must not downgrade the
@@ -2364,7 +2296,7 @@ fn stamp_declared_head_mode_transaction(
                     if incoming != stored && !same_election {
                         if let Err(reason) = canonical_move_verdict(Some(incoming), Some(stored)) {
                             crate::metrics::inc_projection_refused_stale(reason.label());
-                            return Ok((StampOutcome::SkippedStale, false));
+                            return Ok(StampOutcome::SkippedStale);
                         }
                     }
                 }
@@ -2454,26 +2386,14 @@ fn stamp_declared_head_mode_transaction(
         .map_err(|e| StorageError::Internal(format!("Clear canonical ordering failed: {e}")))?;
     }
 
-    // F19: adopting an EARNED head carries its verified reach — widen-only (see
-    // `widen_to_adopted_earned_reach`). Before the patch fields, so authored
-    // edges the patch re-states land at the widened reach. A staging or absent
-    // election, and every other mode (`GapFill` fallback, `LegacySignal`,
-    // `Declare`), keeps reach insert-only.
-    let mut widened = false;
-    if mode == StampMode::HealCanonical && canonical_ordering.is_some_and(|o| o.earned) {
-        if let Some(reach) = patch.as_ref().and_then(|p| p.reach.as_deref()) {
-            widened = widen_to_adopted_earned_reach(conn, ctx, id, reach)?;
-        }
-    }
-
     if let Some(patch) = patch {
         apply_content_patch_fields(conn, ctx, id, &patch)?;
     }
 
     if same_declared_head {
-        Ok((StampOutcome::Refreshed, widened))
+        Ok(StampOutcome::Refreshed)
     } else {
-        Ok((StampOutcome::Stamped, widened))
+        Ok(StampOutcome::Stamped)
     }
 }
 
@@ -7336,286 +7256,5 @@ mod tests {
         .unwrap();
         assert_eq!(count_dead_anchor_content(&mut conn, &lamad).unwrap(), 1);
         assert_eq!(count_dead_anchor_content(&mut conn, &elohim).unwrap(), 0);
-    }
-
-    // ── F19: adopting an EARNED head widens reach (never narrows) ───────────
-
-    /// A row at `reach` with one AUTHORED edge (the verified-source-head
-    /// projection) and one plain explicit edge, both at `reach`.
-    fn f19_row(conn: &mut SqliteConnection, ctx: &AppContext, id: &str, reach: &str) {
-        create_content(
-            conn,
-            ctx,
-            CreateContentInput {
-                id: id.to_string(),
-                title: id.to_string(),
-                description: None,
-                content_type: "concept".to_string(),
-                content_format: "markdown".to_string(),
-                blob_hash: None,
-                blob_cid: None,
-                content_size_bytes: None,
-                metadata_json: None,
-                reach: reach.to_string(),
-                created_by: None,
-                tags: Vec::new(),
-                content_body: Some("body".to_string()),
-                dht_anchor_hash: None,
-            },
-        )
-        .unwrap();
-        super::super::authored_edges::replace_authored_edges(
-            conn,
-            ctx,
-            id,
-            &[super::super::authored_edges::AuthoredEdge {
-                relationship_type: "RELATES_TO".to_string(),
-                target_id: format!("{id}-authored-target"),
-                role: None,
-            }],
-            reach,
-            None,
-        )
-        .unwrap();
-        super::super::relationships_diesel::create_relationship(
-            conn,
-            ctx,
-            super::super::relationships_diesel::CreateRelationshipInput {
-                id: Some(format!("rel-posted-{id}")),
-                source_id: id.to_string(),
-                target_id: format!("{id}-posted-target"),
-                relationship_type: "RELATES_TO".to_string(),
-                confidence: 1.0,
-                inference_source: "explicit".to_string(),
-                is_bidirectional: false,
-                provenance_chain_json: None,
-                governance_layer: None,
-                reach: Some(reach.to_string()),
-                metadata_json: None,
-            },
-        )
-        .unwrap();
-    }
-
-    /// (row reach, authored edge reach, posted edge reach).
-    fn f19_reaches(conn: &mut SqliteConnection, id: &str) -> (String, String, String) {
-        use crate::db::diesel_schema::relationships;
-        let row: String = content::table
-            .filter(content::id.eq(id))
-            .select(content::reach)
-            .first(conn)
-            .unwrap();
-        let edge = |conn: &mut SqliteConnection, target: String| -> String {
-            relationships::table
-                .filter(relationships::source_id.eq(id))
-                .filter(relationships::target_id.eq(target))
-                .select(relationships::reach)
-                .first(conn)
-                .unwrap()
-        };
-        let authored = edge(conn, format!("{id}-authored-target"));
-        let posted = edge(conn, format!("{id}-posted-target"));
-        (row, authored, posted)
-    }
-
-    fn f19_adopt(
-        conn: &mut SqliteConnection,
-        ctx: &AppContext,
-        id: &str,
-        head: &str,
-        reach: &str,
-        mode: StampMode,
-        ordering: CanonicalOrdering,
-    ) -> StampOutcome {
-        stamp_declared_head_mode(
-            conn,
-            ctx,
-            id,
-            head,
-            None,
-            Some(ContentProjectionPatch {
-                reach: Some(reach.to_string()),
-                ..Default::default()
-            }),
-            mode,
-            Some(ordering),
-        )
-        .unwrap()
-    }
-
-    /// The FCT v2 publish: a peer holds the id at `private` (an old seeder
-    /// default); adopting the steward's EARNED head at `commons` opens the row
-    /// and the edges projected from its verified source head — and ONLY those:
-    /// an edge that stated its own reach does not follow the source up. A
-    /// same-head refresh under the earned election heals a row adopted before
-    /// reach travelled.
-    #[test]
-    fn f19_adopting_an_earned_head_widens_the_row_and_its_authored_edges() {
-        let pool = crate::test_util::test_pool();
-        let mut conn = pool.get().unwrap();
-        let ctx = AppContext::default_lamad();
-
-        f19_row(&mut conn, &ctx, "fct-atom", "private");
-        assert_eq!(
-            f19_adopt(
-                &mut conn,
-                &ctx,
-                "fct-atom",
-                "uhCkkEarned",
-                "commons",
-                StampMode::HealCanonical,
-                ord(10, true),
-            ),
-            StampOutcome::Stamped
-        );
-        assert_eq!(
-            f19_reaches(&mut conn, "fct-atom"),
-            ("commons".into(), "commons".into(), "private".into())
-        );
-
-        // Adopted before this cure: the row already obeys the earned head at
-        // `private`. The same-head refresh widens it.
-        f19_row(&mut conn, &ctx, "fct-adopted-early", "private");
-        assert_eq!(
-            heal(
-                &mut conn,
-                &ctx,
-                "fct-adopted-early",
-                "uhCkkEarly",
-                ord(10, true)
-            ),
-            StampOutcome::Stamped
-        );
-        assert_eq!(f19_reaches(&mut conn, "fct-adopted-early").0, "private");
-        assert_eq!(
-            f19_adopt(
-                &mut conn,
-                &ctx,
-                "fct-adopted-early",
-                "uhCkkEarly",
-                "commons",
-                StampMode::HealCanonical,
-                ord(10, true),
-            ),
-            StampOutcome::Refreshed
-        );
-        assert_eq!(
-            f19_reaches(&mut conn, "fct-adopted-early"),
-            ("commons".into(), "commons".into(), "private".into())
-        );
-    }
-
-    /// A merely DECLARED (staging-tier) head, and a fallback answer carrying an
-    /// earned-looking ordering on a non-canonical channel, keep reach
-    /// insert-only.
-    #[test]
-    fn f19_a_non_earned_head_never_widens() {
-        let pool = crate::test_util::test_pool();
-        let mut conn = pool.get().unwrap();
-        let ctx = AppContext::default_lamad();
-
-        f19_row(&mut conn, &ctx, "staged", "private");
-        assert_eq!(
-            f19_adopt(
-                &mut conn,
-                &ctx,
-                "staged",
-                "uhCkkStaged",
-                "commons",
-                StampMode::HealCanonical,
-                ord(10, false),
-            ),
-            StampOutcome::Stamped
-        );
-        assert_eq!(
-            f19_reaches(&mut conn, "staged"),
-            ("private".into(), "private".into(), "private".into())
-        );
-
-        for mode in [
-            StampMode::GapFill,
-            StampMode::LegacySignal,
-            StampMode::Declare,
-        ] {
-            let id = format!("mode-{mode:?}");
-            f19_row(&mut conn, &ctx, &id, "private");
-            f19_adopt(
-                &mut conn,
-                &ctx,
-                &id,
-                "uhCkkOther",
-                "commons",
-                mode,
-                ord(10, true),
-            );
-            assert_eq!(
-                f19_reaches(&mut conn, &id).0,
-                "private",
-                "{mode:?} is not the earned-adoption channel"
-            );
-        }
-    }
-
-    /// Narrowing is not applied by adoption (deliberate — RC-4): an earned
-    /// head at a narrower reach leaves the row and its edges where they were.
-    #[test]
-    fn f19_an_earned_head_at_a_narrower_reach_never_narrows() {
-        let pool = crate::test_util::test_pool();
-        let mut conn = pool.get().unwrap();
-        let ctx = AppContext::default_lamad();
-
-        f19_row(&mut conn, &ctx, "open", "commons");
-        assert_eq!(
-            f19_adopt(
-                &mut conn,
-                &ctx,
-                "open",
-                "uhCkkNarrow",
-                "private",
-                StampMode::HealCanonical,
-                ord(10, true),
-            ),
-            StampOutcome::Stamped
-        );
-        assert_eq!(
-            f19_reaches(&mut conn, "open"),
-            ("commons".into(), "commons".into(), "commons".into())
-        );
-    }
-
-    /// An unrecognized reach word cannot be ordered, so it moves nothing — on
-    /// either side of the comparison.
-    #[test]
-    fn f19_an_unknown_reach_word_never_widens() {
-        let pool = crate::test_util::test_pool();
-        let mut conn = pool.get().unwrap();
-        let ctx = AppContext::default_lamad();
-
-        f19_row(&mut conn, &ctx, "odd-incoming", "private");
-        f19_adopt(
-            &mut conn,
-            &ctx,
-            "odd-incoming",
-            "uhCkkOdd",
-            "galactic",
-            StampMode::HealCanonical,
-            ord(10, true),
-        );
-        assert_eq!(
-            f19_reaches(&mut conn, "odd-incoming"),
-            ("private".into(), "private".into(), "private".into())
-        );
-
-        f19_row(&mut conn, &ctx, "odd-stored", "galactic");
-        f19_adopt(
-            &mut conn,
-            &ctx,
-            "odd-stored",
-            "uhCkkOdd",
-            "commons",
-            StampMode::HealCanonical,
-            ord(10, true),
-        );
-        assert_eq!(f19_reaches(&mut conn, "odd-stored").0, "galactic");
     }
 }
