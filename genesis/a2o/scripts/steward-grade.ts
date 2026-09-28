@@ -90,6 +90,7 @@ interface Options {
   dryRun: boolean;
   coStewardAdminWs: string[];
   concurrency: number;
+  newRoots: boolean;
 }
 
 function usage(msg?: string): never {
@@ -97,7 +98,7 @@ function usage(msg?: string): never {
   console.error(
     'usage: steward-grade.ts [<id>…] [--manifest FILE] [--closure PATH_ID]… [--dry-run] ' +
       '[--storage URL] [--admin-ws URL] [--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] ' +
-      '[--co-steward-admin-ws URL]… [--concurrency N]'
+      '[--co-steward-admin-ws URL]… [--concurrency N] [--new-roots]'
   );
   process.exit(2);
 }
@@ -132,6 +133,7 @@ function parseArgs(argv: string[]): Options {
     dryRun: false,
     coStewardAdminWs: [],
     concurrency: Number(env.STEWARD_GRADE_CONCURRENCY ?? 4),
+    newRoots: env.STEWARD_GRADE_NEW_ROOTS === '1',
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -172,6 +174,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--concurrency':
         o.concurrency = Number(val());
+        break;
+      case '--new-roots':
+        o.newRoots = true;
         break;
       case '-h':
       case '--help':
@@ -429,6 +434,21 @@ async function main(): Promise<void> {
         return;
       }
       const newRoot = d.mode === 'new-root';
+      if (newRoot && !o.newRoots) {
+        // A chainless row was bulk-seeded and never DHT-anchored: a reach PATCH must
+        // create its root through the conductor, which outlasts 180 s on a loaded fleet
+        // peer (genesis #1591: 28 of 34 timeouts; the #1121/#1122 anchor gap). Off by
+        // default so it can't stall the serialized write queue — opt in with --new-roots.
+        line(
+          id,
+          d.from,
+          d.to,
+          'refused',
+          'no version chain: unanchored row (opt in with --new-roots)'
+        );
+        counts.refused++;
+        return;
+      }
       if (o.dryRun) {
         line(
           id,
