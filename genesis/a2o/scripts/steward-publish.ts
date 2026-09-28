@@ -494,7 +494,8 @@ async function publishOne(
       const landed = await getRow(o.storage, id);
       if (!landed?.dhtAnchorHash) throw e;
       const off = landedMismatches(input, plan.seedHash, landed);
-      if (off.length > 0) throw new Error(`after a chain-head race the row no longer holds: ${off.join(', ')}`);
+      if (off.length > 0)
+        throw new Error(`after a chain-head race the row no longer holds: ${off.join(', ')}`);
       head = landed.dhtAnchorHash;
     }
   }
@@ -502,11 +503,14 @@ async function publishOne(
 
 /** Targets of the typed edges a content item authors (top-level or legacy metadata list). */
 function edgeTargets(json: Record<string, unknown>): string[] {
-  const lists = [json.relationships, (json.metadata as Record<string, unknown> | undefined)?.relationships];
+  const lists = [
+    json.relationships,
+    (json.metadata as Record<string, unknown> | undefined)?.relationships,
+  ];
   const out = new Set<string>();
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
-    for (const edge of list as Array<Record<string, unknown>>) {
+    for (const edge of list as Record<string, unknown>[]) {
       const target = edge?.target ?? edge?.targetId ?? edge?.target_id;
       if (typeof target === 'string' && target && target !== json.id) out.add(target);
     }
