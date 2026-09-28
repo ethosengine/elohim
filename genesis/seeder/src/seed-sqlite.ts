@@ -993,7 +993,11 @@ async function seedBatchIdempotent(
 const RELATIONSHIP_LIST_LIMIT = 500;
 const RELATIONSHIP_WRITE_BATCH = 500;
 
-type RelationshipLookup = { kind: 'ok'; rows: StoredRelationshipRow[] } | { kind: 'error'; message: string };
+type RelationshipLookup =
+  | { kind: 'ok'; rows: StoredRelationshipRow[] }
+  /** The reach gate refused the anonymous seeder: it cannot compare, so it writes nothing (as for content). */
+  | { kind: 'unreadable'; status: number }
+  | { kind: 'error'; message: string };
 
 /** Storage keys an edge on (source, target, type); so does the seeder. */
 const edgeKey = (e: { relationshipType: string; targetId: string }) => `${e.relationshipType}|${e.targetId}`;
@@ -1022,6 +1026,7 @@ async function listOutgoingRelationships(sourceId: string): Promise<Relationship
         }
         return { kind: 'ok', rows: body.items.filter(r => r.sourceId === sourceId) };
       }
+      if (status === 401 || status === 403) return { kind: 'unreadable', status };
       lastMessage = `GET relationships ${sourceId}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
     } catch (err) {
       lastMessage = `GET relationships ${sourceId}: ${err instanceof Error ? err.message : String(err)}`;
@@ -1075,6 +1080,8 @@ interface RelationshipTally {
   updated: number;
   unchanged: number;
   failed: number;
+  /** The source is above the seeder's reach (403): its edges cannot be compared, so none are written. */
+  unverified: number;
   /** Stored reach differs from the source atom's — the bulk route cannot carry reach (reported, never written). */
   reachUncarried: number;
 }
@@ -1083,7 +1090,7 @@ function formatRelationshipTally(t: RelationshipTally, remaps: RelationshipRemap
   const remapSummary = remaps.summary();
   return (
     `Seed summary [relationships]: inserted=${t.inserted} updated=${t.updated} ` +
-    `unchanged=${t.unchanged} failed=${t.failed} reachUncarried=${t.reachUncarried} ` +
+    `unchanged=${t.unchanged} unverified=${t.unverified} failed=${t.failed} reachUncarried=${t.reachUncarried} ` +
     `remapped=${remaps.total()}${remapSummary ? ` (${remapSummary})` : ''}`
   );
 }
@@ -1096,7 +1103,14 @@ async function seedRelationships(
   concepts: ConceptJson[],
   remaps: RelationshipRemapLedger,
 ): Promise<{ tally: RelationshipTally; errors: string[] }> {
-  const tally: RelationshipTally = { inserted: 0, updated: 0, unchanged: 0, failed: 0, reachUncarried: 0 };
+  const tally: RelationshipTally = {
+    inserted: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    unverified: 0,
+    reachUncarried: 0,
+  };
   const errors: string[] = [];
 
   const bySource = concepts
@@ -1110,6 +1124,10 @@ async function seedRelationships(
   let plannedInserts = 0;
   bySource.forEach((source, i) => {
     const lookup = lookups[i];
+    if (lookup.kind === 'unreadable') {
+      tally.unverified += source.edges.length;
+      return;
+    }
     if (lookup.kind === 'error') {
       tally.failed += source.edges.length;
       errors.push(lookup.message);
