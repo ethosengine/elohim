@@ -1,0 +1,21 @@
+{
+  "id": "fct-bible-exodus-1-2",
+  "contentType": "reference",
+  "title": "Exodus 1–2",
+  "description": "Scripture: Exodus 1–2",
+  "content": "## Exodus 1–2\n\nRead Exodus 1–2 in your own Bible, or [online](https://www.biblegateway.com/passage/?search=Exodus+1-2).\n",
+  "contentFormat": "markdown",
+  "reach": "commons",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "courseId": "foundations-christian-technology",
+    "generatedBy": "fct-course/recompose.py"
+  },
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z"
+}

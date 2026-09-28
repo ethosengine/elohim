@@ -300,6 +300,7 @@ impl ContentService {
             description: view.description,
             content_body: view.content_body,
             content_format: view.content_format,
+            content_type: view.content_type,
             metadata_json: merged_metadata_json,
             tags: view.tags,
             reach: view.reach,
@@ -460,7 +461,10 @@ impl ContentService {
         let bootstrap = {
             lamad_types::CreateContentInput {
                 id: existing.content.id.clone(),
-                content_type: existing.content.content_type.clone(),
+                content_type: view
+                    .content_type
+                    .clone()
+                    .unwrap_or_else(|| existing.content.content_type.clone()),
                 title: view
                     .title
                     .clone()
@@ -511,21 +515,12 @@ impl ContentService {
             // live-anchored entry is a real substrate move (the projection then stamps
             // the committed grade). `reach_patch_refusal` (called above) only refuses
             // when the conductor bridge cannot carry the change; on this arm it can.
-            let patch = lamad_types::UpdateContentInput {
-                id: id.to_string(),
-                blob_cid: new_blob_cid.clone(),
-                // stageSpaBlobs sends blob_hash only; content_size_bytes/content_hash
-                // come from the entry's existing fields. Phase 1 PATCH surface is
-                // blob_cid-only — title/description/metadata go through the legacy
-                // diesel `update` for now (those bypass the substrate; substrate
-                // migration for them is a follow-up sweep).
-                content_size_bytes: None,
-                content_hash: None,
-                title: view.title.clone(),
-                description: view.description.clone(),
-                metadata_json: merged_metadata_json.clone(),
-                reach: view.reach.clone(),
-            };
+            let patch = anchored_update_input(
+                id,
+                &view,
+                new_blob_cid.clone(),
+                merged_metadata_json.clone(),
+            );
             match conductor_writes::call_update_content(hc, &patch).await {
                 Ok(bytes) => bytes,
                 // STALE-ANCHOR HEAL (2026-06-10): the SQL row carries a
@@ -570,19 +565,7 @@ impl ContentService {
             })?;
         let action_hash_str = format!("{}", output.action_hash);
         let oc = &output.content;
-        let size_i32 = oc
-            .content_size_bytes
-            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
-        let patch = ContentProjectionPatch {
-            blob_cid: oc.blob_cid.clone(),
-            content_size_bytes: size_i32,
-            title: Some(oc.title.clone()),
-            description: Some(oc.description.clone()),
-            content_type: Some(oc.content_type.clone()),
-            content_format: Some(oc.content_format.clone()),
-            reach: Some(oc.reach.clone()),
-            metadata_json: Some(oc.metadata_json.clone()),
-        };
+        let patch = committed_projection_patch(oc);
         // Declare the author's own election for the version BEFORE the row names
         // it, so the declaration and its ordering land together below: a row
         // naming B with a cleared ordering is exactly what an older complete
@@ -592,60 +575,33 @@ impl ContentService {
         } else {
             None
         };
-        {
-            use diesel::Connection;
-            let mut pooled = self.conn()?;
-            let conn: &mut diesel::SqliteConnection = &mut pooled;
-            let ctx = &self.ctx;
-            conn.transaction::<_, StorageError, _>(|conn| {
-                content_diesel::upsert_with_anchor(
-                    conn,
-                    ctx,
-                    id,
-                    patch,
-                    &action_hash_str,
-                    election,
-                )?;
-                if let Some((ordering, declared_at)) = author_election {
-                    let outcome = content_diesel::stamp_declared_head_mode(
-                        conn,
-                        ctx,
-                        id,
-                        &action_hash_str,
-                        Some(declared_at),
-                        None,
-                        content_diesel::StampMode::HealCanonical,
-                        Some(ordering),
-                    )?;
-                    if outcome != content_diesel::StampOutcome::Refreshed {
-                        tracing::warn!(
-                            content_id = %id, head = %action_hash_str, outcome = ?outcome,
-                            "publish: the author's election ordering was not recorded on the \
-                             row the publish just declared"
-                        );
-                    }
-                }
-                Ok(())
-            })?;
-        }
-
         // Mirror the COMMITTED reach into SQL when the re-publish carried a
         // reach change the projection would otherwise drop. See
         // `reach_mirror_after_renotarize` for why the projection drops it and
-        // why this stays on the request-borne path only.
-        if let Some(committed_reach) = reach_mirror_after_renotarize(
+        // why this stays on the request-borne path only. It lands INSIDE the
+        // projection's transaction (`project_own_commit`), so the row's reach
+        // and its edges' reach move together.
+        let mirror_reach = reach_mirror_after_renotarize(
             view.reach.as_deref(),
             &output.content.reach,
             &existing.content.reach,
-        ) {
-            let mut conn = self.conn()?;
-            let reach_patch = content_diesel::UpdateContentInput {
-                id: id.to_string(),
-                reach: Some(committed_reach),
-                ..Default::default()
-            };
-            content_diesel::update_content(&mut conn, &self.ctx, reach_patch)?;
+        );
+        {
+            let mut pooled = self.conn()?;
+            project_own_commit(
+                &mut pooled,
+                &self.ctx,
+                id,
+                patch,
+                &action_hash_str,
+                election,
+                author_election,
+                mirror_reach.as_deref(),
+            )?;
         }
+
+        // Tags, type and authored edges ride `committed_projection_patch` (the
+        // eager projection above), exactly as every adopting peer projects them.
 
         let updated = {
             let mut conn = self.conn()?;
@@ -707,19 +663,7 @@ impl ContentService {
         // identical to the eager-projection block in `update_via_conductor`.
         let action_hash_str = format!("{}", output.action_hash);
         let oc = &output.content;
-        let size_i32 = oc
-            .content_size_bytes
-            .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
-        let patch = ContentProjectionPatch {
-            blob_cid: oc.blob_cid.clone(),
-            content_size_bytes: size_i32,
-            title: Some(oc.title.clone()),
-            description: Some(oc.description.clone()),
-            content_type: Some(oc.content_type.clone()),
-            content_format: Some(oc.content_format.clone()),
-            reach: Some(oc.reach.clone()),
-            metadata_json: Some(oc.metadata_json.clone()),
-        };
+        let patch = committed_projection_patch(oc);
         {
             let mut conn = self.conn()?;
             content_diesel::upsert_with_anchor(
@@ -867,6 +811,58 @@ impl ContentService {
     }
 }
 
+/// Project a commit THIS conductor just returned onto its row, in ONE
+/// transaction: the committed reach mirror (when the request carried a reach
+/// change), the verified version (`upsert_with_anchor` — body, tags, type and
+/// the authored edges its metadata states), and the author's own election.
+///
+/// Order is load-bearing. The reach mirror runs FIRST: it narrows every stored
+/// edge of the atom to the new reach (`authored_edges::narrow_edges_of_source`)
+/// and moves the row's reach, so `upsert_with_anchor`'s authored-edge
+/// projection — which stamps edges at the row's CURRENT reach — writes them at
+/// the committed reach. Mirrored after (as it used to be, in a second
+/// transaction), a reach-narrowing PATCH left the atom's authored edges at the
+/// OLD, wider reach: an edge more open than the atom that authored it.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn project_own_commit(
+    conn: &mut diesel::SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    patch: ContentProjectionPatch,
+    action_hash: &str,
+    election: content_diesel::HeadElection,
+    author_election: Option<(content_diesel::CanonicalOrdering, i64)>,
+    mirror_reach: Option<&str>,
+) -> Result<(), StorageError> {
+    use diesel::Connection;
+    conn.transaction::<_, StorageError, _>(|conn| {
+        if let Some(reach) = mirror_reach {
+            content_diesel::mirror_committed_reach(conn, ctx, id, reach)?;
+        }
+        content_diesel::upsert_with_anchor(conn, ctx, id, patch, action_hash, election)?;
+        if let Some((ordering, declared_at)) = author_election {
+            let outcome = content_diesel::stamp_declared_head_mode(
+                conn,
+                ctx,
+                id,
+                action_hash,
+                Some(declared_at),
+                None,
+                content_diesel::StampMode::HealCanonical,
+                Some(ordering),
+            )?;
+            if outcome != content_diesel::StampOutcome::Refreshed {
+                tracing::warn!(
+                    content_id = %id, head = %action_hash, outcome = ?outcome,
+                    "publish: the author's election ordering was not recorded on the \
+                     row the publish just declared"
+                );
+            }
+        }
+        Ok(())
+    })
+}
+
 /// The reach value a request-borne re-notarization must mirror into SQL, or
 /// `None` when there is nothing to mirror.
 ///
@@ -945,6 +941,73 @@ fn reach_patch_refusal(
 pub struct ContentStats {
     pub total_count: u64,
     pub by_type: std::collections::HashMap<String, i64>,
+}
+
+/// The patch an anchored-row PATCH sends to `content_store::update_content`:
+/// only the fields the request carried cross the wire (absent = unchanged).
+///
+/// `blob_cid` is the DNA name for the view's `blob_hash`; `content_size_bytes`
+/// / `content_hash` come from the entry's existing fields (the coordinator
+/// keeps an inline-only entry's size coherent with a patched body). The BODY
+/// rides here (content-body-travels): a changed body on an anchored row is a
+/// new signed version, and it reaches other peers only inside the entry they
+/// adopt. Before this, only the NULL-anchor bootstrap carried a body, and an
+/// anchored body edit never left the authoring peer. Format, tags and TYPE
+/// (F17 — a recomposed atom is retyped in place) ride with it so the notarized
+/// entry stays coherent with the row; authored edges ride inside
+/// `metadata_json` (F16).
+pub(crate) fn anchored_update_input(
+    id: &str,
+    view: &crate::views::UpdateContentInputView,
+    blob_cid: Option<String>,
+    merged_metadata_json: Option<String>,
+) -> lamad_types::UpdateContentInput {
+    lamad_types::UpdateContentInput {
+        id: id.to_string(),
+        blob_cid,
+        content_size_bytes: None,
+        content_hash: None,
+        title: view.title.clone(),
+        description: view.description.clone(),
+        metadata_json: merged_metadata_json,
+        // REACH (reach-floor Task 6): the zome re-notarizes the entry with it;
+        // `reach_patch_refusal` only refuses when the bridge cannot carry it.
+        reach: view.reach.clone(),
+        content: view.content_body.clone(),
+        content_format: view.content_format.clone(),
+        tags: view.tags.clone(),
+        content_type: view.content_type.clone(),
+    }
+}
+
+/// The projection of an entry THIS conductor just committed (or returned from
+/// its own DHT view): every mutable field, including the inline body. The
+/// entry is conductor-verified, so its body is the version's body. Shared by
+/// the eager projection in `update_via_conductor` and the anchor recovery in
+/// `project_existing_anchor`, so both stay byte-identical to the
+/// `ContentCommitted` signal arm (`rea_projection.rs`).
+pub(crate) fn committed_projection_patch(oc: &lamad_types::Content) -> ContentProjectionPatch {
+    ContentProjectionPatch {
+        blob_cid: oc.blob_cid.clone(),
+        // u64 to i32, saturating: the SQL column is i32.
+        content_size_bytes: oc
+            .content_size_bytes
+            .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
+        title: Some(oc.title.clone()),
+        description: Some(oc.description.clone()),
+        content_type: Some(oc.content_type.clone()),
+        content_format: Some(oc.content_format.clone()),
+        reach: Some(oc.reach.clone()),
+        metadata_json: Some(oc.metadata_json.clone()),
+        ..Default::default()
+    }
+    .carry_verified_version(
+        &oc.id,
+        &oc.content,
+        oc.blob_cid.as_deref(),
+        &oc.tags,
+        &oc.metadata_json,
+    )
 }
 
 #[cfg(test)]
@@ -1064,6 +1127,7 @@ mod tests {
             description: None,
             content_body: None,
             content_format: None,
+            content_type: None,
             metadata: None,
             tags: None,
             reach: None,
@@ -1157,6 +1221,231 @@ mod tests {
         assert_eq!(
             merge_server_bundle_metadata(Some("{}"), None, None).unwrap(),
             None
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // content-body-travels: a changed body on an anchored row is a signed
+    // version. The patch sent to the conductor carries it; the projection of
+    // the committed entry writes it.
+    // ---------------------------------------------------------------------
+
+    fn committed_entry(id: &str, body: &str) -> lamad_types::Content {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "content_type": "reference",
+            "title": "Psalm 13",
+            "description": "Scripture: Psalm 13",
+            "content": body,
+            "content_format": "markdown",
+            "tags": ["bible"],
+            "related_node_ids": [],
+            "reach": "commons",
+            "trust_score": 0.0,
+            "metadata_json": "{}",
+            "created_at": "t0",
+            "updated_at": "t1",
+        }))
+        .expect("a Content wire value")
+    }
+
+    #[test]
+    fn anchored_update_input_carries_body_format_and_tags() {
+        let view = crate::views::UpdateContentInputView {
+            content_body: Some("## Psalm 13\n\nHow long, O LORD?\n".into()),
+            content_format: Some("markdown".into()),
+            tags: Some(vec!["bible".into(), "fct".into()]),
+            reach: Some("commons".into()),
+            ..empty_patch_view()
+        };
+        let input = anchored_update_input("fct-bible-psalm-13", &view, None, None);
+        assert_eq!(input.id, "fct-bible-psalm-13");
+        assert_eq!(
+            input.content.as_deref(),
+            Some("## Psalm 13\n\nHow long, O LORD?\n"),
+            "the body must cross the wire on the anchored-update path"
+        );
+        assert_eq!(input.content_format.as_deref(), Some("markdown"));
+        assert_eq!(
+            input.tags.as_deref(),
+            Some(&["bible".to_string(), "fct".to_string()][..])
+        );
+        assert_eq!(input.reach.as_deref(), Some("commons"));
+
+        // Absent in the request = absent on the wire (patch semantics).
+        let bare = anchored_update_input("x", &empty_patch_view(), None, None);
+        assert!(bare.content.is_none());
+        assert!(bare.content_format.is_none());
+        assert!(bare.tags.is_none());
+    }
+
+    #[test]
+    fn committed_entry_projection_writes_the_body() {
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+        content_diesel::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            committed_projection_patch(&committed_entry("psalm", "old body")),
+            "uhCkk-v1",
+            content_diesel::HeadElection::Declare,
+        )
+        .unwrap();
+        let body = |conn: &mut diesel::SqliteConnection| {
+            content_diesel::get_content(conn, &ctx, "psalm", content_diesel::MinTrust::Invisible)
+                .unwrap()
+                .unwrap()
+                .content_body
+        };
+        assert_eq!(
+            body(&mut conn).as_deref(),
+            Some("old body"),
+            "a first projection inserts the body"
+        );
+
+        content_diesel::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            committed_projection_patch(&committed_entry("psalm", "new body")),
+            "uhCkk-v2",
+            content_diesel::HeadElection::Declare,
+        )
+        .unwrap();
+        assert_eq!(
+            body(&mut conn).as_deref(),
+            Some("new body"),
+            "the committed version's body replaces the old one"
+        );
+
+        // A blob-backed version carries an empty inline body: preserve.
+        content_diesel::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            committed_projection_patch(&committed_entry("psalm", "")),
+            "uhCkk-v3",
+            content_diesel::HeadElection::Declare,
+        )
+        .unwrap();
+        assert_eq!(body(&mut conn).as_deref(), Some("new body"));
+    }
+
+    /// The authoring peer, end to end after the conductor answers: a PATCH
+    /// that narrows reach routes through the conductor (`patch_needs_conductor`
+    /// — the reach clause), the committed entry re-states its authored edges
+    /// (`carry_verified_version`), and `project_own_commit` lands the row's new
+    /// reach AND its edges' new reach in ONE transaction — the authored edge it
+    /// states AND an unauthored (seeded `path`) edge of the same atom, which the
+    /// verified projection does not replace. Reach and
+    /// edge-reach move together; no committed state has an edge more open than
+    /// the atom that authored it.
+    #[test]
+    fn a_reach_narrowing_patch_narrows_the_atoms_edges_in_the_same_commit() {
+        use crate::db::relationships_diesel;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+
+        let mut v1 = committed_entry("psalm", "body");
+        v1.metadata_json = serde_json::json!({
+            "relationships": [{ "type": "RELATES_TO", "targetId": "psalm-23" }]
+        })
+        .to_string();
+        content_diesel::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            committed_projection_patch(&v1),
+            "uhCkk-v1",
+            content_diesel::HeadElection::Declare,
+        )
+        .unwrap();
+        relationships_diesel::create_relationship(
+            &mut conn,
+            &ctx,
+            relationships_diesel::CreateRelationshipInput {
+                id: Some("rel-seeded-path".into()),
+                source_id: "psalm".into(),
+                target_id: "psalm-139".into(),
+                relationship_type: "RELATES_TO".into(),
+                confidence: 1.0,
+                inference_source: "path".into(),
+                is_bidirectional: false,
+                provenance_chain_json: None,
+                governance_layer: None,
+                reach: Some("commons".into()),
+                metadata_json: None,
+            },
+        )
+        .unwrap();
+        let edges = |conn: &mut diesel::SqliteConnection| {
+            let mut e: Vec<(String, String, bool)> =
+                relationships_diesel::get_outgoing_relationships(conn, &ctx, "psalm", None)
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| {
+                        let marked = crate::db::authored_edges::is_authored_projection(
+                            r.provenance_chain_json.as_deref(),
+                        );
+                        (r.target_id, r.reach, marked)
+                    })
+                    .collect();
+            e.sort();
+            e
+        };
+        assert_eq!(
+            edges(&mut conn),
+            vec![
+                ("psalm-139".into(), "commons".into(), false),
+                ("psalm-23".into(), "commons".into(), true),
+            ]
+        );
+
+        // The PATCH: reach only.
+        let view = crate::views::UpdateContentInputView {
+            reach: Some("intimate".into()),
+            ..empty_patch_view()
+        };
+        assert!(
+            crate::http::patch_needs_conductor(&view),
+            "a reach PATCH is a signed version — it routes through the conductor"
+        );
+        // The conductor re-notarizes the WHOLE entry at the new reach.
+        let mut v2 = v1.clone();
+        v2.reach = "intimate".into();
+        let row_reach = content_diesel::reach_for(&mut conn, &ctx, "psalm")
+            .unwrap()
+            .unwrap();
+        let mirror = reach_mirror_after_renotarize(view.reach.as_deref(), &v2.reach, &row_reach);
+        assert_eq!(mirror.as_deref(), Some("intimate"));
+        project_own_commit(
+            &mut conn,
+            &ctx,
+            "psalm",
+            committed_projection_patch(&v2),
+            "uhCkk-v2",
+            content_diesel::HeadElection::Declare,
+            None,
+            mirror.as_deref(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            content_diesel::reach_for(&mut conn, &ctx, "psalm")
+                .unwrap()
+                .as_deref(),
+            Some("intimate")
+        );
+        assert_eq!(
+            edges(&mut conn),
+            vec![
+                ("psalm-139".into(), "intimate".into(), false),
+                ("psalm-23".into(), "intimate".into(), true),
+            ],
+            "every edge of the atom narrowed with it, in the same commit"
         );
     }
 }

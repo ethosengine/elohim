@@ -53,6 +53,52 @@ pub const VALID_RELATIONSHIP_TYPES: &[&str] = &[
     "DEFINITION_OF",
 ];
 
+/// The reach an edge whose SOURCE atom has no local row is written at: the
+/// most restrictive tier (the read gate serves it to nobody anonymous — and,
+/// with the source unknown, the `self` authorizer finds no creator to admit).
+/// A fabricated edge from an id this peer cannot check never serves openly.
+pub const UNKNOWN_SOURCE_EDGE_REACH: &str = "self";
+
+/// The narrower (more restrictive) of two recognized reach tiers; on a tie,
+/// `a`.
+fn narrower_reach<'a>(a: &'a str, b: &'a str) -> &'a str {
+    if crate::epr_service::reach_level_index(b) > crate::epr_service::reach_level_index(a) {
+        b
+    } else {
+        a
+    }
+}
+
+/// The reach a write route stores an edge at — derived server-side, never
+/// taken from the caller (invariant: an edge is never more open than the atom
+/// that authored it, `db::authored_edges`).
+///
+/// - Source row held: the SOURCE's reach, or the caller's stated reach when
+///   that is NARROWER (a caller may narrow an edge, never widen it).
+/// - Source row absent: [`UNKNOWN_SOURCE_EDGE_REACH`], whatever was stated.
+/// - A stated reach that is not a recognized tier is refused.
+pub(crate) fn written_edge_reach(
+    conn: &mut diesel::SqliteConnection,
+    ctx: &AppContext,
+    input: &relationships_diesel::CreateRelationshipInput,
+) -> Result<String, StorageError> {
+    let stated = input.reach.as_deref().map(str::trim);
+    if let Some(stated) = stated {
+        if crate::epr_service::recognized_reach_level_index(stated).is_none() {
+            return Err(StorageError::InvalidInput(format!(
+                "reach '{stated}' is not a recognized tier"
+            )));
+        }
+    }
+    let Some(source_reach) = content_diesel::reach_for(conn, ctx, &input.source_id)? else {
+        return Ok(UNKNOWN_SOURCE_EDGE_REACH.to_string());
+    };
+    Ok(match stated {
+        Some(stated) => narrower_reach(&source_reach, stated).to_string(),
+        None => source_reach,
+    })
+}
+
 /// Relationship service for content graph operations
 pub struct RelationshipService {
     pool: DbPool,
@@ -139,6 +185,7 @@ impl RelationshipService {
             include_computed: false,
             max_computed: 25,
             min_shared_tags: 1,
+            admission: None,
         };
         Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
     }
@@ -163,6 +210,7 @@ impl RelationshipService {
             include_computed: false,
             max_computed: 25,
             min_shared_tags: 1,
+            admission: None,
         };
         Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
     }
@@ -172,29 +220,18 @@ impl RelationshipService {
     /// The HTTP route (`GET /db/relationships/graph/{id}`) delegates here. All
     /// caps are the caller's responsibility to clamp BEFORE calling — the route
     /// bounds `depth`, `max_computed`, and `min_shared_tags` so an attacker can
-    /// never pass a huge/negative cap into the SQL `LIMIT`.
+    /// never pass a huge/negative cap into the SQL `LIMIT`. The route also
+    /// supplies `query.admission` (the caller's reach filter), so the walk
+    /// prunes nodes the caller may not read.
     pub fn get_graph_query(
         &self,
-        content_id: &str,
-        depth: u32,
-        include_computed: bool,
-        min_shared_tags: usize,
-        max_computed: usize,
-        relationship_types: Option<&[String]>,
+        query: &crate::graph_engine::GraphQuery<'_>,
     ) -> Result<ContentGraphView, StorageError> {
         debug_assert!(
-            depth <= 3 && max_computed <= 100 && min_shared_tags >= 1,
+            query.max_depth <= 3 && query.max_computed <= 100 && query.min_shared_tags >= 1,
             "get_graph_query expects clamped params (depth<=3, max_computed<=100, min_shared_tags>=1)"
         );
-        let q = crate::graph_engine::GraphQuery {
-            root_id: content_id,
-            max_depth: depth,
-            relationship_types,
-            include_computed,
-            max_computed,
-            min_shared_tags,
-        };
-        Ok(self.resolver.resolve_neighborhood(&self.ctx, &q)?.into())
+        Ok(self.resolver.resolve_neighborhood(&self.ctx, query)?.into())
     }
 
     // =========================================================================
@@ -229,8 +266,10 @@ impl RelationshipService {
             ));
         }
 
-        // Create relationship
+        // Create relationship at the reach its SOURCE row allows.
         let mut conn = self.conn()?;
+        let mut input = input;
+        input.reach = Some(written_edge_reach(&mut conn, &self.ctx, &input)?);
         let result = relationships_diesel::create_relationship(&mut conn, &self.ctx, input)?;
 
         // Emit event
@@ -256,8 +295,15 @@ impl RelationshipService {
             }
         }
 
-        // Perform bulk create
+        // Perform bulk create, each edge at the reach its SOURCE row allows.
         let mut conn = self.conn()?;
+        let mut inputs = inputs;
+        for (i, input) in inputs.iter_mut().enumerate() {
+            input.reach = Some(
+                written_edge_reach(&mut conn, &self.ctx, input)
+                    .map_err(|e| StorageError::InvalidInput(format!("item[{}]: {}", i, e)))?,
+            );
+        }
         let result = relationships_diesel::bulk_create_relationships(&mut conn, &self.ctx, inputs)?;
 
         // Emit event
@@ -324,6 +370,17 @@ impl RelationshipService {
         if input.confidence < 0.0 || input.confidence > 1.0 {
             return Err(StorageError::InvalidInput(
                 "confidence must be between 0.0 and 1.0".into(),
+            ));
+        }
+
+        // The verified-projection marker is written by `authored_edges` alone;
+        // a request that claims it is claiming a signed head it does not carry.
+        if crate::db::authored_edges::is_authored_projection(input.provenance_chain_json.as_deref())
+        {
+            return Err(StorageError::InvalidInput(
+                "provenance_chain_json names the verified-projection marker, which only a \
+                 conductor-verified source head can write"
+                    .into(),
             ));
         }
 
@@ -462,7 +519,13 @@ mod tests {
 
         let svc = RelationshipService::new(pool, ctx, Arc::new(EventBus::new()));
         let graph = svc
-            .get_graph_query("X", 2, true, 1, 25, None)
+            .get_graph_query(&crate::graph_engine::GraphQuery {
+                max_depth: 2,
+                include_computed: true,
+                min_shared_tags: 1,
+                max_computed: 25,
+                ..crate::graph_engine::GraphQuery::new("X")
+            })
             .expect("resolve neighborhood");
 
         assert_eq!(graph.root_id, "X");
@@ -517,5 +580,133 @@ mod relationship_vocabulary_tests {
             missing.is_empty(),
             "manifest relationship ids not accepted by relationship_service: {missing:?}"
         );
+    }
+}
+
+/// The write routes' edge-reach derivation (an edge is never more open than
+/// its source atom).
+#[cfg(test)]
+mod written_edge_reach_tests {
+    use super::*;
+
+    fn edge_input(
+        source: &str,
+        target: &str,
+        reach: Option<&str>,
+    ) -> relationships_diesel::CreateRelationshipInput {
+        relationships_diesel::CreateRelationshipInput {
+            id: None,
+            source_id: source.into(),
+            target_id: target.into(),
+            relationship_type: "RELATES_TO".into(),
+            confidence: 1.0,
+            inference_source: "explicit".into(),
+            is_bidirectional: false,
+            provenance_chain_json: None,
+            governance_layer: None,
+            reach: reach.map(str::to_owned),
+            metadata_json: None,
+        }
+    }
+
+    fn seed_atom(conn: &mut diesel::SqliteConnection, ctx: &AppContext, id: &str, reach: &str) {
+        content_diesel::create_content(
+            conn,
+            ctx,
+            content_diesel::CreateContentInput {
+                id: id.into(),
+                title: id.into(),
+                description: None,
+                content_type: "concept".into(),
+                content_format: "markdown".into(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: reach.into(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: Some("body".into()),
+                dht_anchor_hash: None,
+            },
+        )
+        .unwrap();
+    }
+
+    /// The write routes derive an edge's reach from its SOURCE row: a stated
+    /// reach may only narrow it, an unknown source writes the most restrictive
+    /// tier, an unrecognized tier is refused.
+    #[test]
+    fn a_written_edge_is_never_more_open_than_its_source() {
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().unwrap();
+        seed_atom(&mut conn, &ctx, "open", "commons");
+        seed_atom(&mut conn, &ctx, "closed", "intimate");
+        let reach = |conn: &mut diesel::SqliteConnection, s: &str, r: Option<&str>| {
+            written_edge_reach(conn, &ctx, &edge_input(s, "t", r))
+        };
+
+        assert_eq!(reach(&mut conn, "open", None).unwrap(), "commons");
+        assert_eq!(
+            reach(&mut conn, "open", Some("community")).unwrap(),
+            "community",
+            "narrowing is the caller's to ask"
+        );
+        assert_eq!(
+            reach(&mut conn, "closed", Some("commons")).unwrap(),
+            "intimate",
+            "widening is refused by taking the source's tier"
+        );
+        assert_eq!(reach(&mut conn, "closed", None).unwrap(), "intimate");
+        assert_eq!(
+            reach(&mut conn, "unknown-source", Some("commons")).unwrap(),
+            UNKNOWN_SOURCE_EDGE_REACH
+        );
+        assert!(reach(&mut conn, "open", Some("wide-open")).is_err());
+    }
+
+    /// Through the service the POST routes call: bulk rows land at the derived
+    /// reach (including an upsert of an existing row), and a request claiming
+    /// the verified-projection marker is refused whole.
+    #[test]
+    fn bulk_create_writes_the_derived_reach_and_refuses_the_marker() {
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            seed_atom(&mut conn, &ctx, "closed", "intimate");
+            seed_atom(&mut conn, &ctx, "open", "commons");
+        }
+        let svc = RelationshipService::new(pool.clone(), ctx.clone(), Arc::new(EventBus::new()));
+        svc.bulk_create(vec![
+            edge_input("closed", "open", Some("commons")),
+            edge_input("ghost", "open", Some("commons")),
+        ])
+        .unwrap();
+        // Re-POST the same triple asking for commons: still intimate.
+        svc.bulk_create(vec![edge_input("closed", "open", Some("public"))])
+            .unwrap();
+        let edges = svc
+            .list(&relationships_diesel::RelationshipQuery {
+                limit: 100,
+                ..Default::default()
+            })
+            .unwrap();
+        let reach_of = |s: &str| {
+            edges
+                .iter()
+                .find(|e| e.source_id == s)
+                .unwrap()
+                .reach
+                .clone()
+        };
+        assert_eq!(reach_of("closed"), "intimate");
+        assert_eq!(reach_of("ghost"), UNKNOWN_SOURCE_EDGE_REACH);
+
+        let mut forged = edge_input("open", "closed", None);
+        forged.provenance_chain_json =
+            Some(crate::db::authored_edges::AUTHORED_PROVENANCE_JSON.to_string());
+        assert!(svc.bulk_create(vec![forged]).is_err());
     }
 }

@@ -13,6 +13,12 @@ export type UpdateContentInputView = { title: string | null,
  */
 description: string | null, contentBody: string | null, contentFormat: string | null, 
 /**
+ * Content type (e.g. `discussion`). On an anchored row a changed type is a
+ * new signed version: it re-notarizes through the conductor and travels to
+ * every peer inside the entry they adopt.
+ */
+contentType: string | null, 
+/**
  * Shallow-merged into existing metadata: only keys present in this object are updated.
  */
 metadata: JsonValue | null, 

@@ -489,6 +489,15 @@ export class RelatedConceptsService {
   /**
    * Get neighborhood graph data for mini-graph visualization.
    *
+   * Depth 1 (the exploration sidebar's map) is drawn from the SAME edge source
+   * as the Related Concepts panel — the node's authored edges in both
+   * directions plus the resolver's computed edges — so the map and the panel
+   * never disagree about whether a node has connections. Deeper neighborhoods
+   * walk the rooted resolver graph.
+   *
+   * The edge sources carry ids only; neighbor titles and types are then read
+   * through the data loader, degrading to the id when a node can't be loaded.
+   *
    * Uses LRU caching for repeated queries.
    *
    * @param contentId - The focus node ID
@@ -510,20 +519,97 @@ export class RelatedConceptsService {
       return of(cached);
     }
 
-    // Root the underlying graph at the focus node so the mini-graph slices the
-    // CURRENT node's neighborhood (not always the default/manifesto root's).
-    return this.getGraph(contentId).pipe(
-      map(graph => {
-        const result = this.buildNeighborhoodGraph(
-          graph,
-          contentId,
-          depth,
-          maxNodes,
-          relationshipTypes
-        );
-        this.neighborhoodCache.set(cacheKey, result);
-        return result;
-      })
+    const neighborhood$: Observable<MiniGraphData> =
+      depth <= 1
+        ? this.dataLoader
+            .getResolvedRelationshipsForNode(contentId, 2)
+            .pipe(
+              map(relationships =>
+                this.buildDirectNeighborhood(contentId, relationships, maxNodes, relationshipTypes)
+              )
+            )
+        : // Root the underlying graph at the focus node so the mini-graph slices the
+          // CURRENT node's neighborhood (not always the default/manifesto root's).
+          this.getGraph(contentId).pipe(
+            map(graph =>
+              this.buildNeighborhoodGraph(graph, contentId, depth, maxNodes, relationshipTypes)
+            )
+          );
+
+    return neighborhood$.pipe(
+      switchMap(data => this.labelNeighborhood(data)),
+      tap(result => this.neighborhoodCache.set(cacheKey, result))
+    );
+  }
+
+  /**
+   * One-hop neighborhood from a node's relationships (either direction).
+   * One edge per neighbor; nodes carry their id until labelled.
+   */
+  private buildDirectNeighborhood(
+    focusId: string,
+    relationships: ContentRelationship[],
+    maxNodes: number,
+    relationshipTypes?: RelationshipType[]
+  ): MiniGraphData {
+    const seen = new Set<string>([focusId]);
+    const neighbors: MiniGraphNode[] = [];
+    const edges: MiniGraphEdge[] = [];
+
+    for (const rel of relationships) {
+      if (neighbors.length >= maxNodes - 1) break;
+      const relType = rel.relationshipType as RelationshipType;
+      if (relationshipTypes && !relationshipTypes.includes(relType)) continue;
+
+      if (rel.sourceNodeId !== focusId && rel.targetNodeId !== focusId) continue;
+      const otherId = rel.sourceNodeId === focusId ? rel.targetNodeId : rel.sourceNodeId;
+      if (!otherId || seen.has(otherId)) continue;
+      seen.add(otherId);
+
+      neighbors.push(this.unlabelledNode(otherId, 1));
+      edges.push({ source: rel.sourceNodeId, target: rel.targetNodeId, relationshipType: relType });
+    }
+
+    return { focus: { ...this.unlabelledNode(focusId, 0), isFocus: true }, neighbors, edges };
+  }
+
+  private unlabelledNode(id: string, depth: number): MiniGraphNode {
+    return { id, title: id, contentType: 'unknown', isFocus: false, depth };
+  }
+
+  /**
+   * Fill node titles and types from content, keeping the id for any node that
+   * can't be loaded. Never fails the neighborhood for a missing label.
+   */
+  private labelNeighborhood(data: MiniGraphData): Observable<MiniGraphData> {
+    const nodes = [data.focus, ...data.neighbors];
+    const unlabelled = nodes.filter(n => n.title === n.id);
+    if (unlabelled.length === 0) {
+      return of(data);
+    }
+
+    return forkJoin(
+      unlabelled.map(n =>
+        this.dataLoader.getContent(n.id).pipe(
+          take(1),
+          catchError(() => of(null))
+        )
+      )
+    ).pipe(
+      map(loaded => {
+        const byId = new Map<string, ContentNode>();
+        for (const node of loaded) {
+          if (node && node.contentType !== 'placeholder') byId.set(node.id, node);
+        }
+        const label = (n: MiniGraphNode): MiniGraphNode => {
+          const node = byId.get(n.id);
+          return node
+            ? { ...n, title: node.title || n.id, contentType: node.contentType || n.contentType }
+            : n;
+        };
+        return { ...data, focus: label(data.focus), neighbors: data.neighbors.map(label) };
+      }),
+      catchError(() => of(data))
     );
   }
 
@@ -849,14 +935,9 @@ export class RelatedConceptsService {
     maxNodes: number,
     relationshipTypes?: RelationshipType[]
   ): MiniGraphData {
+    // The resolver graph carries ids and edges only — a node without loaded
+    // content is still a node (labelNeighborhood fills titles afterwards).
     const focusNode = graph.nodes.get(focusId);
-    if (!focusNode) {
-      return {
-        focus: { id: focusId, title: 'Unknown', contentType: 'unknown', isFocus: true, depth: 0 },
-        neighbors: [],
-        edges: [],
-      };
-    }
 
     const visited = new Set<string>([focusId]);
     const neighbors: MiniGraphNode[] = [];
@@ -897,8 +978,8 @@ export class RelatedConceptsService {
     return {
       focus: {
         id: focusId,
-        title: focusNode.title || focusId,
-        contentType: focusNode.contentType,
+        title: focusNode?.title || focusId,
+        contentType: focusNode?.contentType ?? 'unknown',
         isFocus: true,
         depth: 0,
       },
@@ -925,15 +1006,13 @@ export class RelatedConceptsService {
       context.nextFrontier.push(targetId);
 
       const targetNode = context.graph.nodes.get(targetId);
-      if (targetNode) {
-        context.neighbors.push({
-          id: targetId,
-          title: targetNode.title || targetId,
-          contentType: targetNode.contentType,
-          isFocus: false,
-          depth: context.depth,
-        });
-      }
+      context.neighbors.push({
+        id: targetId,
+        title: targetNode?.title || targetId,
+        contentType: targetNode?.contentType ?? 'unknown',
+        isFocus: false,
+        depth: context.depth,
+      });
 
       context.edges.push({
         source: context.nodeId,
@@ -961,15 +1040,13 @@ export class RelatedConceptsService {
       context.nextFrontier.push(sourceId);
 
       const sourceNode = context.graph.nodes.get(sourceId);
-      if (sourceNode) {
-        context.neighbors.push({
-          id: sourceId,
-          title: sourceNode.title || sourceId,
-          contentType: sourceNode.contentType,
-          isFocus: false,
-          depth: context.depth,
-        });
-      }
+      context.neighbors.push({
+        id: sourceId,
+        title: sourceNode?.title || sourceId,
+        contentType: sourceNode?.contentType ?? 'unknown',
+        isFocus: false,
+        depth: context.depth,
+      });
 
       context.edges.push({
         source: sourceId,

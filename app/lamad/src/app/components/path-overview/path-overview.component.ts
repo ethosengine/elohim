@@ -26,7 +26,14 @@ import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface'
 import { LAMAD_EPR_NAV, type ILamadEprNav } from '../../interfaces/cross-pillar.interface';
 
 import { SeoService } from '../../shared/services/seo.service';
-import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
+import {
+  LearningPath,
+  PathStep,
+  PathChapter,
+  PathModule,
+  PathSection,
+  findItemTitle,
+} from '../../models';
 import { RecommendationListComponent } from '../../quiz-engine/components/recommendation-list/recommendation-list.component';
 import {
   PathAdaptationService,
@@ -55,6 +62,17 @@ interface StepDisplay {
   masteryTier: MasteryTier;
   /** How this step was unlocked (for visual differentiation) */
   accessType?: AccessType;
+}
+
+/** An authored title that already carries its own ordinal ("5. Our Attention…"). */
+const LEADING_ORDINAL = /^\s*\d+[.):]\s/;
+
+/**
+ * Module heading, numbered once: an authored ordinal is kept as written;
+ * an unnumbered title gets its position within the chapter.
+ */
+export function moduleHeading(title: string, index: number): string {
+  return LEADING_ORDINAL.test(title) ? title : `${index + 1}. ${title}`;
 }
 
 /**
@@ -91,6 +109,14 @@ interface SectionDisplay {
  */
 interface ModuleDisplay {
   module: PathModule;
+  /** Module heading as shown: the authored title, numbered once */
+  heading: string;
+  /**
+   * True when the module IS its own lesson (its only section is itself, the
+   * chapters → titled-lesson shape). The template then lists the steps
+   * directly under the module instead of repeating the module as a section.
+   */
+  isOwnLesson: boolean;
   sections: SectionDisplay[];
   totalConcepts: number;
   completedConcepts: number;
@@ -653,6 +679,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     return [
       {
         module: syntheticModule,
+        heading: syntheticModule.title,
+        isOwnLesson: true,
         sections: [sectionDisplay],
         totalConcepts: steps.length,
         completedConcepts: 0,
@@ -666,8 +694,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Build module display objects from chapter modules.
    */
   private buildModuleDisplays(modules: PathModule[]): ModuleDisplay[] {
-    return modules.map(module => {
+    return modules.map((module, index) => {
       const sections = this.buildSectionDisplays(module.sections ?? []);
+      const isOwnLesson = module.sections?.length === 1 && module.sections[0].id === module.id;
       const totalConcepts = sections.reduce((sum, s) => sum + s.totalConcepts, 0);
       const completedConcepts = sections.reduce((sum, s) => sum + s.completedConcepts, 0);
       const completionPercentage =
@@ -675,6 +704,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
       return {
         module,
+        heading: moduleHeading(module.title, index),
+        isOwnLesson,
         sections,
         totalConcepts,
         completedConcepts,
@@ -689,7 +720,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   private buildSectionDisplays(sections: PathSection[]): SectionDisplay[] {
     return sections.map(section => {
-      const concepts = this.buildConceptDisplays(section.conceptIds);
+      const concepts = this.buildConceptDisplays(section);
       const totalConcepts = concepts.length;
       const completedConcepts = concepts.filter(c => c.isCompleted || c.isGlobalCompletion).length;
       const completionPercentage =
@@ -710,14 +741,18 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Build concept display objects from concept IDs.
    * Uses conceptProgress data for completion status, utility functions for icons.
    */
-  private buildConceptDisplays(conceptIds: string[]): ConceptDisplay[] {
-    return conceptIds.map(conceptId => {
+  private buildConceptDisplays(section: PathSection): ConceptDisplay[] {
+    return section.conceptIds.map(conceptId => {
       const conceptData = this.conceptProgress.find(c => c.conceptId === conceptId);
       const inferredType = inferContentTypeFromId(conceptId);
 
       return {
         conceptId,
-        title: conceptData?.title ?? this.formatConceptTitle(conceptId),
+        // The path author's step title wins; id formatting is the last resort.
+        title:
+          findItemTitle(section, conceptId) ??
+          conceptData?.title ??
+          this.formatConceptTitle(conceptId),
         isCompleted: this.isConceptCompleted(conceptId),
         isGlobalCompletion: this.isConceptGloballyComplete(conceptId),
         icon: getIconForContent(conceptId, inferredType),

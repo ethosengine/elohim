@@ -321,13 +321,28 @@ export class SeoService {
    */
   private generateCanonicalUrl(): string {
     const path = this.router.url.split('?')[0].split('#')[0]; // strip query params and fragment
-    const baseUri = this.document.baseURI;
-    const base =
-      baseUri.startsWith('http://') || baseUri.startsWith('https://')
-        ? new URL(baseUri).pathname.replace(/\/$/, '')
-        : '';
+    const baseUri = this.documentBaseUri();
+    let base = '';
+    if (baseUri.startsWith('http://') || baseUri.startsWith('https://')) {
+      base = new URL(baseUri).pathname.replace(/\/$/, '');
+    } else if (baseUri.startsWith('/')) {
+      base = baseUri.replace(/\/$/, '');
+    }
     const publicPath = `${base}${path}`.replace(/\/{2,}/g, '/');
     return `${DEFAULTS.siteUrl}${publicPath}`;
+  }
+
+  /**
+   * The document's base URI. The server DOM does not implement `baseURI`
+   * (it throws NotYetImplemented, which escaped the step page's subscription
+   * and killed the SSR dev server), so fall back to the `<base href>`.
+   */
+  private documentBaseUri(): string {
+    try {
+      return this.document.baseURI ?? '';
+    } catch {
+      return this.document.querySelector('base')?.getAttribute('href') ?? '';
+    }
   }
 
   /**

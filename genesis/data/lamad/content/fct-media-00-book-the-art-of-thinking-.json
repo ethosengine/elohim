@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-the-art-of-thinking-",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "The Art of Thinking Clearly",
   "description": "Book by Rolf Dobelli",
   "content": "# The Art of Thinking Clearly\n\n**Author:** Rolf Dobelli\n**Format:** book",

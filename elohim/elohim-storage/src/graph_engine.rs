@@ -120,6 +120,11 @@ pub struct GraphQuery<'a> {
     pub include_computed: bool,
     pub max_computed: usize,
     pub min_shared_tags: usize,
+    /// Who may see which node. `None` = every node (internal callers). `Some`
+    /// = an edge is emitted — and its target traversed — only when the gate
+    /// admits BOTH endpoints; an unadmitted node is pruned and never walked
+    /// THROUGH, so a reader cannot reach past an atom they may not read.
+    pub admission: Option<&'a dyn NodeAdmission>,
 }
 
 impl<'a> GraphQuery<'a> {
@@ -132,8 +137,26 @@ impl<'a> GraphQuery<'a> {
             include_computed: true,
             max_computed: 25,
             min_shared_tags: 1,
+            admission: None,
         }
     }
+}
+
+/// A read gate over graph nodes, supplied per query by the route that knows
+/// the caller (the reach gate — `api::content_reach_gate::ReachFilter`). The
+/// resolver stays engine-only: it asks, never decides.
+pub trait NodeAdmission: std::fmt::Debug + Send + Sync {
+    /// May the caller see `node_id`? `via` is the stored edge the node was
+    /// reached by (`None` = no edge, e.g. a tag neighbour). The gate decides
+    /// what that edge may vouch for when the node has no local content row —
+    /// the resolver only reports which edge it walked.
+    fn admits(
+        &self,
+        conn: &mut diesel::SqliteConnection,
+        ctx: &AppContext,
+        node_id: &str,
+        via: Option<&crate::db::models::Relationship>,
+    ) -> bool;
 }
 
 /// The seam. A future Cozo/datalog/embedding engine is just another impl.
@@ -226,6 +249,15 @@ impl NativeGraphResolver {
             let rels =
                 relationships_diesel::get_outgoing_relationships(&mut conn, ctx, &node, types)?;
             for r in rels {
+                if let Some(gate) = query.admission {
+                    // Both endpoints: the source matters for the root (it may
+                    // have no local row), the target for every hop.
+                    if !gate.admits(&mut conn, ctx, &r.source_id, Some(&r))
+                        || !gate.admits(&mut conn, ctx, &r.target_id, Some(&r))
+                    {
+                        continue;
+                    }
+                }
                 if visited.insert(r.target_id.clone()) {
                     let edge_depth = depth + 1;
                     out.push(ResolvedEdge {
@@ -316,6 +348,12 @@ impl NativeGraphResolver {
         Ok(rows
             .into_iter()
             .filter(|r| !exclude.contains(&r.content_id))
+            // A tag neighbour has no edge: it is admitted only by its own row.
+            .filter(|r| {
+                query
+                    .admission
+                    .is_none_or(|gate| gate.admits(&mut conn, ctx, &r.content_id, None))
+            })
             .take(query.max_computed)
             .map(|r| ResolvedEdge {
                 target_id: r.content_id,

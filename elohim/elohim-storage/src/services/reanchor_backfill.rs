@@ -462,6 +462,7 @@ pub async fn run_once(
             description: None,
             content_body: None,
             content_format: None,
+            content_type: None,
             metadata: None,
             tags: None,
             reach: None,

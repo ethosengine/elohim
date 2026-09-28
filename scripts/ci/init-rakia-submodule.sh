@@ -23,10 +23,14 @@
 #   RAKIA_GIT_TOKEN  ee-bot-pat token/password
 #
 # CONTRACT — WARN-ONLY, NEVER BLOCKS THE DEPLOY PATH
-#   elohim/rakia only feeds an ADVISORY schema mirror test (the Storage
-#   quality gate's non-blocking release_adoption::verify) — it is not on the
-#   critical path to a deploy. A submodule fetch failure here must never take
-#   the edge deploy down the way build #1433 did. So:
+#   In the edge pipeline elohim/rakia only feeds an ADVISORY schema mirror test
+#   (the Storage quality gate's non-blocking release_adoption::verify) — it is
+#   not on the critical path to a deploy. In the App pipeline the release
+#   packager (genesis/a2o/scripts/epr-release-package.ts) validates the release
+#   manifest against the same schema; if the fetch fails there, the packager
+#   refuses the release loudly (APP-RELEASE-REFUSED reason=package), which is
+#   the honest outcome. A submodule fetch failure here must never take the edge
+#   deploy down the way build #1433 did. So:
 #     success → elohim/rakia populated, schema present; prints
 #               "rakia submodule at <sha>"; exit 0.
 #     failure (fetch fails OR schema missing afterward) → prints a loud,

@@ -1557,12 +1557,37 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // as the periodic path (`EprRouter::install_from_fallback`), never the bare
         // single-target fetch this used to be.
         let subscriber_pool_urls = epr_storage_pool(&state.args);
+        // F22: the /api/v1/cache projection is refreshed from the same event
+        // stream (content/relationship events → targeted re-read of the one row
+        // from the PRIMARY storage, reach-checked) plus a reconciliation sweep
+        // every DOORWAY_CACHE_RECONCILE_SECS (default 600; 0 = timer off) for
+        // events the stream dropped. Only a projection writer writes it.
+        let cache_refresher = match (&state.projection, subscriber_pool_urls.first()) {
+            (Some(projection_store), Some(primary)) if args.projection_writer => {
+                let refresher = Arc::new(doorway::projection::CacheRefresher::new(
+                    Arc::clone(projection_store),
+                    primary.clone(),
+                ));
+                let period = doorway::projection::cache_refresh::parse_reconcile_period(
+                    std::env::var("DOORWAY_CACHE_RECONCILE_SECS").ok(),
+                );
+                refresher.spawn(period);
+                info!(
+                    primary = %primary,
+                    reconcile_secs = period.map(|p| p.as_secs()).unwrap_or(0),
+                    "Projection cache refresher spawned (event-driven + reconciliation sweep)"
+                );
+                Some(refresher)
+            }
+            _ => None,
+        };
         let _events_handle = doorway::projection::storage_events_subscriber::spawn_subscriber_task(
             subscriber_pool_urls,
             doorway_id,
             state.app_file_cache.clone(),
             Arc::clone(&state.epr_router),
             bundle_heads.clone(),
+            cache_refresher,
         );
         info!(
             storage_url = %storage_url,

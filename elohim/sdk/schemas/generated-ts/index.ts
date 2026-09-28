@@ -66,6 +66,7 @@ export * from './inputs/create-collab-agreement-input';
 export * from './inputs/create-collective-input';
 export * from './inputs/create-content-input';
 export * from './inputs/create-economic-event-input';
+export * from './inputs/create-relationship-input';
 export * from './inputs/create-token-transfer-input';
 export * from './inputs/economic-event-query';
 export * from './inputs/epr-publish-input';

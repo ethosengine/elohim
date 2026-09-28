@@ -1,0 +1,40 @@
+{
+  "$id": "epr:schema:input:create-relationship",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CreateRelationshipInput",
+  "description": "Input for creating a content edge (POST /db/relationships, POST /db/relationships/bulk items). Must match Rust CreateRelationshipInputView (crates/elohim-views/src/imagodei.rs). Source of truth: an authored edge's truth is its SOURCE atom's signed entry (Content.metadata_json relationships[], F16); storage projects each peer's relationships table from the adopted head. This direct write is seeder scaffold, retired once every atom states its edges in its entry.",
+  "type": "object",
+  "required": ["sourceId", "targetId", "relationshipType"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Deterministic edge id: 'rel-' + first 32 hex of sha256(source|type|target). Omitted: storage mints one."
+    },
+    "schemaVersion": { "type": "integer", "default": 1, "description": "Schema version for migration tracking" },
+    "sourceId": { "type": "string", "minLength": 1, "description": "The atom that authored the edge" },
+    "targetId": { "type": "string", "minLength": 1, "description": "The atom the edge names" },
+    "relationshipType": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A lamad manifest relationship id (elohim/sdk/domains/lamad/manifest/relationships.json)"
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "Edge confidence, default 1.0" },
+    "inferenceSource": {
+      "type": "string",
+      "enum": ["explicit", "path", "tag", "semantic", "system"],
+      "description": "How the edge came to be; authored edges are 'explicit'"
+    },
+    "reach": {
+      "$ref": "../enums/reach.schema.json",
+      "description": "The SOURCE atom's reach: an edge is never more open than the atom that authored it. Absent: a new edge is written at commons and an existing edge keeps its stored reach."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Edge metadata, stored as metadata_json. Carries the authored role.",
+      "properties": {
+        "role": { "type": "string", "description": "The authored role (anchor, supporting, story, practice, callback, related, ...)" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

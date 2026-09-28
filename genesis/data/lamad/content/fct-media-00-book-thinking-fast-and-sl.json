@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-thinking-fast-and-sl",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "Thinking, Fast and Slow",
   "description": "Book by Daniel Kahneman",
   "content": "# Thinking, Fast and Slow\n\n**Author:** Daniel Kahneman\n**Format:** book",

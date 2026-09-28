@@ -101,6 +101,7 @@ pub mod knowledge_service;
 pub mod lens_facing; // lens-market service layer — DB → affinity fold → LensBindingView (S5)
 pub mod limit_gradient_registry;
 pub mod lineage_bridge; // Station 6 — trailing held-carry sweep: one page per tick per neighbour while a lineage window is open
+pub mod live_earned; // F26 — `/head?election=live`: earned from this peer's own conductor election (one local-links ask, reused with the staging-candidate read), healing a behind `canonical_earned` column in the same request
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod measure;

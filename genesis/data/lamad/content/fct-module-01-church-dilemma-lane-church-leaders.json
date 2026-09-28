@@ -1,0 +1,61 @@
+{
+  "id": "fct-module-01-church-dilemma-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: The Church Dilemma",
+  "description": "Church leaders  Pull one week of your church's communications and ask honestly: what do these compete for — attention or formation?",
+  "content": "## Church leaders\n\nPull one week of your church's communications and ask honestly: what do these compete for — attention or formation? Notice where Sunday's messages are filtered through what the audience will tolerate hearing. Hold the findings for Modules 3 and 7.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

@@ -193,6 +193,9 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         content_id: c.id.clone(),
         head_action_hash,
         declared: c.declared_head_action_hash.is_some(),
+        // 1 = EARNED tier (`canonical_earned`, stamped only from a
+        // conductor-answered election); 0 / NULL = not known earned.
+        earned: c.canonical_earned == Some(1),
         dht_anchor_hash: c.dht_anchor_hash.clone(),
         trust: trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some()),
         anchor_matches_head: c
@@ -211,6 +214,9 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         staging_candidate: None,
         staging_candidate_blob_hash: None,
         staging_candidate_state: None,
+        // Only a live-election read (`?election=live`) names where `earned`
+        // came from; a plain row → view mapping stays silent about it.
+        earned_source: None,
     })
 }
 
@@ -522,5 +528,24 @@ mod trust_label_tests {
                 .anchor_matches_head,
             None
         );
+    }
+
+    /// `earned` reads the projection's election tier: only an EARNED election
+    /// (`canonical_earned = 1`) reports true; a staging/unmarked election (0)
+    /// and no recorded election (NULL) both report false.
+    #[test]
+    fn head_view_reports_whether_the_canonical_is_earned() {
+        let at = |tier: Option<i32>| {
+            content_head_view_from_content(&Content {
+                declared_head_action_hash: Some("uhCkk_A".to_string()),
+                canonical_earned: tier,
+                ..bare_content()
+            })
+            .unwrap()
+            .earned
+        };
+        assert!(at(Some(1)));
+        assert!(!at(Some(0)));
+        assert!(!at(None));
     }
 }

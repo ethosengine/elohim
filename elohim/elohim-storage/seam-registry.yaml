@@ -5049,3 +5049,46 @@ decisionPoints:
       boundary its contract without needing ts-rs), and F6 (the three schemas' stale "EprHead
       CID" prose) are deliberately out of scope for this slice — see
       genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md §7.
+
+  - name: replace_authored_edges
+    kind: verdict-fn
+    sourceLocation:
+      file: src/db/authored_edges.rs
+      modulePath: db::authored_edges::replace_authored_edges
+    summary: >
+      F16 (lamad-teacher-authoring-backlog "F16 design"): an atom's authored edges ride its
+      signed entry as metadata.relationships. Every projection / adoption arm that fills a row
+      from a conductor-verified entry (ContentProjectionPatch::carry_verified_version) replaces
+      THAT SOURCE atom's explicit rows in the relationships table - insert new, update role,
+      delete edges no longer listed - at the source row's reach, with deterministic ids
+      (rel- + sha256(source|type|target)[:32], the seeder's relationshipId) and types
+      canonicalized onto the lamad manifest. An entry with no relationships key states nothing
+      and leaves the rows alone; read routes serve an edge only when the caller may read both
+      endpoints (api::content_reach_gate::ReachFilter).
+    concernIds:
+      - { id: C0, status: answered, justification: "Edges live inside the source atom's notarized Content entry; the SQL table is a per-peer projection rebuildable from adopted heads." }
+      - { id: C1, status: n-a, justification: "No election of its own; the edges follow the source atom's elected head through the same guarded stamp." }
+      - { id: C2, status: answered, justification: "Only carry_verified_version fills the patch, and every caller hands it a conductor-verified entry; a late snapshot under a different preserved head drops the edges with the body." }
+      - { id: C3, status: answered, justification: "Runs on every adoption / projection of the source row (commit signal, canonical adoption, courier obey, eager declare stamps, authenticated heal)." }
+      - { id: C4, status: partial, justification: "A peer holding no copy of the source atom has no edges for it and reports absence, not 'no edges'; a legacy entry with no relationships key leaves seeded rows in place." }
+      - { id: C5, status: answered, justification: "Unsigned sync-document fields never reach the patch (the CRDT reverse projection leaves relationships None)." }
+      - { id: C6a, status: answered, justification: "256 edges per atom after a deterministic (type, target) sort; truncation logged." }
+      - { id: C6b, status: answered, justification: "Replace-set is idempotent: an unchanged list writes nothing (counted unchanged)." }
+      - { id: C7, status: answered, justification: "GET /db/relationships (with or without contentId), /relationships/{id} and /relationships/graph/{id} serve only projected edges whose both endpoints the caller may read; the open-tier filter runs in SQL for anonymous pages." }
+      - { id: C8, status: partial, justification: "Each adoption that changes edges logs inserted/updated/removed/unchanged counts; no metric yet." }
+      - { id: C9, status: answered, justification: "Rows are keyed by the stable source id and (type, target); the edge's dht_anchor_hash names the source head that states it." }
+      - { id: C10, status: partial, justification: "Accepts the builder's spellings (targetId|target|target_id, type|relationshipType|relationship_type, role); the metadata.relationships shape is not yet versioned, and the seeder drops the key when an atom has zero edges, so dropping the LAST edge does not travel until the builder writes an empty array." }
+      - { id: C11, status: n-a, justification: "No new admission surface; runs inside the existing projection transaction." }
+      - { id: C12, status: answered, justification: "Only the atom's signer states its edges (they are inside its entry); the read reach gate judges both endpoints." }
+      - { id: C13, status: n-a, justification: "No social tier changes; edge reach equals source reach." }
+      - { id: C14, status: partial, justification: "SQL-seeded edges from the POST /db/relationships/bulk scaffold remain until the first projected adoption of an entry that states its edges replaces them; only inference_source=explicit rows are replaced." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/db/authored_edges.rs, testName: replace_inserts_updates_role_and_removes_dropped_edges, kind: unit }
+      - { path: elohim/elohim-storage/src/db/authored_edges.rs, testName: edge_id_matches_the_seeder, kind: unit }
+      - { path: elohim/elohim-storage/src/db/authored_edges.rs, testName: no_key_states_nothing_and_an_empty_list_states_none, kind: unit }
+      - { path: elohim/elohim-storage/src/db/authored_edges.rs, testName: the_cap_truncates_deterministically, kind: unit }
+      - { path: elohim/elohim-storage/src/db/content_diesel.rs, testName: a_verified_version_carries_type_tags_and_edges, kind: unit }
+      - { path: elohim/elohim-storage/src/services/head_adoption.rs, testName: canonical_head_adoption_carries_type_tags_and_edges, kind: unit }
+      - { path: elohim/elohim-storage/src/services/courier_obey.rs, testName: a_proven_version_carries_its_body, kind: unit }
+      - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_edge_list_never_names_a_restricted_atom, kind: integration }
+      - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_graph_walk_prunes_and_never_walks_through_a_restricted_atom, kind: integration }

@@ -18,6 +18,10 @@ export interface ContentHeadView {
    */
   declared: boolean;
   /**
+   * true iff this peer's projection records that the election standing behind the declared HEAD is EARNED (content_store::select_canonical_winner's earned tier — a steward's earned canonical, which beats any staging declaration regardless of recency); false when no earned election is known here (a staging/unmarked election, or none recorded). A pipeline seed update can never become canonical over an earned head, so a seeder reads this and leaves stewarded atoms alone. Additive: absent from older serving nodes; a reader treats absence as not-known-earned.
+   */
+  earned: boolean;
+  /**
    * The DHT anchor for the resolved row when notarized; null when the HEAD answer rests only on a declared head with no anchor yet.
    */
   dhtAnchorHash?: string | null;
@@ -49,4 +53,8 @@ export interface ContentHeadView {
    * Epistemic status of the staging-candidate read. staged names an authoritative declaration, none is an authoritative withdrawal/absence, and unavailable means the conductor ask could not be put. Missing is an older-peer response and is not authoritative absence.
    */
   stagingCandidateState?: 'staged' | 'none' | 'unavailable' | null;
+  /**
+   * Where earned came from. Present ONLY on a live-election read (GET /db/content/{id}/head?election=live); absent on a plain read, which keeps that response identical to one from a peer that predates it. live: this peer's own conductor answered its local canonical election and earned was read from it (true when the winner is EARNED and is the declared head; an earned tier already recorded here for the same head is never lowered by a local link view lacking the earned declaration) — a live answer that finds the projection behind also heals the projection's election columns in the same request, never the head. cached: the conductor could not answer inside the read's budget (absent, errored or timed out), so earned is the projection's recorded column.
+   */
+  earnedSource?: 'live' | 'cached';
 }

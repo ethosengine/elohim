@@ -1,0 +1,350 @@
+{
+  "id": "fct-module-02-systems-thinking-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: Systems Thinking",
+  "description": "Mastery check for Module 2, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-02-systems-thinking-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which is a complex system rather than a merely complicated one?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "A watch",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q1-c0"
+                },
+                {
+                  "content": "A car engine",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q1-c1"
+                },
+                {
+                  "content": "A congregation",
+                  "correct": true,
+                  "id": "fct-module-02-systems-thinking-q1-c2"
+                },
+                {
+                  "content": "A computer",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Complicated systems have knowable rules; complex systems adapt, and prediction fails.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-quiz",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-02-systems-thinking-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "What engagement technique fits a complex system?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Sense, analyze, respond",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q2-c0"
+                },
+                {
+                  "content": "Probe, sense, respond: small experiments, watch what changes, adapt",
+                  "correct": true,
+                  "id": "fct-module-02-systems-thinking-q2-c1"
+                },
+                {
+                  "content": "Plan everything in advance, then execute",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q2-c2"
+                },
+                {
+                  "content": "Find the one part to optimize",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-quiz",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-02-systems-thinking-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "In 1 Corinthians 12, where does the health of the Body lie?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "In its strongest member",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q3-c0"
+                },
+                {
+                  "content": "In the relationships among diverse parts",
+                  "correct": true,
+                  "id": "fct-module-02-systems-thinking-q3-c1"
+                },
+                {
+                  "content": "In making every part the same",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q3-c2"
+                },
+                {
+                  "content": "In optimizing the most visible part",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-quiz",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-02-systems-thinking-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "Josiah's reform ended child sacrifice to Moloch. In systems terms, what did it change?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The hearts of each individual parent, one by one",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q4-c0"
+                },
+                {
+                  "content": "The payoffs of the game, so no one had to sacrifice to keep up",
+                  "correct": true,
+                  "id": "fct-module-02-systems-thinking-q4-c1"
+                },
+                {
+                  "content": "The laws about temple worship only",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q4-c2"
+                },
+                {
+                  "content": "Nothing structural; it was a personal example",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "A multipolar trap is one where everyone loses by playing, but anyone who stops alone loses more.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-quiz",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-02-systems-thinking-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "If our habits are fingerprints of the systems we live inside, what is the course's advice for changing a habit?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Resolve to try harder",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q5-c0"
+                },
+                {
+                  "content": "Redesign the system that produces the habit",
+                  "correct": true,
+                  "id": "fct-module-02-systems-thinking-q5-c1"
+                },
+                {
+                  "content": "Find someone to blame for it",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q5-c2"
+                },
+                {
+                  "content": "Wait for the technology to change",
+                  "correct": false,
+                  "id": "fct-module-02-systems-thinking-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-quiz",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

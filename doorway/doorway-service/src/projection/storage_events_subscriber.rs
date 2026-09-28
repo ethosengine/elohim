@@ -13,6 +13,14 @@
 //! thing, so the declared head never moved and a shell from a previous bundle
 //! era served for 15 hours.
 //!
+//! **Cache refresh** (`content.*`, `relationship.*`, the `: lagged` notice and
+//! every RE-connect): handed to the [`CacheRefresher`] when one is wired (a
+//! projection-writer doorway). It re-reads the one changed row from storage and
+//! upserts or evicts the `/api/v1/cache` projection (F22: that projection used
+//! to be filled at boot and never refreshed), and requests a reconciliation
+//! sweep whenever events may have been lost. See `cache_refresh.rs` for the
+//! reach rule, coalescing and the freshness bound.
+//!
 //! **Projection events** (`projection.registered` / `projection.revoked`):
 //! Re-fetches the active project-epr commitment set — through the SAME pool-fallback
 //! resilience `main.rs`'s periodic `DOORWAY_EPR_REFRESH_SECS` task uses
@@ -59,6 +67,7 @@ use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
 use crate::cache::AppFileCacheService;
+use crate::projection::cache_refresh::CacheRefresher;
 use crate::projection::{fetch_projections_with_fallback, EprRouter, FallbackInstallOutcome};
 use crate::render::bundle_heads::BundleHeadsReconciler;
 
@@ -80,12 +89,15 @@ use crate::render::bundle_heads::BundleHeadsReconciler;
 ///   `EprRouter::install_from_fallback`'s doc) on projection.{registered,revoked}
 /// - `doorway_id`: passed to `fetch_projections_with_fallback` for the
 ///   re-fetch that follows a projection event
+/// - `cache_refresher`: refreshes the `/api/v1/cache` projection on content and
+///   relationship events; `None` on a read-replica doorway (no projection writes)
 pub fn spawn_subscriber_task(
     storage_pool_urls: Vec<String>,
     doorway_id: String,
     app_file_cache: Option<Arc<AppFileCacheService>>,
     epr_router: Arc<EprRouter>,
     bundle_heads: Option<Arc<BundleHeadsReconciler>>,
+    cache_refresher: Option<Arc<CacheRefresher>>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let Some(storage_url) = storage_pool_urls.first().cloned() else {
@@ -108,6 +120,9 @@ pub fn spawn_subscriber_task(
         // storage/LB that answers 200 and closes immediately must escalate,
         // not hot-loop (clean close used to reconnect with zero delay).
         let stable_stream = Duration::from_secs(10);
+        // The first connect follows the boot warm-up, which already streamed the
+        // whole cacheable set; every LATER connect may have missed events.
+        let mut connected_before = false;
 
         loop {
             let stream_start = std::time::Instant::now();
@@ -118,6 +133,8 @@ pub fn spawn_subscriber_task(
                 app_file_cache.as_ref(),
                 &epr_router,
                 bundle_heads.as_ref(),
+                cache_refresher.as_ref(),
+                &mut connected_before,
                 &http,
             )
             .await;
@@ -151,6 +168,10 @@ pub fn spawn_subscriber_task(
 }
 
 /// Inner subscriber loop. Connects, tails events, returns on disconnect.
+///
+/// `connected_before` is set on the first successful connect; a connect that
+/// finds it already set asks the cache refresher for a reconciliation sweep —
+/// events emitted while the stream was down are gone.
 #[allow(clippy::too_many_arguments)]
 async fn run_subscriber(
     url: &str,
@@ -159,6 +180,8 @@ async fn run_subscriber(
     app_file_cache: Option<&Arc<AppFileCacheService>>,
     epr_router: &EprRouter,
     bundle_heads: Option<&Arc<BundleHeadsReconciler>>,
+    cache_refresher: Option<&Arc<CacheRefresher>>,
+    connected_before: &mut bool,
     http: &reqwest::Client,
 ) -> Result<(), String> {
     // No top-level timeout — this is a long-lived stream. The reqwest body
@@ -186,6 +209,14 @@ async fn run_subscriber(
     // seed. Re-syncing here makes the subscriber self-healing: any missed
     // projection event is recovered on the next reconnect.
     sync_router_from_storage(pool_urls, doorway_id, epr_router, http, "connect").await;
+
+    // Same gap for the /api/v1/cache projection: a RE-connect means content
+    // events may have been missed, so reconcile it (coalesced, rate-limited).
+    if std::mem::replace(connected_before, true) {
+        if let Some(refresher) = cache_refresher {
+            refresher.request_sweep();
+        }
+    }
 
     let mut byte_stream = response.bytes_stream();
     let mut line_buffer = String::new();
@@ -217,6 +248,7 @@ async fn run_subscriber(
                         app_file_cache,
                         epr_router,
                         bundle_heads,
+                        cache_refresher,
                         http,
                     )
                     .await;
@@ -225,8 +257,19 @@ async fn run_subscriber(
                 current_event_type = Some(rest.trim().to_string());
             } else if let Some(rest) = line.strip_prefix("data:") {
                 current_event_data = Some(rest.trim().to_string());
-            } else if line.starts_with(':') {
-                // SSE comment (heartbeat) — ignore
+            } else if let Some(comment) = line.strip_prefix(':') {
+                // SSE comment. A heartbeat is ignored; storage's
+                // `: lagged, skipped N events` means this subscriber fell behind
+                // the broadcast and events are gone — reconcile the cache.
+                if comment.trim_start().starts_with("lagged") {
+                    warn!(
+                        notice = %comment.trim(),
+                        "storage_events_subscriber: storage reports dropped events"
+                    );
+                    if let Some(refresher) = cache_refresher {
+                        refresher.request_sweep();
+                    }
+                }
             }
             // Unknown lines silently ignored (per SSE spec)
         }
@@ -335,8 +378,15 @@ async fn handle_event(
     app_file_cache: Option<&Arc<AppFileCacheService>>,
     epr_router: &EprRouter,
     bundle_heads: Option<&Arc<BundleHeadsReconciler>>,
+    cache_refresher: Option<&Arc<CacheRefresher>>,
     http: &reqwest::Client,
 ) {
+    // The /api/v1/cache projection: non-blocking enqueue (the refresher's own
+    // worker reads storage), so it never stalls this SSE loop.
+    let cache_consumed = cache_refresher
+        .map(|r| r.on_storage_event(event_type, event_data))
+        .unwrap_or(false);
+
     match event_type {
         "content.created" | "content.updated" | "content.deleted" => {
             // The cache surface that matters for /apps/{slug} is keyed by
@@ -414,10 +464,12 @@ async fn handle_event(
         }
 
         _ => {
-            debug!(
-                event_type = %event_type,
-                "storage_events_subscriber: skipping unhandled event kind"
-            );
+            if !cache_consumed {
+                debug!(
+                    event_type = %event_type,
+                    "storage_events_subscriber: skipping unhandled event kind"
+                );
+            }
         }
     }
 }
@@ -479,8 +531,14 @@ mod tests {
         // The spawned task should return without panicking when the storage pool
         // is empty — covers the "no peer configured" startup case.
         let router = Arc::new(EprRouter::new());
-        let handle =
-            spawn_subscriber_task(Vec::new(), "doorway:test".to_string(), None, router, None);
+        let handle = spawn_subscriber_task(
+            Vec::new(),
+            "doorway:test".to_string(),
+            None,
+            router,
+            None,
+            None,
+        );
         // Task should complete (return) — give it a generous timeout in
         // case the runtime is slow.
         let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
@@ -576,6 +634,7 @@ mod tests {
 
         let events_url = format!("{}/api/v1/events", server.uri());
         let pool = vec![server.uri()];
+        let mut connected_before = false;
         let result = run_subscriber(
             &events_url,
             &pool,
@@ -583,6 +642,8 @@ mod tests {
             None,
             &router,
             None,
+            None,
+            &mut connected_before,
             &http,
         )
         .await;
@@ -593,6 +654,118 @@ mod tests {
             .dispatch_any_host("/lamad")
             .expect("router must be populated by on-connect re-sync (no event was sent)");
         assert_eq!(hit.epr_id, "lamad-spa");
+    }
+
+    /// F22 through the real SSE loop: a `content.updated` event reaches the
+    /// cache refresher and the cached copy is replaced; a `: lagged` notice
+    /// (storage dropped events for this subscriber) requests a sweep.
+    #[tokio::test]
+    async fn run_subscriber_refreshes_the_projection_cache_on_content_updated() {
+        use crate::projection::{ProjectedDocument, ProjectionConfig, ProjectionStore};
+        use wiremock::matchers::{method, path, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/events"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/event-stream")
+                    .set_body_string(
+                        ": heartbeat\n\n\
+                         event: content.updated\nid: 7\ndata: {\"id\":\"fct\"}\n\n\
+                         : lagged, skipped 3 events\n\n",
+                    ),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/db/rea_commitments"))
+            .and(query_param("action", "project-epr"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(Vec::<elohim_views::projection::EprProjectionView>::new()),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/db/content/fct"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({ "id": "fct", "title": "Five movements", "reach": "commons" }),
+            ))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/db/relationships"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "items": [] })),
+            )
+            .mount(&server)
+            .await;
+
+        let store = Arc::new(ProjectionStore::memory_only(ProjectionConfig::default()));
+        store
+            .set(ProjectedDocument::new(
+                "Content",
+                "fct",
+                "cache-stream",
+                "cache-stream",
+                serde_json::json!({ "id": "fct", "title": "Six chapters", "reach": "commons" }),
+            ))
+            .await
+            .unwrap();
+        let refresher = Arc::new(CacheRefresher::new(Arc::clone(&store), server.uri()));
+
+        let router = EprRouter::new();
+        let http = reqwest::Client::new();
+        let events_url = format!("{}/api/v1/events", server.uri());
+        let pool = vec![server.uri()];
+        let mut connected_before = false;
+        let result = run_subscriber(
+            &events_url,
+            &pool,
+            "doorway:test",
+            None,
+            &router,
+            None,
+            Some(&refresher),
+            &mut connected_before,
+            &http,
+        )
+        .await;
+        assert!(result.is_ok(), "subscriber should end cleanly: {result:?}");
+        assert!(connected_before, "the first connect is recorded");
+        assert_eq!(
+            refresher.pending_len(),
+            1,
+            "the update is queued, not read inline"
+        );
+        assert_eq!(
+            refresher.stats().sweep_requests,
+            1,
+            "the lagged notice requests a sweep; the first connect does not"
+        );
+
+        refresher.drain_once().await;
+        let doc = store.get("Content", "fct").await.expect("still cached");
+        assert_eq!(doc.data["title"], "Five movements");
+
+        // A RE-connect: events emitted while the stream was down are gone, so
+        // the reconnect itself requests a sweep (plus this body's lagged notice).
+        run_subscriber(
+            &events_url,
+            &pool,
+            "doorway:test",
+            None,
+            &router,
+            None,
+            Some(&refresher),
+            &mut connected_before,
+            &http,
+        )
+        .await
+        .unwrap();
+        assert_eq!(refresher.stats().sweep_requests, 3);
     }
 
     /// The fix itself: a `projection.revoked`-armed shield must survive into

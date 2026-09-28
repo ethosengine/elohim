@@ -1,0 +1,104 @@
+{
+  "id": "fct-module-02-systems-thinking-reflection",
+  "contentType": "assessment",
+  "title": "One habit, one system",
+  "description": "Name one of your own habits with technology. What system produces it (incentives, defaults, the people around you)? Describe one change to that system, not to your willpower, that would make a different habit the easy one.",
+  "content": [
+    {
+      "id": "fct-module-02-systems-thinking-reflection",
+      "purpose": "reflection",
+      "content": {
+        "content": "[[☃ free-response 1]]",
+        "images": {},
+        "widgets": {
+          "free-response 1": {
+            "type": "free-response",
+            "options": {
+              "allowUnlimitedCharacters": false,
+              "characterLimit": 1500,
+              "placeholder": "",
+              "question": "Name one of your own habits with technology. What system produces it (incentives, defaults, the people around you)? Describe one change to that system, not to your willpower, that would make a different habit the easy one.",
+              "scoringCriteria": [
+                {
+                  "text": "Names a specific habit"
+                },
+                {
+                  "text": "Identifies what in the surrounding system produces it"
+                },
+                {
+                  "text": "Proposes a change to the system rather than a resolution to try harder"
+                }
+              ]
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "fct-module-02-systems-thinking-reflection",
+        "assessesContentId": "fct-module-02-systems-thinking",
+        "bloomsLevel": "create",
+        "estimatedTimeSeconds": 600,
+        "questionType": "open-response",
+        "tags": [
+          "fct",
+          "reflection"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "reflection"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "reflection",
+    "assessmentType": "reflection",
+    "questionCount": 1
+  },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "VALIDATES",
+      "role": "reflection"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "reflection"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

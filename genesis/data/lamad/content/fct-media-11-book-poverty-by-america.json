@@ -1,6 +1,7 @@
 {
   "id": "fct-media-11-book-poverty-by-america",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "Poverty, by America",
   "description": "Book by Matthew Desmond",
   "content": "# Poverty, by America\n\n**Author:** Matthew Desmond\n**Format:** book",

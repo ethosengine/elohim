@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-02-systems-thinking-lane-tech-workers",
+  "contentType": "practice",
+  "title": "Tech workers: Systems Thinking",
+  "description": "Tech workers  Practice moving between parts and whole: this week, map how one feature, algorithm, or metric you own affects users' wider lives and communities — the relationship work that simple metrics never capture.",
+  "content": "## Tech workers\n\nPractice moving between parts and whole: this week, map how one feature, algorithm, or metric you own affects users' wider lives and communities — the relationship work that simple metrics never capture. Consider whether investigating those relationships should become a formal part of your role, and remember James Clear's principle (*Atomic Habits*, on tomorrow's shelf): outcomes follow systems, not intentions — so design the system that makes the good outcome natural.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "practice-lane",
+    "audience": "tech-workers"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

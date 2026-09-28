@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-01-church-dilemma-homework",
+  "contentType": "practice",
+  "title": "Homework: The Church Dilemma",
+  "description": "Homework  Watch The Social Dilemma (2020, 1:34) if not screened in class, and create your account at the Foundations of Humane Technology course — orientation only.",
+  "content": "## Homework\n\nWatch *The Social Dilemma* (2020, 1:34) if not screened in class, and create your account at the Foundations of Humane Technology course — orientation only. One assignment; come ready to see systems.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

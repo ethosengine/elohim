@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-book-the-death-of-experti",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "The Death of Expertise",
   "description": "Book by Tom Nichols",
   "content": "# The Death of Expertise\n\n**Author:** Tom Nichols\n**Format:** book",

@@ -1,38 +1,79 @@
 {
   "id": "fct-module-04-scaling-wisdom-application",
-  "contentType": "exercise",
-  "title": "Application: Setting the Stage: Scaling Wisdom",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** \\* We need to hold ourselves as an institution to a higher standard than is minimally required by law, especially in areas where we are found to be lacking, sexual misconduct, tax-law, equity and inclusion (both racial and class) .. (any others?)  Doing more than what's minimially required with boldness gives institutions opportunities to build trust. \n\n\\* Churches need to prioritize highly accurate, authentic, and meaningful communication as a discipline (not one minister's job), that everyone is a participant. What technology we use to do to facilitate that should help us have complex face-to-face encounters, and increase collaborative opporutinties.   \n If you are a ministry leader, there needs to be obvious ways to create a story, have it reviewed, and get it published. There needs to be a clarity in the process and a strong incentive for people to participate and be heard. \n\n\\*  Churches needs to priritize complex interactions:    \n    \\-  Accessible and dynamic in-person small group networks need robust platform support for Discoverability, Scheduling, and Invitation.  \n    \\- Transition times between Service and Class aren't just dead space, these are KEY invatational moments to build REAL community, Extend     these times, inviting SPACES for people to enter into deeper conversation.  Extend the pick-up times for Childrens misintry, release kids to the playground.   \n    \\-  Prioritize high-quality meals at the building that would incentivize people to stay for lunch and provide flexibility for childcare.    \n\nWisdom Amplification Systems: Design platforms that don't just inform, but help users develop discernment. This could involve AI-assisted analysis tools that guide users through critical thinking processes, echoing Proverbs 4:7: \"The beginning of wisdom is this: Get wisdom.\"  \nCollaborative Discernment Mechanisms: Create systems that facilitate group decision-making processes based on biblical principles. This could include digital spaces for communal prayer, reflection, and discussion, embodying James 1:5: \"If any of you lacks wisdom, you should ask God.\"  \nEthical Impact Visualization: Develop tools that help users see the long-term consequences of their digital actions, fostering a sense of ethical responsibility. This aligns with Galatians 6:7: \"A man reaps what he sows.\"  \nWisdom Distribution Networks: Design algorithms that prioritize the spread of wise counsel and thoughtful reflection over mere viral content, inspired by Proverbs 15:31: \"Whoever heeds life-giving correction will be at home among the wise.\"  \nStewardship-Centered UX: Create user experiences that encourage mindful use of time and attention, helping users grow in digital stewardship. This embodies 1 Peter 4:10: \"Each of you should use whatever gift you have received to serve others.\"\n\nActionable Steps for Scaling Wisdom\n\nImplement Reflection Prompts: Integrate moments of pause and reflection into user flows, encouraging thoughtful engagement rather than mindless scrolling.  \nDevelop Wisdom Metrics: Create new metrics that measure growth in discernment and wise decision-making, not just engagement or time spent.  \nDesign for Diverse Insights: Build systems that intentionally expose users to diverse perspectives, fostering a more comprehensive understanding of complex issues.  \nCreate Ethical Sandboxes: Develop safe spaces within platforms where users can explore the consequences of their digital actions without real-world repercussions.  \nImplement Wisdom-Sharing Features: Design tools that make it easy for users to share insights and life lessons, creating a crowd-sourced wisdom repository.  \nBuild Digital Discipleship Tools: Create features that support mentorship and discipleship relationships, scaling personal growth through technology.  \nIntegrate Scripture-Based Guidance: Develop AI systems that can offer relevant biblical wisdom in response to user queries or situations.\n\nAs we apply these principles, let us be guided by Colossians 3:16-17: \"Let the message of Christ dwell among you richly as you teach and admonish one another with all wisdom... And whatever you do, whether in word or deed, do it all in the name of the Lord Jesus, giving thanks to God the Father through him.\"  \nOur calling as Christian technologists is not just to create efficient systems, but to design digital ecosystems that cultivate and scale godly wisdom. By integrating these principles into our work, we can leverage technology to amplify biblical insights, foster discernment, and guide users towards Christ-like decision making. In doing so, we participate in God's redemptive work, transforming our digital landscapes into spaces where wisdom flourishes and communities are built up in faith and understanding.\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: The Wisdom Gap & the Conditions for Trust",
+  "description": "Application — Three Lanes  - Tech workers: Sketch one wisdom amplification feature for something you build — reflection prompts that interrupt mindless flows, metrics that measure discernment rather than time-on-site, designs that surface d",
+  "content": "## Application — Three Lanes\n\n- **Tech workers:** Sketch one *wisdom amplification* feature for something you build — reflection prompts that interrupt mindless flows, metrics that measure discernment rather than time-on-site, designs that surface diverse perspectives, or tools that make consequences visible before actions are taken (Galatians 6:7). Bring the sketch to Module 8, where values get centered formally.\n- **Households:** Audit your home against the three trust conditions. Repeat interactions: is there a daily table, a weekly ritual? Win-wins: do chores and decisions have a shape where everyone can gain? Low miscommunication: is there a regular, unhurried time when misunderstandings get repaired? Choose the weakest condition and strengthen it this week.\n- **Church leaders:** Redesign the game board, not the players. Treat communication as a whole-body discipline with a clear path for anyone to create, review, and publish a story — not one minister's job. Give small groups real platform support for discoverability, scheduling, and invitation. Treat transition times between services and classes as key invitational moments — extend them, extend children's pick-up, release kids to the playground. Prioritize high-quality communal meals that make staying easy and childcare flexible. Each of these is one of the three trust conditions made concrete. *(The institutional-standards material — exceeding legal minimums on misconduct, tax, and equity — now lives in Module 7 as binding scale to responsibility.)*",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "setting-stage"
-  ],
-  "relatedNodeIds": [
-    "fct-module-04-scaling-wisdom"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-04-scaling-wisdom",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.196740",
-  "updatedAt": "2025-12-26T21:04:01.828Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: Setting the Stage: Scaling Wisdom",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: Setting the Stage: Scaling Wisdom - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -47,17 +88,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

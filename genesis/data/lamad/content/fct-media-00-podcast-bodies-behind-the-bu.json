@@ -1,6 +1,7 @@
 {
   "id": "fct-media-00-podcast-bodies-behind-the-bu",
-  "contentType": "collective",
+  "contentType": "podcast",
+  "reach": "commons",
   "title": "Bodies Behind the Bus",
   "description": "Podcast recommended in FCT Module 1",
   "content": "# Bodies Behind the Bus\n",

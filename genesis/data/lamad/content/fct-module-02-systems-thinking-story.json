@@ -1,39 +1,59 @@
 {
   "id": "fct-module-02-systems-thinking-story",
-  "contentType": "example",
-  "title": "Multipolar Trap Analysis:",
-  "description": "Biblical story or example illustrating module concepts",
-  "content": "**Narrative:** Multipolar Trap Analysis:\n\nIn a multipolar trap, multiple parties may find themselves in a situation where, despite a mutual preference for a better collective outcome, they end up in a worse equilibrium because unilateral deviation results in individual disadvantage. The practice of sacrificing to Moloch can be seen as such a trap for several reasons:\n\nSocial and Religious Pressure: The continuation of child sacrifice could have been driven by intense social, religious, and possibly economic pressures, where individuals felt compelled to conform to maintain favor with the deity, ensure fertility, prosperity, or avoid societal ostracization.\n\nCollective Action Problem: Even if many individuals within the society recognized the moral reprehensibility of the practice, the belief that their unilateral cessation would not affect the deity's favor (or the societal norms) without a collective agreement to stop could perpetuate the practice.\n\nStrategic Signaling: Participating in the sacrifices might have been a way for individuals to signal loyalty to the prevailing social and religious order, a concept in game theory known as signaling. Not participating could signal disloyalty or disbelief, potentially leading to social costs.\n\nKing Josiah's reforms, including the action against the site of Moloch worship, represent an authoritative intervention to shift the equilibrium from a suboptimal to a more moral and sustainable one. By desecrating Topheth, Josiah not only physically prevented the continuation of sacrifices but also symbolically broke the cycle of the multipolar trap. This act could be seen as an imposition of a top-down solution to a collective action problem, where the king uses his authority to enforce a societal change that individual actors found difficult to achieve due to the existing pressures and incentives.\n\nIn modern terms, escaping a multipolar trap often requires a change in the payoff structure of the game, such that the incentives for detrimental actions are removed or significantly reduced. Josiah's reforms could be interpreted as an effort to change the incentives and beliefs that underpinned the sacrificial practices, thereby realigning societal values towards more humane and ethical behaviors.\n**NarrativeType:** biblical-example",
+  "contentType": "article",
+  "title": "Story: Josiah and the Trap of Moloch",
+  "description": "Josiah and the Trap of Moloch  2 Kings 23:10 records Josiah desecrating Topheth \"so no one could use it to sacrifice their son or daughter in the fire to Molek.\" Read as a multipolar trap: many families likely knew the practice was abominab",
+  "content": "## Josiah and the Trap of Moloch\n\n2 Kings 23:10 records Josiah desecrating Topheth \"so no one could use it to sacrifice their son or daughter in the fire to Molek.\" Read as a multipolar trap: many families likely knew the practice was abominable, yet social and religious pressure, the fear of losing the deity's favor, and the signaling cost of non-participation held the equilibrium in place. No family could unilaterally defect without paying a price, so a society continued doing what perhaps few of its members individually wanted. Josiah's reform broke the trap by changing the game itself — destroying the altar removed the option, and the public, top-down act reset what participation signaled. The application writes itself: our era has its own altars where children are fed to systems nobody individually chose — and escaping such traps requires changing payoff structures, not just persuading individuals. Sometimes that is regulation; sometimes it is a community, like the church, agreeing to defect *together*.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 2 - Systems Thinking.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
   "tags": [
-    "story",
-    "narrative",
     "fct",
-    "biblical-example",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-02-systems-thinking"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "story"
   ],
   "metadata": {
-    "category": "fct-narrative",
-    "sourceModule": "fct-module-02-systems-thinking",
-    "originalContentType": "narrative"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "story"
   },
+  "relationships": [
+    {
+      "target": "fct-bible-2-kings-23-10",
+      "type": "REFERENCES",
+      "role": "story-text"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "story"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.195290",
-  "updatedAt": "2025-12-26T21:04:01.827Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Multipolar Trap Analysis:",
-    "ogDescription": "Biblical story or example illustrating module concepts",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-02-systems-thinking-story",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
-    "ogImageAlt": "Multipolar Trap Analysis: - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +68,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

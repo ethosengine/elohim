@@ -1854,8 +1854,15 @@ impl HttpServer {
     /// Run the HTTP server
     pub async fn run(self: Arc<Self>) -> Result<(), StorageError> {
         let listener = TcpListener::bind(self.bind_addr).await?;
+        self.serve(listener).await
+    }
+
+    /// Serve HTTP on an already-bound listener — the whole production request
+    /// path. `run` binds `bind_addr` and calls this; integration tests bind
+    /// `127.0.0.1:0`, read the port, and drive the real routes over HTTP.
+    pub async fn serve(self: Arc<Self>, listener: TcpListener) -> Result<(), StorageError> {
         info!(
-            addr = %self.bind_addr,
+            addr = ?listener.local_addr().ok(),
             max_concurrent = MAX_CONCURRENT_REQUESTS,
             "HTTP server listening"
         );
@@ -7189,6 +7196,22 @@ impl HttpServer {
             return self.handle_did_resolution(method, did_str).await;
         }
 
+        // READ REACH GATE — one gate for every GET that reveals a content atom
+        // or its edges (body, /head, /head-record, /schedule, relationships of
+        // / graph from / a single edge by its source). Applied before routing
+        // so a sibling route born under `content/{id}/…` is gated by
+        // construction. See `api::content_reach_gate`.
+        if method == Method::GET {
+            if let Some(refusal) = self.gated_read_refusal(
+                resource_path,
+                req.uri().query().unwrap_or(""),
+                &req,
+                &app_ctx,
+            )? {
+                return Ok(refusal);
+            }
+        }
+
         if resource_path == "content" {
             return self.handle_db_content_list(req, method).await;
         }
@@ -8535,7 +8558,35 @@ impl HttpServer {
         Option<String>,
         elohim_views::lamad::StagingCandidateState,
     ) {
-        use elohim_views::lamad::StagingCandidateState;
+        let deadline =
+            tokio::time::Instant::now() + crate::services::live_earned::LIVE_ELECTION_BUDGET;
+        let (hc, election) = self.ask_local_election(content_id, deadline).await;
+        self.staging_candidate_from_election(
+            hc.as_ref(),
+            content_id,
+            projected_head_action,
+            &election,
+            deadline,
+        )
+        .await
+    }
+
+    /// Put the ONE local-election ask a `/head` read makes for `content_id`
+    /// (`resolve_canonical_election` — local canonical-head links only, see
+    /// [`Self::resolve_staging_candidate`]), waiting no longer than `deadline`.
+    ///
+    /// Shared by the staging-candidate read and the live earned answer
+    /// (`?election=live`), so a live read of an unbound slug costs no second
+    /// conductor call. Returns the client too, for the candidate's blob ask.
+    async fn ask_local_election(
+        &self,
+        content_id: &str,
+        deadline: tokio::time::Instant,
+    ) -> (
+        Option<Arc<crate::hc_client::HcClient>>,
+        crate::services::live_earned::LocalElection,
+    ) {
+        use crate::services::live_earned::{ElectionUnavailable, LocalElection};
 
         let client_started = tokio::time::Instant::now();
         let Some(hc) = self
@@ -8549,76 +8600,147 @@ impl HttpServer {
                 elapsed_ms = client_started.elapsed().as_millis(),
                 "head read: candidate role client is unavailable"
             );
-            return (None, None, StagingCandidateState::Unavailable);
+            return (
+                None,
+                LocalElection::Unavailable(ElectionUnavailable::NoClient),
+            );
         };
         let started = tokio::time::Instant::now();
-        let deadline = started + std::time::Duration::from_secs(2);
         let read =
             crate::services::conductor_writes::call_resolve_canonical_election(&hc, content_id);
-        match tokio::time::timeout_at(deadline, read).await {
-            Ok(Ok(election)) => {
-                debug!(
-                    phase = "election",
-                    outcome = if election.is_some() {
-                        "ok_some"
-                    } else {
-                        "ok_none"
-                    },
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "candidate-head resolution phase"
-                );
-                let candidate = match staging_candidate_for_projected_head(
-                    projected_head_action,
-                    election,
-                ) {
-                    Ok(candidate) => candidate,
-                    Err(_actual_winner) => {
-                        warn!(
-                            phase = "election_binding",
-                            outcome = "winner_mismatch",
-                            elapsed_ms = started.elapsed().as_millis(),
-                            remaining_ms = candidate_head_remaining_ms(deadline),
-                            "head read: local election winner differs from projected head — reporting unavailable"
-                        );
-                        return (None, None, StagingCandidateState::Unavailable);
-                    }
-                };
-                let blob = match candidate.as_deref() {
-                    Some(action) => {
-                        self.resolve_exact_candidate_blob(&hc, content_id, action, deadline)
-                            .await
-                    }
-                    None => None,
-                };
-                let state = if candidate.is_some() {
-                    StagingCandidateState::Staged
+        let election = crate::services::live_earned::ask_local_election_with(read, deadline).await;
+        match &election {
+            LocalElection::Answered(answer) => debug!(
+                phase = "election",
+                outcome = if answer.is_some() {
+                    "ok_some"
                 } else {
-                    StagingCandidateState::None
-                };
-                (candidate, blob, state)
-            }
-            Ok(Err(_error)) => {
+                    "ok_none"
+                },
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "candidate-head resolution phase"
+            ),
+            LocalElection::Unavailable(ElectionUnavailable::Deadline) => warn!(
+                phase = "election",
+                outcome = "deadline",
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: local election ask timed out — reporting unavailable"
+            ),
+            LocalElection::Unavailable(_) => warn!(
+                phase = "election",
+                outcome = "error",
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: local election ask failed — reporting unavailable"
+            ),
+        }
+        (Some(hc), election)
+    }
+
+    /// The staging candidate beneath the projected head, derived from an
+    /// already-put local-election ask. An unanswered ask is `Unavailable`; a
+    /// winner other than the projected head is `Unavailable` too (the
+    /// candidate belongs to a head this row does not serve).
+    async fn staging_candidate_from_election(
+        &self,
+        hc: Option<&Arc<crate::hc_client::HcClient>>,
+        content_id: &str,
+        projected_head_action: &str,
+        election: &crate::services::live_earned::LocalElection,
+        deadline: tokio::time::Instant,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        elohim_views::lamad::StagingCandidateState,
+    ) {
+        use elohim_views::lamad::StagingCandidateState;
+
+        let (Some(hc), crate::services::live_earned::LocalElection::Answered(election)) =
+            (hc, election)
+        else {
+            return (None, None, StagingCandidateState::Unavailable);
+        };
+        let candidate = match staging_candidate_for_projected_head(
+            projected_head_action,
+            election.clone(),
+        ) {
+            Ok(candidate) => candidate,
+            Err(_actual_winner) => {
                 warn!(
-                    phase = "election",
-                    outcome = "error",
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: staging-candidate ask failed — reporting unavailable"
-                );
-                (None, None, StagingCandidateState::Unavailable)
+                        phase = "election_binding",
+                        outcome = "winner_mismatch",
+                        remaining_ms = candidate_head_remaining_ms(deadline),
+                        "head read: local election winner differs from projected head — reporting unavailable"
+                    );
+                return (None, None, StagingCandidateState::Unavailable);
             }
-            Err(_) => {
-                warn!(
-                    phase = "election",
-                    outcome = "deadline",
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: staging-candidate ask timed out — reporting unavailable"
-                );
-                (None, None, StagingCandidateState::Unavailable)
+        };
+        let blob = match candidate.as_deref() {
+            Some(action) => {
+                self.resolve_exact_candidate_blob(hc, content_id, action, deadline)
+                    .await
+            }
+            None => None,
+        };
+        let state = if candidate.is_some() {
+            StagingCandidateState::Staged
+        } else {
+            StagingCandidateState::None
+        };
+        (candidate, blob, state)
+    }
+
+    /// Answer `earned` from this peer's own conductor (`?election=live`, F26)
+    /// and heal a `canonical_earned` column the answer proves behind — see
+    /// [`crate::services::live_earned`]. The heal is best-effort: a failed
+    /// write is logged and the read still answers from the live election.
+    fn apply_live_earned(
+        &self,
+        mut view: elohim_views::ContentHeadView,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+        election: &crate::services::live_earned::LocalElection,
+    ) -> elohim_views::ContentHeadView {
+        use crate::services::live_earned::{heal_behind_column, live_earned_verdict};
+
+        let verdict = live_earned_verdict(&view.head_action_hash, view.earned, election);
+        if verdict.heal.is_some() {
+            let healed = self
+                .db_pool
+                .as_ref()
+                .ok_or_else(|| StorageError::Internal("Database pool not available".into()))
+                .and_then(|pool| {
+                    pool.get().map_err(|e| {
+                        StorageError::Internal(format!("Failed to get connection: {e}"))
+                    })
+                })
+                .and_then(|mut conn| {
+                    heal_behind_column(
+                        &mut conn,
+                        app_ctx,
+                        content_id,
+                        &view.head_action_hash,
+                        &verdict,
+                    )
+                });
+            match healed {
+                Ok(outcome) => info!(
+                    content_id = %content_id,
+                    outcome = ?outcome,
+                    "head read: live election proves an earned head the projection did not record"
+                ),
+                Err(e) => warn!(
+                    content_id = %content_id,
+                    error = %e,
+                    "head read: live earned election could not be recorded — answering live anyway"
+                ),
             }
         }
+        view.earned = verdict.earned;
+        view.earned_source = Some(verdict.source);
+        view
     }
 
     /// **Slice 2 (N4).** The candidate of a slug bound to a release channel —
@@ -8878,6 +9000,12 @@ impl HttpServer {
 
         match method {
             Method::GET => {
+                // `?election=live` (F26): answer `earned` from this peer's own
+                // conductor election rather than the projection's column alone.
+                let live_election = req.uri().query().is_some_and(|query| {
+                    url::form_urlencoded::parse(query.as_bytes())
+                        .any(|(key, value)| key == "election" && value == "live")
+                });
                 // Internal read (Invisible): the notary answer is authority data —
                 // surface it regardless of serving trust tier, then let `trust`
                 // label it honestly.
@@ -8919,27 +9047,78 @@ impl HttpServer {
                                 crate::services::head_adoption::bound_release_channel(
                                     cwt.content.metadata_json.as_deref(),
                                 );
-                            let (candidate, candidate_blob, candidate_state) = match bound_channel {
-                                Some(channel) => {
-                                    self.resolve_bound_slug_candidate(&channel, content_id)
+                            //
+                            // `?election=live` reuses the unbound read's ONE
+                            // election ask for `earned`; a bound slug's
+                            // candidate comes from its channel's election, so
+                            // its own is asked alongside (concurrently, same
+                            // 2 s budget) — never a second ask of the same one.
+                            let live_deadline = tokio::time::Instant::now()
+                                + crate::services::live_earned::LIVE_ELECTION_BUDGET;
+                            let (live, (candidate, candidate_blob, candidate_state)) =
+                                match (bound_channel, live_election) {
+                                    (Some(channel), false) => (
+                                        None,
+                                        self.resolve_bound_slug_candidate(&channel, content_id)
+                                            .instrument(span)
+                                            .await,
+                                    ),
+                                    (Some(channel), true) => {
+                                        let ((_, own), bound) = async {
+                                            tokio::join!(
+                                                self.ask_local_election(content_id, live_deadline),
+                                                self.resolve_bound_slug_candidate(
+                                                    &channel, content_id
+                                                ),
+                                            )
+                                        }
+                                        .instrument(span)
+                                        .await;
+                                        (Some(own), bound)
+                                    }
+                                    (None, false) => (
+                                        None,
+                                        self.resolve_staging_candidate(
+                                            content_id,
+                                            &view.head_action_hash,
+                                        )
+                                        .instrument(span)
+                                        .await,
+                                    ),
+                                    (None, true) => {
+                                        let head = view.head_action_hash.clone();
+                                        async {
+                                            let (hc, own) = self
+                                                .ask_local_election(content_id, live_deadline)
+                                                .await;
+                                            let staged = self
+                                                .staging_candidate_from_election(
+                                                    hc.as_ref(),
+                                                    content_id,
+                                                    &head,
+                                                    &own,
+                                                    live_deadline,
+                                                )
+                                                .await;
+                                            (Some(own), staged)
+                                        }
                                         .instrument(span)
                                         .await
-                                }
-                                None => {
-                                    self.resolve_staging_candidate(
-                                        content_id,
-                                        &view.head_action_hash,
-                                    )
-                                    .instrument(span)
-                                    .await
-                                }
-                            };
-                            Ok(response::ok(&crate::views::with_staging_candidate(
+                                    }
+                                };
+                            let view = crate::views::with_staging_candidate(
                                 view,
                                 candidate,
                                 candidate_blob,
                                 candidate_state,
-                            )))
+                            );
+                            let view = match live {
+                                Some(election) => {
+                                    self.apply_live_earned(view, content_id, app_ctx, &election)
+                                }
+                                None => view,
+                            };
+                            Ok(response::ok(&view))
                         }
                         // Honest: the row exists but the notary holds no HEAD for it.
                         None => Ok(response::not_found(
@@ -9253,15 +9432,23 @@ impl HttpServer {
             .content_size_bytes
             .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
         let patch = db::content_diesel::ContentProjectionPatch {
-            blob_cid: content.blob_cid,
+            blob_cid: content.blob_cid.clone(),
             content_size_bytes: size_i32,
             title: Some(content.title),
             description: Some(content.description),
             content_type: Some(content.content_type),
             content_format: Some(content.content_format),
             reach: Some(content.reach),
-            metadata_json: Some(content.metadata_json),
-        };
+            metadata_json: Some(content.metadata_json.clone()),
+            ..Default::default()
+        }
+        .carry_verified_version(
+            &content.id,
+            &content.content,
+            content.blob_cid.as_deref(),
+            &content.tags,
+            &content.metadata_json,
+        );
         let stamp = match stamp_policy {
             HeadDeclareStampPolicy::Canonical(ordering) => {
                 db::content_diesel::stamp_declared_head_mode(
@@ -9481,15 +9668,23 @@ impl HttpServer {
             .content_size_bytes
             .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
         let patch = db::content_diesel::ContentProjectionPatch {
-            blob_cid: content.blob_cid,
+            blob_cid: content.blob_cid.clone(),
             content_size_bytes: size_i32,
             title: Some(content.title),
             description: Some(content.description),
             content_type: Some(content.content_type),
             content_format: Some(content.content_format),
             reach: Some(content.reach),
-            metadata_json: Some(content.metadata_json),
-        };
+            metadata_json: Some(content.metadata_json.clone()),
+            ..Default::default()
+        }
+        .carry_verified_version(
+            &content.id,
+            &content.content,
+            content.blob_cid.as_deref(),
+            &content.tags,
+            &content.metadata_json,
+        );
         let stamp = db::content_diesel::stamp_declared_head_mode(
             &mut conn,
             app_ctx,
@@ -9724,6 +9919,48 @@ impl HttpServer {
         }
     }
 
+    /// The read reach gate (see `api::content_reach_gate`): the refusal for a
+    /// GET that reveals a content atom or its edges, or `None` to route it.
+    fn gated_read_refusal<B>(
+        &self,
+        resource_path: &str,
+        query: &str,
+        req: &Request<B>,
+        app_ctx: &db::AppContext,
+    ) -> Result<Option<Response<Full<Bytes>>>, StorageError> {
+        let agent_cid = crate::api::account::extract_agent_cid_explicit(req);
+        self.gated_read_refusal_for(resource_path, query, agent_cid.as_deref(), app_ctx)
+    }
+
+    fn gated_read_refusal_for(
+        &self,
+        resource_path: &str,
+        query: &str,
+        agent_cid: Option<&str>,
+        app_ctx: &db::AppContext,
+    ) -> Result<Option<Response<Full<Bytes>>>, StorageError> {
+        use crate::api::content_reach_gate as gate;
+        let Some((route, key)) = gate::gated_read_target(resource_path, query) else {
+            return Ok(None);
+        };
+        let Some(pool) = self.db_pool.as_ref() else {
+            // No projection to read: the routes answer their own unavailability.
+            return Ok(None);
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+        let ctx = gate::gate_context(route, app_ctx);
+        gate::gated_read_refusal(
+            &mut conn,
+            &ctx,
+            route,
+            &key,
+            agent_cid,
+            self.memo_store.clone(),
+        )
+    }
+
     /// GET/DELETE /db/content/{id} - Get or delete content by ID
     async fn handle_db_content_by_id(
         &self,
@@ -9758,114 +9995,10 @@ impl HttpServer {
                 )
                 .map(|opt| opt.map(ContentView::from));
 
-                // Layer 1: Reach-based access control
-                // commons/public serve without auth, restricted content requires authentication
+                // Layers 1 / 1.5 (reach): enforced by the `/db` dispatch's read
+                // reach gate before this route runs — one gate for the body and
+                // every sibling read (`api::content_reach_gate`).
                 if let Ok(Some(ref view)) = result {
-                    let is_public = view.reach == "commons" || view.reach == "public";
-                    if !is_public {
-                        // Header PRESENCE is not authentication — see the /db/content
-                        // listing note. Require the caller to RESOLVE to an identity
-                        // via the doorway-injected `X-Agent-Cid`; a bare
-                        // `Authorization:` header no longer opens restricted tiers,
-                        // and neither does the ambient local session (which would
-                        // resolve an anonymous request as the node's own human).
-                        let resolved =
-                            crate::api::account::extract_agent_cid_explicit(&req).is_some();
-                        if !resolved {
-                            return Ok(Response::builder()
-                                .status(StatusCode::FORBIDDEN)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(
-                                    r#"{{"error":"Authentication required","requiredReach":"{}"}}"#,
-                                    view.reach
-                                ))))
-                                .unwrap());
-                        }
-                    }
-
-                    // Layer 1.5: Steward-specific reach authorization for tiers
-                    // ABOVE community (familiar / trusted / intimate / self). The
-                    // is_public check above only refuses anonymous; this enforces
-                    // the SAME reach gate the P2P transport path uses
-                    // (epr_service::authorize_reach_for_human — single source of
-                    // truth), resolving the requester by the reliable humans.id
-                    // column (then agent key). Deny-by-default when the requester
-                    // can't be resolved. NOTE: live-alpha end-to-end enforcement
-                    // is coupled to humans.agent_pub_key population (the
-                    // resilience-card-self-cid-provide-loop-gate fork); the
-                    // household stack (id populated) proves it now.
-                    if crate::epr_service::reach_level_index(&view.reach)
-                        > crate::epr_service::reach_level_index("community")
-                    {
-                        // Explicit header only — see `extract_agent_cid_explicit`.
-                        let identity = crate::api::account::extract_agent_cid_explicit(&req);
-                        let requester = match identity {
-                            Some(idv) => {
-                                match crate::db::humans::get_human_by_id(&mut conn, &idv)
-                                    .ok()
-                                    .flatten()
-                                {
-                                    Some(h) => Some(h),
-                                    None => {
-                                        crate::db::humans::get_human_by_agent_key(&mut conn, &idv)
-                                            .ok()
-                                            .flatten()
-                                    }
-                                }
-                            }
-                            None => None,
-                        };
-                        match requester {
-                            Some(human) => {
-                                let reach_gate = crate::epr_service::EprService::new(
-                                    None,
-                                    None,
-                                    None,
-                                    crate::p2p::trust_cache::PeerTrustCache::new(),
-                                )
-                                // T7: this `EprService` is still constructed
-                                // fresh per request (unchanged — cheap,
-                                // Option<Arc<_>> handles), but the memo store
-                                // it holds is now the SAME process-lifetime
-                                // Arc on every request, wired at startup via
-                                // `HttpServer::with_memo_store`.
-                                .with_memo_store(self.memo_store.clone());
-                                // T9: the gradient selection (memo-carrying vs
-                                // inert) lives in ONE place — the service's
-                                // own dormancy gate. Flag off ⇒ inert() ⇒
-                                // byte-identical to pre-T9 behavior.
-                                if let Err(reason) = reach_gate
-                                    .authorize_reach_for_human_with_own_trust(
-                                        &mut conn,
-                                        &app_ctx,
-                                        &view.reach,
-                                        &human,
-                                        content_id,
-                                    )
-                                {
-                                    return Ok(Response::builder()
-                                        .status(StatusCode::FORBIDDEN)
-                                        .header(header::CONTENT_TYPE, "application/json")
-                                        .body(Full::new(Bytes::from(format!(
-                                            r#"{{"error":"Reach denied","requiredReach":"{}","reason":"{}"}}"#,
-                                            view.reach, reason
-                                        ))))
-                                        .unwrap());
-                                }
-                            }
-                            None => {
-                                return Ok(Response::builder()
-                                    .status(StatusCode::FORBIDDEN)
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(format!(
-                                        r#"{{"error":"Reach authorization required","requiredReach":"{}"}}"#,
-                                        view.reach
-                                    ))))
-                                    .unwrap());
-                            }
-                        }
-                    }
-
                     // Policy enforcement: check device policy ceiling
                     let agent_id = Self::extract_agent_id(&req);
                     if let (Some(ref enforcement), Some(ref agent)) =
@@ -9976,6 +10109,23 @@ impl HttpServer {
                     if let Some((head, content_bytes)) = handle.resolve_and_fetch(content_id).await
                     {
                         info!(id = %content_id, size = content_bytes.len(), "Content resolved via P2P");
+
+                        // READ REACH GATE, resolved arm: the dispatch gate had no
+                        // row to judge, so judge the RESOLVED head's reach — the
+                        // same Layers 1 / 1.5 — before persisting or serving
+                        // anything. A head stating no reach is refused (it used
+                        // to be defaulted to commons here, widening it).
+                        if let Some(refusal) = crate::api::content_reach_gate::resolved_head_refusal(
+                            &mut conn,
+                            &app_ctx,
+                            content_id,
+                            head.qahal.reach.as_deref(),
+                            crate::api::account::extract_agent_cid_explicit(&req).as_deref(),
+                            self.memo_store.clone(),
+                        ) {
+                            info!(id = %content_id, "P2P-resolved content refused by the reach gate; not persisted");
+                            return Ok(refusal);
+                        }
 
                         // Store blob
                         let blob_result = self.blob_store.store(&content_bytes).await;
@@ -10096,7 +10246,34 @@ impl HttpServer {
                 // those don't break cross-peer divergence.
                 //
                 // See 2026-05-26-substrate-rea-replication-fix.md Task 8d.
-                let needs_conductor = patch_needs_conductor(&view);
+                // A body edit on an ANCHORED row is a new signed version too
+                // (content-body-travels): routed through the conductor so the
+                // body rides the entry peers adopt. Left on the diesel path it
+                // would never leave this peer — and the next verified-entry
+                // heal would put the notarized body back. An unchanged body (a
+                // seeder re-PATCH of the same bytes) and an un-anchored row keep
+                // the legacy path.
+                let needs_conductor = patch_needs_conductor(&view) || {
+                    let existing = {
+                        let mut conn = self.get_conn()?;
+                        db::content_diesel::get_content_with_tags(
+                            &mut conn,
+                            &db::AppContext::default_lamad(),
+                            content_id,
+                            db::content_diesel::MinTrust::Invisible,
+                        )?
+                    };
+                    version_patch_needs_conductor(
+                        &view,
+                        existing.as_ref().map(|e| StoredVersion {
+                            anchor: e.content.dht_anchor_hash.as_deref(),
+                            body: e.content.content_body.as_deref(),
+                            content_type: &e.content.content_type,
+                            tags: &e.tags,
+                            metadata_json: e.content.metadata_json.as_deref(),
+                        }),
+                    )
+                };
                 let lamad_hc = self.hc_registry.as_ref().and_then(|r| r.lamad_client());
 
                 let update_result = match (needs_conductor, lamad_hc) {
@@ -10178,24 +10355,41 @@ impl HttpServer {
             .ok_or_else(|| StorageError::Internal("Services not available".into()))?;
 
         let query_str = req.uri().query().unwrap_or("");
-        let query: db::relationships_diesel::RelationshipQuery =
+        let mut query: db::relationships_diesel::RelationshipQuery =
             serde_urlencoded::from_str(query_str).unwrap_or_default();
 
         match method {
-            Method::GET => match services.relationship.list(&query) {
-                Ok(items) => {
-                    let views: Vec<RelationshipView> =
-                        items.into_iter().map(|r| r.into()).collect();
-                    let body = serde_json::json!({
-                        "items": views,
-                        "count": views.len(),
-                        "limit": query.limit,
-                        "offset": query.offset,
-                    });
-                    Ok(response::ok(&body))
+            Method::GET => {
+                // Every edge served passes the reach filter on BOTH endpoints —
+                // with or without a `contentId` (the dispatch gate only judged
+                // the atom a `contentId` named). An open-tier-only caller's
+                // filter also runs in SQL so pages never count hidden edges.
+                let filter = self.reach_filter_for(&req);
+                query.readable_reaches = filter.sql_readable_reaches();
+                let (limit, offset) = query.clamped_page();
+                match services.relationship.list(&query) {
+                    Ok(items) => {
+                        let items = {
+                            let mut conn = self.get_conn()?;
+                            filter.retain_readable_edges(
+                                &mut conn,
+                                &db::AppContext::default_lamad(),
+                                items,
+                            )
+                        };
+                        let views: Vec<RelationshipView> =
+                            items.into_iter().map(|r| r.into()).collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                            "limit": limit,
+                            "offset": offset,
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
                 }
-                Err(e) => Ok(response::error_response(e)),
-            },
+            }
             Method::POST => {
                 // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
                 // Currently null for direct storage writes. Backfill needed for pre-coherence data.
@@ -10334,22 +10528,38 @@ impl HttpServer {
             .unwrap_or(25)
             .min(100) as usize;
 
+        // The walk prunes every node the caller may not read and never
+        // traverses THROUGH one (the dispatch gate judged only the root).
+        let filter = self.reach_filter_for(&req);
         Ok(response::from_result(
-            services.relationship.get_graph_query(
-                content_id,
-                depth,
-                include_computed,
-                min_shared_tags,
-                max_computed,
-                types_opt,
-            ),
+            services
+                .relationship
+                .get_graph_query(&crate::graph_engine::GraphQuery {
+                    root_id: content_id,
+                    max_depth: depth,
+                    relationship_types: types_opt,
+                    include_computed,
+                    max_computed,
+                    min_shared_tags,
+                    admission: Some(&filter),
+                }),
         ))
+    }
+
+    /// The per-request reach filter for the caller named by the explicit
+    /// `X-Agent-Cid` header (`api::content_reach_gate::ReachFilter`).
+    fn reach_filter_for<B>(&self, req: &Request<B>) -> crate::api::content_reach_gate::ReachFilter {
+        let agent_cid = crate::api::account::extract_agent_cid_explicit(req);
+        crate::api::content_reach_gate::ReachFilter::new(
+            agent_cid.as_deref(),
+            self.memo_store.clone(),
+        )
     }
 
     /// GET/DELETE /db/relationships/{id} - Get or delete relationship by ID
     async fn handle_db_relationship_by_id(
         &self,
-        _req: Request<Incoming>,
+        req: Request<Incoming>,
         method: Method,
         rel_id: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
@@ -10360,7 +10570,18 @@ impl HttpServer {
 
         match method {
             Method::GET => {
-                let result = services.relationship.get(rel_id);
+                // The dispatch gate judged the edge's SOURCE; an edge whose
+                // TARGET the caller may not read is not theirs to see either,
+                // and answers exactly as an absent edge does.
+                let result = match services.relationship.get(rel_id) {
+                    Ok(Some(edge)) => {
+                        let filter = self.reach_filter_for(&req);
+                        let mut conn = self.get_conn()?;
+                        let ctx = db::AppContext::default_lamad();
+                        Ok(filter.can_read_edge(&mut conn, &ctx, &edge).then_some(edge))
+                    }
+                    other => other,
+                };
                 Ok(response::from_option(
                     result,
                     &format!("Relationship not found: {}", rel_id),
@@ -15501,7 +15722,57 @@ impl HttpServer {
 /// not a DHT entry field, so its diesel write is not subject to reconciliation-controller reversion.
 /// Server bundle identity lives in the notarized Content metadata snapshot.
 /// Reserved-key metadata patches require the conductor so they cannot bypass it.
-fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
+/// The stored version of a row, as far as a PATCH can change it.
+#[derive(Debug, Clone, Copy)]
+struct StoredVersion<'a> {
+    anchor: Option<&'a str>,
+    body: Option<&'a str>,
+    content_type: &'a str,
+    tags: &'a [String],
+    metadata_json: Option<&'a str>,
+}
+
+/// Does this PATCH change the VERSION of a DHT-anchored row — its inline body,
+/// its type (F17), its tags (F17) or the authored edges its metadata states
+/// (F16)?
+///
+/// Such a change is a new signed version and routes through the conductor like
+/// `blob_hash`/`reach`: it reaches other peers only inside the entry they
+/// adopt, and a diesel-only write would be put back by the next verified heal.
+/// An absent field, an un-anchored row (the seeder's diesel path), or a value
+/// identical to the stored one keeps the legacy diesel path.
+fn version_patch_needs_conductor(
+    view: &UpdateContentInputView,
+    stored: Option<StoredVersion<'_>>,
+) -> bool {
+    let Some(stored) = stored.filter(|s| s.anchor.is_some()) else {
+        return false;
+    };
+    let body_changed = view
+        .content_body
+        .as_deref()
+        .is_some_and(|body| stored.body != Some(body));
+    let type_changed = view
+        .content_type
+        .as_deref()
+        .is_some_and(|ct| ct != stored.content_type);
+    let tags_changed = view.tags.as_ref().is_some_and(|tags| {
+        let wanted: std::collections::BTreeSet<&String> = tags.iter().collect();
+        let held: std::collections::BTreeSet<&String> = stored.tags.iter().collect();
+        wanted != held
+    });
+    let edges_changed = view
+        .metadata
+        .as_ref()
+        .and_then(|m| m.0.get("relationships").map(|_| m.0.to_string()))
+        .is_some_and(|patch_meta| {
+            let edges = |meta: &str| db::authored_edges::edges_from_verified_metadata("", meta);
+            edges(&patch_meta) != stored.metadata_json.and_then(edges)
+        });
+    body_changed || type_changed || tags_changed || edges_changed
+}
+
+pub(crate) fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
     view.blob_hash.is_some()
         || view.reach.is_some()
         || view.server_blob_hash.is_some()
@@ -18549,6 +18820,7 @@ mod tests {
             description: None,
             content_body: None,
             content_format: None,
+            content_type: None,
             metadata: None,
             tags: None,
             reach: reach.map(str::to_string),
@@ -18608,6 +18880,96 @@ mod tests {
             patch_needs_conductor(&metadata),
             "reserved metadata cannot bypass the conductor"
         );
+    }
+
+    #[test]
+    fn anchored_body_change_routes_through_conductor() {
+        let tags = vec!["bible".to_string()];
+        let meta = r#"{"relationships":[{"type":"RELATES_TO","targetId":"b"}]}"#;
+        let stored = |anchor: Option<&'static str>, body: Option<&'static str>| {
+            Some(StoredVersion {
+                anchor,
+                body,
+                content_type: "concept",
+                tags: &[],
+                metadata_json: None,
+            })
+        };
+        let body = |b: &str| UpdateContentInputView {
+            content_body: Some(b.into()),
+            ..patch_view(None, None)
+        };
+        // A changed body on an anchored row is a new signed version.
+        assert!(version_patch_needs_conductor(
+            &body("new"),
+            stored(Some("uhCkk-anchor"), Some("old"))
+        ));
+        assert!(version_patch_needs_conductor(
+            &body("new"),
+            stored(Some("uhCkk-anchor"), None)
+        ));
+        // Same bytes (a seeder re-PATCH) stay on the diesel path.
+        assert!(!version_patch_needs_conductor(
+            &body("same"),
+            stored(Some("uhCkk-anchor"), Some("same"))
+        ));
+        // An un-anchored row keeps the legacy diesel path.
+        assert!(!version_patch_needs_conductor(
+            &body("new"),
+            stored(None, Some("old"))
+        ));
+        assert!(!version_patch_needs_conductor(&body("new"), None));
+        // No version field in the patch: nothing to route.
+        assert!(!version_patch_needs_conductor(
+            &patch_view(None, None),
+            stored(Some("uhCkk-anchor"), Some("old"))
+        ));
+
+        // F17: a changed type or tag set is a version too; the same is not.
+        let retyped = UpdateContentInputView {
+            content_type: Some("discussion".into()),
+            ..patch_view(None, None)
+        };
+        assert!(version_patch_needs_conductor(
+            &retyped,
+            stored(Some("uhCkk-anchor"), None)
+        ));
+        let same_type = UpdateContentInputView {
+            content_type: Some("concept".into()),
+            ..patch_view(None, None)
+        };
+        assert!(!version_patch_needs_conductor(
+            &same_type,
+            stored(Some("uhCkk-anchor"), None)
+        ));
+        let retagged = UpdateContentInputView {
+            tags: Some(tags.clone()),
+            ..patch_view(None, None)
+        };
+        assert!(version_patch_needs_conductor(
+            &retagged,
+            stored(Some("uhCkk-anchor"), None)
+        ));
+        let tagged_row = Some(StoredVersion {
+            tags: &tags,
+            ..stored(Some("uhCkk-anchor"), None).unwrap()
+        });
+        assert!(!version_patch_needs_conductor(&retagged, tagged_row));
+
+        // F16: a changed edge list rides the signed entry; the same list does not.
+        let edged = UpdateContentInputView {
+            metadata: Some(crate::views::JsonVal(serde_json::from_str(meta).unwrap())),
+            ..patch_view(None, None)
+        };
+        assert!(version_patch_needs_conductor(
+            &edged,
+            stored(Some("uhCkk-anchor"), None)
+        ));
+        let edged_row = Some(StoredVersion {
+            metadata_json: Some(meta),
+            ..stored(Some("uhCkk-anchor"), None).unwrap()
+        });
+        assert!(!version_patch_needs_conductor(&edged, edged_row));
     }
 
     #[tokio::test]

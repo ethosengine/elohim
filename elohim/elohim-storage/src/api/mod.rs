@@ -25,6 +25,7 @@ pub mod comments;
 pub mod compute;
 pub mod compute_grants;
 pub mod compute_tasks;
+pub mod content_reach_gate;
 pub mod contributors;
 pub mod custodians;
 pub mod dashboard;

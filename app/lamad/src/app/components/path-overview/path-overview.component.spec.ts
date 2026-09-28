@@ -1,14 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute, Router } from '@angular/router';
 import { of, throwError, BehaviorSubject, Subject } from 'rxjs';
-import { PathOverviewComponent } from './path-overview.component';
+import { PathOverviewComponent, moduleHeading } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
 import { LAMAD_EPR_NAV } from '../../interfaces/cross-pillar.interface';
 import { SeoService } from '../../shared/services/seo.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { LearningPath } from '../../models';
+import { LearningPath, parsePathView } from '../../models';
+import type { ContentNode } from '../../models/content-node.model';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { vi, Mock } from 'vitest';
 
@@ -418,6 +419,96 @@ describe('PathOverviewComponent', () => {
 
     expect(component['destroy$'].next).toHaveBeenCalled();
     expect(component['destroy$'].complete).toHaveBeenCalled();
+  });
+
+  describe('chapters of titled lessons (movement → module → steps)', () => {
+    // The seeded shape: a chapter's modules are titled lessons of steps, and
+    // each step carries the author's own title.
+    const chapteredPath = parsePathView({
+      id: 'fct',
+      title: 'Foundations',
+      description: 'd',
+      contentType: 'path',
+      contentFormat: 'epr-composite',
+      content: {
+        sections: [
+          {
+            id: 'movement-1',
+            title: 'Movement I: Waking Up',
+            level: 'unit',
+            sections: [
+              {
+                id: 'fct-m01',
+                title: '1. The Church Dilemma',
+                description: 'from assuming → to lament',
+                level: 'lesson',
+                items: [
+                  { ref: 'fct-module-01-church-dilemma', role: 'step', title: 'The Church Dilemma' },
+                  {
+                    ref: 'fct-module-01-church-dilemma-story',
+                    role: 'step',
+                    title: 'Story: A People Inside a System',
+                  },
+                  { ref: 'fct-course', role: 'step' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      tags: [],
+      relatedNodeIds: [],
+      metadata: {},
+    } as unknown as ContentNode);
+
+    beforeEach(() => {
+      pathService.getPath.mockReturnValue(of(chapteredPath));
+      pathService.getChapterSummariesWithContent.mockReturnValue(
+        of([
+          {
+            chapter: chapteredPath.chapters![0],
+            totalUniqueContent: 3,
+            completedUniqueContent: 0,
+            contentCompletionPercentage: 0,
+            sharedContentCompleted: 0,
+            completedSteps: 0,
+            totalSteps: 3,
+          },
+        ])
+      );
+    });
+
+    it('shows each module once, with its authored title numbered once', () => {
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+
+      const moduleTitles = Array.from(el.querySelectorAll('.module-title')).map(h =>
+        h.textContent?.trim()
+      );
+      expect(moduleTitles).toEqual(['1. The Church Dilemma']);
+      // No inner section card repeating the module's title and narrative.
+      expect(el.querySelectorAll('.section-title').length).toBe(0);
+      expect(el.querySelectorAll('.section-description').length).toBe(0);
+    });
+
+    it('shows the authored step titles, falling back to the id only when none was authored', () => {
+      fixture.detectChanges();
+      const names = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.concept-name')
+      ).map(n => n.textContent?.trim());
+      expect(names).toEqual([
+        'The Church Dilemma',
+        'Story: A People Inside a System',
+        'Fct Course',
+      ]);
+    });
+  });
+
+  describe('moduleHeading', () => {
+    it('keeps an authored ordinal and numbers an unnumbered title', () => {
+      expect(moduleHeading('5. Our Attention is Sacred', 0)).toBe('5. Our Attention is Sacred');
+      expect(moduleHeading('Systems Thinking', 1)).toBe('2. Systems Thinking');
+    });
   });
 
   it('should reload when route params change', () => {

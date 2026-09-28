@@ -1,7 +1,8 @@
 {
   "id": "fct-video-04-00",
-  "contentType": "collective",
-  "title": "is Haugen - 60mins interview or Congressional Testimony",
+  "contentType": "video",
+  "reach": "commons",
+  "title": "Frances Haugen: 60 Minutes interview and congressional testimony",
   "description": "Recommended video for Respecting Human Nature",
   "content": "**Platform:** youtube",
   "contentFormat": "markdown",

@@ -1,9 +1,10 @@
 {
   "id": "fct-media-05-video-love-your-neighbor-a",
-  "contentType": "collective",
-  "title": "love your neighbor as yourself",
+  "contentType": "video",
+  "reach": "commons",
+  "title": "Love Your Neighbor as Yourself",
   "description": "love your neighbor as yourself",
-  "content": "# love your neighbor as yourself\n",
+  "content": "# Love Your Neighbor as Yourself\n",
   "contentFormat": "markdown",
   "sourcePath": "fct/v1/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
   "tags": [
@@ -27,7 +28,7 @@
   "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
   "activityPubType": "Video",
   "openGraphMetadata": {
-    "ogTitle": "love your neighbor as yourself",
+    "ogTitle": "Love Your Neighbor as Yourself",
     "ogDescription": "love your neighbor as yourself",
     "ogType": "website",
     "ogUrl": "https://elohim-protocol.org/content/fct-media-05-video-love-your-neighbor-a",

@@ -1,0 +1,350 @@
+{
+  "id": "fct-module-01-church-dilemma-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: The Church Dilemma",
+  "description": "Mastery check for Module 1, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-01-church-dilemma-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "In the attention economy, what is the product being sold?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The apps and devices people buy",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q1-c0"
+                },
+                {
+                  "content": "The content creators publish",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q1-c1"
+                },
+                {
+                  "content": "Human attention, sold to advertisers",
+                  "correct": true,
+                  "id": "fct-module-01-church-dilemma-q1-c2"
+                },
+                {
+                  "content": "Subscriptions to premium features",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "If you are not paying for the product, ask what is being paid for.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-01-church-dilemma-quiz",
+        "assessesContentId": "fct-module-01-church-dilemma",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-01-church-dilemma-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "The Ledger of Harms names addiction, isolation, outrage, misinformation and polarization. How does the course ask us to see them?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "As five separate problems, each needing its own ministry",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q2-c0"
+                },
+                {
+                  "content": "As one interconnected system of human downgrading",
+                  "correct": true,
+                  "id": "fct-module-01-church-dilemma-q2-c1"
+                },
+                {
+                  "content": "As the fault of individual bad actors in the industry",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q2-c2"
+                },
+                {
+                  "content": "As problems outside the church that we can help others with",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-01-church-dilemma-quiz",
+        "assessesContentId": "fct-module-01-church-dilemma",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-01-church-dilemma-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "Deuteronomy 6 binds God's words on hands and foreheads. What question does the module draw from that?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Whether Christians should use devices at all",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q3-c0"
+                },
+                {
+                  "content": "Whether we will wear an attention technology",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q3-c1"
+                },
+                {
+                  "content": "Whose attention technology we wear, since we will wear one",
+                  "correct": true,
+                  "id": "fct-module-01-church-dilemma-q3-c2"
+                },
+                {
+                  "content": "How to fit Scripture reading into screen time",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-01-church-dilemma-quiz",
+        "assessesContentId": "fct-module-01-church-dilemma",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-01-church-dilemma-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why does the course begin with lament rather than solutions?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Because nothing can be done about the crisis",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q4-c0"
+                },
+                {
+                  "content": "Because lament is faith refusing to lie: honest complaint that turns toward hope",
+                  "correct": true,
+                  "id": "fct-module-01-church-dilemma-q4-c1"
+                },
+                {
+                  "content": "Because solutions are the pastor's job, not the class's",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q4-c2"
+                },
+                {
+                  "content": "Because the crisis is too complex to understand yet",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Psalm 13 moves from 'How long, Lord?' to 'But I trust in your unfailing love.'",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-01-church-dilemma-quiz",
+        "assessesContentId": "fct-module-01-church-dilemma",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-01-church-dilemma-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which of these is a commitment in the class covenant?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "We will identify the people most responsible for the crisis",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q5-c0"
+                },
+                {
+                  "content": "We will stay neutral observers of the technology debate",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q5-c1"
+                },
+                {
+                  "content": "We extend grace and refuse scapegoats",
+                  "correct": true,
+                  "id": "fct-module-01-church-dilemma-q5-c2"
+                },
+                {
+                  "content": "We will avoid discussing our own church's habits",
+                  "correct": false,
+                  "id": "fct-module-01-church-dilemma-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-01-church-dilemma-quiz",
+        "assessesContentId": "fct-module-01-church-dilemma",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

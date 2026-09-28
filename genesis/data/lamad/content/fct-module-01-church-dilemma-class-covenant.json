@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-01-church-dilemma-class-covenant",
+  "contentType": "practice",
+  "title": "The Class Covenant",
+  "description": "The Class Covenant  Reframed from course rules into commitments we make to one another:  1.",
+  "content": "## The Class Covenant\n\nReframed from course rules into commitments we make to one another:\n\n1. **We acknowledge the crisis** — social, cultural, economic, ecclesial — and that it is connected.\n2. **We come as patients and participants, not spectators.** Churchgoers have been shaped as consumers, and the church, like media, sits downstream of the technology and incentives shaping culture.\n3. **We refuse both denial and despair.** Lament is our doorway to hope, not our destination.\n4. **We extend grace and refuse scapegoats.** Ministry is a marathon in a church filled with sprinters; we will not blame individuals for systemic failures (Module 2 gives us the lens for this).\n5. **We aim at agency and mission** — equipping Christians and ministry leaders to re-present Christ in a world facing god-like technology, as builders and not only users.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "practice"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "practice"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

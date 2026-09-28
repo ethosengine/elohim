@@ -22,10 +22,14 @@
         "type": "object",
         "properties": {
           "type": { "type": "string" },
-          "targetId": { "type": "string" }
+          "targetId": { "type": "string" },
+          "role": {
+            "type": "string",
+            "description": "The edge's authored role within its source atom: anchor, supporting, story, lane, callback, assignment and the like"
+          }
         }
       },
-      "description": "Inline relationship declarations from import"
+      "description": "The atom's authored edges. They ride the atom's signed entry, so they travel, version and disappear with the head that states them; each peer projects its relationship table from them"
     },
     "did": { "type": "string", "description": "Decentralized identifier for the concept" },
     "openGraphMetadata": {

@@ -6,6 +6,14 @@ import type { JsonValue } from "./JsonValue";
  */
 export type CreateRelationshipInputView = { id: string | null, schemaVersion: number, sourceId: string, targetId: string, relationshipType: string, confidence: number | null, inferenceSource: string | null, 
 /**
+ * A NARROWING request for the edge's reach. The server derives the
+ * stored reach from the SOURCE atom (an edge is never more open than the
+ * atom that authored it): this value can only narrow it, never widen it;
+ * absent = the source's reach; a source this peer does not hold stores
+ * the edge at the most restrictive tier. An unrecognized tier is refused.
+ */
+reach: string | null, 
+/**
  * Parsed metadata object (serialized to JSON string for DB)
  */
 metadata: JsonValue | null, };

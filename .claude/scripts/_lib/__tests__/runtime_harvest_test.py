@@ -287,6 +287,46 @@ _recovered = _win("alpha-b", [_shpr(_prm(0, 60 + i)) for i in range(3)]
 check("a converged measured sample still clears through interleaved unmeasured ones",
       not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(_recovered)))
 
+# ── one published sweep read by N polls is ONE observation — fp 6cdded115d74, 2026-09-27 ──
+# The LIVE alpha ring (runtime-cursor.json, polls 196-203): one matthew process converged on
+# sweeps 119/134/134/152, storage restarted, and polls 201-203 all read the fresh process's
+# sweep 5 (pending 48, failed 3, converged false). The measured arm filed "healed NOTHING over
+# 5-5 sweeps"; sweep 6 published converged:true minutes later.
+def _pra(sweeps, divergent=59, converged=False, pending=0):
+    d = _prm(0, sweeps, divergent=divergent, converged=converged)
+    d["pending"] = pending
+    return d
+
+
+_alpha_ring = _win("alpha", [_shpr(_pra(95, pending=1)), _shpr(_pra(119, converged=True)),
+                             _shpr(_pra(134, converged=True)), _shpr(_pra(134, converged=True)),
+                             _shpr(_pra(152, converged=True))]
+                   + [_shpr(_pra(5, divergent=60, pending=48))] * 3)
+check("three polls reading one published sweep after a restart stay silent (6cdded115d74)",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(_alpha_ring)))
+check("the alpha projector fp is the one the ledger filed",
+      rh.fingerprint("alpha", rh.CLASS, "projector:reconcile") == "6cdded115d74")
+_one_sweep = _win("alpha-b", [_shpr(_prm(0, 45))] * rh.WINDOW)
+check("one unconverged sweep re-read across the whole ring is not three sweeps",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(_one_sweep)))
+# a genuine ceiling whose sweep outlasts the poll cadence keeps firing: repeats collapse,
+# distinct unconverged sweeps elsewhere in the ring still carry the verdict
+_slow_stuck = _win("alpha-b", [_shpr(_prm(0, 45)), _shpr(_prm(0, 46)), _shpr(_prm(0, 46)),
+                               _shpr(_prm(0, 47)), _shpr(_prm(0, 47)), _shpr(_prm(0, 47))])
+check("a real ceiling with slow sweeps still files (distinct sweeps 45, 46, 47)",
+      any("healed NOTHING" in f["line"] for f in rh.evaluate(_slow_stuck)))
+# ... and a live blocked line is not deleted while polls repeat one sweep of that ceiling
+_led2 = [{"fp": rh.fingerprint("alpha-b", rh.CLASS, "projector:reconcile"), "status": "blocked",
+          "clean_poll_streak": 0}]
+_rep_ring = [_shpr(_prm(0, 45)), _shpr(_prm(0, 46)), _shpr(_prm(0, 47))] + [_shpr(_prm(0, 48))] * 6
+for _i in range(3, len(_rep_ring) + 1):
+    _w = _win("alpha-b", _rep_ring[max(0, _i - rh.WINDOW):_i])
+    _found = [dict(f, fp=rh.fingerprint(f["node"], f["class"], f["provenance"]))
+              for f in rh.evaluate(_w) if f["provenance"] == "projector:reconcile"]
+    rh.reconcile(_led2, _found, 300 + _i)
+check("repeated reads of one sweep neither re-file nor delete a live ceiling line",
+      len(_led2) == 1 and _led2[0]["status"] == "blocked")
+
 # absent /admin/self-healing block -> none of the pending predicates fire
 absent = _win("alpha", [{"render": {"degenerateRate": 0.0}}] * rh.WINDOW)
 check("pending predicates silent when self-healing block absent",

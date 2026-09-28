@@ -1,9 +1,10 @@
 {
   "id": "fct-media-10-book-everything-you-think",
-  "contentType": "collective",
-  "title": "Everything you think you know about addiction is wrong",
+  "contentType": "video",
+  "reach": "commons",
+  "title": "Everything You Think You Know About Addiction Is Wrong",
   "description": "Book by Johann Hari",
-  "content": "# Everything you think you know about addiction is wrong\n\n**Author:** Johann Hari\n**Format:** book",
+  "content": "# Everything You Think You Know About Addiction Is Wrong\n\n**Author:** Johann Hari\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/v1/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
   "tags": [
@@ -27,7 +28,7 @@
   "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
   "activityPubType": "Document",
   "openGraphMetadata": {
-    "ogTitle": "Everything you think you know about addiction is wrong",
+    "ogTitle": "Everything You Think You Know About Addiction Is Wrong",
     "ogDescription": "Book by Johann Hari",
     "ogType": "website",
     "ogUrl": "https://elohim-protocol.org/content/fct-media-10-book-everything-you-think",

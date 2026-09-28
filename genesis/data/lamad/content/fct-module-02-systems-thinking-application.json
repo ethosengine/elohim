@@ -1,38 +1,69 @@
 {
   "id": "fct-module-02-systems-thinking-application",
-  "contentType": "exercise",
-  "title": "Application: Systems Thinking",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** \\* Healthy stable families are a foundational to a healthy church.\n\n A large component of what we experience as \"church decline\" in the US is gerenerated largely preceeded by middle-class decline, ( closure of Heritage Christian Schools, NTCA, )  individualizing risks in our society, and rising social and economic inequality putting the squeeze on the outgrowth of institutions from what was for several formative decades a healthy middle-class.    \n   \\- Public transit access to campus.(including Pedestrian and Bike traffic), and high quality land-use.   \n   \\- Household formation for young families.  \n   \\- Addressing REAL structural inequalities in funding Vocational Training and Higher Education.   \n   \\- Job placement (tent-making) and enhanced career development. \n\nAtomic Habits: An Easy & Proven Way to Build Good Habits & Break Bad Ones   \nIn \"Atomic Habits,\" James Clear emphasizes the idea that \"you do not rise to the level of your goals, you fall to the level of your systems.\" This statement highlights the importance of the systems and processes you have in place to achieve your goals. Clear argues that while setting goals is important, the systems you implement to reach those goals are even more crucial.\n\nHere's a breakdown of the concept:  \nGoals vs. Systems: Goals are the desired outcomes you want to achieve, while systems are the daily habits and routines that lead to those outcomes. Clear suggests that focusing on the system is more effective than fixating on the goal itself.\n\nPredictability of Systems: Systems create predictable results. When you have effective systems, you consistently produce the desired outcomes. When you don't, you are likely to fall short of your goals regardless of how ambitious they are.\n\nSustainable Progress: Good systems create a pathway for sustainable progress. By improving your habits and processes, you can make steady, incremental progress towards your goals.\n\nExamples in Practice: Clear uses various examples to illustrate this point. For instance, a writer who wants to finish a book should focus on writing a certain number of words each day (system) rather than just aiming to complete a book (goal).\n\nfor Us: Christian's need to advocate for designing and optimizing systems that align with the fullfillment of the Kingdom of God. By doing so, Christians create the environment(s) that supports continuous improvement and make the manifestation of God's Love in the world a natural outcome.\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: Systems Thinking",
+  "description": "Application — Three Lanes  - Tech workers: Practice moving between parts and whole: this week, map how one feature, algorithm, or metric you own affects users' wider lives and communities — the relationship work that simple metrics never ca",
+  "content": "## Application — Three Lanes\n\n- **Tech workers:** Practice moving between parts and whole: this week, map how one feature, algorithm, or metric you own affects users' wider lives and communities — the relationship work that simple metrics never capture. Consider whether investigating those relationships should become a formal part of your role, and remember James Clear's principle (*Atomic Habits*, on tomorrow's shelf): outcomes follow systems, not intentions — so design the system that makes the good outcome natural.\n- **Households:** Build identity-based habits as a family: name who you are in Christ, then install one small daily system that expresses it — a table liturgy, a screen-free hour, an evening examen. Trust the mustard seed: small and faithful beats grand and abandoned.\n- **Church leaders:** See the church's own decline systemically. Much of what presents as spiritual decline was preceded by middle-class decline, individualized risk, and rising inequality squeezing the institutions that grew from healthier economic soil. Systemic responses belong on the church's agenda: transit, pedestrian, and bike access to campus and high-quality land use; pathways to household formation for young families; addressing real structural inequities in vocational training and higher education; job placement and career development as ministry. The church that tends the soil will not need to force the growth.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 2 - Systems Thinking.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-02-systems-thinking"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-02-systems-thinking",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-02-systems-thinking-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-02-systems-thinking-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.195293",
-  "updatedAt": "2025-12-26T21:04:01.815Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: Systems Thinking",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-02-systems-thinking-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: Systems Thinking - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -47,17 +78,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

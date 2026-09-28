@@ -35,6 +35,7 @@ import {
   PathChapter,
   PathModule,
   PathSection,
+  findItemTitle,
 } from '../../models/learning-path.model';
 import { RendererCompletionEvent } from '../../renderers/renderer-registry.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -661,7 +662,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   private buildSectionContext(params: SectionContextParams): LessonContext {
     const concepts: LessonConcept[] = (params.section.conceptIds ?? []).map((conceptId, idx) => ({
       conceptId,
-      title: this.formatConceptTitle(conceptId),
+      // The path author's step title wins; id formatting is the last resort.
+      title: findItemTitle(params.section, conceptId) ?? this.formatConceptTitle(conceptId),
       isCompleted: this.contentMasteryService.getMasteryLevelSync(conceptId) !== 'not_started',
       isCurrent: idx === params.currentConceptIndex,
       index: params.globalIndex + idx,

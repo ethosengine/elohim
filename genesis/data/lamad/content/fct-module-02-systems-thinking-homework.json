@@ -1,0 +1,55 @@
+{
+  "id": "fct-module-02-systems-thinking-homework",
+  "contentType": "practice",
+  "title": "Homework: Systems Thinking",
+  "description": "Homework  Complete FHT Module 1: Setting the Stage, with its companion listen, the A Problem Well Stated podcast — it preps tomorrow directly.",
+  "content": "## Homework\n\nComplete FHT Module 1: *Setting the Stage*, with its companion listen, the *A Problem Well Stated* podcast — it preps tomorrow directly.",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "homework"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "homework"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "homework"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

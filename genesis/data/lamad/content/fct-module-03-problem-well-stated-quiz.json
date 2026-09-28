@@ -1,0 +1,344 @@
+{
+  "id": "fct-module-03-problem-well-stated-quiz",
+  "contentType": "assessment",
+  "title": "Check your understanding: A Problem Well Stated",
+  "description": "Mastery check for Module 3, drawn from its learning objectives.",
+  "content": [
+    {
+      "id": "fct-module-03-problem-well-stated-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Which is one of Schmachtenberger's three generators of existential risk?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Too little technology",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q1-c0"
+                },
+                {
+                  "content": "Inadequate collective sense-making and choice-making",
+                  "correct": true,
+                  "id": "fct-module-03-problem-well-stated-q1-c1"
+                },
+                {
+                  "content": "Lack of government regulation",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q1-c2"
+                },
+                {
+                  "content": "The decline of church attendance",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q1-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-quiz",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "The course translates each generator into a church expression. What does 'rivalrous dynamics' become?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Denominational splits",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q2-c0"
+                },
+                {
+                  "content": "The worship-experience arms race",
+                  "correct": true,
+                  "id": "fct-module-03-problem-well-stated-q2-c1"
+                },
+                {
+                  "content": "Budget disputes",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q2-c2"
+                },
+                {
+                  "content": "Competition between small groups",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q2-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-quiz",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What pattern does 1 Samuel 8 show when Israel demands a king?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Trading agency for god-like power, with the costs read aloud in advance",
+                  "correct": true,
+                  "id": "fct-module-03-problem-well-stated-q3-c0"
+                },
+                {
+                  "content": "God refusing to let the people choose",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q3-c1"
+                },
+                {
+                  "content": "Samuel seizing power for himself",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q3-c2"
+                },
+                {
+                  "content": "Israel lacking the information to decide well",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q3-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Samuel read them exactly what a king would take. They chose it anyway.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-quiz",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "analyze",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-q4",
+      "purpose": "mastery",
+      "content": {
+        "content": "What standard does Scripture set for power, according to Luke 12:48 and James 3:1?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Power should be avoided entirely",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q4-c0"
+                },
+                {
+                  "content": "Responsibility grows with what we are entrusted with",
+                  "correct": true,
+                  "id": "fct-module-03-problem-well-stated-q4-c1"
+                },
+                {
+                  "content": "Power belongs only to those who earn it",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q4-c2"
+                },
+                {
+                  "content": "Leaders are judged less strictly than others",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q4-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-quiz",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-q5",
+      "purpose": "mastery",
+      "content": {
+        "content": "The module closes by naming the real deficit. What is it?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Information",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q5-c0"
+                },
+                {
+                  "content": "Money",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q5-c1"
+                },
+                {
+                  "content": "Wisdom, and the trust that lets wisdom travel between us",
+                  "correct": true,
+                  "id": "fct-module-03-problem-well-stated-q5-c2"
+                },
+                {
+                  "content": "Technology",
+                  "correct": false,
+                  "id": "fct-module-03-problem-well-stated-q5-c3"
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "fct-module-03-problem-well-stated-quiz",
+        "assessesContentId": "fct-module-03-problem-well-stated",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "core",
+        "tags": [
+          "fct"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "sophia-quiz-json",
+  "sourcePath": "docs/content/fct/fct-course/content/m03.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-3",
+    "quiz"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 3,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 1",
+    "form": "quiz",
+    "assessmentType": "mastery",
+    "questionCount": 5
+  },
+  "relationships": [
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "VALIDATES",
+      "role": "mastery"
+    },
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "BELONGS_TO",
+      "role": "quiz"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

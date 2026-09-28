@@ -1,38 +1,89 @@
 {
   "id": "fct-module-01-church-dilemma-application",
-  "contentType": "exercise",
-  "title": "Application: The Church Dilemma",
-  "description": "Practical application and action steps",
-  "content": "**Instructions:** \\* Success cannot be defined by attention, high-production value worship \"experiences\", or programs. Hot Take: the \"Attractional Church\" model is largely a commercial success but a failure in that it has metastasized what is in lika a tumor or an autoimmune disease, in the development of a healthy body within Christianity. \n\n\\* This expresses into messages we get on a Sunday are filtered through what we the audience will tolerate to hear.\n**PracticeType:** application",
+  "contentType": "practice",
+  "title": "Practice: The Church Dilemma",
+  "description": "Application — Three Lanes  No fixing yet.",
+  "content": "## Application — Three Lanes\n\nNo fixing yet. This week's discipline in every lane is *seeing*.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 1 - The Church Dilemma.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
   "tags": [
-    "application",
-    "practice",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-01-church-dilemma"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "practice-lanes"
   ],
   "metadata": {
-    "category": "fct-practice",
-    "sourceModule": "fct-module-01-church-dilemma",
-    "originalContentType": "practice"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "practice-lanes"
   },
+  "relationships": [
+    {
+      "target": "fct-module-03-problem-well-stated",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-06-harmful-consequences",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-08-centering-love",
+      "type": "RELATES_TO",
+      "role": "callback"
+    },
+    {
+      "target": "fct-module-01-church-dilemma-lane-tech-workers",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-01-church-dilemma-lane-households",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-01-church-dilemma-lane-church-leaders",
+      "type": "CONTAINS",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "BELONGS_TO",
+      "role": "practice"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.190698",
-  "updatedAt": "2025-12-26T21:04:01.814Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Application: The Church Dilemma",
-    "ogDescription": "Practical application and action steps",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-application",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
-    "ogImageAlt": "Application: The Church Dilemma - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -47,17 +98,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

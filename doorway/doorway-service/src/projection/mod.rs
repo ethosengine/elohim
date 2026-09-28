@@ -35,6 +35,7 @@
 //! ```
 
 pub mod app_auth;
+pub mod cache_refresh;
 pub mod collections;
 pub mod document;
 pub mod engine;
@@ -46,6 +47,7 @@ pub mod warm;
 pub mod warm_stream;
 
 // Re-export main types
+pub use cache_refresh::{CacheRefreshStats, CacheRefresher};
 pub use document::{ProjectedDocument, ProjectionQuery};
 pub use engine::{spawn_engine_task, EngineConfig, ProjectionEngine, ProjectionSignal};
 pub use epr_router::{

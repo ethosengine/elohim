@@ -31,6 +31,11 @@ then open `site/index.html` in a browser, or host the `site/` folder as-is.
                              build.py copies it into site/ and links it from the
                              course home so the site carries its own source
     build.py                 regenerates site/ from content/ (and the .docx)
+    recompose.py             regenerates the platform's content nodes and course
+                             path from content/; by default only Movement I,
+                             `--modules 1-15` for all (see "Recomposing into content nodes")
+    recompose/mNN.yaml       per-module assessment questions and simulation labs
+                             that the markdown does not carry
     README.md                this file
 
 ## What build.py produces (generated, not checked in)
@@ -129,10 +134,32 @@ Finally, from the repository root, check and seed:
 
 `../v1/` holds the 2025 lesson-plan markdown this course was rewritten from.
 It is kept for reference only; do not edit it. The per-module content nodes
-named `fct-module-*` (and their `fct-bible-*` / `fct-media-*` children) were
-generated from that v1 text and have not yet been regenerated from v2. Both
-exist on the platform without conflict: the bundle (the `fct-course` node)
-is the current course, and the v1 nodes are the older per-module outline
-that the course path still lists after it. As of 2026-09-23 they have not
-been regenerated from v2; the `fct-course` node and this directory are the
-only v2 wiring.
+named `fct-module-*` were first generated from that v1 text.
+
+`recompose.py` regenerates them from this v2 source: for each module it
+writes a lesson, its story, discussion, practice lanes, homework and
+assessments as separate linked content nodes, and rewrites the course path
+as five movements. A module not yet recomposed keeps its v1 lesson on the
+path. `python3 recompose.py --check` says whether the committed nodes match
+this directory; the path's `metadata.recomposedModules` lists which modules
+are v2.
+
+## Recomposing into content nodes
+
+Needs Python 3 and PyYAML (`pip install pyyaml`); it does not need the
+platform running. With no arguments it recomposes Movement I only, the slice
+recomposed and reviewed so far; name modules to go further.
+
+    python3 recompose.py                  # Movement I (modules 1-4)
+    python3 recompose.py --modules 1-15   # the whole course
+    python3 recompose.py --check          # exit 1 if any output is stale
+
+The markdown here stays the source of truth. What the prose cannot say, a
+module's assessment questions and the simulations it points to, lives in
+`recompose/mNN.yaml`. Everything else is read from the markdown: the anchor
+and supporting scripture from the module's first lines, the three practice
+lanes from the Application bullets, and callbacks from every "Module N"
+mention. Existing curated scripture nodes (with verse text) are inputs and
+are never overwritten; nodes the script writes carry
+`metadata.generatedBy`. The `fct-course` bundle stays the facilitator's
+printable workbook, and every generated node cites it as its source.

@@ -355,6 +355,8 @@ pub struct UpdateContentInput {
     pub description: Option<String>,
     pub content_body: Option<String>,
     pub content_format: Option<String>,
+    /// Content type patch (F17). None preserves the existing type.
+    pub content_type: Option<String>,
     /// Already-serialized JSON string. If provided, replaces metadata_json in the row.
     /// The caller (ContentService) is responsible for shallow-merging before calling this.
     pub metadata_json: Option<String>,
@@ -816,6 +818,10 @@ pub fn update_content(
         .content_format
         .as_deref()
         .unwrap_or(&existing.content.content_format);
+    let new_content_type = input
+        .content_type
+        .as_deref()
+        .unwrap_or(&existing.content.content_type);
     let new_reach = input.reach.as_deref().unwrap_or(&existing.content.reach);
     let new_metadata_json = input
         .metadata_json
@@ -878,6 +884,7 @@ pub fn update_content(
             content::description.eq(new_description),
             content::content_body.eq(new_content_body),
             content::content_format.eq(new_content_format),
+            content::content_type.eq(new_content_type),
             content::metadata_json.eq(new_metadata_json),
             content::reach.eq(new_reach),
             content::blob_hash.eq(new_blob_hash),
@@ -888,6 +895,12 @@ pub fn update_content(
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+
+        // An edge is never more open than the atom that authored it: a reach
+        // change narrows the atom's stored edges in this same transaction.
+        if new_reach != existing.content.reach {
+            super::authored_edges::narrow_edges_of_source(conn, ctx, id, new_reach)?;
+        }
 
         // Replace tags if provided
         if let Some(ref new_tags) = input.tags {
@@ -978,6 +991,148 @@ pub struct ContentProjectionPatch {
     pub content_format: Option<String>,
     pub reach: Option<String>,
     pub metadata_json: Option<String>,
+    /// The entry's inline body (`Content.content`). Fill it ONLY from a
+    /// conductor-verified entry — [`body_from_verified_entry`] — never from an
+    /// unauthenticated sync-doc field (the CRDT reverse projection leaves it
+    /// `None`). Tri-state: `None` preserves the `content_body` column,
+    /// `Some(None)` clears it (the version moved its bytes behind a blob),
+    /// `Some(Some(body))` writes it.
+    pub content_body: Option<Option<String>>,
+    /// The entry's tags. `Some` REPLACES the row's `content_tags`; fill it only
+    /// from a conductor-verified entry (F17 — tags travel with the version).
+    pub tags: Option<Vec<String>>,
+    /// The authored edges the entry states in `metadata.relationships` (F16).
+    /// `Some` REPLACES this source atom's authored rows in `relationships` at
+    /// the row's reach; `None` leaves them alone. Fill it only through
+    /// [`ContentProjectionPatch::carry_verified_version`] /
+    /// [`super::authored_edges::edges_from_verified_metadata`].
+    pub relationships: Option<Vec<super::authored_edges::AuthoredEdge>>,
+}
+
+impl ContentProjectionPatch {
+    /// Attach the VERSION fields of a conductor-verified entry — its inline
+    /// body, its tags and the authored edges its metadata states — to this
+    /// patch. Every projection / adoption arm that fills a row from a verified
+    /// entry calls this, so the version travels whole; nothing calls it with
+    /// unauthenticated input (sync documents, request bodies, SQL rows).
+    pub fn carry_verified_version(
+        mut self,
+        id: &str,
+        body: &str,
+        blob_cid: Option<&str>,
+        tags: &[String],
+        metadata_json: &str,
+    ) -> Self {
+        self.content_body = body_from_verified_entry(body, blob_cid);
+        self.tags = Some(tags.to_vec());
+        self.relationships = super::authored_edges::edges_from_verified_metadata(id, metadata_json);
+        self
+    }
+}
+
+/// The projection value of a conductor-verified entry's inline body.
+///
+/// - A non-empty body writes it.
+/// - An EMPTY body on an entry that carries a blob pointer CLEARS the column:
+///   the version keeps its bytes behind `blob_cid`, and an inline body left on
+///   the row would keep serving stale text for a row that moved to a blob.
+/// - An EMPTY body with NO blob pointer preserves the column. The case it
+///   protects: an entry whose create carried no inline body (structure-only
+///   creates, `feedback_operations`' `body.unwrap_or("")`, entries authored
+///   before content-body-travels) while this peer's row holds a diesel-seeded
+///   inline body — adopting that entry must not erase the only copy of the
+///   body the peer holds. Clearing an inline-only body to empty is therefore
+///   not expressible through adoption (an empty inline-only body is not a
+///   meaningful version).
+pub fn body_from_verified_entry(content: &str, blob_cid: Option<&str>) -> Option<Option<String>> {
+    if !content.is_empty() {
+        return Some(Some(content.to_owned()));
+    }
+    blob_cid.filter(|cid| !cid.trim().is_empty()).map(|_| None)
+}
+
+/// Replace a content row's tags (clear + insert), skipping the write when the
+/// stored set already equals `tags`.
+fn replace_content_tags(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    tags: &[String],
+) -> Result<(), StorageError> {
+    let current: std::collections::BTreeSet<String> =
+        get_content_tags(conn, ctx, id)?.into_iter().collect();
+    let wanted: std::collections::BTreeSet<String> = tags.iter().cloned().collect();
+    if current == wanted {
+        return Ok(());
+    }
+    diesel::delete(
+        content_tags::table
+            .filter(content_tags::h_app_id.eq(&ctx.h_app_id))
+            .filter(content_tags::content_id.eq(id)),
+    )
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Tag clear failed: {}", e)))?;
+    for tag in &wanted {
+        diesel::insert_or_ignore_into(content_tags::table)
+            .values(&NewContentTag {
+                h_app_id: &ctx.h_app_id,
+                content_id: id,
+                tag,
+            })
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
+    }
+    Ok(())
+}
+
+/// Move an EXISTING row to the reach its conductor just committed, narrowing
+/// the atom's stored edges with it (never widening one) on the caller's
+/// connection — so inside the caller's transaction. The request-borne
+/// re-notarize path (`content_service::project_own_commit`) runs it BEFORE the
+/// verified version's projection, which then re-states the authored edges at
+/// exactly this reach.
+pub fn mirror_committed_reach(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    reach: &str,
+) -> Result<(), StorageError> {
+    use super::models::current_timestamp;
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id)),
+    )
+    .set((
+        content::reach.eq(reach),
+        content::updated_at.eq(current_timestamp()),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Mirror committed reach failed: {e}")))?;
+    super::authored_edges::narrow_edges_of_source(conn, ctx, id, reach)?;
+    Ok(())
+}
+
+/// Replace `id`'s authored edges with the verified list, at the row's CURRENT
+/// reach (edge reach = source reach), stamped with the row's anchor.
+fn project_authored_edges(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    edges: &[super::authored_edges::AuthoredEdge],
+) -> Result<(), StorageError> {
+    let row: Option<(String, Option<String>)> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select((content::reach, content::dht_anchor_hash))
+        .first(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("edge source read failed: {e}")))?;
+    let Some((reach, anchor)) = row else {
+        return Ok(());
+    };
+    super::authored_edges::replace_authored_edges(conn, ctx, id, edges, &reach, anchor.as_deref())?;
+    Ok(())
 }
 
 /// Derive only from conductor-verified Content metadata. An absent key clears
@@ -1060,6 +1215,49 @@ pub(crate) fn apply_content_patch_fields(
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
+    }
+    if let Some(ref v) = patch.content_body {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::content_body.eq(v.as_deref()))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update content_body failed: {}", e)))?;
+    }
+    // F17: the version's TYPE and FORMAT travel with it. Every arm that fills
+    // these reads them off a conductor-verified entry (the CRDT reverse
+    // projection and the release vehicle leave them `None`), so a retyped atom
+    // is retyped on every peer that adopts its head. Reach stays insert-only
+    // here (see `reach_mirror_after_renotarize`).
+    if let Some(ref v) = patch.content_type {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .filter(content::content_type.ne(v)),
+        )
+        .set(content::content_type.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update content_type failed: {}", e)))?;
+    }
+    if let Some(ref v) = patch.content_format {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .filter(content::content_format.ne(v)),
+        )
+        .set(content::content_format.eq(v))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update content_format failed: {}", e)))?;
+    }
+    if let Some(ref tags) = patch.tags {
+        replace_content_tags(conn, ctx, id, tags)?;
+    }
+    if let Some(ref edges) = patch.relationships {
+        project_authored_edges(conn, ctx, id, edges)?;
     }
     Ok(())
 }
@@ -1191,6 +1389,12 @@ fn upsert_with_anchor_transaction(
             patch.blob_cid = None;
             patch.content_size_bytes = None;
             patch.metadata_json = None;
+            patch.content_body = None;
+            // The rest of the version is the preserved head's, too.
+            patch.content_type = None;
+            patch.content_format = None;
+            patch.tags = None;
+            patch.relationships = None;
         }
         // Build a single UPDATE that touches anchor + whichever patch fields
         // are present. Diesel doesn't generate dynamic SET clauses cleanly,
@@ -1273,7 +1477,7 @@ fn upsert_with_anchor_transaction(
             metadata_json: patch.metadata_json.as_deref(),
             reach,
             created_by: None,
-            content_body: None,
+            content_body: patch.content_body.as_ref().and_then(|b| b.as_deref()),
             dht_anchor_hash: None,
             server_blob_hash: server_blob_hash.as_deref(),
         };
@@ -1318,6 +1522,14 @@ fn upsert_with_anchor_transaction(
                     StorageError::Internal(format!("Set anchor on insert failed: {}", e))
                 })?;
             }
+        }
+        // The version's tags and authored edges land with the inserted row
+        // (after the anchor, so the edges carry it).
+        if let Some(ref tags) = patch.tags {
+            replace_content_tags(conn, ctx, id, tags)?;
+        }
+        if let Some(ref edges) = patch.relationships {
+            project_authored_edges(conn, ctx, id, edges)?;
         }
     }
 
@@ -2183,6 +2395,104 @@ fn stamp_declared_head_mode_transaction(
     } else {
         Ok(StampOutcome::Stamped)
     }
+}
+
+/// What [`heal_election_columns`] did with a live election answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElectionColumnHeal {
+    /// The row's election columns now record the live election.
+    Healed,
+    /// The row already records this election's tier (nothing to heal), or the
+    /// ordering guard refused the write (a recorded EARNED tier is never
+    /// lowered by an unearned answer for the same head).
+    Unchanged,
+    /// The row no longer carries the head the election was read against (it
+    /// moved between the read and this write, or never held it). Nothing is
+    /// written: moving heads is the canonical channels' job, not this one's.
+    HeadMismatch,
+    /// No local row for this id.
+    NoRow,
+}
+
+/// Record a LIVE canonical election for the head a row ALREADY carries —
+/// the election columns only (`canonical_declared_at`, `canonical_earned`,
+/// `canonical_link_hash`), never `declared_head_action_hash`, the DHT anchor,
+/// the body or `updated_at`.
+///
+/// Why this exists (F26): `stamp_declared_head_mode` records an election only
+/// when the stamp carries one, so a peer that adopted a steward's head through
+/// an unordered channel keeps `canonical_earned` at NULL/0 forever, and every
+/// `/head` read on that peer reports `earned: false` for a head its own
+/// conductor elects EARNED. The live `/head?election=live` read already holds
+/// the conductor's answer; this lets it correct the projection in the same
+/// request instead of lying on every later plain read.
+///
+/// Fills, never moves (C2): a compare-and-set on `expected_head` inside one
+/// transaction — a row whose head moved since the read is left alone
+/// ([`ElectionColumnHeal::HeadMismatch`]). The write only happens when the
+/// recorded tier differs from the live one, or no election is recorded, AND
+/// [`canonical_move_verdict`] admits the live election over the stored one — so
+/// the ordering the heal plane obeys (contract test
+/// `canonical_move_verdict_is_antisymmetric_and_total`) is the one this obeys:
+/// an unearned answer never lowers a recorded earned tier. The three columns
+/// are written together, which is the invariant
+/// `canonical_ordering_from_columns` relies on.
+pub fn heal_election_columns(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    expected_head: &str,
+    live: CanonicalOrdering,
+) -> Result<ElectionColumnHeal, StorageError> {
+    conn.transaction(|conn| {
+        #[allow(clippy::type_complexity)]
+        let existing: Option<(Option<String>, Option<i64>, Option<i32>, Option<String>)> =
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .select((
+                    content::declared_head_action_hash,
+                    content::canonical_declared_at,
+                    content::canonical_earned,
+                    content::canonical_link_hash,
+                ))
+                .first(conn)
+                .optional()
+                .map_err(|e| StorageError::Internal(format!("Election heal lookup: {e}")))?;
+        let Some((declared, stored_at, stored_earned, stored_link)) = existing else {
+            return Ok(ElectionColumnHeal::NoRow);
+        };
+        if declared.as_deref() != Some(expected_head) {
+            return Ok(ElectionColumnHeal::HeadMismatch);
+        }
+        // A recorded earned bit is never lowered, even on a (defensively
+        // impossible) half-populated row the ordering reads as "no election".
+        if stored_earned == Some(1) && !live.earned {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        let stored =
+            canonical_ordering_from_columns(stored_at, stored_earned, stored_link.as_deref());
+        if stored.is_some_and(|stored| stored.earned == live.earned) {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        if canonical_move_verdict(Some(live), stored).is_err() {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .filter(content::declared_head_action_hash.eq(expected_head)),
+        )
+        .set((
+            content::canonical_declared_at.eq(Some(live.declared_at)),
+            content::canonical_earned.eq(Some(i32::from(live.earned))),
+            content::canonical_link_hash.eq(live.link.map(ElectionLink::to_b64)),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Election heal write: {e}")))?;
+        Ok(ElectionColumnHeal::Healed)
+    })
 }
 
 // ============================================================================
@@ -4083,6 +4393,7 @@ mod tests {
             description: None,
             content_body: None,
             content_format: None,
+            content_type: None,
             metadata_json: None,
             tags: None,
             reach: None,
@@ -4786,6 +5097,237 @@ mod tests {
         assert_eq!(fresh.server_blob_hash.as_deref(), Some("server-first"));
         assert_eq!(fresh.blob_hash.as_deref(), Some("browser-first"));
         assert!(fresh.declared_head_action_hash.is_none());
+    }
+
+    /// content-body-travels: the body is a serving field like the pointer. A
+    /// late local snapshot under a DIFFERENT declared head cannot put its body
+    /// back; the elected version's body, re-delivered, can.
+    #[test]
+    fn late_preserved_snapshot_cannot_replace_the_declared_body() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let patch = |body: &str| ContentProjectionPatch {
+            content_body: body_from_verified_entry(body, None),
+            ..Default::default()
+        };
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            patch("elected body"),
+            "head-new",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            patch("stale body"),
+            "head-old",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let body = |conn: &mut SqliteConnection| {
+            get_content(conn, &ctx, "psalm", MinTrust::Invisible)
+                .unwrap()
+                .unwrap()
+                .content_body
+        };
+        assert_eq!(body(&mut conn).as_deref(), Some("elected body"));
+
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            patch("elected body, healed"),
+            "head-new",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        assert_eq!(body(&mut conn).as_deref(), Some("elected body, healed"));
+    }
+
+    /// A declared-head stamp (the adoption / heal channel) writes the verified
+    /// entry's body; an empty verified body preserves the column when the
+    /// entry has no blob pointer, and CLEARS it when the version moved its
+    /// bytes behind a blob (no stale inline text keeps serving).
+    #[test]
+    fn declared_head_stamp_fills_the_body_and_empty_preserves() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "psalm",
+            ContentProjectionPatch {
+                content_body: Some(Some("seeded body".into())),
+                ..Default::default()
+            },
+            "head-1",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let stamp_body = |conn: &mut SqliteConnection, body: &str, blob: Option<&str>| {
+            stamp_declared_head(
+                conn,
+                &ctx,
+                "psalm",
+                "head-1",
+                None,
+                Some(ContentProjectionPatch {
+                    content_body: body_from_verified_entry(body, blob),
+                    ..Default::default()
+                }),
+            )
+            .unwrap();
+            get_content(conn, &ctx, "psalm", MinTrust::Invisible)
+                .unwrap()
+                .unwrap()
+                .content_body
+        };
+        assert_eq!(
+            stamp_body(&mut conn, "adopted body", None).as_deref(),
+            Some("adopted body")
+        );
+
+        assert_eq!(body_from_verified_entry("", None), None);
+        assert_eq!(
+            stamp_body(&mut conn, "", None).as_deref(),
+            Some("adopted body"),
+            "an empty inline-only body preserves the column"
+        );
+
+        assert_eq!(
+            body_from_verified_entry("", Some("bafkreiblob")),
+            Some(None)
+        );
+        assert_eq!(body_from_verified_entry("", Some("  ")), None);
+        assert_eq!(
+            stamp_body(&mut conn, "", Some("bafkreiblob")),
+            None,
+            "a version whose bytes live behind a blob clears the stale inline body"
+        );
+    }
+
+    /// F16 / F17: the rest of the version travels with the body — type,
+    /// format, tags and the authored edges its metadata states — and a late
+    /// snapshot under a different preserved head carries none of it.
+    #[test]
+    fn a_verified_version_carries_type_tags_and_edges() {
+        use crate::db::diesel_schema::relationships;
+        // The full migrated schema: this test needs `relationships` too.
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        let version = |ct: &str, tags: &[&str], meta: serde_json::Value| {
+            let tags: Vec<String> = tags.iter().map(|t| t.to_string()).collect();
+            let meta = meta.to_string();
+            ContentProjectionPatch {
+                content_type: Some(ct.into()),
+                content_format: Some("markdown".into()),
+                reach: Some("intimate".into()),
+                metadata_json: Some(meta.clone()),
+                ..Default::default()
+            }
+            .carry_verified_version("atom", "body", None, &tags, &meta)
+        };
+        let edges = |conn: &mut SqliteConnection| -> Vec<(String, String, Option<String>)> {
+            relationships::table
+                .filter(relationships::source_id.eq("atom"))
+                .order(relationships::target_id)
+                .select((
+                    relationships::target_id,
+                    relationships::reach,
+                    relationships::metadata_json,
+                ))
+                .load(conn)
+                .unwrap()
+        };
+        // Insert branch: a first projection lands type, tags and edges.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "atom",
+            version(
+                "exercise",
+                &["a"],
+                serde_json::json!({"relationships": [
+                    {"type": "RELATES_TO", "targetId": "t1", "role": "anchor"},
+                    {"type": "RELATES_TO", "targetId": "t2"},
+                ]}),
+            ),
+            "head-1",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        let row = get_content_with_tags(&mut conn, &ctx, "atom", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.content.content_type, "exercise");
+        assert_eq!(row.tags, vec!["a".to_string()]);
+        let got = edges(&mut conn);
+        assert_eq!(got.len(), 2);
+        assert!(
+            got.iter().all(|e| e.1 == "intimate"),
+            "edge reach = source reach"
+        );
+        assert_eq!(got[0].2.as_deref(), Some(r#"{"role":"anchor"}"#));
+
+        // Update branch: retyped, retagged, one edge dropped.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "atom",
+            version(
+                "discussion",
+                &["b", "c"],
+                serde_json::json!({"relationships": [
+                    {"type": "RELATES_TO", "targetId": "t1", "role": "callback"},
+                ]}),
+            ),
+            "head-2",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        let row = get_content_with_tags(&mut conn, &ctx, "atom", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.content.content_type, "discussion");
+        let mut tags = row.tags.clone();
+        tags.sort();
+        assert_eq!(tags, vec!["b".to_string(), "c".to_string()]);
+        let got = edges(&mut conn);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].2.as_deref(), Some(r#"{"role":"callback"}"#));
+
+        // A late snapshot under a different preserved head carries nothing.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "atom",
+            version("exercise", &["z"], serde_json::json!({"relationships": []})),
+            "head-old",
+            HeadElection::PreserveExistingDeclaration,
+        )
+        .unwrap();
+        let row = get_content_with_tags(&mut conn, &ctx, "atom", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.content.content_type, "discussion");
+        assert_eq!(edges(&mut conn).len(), 1);
+
+        // An entry that states no `relationships` key leaves the edges alone.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "atom",
+            version("discussion", &["b", "c"], serde_json::json!({})),
+            "head-2",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        assert_eq!(edges(&mut conn).len(), 1);
     }
 
     /// Adopt-before-author (b): `PreserveExistingDeclaration` on an UNDECLARED

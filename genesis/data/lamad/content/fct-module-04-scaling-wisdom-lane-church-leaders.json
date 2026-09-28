@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-04-scaling-wisdom-lane-church-leaders",
+  "contentType": "practice",
+  "title": "Church leaders: The Wisdom Gap & the Conditions for Trust",
+  "description": "Church leaders  Redesign the game board, not the players.",
+  "content": "## Church leaders\n\nRedesign the game board, not the players. Treat communication as a whole-body discipline with a clear path for anyone to create, review, and publish a story — not one minister's job. Give small groups real platform support for discoverability, scheduling, and invitation. Treat transition times between services and classes as key invitational moments — extend them, extend children's pick-up, release kids to the playground. Prioritize high-quality communal meals that make staying easy and childcare flexible. Each of these is one of the three trust conditions made concrete. *(The institutional-standards material — exceeding legal minimums on misconduct, tax, and equity — now lives in Module 7 as binding scale to responsibility.)*",
+  "contentFormat": "markdown",
+  "sourcePath": "docs/content/fct/fct-course/content/m04.md",
+  "reach": "commons",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-4",
+    "practice-lane"
+  ],
+  "metadata": {
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 4,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 2",
+    "form": "practice-lane",
+    "audience": "church-leaders"
+  },
+  "relationships": [
+    {
+      "target": "fct-module-04-scaling-wisdom-application",
+      "type": "BELONGS_TO",
+      "role": "lane"
+    },
+    {
+      "target": "fct-module-07-regeneration",
+      "type": "RELATES_TO",
+      "role": "callback"
+    }
+  ],
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ]
+}

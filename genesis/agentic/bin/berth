@@ -957,11 +957,14 @@ def _main(argv):
         return EXIT_NO_SESSION
     if cmd == "moor":
         writes = _opt(argv, "--writes")
+        # _opt consumes the flag it reads, so each value is read exactly once.
+        pid = _opt(argv, "--pid")
+        ttl = _opt(argv, "--ttl")
         m = b.moor(session, model=_opt(argv, "--model"), lab=_opt(argv, "--lab"), runtime=_opt(argv, "--runtime"),
                    principal=_opt(argv, "--principal"), task=_opt(argv, "--task"),
                    writes=[w for w in writes.split(",") if w] if writes else None,
-                   pid=int(_opt(argv, "--pid")) if _opt(argv, "--pid") else None,
-                   ttl_s=int(_opt(argv, "--ttl")) if _opt(argv, "--ttl") else None)
+                   pid=int(pid) if pid else None,
+                   ttl_s=int(ttl) if ttl else None)
         r = m["recipient"]
         print(f"moored {session} as {r.get('runtime', '?')} {r.get('model', '?')}@{r.get('lab', '?')} for {m.get('principal') or '?'}")
         return 0

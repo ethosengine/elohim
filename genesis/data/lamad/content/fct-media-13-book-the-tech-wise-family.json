@@ -1,6 +1,7 @@
 {
   "id": "fct-media-13-book-the-tech-wise-family",
-  "contentType": "collective",
+  "contentType": "book",
+  "reach": "commons",
   "title": "The Tech-Wise Family",
   "description": "Book by Andy Crouch",
   "content": "# The Tech-Wise Family\n\n**Author:** Andy Crouch\n**Format:** book",

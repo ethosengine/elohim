@@ -1,0 +1,21 @@
+{
+  "id": "fct-bible-psalm-13",
+  "contentType": "reference",
+  "title": "Psalm 13",
+  "description": "Scripture: Psalm 13",
+  "content": "## Psalm 13\n\nRead Psalm 13 in your own Bible, or [online](https://www.biblegateway.com/passage/?search=Psalm+13).\n",
+  "contentFormat": "markdown",
+  "reach": "commons",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "courseId": "foundations-christian-technology",
+    "generatedBy": "fct-course/recompose.py"
+  },
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z"
+}

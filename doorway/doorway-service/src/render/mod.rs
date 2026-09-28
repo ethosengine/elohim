@@ -51,6 +51,126 @@ pub fn ssr_semaphore_permits(
     }
 }
 
+/// Most degenerate fetches named on one render-trace warn line. A render that
+/// stalls on more than this is already legible from the count.
+const DEGENERATE_FETCHES_NAMED: usize = 5;
+
+/// Name the fetches that made a render degenerate: every `Stalled` or `Errored`
+/// event on the trace, as `METHOD url (outcome)`, joined with `"; "`. `None`
+/// when every fetch arrived, so a healthy render's URLs never reach the log.
+///
+/// `RenderTrace` records each fetch's URL, and the header, Loki line and
+/// `/admin/render-stats` expose only counts. With counts alone, the 2026-09-12
+/// and 2026-09-28 alpha cold-window firings of `render-degenerate` showed that
+/// one of 29 fetches never settled but not which one (see
+/// `genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md`).
+pub fn degenerate_fetch_summary(trace: &elohim_render::RenderTrace) -> Option<String> {
+    use elohim_render::FetchOutcome;
+    let named: Vec<String> = trace
+        .fetches
+        .iter()
+        .filter_map(|f| {
+            let outcome = match &f.outcome {
+                FetchOutcome::Arrived { .. } => return None,
+                FetchOutcome::Stalled { waited_ms } => format!("stalled {waited_ms}ms"),
+                FetchOutcome::Errored { duration_ms, .. } => format!("errored {duration_ms}ms"),
+            };
+            Some(format!("{} {} ({outcome})", f.method, f.url))
+        })
+        .collect();
+    if named.is_empty() {
+        return None;
+    }
+    let total = named.len();
+    let mut line = named
+        .into_iter()
+        .take(DEGENERATE_FETCHES_NAMED)
+        .collect::<Vec<_>>()
+        .join("; ");
+    if total > DEGENERATE_FETCHES_NAMED {
+        line.push_str(&format!("; +{} more", total - DEGENERATE_FETCHES_NAMED));
+    }
+    Some(line)
+}
+
+#[cfg(test)]
+mod degenerate_fetch_summary_tests {
+    use super::degenerate_fetch_summary;
+    use elohim_render::{FetchEvent, FetchOutcome, RenderTrace};
+
+    fn event(url: &str, outcome: FetchOutcome) -> FetchEvent {
+        FetchEvent {
+            url: url.to_string(),
+            method: "GET".to_string(),
+            offset_ms: 0,
+            outcome,
+        }
+    }
+
+    fn arrived(url: &str) -> FetchEvent {
+        event(
+            url,
+            FetchOutcome::Arrived {
+                status: 200,
+                bytes: 10,
+                duration_ms: 3,
+                empty: false,
+            },
+        )
+    }
+
+    #[test]
+    fn healthy_render_names_nothing() {
+        let trace = RenderTrace {
+            fetches: vec![arrived("/db/a"), arrived("/db/b")],
+            ..Default::default()
+        };
+        assert_eq!(degenerate_fetch_summary(&trace), None);
+    }
+
+    #[test]
+    fn names_the_one_stalled_fetch_among_arrivals() {
+        // The alpha cold-window shape: 28 arrive fast, exactly one never settles.
+        let mut fetches: Vec<FetchEvent> = (0..28).map(|i| arrived(&format!("/db/{i}"))).collect();
+        fetches.push(event(
+            "/db/content/slow",
+            FetchOutcome::Stalled { waited_ms: 1200 },
+        ));
+        let trace = RenderTrace {
+            fetches,
+            ..Default::default()
+        };
+        assert_eq!(
+            degenerate_fetch_summary(&trace).as_deref(),
+            Some("GET /db/content/slow (stalled 1200ms)")
+        );
+    }
+
+    #[test]
+    fn names_errored_fetches_and_caps_the_list() {
+        let fetches: Vec<FetchEvent> = (0..7)
+            .map(|i| {
+                event(
+                    &format!("/db/{i}"),
+                    FetchOutcome::Errored {
+                        message: "boom".to_string(),
+                        duration_ms: 4,
+                    },
+                )
+            })
+            .collect();
+        let trace = RenderTrace {
+            fetches,
+            ..Default::default()
+        };
+        let line = degenerate_fetch_summary(&trace).expect("errored fetches are named");
+        assert!(line.starts_with("GET /db/0 (errored 4ms); GET /db/1 (errored 4ms)"));
+        assert!(line.contains("GET /db/4 (errored 4ms)"));
+        assert!(!line.contains("/db/5 "));
+        assert!(line.ends_with("; +2 more"));
+    }
+}
+
 #[cfg(test)]
 mod semaphore_sizing_tests {
     use super::types::RenderCapabilityProfile;

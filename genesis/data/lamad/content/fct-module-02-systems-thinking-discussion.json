@@ -1,39 +1,54 @@
 {
   "id": "fct-module-02-systems-thinking-discussion",
-  "contentType": "exercise",
+  "contentType": "discussion",
   "title": "Discussion: Systems Thinking",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** Compare and Contrast verses, Complicated vs Complex in scripture, which is the priority?: \n\nMatthew 23:23 \\- Woe to you teachers of the law and Pharisees, you hypocrites\" You give a tenth of your spices \\- mint, dill, and cumin. But you have neglected the more important matters of the law \\- justice, mercy, and faithfulness. You should have practiced the latter, without neglecting the former. \n\nMatthew 22:36-40 \"Teacher, which is the greatest commandment in the Law?\" Jesus replied: \"Love the Lord your God with all your heart and with all your soul and with all your mind. This is the first and greatest commandment. And the second is like it: 'Love your neighbor as yourself.' All the Law and the Prophets hang on these two commandments.\"\n\nHow personal spiritual disciplines (prayer, reading scripture, serving) contribute to the collective well-being and mission of the church.  \nKey Concept: Small, consistent actions lead to significant change.\n\n ... other verses?\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "description": "Discussion & Activity  Compare and contrast: which does Jesus prioritize?",
+  "content": "## Discussion & Activity\n\n**Compare and contrast: which does Jesus prioritize?** Read Matthew 23:23 (tithing mint, dill, and cumin while neglecting justice, mercy, and faithfulness) beside Matthew 22:36-40 (the greatest commandments, on which all the Law and Prophets hang). Tithing spices is complicated-system religion — precise, auditable, complete-able. Justice, mercy, and love of God and neighbor are complex — never finished, always adaptive. Jesus doesn't abolish the complicated (\"without neglecting the former\") but he unmistakably subordinates it. Discuss: where does our church excel at the auditable and neglect the weightier, and why is the auditable so much more comfortable?\n\n**Activity — Habit archaeology.** Each participant picks one habit they wish were different (personal or congregational). Trace the system producing it: what cues, incentives, defaults, and community patterns hold it in place? Then redesign one element of the *system* — not a resolution to try harder. Share designs in pairs; note how personal disciplines (prayer, Scripture, service) function as counter-systems, and how community sustains them (Hebrews 10:24-25; Daniel's daily prayer, Daniel 6:10; Jesus wielding Scripture against temptation, Matthew 4:1-11). New habits ultimately flow from new identity: the new creation of 2 Corinthians 5:17, Saul become Paul.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 2 - Systems Thinking.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m02.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-02-systems-thinking"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-2",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-02-systems-thinking",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 2,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0 (second session)",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-02-systems-thinking",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.195283",
-  "updatedAt": "2025-12-24T03:05:26.171Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: Systems Thinking",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-02-systems-thinking-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: Systems Thinking - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }

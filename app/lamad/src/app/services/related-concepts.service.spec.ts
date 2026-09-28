@@ -464,7 +464,7 @@ describe('RelatedConceptsService', () => {
       new Promise<void>(done => {
         service.getNeighborhood('concept-1').subscribe(() => {
           service.getNeighborhood('concept-1').subscribe(() => {
-            expect(dataLoaderSpy.getGraph).toHaveBeenCalledTimes(1);
+            expect(dataLoaderSpy.getResolvedRelationshipsForNode).toHaveBeenCalledTimes(1);
             done();
           });
         });
@@ -488,6 +488,45 @@ describe('RelatedConceptsService', () => {
           const hasOutgoing = graph.edges.some(e => e.source === 'concept-1');
           const hasIncoming = graph.edges.some(e => e.target === 'concept-1');
           expect(hasOutgoing || hasIncoming).toBe(true);
+          done();
+        });
+      }));
+  });
+
+  describe('getNeighborhood — the sidebar concept map', () => {
+    // The resolver graph and relationship rows carry ids only; the map used to
+    // require loaded content for every node and so drew "No connections" for
+    // any lesson whose neighbors were not already in the graph's node map.
+    it('draws a node with edges from relationships alone, labelled from content', () =>
+      new Promise<void>(done => {
+        dataLoaderSpy.getResolvedRelationshipsForNode.mockReturnValue(
+          of([
+            {
+              id: 'r-in',
+              sourceNodeId: 'callback-atom',
+              targetNodeId: 'concept-1',
+              relationshipType: 'RELATES_TO',
+            },
+            {
+              id: 'r-out',
+              sourceNodeId: 'concept-1',
+              targetNodeId: 'concept-2',
+              relationshipType: 'REFERENCES',
+            },
+          ] as ContentRelationship[])
+        );
+
+        service.getNeighborhood('concept-1', { depth: 1 }).subscribe(graph => {
+          expect(graph.neighbors.map(n => n.id)).toEqual(['callback-atom', 'concept-2']);
+          expect(graph.edges).toContainEqual({
+            source: 'callback-atom',
+            target: 'concept-1',
+            relationshipType: 'RELATES_TO',
+          });
+          // Loadable nodes get their titles; an unloadable one keeps its id.
+          expect(graph.focus.title).toBe(mockNodes.get('concept-1')!.title);
+          expect(graph.neighbors[1].title).toBe(mockNodes.get('concept-2')!.title);
+          expect(graph.neighbors[0].title).toBe('callback-atom');
           done();
         });
       }));

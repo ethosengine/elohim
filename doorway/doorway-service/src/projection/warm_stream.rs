@@ -72,6 +72,7 @@ fn warmup_pace() -> std::time::Duration {
     parse_warmup_pace(std::env::var("WARMUP_PACE_MS").ok())
 }
 
+use super::cache_refresh::is_cacheable_reach;
 use super::document::ProjectedDocument;
 use super::store::ProjectionStore;
 
@@ -133,6 +134,17 @@ pub struct StreamResult {
     pub human_count: usize,
     pub relationship_count: usize,
     pub errors: Vec<String>,
+    /// The stream reached storage's `cache.done` event. A stream cut short
+    /// (timeout, disconnect) never sets it, so absence from `content_ids` /
+    /// `relationship_ids` means something only when this is true — and even
+    /// then only as a candidate for a per-row check (`cache_refresh`).
+    pub completed: bool,
+    /// Ids of the cacheable Content rows the stream carried.
+    pub content_ids: std::collections::HashSet<String>,
+    /// Ids of the cacheable Relationship rows the stream carried.
+    pub relationship_ids: std::collections::HashSet<String>,
+    /// Rows refused because their reach is not one the public cache may hold.
+    pub refused_reach: usize,
 }
 
 /// Per-upstream observable health surfaced on /health/startup (W6).
@@ -340,6 +352,7 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
                     if let Some(event) = parse_sse_event(&event_lines) {
                         // Check for done signal
                         if event.event_type == "cache.done" {
+                            result.completed = true;
                             info!(
                                 content = result.content_count,
                                 humans = result.human_count,
@@ -362,6 +375,35 @@ pub async fn stream_from_peer(store: Arc<ProjectionStore>, storage_url: &str) ->
                                     .unwrap_or("unknown")
                                     .to_string()
                             };
+
+                            // Defense in depth: storage streams only commons/public
+                            // rows (`list_cacheable_*`), but the doorway never writes
+                            // a Content or Relationship row whose own reach it could
+                            // not serve to an anonymous visitor. A refused row is NOT
+                            // recorded as seen, so a sweep questions (and evicts) any
+                            // older cached copy of it.
+                            if matches!(doc_type, "Content" | "Relationship")
+                                && !is_cacheable_reach(&event.data)
+                            {
+                                result.refused_reach += 1;
+                                debug!(
+                                    doc_type,
+                                    doc_id = %doc_id,
+                                    "Streamed entry not cacheable at its reach; skipped"
+                                );
+                                event_lines.clear();
+                                continue;
+                            }
+
+                            match doc_type {
+                                "Content" => {
+                                    result.content_ids.insert(doc_id.clone());
+                                }
+                                "Relationship" => {
+                                    result.relationship_ids.insert(doc_id.clone());
+                                }
+                                _ => {}
+                            }
 
                             let doc = ProjectedDocument::new(
                                 doc_type,

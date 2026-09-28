@@ -1,39 +1,54 @@
 {
   "id": "fct-module-01-church-dilemma-discussion",
-  "contentType": "exercise",
+  "contentType": "discussion",
   "title": "Discussion: The Church Dilemma",
-  "description": "Group discussion and reflection activity",
-  "content": "**Instructions:** What are some ways that we \"the church\" is reacting to this change?\n\nWhat are some examples of \"god-like\" technology?\n\nWhat are the things churches do which make sense if we look for race for attention?\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "description": "Discussion & Activity  After the screening (or with it fresh from homework), work in three rounds:  1.",
+  "content": "## Discussion & Activity\n\nAfter the screening (or with it fresh from homework), work in three rounds:\n\n1. **Ledger walk.** Post the Ledger of Harms categories around the room. Participants place sticky notes under each: *where did you see yourself? where did you see our church?* Cluster and read the patterns aloud.\n2. **Discussion.** What are some ways the church is reacting to this change? What are some examples of \"god-like\" technology? What are the things churches do that make sense if we look for a race for attention?\n3. **Communal lament.** In small groups, draft one sentence of honest complaint in the pattern of Psalm 13 (\"How long, Lord...\"). Gather the sentences into a single communal lament and pray it together. Do not resolve it. The turn toward hope comes — but let today's session end where Israel's deliverance began.",
   "contentFormat": "markdown",
-  "sourcePath": "fct/v1/Module 1 - The Church Dilemma.md",
+  "sourcePath": "docs/content/fct/fct-course/content/m01.md",
+  "reach": "commons",
   "tags": [
-    "activity",
-    "discussion",
     "fct",
-    "foundations"
-  ],
-  "relatedNodeIds": [
-    "fct-module-01-church-dilemma"
+    "christian-technology",
+    "humane-tech",
+    "movement-1",
+    "module-1",
+    "discussion"
   ],
   "metadata": {
-    "category": "fct-activity",
-    "sourceModule": "fct-module-01-church-dilemma",
-    "activityType": "discussion",
-    "originalContentType": "activity"
+    "category": "fct",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "sourceWorkbook": "fct-course",
+    "moduleNumber": 1,
+    "movement": 1,
+    "movementTitle": "Waking Up — Lament & Sight",
+    "day": "Day 0",
+    "form": "discussion"
   },
+  "relationships": [
+    {
+      "target": "fct-module-01-church-dilemma",
+      "type": "BELONGS_TO",
+      "role": "discussion"
+    }
+  ],
   "createdAt": "2025-11-28T21:10:19.190689",
-  "updatedAt": "2025-12-24T03:05:26.169Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 0.3,
+      "role": "endorser"
+    }
+  ],
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Page",
-  "openGraphMetadata": {
-    "ogTitle": "Discussion: The Church Dilemma",
-    "ogDescription": "Group discussion and reflection activity",
-    "ogType": "website",
-    "ogUrl": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-discussion",
-    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
-    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
-    "ogImageAlt": "Discussion: The Church Dilemma - Elohim Protocol"
-  },
   "linkedData": {
     "@context": "https://schema.org/",
     "@type": "CreativeWork",
@@ -48,17 +63,5 @@
       "@id": "https://elohim-protocol.org",
       "name": "Elohim Protocol"
     }
-  },
-  "stewardedBy": [
-    {
-      "humanId": "human-pete-pastor",
-      "affinity": 0.7,
-      "role": "steward"
-    },
-    {
-      "humanId": "human-matthew-manager",
-      "affinity": 0.3,
-      "role": "endorser"
-    }
-  ]
+  }
 }
