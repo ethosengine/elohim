@@ -281,7 +281,12 @@ export function isShedPatch(status: number, bodyText: string): boolean {
   try {
     const body = JSON.parse(bodyText) as { status?: unknown; error?: unknown };
     if (body?.status === 'catching-up') return true;
-    return typeof body?.error === 'string' && /websocket error: timeout/i.test(body.error);
+    // A concurrent commit on the same agent's chain (genesis #1591): the write lost a
+    // race, it was not refused — retry after the head settles.
+    return (
+      typeof body?.error === 'string' &&
+      /websocket error: timeout|source chain head has moved/i.test(body.error)
+    );
   } catch {
     return false;
   }

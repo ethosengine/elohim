@@ -223,13 +223,42 @@ async function patchReach(
   id: string,
   to: Parameters<typeof widenPatch>[0]
 ): Promise<void> {
+  // Every PATCH signs on this node's ONE source chain: concurrent commits race for its
+  // head (genesis #1591 "source chain head has moved"), so writes go one at a time
+  // while reads and the authorship proofs stay concurrent.
+  const run = writeQueue.then(async () => patchReachSerial(storage, id, to));
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+async function patchReachSerial(
+  storage: string,
+  id: string,
+  to: Parameters<typeof widenPatch>[0]
+): Promise<void> {
+  let timeouts = 0;
   for (let waits = 0; ; waits++) {
-    const r = await fetch(`${storage}/db/content/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(widenPatch(to)),
-      signal: AbortSignal.timeout(180_000),
-    });
+    let r: Response;
+    try {
+      r = await fetch(`${storage}/db/content/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(widenPatch(to)),
+        signal: AbortSignal.timeout(180_000),
+      });
+    } catch (err) {
+      // The client gave up, not the peer: a new root through a loaded conductor can
+      // outlast the timeout and still commit. Re-read before deciding.
+      if (!(err instanceof Error && /timeout|aborted/i.test(`${err.name} ${err.message}`)))
+        throw err;
+      if (widenLanded(to, await readAnonymously(storage, id))) return;
+      // Each timeout costs 3 minutes of a serialized queue: two retries, then the row
+      // waits for the next run (the grade is idempotent).
+      if (++timeouts > 2 || waits >= SHED_MAX_WAITS) throw err;
+      continue;
+    }
     if (r.status < 300) return;
     const text = await r.text();
     if (!isShedPatch(r.status, text) || waits >= SHED_MAX_WAITS) {

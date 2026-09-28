@@ -236,6 +236,13 @@ describe('PATCH shed ladder', () => {
   it('waits out catching-up and a zome websocket timeout, nothing else', () => {
     assert.equal(isShedPatch(503, '{"status":"catching-up","retryAfter":2}'), true);
     assert.equal(isShedPatch(503, '{"error":"Zome call failed: Websocket error: Timeout"}'), true);
+    assert.equal(
+      isShedPatch(
+        503,
+        '{"error":"Zome call failed: Source chain error: Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began"}'
+      ),
+      true
+    );
     assert.equal(isShedPatch(503, '{"error":"Zome call failed: source chain head moved"}'), false);
     assert.equal(isShedPatch(500, '{"status":"catching-up"}'), false);
     assert.equal(isShedPatch(503, 'not json'), false);
