@@ -3,16 +3,26 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::address::{BlobCid, EprRef, ProjectionId};
 use crate::error::{EprfsError, Result};
 
 /// A validated relative path inside a projection.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
 pub struct ProjectionPath(PathBuf);
+
+impl<'de> Deserialize<'de> for ProjectionPath {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path = PathBuf::deserialize(deserializer)?;
+        Self::new(path).map_err(D::Error::custom)
+    }
+}
 
 impl ProjectionPath {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
@@ -163,6 +173,9 @@ impl ProjectionManifest {
         let mut paths = HashSet::with_capacity(self.entries.len());
 
         for entry in &self.entries {
+            // Keep the materialization boundary safe even if an in-memory path is ever built
+            // without passing through Deserialize or ProjectionPath::new.
+            ProjectionPath::new(entry.path.as_path())?;
             if let Some(source) = &entry.source {
                 if source.namespace.trim().is_empty() || source.id.trim().is_empty() {
                     return Err(EprfsError::InvalidProjectionManifest(format!(
@@ -222,6 +235,44 @@ impl ProjectionManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serialized_projection_paths_obey_constructor_invariants() {
+        for invalid in ["/absolute", "../escape", "", "."] {
+            let encoded = serde_json::to_string(invalid).unwrap();
+            assert!(
+                serde_json::from_str::<ProjectionPath>(&encoded).is_err(),
+                "deserialization accepted invalid projection path {invalid:?}"
+            );
+        }
+
+        let valid = ProjectionPath::new("nested/file.txt").unwrap();
+        let encoded = serde_json::to_string(&valid).unwrap();
+        assert_eq!(encoded, "\"nested/file.txt\"");
+        assert_eq!(
+            serde_json::from_str::<ProjectionPath>(&encoded).unwrap(),
+            valid
+        );
+    }
+
+    #[test]
+    fn manifest_revalidates_paths_before_materialization() {
+        let manifest = ProjectionManifest {
+            root: ProjectionRoot {
+                id: ProjectionId::new("test"),
+                root: EprRef::new("epr:test"),
+            },
+            entries: vec![ProjectionEntry::file(
+                ProjectionPath(PathBuf::from("../escape")),
+                BlobCid::compute_raw(b"sentinel replacement"),
+            )],
+            metadata: Value::Null,
+        };
+        assert!(matches!(
+            manifest.validate(),
+            Err(EprfsError::InvalidProjectionPath(_))
+        ));
+    }
 
     #[test]
     fn rejects_duplicate_projection_paths() {

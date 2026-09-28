@@ -1,0 +1,37 @@
+---
+epr-meta-version: 1
+id: eprfs-core-tree-boundary
+purpose: >
+  Artifact-neutral addressing and filesystem tree contracts. The shared tree is an
+  immutable, versioned content-addressed value; local projection state remains rebuildable.
+rules:
+  - id: immutable-tree-is-not-projection-manifest
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["TreeNode", "TreeEntry", "ProjectionManifest", "ProjectionEntry"]
+    dedupe-of: "elohim/eprfs/eprfs-core/src/projection.rs (existing mutable local view)"
+    why: >
+      Reuse tree.rs and address.rs in eprfs-core for immutable,
+      versioned, artifact-neutral values: byte names, raw leaves, modes, symlink target
+      bytes, explicit external boundaries and build closure. ProjectionManifest and
+      ProjectionEntry in projection.rs describe a mutable local view with adapter
+      metadata; ProjectionAwareness carries local status. Neither is the canonical
+      source or a tree CID. Git submodule pins, OIDs,
+      index and worktree interpretation belong in brit's Git bridge; build recipes and
+      hApp/Cargo packaging belong in rakia adapters. Migrate brit's BritCid
+      through eprfs-core's explicit tag-42 BlobLink only with byte/CID conformance;
+      a direct BlobCid alias can change serialized bytes. Preserve EprMeta v1 bytes.
+---
+
+# eprfs-core — portable tree contract
+
+`address.rs` provides codec-aware `BlobCid` addressing and the explicit `BlobLink` wire
+wrapper (tag-42 in DAG-CBOR, strings in JSON); existing `BlobCid` serialization is unchanged.
+The wrapper is additive; existing serialized fields do not silently migrate.
+`projection.rs` describes local projection entries. `tree.rs` owns the additive
+version-1 shared tree and bounded verified closure loader; it does not reinterpret
+`ProjectionManifest`. The tree is being qualified for publication as 0.1.2; source
+presence is not proof that a standalone consumer can resolve it. Its bytes must
+be stable across artifact adapters. A CID proves bytes, not publication standing or
+which release head was elected; those decisions remain with content governance.

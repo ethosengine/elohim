@@ -20,6 +20,7 @@ pub async fn verify_projection(
     target: impl AsRef<Path>,
 ) -> Result<Vec<EntryDrift>> {
     let target = target.as_ref();
+    manifest.validate()?;
     let mut drifts = Vec::new();
 
     for entry in &manifest.entries {
@@ -33,7 +34,12 @@ pub async fn verify_projection(
 
         let (actual, status) = match tokio::fs::read(&path).await {
             Ok(bytes) => {
-                let actual = BlobCid::compute(&bytes);
+                let actual = expected.recompute_for_codec(&bytes).ok_or_else(|| {
+                    eprfs_core::EprfsError::Storage(format!(
+                        "unsupported blob codec for projection path {}",
+                        entry.path.as_path().display()
+                    ))
+                })?;
                 let status = if actual == expected {
                     LocalOverlayStatus::Clean
                 } else {
@@ -125,5 +131,22 @@ mod tests {
         assert_eq!(drifts[0].status, LocalOverlayStatus::Dirty);
         assert!(drifts[0].actual.is_none());
         assert!(has_drift(&drifts));
+    }
+
+    #[tokio::test]
+    async fn dirty_file_actual_cid_uses_expected_codec() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::write(dir.path().join("a.md"), b"changed")
+            .await
+            .unwrap();
+        let raw = BlobCid::compute_raw(b"hello");
+        let legacy = BlobCid::compute(b"hello");
+        for expected in [raw, legacy] {
+            let mut manifest = manifest_for(b"hello");
+            manifest.entries[0].blob = Some(expected.clone());
+            let drifts = verify_projection(&manifest, dir.path()).await.unwrap();
+            assert_eq!(drifts[0].status, LocalOverlayStatus::Dirty);
+            assert_eq!(drifts[0].actual, expected.recompute_for_codec(b"changed"));
+        }
     }
 }

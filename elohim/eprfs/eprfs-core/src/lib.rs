@@ -12,8 +12,9 @@ pub mod error;
 pub mod meta;
 pub mod projection;
 pub mod storage;
+pub mod tree;
 
-pub use address::{BlobCid, EprRef, ProjectionId};
+pub use address::{BlobCid, BlobLink, EprRef, ProjectionId};
 pub use attestation::{AttestationDraft, AttestationKind};
 pub use awareness::{
     BytePresence, EprCard, EprResiliency, LocalOverlayStatus, PeerVisibility, ProjectionAwareness,
@@ -31,3 +32,7 @@ pub use projection::{
     ProjectionRoot, ProjectionSource, ProjectionSourceKind, ProjectionStatus,
 };
 pub use storage::{BlobHandle, BlobPresence, EprRecord, EprfsStorage, FetchPolicy};
+pub use tree::{
+    decode_tree, encode_tree, load_verified_tree, TreeEntry, TreeEntryKind, TreeError, TreeLimits,
+    TreeNode, TreeResult, VerifiedTree,
+};

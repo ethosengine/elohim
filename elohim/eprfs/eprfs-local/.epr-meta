@@ -1,0 +1,46 @@
+---
+epr-meta-version: 1
+id: eprfs-local-verified-materialization
+purpose: >
+  Host-aware local projection and drift inspection over content-addressed bytes. This
+  crate converts a verified tree or projection into ordinary files; the on-disk view is
+  reconstructable and never becomes the authority for its source.
+rules:
+  - id: verify-fetched-bytes-before-writing
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["fetch_blob", "write_file", "write_symlink", "materialize_entry"]
+    dedupe-of: "elohim/eprfs/eprfs-core/src/address.rs (BlobCid::verifies)"
+    why: >
+      In eprfs-local, check the returned handle CID and verify fetched bytes against
+      the requested BlobCid before any destination write. BlobCid::verifies dispatches
+      by the CID's declared raw or DAG-CBOR codec; do not hardcode one codec.
+      Keep this check on every LocalOnly and FetchIfMissing file/symlink path.
+      Whole-tree restore uses restore_exact_tree in exact_tree.rs; never infer its
+      guarantees from the legacy entry-by-entry materializer.
+  - id: preserve-host-file-semantics
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["SymlinkMode", "executable_bits", "apply_executable_bit", "atomic_rename"]
+    dedupe-of: "elohim/eprfs/eprfs-host/src/lib.rs (HostProfile capabilities)"
+    why: >
+      Use eprfs-host's HostProfile when materializing mode and symlink semantics.
+      Preserve symlink target bytes and executable mode when the host supports them;
+      refuse an exact restore when it cannot express required semantics. A marker or
+      sparse projection must not be reported as an exact restored tree. Stage and
+      promote verified content safely without overwriting an existing destination
+      before verification succeeds. Git mode/index semantics belong in brit.
+---
+
+# eprfs-local — verified host projection
+
+`LocalMaterializer` validates the projection shape and writes entries one by one;
+each fetched handle must pass CID and byte verification before its entry is written.
+`verify_projection` checks file drift only. The separate `restore_exact_tree`
+checks the complete closure, then stages and promotes to a NEW destination on
+Linux with no-replace semantics. It refuses external boundaries and unsupported
+host semantics. Its parent must be trusted against concurrent hostile mutation;
+power-loss durability and replacing an existing checkout are not claimed.
+The additive 0.1.2 API is under qualification; publication is a separate proof.

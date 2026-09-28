@@ -7,8 +7,6 @@
 //! Hyper integration note: `ctx.data` is populated by `build_schema` (not by any
 //! axum extractor), so the standard `async-graphql` macro surface works unchanged.
 
-#![cfg(feature = "graph-native")]
-
 use std::sync::Arc;
 
 use async_graphql::{Context, Enum, FieldResult, Object, ID};

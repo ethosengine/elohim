@@ -1,0 +1,77 @@
+seamRegistryVersion: 1
+crate: eprfs-storage
+crateRoot: elohim/eprfs/eprfs-storage
+seamLocus: >
+  Explicit private byte custody through the existing EprfsStorage trait.
+  The directory adapter is local content storage, not a transport, release
+  head, publication record, or authority source.
+decisionPoints:
+  - name: DirectoryStorage
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: eprfs_storage::DirectoryStorage
+    summary: >
+      Open or explicitly create a private flat local content store; verify raw
+      or DAG-CBOR bytes against a caller-supplied CID before storing or serving.
+      Refuse symlink, public, and corrupt objects. Never infer release standing.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: This is private local byte custody, not elected reach.
+      - id: C1
+        status: n-a
+        justification: Blob possession elects no release candidate.
+      - id: C2
+        status: n-a
+        justification: No head, authority clock, or version order is changed.
+      - id: C3
+        status: answered
+        justification: Each explicit request returns success or refusal; no retry loop runs.
+      - id: C4
+        status: partial
+        justification: Missing, corrupt, wrong-CID, and inaccessible objects refuse; the shared storage error type still groups several reasons under Storage.
+      - id: C5
+        status: partial
+        justification: Bytes are rehashed on fetch and put, but no signature, lineage, or standing is checked.
+      - id: C6a
+        status: partial
+        justification: Directory reads and writes cap each object at 64 MiB by default, with a caller-configurable bound; filesystem I/O duration and concurrent trusted-path replacement are not bounded here.
+      - id: C6b
+        status: answered
+        justification: Repeated puts of the same valid CID are idempotent and no-clobber; corrupt existing bytes are refused.
+      - id: C7
+        status: partial
+        justification: Local possession is checked but no peer-delivery or availability guarantee follows.
+      - id: C8
+        status: partial
+        justification: Errors expose refusals to callers; metrics and durable observations are caller-owned.
+      - id: C9
+        status: n-a
+        justification: The adapter interprets no agent, identity key, or lineage.
+      - id: C10
+        status: answered
+        justification: Explicit-CID put is additive; legacy put_blob and BlobCid wire bytes remain unchanged.
+      - id: C11
+        status: n-a
+        justification: No network listener, ingress, or background retries are added.
+      - id: C12
+        status: answered
+        justification: Only an explicit caller-selected put writes bytes; custody grants no publication or execution authority.
+      - id: C13
+        status: n-a
+        justification: No authority tier or release fallback is added.
+      - id: C14
+        status: partial
+        justification: Every refusal returns Result; durable witness recording belongs to the caller.
+    contractTests:
+      - path: elohim/eprfs/eprfs-storage/src/lib.rs
+        testName: directory_store_verifies_raw_and_dag_cbor_and_never_clobbers_corruption
+        kind: unit
+      - path: elohim/eprfs/eprfs-storage/src/lib.rs
+        testName: directory_store_refuses_public_existing_root_and_object
+        kind: unit
+    notes: >
+      This adapter creates no DHT entry, coordinator, route, or release linkage;
+      expected head-plane cost is zero at seed and one year. Directory ancestry
+      is caller-owned and trusted against concurrent local path replacement.
