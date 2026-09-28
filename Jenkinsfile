@@ -715,6 +715,12 @@ def publishReleaseAndVerifyAdoption(List<String> doorwayEprUrls, String adminKey
     if (createChannel) {
         echo "[app:channel-create] on the tip commit — app-release-stage.sh creates the release channel if absent and binds the unbound app slugs"
     }
+    // The packager validates the release manifest against rakia's schema
+    // (elohim/rakia/schemas/v1/release-manifest.schema.json); CI checkouts leave
+    // submodules empty, so fetch it exactly as the edge pipeline does.
+    withCredentials([usernamePassword(credentialsId: 'ee-bot-pat', usernameVariable: 'RAKIA_GIT_USER', passwordVariable: 'RAKIA_GIT_TOKEN')]) {
+        sh "bash '${env.WORKSPACE}/scripts/ci/init-rakia-submodule.sh'"
+    }
     withEnv(["STORAGE_API_KEY_ADMIN=${adminKey ?: ''}", "APP_RELEASE_BUNDLES=${appReleaseBundles(bundles)}",
              "APP_RELEASE_STAGE_OUT=${stageOut}", "APP_RELEASE_CHANNEL_CREATE=${createChannel ? '1' : '0'}",
              "APP_RELEASE_BRANCH=${branch}", "DEPLOY_INTENT_OUT=${env.WORKSPACE}/deploy-intent.json",
