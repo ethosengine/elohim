@@ -6,15 +6,16 @@ contentFormat: "markdown"
 title: "alpha's SSR degenerate burst is REAL and deploy-coupled: for ~15min after a bundle-head swap, ONE fetch of the 29 in every cold `/` render exceeds the 1200ms soft budget, so every visitor in that window gets a degenerate HTTP 200 — and the stalling URL is unknowable from outside the process"
 slug: "self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 written: "2026-09-12"
+updated: "2026-09-28"
 author: "runtime-triage"
-status: "backlog"
+status: "wip"
 priority: "medium"
-self_heal_status: blocked
+self_heal_status: in-progress
 severity: medium
 fingerprints: [da8bb3bdd7e1]
 nodes: [alpha, doorway-alpha, elohim-matthew-alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, ssr, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, matthew, alpha]
+tags: [self-heal, render-degenerate, ssr, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha]
 cites:
   - https://doorway-alpha.elohim.host/admin/render-stats
   - https://doorway-alpha.elohim.host/admin/self-healing
@@ -29,6 +30,7 @@ cites:
   - doorway/doorway-service/src/render/warm_shell.rs
   - doorway/doorway-service/src/render/mod.rs
   - doorway/doorway-service/src/ssr.rs
+  - .claude/data/runtime-cursor.json
   - genesis/orchestrator/manifests/doorway/alpha.yaml
   - .claude/scripts/_lib/runtime_harvest.py
   - genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md
@@ -254,3 +256,125 @@ The two peers' `updatedAt` for the same content id are serialized differently �
 two write paths for the same projection row or two serializers, and it is the kind of
 asymmetry that makes cross-peer head comparison brittle. Named here because it was seen;
 not chased, and not claimed to relate to the stall.
+
+(2026-09-28: both peers now serialize `updatedAt` as RFC 3339, `2026-09-28T03:59:32Z`.
+This asymmetry no longer reproduces.)
+
+---
+
+# 2026-09-28: `da8bb3bdd7e1` fired again after an edge deploy (second true positive)
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 204, `2026-09-28T04:05:16+00:00`):
+
+```
+render degenerate 11/33 of NEW renders = 0.33 over 4 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+The base clears every floor the false-positive record added: 11 new degenerate renders
+(floor 3), a 33-render delta, and 4 poll transitions in which `total` moved. The stored
+window (`.claude/data/runtime-cursor.json`, poll 204) begins at `total: 1` on alpha and
+`total: 0` on alpha-b. **Both doorways had just restarted**, which fits the
+`a62972d24` `[build:conductor] [build:edge]` roll. Across the same window:
+
+| node | `total` | `stalled` | `maxWallMs` |
+|---|---|---|---|
+| alpha (matthew) | 1 → 34 | 0 → 11 | 1272 |
+| alpha-b (adam) | 0 → 27 | 0 → 0 | 2015 |
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (04:06:21Z, HTTP 200):
+
+```json
+{"total": 34, "rendered": 23, "renderedEmpty": 0, "stalled": 11, "timedOut": 0,
+ "errored": 0, "avgWallMs": 457, "maxWallMs": 1272, "degenerateRate": 0.3235}
+```
+
+`/admin/self-healing` from the same minute shows every other arm idle:
+`admission.shedTotal: 0`, upstream `circuit: closed, errorStreak: 0`,
+`conductor.connectedWorkers: 4/4`, `warmup.completed: true`. `projector.caughtUp: false`
+with `divergentAnchor: 60` and all seven conductor peers `Degraded`: the fleet was still
+catching up after the roll.
+
+`maxWallMs: 1272` is the same clamp as on 2026-09-12: the 1200 ms soft budget plus the
+rest of the render. `errored: 0` again. One fetch never settles, and the render is cut at
+the budget.
+
+## The re-encounter rule said to read the head first
+
+- `GET /db/content/elohim-host-landing/head` on doorway-alpha returned `updatedAt: 2026-09-28T03:59:32Z`.
+  The finding was filed **5m44s later**.
+- Served bundle: alpha `main-LDLJH3DK.js`, which is new (it was `main-G4BXXWHN.js` on
+  2026-09-12). Adam is still on `main-UK6P25XM.js`, unchanged since 2026-09-12.
+- Only alpha took a new app bundle, and only alpha stalled. The same thing happened on
+  2026-09-12.
+
+**Same concern, same shape.** The fingerprint maps onto this record. It does not need a
+new one.
+
+## Already cleared by triage time
+
+Three cache-busted cold renders of `/` on doorway-alpha at 04:06:43Z (`x-render-cache: MISS`):
+`rendered`, 29/28/29 fetches, **83 / 57 / 40 ms**. A fourth at 04:08:38Z rendered in
+117 ms. On elohim.host at 04:08:38Z the render took 396 ms. The window had closed about
+7 minutes after the head update. On 2026-09-12 it took about 15 minutes.
+
+Instrument disclosure: those probes add 4 renders to alpha's lifetime counters and 1 to
+alpha-b's. None of them stalled.
+
+## Decision this time: fix move 1 (name the fetch) is landed
+
+On 2026-09-12 both fix moves were blocked because that pass could not run cargo. This
+pass could. Move 1 was the prerequisite, because move 2 (warm after a swap) cannot be
+designed until we know which fetch is cold.
+
+- `doorway/doorway-service/src/render/mod.rs`: new `degenerate_fetch_summary(&RenderTrace)`.
+  It selects only the `Stalled`/`Errored` `FetchEvent`s as `METHOD url (outcome Nms)`,
+  names at most 5 and appends `+N more`, and returns `None` on a healthy render. Three
+  unit tests cover this, one of them the 28-arrive/1-stalls cold-window shape.
+- `doorway/doorway-service/src/server/http.rs`, at the SSR trace site: when the summary
+  is `Some`, a `warn!` on target `doorway::ssr::trace` carries `degenerate_fetches` next
+  to `path`, `terminal`, `wall_ms` and `observation_id`.
+
+Deliberately log-only. A response header was NOT added: the fetch URL can be the rewritten
+`SSR_STORAGE_URL` target (cluster-internal DNS), and that should not be served to the
+public.
+
+Still not proposed: widening the soft budget, touching `_render_degenerate`, or raising
+`DEFAULT_SSR_RENDER_PERMITS`. The reasons above are unchanged.
+
+## Current decision (supersedes the 2026-09-12 BLOCKED)
+
+**IN PROGRESS. The instrument is committed and the cure waits on its first reading.**
+
+- Next step (not an operator action): the next edge deploy that carries this commit opens
+  a cold window of its own. When it does, query Loki on alpha for target
+  `doorway::ssr::trace` lines containing `degenerate_fetches` to get the stalling URL.
+- Then decide move 2 using that URL. It could be a warm render after the swap, or a fix to
+  whatever storage read is cold for that route.
+- What the poller cites on re-encounter: this record. If the head's `updatedAt` is within
+  ~15 min of the finding, this is the same cold window and it clears on its own. Read the
+  `degenerate_fetches` warn before triaging again.
+
+## Verification
+
+- 2026-09-28 04:06:21Z: `/admin/render-stats`, `/admin/self-healing` and the landing head
+  re-fetched on both nodes, all HTTP 200, quoted above. The cursor window was read from disk.
+- 2026-09-28 04:06:43Z and 04:08:38Z: four cold renders on alpha, 4/4 `rendered` at
+  40–117 ms. **The condition had cleared without intervention.**
+- `just gate doorway` (fmt-check, clippy `-D warnings`, test, `RUSTFLAGS=""`): EXIT=0. The lib suite passed 1720, 0 failed, 2 ignored, including
+  the 3 new `render::degenerate_fetch_summary_tests`. The bins suites were green too.
+- Closure: left to the poller, by disappearance. The ledger line is `triaged` and is NOT
+  manually deleted. The condition was real, so it closes by disappearance and a recurrence
+  files as NEW.
+
+## Observation, not a claim (cross-peer head vs blob)
+
+Both peers report the **same** `headActionHash` (`uhCkkEBj4KjHttF86rslxs2fzwFvgJU8jQZJHsVLEbsYrw_lGBP0K`)
+and the same `updatedAt` (`2026-09-28T03:59:32Z`) for `elohim-host-landing`, but different
+`blobHash`es. Matthew has `sha256-9a0bae8d…`. Adam has `sha256-3bf2280c…`, the blob adam
+already declared on 2026-09-12. So one declared head resolves to two blobs, and adam's
+doorway serves a 16-day-old app bundle. That is a head/blob coherence question on the
+content-sync plane, not an SSR render question. It is named here because it was seen,
+not investigated, and not claimed to cause the stall (adam, the peer with the stale blob,
+is the one that does NOT stall).

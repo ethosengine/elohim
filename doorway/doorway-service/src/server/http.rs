@@ -6617,6 +6617,19 @@ async fn serve_ssr_route(
                     observation_id = observation_id.unwrap_or(""),
                     "SSR render trace"
                 );
+                // A degenerate render names the fetches that made it so. The
+                // info line above carries only the count.
+                if let Some(degenerate) = crate::render::degenerate_fetch_summary(&out.trace) {
+                    tracing::warn!(
+                        target: "doorway::ssr::trace",
+                        path = %path,
+                        terminal = out.trace.terminal.as_str(),
+                        wall_ms = out.trace.wall_ms,
+                        observation_id = observation_id.unwrap_or(""),
+                        degenerate_fetches = %degenerate,
+                        "SSR render degenerate — fetches that did not arrive"
+                    );
+                }
                 state.render_trace_stats.record(&out.trace);
 
                 // A render can "succeed" yet activate NO route component (a caught
