@@ -1,13 +1,80 @@
-# Additive codec recomputation for local byte verification. No tree format or
-# authority/election surface is introduced by this decision point.
+# Artifact-neutral byte addressing, canonical private trees, and local closure
+# verification. None of these surfaces elects or publishes a release head.
 seamRegistryVersion: 1
 crate: eprfs-core
 crateRoot: elohim/eprfs/eprfs-core
 seamLocus: >
-  BlobCid addressing is the artifact-neutral byte-integrity contract. Codec
-  recomputation preserves an already-declared CID codec for local drift checks;
-  it never decides which content version or release head is authoritative.
+  BlobCid addressing and the versioned canonical tree are artifact-neutral
+  byte-integrity contracts. They never decide which release is authoritative.
 decisionPoints:
+  - name: canonical_tree_and_verified_closure
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/tree.rs
+      modulePath: eprfs_core::tree
+    summary: >
+      Encode version-one byte-name trees canonically, validate links and bounds,
+      then fetch and rehash the complete local byte closure before reporting it.
+      Opaque external boundaries remain explicit and unverified.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Private content custody and local projection; no reach or election.
+      - id: C1
+        status: n-a
+        justification: No release candidate is elected.
+      - id: C2
+        status: n-a
+        justification: Content CIDs impose no head order or authority clock.
+      - id: C3
+        status: answered
+        justification: One bounded walk returns success or typed refusal, with no retry loop.
+      - id: C4
+        status: answered
+        justification: Missing bytes, integrity failure, schema refusal, and budget refusal are distinct results; external boundaries are separately reported.
+      - id: C5
+        status: partial
+        justification: Every fetched node and leaf is rehashed; neither signatures nor standing are authenticated.
+      - id: C6a
+        status: partial
+        justification: Encoded node, entry, depth, path, pending-frontier, and expanded byte ceilings are enforced; the storage adapter must bound its own fetch allocation and time.
+      - id: C6b
+        status: answered
+        justification: Canonical encoding and immutable CIDs make repeated read-only walks deterministic; no effects are replayed.
+      - id: C7
+        status: partial
+        justification: Opaque external boundaries are reported and never claimed complete, but remote delivery is outside this crate.
+      - id: C8
+        status: partial
+        justification: Typed error variants expose refusals; operational telemetry belongs to callers.
+      - id: C9
+        status: n-a
+        justification: No actor, identity key, or lineage is interpreted.
+      - id: C10
+        status: answered
+        justification: Additive version-one schema rejects unknown fields and noncanonical bytes; prior BlobCid and EprMeta wire formats remain untouched.
+      - id: C11
+        status: n-a
+        justification: No listener, network ingress, or background retry is added.
+      - id: C12
+        status: answered
+        justification: Callers explicitly select local bytes; a tree CID does not authorize publication or execution.
+      - id: C13
+        status: n-a
+        justification: No authority scaffold or fallback tier is introduced.
+      - id: C14
+        status: partial
+        justification: Every refusal returns a Result; durable witnesses belong to callers.
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/tree.rs
+        testName: canonical_tree_sorts_raw_names_and_round_trips
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/tree.rs
+        testName: closure_verifies_leaf_and_reports_external_boundary
+        kind: unit
+    notes: >
+      Expected head-plane cost is zero at seed and one year. This is content
+      storage only, with no DHT type, coordinator, route, or release A2 linkage.
   - name: recompute_for_codec
     kind: pure-decision-predicate
     sourceLocation:

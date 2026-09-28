@@ -11,6 +11,9 @@ use eprfs_host::{Capability, HostProfile, SymlinkMode};
 mod verify;
 pub use verify::{has_drift, verify_projection, EntryDrift};
 
+mod exact_tree;
+pub use exact_tree::{restore_exact_tree, ExactRestoreError, ExactRestoreReport};
+
 /// Writes an EPR projection manifest into an ordinary local directory.
 pub struct LocalMaterializer<S> {
     storage: S,

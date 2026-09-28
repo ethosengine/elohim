@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "cid",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-agent"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -486,27 +486,29 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "bytes",
  "cid",
  "multihash-codetable",
  "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
  "serde_json",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "eprfs-host"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "eprfs-meta"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eprfs-core",
  "serde",

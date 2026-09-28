@@ -1,13 +1,100 @@
-# Local byte-integrity decision at the projection boundary. This registry makes no
-# claim that a complete tree can be restored atomically or that a CID elects a head.
+# Local integrity and fresh-target restore decisions. No CID elects a head.
 seamRegistryVersion: 1
 crate: eprfs-local
 crateRoot: elohim/eprfs/eprfs-local
 seamLocus: >
-  A fetched storage handle is admitted to a local file or symlink only after the
-  requested content address and returned bytes agree. The scope is one entry;
-  full-tree promotion, path containment and authority remain separate concerns.
+  The legacy projection materializer checks each fetched entry; exact tree restore
+  checks the complete closure before fresh-target Linux promotion. Host and trusted
+  parent limits remain explicit; neither operation establishes release authority.
 decisionPoints:
+  - name: restore_exact_tree
+    kind: state-transition
+    sourceLocation:
+      file: src/exact_tree.rs
+      modulePath: eprfs_local::restore_exact_tree
+    summary: >
+      Verify the complete private tree closure, reject external and host-inexpressible
+      entries, then stage in a trusted same-filesystem parent and atomically promote
+      to an absent destination with Linux RENAME_NOREPLACE. This does not elect a head.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Local private content is projected only after CID integrity verification; storage possession grants no head authority.
+      - id: C1
+        status: n-a
+        justification: The caller supplies a root CID; this function does not choose a candidate or release head.
+      - id: C2
+        status: n-a
+        justification: No version ordering or authoritative pointer is changed.
+      - id: C3
+        status: answered
+        justification: The path has explicit preflight, verified closure, private staging, and no-replace promotion states; failures before promotion leave the destination absent.
+      - id: C4
+        status: partial
+        justification: Tree failures, local refusals, and I/O failures are typed, but individual host refusals remain strings.
+      - id: C5
+        status: partial
+        justification: The receiver verifies all fetched bytes and names before writing; standing, signatures, and head election are outside this local projection.
+      - id: C6a
+        status: partial
+        justification: TreeLimits bound decoded nodes, closure depth, entry count, and retained bytes, but EprfsStorage fetch can allocate a single unbounded response before the limit is checked; no deadline is imposed.
+      - id: C6b
+        status: answered
+        justification: A new destination alone is admitted; Linux no-replace promotion refuses a concurrent occupant instead of overwriting it.
+      - id: C7
+        status: partial
+        justification: The exact closure is restored for Linux native profiles only; external entries, unsupported hosts, and an existing destination are refused.
+      - id: C8
+        status: partial
+        justification: The report counts files, directories, symlinks and bytes; no durable per-reason counters are emitted.
+      - id: C9
+        status: n-a
+        justification: The lane carries no agent identity or key lineage.
+      - id: C10
+        status: answered
+        justification: Raw leaves and DAG-CBOR directory nodes use the core codec and BlobCid verifier; this crate adds no alternate encoding.
+      - id: C11
+        status: partial
+        justification: Staging is sequential and size-limited by the verified closure budget, but there is no concurrency scheduling or fetch deadline.
+      - id: C12
+        status: n-a
+        justification: Restoring private bytes does not authorize publication, execution, or peer action.
+      - id: C13
+        status: partial
+        justification: Linux native same-filesystem promotion is required; cross-platform atomicity and crash durability are not claimed.
+      - id: C14
+        status: partial
+        justification: Refusal leaves the destination absent and errors carry reasons, but no durable witness is recorded for interrupted or crash recovery.
+    contractTests:
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: restores_nested_raw_bytes_executable_mode_non_utf8_names_and_symlink_target
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: corrupt_late_leaf_leaves_absent_destination_and_existing_sibling_unchanged
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: refuses_existing_destination_even_when_empty
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: interruption_before_promotion_never_exposes_destination
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: refuses_symlinked_parent_and_unsafe_tree_name_before_any_write
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: concurrent_destination_creation_is_never_replaced
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: expanded_repeated_leaf_bytes_are_bounded_before_staging
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
+        testName: external_boundary_and_nul_symlink_target_refuse_exact_restore
+        kind: unit
+    notes: >
+      The destination parent must be owned/trusted against concurrent mutation;
+      path-based staging is not an adversarial race containment boundary. The
+      implementation rejects symlinked ancestors and uses an opened parent fd
+      for final promotion. No fsync durability guarantee is made.
   - name: fetch_verified_blob
     kind: verdict-fn
     sourceLocation:

@@ -17,7 +17,8 @@ rules:
       the requested BlobCid before any destination write. BlobCid::verifies dispatches
       by the CID's declared raw or DAG-CBOR codec; do not hardcode one codec.
       Keep this check on every LocalOnly and FetchIfMissing file/symlink path.
-      Whole-tree atomic promotion remains a separate unfinished station.
+      Whole-tree restore uses restore_exact_tree in exact_tree.rs; never infer its
+      guarantees from the legacy entry-by-entry materializer.
   - id: preserve-host-file-semantics
     class: inject
     when:
@@ -37,6 +38,9 @@ rules:
 
 `LocalMaterializer` validates the projection shape and writes entries one by one;
 each fetched handle must pass CID and byte verification before its entry is written.
-`verify_projection` checks file drift only. Neither is complete-tree verified
-restore today. The through-line still requires a safe promotion boundary and
-explicit refusal for host-inexpressible exact restores.
+`verify_projection` checks file drift only. The separate `restore_exact_tree`
+checks the complete closure, then stages and promotes to a NEW destination on
+Linux with no-replace semantics. It refuses external boundaries and unsupported
+host semantics. Its parent must be trusted against concurrent hostile mutation;
+power-loss durability and replacing an existing checkout are not claimed.
+The additive 0.1.2 API is under qualification; publication is a separate proof.

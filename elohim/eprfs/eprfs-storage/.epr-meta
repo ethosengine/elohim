@@ -17,13 +17,17 @@ rules:
       possessing a blob does not elect its release head or confer standing; content
       governance owns lineage, delegation, revocation and observed election. Reuse
       the existing transport and retention path rather than adding a new authority
-      store or protocol. The current adapter is memory-backed scaffolding, not a
-      completed peer-delivery implementation.
+      store or protocol. MemoryStorage is test scaffolding; DirectoryStorage is
+      an explicit private local CAS, not a completed peer-delivery implementation.
 ---
 
 # eprfs-storage — bytes, not release authority
 
-The current `MemoryStorage` is a test/prototyping adapter. The approved peer-delivery
+`MemoryStorage` is a test/prototyping adapter. `DirectoryStorage` verifies immutable
+local CID-named files and refuses corrupt or public Unix stores/objects; it does
+not resolve EPRs or publish attestations. The caller owns and trusts its directory
+against hostile path replacement. The additive 0.1.2 API is under qualification.
+The approved peer-delivery
 station will use existing transport to publish and retrieve verified bytes through a
 second peer; that outcome needs a separate household receipt. Blob possession alone
 does not establish an authorized release.
