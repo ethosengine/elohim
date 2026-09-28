@@ -698,20 +698,29 @@ async function stampProvenance(
   let reachCircuitSkipped = 0;
 
   const patchContent = async (id: string, body: Record<string, string>): Promise<boolean> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PATCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      return response.ok;
-    } catch {
-      return false;
-    } finally {
-      clearTimeout(timer);
+    for (let waits = 0; ; waits++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PATCH_TIMEOUT_MS);
+      try {
+        const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (response.ok) return true;
+        // A shed write (peer catching up) is not a conductor-path failure: wait,
+        // don't feed the circuit breaker.
+        if (isCatchingUp(response.status, await response.text()) && waits < CATCHING_UP_MAX_WAITS) {
+          await new Promise(resolve => setTimeout(resolve, catchingUpDelayMs(response.headers.get('Retry-After'))));
+          continue;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(timer);
+      }
     }
   };
 
@@ -861,6 +870,7 @@ async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T) => Prom
  */
 async function patchContentFields(id: string, patch: ContentFieldPatch): Promise<string | null> {
   let lastErr = 'unknown failure';
+  let catchingUpWaits = 0;
   for (let attempt = 0; attempt < LOOKUP_MAX_ATTEMPTS; attempt++) {
     let status: number | null = null;
     let bodyText = '';
@@ -874,6 +884,19 @@ async function patchContentFields(id: string, patch: ContentFieldPatch): Promise
       if (response.ok) return null;
       bodyText = await response.text();
       lastErr = `PATCH ${id}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
+      // A peer still catching up SHEDS writes (genesis #1589: adam's FCT path PATCH).
+      // The write was refused, not lost: wait it out on its own bounded ladder
+      // without spending an attempt (the same ladder seed-epr-atom.ts uses).
+      if (isCatchingUp(status, bodyText) && catchingUpWaits < CATCHING_UP_MAX_WAITS) {
+        const delay = catchingUpDelayMs(response.headers.get('Retry-After'));
+        catchingUpWaits++;
+        console.log(
+          `     ⏳ ${id}: peer catching-up (503) — wait ${catchingUpWaits}/${CATCHING_UP_MAX_WAITS} in ${delay / 1000}s`,
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt--;
+        continue;
+      }
     } catch (err) {
       lastErr = `PATCH ${id}: ${err instanceof Error ? err.message : String(err)}`;
       bodyText = lastErr;
@@ -882,6 +905,24 @@ async function patchContentFields(id: string, patch: ContentFieldPatch): Promise
     await backoffSleep(attempt);
   }
   return lastErr;
+}
+
+/** A peer whose projector is catching up sheds writes with 503 {"status":"catching-up"}. */
+const CATCHING_UP_MAX_WAITS = 24;
+
+function isCatchingUp(status: number | null, bodyText: string): boolean {
+  if (status !== 503) return false;
+  try {
+    return (JSON.parse(bodyText) as { status?: string })?.status === 'catching-up';
+  } catch {
+    return false;
+  }
+}
+
+/** Honour Retry-After (seconds), default 5 s, capped at 15 s. */
+function catchingUpDelayMs(retryAfter: string | null): number {
+  const secs = retryAfter ? parseInt(retryAfter, 10) : NaN;
+  return Math.min(Number.isFinite(secs) ? Math.max(secs, 2) * 1000 : 5000, 15000);
 }
 
 /**
