@@ -593,22 +593,38 @@ def runContentSeedStage() {
     echo "Genesis peers (direct ingest): ${genesisPeers.collect { it.humanId }.join(', ')}"
     echo "Replica peers (P2P replication): ${replicaPeers.collect { it.humanId }.join(', ')}"
 
-    // ── Genesis peers: seed whoever is ready (fatal only if zero seeded) ──
+    // ── Genesis peers: grade, then seed whoever is ready (fatal only if zero seeded) ──
+    // Grade first: each genesis peer widens its OWN rows (proven own-authored by its own
+    // conductor) to their authored commons/public reach — the anonymous seeder cannot
+    // read, so never corrects, rows an old seeder stamped `private`. Idempotent; a grade
+    // failure is UNSTABLE, never fatal. A peer whose seed fails is UNSTABLE and counts as
+    // not seeded; the loop continues to the next peer.
     def seededGenesis = []
     def skippedGenesis = []
+    def failedGenesis = []
     for (gp in genesisPeers) {
         if (!waitForStorageReady(gp.storageUrl, gp.service, 60)) {
             echo "⏭️  Skipping genesis peer ${gp.humanId} — storage unreachable (seed-whoever-is-ready)"
             skippedGenesis << gp.humanId
             continue
         }
+        def gradeRc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/genesis/scripts/ci/steward-grade-peer.sh' '${gp.humanId}' '${gp.storageUrl}' '${gp.service}' '${gp.namespace}'")
+        if (gradeRc != 0) {
+            unstable("Steward grade failed on genesis peer ${gp.humanId} (exit ${gradeRc}) — continuing to its content seed")
+        }
+        def seedRc = 0
         dir('genesis/seeder') {
-            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-genesis-peer.sh' '${gp.humanId}' '${gp.storageUrl}'"
+            seedRc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-genesis-peer.sh' '${gp.humanId}' '${gp.storageUrl}'")
+        }
+        if (seedRc != 0) {
+            unstable("Content seed failed on genesis peer ${gp.humanId} (exit ${seedRc}) — counted as not seeded; continuing to the next peer")
+            failedGenesis << gp.humanId
+            continue
         }
         seededGenesis << gp.humanId
     }
     if (seededGenesis.isEmpty()) {
-        error("No genesis peer became ready — nothing seeded. At least one genesis peer's storage must answer (skipped: ${skippedGenesis.join(', ')}). If the remote pool is down, an on-prem genesis peer such as matthew must be healthy.")
+        error("No genesis peer seeded — nothing ingested. At least one genesis peer's storage must answer and its seed succeed (skipped unreachable: ${skippedGenesis.join(', ') ?: 'none'}; seed failed: ${failedGenesis.join(', ') ?: 'none'}). If the remote pool is down, an on-prem genesis peer such as matthew must be healthy.")
     }
     if (!skippedGenesis.isEmpty()) {
         unstable("Seeded genesis peers: ${seededGenesis.join(', ')}; skipped unreachable: ${skippedGenesis.join(', ')} — partial-cluster steady state (seed whoever is ready)")
