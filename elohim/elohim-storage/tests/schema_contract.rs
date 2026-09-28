@@ -184,7 +184,7 @@ fn assert_source_of_truth_declared(schema_value: &Value, schema_name: &str) {
 
 #[test]
 fn content_head_view_matches_schema() {
-    use elohim_views::{ContentHeadView, StagingCandidateState};
+    use elohim_views::{ContentHeadView, EarnedSource, StagingCandidateState};
 
     // Full variant: explicitly-declared head with an anchor + serving blob.
     let declared = ContentHeadView {
@@ -205,6 +205,7 @@ fn content_head_view_matches_schema() {
         ),
         staging_candidate_blob_hash: Some("bafkrei-candidate".to_string()),
         staging_candidate_state: Some(StagingCandidateState::Staged),
+        earned_source: Some(EarnedSource::Live),
     };
     let json = serde_json::to_value(&declared).unwrap();
     validate_against_schema("views/content-head.schema.json", &json);
@@ -230,8 +231,22 @@ fn content_head_view_matches_schema() {
         staging_candidate: None,
         staging_candidate_blob_hash: None,
         staging_candidate_state: Some(StagingCandidateState::None),
+        earned_source: None,
     };
     let json = serde_json::to_value(&anchor_only).unwrap();
+    assert!(
+        json.get("earnedSource").is_none(),
+        "a plain /head read omits earnedSource entirely (not null)"
+    );
+    validate_against_schema("views/content-head.schema.json", &json);
+
+    // Live-election read whose conductor did not answer: the column stands.
+    let cached = ContentHeadView {
+        earned_source: Some(EarnedSource::Cached),
+        ..anchor_only
+    };
+    let json = serde_json::to_value(&cached).unwrap();
+    assert_eq!(json["earnedSource"], "cached");
     validate_against_schema("views/content-head.schema.json", &json);
 }
 

@@ -161,6 +161,36 @@ pub struct ContentHeadView {
     /// Absent on older serving nodes and therefore not an authoritative answer.
     #[ts(optional)]
     pub staging_candidate_state: Option<StagingCandidateState>,
+    /// Where [`Self::earned`] came from, present ONLY when the caller asked for
+    /// the live answer (`GET /db/content/{id}/head?election=live`):
+    ///
+    /// - `live` — this peer's own conductor answered its local canonical
+    ///   election for the id, and `earned` was read from it (`true` when the
+    ///   winner is EARNED and IS the declared head; an earned tier this peer's
+    ///   projection had already recorded for the same head is never lowered by
+    ///   a local link view that lacks the earned declaration). A live answer
+    ///   that finds the projection behind also heals the projection's
+    ///   election columns in the same request (never the head).
+    /// - `cached` — the conductor could not answer inside the read's budget
+    ///   (absent, errored, or timed out), so `earned` is the projection's
+    ///   recorded column, exactly as without the parameter.
+    ///
+    /// Absent (not `null`) on a plain read, so a response without the
+    /// parameter is byte-identical to one from a peer that predates it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub earned_source: Option<EarnedSource>,
+}
+
+/// Provenance of [`ContentHeadView::earned`] on a live-election read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub enum EarnedSource {
+    /// Read from this peer's conductor's local canonical election.
+    Live,
+    /// The conductor did not answer in budget; the projection's column stands.
+    Cached,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]

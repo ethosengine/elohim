@@ -8558,7 +8558,35 @@ impl HttpServer {
         Option<String>,
         elohim_views::lamad::StagingCandidateState,
     ) {
-        use elohim_views::lamad::StagingCandidateState;
+        let deadline =
+            tokio::time::Instant::now() + crate::services::live_earned::LIVE_ELECTION_BUDGET;
+        let (hc, election) = self.ask_local_election(content_id, deadline).await;
+        self.staging_candidate_from_election(
+            hc.as_ref(),
+            content_id,
+            projected_head_action,
+            &election,
+            deadline,
+        )
+        .await
+    }
+
+    /// Put the ONE local-election ask a `/head` read makes for `content_id`
+    /// (`resolve_canonical_election` — local canonical-head links only, see
+    /// [`Self::resolve_staging_candidate`]), waiting no longer than `deadline`.
+    ///
+    /// Shared by the staging-candidate read and the live earned answer
+    /// (`?election=live`), so a live read of an unbound slug costs no second
+    /// conductor call. Returns the client too, for the candidate's blob ask.
+    async fn ask_local_election(
+        &self,
+        content_id: &str,
+        deadline: tokio::time::Instant,
+    ) -> (
+        Option<Arc<crate::hc_client::HcClient>>,
+        crate::services::live_earned::LocalElection,
+    ) {
+        use crate::services::live_earned::{ElectionUnavailable, LocalElection};
 
         let client_started = tokio::time::Instant::now();
         let Some(hc) = self
@@ -8572,76 +8600,147 @@ impl HttpServer {
                 elapsed_ms = client_started.elapsed().as_millis(),
                 "head read: candidate role client is unavailable"
             );
-            return (None, None, StagingCandidateState::Unavailable);
+            return (
+                None,
+                LocalElection::Unavailable(ElectionUnavailable::NoClient),
+            );
         };
         let started = tokio::time::Instant::now();
-        let deadline = started + std::time::Duration::from_secs(2);
         let read =
             crate::services::conductor_writes::call_resolve_canonical_election(&hc, content_id);
-        match tokio::time::timeout_at(deadline, read).await {
-            Ok(Ok(election)) => {
-                debug!(
-                    phase = "election",
-                    outcome = if election.is_some() {
-                        "ok_some"
-                    } else {
-                        "ok_none"
-                    },
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "candidate-head resolution phase"
-                );
-                let candidate = match staging_candidate_for_projected_head(
-                    projected_head_action,
-                    election,
-                ) {
-                    Ok(candidate) => candidate,
-                    Err(_actual_winner) => {
-                        warn!(
-                            phase = "election_binding",
-                            outcome = "winner_mismatch",
-                            elapsed_ms = started.elapsed().as_millis(),
-                            remaining_ms = candidate_head_remaining_ms(deadline),
-                            "head read: local election winner differs from projected head — reporting unavailable"
-                        );
-                        return (None, None, StagingCandidateState::Unavailable);
-                    }
-                };
-                let blob = match candidate.as_deref() {
-                    Some(action) => {
-                        self.resolve_exact_candidate_blob(&hc, content_id, action, deadline)
-                            .await
-                    }
-                    None => None,
-                };
-                let state = if candidate.is_some() {
-                    StagingCandidateState::Staged
+        let election = crate::services::live_earned::ask_local_election_with(read, deadline).await;
+        match &election {
+            LocalElection::Answered(answer) => debug!(
+                phase = "election",
+                outcome = if answer.is_some() {
+                    "ok_some"
                 } else {
-                    StagingCandidateState::None
-                };
-                (candidate, blob, state)
-            }
-            Ok(Err(_error)) => {
+                    "ok_none"
+                },
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "candidate-head resolution phase"
+            ),
+            LocalElection::Unavailable(ElectionUnavailable::Deadline) => warn!(
+                phase = "election",
+                outcome = "deadline",
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: local election ask timed out — reporting unavailable"
+            ),
+            LocalElection::Unavailable(_) => warn!(
+                phase = "election",
+                outcome = "error",
+                elapsed_ms = started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: local election ask failed — reporting unavailable"
+            ),
+        }
+        (Some(hc), election)
+    }
+
+    /// The staging candidate beneath the projected head, derived from an
+    /// already-put local-election ask. An unanswered ask is `Unavailable`; a
+    /// winner other than the projected head is `Unavailable` too (the
+    /// candidate belongs to a head this row does not serve).
+    async fn staging_candidate_from_election(
+        &self,
+        hc: Option<&Arc<crate::hc_client::HcClient>>,
+        content_id: &str,
+        projected_head_action: &str,
+        election: &crate::services::live_earned::LocalElection,
+        deadline: tokio::time::Instant,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        elohim_views::lamad::StagingCandidateState,
+    ) {
+        use elohim_views::lamad::StagingCandidateState;
+
+        let (Some(hc), crate::services::live_earned::LocalElection::Answered(election)) =
+            (hc, election)
+        else {
+            return (None, None, StagingCandidateState::Unavailable);
+        };
+        let candidate = match staging_candidate_for_projected_head(
+            projected_head_action,
+            election.clone(),
+        ) {
+            Ok(candidate) => candidate,
+            Err(_actual_winner) => {
                 warn!(
-                    phase = "election",
-                    outcome = "error",
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: staging-candidate ask failed — reporting unavailable"
-                );
-                (None, None, StagingCandidateState::Unavailable)
+                        phase = "election_binding",
+                        outcome = "winner_mismatch",
+                        remaining_ms = candidate_head_remaining_ms(deadline),
+                        "head read: local election winner differs from projected head — reporting unavailable"
+                    );
+                return (None, None, StagingCandidateState::Unavailable);
             }
-            Err(_) => {
-                warn!(
-                    phase = "election",
-                    outcome = "deadline",
-                    elapsed_ms = started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: staging-candidate ask timed out — reporting unavailable"
-                );
-                (None, None, StagingCandidateState::Unavailable)
+        };
+        let blob = match candidate.as_deref() {
+            Some(action) => {
+                self.resolve_exact_candidate_blob(hc, content_id, action, deadline)
+                    .await
+            }
+            None => None,
+        };
+        let state = if candidate.is_some() {
+            StagingCandidateState::Staged
+        } else {
+            StagingCandidateState::None
+        };
+        (candidate, blob, state)
+    }
+
+    /// Answer `earned` from this peer's own conductor (`?election=live`, F26)
+    /// and heal a `canonical_earned` column the answer proves behind — see
+    /// [`crate::services::live_earned`]. The heal is best-effort: a failed
+    /// write is logged and the read still answers from the live election.
+    fn apply_live_earned(
+        &self,
+        mut view: elohim_views::ContentHeadView,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+        election: &crate::services::live_earned::LocalElection,
+    ) -> elohim_views::ContentHeadView {
+        use crate::services::live_earned::{heal_behind_column, live_earned_verdict};
+
+        let verdict = live_earned_verdict(&view.head_action_hash, view.earned, election);
+        if verdict.heal.is_some() {
+            let healed = self
+                .db_pool
+                .as_ref()
+                .ok_or_else(|| StorageError::Internal("Database pool not available".into()))
+                .and_then(|pool| {
+                    pool.get().map_err(|e| {
+                        StorageError::Internal(format!("Failed to get connection: {e}"))
+                    })
+                })
+                .and_then(|mut conn| {
+                    heal_behind_column(
+                        &mut conn,
+                        app_ctx,
+                        content_id,
+                        &view.head_action_hash,
+                        &verdict,
+                    )
+                });
+            match healed {
+                Ok(outcome) => info!(
+                    content_id = %content_id,
+                    outcome = ?outcome,
+                    "head read: live election proves an earned head the projection did not record"
+                ),
+                Err(e) => warn!(
+                    content_id = %content_id,
+                    error = %e,
+                    "head read: live earned election could not be recorded — answering live anyway"
+                ),
             }
         }
+        view.earned = verdict.earned;
+        view.earned_source = Some(verdict.source);
+        view
     }
 
     /// **Slice 2 (N4).** The candidate of a slug bound to a release channel —
@@ -8901,6 +9000,12 @@ impl HttpServer {
 
         match method {
             Method::GET => {
+                // `?election=live` (F26): answer `earned` from this peer's own
+                // conductor election rather than the projection's column alone.
+                let live_election = req.uri().query().is_some_and(|query| {
+                    url::form_urlencoded::parse(query.as_bytes())
+                        .any(|(key, value)| key == "election" && value == "live")
+                });
                 // Internal read (Invisible): the notary answer is authority data —
                 // surface it regardless of serving trust tier, then let `trust`
                 // label it honestly.
@@ -8942,27 +9047,78 @@ impl HttpServer {
                                 crate::services::head_adoption::bound_release_channel(
                                     cwt.content.metadata_json.as_deref(),
                                 );
-                            let (candidate, candidate_blob, candidate_state) = match bound_channel {
-                                Some(channel) => {
-                                    self.resolve_bound_slug_candidate(&channel, content_id)
+                            //
+                            // `?election=live` reuses the unbound read's ONE
+                            // election ask for `earned`; a bound slug's
+                            // candidate comes from its channel's election, so
+                            // its own is asked alongside (concurrently, same
+                            // 2 s budget) — never a second ask of the same one.
+                            let live_deadline = tokio::time::Instant::now()
+                                + crate::services::live_earned::LIVE_ELECTION_BUDGET;
+                            let (live, (candidate, candidate_blob, candidate_state)) =
+                                match (bound_channel, live_election) {
+                                    (Some(channel), false) => (
+                                        None,
+                                        self.resolve_bound_slug_candidate(&channel, content_id)
+                                            .instrument(span)
+                                            .await,
+                                    ),
+                                    (Some(channel), true) => {
+                                        let ((_, own), bound) = async {
+                                            tokio::join!(
+                                                self.ask_local_election(content_id, live_deadline),
+                                                self.resolve_bound_slug_candidate(
+                                                    &channel, content_id
+                                                ),
+                                            )
+                                        }
+                                        .instrument(span)
+                                        .await;
+                                        (Some(own), bound)
+                                    }
+                                    (None, false) => (
+                                        None,
+                                        self.resolve_staging_candidate(
+                                            content_id,
+                                            &view.head_action_hash,
+                                        )
+                                        .instrument(span)
+                                        .await,
+                                    ),
+                                    (None, true) => {
+                                        let head = view.head_action_hash.clone();
+                                        async {
+                                            let (hc, own) = self
+                                                .ask_local_election(content_id, live_deadline)
+                                                .await;
+                                            let staged = self
+                                                .staging_candidate_from_election(
+                                                    hc.as_ref(),
+                                                    content_id,
+                                                    &head,
+                                                    &own,
+                                                    live_deadline,
+                                                )
+                                                .await;
+                                            (Some(own), staged)
+                                        }
                                         .instrument(span)
                                         .await
-                                }
-                                None => {
-                                    self.resolve_staging_candidate(
-                                        content_id,
-                                        &view.head_action_hash,
-                                    )
-                                    .instrument(span)
-                                    .await
-                                }
-                            };
-                            Ok(response::ok(&crate::views::with_staging_candidate(
+                                    }
+                                };
+                            let view = crate::views::with_staging_candidate(
                                 view,
                                 candidate,
                                 candidate_blob,
                                 candidate_state,
-                            )))
+                            );
+                            let view = match live {
+                                Some(election) => {
+                                    self.apply_live_earned(view, content_id, app_ctx, &election)
+                                }
+                                None => view,
+                            };
+                            Ok(response::ok(&view))
                         }
                         // Honest: the row exists but the notary holds no HEAD for it.
                         None => Ok(response::not_found(

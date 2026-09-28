@@ -73,25 +73,7 @@ pub fn create_cache_stream(pool: DbPool, h_app_id: &str) -> hyper::Response<SseB
         let mut counts = StreamCounts::default();
 
         // Stream content (reach = 'commons') — paths are now content rows with contentType 'path'
-        counts.content = stream_table(
-            &tx,
-            &pool,
-            &ctx,
-            "cache.content",
-            |conn, ctx, limit, offset| {
-                cache_queries::list_cacheable_content(conn, ctx, limit, offset).map(|items| {
-                    items
-                        .into_iter()
-                        .map(|c| {
-                            let view = ContentView::from(c);
-                            let id = view.id.clone();
-                            (id, serde_json::to_value(&view).unwrap_or_default())
-                        })
-                        .collect()
-                })
-            },
-        )
-        .await;
+        counts.content = stream_table(&tx, &pool, &ctx, "cache.content", content_page_events).await;
 
         // Stream humans (profile_reach = 'public')
         counts.humans = stream_table(
@@ -171,6 +153,28 @@ pub fn create_cache_stream(pool: DbPool, h_app_id: &str) -> hyper::Response<SseB
         .header("Access-Control-Allow-Origin", "*")
         .body(StreamBody::new(pinned))
         .expect("SSE response builder should not fail")
+}
+
+/// One page of `cache.content` events. Each row carries its tags (one batched
+/// tag read per page — `cache_queries::list_cacheable_content_with_tags`), so
+/// the doorway's warmed and swept cache documents match the `/db/content/{id}`
+/// read instead of arriving with `tags: []`.
+fn content_page_events(
+    conn: &mut diesel::SqliteConnection,
+    ctx: &AppContext,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<(String, serde_json::Value)>, crate::error::StorageError> {
+    cache_queries::list_cacheable_content_with_tags(conn, ctx, limit, offset).map(|items| {
+        items
+            .into_iter()
+            .map(|c| {
+                let view = ContentView::from(c);
+                let id = view.id.clone();
+                (id, serde_json::to_value(&view).unwrap_or_default())
+            })
+            .collect()
+    })
 }
 
 /// Stream a single table in batches, sending SSE events via the channel.
@@ -290,6 +294,66 @@ mod tests {
         let counts = StreamCounts::default();
         let event = format_done_event(&counts);
         assert!(event.contains("\"content\":0"));
+    }
+
+    /// The streamed `cache.content` data is the `/db/content/{id}` view: the
+    /// row's tags ride along (F: doorway cache docs lost tags on boot-warm and
+    /// sweep when the stream built views from bare `Content` rows).
+    #[test]
+    fn streamed_content_rows_carry_their_tags() {
+        use crate::db::content_diesel::{create_content, CreateContentInput};
+
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        for (id, tags) in [("tagged", vec!["b", "a"]), ("untagged", vec![])] {
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.into(),
+                    title: id.into(),
+                    description: None,
+                    content_type: "concept".into(),
+                    content_format: "markdown".into(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".into(),
+                    created_by: None,
+                    tags: tags.into_iter().map(String::from).collect(),
+                    content_body: None,
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let events = content_page_events(&mut conn, &ctx, BATCH_SIZE, 0).unwrap();
+        let tags_of = |id: &str| {
+            events
+                .iter()
+                .find(|(event_id, _)| event_id == id)
+                .map(|(_, data)| data["tags"].clone())
+                .unwrap()
+        };
+        assert_eq!(tags_of("tagged"), serde_json::json!(["a", "b"]));
+        assert_eq!(tags_of("untagged"), serde_json::json!([]));
+
+        let read = crate::db::content_diesel::get_content_with_tags(
+            &mut conn,
+            &ctx,
+            "tagged",
+            crate::db::content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            tags_of("tagged"),
+            serde_json::to_value(ContentView::from(read)).unwrap()["tags"],
+            "a streamed row's tags equal the by-id read's"
+        );
     }
 
     #[test]

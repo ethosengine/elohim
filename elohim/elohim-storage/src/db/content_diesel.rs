@@ -2397,6 +2397,104 @@ fn stamp_declared_head_mode_transaction(
     }
 }
 
+/// What [`heal_election_columns`] did with a live election answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElectionColumnHeal {
+    /// The row's election columns now record the live election.
+    Healed,
+    /// The row already records this election's tier (nothing to heal), or the
+    /// ordering guard refused the write (a recorded EARNED tier is never
+    /// lowered by an unearned answer for the same head).
+    Unchanged,
+    /// The row no longer carries the head the election was read against (it
+    /// moved between the read and this write, or never held it). Nothing is
+    /// written: moving heads is the canonical channels' job, not this one's.
+    HeadMismatch,
+    /// No local row for this id.
+    NoRow,
+}
+
+/// Record a LIVE canonical election for the head a row ALREADY carries —
+/// the election columns only (`canonical_declared_at`, `canonical_earned`,
+/// `canonical_link_hash`), never `declared_head_action_hash`, the DHT anchor,
+/// the body or `updated_at`.
+///
+/// Why this exists (F26): `stamp_declared_head_mode` records an election only
+/// when the stamp carries one, so a peer that adopted a steward's head through
+/// an unordered channel keeps `canonical_earned` at NULL/0 forever, and every
+/// `/head` read on that peer reports `earned: false` for a head its own
+/// conductor elects EARNED. The live `/head?election=live` read already holds
+/// the conductor's answer; this lets it correct the projection in the same
+/// request instead of lying on every later plain read.
+///
+/// Fills, never moves (C2): a compare-and-set on `expected_head` inside one
+/// transaction — a row whose head moved since the read is left alone
+/// ([`ElectionColumnHeal::HeadMismatch`]). The write only happens when the
+/// recorded tier differs from the live one, or no election is recorded, AND
+/// [`canonical_move_verdict`] admits the live election over the stored one — so
+/// the ordering the heal plane obeys (contract test
+/// `canonical_move_verdict_is_antisymmetric_and_total`) is the one this obeys:
+/// an unearned answer never lowers a recorded earned tier. The three columns
+/// are written together, which is the invariant
+/// `canonical_ordering_from_columns` relies on.
+pub fn heal_election_columns(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    expected_head: &str,
+    live: CanonicalOrdering,
+) -> Result<ElectionColumnHeal, StorageError> {
+    conn.transaction(|conn| {
+        #[allow(clippy::type_complexity)]
+        let existing: Option<(Option<String>, Option<i64>, Option<i32>, Option<String>)> =
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .select((
+                    content::declared_head_action_hash,
+                    content::canonical_declared_at,
+                    content::canonical_earned,
+                    content::canonical_link_hash,
+                ))
+                .first(conn)
+                .optional()
+                .map_err(|e| StorageError::Internal(format!("Election heal lookup: {e}")))?;
+        let Some((declared, stored_at, stored_earned, stored_link)) = existing else {
+            return Ok(ElectionColumnHeal::NoRow);
+        };
+        if declared.as_deref() != Some(expected_head) {
+            return Ok(ElectionColumnHeal::HeadMismatch);
+        }
+        // A recorded earned bit is never lowered, even on a (defensively
+        // impossible) half-populated row the ordering reads as "no election".
+        if stored_earned == Some(1) && !live.earned {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        let stored =
+            canonical_ordering_from_columns(stored_at, stored_earned, stored_link.as_deref());
+        if stored.is_some_and(|stored| stored.earned == live.earned) {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        if canonical_move_verdict(Some(live), stored).is_err() {
+            return Ok(ElectionColumnHeal::Unchanged);
+        }
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id))
+                .filter(content::declared_head_action_hash.eq(expected_head)),
+        )
+        .set((
+            content::canonical_declared_at.eq(Some(live.declared_at)),
+            content::canonical_earned.eq(Some(i32::from(live.earned))),
+            content::canonical_link_hash.eq(live.link.map(ElectionLink::to_b64)),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Election heal write: {e}")))?;
+        Ok(ElectionColumnHeal::Healed)
+    })
+}
+
 // ============================================================================
 // Stats
 // ============================================================================

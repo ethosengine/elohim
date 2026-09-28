@@ -214,6 +214,9 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         staging_candidate: None,
         staging_candidate_blob_hash: None,
         staging_candidate_state: None,
+        // Only a live-election read (`?election=live`) names where `earned`
+        // came from; a plain row → view mapping stays silent about it.
+        earned_source: None,
     })
 }
 
