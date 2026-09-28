@@ -11,9 +11,14 @@ import { describe, it } from 'node:test';
 import {
   authoredReachFor,
   classifyRow,
-  ownAuthorshipRefusal,
+  decideWiden,
+  isShedPatch,
+  shedDelayMs,
+  stewardAuthorshipRefusal,
+  stewardSet,
   widenLanded,
   widenPatch,
+  type ChainAnswer,
   type HeadB64,
   type LineageB64,
 } from '../lib/steward-grade-plan.js';
@@ -21,6 +26,9 @@ import {
 const ME = 'uhCAkMEmeMEmeMEmeMEmeMEmeMEmeMEmeMEmeMEmeMEmeMEme';
 const NEEDS = 'needs-authorship';
 const OTHER = 'uhCAkOTHERotherOTHERotherOTHERotherOTHERotherOTH';
+const COSTEWARD = 'uhCAkADAMadamADAMadamADAMadamADAMadamADAMadamADA';
+const SOLO = stewardSet(ME);
+const PAIR = stewardSet(ME, [[COSTEWARD, 'ws://adam-conductor:4444']]);
 
 describe('authoredReachFor', () => {
   it('reads a content atom’s reach only, and a path’s reach else visibility', () => {
@@ -88,58 +96,157 @@ describe('classifyRow', () => {
   });
 });
 
-describe('ownAuthorshipRefusal', () => {
-  const head: HeadB64 = { headActionHash: 'uhCkkHEAD', author: ME };
-  const lineage = (over: Partial<LineageB64> = {}): LineageB64 => ({
-    rootAuthor: ME,
-    contentId: 'c1',
-    candidates: [
-      { actionHash: 'uhCkkROOT', author: ME, fetchOutcome: 'fetched', inRoot: true },
-      { actionHash: 'uhCkkHEAD', author: ME, fetchOutcome: 'fetched', inRoot: true },
-    ],
-    otherRootCandidates: 0,
-    unfetchableCandidates: 0,
-    invalidLinkTargets: 0,
-    truncated: false,
-    ...over,
-  });
+const head: HeadB64 = { headActionHash: 'uhCkkHEAD', author: ME };
+const lineage = (over: Partial<LineageB64> = {}): LineageB64 => ({
+  rootAuthor: ME,
+  contentId: 'c1',
+  candidates: [
+    { actionHash: 'uhCkkROOT', author: ME, fetchOutcome: 'fetched', inRoot: true },
+    { actionHash: 'uhCkkHEAD', author: ME, fetchOutcome: 'fetched', inRoot: true },
+  ],
+  otherRootCandidates: 0,
+  unfetchableCandidates: 0,
+  invalidLinkTargets: 0,
+  truncated: false,
+  ...over,
+});
 
+describe('stewardAuthorshipRefusal', () => {
   it('admits the node when its own agent authored the root and every version', () => {
-    assert.equal(ownAuthorshipRefusal(ME, head, lineage()), undefined);
+    assert.equal(stewardAuthorshipRefusal(SOLO, head, lineage()), undefined);
   });
 
-  it('refuses when the id has no version chain on the conductor', () => {
-    assert.match(ownAuthorshipRefusal(ME, null, null) ?? '', /no version chain/);
-  });
-
-  it('refuses when another agent authored the root', () => {
+  it('admits a co-steward’s root, head and versions alongside this node’s', () => {
+    const l = lineage({
+      rootAuthor: COSTEWARD,
+      candidates: [
+        { actionHash: 'uhCkkROOT', author: COSTEWARD, fetchOutcome: 'fetched', inRoot: true },
+        { actionHash: 'uhCkkMINE', author: ME, fetchOutcome: 'fetched', inRoot: true },
+        { actionHash: 'uhCkkHEAD', author: COSTEWARD, fetchOutcome: 'fetched', inRoot: true },
+      ],
+    });
+    assert.equal(stewardAuthorshipRefusal(PAIR, { ...head, author: COSTEWARD }, l), undefined);
+    // …but without that co-steward in the set, the same chain is refused.
     assert.match(
-      ownAuthorshipRefusal(ME, head, lineage({ rootAuthor: OTHER })) ?? '',
-      /root authored by/
+      stewardAuthorshipRefusal(SOLO, { ...head, author: COSTEWARD }, l) ?? '',
+      /head uhCkkHEAD authored by uhCAkADAMadamADA…, not this node$/
     );
   });
 
-  it('refuses when the elected head is another agent’s (an earned election elsewhere)', () => {
-    assert.match(ownAuthorshipRefusal(ME, { ...head, author: OTHER }, lineage()) ?? '', /head/);
-  });
-
-  it('refuses when a foreign update sits in the chain the PATCH would build on', () => {
-    const l = lineage({
+  it('refuses a key outside the set and names it, even with co-stewards', () => {
+    assert.match(
+      stewardAuthorshipRefusal(PAIR, head, lineage({ rootAuthor: OTHER })) ?? '',
+      /root authored by uhCAkOTHERotherO…, not this node or one of its 1 co-steward/
+    );
+    assert.match(
+      stewardAuthorshipRefusal(PAIR, { ...head, author: OTHER }, lineage()) ?? '',
+      /head/
+    );
+    const foreign = lineage({
       candidates: [
         { actionHash: 'uhCkkROOT', author: ME, fetchOutcome: 'fetched', inRoot: true },
         { actionHash: 'uhCkkFOREIGN', author: OTHER, fetchOutcome: 'fetched', inRoot: true },
       ],
     });
-    assert.match(ownAuthorshipRefusal(ME, head, l) ?? '', /authored by/);
+    assert.match(stewardAuthorshipRefusal(PAIR, head, foreign) ?? '', /version .* authored by/);
+    const anon = lineage({
+      candidates: [
+        { actionHash: 'uhCkkROOT', author: null, fetchOutcome: 'fetched', inRoot: true },
+      ],
+    });
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, anon));
   });
 
-  it('refuses when another root claims the id, or the lineage is incomplete', () => {
-    assert.ok(ownAuthorshipRefusal(ME, head, lineage({ otherRootCandidates: 1 })));
-    assert.ok(ownAuthorshipRefusal(ME, head, lineage({ unfetchableCandidates: 1 })));
-    assert.ok(ownAuthorshipRefusal(ME, head, lineage({ invalidLinkTargets: 1 })));
-    assert.ok(ownAuthorshipRefusal(ME, head, lineage({ truncated: true })));
-    assert.ok(ownAuthorshipRefusal(ME, head, lineage({ candidates: [] })));
-    assert.ok(ownAuthorshipRefusal(ME, head, null));
+  it('keeps every lineage-completeness check with co-stewards admitted', () => {
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, lineage({ otherRootCandidates: 1 })));
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, lineage({ unfetchableCandidates: 1 })));
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, lineage({ invalidLinkTargets: 1 })));
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, lineage({ truncated: true })));
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, lineage({ candidates: [] })));
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, null));
+    const outOfRoot = lineage({
+      candidates: [{ actionHash: 'uhCkkX', author: ME, fetchOutcome: 'fetched', inRoot: false }],
+    });
+    assert.ok(stewardAuthorshipRefusal(PAIR, head, outOfRoot));
+  });
+
+  it('never lets a co-steward entry stand in for this node', () => {
+    assert.equal(stewardSet(ME, [[ME, 'ws://self']]).coStewards.size, 0);
+  });
+});
+
+describe('decideWiden', () => {
+  const needs = classifyRow('commons', { kind: 'gated', requiredReach: 'private' });
+  const chain = (over: Partial<LineageB64> = {}, h: HeadB64 = head): ChainAnswer => ({
+    kind: 'chain',
+    head: h,
+    lineage: lineage(over),
+  });
+
+  it('widens over a chain the stewards authored', () => {
+    assert.deepEqual(decideWiden(needs, PAIR, chain({ rootAuthor: COSTEWARD })), {
+      action: 'widen',
+      mode: 'chain',
+      from: 'private',
+      to: 'commons',
+    });
+  });
+
+  it('refuses a chain with an author outside the set', () => {
+    const d = decideWiden(needs, PAIR, chain({ rootAuthor: OTHER }));
+    assert.equal(d.action, 'refused');
+    assert.match((d as { reason: string }).reason, /root authored by uhCAkOTHER/);
+  });
+
+  it('widens as a new root when the row exists but no version chain does', () => {
+    assert.deepEqual(decideWiden(needs, SOLO, { kind: 'no-chain' }), {
+      action: 'widen',
+      mode: 'new-root',
+      from: 'private',
+      to: 'commons',
+    });
+  });
+
+  it('refuses (retry later) when the zome answers PENDING — never read as no chain', () => {
+    const d = decideWiden(needs, PAIR, { kind: 'pending', detail: 'PENDING: not retrievable' });
+    assert.equal(d.action, 'refused');
+    assert.match((d as { reason: string }).reason, /pending/);
+  });
+
+  it('never narrows: a current row stays current whatever the conductor says', () => {
+    const current = classifyRow('public', { kind: 'served', reach: 'commons' });
+    for (const a of [{ kind: 'no-chain' } as ChainAnswer, chain()]) {
+      assert.deepEqual(decideWiden(current, PAIR, a), current);
+    }
+  });
+
+  it('keeps the commons fence: an intimate or unknown authored reach is refused', () => {
+    for (const r of ['intimate', 'community', 'everyone']) {
+      const v = classifyRow(r, { kind: 'gated', requiredReach: 'private' });
+      const d = decideWiden(v, PAIR, { kind: 'no-chain' });
+      assert.equal(d.action, 'refused', r);
+    }
+    // An absent row never becomes a new root.
+    const absent = classifyRow('commons', { kind: 'absent' });
+    assert.equal(decideWiden(absent, PAIR, { kind: 'no-chain' }).action, 'refused');
+  });
+});
+
+describe('PATCH shed ladder', () => {
+  it('waits out catching-up and a zome websocket timeout, nothing else', () => {
+    assert.equal(isShedPatch(503, '{"status":"catching-up","retryAfter":2}'), true);
+    assert.equal(isShedPatch(503, '{"error":"Zome call failed: Websocket error: Timeout"}'), true);
+    assert.equal(isShedPatch(503, '{"error":"Zome call failed: source chain head moved"}'), false);
+    assert.equal(isShedPatch(500, '{"status":"catching-up"}'), false);
+    assert.equal(isShedPatch(503, 'not json'), false);
+  });
+
+  it('honours Retry-After (header, else body), default 5 s, within 2–15 s', () => {
+    assert.equal(shedDelayMs('7', ''), 7000);
+    assert.equal(shedDelayMs(null, '{"status":"catching-up","retryAfter":2}'), 2000);
+    assert.equal(shedDelayMs(null, '{"error":"timeout"}'), 5000);
+    assert.equal(shedDelayMs('600', ''), 15_000);
+    assert.equal(shedDelayMs('0', ''), 2000);
   });
 });
 

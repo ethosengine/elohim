@@ -33,35 +33,45 @@ export interface Conductor {
   close(): Promise<void>;
 }
 
+/** Find the provisioned cell of `role` in the installed app `appId`, or throw. */
+async function findCell(admin: AdminWebsocket, appId: string, role: string): Promise<CellId> {
+  const apps = await admin.listApps({});
+  const app = apps.find(a => a.installed_app_id === appId);
+  if (!app) {
+    throw new Error(
+      `no installed app "${appId}" (have: ${apps.map(a => a.installed_app_id).join(', ')})`
+    );
+  }
+  let cellId: CellId | undefined;
+  for (const [r, infos] of Object.entries(app.cell_info)) {
+    if (r !== role) continue;
+    for (const info of infos as { type: string; value?: { cell_id?: CellId } }[]) {
+      if (info.type === 'provisioned' && info.value?.cell_id) cellId = info.value.cell_id;
+    }
+  }
+  if (!cellId) {
+    throw new Error(
+      `app "${appId}" has no provisioned role "${role}" (roles: ${Object.keys(app.cell_info).join(', ')})`
+    );
+  }
+  return cellId;
+}
+
 export async function connectConductor(o: ConductorOptions): Promise<Conductor> {
   const admin = await AdminWebsocket.connect({
     url: new URL(o.adminWs),
     wsClientOptions: { origin: o.appId },
     defaultTimeout: 120_000,
   });
-  const apps = await admin.listApps({});
-  const app = apps.find(a => a.installed_app_id === o.appId);
-  if (!app) {
+  let cellId: CellId;
+  try {
+    cellId = await findCell(admin, o.appId, o.role);
+  } catch (e) {
     await admin.client.close();
-    throw new Error(
-      `no installed app "${o.appId}" (have: ${apps.map(a => a.installed_app_id).join(', ')})`
-    );
-  }
-  let cellId: CellId | undefined;
-  for (const [role, infos] of Object.entries(app.cell_info)) {
-    if (role !== o.role) continue;
-    for (const info of infos as { type: string; value?: { cell_id?: CellId } }[]) {
-      if (info.type === 'provisioned' && info.value?.cell_id) cellId = info.value.cell_id;
-    }
-  }
-  if (!cellId) {
-    await admin.client.close();
-    throw new Error(
-      `app "${o.appId}" has no provisioned role "${o.role}" (roles: ${Object.keys(app.cell_info).join(', ')})`
-    );
+    throw e;
   }
   await admin.authorizeSigningCredentials(cellId);
-  const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
+  const token = await admin.issueAppAuthenticationToken({ installed_app_id: o.appId });
   const appWs = await AppWebsocket.connect({
     url: new URL(o.appWs),
     token: token.token,
@@ -85,4 +95,39 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
       await admin.client.close();
     },
   };
+}
+
+/**
+ * Read the agent key of `role`'s cell straight from a conductor's admin interface —
+ * the same key `connectConductor` reports as `agent`, but read-only: it neither
+ * authorizes signing credentials nor opens an app interface, so it writes nothing to
+ * that conductor's chain. Used to learn a CO-STEWARD's key from its own conductor.
+ */
+export async function readConductorAgent(
+  adminWs: string,
+  appId: string,
+  role: string,
+  timeoutMs = 30_000
+): Promise<string> {
+  let admin: AdminWebsocket | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const read = (async () => {
+    admin = await AdminWebsocket.connect({
+      url: new URL(adminWs),
+      wsClientOptions: { origin: appId },
+      defaultTimeout: timeoutMs,
+    });
+    const cellId = await findCell(admin, appId, role);
+    return encodeHashToBase64(cellId[1]);
+  })();
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no answer within ${timeoutMs / 1000}s`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([read, deadline]);
+  } finally {
+    clearTimeout(timer);
+    read.catch(() => undefined);
+    await admin?.client.close().catch(() => undefined);
+  }
 }

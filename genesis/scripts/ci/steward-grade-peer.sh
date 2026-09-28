@@ -21,6 +21,10 @@
 #   $2 = genesis peer storage URL (host:port, no scheme)
 #   $3 = the peer's storage Service name (e.g. elohim-matthew-alpha)
 #   $4 = the peer's namespace (e.g. elohim-alpha)
+#   $5 = (optional) the OTHER genesis peers' conductor admin WS URLs, space-
+#        separated — the co-stewards (else STEWARD_CO_STEWARD_ADMIN_WS). The grade
+#        reads each one's agent key from that conductor (read-only) and admits it as
+#        a co-author of the shared genesis corpus; an unreachable one is left out.
 #
 # The conductor lives on its own Service, `<service>-conductor` (rung 2,
 # 2026-08-31; genesis/orchestrator/manifests/humans/_edgenode-conductor.template.yaml),
@@ -35,6 +39,7 @@ GP_HUMAN_ID="$1"
 GP_STORAGE_URL="$2"
 GP_SERVICE="$3"
 GP_NAMESPACE="$4"
+CO_STEWARD_ADMIN_WS="${5:-${STEWARD_CO_STEWARD_ADMIN_WS:-}}"
 
 CONDUCTOR_HOST="${GP_SERVICE}-conductor.${GP_NAMESPACE}.svc.cluster.local"
 ADMIN_WS="${STEWARD_ADMIN_WS:-ws://${CONDUCTOR_HOST}:4444}"
@@ -42,12 +47,15 @@ APP_WS="${STEWARD_APP_WS:-ws://${CONDUCTOR_HOST}:4445}"
 CLOSURE="${STEWARD_GRADE_CLOSURE:-foundations-christian-technology}"
 DRY=()
 if [ "${STEWARD_GRADE_DRY_RUN:-0}" = "1" ]; then DRY=(--dry-run); fi
+CO=()
+for url in ${CO_STEWARD_ADMIN_WS}; do CO+=(--co-steward-admin-ws "${url}"); done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "🎚️  STEWARD GRADE: ${GP_HUMAN_ID} (storage ${GP_STORAGE_URL}, conductor ${ADMIN_WS} / ${APP_WS})"
-echo "    closure ${CLOSURE} — widen own-authored rows to their authored reach"
+echo "    closure ${CLOSURE} — widen steward-authored rows to their authored reach"
+echo "    co-stewards: ${CO_STEWARD_ADMIN_WS:-none}"
 echo "═══════════════════════════════════════════════════════════"
 
 # The whole course, not only what the path's walk names: every authored fct-* atom
@@ -64,6 +72,7 @@ npx tsx scripts/steward-grade.ts \
     --storage "http://${GP_STORAGE_URL}" \
     --admin-ws "${ADMIN_WS}" \
     --app-ws "${APP_WS}" \
+    "${CO[@]}" \
     "${DRY[@]}"
 RC=$?
 echo "STEWARD_GRADE_EXIT=${RC} (${GP_HUMAN_ID})"
