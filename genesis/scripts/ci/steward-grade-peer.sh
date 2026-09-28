@@ -50,9 +50,17 @@ echo "🎚️  STEWARD GRADE: ${GP_HUMAN_ID} (storage ${GP_STORAGE_URL}, conduct
 echo "    closure ${CLOSURE} — widen own-authored rows to their authored reach"
 echo "═══════════════════════════════════════════════════════════"
 
+# The whole course, not only what the path's walk names: every authored fct-* atom
+# (modules' pieces, scripture, media) is graded alongside the closure.
+MANIFEST="$(mktemp)"
+trap 'rm -f "${MANIFEST}"' EXIT
+( cd "${REPO_ROOT}/genesis/data/lamad/content" && ls fct-*.json 2>/dev/null | sed 's/\.json$//' ) > "${MANIFEST}"
+echo "    + $(wc -l < "${MANIFEST}") fct-* atoms from genesis/data/lamad/content"
+
 cd "${REPO_ROOT}/genesis/a2o" || { echo "❌ genesis/a2o missing"; exit 1; }
 npx tsx scripts/steward-grade.ts \
     --closure "${CLOSURE}" \
+    --manifest "${MANIFEST}" \
     --storage "http://${GP_STORAGE_URL}" \
     --admin-ws "${ADMIN_WS}" \
     --app-ws "${APP_WS}" \
