@@ -383,7 +383,9 @@ pub(crate) fn patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
 /// tags and authored edges — and nothing that could narrow `reach` or rewrite
 /// the title/description identity fields, exactly as the adopt path's T-1 move
 /// does (`head_adoption::adopt_local`). The RC-4 non-narrowing guard lives on
-/// the projection, not here.
+/// the projection, not here. `reach` rides along for F19 only: the stamp reads
+/// it solely to WIDEN a row whose adopted head is EARNED
+/// (`content_diesel::widen_to_adopted_earned_reach`), never to narrow one.
 pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
     ContentProjectionPatch {
         blob_cid: c.blob_cid.clone(),
@@ -396,6 +398,8 @@ pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch
         // version, not identity, and none of them can narrow reach.
         content_type: Some(c.content_type.clone()),
         content_format: Some(c.content_format.clone()),
+        // F19: widen-only, and only under an EARNED election (the stamp's rule).
+        reach: Some(c.reach.clone()),
         ..Default::default()
     }
     .carry_verified_version(

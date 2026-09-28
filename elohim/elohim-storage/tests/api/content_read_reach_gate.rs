@@ -571,3 +571,95 @@ async fn a_posted_edge_is_never_more_open_than_its_source_nor_vouches_for_an_unk
         .unwrap();
     assert_eq!(resp.status().as_u16(), 400);
 }
+
+/// F19 — the peer adopts the steward's signed grade. A peer holds an atom at
+/// `private` (an old seeder default) with an authored edge; its own conductor
+/// hands it the steward's EARNED head, whose verified entry says `commons`.
+/// After the adoption stamp an anonymous caller is SERVED the body and the
+/// edge — the row and the edge its verified source head states opened together.
+#[tokio::test]
+async fn adopting_an_earned_commons_head_opens_a_private_row_to_anonymous_readers() {
+    use elohim_storage::db::content_diesel::{
+        stamp_declared_head_mode, CanonicalOrdering, ContentProjectionPatch, StampMode,
+        StampOutcome,
+    };
+    const ADOPTED: &str = "fct-teacher-workbook-atom";
+    let fx = serve().await;
+    {
+        let mut conn = fx.pool.get().unwrap();
+        let ctx = AppContext::default_lamad();
+        create_content(
+            &mut conn,
+            &ctx,
+            CreateContentInput {
+                id: ADOPTED.into(),
+                title: ADOPTED.into(),
+                description: None,
+                content_type: "concept".into(),
+                content_format: "markdown".into(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: "private".into(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: Some("the steward's words".into()),
+                dht_anchor_hash: Some(format!("uhCkk-{ADOPTED}")),
+            },
+        )
+        .unwrap();
+        replace_authored_edges(
+            &mut conn,
+            &ctx,
+            ADOPTED,
+            &[AuthoredEdge {
+                relationship_type: "RELATES_TO".into(),
+                target_id: COMMONS_B.into(),
+                role: None,
+            }],
+            "private",
+            Some(&format!("uhCkk-{ADOPTED}")),
+        )
+        .unwrap();
+    }
+    let (status, body) = get(&fx, &format!("content/{ADOPTED}"), None).await;
+    assert_ne!(
+        status, 200,
+        "a private atom is not served anonymously: {body}"
+    );
+    let (_, edges) = get(&fx, &format!("relationships?contentId={ADOPTED}"), None).await;
+    assert!(!edges.contains(COMMONS_B), "nor is its edge: {edges}");
+
+    {
+        let mut conn = fx.pool.get().unwrap();
+        let outcome = stamp_declared_head_mode(
+            &mut conn,
+            &AppContext::default_lamad(),
+            ADOPTED,
+            "uhCkk-steward-earned-head",
+            Some(10),
+            Some(ContentProjectionPatch {
+                reach: Some("commons".into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some(CanonicalOrdering::new(10, true)),
+        )
+        .unwrap();
+        assert_eq!(outcome, StampOutcome::Stamped);
+    }
+
+    let (status, body) = get(&fx, &format!("content/{ADOPTED}"), None).await;
+    assert_eq!(
+        status, 200,
+        "the adopted commons atom serves anonymously: {body}"
+    );
+    assert!(body.contains("the steward's words"), "served body: {body}");
+    let (status, edges) = get(&fx, &format!("relationships?contentId={ADOPTED}"), None).await;
+    assert_eq!(status, 200, "{edges}");
+    assert!(
+        pairs(&edges).contains(&(ADOPTED.to_string(), COMMONS_B.to_string())),
+        "the authored edge opened with its source: {edges}"
+    );
+}

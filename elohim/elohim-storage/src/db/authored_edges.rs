@@ -125,6 +125,36 @@ pub fn narrow_edges_of_source(
     .map_err(|e| StorageError::Internal(format!("edge reach narrow failed: {e}")))
 }
 
+/// Re-stamp every AUTHORED edge of `source_id` — the rows projected from its
+/// verified signed head ([`is_authored_projection`]) — to exactly `reach`, the
+/// source's reach (edge reach = source reach). Returns how many rows moved.
+///
+/// The widening counterpart of [`narrow_edges_of_source`], for the earned
+/// adoption that opens a row (`content_diesel::widen_to_adopted_earned_reach`).
+/// Only authored rows follow the source up: a POSTed or seeded edge stated its
+/// own reach, and a source opening is no licence to open it.
+pub fn restamp_authored_edges_of_source(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    source_id: &str,
+    reach: &str,
+) -> Result<usize, StorageError> {
+    diesel::update(
+        relationships::table
+            .filter(relationships::h_app_id.eq(&ctx.h_app_id))
+            .filter(relationships::source_id.eq(source_id))
+            .filter(relationships::inference_source.eq(AUTHORED))
+            .filter(relationships::provenance_chain_json.eq(AUTHORED_PROVENANCE_JSON))
+            .filter(relationships::reach.ne(reach)),
+    )
+    .set((
+        relationships::reach.eq(reach),
+        relationships::updated_at.eq(current_timestamp()),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("authored edge reach restamp failed: {e}")))
+}
+
 /// One authored edge as its source entry states it, already canonical.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredEdge {

@@ -2116,11 +2116,14 @@ fn adopt_local(
         // under the same guarded stamp (fill, move, or same-head refresh —
         // the last heals a row adopted before these were carried). Type is
         // a version field, not identity: a recomposed atom is retyped in
-        // place (F17). Reach stays out (RC-4, below).
+        // place (F17). Reach rides along for F19 only: the stamp applies it
+        // solely to WIDEN a row under an EARNED election, never to narrow one
+        // (RC-4, below) — `content_diesel::widen_to_adopted_earned_reach`.
         content_diesel::ContentProjectionPatch {
             metadata_json: Some(head.content.metadata_json.clone()),
             content_type: Some(head.content.content_type.clone()),
             content_format: Some(head.content.content_format.clone()),
+            reach: Some(head.content.reach.clone()),
             ..Default::default()
         }
         .carry_verified_version(
@@ -2137,9 +2140,10 @@ fn adopt_local(
         // notarized Content entry in hand — carry ONLY its pointer and size,
         // exactly as the siblings do (`projection_reconcile.rs:6560-6576`,
         // this file's election-obey and adopt-via-conductor-declare arms).
-        // No `reach`/`title`/`content_type` here: `project_authenticated_content_head`
-        // guards `reach` with the RC-4 non-narrowing check and this call site
-        // has no such guard, so adding it unguarded would re-open RC-4.
+        // No `title` here, and `reach` is only the widen-only F19 carry above:
+        // `project_authenticated_content_head` guards `reach` with the RC-4
+        // non-narrowing check, and the stamp never narrows on adoption, so
+        // RC-4 stays closed.
         if let Some(patch) = verified_patch.as_mut() {
             patch.blob_cid = head.content.blob_cid.clone();
             patch.content_size_bytes = head
@@ -4380,6 +4384,42 @@ mod tests {
         assert_eq!(row.content.content_type, "discussion", "fallback: no type");
         assert_eq!(row.tags, vec!["fct".to_string()], "fallback: no tags");
         assert_eq!(edges.len(), 2, "fallback: no edges");
+    }
+
+    /// F19: the own conductor's canonical answer for an EARNED head carries
+    /// its verified reach — `adopt_local` opens a `private` row to the entry's
+    /// `commons`. A staging-tier canonical answer does not.
+    #[test]
+    fn canonical_earned_head_adoption_widens_reach() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        let reach = |pool: &DbPool, id: &str| {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::reach_for(&mut conn, &ctx, id)
+                .unwrap()
+                .unwrap()
+        };
+        for (id, earned, expected) in [("earned", true, "commons"), ("staged", false, "private")] {
+            seed_adoption_content(&pool, id, "{}");
+            {
+                use crate::db::diesel_schema::content;
+                use diesel::prelude::*;
+                let mut conn = pool.get().expect("connection");
+                diesel::update(content::table.filter(content::id.eq(id)))
+                    .set(content::reach.eq("private"))
+                    .execute(&mut conn)
+                    .unwrap();
+            }
+            let mut head = wire(true);
+            head.content.id = id.to_string();
+            head.canonical_declared_at = Some(1);
+            head.canonical_earned = Some(earned);
+            assert_eq!(
+                adopt_local(&pool, &ctx, id, &head, None),
+                AdoptOutcome::Adopted
+            );
+            assert_eq!(reach(&pool, id), expected, "earned={earned}");
+        }
     }
 
     #[test]
