@@ -7,8 +7,6 @@
 //! are the two registered manifests). Future sprints may generalize to fully
 //! dynamic SDL emission by iterating `ManifestRegistry` entries.
 
-#![cfg(feature = "graph-native")]
-
 /// Generate Apollo Federation v2 subgraph SDL from the named manifests.
 ///
 /// Core types are always emitted first. Each manifest name appends its

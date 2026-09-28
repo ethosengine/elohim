@@ -15,8 +15,6 @@
 //! is built per-request from the `Arc<GraphEngine>` — inexpensive because the
 //! build just stores the Arc and compiles the static SDL.
 
-#![cfg(feature = "graph-native")]
-
 use std::sync::Arc;
 
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
