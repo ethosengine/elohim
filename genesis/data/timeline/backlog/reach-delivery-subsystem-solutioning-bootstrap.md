@@ -101,7 +101,7 @@ the problem, so new paths keep turning up.
 | 2026-09-25 | A creator could not find their own private row under the doorway's second namespace. | `9f7529be5`. The fix treats a symptom of the identity-spelling split (§4, D10). |
 | 2026-09-27 | Reading an atom's edges was not reach-gated. | `7920095ed`: every read of an atom and its edges is reach-gated. |
 | 2026-09-28/29 | An **earned** head election was judged by link-tag prefix alone, so any peer could forge one. | `4687e4111`, `1e9368935` (dev, local): coordinator-only authentication of earned-link authors. The integrity-layer tag gate is still pending, because it moves the DNA hash. |
-| 2026-09-28 | **F19**: a peer adopting an earned head widened the row's reach and edges (`1869b8fab`). | Reverted (`b31100358`). Being re-landed with safeguards (leg 3, local, in progress). |
+| 2026-09-28 | **F19**: a peer adopting an earned head widened the row's reach and edges (`1869b8fab`). | Reverted (`b31100358`). Re-landed as `600dff891` (local, unpushed): widening needs a complete verified version carrying its own body or blob, the election ordering survives an author `Declare`, only restated edges widen, and the four holes in §2b are closed. `just gate elohim-storage` `EXIT=0`. Household proof pending. |
 
 ### 2b. F19: the four holes the 2026-09-29 adversarial review found
 
@@ -119,6 +119,8 @@ because reach is a row column that head adoption overwrites:
    `canonical_earned`, so an older earned election then wins.
 4. **Private titles and descriptions survive a public replacement.** Local adoption does not carry
    title or description, so the old values remain under the widened reach.
+
+Leg 3 (`600dff891`) closes all four in storage, each with a regression test. Hole 1 is closed by refusing the whole `HealCanonical` stamp when the incoming reach is narrower, and hole 4 by carrying title and description in the adoption patch. They are symptoms of the reach model, so they stay here.
 
 In Zanzibar terms these are: reach not tied to the version it governs (1), a child object inheriting
 its parent's reach without its own relation (2, 4), and the "new enemy" problem (3). F19 leg 3 fixes
