@@ -69,9 +69,12 @@ Then re-land F19 with the three fixes above.
 
 ## Current decision
 
-The coordinator-only mitigation is implemented locally for review: ordinary and carried elections
-re-authenticate every EARNED link author as the id's root author, a currently valid in-scope
-delegate, or the progenitor; supplied delegation proofs are never ignored; and storage refuses to
-exercise the delegated route through a root-author/progenitor conductor. F19 remains held and is
-not part of this change. The integrity-layer tag gate and F19's three widening fixes remain later
-work, so the FCT v2 course's `private` rows on non-steward peers still wait on that re-land.
+The coordinator-only mitigation is implemented and adversarially reviewed locally: ordinary,
+carried-election, and carried-head-evidence paths re-authenticate every EARNED link author as the
+id's immutable first root author, a currently valid in-scope delegate, or the progenitor. Root
+authority is derived from all signed id-link creation facts, including later-deleted links, so an
+attacker cannot delete the live index and substitute its own root. Supplied delegation proofs are
+never ignored, self-delegation is refused consistently, and storage refuses to exercise the
+delegated route through a root-author/progenitor conductor. F19 remains held and is not part of
+this change. The integrity-layer tag gate and F19's three widening fixes remain later work, so the
+FCT v2 course's `private` rows on non-steward peers still wait on that re-land.

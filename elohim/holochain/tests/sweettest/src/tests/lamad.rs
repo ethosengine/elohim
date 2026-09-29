@@ -270,6 +270,9 @@ struct ContentHeadOutput {
     /// on the declare paths (which have written no link they can read back).
     #[serde(default)]
     pub canonical_earned: Option<bool>,
+    /// The exact declaration that won the election (`ActionHashB64` on wire).
+    #[serde(default)]
+    pub canonical_link_hash: Option<String>,
     /// The STAGING declaration standing beneath an EARNED winner (`ActionHashB64`
     /// on the wire ⇒ `String` here). This is the field the storage controller
     /// reads to canary a candidate on a long-lived channel.
@@ -3169,7 +3172,10 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
 
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let seed = network_seed(DNA);
-    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    // Keep the root author distinct from the progenitor so the positive case
+    // proves root-author standing instead of taking the progenitor shortcut.
+    let progenitor = SweetAgents::one(c1.keystore()).await;
+    let dna_file = load_dna(DNA, &seed, Some(progenitor)).await?;
     let dna_hash = dna_file.dna_hash().clone();
     let app1 = c1
         .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
@@ -3204,7 +3210,7 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
 
     // The root author's own earned declaration keeps its tier and wins over
     // the forged link after that link is demoted to staging.
-    let _: ContentHeadOutput = c1
+    let genuine: ContentHeadOutput = c1
         .call(
             &zome1,
             "declare_earned_canonical_head",
@@ -3219,6 +3225,7 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
     let head = head.expect("root author's earned head resolves");
     assert_eq!(head.head_action_hash, root.action_hash);
     assert_eq!(head.canonical_earned, Some(true));
+    assert_eq!(head.canonical_link_hash, genuine.canonical_link_hash);
 
     // A valid root-author delegation lets the delegate retain EARNED.
     let valid_id = unique_id("earned-tier-valid-delegate");
@@ -3343,7 +3350,12 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
     // The ordinary read demotes the forged link, leaving the genuine root
     // declaration earned; carrying those same bytes is refused outright.
     let head: Option<ContentHeadOutput> = c1.call(&zome1, "resolve_content_head", id.clone()).await;
-    assert_eq!(head.and_then(|head| head.canonical_earned), Some(true));
+    let head = head.expect("genuine root-author declaration remains elected");
+    assert_eq!(head.canonical_earned, Some(true));
+    assert_eq!(
+        head.canonical_link_hash, genuine.canonical_link_hash,
+        "the forged earned-tagged link must be demoted, not win by sharing the genuine target"
+    );
     let carried: std::result::Result<Option<CanonicalElectionOutput>, _> = c1
         .call_fallible(
             &zome1,

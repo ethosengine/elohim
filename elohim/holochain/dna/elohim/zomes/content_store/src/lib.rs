@@ -2875,25 +2875,58 @@ pub struct CarriedRecordOutput {
     pub record: Vec<u8>,
 }
 
-/// Walk an action's Update lineage down to the root Create and return its
-/// author. Every update chains from the prior head, so any chain member
-/// resolves to the same root author. `None` if a link in the chain is not
-/// retrievable from the local DHT view.
+/// Is `record` a Content CREATE for `id` — a root of that content identity?
+fn is_content_root_for(record: &Record, id: &str) -> bool {
+    if !matches!(record.action().data, ActionData::Create(_)) {
+        return false;
+    }
+    matches!(
+        record.entry().to_app_option::<Content>(),
+        Ok(Some(content)) if content.id == id
+    )
+}
+
+/// The immutable first root advertised for a content id.
 ///
-/// `strategy` is threaded from the caller — see [`gather_content_chain`] for why
-/// the READ path passes `Local` and the DECLARE path passes `Network`. This walk
-/// is the most timeout-exposed of the three helpers: it is a SEQUENTIAL `get` per
-/// link in the update chain, so a chain of depth D costs D network round-trips
-/// under `Network`.
-fn resolve_root_author(
-    action_hash: ActionHash,
-    strategy: GetStrategy,
-) -> ExternResult<Option<AgentPubKey>> {
-    // ONE walk, not two. `correction::resolve_root_create` returns the root
-    // RECORD (a superset of what this needed) and adds a depth bound, so an
-    // adversarial or cyclic lineage can no longer spin here forever.
-    Ok(correction::resolve_root_create(action_hash, strategy)?
-        .map(|r| r.action().author().clone()))
+/// Authority cannot follow `get_links`: any agent may delete an `IdToContent`
+/// link at the current integrity boundary, which would let it hide the real
+/// root and substitute a root it authored. Link details retain every signed
+/// CreateLink fact even after deletion. Resolve each target to its Content
+/// root and choose the earliest notarized root action, with its action hash as
+/// the deterministic tie-break. Once observed, deleting its index link cannot
+/// transfer authorship to a later root.
+fn canonical_identity_root(id: &str, strategy: GetStrategy) -> ExternResult<Option<Record>> {
+    let anchor = StringAnchor::new("content_id", id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> =
+        get_links_details(query, strategy)?.into();
+    let mut roots: Vec<Record> = Vec::new();
+    for (create, _) in details {
+        let ActionData::CreateLink(link) = &create.action().data else {
+            continue;
+        };
+        let Ok(target) = ActionHash::try_from(link.target_address.clone()) else {
+            continue;
+        };
+        let Some(root) = correction::resolve_root_create(target, strategy)? else {
+            continue;
+        };
+        if is_content_root_for(&root, id)
+            && !roots
+                .iter()
+                .any(|seen| seen.action_address() == root.action_address())
+        {
+            roots.push(root);
+        }
+    }
+    roots.sort_by(|a, b| {
+        a.action()
+            .timestamp()
+            .cmp(&b.action().timestamp())
+            .then_with(|| a.action_address().cmp(b.action_address()))
+    });
+    Ok(roots.into_iter().next())
 }
 
 /// Gather the retrievable IdToContent link-target records for an id plus the
@@ -2950,9 +2983,8 @@ fn gather_content_chain(
     if records.is_empty() {
         return Ok(None);
     }
-    let root_author = match resolve_root_author(records[0].action_hashed().hash.clone(), strategy)?
-    {
-        Some(a) => a,
+    let root_author = match canonical_identity_root(id, strategy)? {
+        Some(root) => root.action().author().clone(),
         None => return Ok(None),
     };
     Ok(Some((root_author, records)))
@@ -4210,6 +4242,11 @@ fn verify_head_delegation(
     id: &str,
 ) -> ExternResult<()> {
     let p = &delegation.payload;
+    if p.grantor == p.delegate {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "head delegation: delegate must differ from the grantor".to_string(),
+        )));
+    }
     if &p.grantor != root_author {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "head delegation: grantor {:?} is not the root author {:?} of content '{id}'",
@@ -6735,7 +6772,8 @@ struct EarnedStanding {
 
 fn earned_standing_for_id(id: &str, strategy: GetStrategy) -> ExternResult<EarnedStanding> {
     Ok(EarnedStanding {
-        root_author: gather_content_chain(id, strategy)?.map(|(author, _)| author),
+        root_author: canonical_identity_root(id, strategy)?
+            .map(|root| root.action().author().clone()),
         progenitor: maybe_bootstrap_steward()?,
     })
 }
@@ -6895,17 +6933,6 @@ fn prove_carried_declaration(
 /// not remember as a verdict on the evidence.
 pub const LINEAGE_NOT_HELD: &str = "lineage-not-held";
 
-/// Is `record` a Content CREATE for `id` — a root of that content identity?
-fn is_content_root_for(record: &Record, id: &str) -> bool {
-    if !matches!(record.action().data, ActionData::Create(_)) {
-        return false;
-    }
-    matches!(
-        record.entry().to_app_option::<Content>(),
-        Ok(Some(content)) if content.id == id
-    )
-}
-
 /// Input for [`verify_carried_head_evidence`].
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyCarriedHeadEvidenceInput {
@@ -7000,16 +7027,10 @@ pub fn verify_carried_head_evidence(
         }
     }
 
-    // The roots this conductor already holds for the id: the Content Creates its
-    // own IdToContent links name. Authority is over an EXISTING content identity,
-    // so the version must descend from one of them.
-    let held_roots: Vec<Record> = match gather_content_chain(id, GetStrategy::Local)? {
-        Some((_, records)) => records
-            .into_iter()
-            .filter(|r| is_content_root_for(r, id))
-            .collect(),
-        None => Vec::new(),
-    };
+    // Authority is over the immutable first root advertised for this id, not
+    // any root an attacker can later add (or make appear first by deleting the
+    // legitimate root's live index link).
+    let identity_root = canonical_identity_root(id, GetStrategy::Local)?;
     let version_root: Option<Record> = match &record.action().data {
         ActionData::Update(update) => {
             match correction::resolve_root_create(
@@ -7031,9 +7052,9 @@ pub fn verify_carried_head_evidence(
     };
     let root = version_root.filter(|root| {
         is_content_root_for(root, id)
-            && held_roots
-                .iter()
-                .any(|held| held.action_address() == root.action_address())
+            && identity_root
+                .as_ref()
+                .is_some_and(|identity| identity.action_address() == root.action_address())
     });
     let version_author = record.action().author().clone();
     let root_author = root.as_ref().map(|r| r.action().author().clone());
@@ -7055,6 +7076,20 @@ pub fn verify_carried_head_evidence(
              conductor holds for '{id}')",
             declaration.declarer
         ))));
+    }
+    if declaration.candidate.is_earned {
+        let standing = earned_standing_for_id(id, GetStrategy::Local)?;
+        if !holds_earned_declaration_standing(
+            id,
+            &declaration.declarer,
+            declaration.tag.as_slice(),
+            &standing,
+        ) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{CALLER}: declarer {:?} holds no earned authoring standing for id '{id}'",
+                declaration.declarer
+            ))));
+        }
     }
 
     let carried_link = declaration.candidate.link_hash.clone();
