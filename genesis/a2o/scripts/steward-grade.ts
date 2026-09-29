@@ -91,6 +91,7 @@ interface Options {
   coStewardAdminWs: string[];
   concurrency: number;
   newRoots: boolean;
+  budgetSeconds: number;
 }
 
 function usage(msg?: string): never {
@@ -98,7 +99,7 @@ function usage(msg?: string): never {
   console.error(
     'usage: steward-grade.ts [<id>…] [--manifest FILE] [--closure PATH_ID]… [--dry-run] ' +
       '[--storage URL] [--admin-ws URL] [--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] ' +
-      '[--co-steward-admin-ws URL]… [--concurrency N] [--new-roots]'
+      '[--co-steward-admin-ws URL]… [--concurrency N] [--new-roots] [--budget-seconds S]'
   );
   process.exit(2);
 }
@@ -134,6 +135,7 @@ function parseArgs(argv: string[]): Options {
     coStewardAdminWs: [],
     concurrency: Number(env.STEWARD_GRADE_CONCURRENCY ?? 4),
     newRoots: env.STEWARD_GRADE_NEW_ROOTS === '1',
+    budgetSeconds: Number(env.STEWARD_GRADE_BUDGET_S ?? 0),
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -177,6 +179,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--new-roots':
         o.newRoots = true;
+        break;
+      case '--budget-seconds':
+        o.budgetSeconds = Number(val());
         break;
       case '-h':
       case '--help':
@@ -401,8 +406,19 @@ async function main(): Promise<void> {
   const getStewards = async (): Promise<{ conductor: Conductor; stewards: StewardSet }> =>
     (stewardsP ??= connectStewards(o));
 
-  const counts = { current: 0, widened: 0, 'would-widen': 0, refused: 0, failed: 0 };
+  const counts = { current: 0, widened: 0, 'would-widen': 0, refused: 0, failed: 0, deferred: 0 };
+  // A first pass over a loaded fleet peer runs ~2 rows/min, longer than the genesis
+  // stage allows (#1590-#1592 all ABORTED inside matthew's grade, adam never reached).
+  // Past the budget no new id starts: the rest are deferred to the next run, which is
+  // idempotent and skips `current` rows without touching the conductor.
+  const startedAt = Date.now();
+  const overBudget = (): boolean =>
+    o.budgetSeconds > 0 && Date.now() - startedAt > o.budgetSeconds * 1000;
   await forEachBounded(ids, o.concurrency, async id => {
+    if (overBudget()) {
+      counts.deferred++;
+      return;
+    }
     const { item, error } = loadRepoItem(o.dataDir, id);
     if (!item) {
       line(id, '?', '?', 'refused', error);
@@ -495,6 +511,7 @@ async function main(): Promise<void> {
   console.log(
     `steward-grade: ${ids.length} id(s) — current ${counts.current}, widened ${counts.widened}, ` +
       `would-widen ${counts['would-widen']}, refused ${counts.refused}, failed ${counts.failed}` +
+      (counts.deferred > 0 ? `, deferred ${counts.deferred} (budget ${o.budgetSeconds}s)` : '') +
       (o.dryRun ? ' (dry run: nothing patched)' : '')
   );
   process.exit(counts.failed > 0 ? 1 : 0);

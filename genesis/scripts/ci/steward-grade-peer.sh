@@ -49,6 +49,10 @@ DRY=()
 if [ "${STEWARD_GRADE_DRY_RUN:-0}" = "1" ]; then DRY=(--dry-run); fi
 CO=()
 for url in ${CO_STEWARD_ADMIN_WS}; do CO+=(--co-steward-admin-ws "${url}"); done
+# Per-peer budget inside the 90-min genesis stage: a first pass on a loaded peer runs
+# ~2 rows/min, and #1590-#1592 ABORTED inside the first peer's grade. Unreached rows
+# are deferred to the next run (idempotent; current rows never touch the conductor).
+export STEWARD_GRADE_BUDGET_S="${STEWARD_GRADE_BUDGET_S:-720}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
