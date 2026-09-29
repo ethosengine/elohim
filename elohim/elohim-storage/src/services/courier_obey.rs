@@ -380,10 +380,12 @@ pub(crate) fn patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
 
 /// The patch a head MOVE carries from a proven record: the version's pointer,
 /// size and metadata (which names its server bundle), its body, type, format,
-/// tags and authored edges — and nothing that could narrow `reach` or rewrite
-/// the title/description identity fields, exactly as the adopt path's T-1 move
-/// does (`head_adoption::adopt_local`). The RC-4 non-narrowing guard lives on
-/// the projection, not here.
+/// tags, authored edges, and identity text. Title/description must travel too:
+/// otherwise opening the adopted version would expose private text retained
+/// from its predecessor. The RC-4 non-narrowing guard lives on the projection,
+/// not here. `reach` rides along for F19 only: the stamp reads
+/// it solely to WIDEN a row whose adopted head is EARNED
+/// (`content_diesel::widen_to_adopted_earned_reach`), never to narrow one.
 pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch {
     ContentProjectionPatch {
         blob_cid: c.blob_cid.clone(),
@@ -391,11 +393,15 @@ pub(crate) fn move_patch_from_proven(c: &ContentEntry) -> ContentProjectionPatch
             .content_size_bytes
             .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
         metadata_json: Some(c.metadata_json.clone()),
+        title: Some(c.title.clone()),
+        description: Some(c.description.clone()),
         // The version moves with its pointer: body, type (a recomposed atom is
         // retyped in place — F17), format, tags and edges (F16) are the
         // version, not identity, and none of them can narrow reach.
         content_type: Some(c.content_type.clone()),
         content_format: Some(c.content_format.clone()),
+        // F19: widen-only, and only under an EARNED election (the stamp's rule).
+        reach: Some(c.reach.clone()),
         ..Default::default()
     }
     .carry_verified_version(
@@ -1022,6 +1028,8 @@ mod tests {
         let proven = entry("## Psalm 13\n\nHow long?\n", None);
         for patch in [patch_from_proven(&proven), move_patch_from_proven(&proven)] {
             assert_eq!(patch.content_body, body);
+            assert_eq!(patch.title.as_deref(), Some("t"));
+            assert_eq!(patch.description.as_deref(), Some(""));
             assert_eq!(patch.content_type.as_deref(), Some("discussion"));
             assert_eq!(patch.tags, Some(vec!["fct".to_string()]));
             let edges = patch.relationships.expect("the entry states edges");

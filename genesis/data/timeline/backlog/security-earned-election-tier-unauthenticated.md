@@ -69,12 +69,18 @@ Then re-land F19 with the three fixes above.
 
 ## Current decision
 
-The coordinator-only mitigation is implemented and adversarially reviewed locally: ordinary,
-carried-election, and carried-head-evidence paths re-authenticate every EARNED link author as the
-id's immutable first root author, a currently valid in-scope delegate, or the progenitor. Root
-authority is derived from all signed id-link creation facts, including later-deleted links, so an
-attacker cannot delete the live index and substitute its own root. Supplied delegation proofs are
-never ignored, self-delegation is refused consistently, and storage refuses to exercise the
-delegated route through a root-author/progenitor conductor. F19 remains held and is not part of
-this change. The integrity-layer tag gate and F19's three widening fixes remain later work, so the
-FCT v2 course's `private` rows on non-steward peers still wait on that re-land.
+The coordinator-only authentication mitigation and the storage-side F19 widening safeguards are
+implemented and locally tested. Ordinary, carried-election, and carried-head-evidence paths
+re-authenticate every EARNED link author as the id's immutable first root author, a currently valid
+in-scope delegate, or the progenitor. Root authority is derived from all signed id-link creation
+facts, including later-deleted links, so an attacker cannot delete the live index and substitute
+its own root. Supplied delegation proofs are never ignored, self-delegation is refused consistently,
+and storage refuses to exercise the delegated route through a root-author/progenitor conductor.
+F19 now widens only when the adopted verified version is complete and carries its own body/blob,
+never while retaining an older blob pointer; it replaces title/description with the adopted
+version, holds a narrower or unknown-grade version rather than serving it under an older wider
+grade, preserves an authenticated election-ordering floor across both unordered author-declaration
+write paths, and widens only edges the adopted head restates. Those additional guards close four
+disclosure paths found by the independent local adversarial review. The integrity-layer
+canonical-head tag gate remains later work (it moves the DNA hash); this re-land changes storage
+only and still needs household proof before F19 is fixed.
