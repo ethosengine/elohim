@@ -308,3 +308,48 @@ Filed separately, NOT caused by this change (identical before and after): on the
 `(hash, blob)` pair. If that hash is not re-derived from the content before insert, a peer could plant a blob
 of its choosing under a victim's grant entry hash and influence an authorisation decision without owning the
 node. Unverified; needs a bounded read of the op-integration path.
+
+## Delta 2026-09-29 — FCT convergence exposes the unshipped lookup fix
+
+During FCT v2 convergence diagnosis, Adam's conductor still emitted the old
+`SELECT cg.action_hash, cg.cap_access, cg.tag` scan. A bounded Loki window
+(18:20–18:24 UTC, 12 latest matching slow statements, truncated) included 11,748 returned rows
+at 19.21 and 27.30 seconds and 7,834 rows at 41.88 seconds. These are threshold-selected SQL
+wall times, not a complete CPU profile or a controlled before/after comparison. Raw evidence:
+`genesis/a2o/reports/recovery/fct-convergence-20260929/adam-cap-slow-1820-1824.json`.
+Matthew's independent conductor election selected FCT v2 at staging tier; Adam's election
+remains unmeasured because authorizing the diagnostic signer timed out. Adam still serves the
+older projected course head and its serving-health probe returns 503. The slow lookup is an
+observed obstacle; clearing it is not yet proof that every convergence obstacle is resolved.
+
+The deployed/pinned fork `c8c17202c` does not contain `61565f320`. **Do not move the pin directly
+to `61565f320` or the shared checkout's `7e553f9c3`: they are on a different branch and would drop
+the deployed branch's publish/WAL/query fixes.** The broader `7e553f9c3` range also has a recorded
+household convergence regression. The isolated candidate is instead based on `c8c17202c`, on
+local fork branch `codex/fct-cap-grant-convergence` at `/tmp/fct-cap-grant-convergence`:
+
+- `db2f5bf37`: port of the one-query-per-access-class lookup (`61565f320`).
+- `f6e974de6`: private-entry-only correction (`06923b304`), excluding public-table shadowing.
+- `26374c316`: independent-review correction: decode an indexed grant's action before skipping
+  missing private bytes. A corrupt action must still deny the read even if a second grant is
+  valid. The differential regression covers corrupt signature, action data and a null indexed
+  entry hash. The query remains one per access class and never reads public grant bytes.
+
+Formatting/diff checks and independent corrective review passed. `cargo test --locked
+-p holochain_data -p holochain_state` passed: 151 data tests, 10 integration tests and 198 state
+tests (359 total), including the cost and missing-private-entry regressions; exit 0. Candidate
+release binary built successfully (encryption, wasmer-sys-cranelift, jemalloc), SHA256
+`c6ffea7d9d834b0643f85a8f6316bd9d0af40075c12c62c99b3784ef545fb841`.
+Changed-library clippy passed; all-target clippy failed on existing needless-borrow lints
+in the capability test-WASM fixture, so the all-target gate is not green. All three
+household conductors now run this exact candidate, preserving their identities; storage
+was restarted through the supported token-refresh rail and all three zome paths passed.
+The first household convergence lane failed before its convergence assertions: the fixture's
+head declaration returned `Stamp declared head failed: database is locked`. This is a
+legitimate caller refused, consistent with the storage stamp's deferred read-to-write
+transaction upgrade, not evidence that an authorization side door closed. The warm retry passed 15/15 steps (sprint-report-household-20260929T185355Z-d2733929),
+with 612,956 ms waiting for organic convergence and no declaration calls during the cure.
+This proves the candidate can converge on this household; it does not prove recovery of
+Adam on the fleet or isolate the peer-carried mechanism (its counter remained absent). No fork push,
+superproject pin change or fleet rollout has occurred. No further fresh signer-authorization
+retries are planned: a client timeout does not cancel or disprove a committed CapGrant.

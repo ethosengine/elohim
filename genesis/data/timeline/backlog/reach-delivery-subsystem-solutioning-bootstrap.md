@@ -87,6 +87,23 @@ root declaration. The resolver's current ancestor walk stops at nested `root: tr
 cross-root authority provenance and network-decision resolution remain design work, not behavior
 implemented by this prose addition.
 
+**Developer views and elected views — sequencing clarification (operator, 2026-09-29).**
+Campaign 1.4 must first establish what the elected head is and prove its convergence between
+Adam and Matthew's conductors/storage and both doorways. Today's alpha/apex difference must not
+be explained away as an intentional developer/elected split without evidence. Once that foundation
+is reliable, an explicit developer view may select a development head while an elected view selects
+the elected head. Both doorways should understand the requested context; hostname alone must not
+stand in for election or authority. Failover must preserve that context.
+
+The reach subsystem may optionally enable or benefit this later distinction: solutioning should
+consider who may discover/read a development head, who has standing to propose or affirm its
+election, and how the selected view exposes that provenance. Read permission, head selection and
+election remain separate questions; public reach does not by itself elect a development head.
+This is a future design consideration, not a claim that separate views already exist or a dependency
+to add to the current convergence repair. Lamad's course-doc-to-module composition and authoring UX
+belong to their own sprint. The developer experience to enable is an authorized atomic content or
+composition update propagating through the network, without a whole application pipeline run.
+
 **Habit served.** `reach-enforced-everywhere` (red). Its `retire-when` is the session's finish line:
 *"every egress plane derives authorization from one shared verifier it cannot bypass by construction."*
 
@@ -504,6 +521,52 @@ standing concerns a particular act in a particular context. The constituting aut
 reviewability of each governance decision must themselves be discoverable, with a bounded
 resolution rule rather than circular self-affirmation or an unbounded walk.
 
+**Development-network key custody — operator clarification (2026-09-29).** The FCT fleet
+diagnostic located hardcoded admin credentials in the checked-in doorway manifests
+`genesis/orchestrator/manifests/doorway/alpha.yaml` and `alpha-b.yaml`. Their values are deliberately
+not repeated here. They enabled admin access for diagnostics; Matthew's election was read, while
+Adam's probe-signing request timed out. Finding a credential did not settle the elected head or
+prove the identity or standing of its bearer.
+
+Matthew's standing as the human operator may be the basis for holding a key to this development
+network and delegating its use to development agents. Solutioning must explain that relationship:
+which human/holon authorizes custody, which network/world and acts the key covers, what delegation
+permits an agent to use it, and what evidence affirms, limits or withdraws that authority. A shared
+hardcoded bearer demonstrates possession when accepted; it cannot by itself distinguish Matthew
+from another holder or establish the claim/standing/Mishpat trace. The current diagnostic use was
+authorized by Matthew in the session; the credential does not encode that authorization history.
+
+Keep this concrete case in the development-network design: how should an agent discover the
+applicable authority and legitimate credential-access mechanism without exposing key material?
+How does delegated use remain attributable and bounded, including when the network matures beyond
+the development stage? Access to an admin key, permission to read a development head, and standing
+to elect or publish a head are distinct acts to account for. This note records the current fixture
+and an open design question; it neither chooses a replacement credential scheme nor treats key
+possession as an unlimited network grant.
+
+**Keys are stewarded resources; total lockout is a failure mode (operator, 2026-09-29).**
+Custody of a resource's key is a stewardship responsibility within its governing relationships,
+not an irrevocable claim of sole control. If Adam were a real person, his claims concerning this
+network would need to be understood as claims within a collective, with the affected humans'
+standing and rights represented. Today's simulated Adam must not be mistaken for that real-person
+case, but the mature-network design must support it.
+
+On a legitimate appeal, the network's applicable governance should be able to affirm a recovery
+decision and authorize re-keying of a resource such as this development network. The authority
+trace must identify the collective, the people with standing, the adjudicating holon and Mishpat
+decision, and the scope of the resulting stewardship change. The recovery path cannot depend
+exclusively on the very key or sole custodian whose loss, unavailability or contested control
+caused the lockout. Nor does an appeal alone authorize an arbitrary takeover: the design must
+establish how a valid decision is reached and verified.
+
+Treat total lockout anywhere as a failure mode to address explicitly. Solutioning must distinguish
+restoring control and future access by re-keying from recovering already-encrypted historical
+bytes; changing authority cannot reconstruct a lost decryption key. Specify the recovery
+arrangements needed for each, with the affected people's privacy and consent accounted for.
+Carry lost keys, unavailable stewards, contested collective claims, authorized re-keying and
+rejected takeover attempts into the acceptance cases. These are design requirements, not a claim
+that appeal-based recovery is implemented or authorization to rotate today's fleet keys.
+
 These are requirements and questions for the existing spec amendment. They do not declare a new
 entry type, route or implementation. In particular, the current `.epr-meta` resolver does not
 perform this network authority resolution.
@@ -678,6 +741,21 @@ that holding content does not mean being able to read it.
       promoting its internal relationships into real-network authority?
     - What is explicitly known today from Matthew's authorization, and what remains pending
       network affirmation? The development agents must be able to explain that distinction.
+
+    - How does Matthew's standing authorize development-network key custody and delegated agent
+      use (§6b), and what makes that authority discoverable, scoped, attributable and withdrawable
+      independently of possession of today's shared hardcoded admin credential?
+    - How are resource keys stewarded on behalf of a collective, and how can a legitimate network
+      appeal authorize re-keying when the current custodian or key is unavailable or contested?
+      Show a recovery path that avoids total lockout without enabling an unaccountable takeover;
+      distinguish restored authority from recovery of historical encrypted data.
+14. **Developer versus elected views, after campaign 1.4's elected-head convergence proof.**
+    - Can reach support explicit access to a development head while preserving a separately
+      elected view, without conflating permission to read with authority to elect?
+    - How do either doorway and its backing peers discover the requested view and preserve it
+      through failover, with evidence distinguishing intentional selection from stale propagation?
+    - What network update contract will the later Lamad authoring sprint consume for atomic
+      lesson/module/path edits? Keep that sprint's composition UX outside this subsystem's scope.
 
 ## 11. Definition of done for the solutioning session
 

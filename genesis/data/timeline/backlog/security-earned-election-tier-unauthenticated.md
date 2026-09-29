@@ -91,3 +91,5 @@ Intimate reads remain 403 everywhere; private fixtures remain 403 on Matthew/Jes
 has no private fixture. Report: `genesis/docs/superpowers/sprints/2026-09-29-f19-household-proof-report.md`.
 World/standing/Mishpat affirmation remains distinct from these HTTP observations; the report
 records the a2o lane's unknown stage rather than claiming a sealed proving ground.
+
+Household follow-up at 19:04 UTC (2026-09-29): the federation version-convergence scenario passed 15/15 steps on conductor candidate `26374c316` and unchanged leg-3 storage, including the forged declaration refusal (sprint-report-household-20260929T185355Z-d2733929). This adds a scenario receipt, not an integrity-layer closure or a restricted-to-commons transition proof. The initial run failed a legitimate declaration on a SQLite lock; its separate storage fix was not running during this pass. No public fleet rollout occurred.

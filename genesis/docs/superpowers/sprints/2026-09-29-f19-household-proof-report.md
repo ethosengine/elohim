@@ -157,3 +157,101 @@ Local raw artifacts: `/tmp/f19-before.json`, `/tmp/f19-after.json`,
 `/tmp/f19-storage-restart.log`, `/tmp/f19-preflight.log`, `/tmp/f19-redeclare.log`,
 `/tmp/f19-reach-lane.log`, `/tmp/f19-focused-tests.log`. The committed report preserves the
 material results; the temporary files are not durable authority.
+
+## Fleet follow-up: FCT v2 and campaign 1.4 (2026-09-29)
+
+The operator clarified the immediate requirement: establish the elected head and prove convergence
+between Adam and Matthew and their doorways. Intentional developer/elected views are later work;
+they must not explain away today's divergence. Lamad course composition is a separate sprint.
+
+Read-only content probes and browser captures showed alpha serving the five-movement v2 path while
+`elohim.host` served the older six-chapter path. The HTTP `/head?election=live` response is not an
+independent election-winner witness: `headActionHash` still comes from the storage projection, and
+both probes returned `earnedSource: cached` with `stagingCandidateState: unavailable`.
+
+Fleet admin credentials were located in the checked-in alpha and alpha-b doorway manifests and
+used without printing their values. The conductor diagnostic used admin/app WebSockets, requesting
+probe signing credentials and an app token, then calling only read-only content zome functions.
+No content, head, election link, deployment or cluster resource was deliberately changed.
+
+- **Matthew:** `resolve_canonical_election("foundations-christian-technology")` returned winner
+  `uhCkkxFL6asdXIQGdVgxMgKwfpmNOKahPVgHp26UWlskOys-5F23_`, `canonical_earned: false`, declaration
+  timestamp `1790587408793189`, and link `uhCkk09OUgVZr5SrtBdVwYZRrvESKKlNENpNbXZvreXV9ez9tkuu3`.
+  `resolve_content_head_local` independently resolved that same canonical action and v2 content.
+  This is an observed staging-tier election winner, not an earned-tier proof.
+- **Adam:** admin `listApps` succeeded, but `authorizeSigningCredentials` failed. A captured
+  doorway proxy frame reported `Holochain error: Request timeout`; the client subsequently closed
+  with a pending request. The first diagnostic used an 18-second budget; the follow-up used 45
+  seconds per call. Adam's election winner remains **unmeasured**, not inferred from the SQL head.
+- Both listed Lamad DNA `uhC0kZezl4k2nZa5ZyU5O5H-5vH5LYpvwkSwkVx4G1wS_sHB4GTOt`.
+  Adam's authoritative running-cell membership included Lamad, while storage's per-role health
+  retained `app-disabled` for Lamad and node_registry, with an approximately 16,138-second episode.
+  This is a latched failure awaiting successful role-call evidence, not proof the cell is currently
+  absent. `elohim.host/health/serving` returned 503; alpha's returned 200.
+
+**Next proof boundary:** obtain Adam's independent local election and resolved-content answers,
+then distinguish election disagreement, missing winner bytes and stale projection. Do not substitute
+`POST .../canonical-head` for this diagnosis: that endpoint declares a staging election, so forcing
+agreement could conceal the campaign 1.4 failure. The existing operator reconcile verb requires an
+actual performer JWT and a scoped delegation; the admin key alone does not authorize that verb.
+No canonical-head POST, push, restart or redeploy was performed in this follow-up.
+
+Diagnostic artifacts are local: `/tmp/fct-adam-election.json`, `/tmp/fct-{alpha,apex}-diagnostics.json`,
+`/tmp/fct-{alpha,apex}-head-now.json`, and browser captures under
+`genesis/a2o/reports/look/fct-v2-{public,apex}-before/`. The material election result and failure are
+preserved above because those raw files are not durable evidence.
+
+
+## Conductor candidate and household convergence receipt (19:04 UTC)
+
+The isolated fork candidate `26374c316ea767c85cb54996b6333e7d53afe249` preserves deployed
+`c8c17202c` and adds the cap-grant lookup port, private-entry restriction, and corrupt-action
+review correction. Its release binary SHA256 is
+`c6ffea7d9d834b0643f85a8f6316bd9d0af40075c12c62c99b3784ef545fb841`.
+All three household conductors were restarted on that exact binary with their identities
+preserved. Storage remained the previously proved leg-3 binary (SHA256
+`68bdf78c82b0b636de977eea4ebad5b94113ef5d89d5a69b52618af39109f693`); the supported storage
+restart refreshed conductor connection tokens and all three zome readiness probes passed.
+
+Candidate validation: 359 data/state/integration tests passed; changed-library clippy passed;
+release build and formatting passed. All-target clippy is **not green**: unchanged capability
+WASM test fixtures have needless-borrow lints. This limitation must remain visible in the
+rollout decision.
+
+`just test mesh features/dataplane/federation-version-convergence.feature` first failed during
+fixture declaration with `Stamp declared head failed: database is locked` (report
+`sprint-report-household-20260929T185058Z-d2733929`). Classified **legitimate caller refused**,
+not a security side door closed. The warm retry passed **1 scenario / 15 steps**, including
+forged declaration rejection, in 10m36.985s (report
+`sprint-report-household-20260929T185355Z-d2733929`). Its organic receipt recorded 612,956 ms
+waiting for convergence, five setup writes, and **zero declaration calls during the cure**.
+Matthew's earned head `uhCkk9axmHr5LdL7ojz_aljwB9ZvSfDQqXG9EtAMCUJGGoYqKlUOe` displaced
+Jessica's later staging head `uhCkkNeUwwickAYV5Ij0TdSFZnvKYC_UOvxclVUYLo56bnQmM99S_` and
+both household doorways agreed. The peer-carried counter was absent before and after: this
+proves organic convergence, not that the carried-election arm caused it. This run-owned
+page is the campaign 1.4 fixture; it is not a claim that the public FCT page has recovered.
+
+**Immediate rollout candidate remains conductor-only.** No fork push, superproject pin move,
+or public fleet rollout has occurred. The public acceptance boundary remains Adam's independent
+election answer plus both doorways serving the same v2 head and content.
+
+### Separate storage findings preserved for follow-up
+
+The first failure exposed a deferred SQLite transaction that reads before acquiring the writer
+slot. A narrow top-level `BEGIN IMMEDIATE` fix, retaining nested savepoints, passed an independent
+review and a two-connection WAL regression. Its control reproduced the old database-lock failure.
+It was not running during the successful household proof.
+
+Review also identified a courier-path gap: a row with a locally canonical staging election may
+never compare a peer's stronger earned declaration; eventual DHT visibility can still converge,
+as this run demonstrated. A draft comparison patch retains own-conductor link verification,
+record proof, byte availability and the monotonic stamp. It needs its own scenario and review:
+first-advertiser inventory selection can hide a later differing peer, and repeated losing evidence
+can consume sweep/conductor budget. It is not part of the immediate rollout candidate.
+
+Both storage drafts are preserved, unapplied, at
+`genesis/a2o/reports/recovery/fct-convergence-20260929/storage-followup.patch`, SHA256
+`4010851314f99131bb283faddb84f1d599cf3509e5905f70561023163f0f3c34`.
+The three shared storage source files were restored to their pre-draft bytes. Raw proof artifacts
+are in the same recovery directory; the organic receipt is
+`genesis/a2o/reports/dataplane/carried-election-organic-receipt-2026-09-29T19-04-25-763Z.json`.
