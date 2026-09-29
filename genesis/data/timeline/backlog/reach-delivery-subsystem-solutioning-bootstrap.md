@@ -373,6 +373,35 @@ declared-world path.
   self-asserted headers, `DEV_MODE`, stage mis-declaration, a simulacra-minted grant presented to a
   Bootstrap peer, a fixture key used outside its world. `reach-enforced-http.feature` is the seed of
   this. Battle school practices the enemy's moves too.
+- **P9. A red says whether it closed a vulnerability or opened a bug.** Operator, 2026-09-29: without
+  a playground scheme we oscillate between opening bugs and closing vulnerabilities. Telling the two
+  apart has to be second nature, and it should come from the substrate, not from judgment.
+
+  Every reach refusal must carry, in its verdict/witness:
+  - which world it ran in;
+  - which authorizing fact it looked for;
+  - whether the caller came in through a **declared** path (a world grant, a real tuple, a hosted
+    session) or an **undeclared** one (a self-asserted header, an anonymous seeder, a stage default,
+    a side door).
+
+  From that, every red after a reach change sorts mechanically into one of three verdicts:
+  - **SIDE-DOOR CLOSED.** The test, seed, CI or demo depended on an undeclared path. The fix is to
+    move it into a declared world with a real grant. **The gate is never loosened.**
+  - **LEGITIMATE-REFUSED.** A declared, authorized caller was refused. This is a real bug in the
+    verifier or its inputs, and the fix is there.
+  - **UNCLASSIFIABLE.** The refusal can't say which. That is itself a defect: an explain gap,
+    fixed before either of the others.
+
+  Tests declare their world. A reach-touching test with no declared world is flagged, not trusted.
+
+  Past rounds of this oscillation, each settled by hand:
+
+  | Round | What turned red | How it was judged |
+  |---|---|---|
+  | `62b658784` doorway loopback seed gate → genesis #1503 `403` | CI had uploaded seeds unauthenticated for many builds through the `dev_mode` hole | Side door. Fixed by giving CI a real credential (`47fb60f58`). Right call, found by accident. |
+  | `7920095ed` every relationships read reach-gated → genesis #1586/#1587 `failed=8833` | The **anonymous** seeder could no longer read private sources' edges | `1b75cdedb` counts them as unverified rather than failing. Right call locally, but the seeder is still an undeclared actor; P2/P5 would give it a world identity instead. |
+  | F19 leg 3 → `canonical_earned_head_adoption_widens_reach` `EXIT=1` (2026-09-29) | A synthetic fixture kept an old blob and still expected a widen | Side door closed: the fixture was corrected, not the rule. It took a reasoning agent to see that. |
+  | `DEV_MODE=true` on every deployed doorway (the origin of the 2026-08 holes) | Deploys and devspaces needed to be drivable | The opposite call: **the gate was loosened to make things work**, and it became four internet-facing holes. This is the failure P9 exists to prevent. |
 
 ## 7. Already decided: compose, don't re-litigate
 
@@ -519,7 +548,11 @@ The session is done when it has produced:
   - the side-door inventory with its retirement order;
   - a2o scenarios proving that (i) a fixture world is deterministic, meaning Adam sees exactly the
     declared set on two independent mints, and (ii) a simulacra-minted grant or fixture key is
-    refused by a Bootstrap-stage peer.
+    refused by a Bootstrap-stage peer;
+- **(g)** the P9 refusal classification specified: the witness fields, the three verdicts
+  (SIDE-DOOR CLOSED / LEGITIMATE-REFUSED / UNCLASSIFIABLE), and where a gate or test report prints
+  them. Acceptance: re-run the four past rounds in the P9 table against the design, and each sorts
+  itself without a human or agent judging it.
 
 ## 12. Pre-read (in this order)
 
