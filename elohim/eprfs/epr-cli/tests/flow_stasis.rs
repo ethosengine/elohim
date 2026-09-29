@@ -43,6 +43,12 @@ fn write(root: &Path, rel: &str, contents: &str) {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let plans = "genesis/docs/superpowers/plans";
 
     // captured — stations in its own bytes, a status, an explained trace, links out

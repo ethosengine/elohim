@@ -19,6 +19,12 @@ fn pin(root: &Path, path: &str) -> Value {
 fn fixture() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let declaration: Value =
         serde_json::from_str(include_str!("../../../../.epr-meta/collective.json")).unwrap();
     write(root, ".epr-meta/collective.json", &declaration);

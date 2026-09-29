@@ -162,6 +162,12 @@ fn a_feature_is_rescued_by_its_own_acts_lane_contract() {
 fn an_unknown_cap_is_drift_on_a_doc_and_a_fixture_tag_on_a_feature() {
     let tmp = base();
     let root = tmp.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(
         root,
         "genesis/docs/superpowers/specs/typo.md",

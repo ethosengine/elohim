@@ -55,6 +55,12 @@ fn doc(id: &str) -> String {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/recipes.yaml", RECIPES);
 
     write(root, "docs/kept.md", &doc("kept"));
@@ -97,6 +103,12 @@ fn fixture() -> TempDir {
 fn a_deletion_and_a_move_out_of_the_chain_are_absorption_but_an_in_place_rename_is_not() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let summary =
         project::project(root, &root.join(".claude/epr-meta/recipes.yaml")).expect("project runs");
 
@@ -126,6 +138,12 @@ fn absorption_is_deduped_by_cid_like_every_other_record() {
     // to being MEASURED is worthless.
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let recipes = root.join(".claude/epr-meta/recipes.yaml");
 
     project::project(root, &recipes).expect("first run");
@@ -144,6 +162,12 @@ fn a_corpus_with_no_removals_yields_no_absorption_rather_than_a_zero_estimate() 
     // corpus never turns over.
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/recipes.yaml", RECIPES);
     write(root, "docs/only.md", &doc("only"));
     git(root, &["init", "-q"]);

@@ -40,6 +40,12 @@ fn git(root: &Path, args: &[&str]) {
 fn repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     std::fs::create_dir_all(root.join("docs")).expect("mkdir");
     std::fs::write(root.join("docs/a.md"), "# A\nbody\n").expect("write");
     std::fs::write(root.join("docs/b.md"), "# B\nbody\n").expect("write");

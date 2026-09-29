@@ -157,6 +157,12 @@ fn sprint_report(lane: &str, when: &str, passed: u64, failed: u64) -> String {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/measures.yaml", MEASURES);
     write(root, "genesis/manifests/habits.yaml", REGISTER);
     write(root, ATOM, ATOM_BODY);

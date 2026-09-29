@@ -17,6 +17,12 @@ use tempfile::TempDir;
 fn fixture() -> (TempDir, String, AcceptanceOptions) {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     std::fs::write(root.join("scope.md"), "The intended feature").unwrap();
     for args in [
         vec!["init", "-q"],
@@ -334,6 +340,15 @@ fn current_acceptance(root: &Path) -> String {
         .as_str()
         .unwrap();
     assert!(view.reconciliation.render_text(3).contains(state));
+    match state {
+        "accepted" => assert!(view.actionable.ranked.is_empty()),
+        "revalidation-required" => assert_eq!(view.actionable.ranked[0].action, "revalidate"),
+        "contested" => assert_eq!(view.actionable.ranked[0].action, "resolve-conflict"),
+        "acceptance-unestablished" => {
+            assert_eq!(view.actionable.ranked[0].action, "independent-acceptance")
+        }
+        _ => {}
+    }
     state.to_owned()
 }
 
@@ -451,4 +466,44 @@ fn conflicting_or_discharging_technical_review_cannot_authorize_acceptance() {
         .unwrap_err()
         .to_string()
         .contains("non-discharging"));
+}
+
+#[test]
+fn actionable_rejected_review_and_revised_delivery_never_suggest_acceptance() {
+    let (dir, _on, options) = fixture();
+    let root = dir.path();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    let records = store.records().unwrap();
+    let (_, FlowRecord::Event(review)) = records
+        .iter()
+        .find(|(cid, _)| Some(cid.to_string()) == options.review)
+        .unwrap()
+    else {
+        panic!()
+    };
+    let mut rejected = review.clone();
+    rejected
+        .classified_as
+        .retain(|s| !s.starts_with("verdict:"));
+    rejected
+        .classified_as
+        .push("verdict:changes-requested".into());
+    store.append(FlowRecord::Event(rejected)).unwrap();
+    let view = flow::context::context(root, "scope.md").unwrap();
+    assert_eq!(
+        view.actionable.ranked[0].action, "revalidate",
+        "existing reconciliation treats a rejected technical review as contrary evidence"
+    );
+    let (_, FlowRecord::Event(produced)) = records
+        .iter()
+        .find(|(cid, _)| Some(cid.to_string()) == options.fulfillment)
+        .unwrap()
+    else {
+        panic!()
+    };
+    let mut revised = produced.clone();
+    revised.occurred_at = "2026-09-28T01:00:00Z".into();
+    store.append(FlowRecord::Event(revised)).unwrap();
+    let view = flow::context::context(root, "scope.md").unwrap();
+    assert_eq!(view.actionable.ranked[0].action, "independent-review");
 }

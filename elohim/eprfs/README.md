@@ -45,6 +45,43 @@ env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target \
 working tree. The remaining commands are `doctor`, `explain <path>`, `check`,
 and `ready [--target <ref>] [--deep]`; every report is also available as JSON.
 
+## Native feature entry and repository attribution
+
+A repository declares its own flow container in `.epr-meta/repository.yaml`:
+
+```yaml
+version: 1
+agent: repo:example/project
+```
+
+This is local attribution, not a human identity or network authority. Flow writes
+refuse missing or malformed declarations. Elohim declares its historical
+`repo:ethosengine/elohim` value so existing record addresses remain unchanged;
+Brit declares its own value. No remote URL or sibling checkout supplies identity.
+
+Use the existing recipe projector to establish current work, then read context:
+
+```sh
+epr flow project --root . --recipes .epr-meta/recipes.yaml
+epr flow context docs/plans/feature.md --root .
+epr flow context docs/plans/feature.md --root . --json
+```
+
+`brit context` delegates to this same installed evaluator. The additive
+`actionable` section explains covenant rank, authored order, current owners,
+environment/seal blockers and the next claim, resume, review or revalidation
+step. Missing identity/habit evidence is explicit. A habit atom as the target
+follows its declared `refs` and accounted commitments, with a disclosed scope
+limit. Context reads never claim work; source changes and rejected reviews
+remain visible independently of production and acceptance.
+
+Habit declarations under each directory's `.epr-meta` are authoritative and
+repository-local. The parent does not walk submodule habits. Generated legacy
+registers remain a compatibility input for undeclared archives, not a fallback
+that can resurrect a deleted modern declaration. `.eprfs/status` carries private
+local projections and flow records; keep it out of version control. Bounded
+memory recall can find further sources; similarity does not grant acceptance.
+
 ## Host Profiles
 
 `eprfs` must be able to collapse a projection onto many host filesystems without

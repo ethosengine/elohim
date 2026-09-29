@@ -60,8 +60,7 @@ use serde::{Deserialize, Serialize};
 use super::note::{named_identity, non_empty, resolve_attribution, NoteActor};
 use super::read::{commitment_latest_event, is_strictly_newer, OccurredAtKey};
 use super::{
-    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent,
-    repo_scope_atom, FlowError, FlowResult,
+    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, FlowError, FlowResult,
 };
 
 /// The synthetic CI agent standing in for the a2o run that observed the verdict.
@@ -229,7 +228,7 @@ pub fn fulfill(
         .collect();
 
     let existing_cids: HashSet<Cid> = records.iter().map(|(cid, _)| *cid).collect();
-    let repo_scope = repo_scope_atom()?;
+    let repo_scope = super::repository_scope(root)?;
 
     let mut summary = FulfillSummary {
         run_id: report.run_id.clone(),
@@ -303,7 +302,7 @@ pub fn fulfill(
                                 let event = FlowEvent {
                                     action: ReaVerb::Produce,
                                     provider: AgentRef(CI_AGENT.to_string()),
-                                    receiver: repo_agent(),
+                                    receiver: super::repository_agent(root)?,
                                     resource,
                                     quantity: Magnitude::Count {
                                         value: 1.0,
@@ -339,7 +338,7 @@ pub fn fulfill(
                 let event = FlowEvent {
                     action: ReaVerb::Produce,
                     provider: AgentRef(CI_AGENT.to_string()),
-                    receiver: repo_agent(),
+                    receiver: super::repository_agent(root)?,
                     resource,
                     quantity: Magnitude::Count {
                         value: 1.0,
@@ -370,7 +369,7 @@ pub fn fulfill(
                 let event = FlowEvent {
                     action: ReaVerb::Dismiss,
                     provider: AgentRef(CI_AGENT.to_string()),
-                    receiver: repo_agent(),
+                    receiver: super::repository_agent(root)?,
                     resource,
                     quantity: Magnitude::Count {
                         value: 1.0,
@@ -610,7 +609,7 @@ pub fn fulfill_on(root: &Path, request: &FulfillOnRequest) -> FlowResult<Fulfill
     let event = FlowEvent {
         action: ReaVerb::Produce,
         provider: AgentRef(attribution.provider(&author)),
-        receiver: repo_agent(),
+        receiver: super::repository_agent(root)?,
         resource: evidence,
         quantity: Magnitude::Count {
             value: 1.0,

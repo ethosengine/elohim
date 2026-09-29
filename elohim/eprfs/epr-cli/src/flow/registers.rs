@@ -1,14 +1,7 @@
-//! Readers over the repository's GENERATED registers — the habit register and the gate
-//! projects declared in `build-manifest.json`.
-//!
-//! Both files are projections that something else owns: `genesis/manifests/habits.yaml` is
-//! written by `.claude/scripts/habits-project.py` from the `.epr-meta` habit atoms, and each
-//! `build-manifest.json` is the pipeline's own declaration. Nothing here ever writes either
-//! one. Reading a generated file and then editing it is how a projection acquires a second
-//! author, and a register with two authors is no longer a register.
-//!
-//! These are the first Rust readers of both files. They deserialize only the fields a reader
-//! needs, so a field added to either register does not break this one.
+//! Read repository-local habit declarations and declared gate projects.
+//! Habit atoms are authoritative; the legacy generated register is read only when a
+//! tree carries no atoms, preserving historical fixture/archive compatibility.
+//! Neither reader writes declarations or their projections.
 
 use std::path::{Path, PathBuf};
 
@@ -33,6 +26,10 @@ struct HabitRegister {
 /// (`invariant`, `checks`), where it stands (`status`, `active`), and what names it (`refs`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct HabitEntry {
+    #[serde(default, rename = "_source")]
+    pub source: Option<String>,
+    #[serde(default, skip_deserializing)]
+    pub priority: Option<usize>,
     pub id: String,
     #[serde(default)]
     pub status: String,
@@ -55,6 +52,14 @@ pub fn habits_register_path(root: &Path) -> PathBuf {
 /// caller asking "is `x` a declared habit" must never be told "no" because the register could
 /// not be read. That is the difference between an absent habit and an absent register.
 pub fn read_habits(root: &Path) -> FlowResult<Vec<HabitEntry>> {
+    if let Some(habits) = super::habit_census::read(root)? {
+        return Ok(habits);
+    }
+    if root.join(super::repository::DECLARATION).exists() {
+        return Err(FlowError::InvalidArguments(
+            "no .epr-meta/*.habit.md declarations in this repository; a stale genesis/manifests/habits.yaml projection cannot establish habits".into(),
+        ));
+    }
     let path = habits_register_path(root);
     let text = std::fs::read_to_string(&path).map_err(|source| FlowError::Read {
         path: path.clone(),
@@ -342,6 +347,20 @@ habits:
             err.to_string().contains(HABITS_REGISTER_REL),
             "the refusal must name the register file; got: {err}"
         );
+    }
+
+    #[test]
+    fn a_declared_repository_cannot_resurrect_a_deleted_habit_from_its_projection() {
+        let dir = fixture();
+        write(
+            dir.path(),
+            super::super::repository::DECLARATION,
+            "version: 1\nagent: repo:fixture/modern\n",
+        );
+        assert!(read_habits(dir.path())
+            .unwrap_err()
+            .to_string()
+            .contains("stale"));
     }
 
     #[test]

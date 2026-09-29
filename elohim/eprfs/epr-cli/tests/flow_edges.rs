@@ -39,6 +39,12 @@ fn write(root: &Path, rel: &str, contents: &str) {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     // Downstream artifacts (code — cannot carry frontmatter) and their upstream contracts.
     write(
         root,
@@ -350,6 +356,12 @@ fn reseal_all_stale_supersedes_every_stale_outgoing_edge() {
 fn fixture_with_cargo_workspace() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(
         root,
         "Cargo.toml",
@@ -455,6 +467,12 @@ fn seal_without_governor_on_two_docs_derives_cite_seal_and_goes_stale_on_mutatio
 fn valueflow_fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
 
     write(
         root,
@@ -532,12 +550,12 @@ recipes:
     write(
         root,
         ".epr-meta/habits-covenant.md",
-        "# Habits covenant\n\nMax 2 active. Flips require evidence.\n",
+        "---\nversion: 1\norder: [dev-system-equilibrium]\n---\n# Habits covenant\n\nMax 2 active. Flips require evidence.\n",
     );
     write(
         root,
         ".epr-meta/dev-system-equilibrium.habit.md",
-        "---\nid: dev-system-equilibrium\nstatus: red\n---\n\nThe evidence ledger.\n",
+        "---\nepr-habit-version: 1\nid: dev-system-equilibrium\ninvariant: Development equilibrium holds\nstatus: red\nactive: false\nchecks: [\"epr flow stocks --check (plans/epic.md)\"]\nretire-when: Superseded by stronger fixture\n---\n\nThe evidence ledger.\n",
     );
 
     git(root, &["init", "-q"]);
@@ -876,8 +894,8 @@ fn serves_is_checked_against_the_register_and_a_brief_is_carried_by_address() {
     )
     .expect_err("an unknown habit id is a typo in the accounting");
     assert!(
-        err.to_string().contains("genesis/manifests/habits.yaml"),
-        "the refusal must name the register file; got: {err}"
+        err.to_string().contains(".epr-meta"),
+        "the refusal must name the declaration home; got: {err}"
     );
 
     let outcome = claim::claim(
@@ -1345,7 +1363,7 @@ fn context_names_the_covering_habit_and_the_owning_gate_for_a_path() {
         .expect("the register's check names this path");
     assert_eq!(covering.status, "red");
     assert!(!covering.active);
-    assert_eq!(covering.source, "register");
+    assert_eq!(covering.source, ".epr-meta/dev-system-equilibrium.habit.md");
     assert!(covering.first_check.is_some());
 
     let gate = result
@@ -1500,14 +1518,12 @@ fn a_ledger_on_an_atom_with_no_history_is_empty_rather_than_an_error() {
 // ── the WIP fence as a bounded commitment ────────────────────────────────────────────────
 
 fn write_register(root: &Path, active: usize) {
-    let mut yaml = String::from("version: 1\nhabits:\n");
+    let _ = std::fs::remove_file(root.join(".epr-meta/dev-system-equilibrium.habit.md"));
     for i in 0..3 {
-        yaml.push_str(&format!(
-            "  - id: habit-{i}\n    status: red\n    active: {}\n    checks: []\n    refs: []\n",
-            i < active
+        write(root, &format!(".epr-meta/habit-{i}.habit.md"), &format!(
+            "---\nepr-habit-version: 1\nid: habit-{i}\ninvariant: Fixture habit holds\nstatus: red\nactive: {}\nchecks: [just test]\nretire-when: Fixture is retired\n---\n", i < active
         ));
     }
-    write(root, "genesis/manifests/habits.yaml", &yaml);
 }
 
 fn fence_reading(root: &Path) -> stocks::StockReport {
@@ -1707,7 +1723,7 @@ fn an_unreadable_register_or_a_missing_fence_refuses_rather_than_reading_zero() 
     let dir = valueflow_fixture();
     let root = dir.path();
 
-    std::fs::remove_file(root.join("genesis/manifests/habits.yaml")).unwrap();
+    std::fs::remove_file(root.join(".epr-meta/dev-system-equilibrium.habit.md")).unwrap();
     let report = fence_reading(root);
     assert_eq!(
         report.verdict.word(),

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::registry::{Recipe, Registry};
 use super::{
     body_cid, body_cid_of_file, cite_path, parse_frontmatter, producing_commit, rel_to_root,
-    repo_agent, repo_scope_atom, FlowError, FlowResult, Labels, REPO_AGENT,
+    FlowError, FlowResult, Labels,
 };
 
 /// What the WIP fence's ceiling is denominated in. Shared with the stock that is judged against
@@ -98,8 +98,8 @@ struct Staged {
 }
 
 /// Accumulates derived records + labels while tracking unresolvable locators.
-#[derive(Default)]
 struct Derivation {
+    repository: AgentRef,
     staged: Vec<Staged>,
     labels: Labels,
     unresolvable: usize,
@@ -120,9 +120,15 @@ impl Derivation {
 
 pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
     let registry = Registry::load(recipes)?;
-    let mut deriv = Derivation::default();
-    let repo_scope = repo_scope_atom()?;
-    deriv.label(&repo_scope, REPO_AGENT);
+    let repository = super::repository_agent(root)?;
+    let mut deriv = Derivation {
+        repository: repository.clone(),
+        staged: Vec::new(),
+        labels: Labels::new(),
+        unresolvable: 0,
+    };
+    let repo_scope = super::repository_scope(root)?;
+    deriv.label(&repo_scope, &repository.0);
 
     for recipe in &registry.recipes {
         derive_recipe(root, recipe, &repo_scope, &mut deriv)?;
@@ -338,7 +344,7 @@ fn derive_absorption(
         let event = FlowEvent {
             action: ReaVerb::Consume,
             provider: AgentRef(removal.author.clone()),
-            receiver: repo_agent(),
+            receiver: deriv.repository.clone(),
             resource,
             quantity: Magnitude::Count {
                 value: 1.0,
@@ -551,12 +557,12 @@ fn derive_process_doc(
             p.occurred_at,
             co_author_slots(&p.co_authors),
         ),
-        None => (repo_agent(), String::new(), Vec::new()),
+        None => (deriv.repository.clone(), String::new(), Vec::new()),
     };
     let event = FlowEvent {
         action: ReaVerb::Produce,
         provider,
-        receiver: repo_agent(),
+        receiver: deriv.repository.clone(),
         resource: own_cid,
         quantity: Magnitude::Count {
             value: 1.0,
@@ -709,9 +715,7 @@ fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
     };
     // Reading the register is the precondition, not an input to the promise: the fence's LIMIT
     // is declared by the covenant, and the register is what will be counted against it.
-    if super::registers::read_habits(root).is_err() {
-        return Ok(());
-    }
+    super::registers::read_habits(root)?;
     deriv.label(&scope_cid, covenant_rel);
 
     // "Max 2 active" is the covenant's sentence; 3.0 is its encoding. `Bound::breached_by` for
@@ -730,7 +734,7 @@ fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
     let commitment = Commitment {
         action: ReaVerb::Produce,
         provider: AgentRef("tool:habits-register".to_string()),
-        receiver: repo_agent(),
+        receiver: deriv.repository.clone(),
         resource_spec: ResourceSpec {
             classified_as: vec![
                 "register:wip-fence".to_string(),
@@ -980,7 +984,7 @@ fn mint_station(id: &str, state: &str, scope_cid: &Cid, deriv: &mut Derivation) 
         let commitment = Commitment {
             action: ReaVerb::Produce,
             provider: AgentRef("tool:decompose-claim".to_string()),
-            receiver: repo_agent(),
+            receiver: deriv.repository.clone(),
             resource_spec,
             in_scope_of: *scope_cid,
             valid_from: None,
@@ -1052,7 +1056,7 @@ fn derive_scenario(
     let commitment = Commitment {
         action: ReaVerb::Produce,
         provider: AgentRef("tool:a2o".to_string()),
-        receiver: repo_agent(),
+        receiver: deriv.repository.clone(),
         resource_spec: ResourceSpec {
             classified_as: vec!["a2o:scenario-green".to_string(), rel.to_string()],
             quantity: None,

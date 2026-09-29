@@ -130,6 +130,12 @@ fn co_authors_of(event: &FlowEvent) -> Vec<String> {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
 
     write(root, ".claude/epr-meta/recipes.yaml", RECIPES);
     write(root, "docs/plural.md", &doc("plural"));
@@ -147,6 +153,12 @@ fn fixture() -> TempDir {
 fn a_plural_commit_credits_every_collaborator_sorted_and_deduped_while_a_solo_one_credits_none() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     project::project(root, &recipes(root)).expect("project runs");
 
     let plural = produce_event_for(root, "docs/plural.md");
@@ -181,6 +193,12 @@ fn a_solo_produce_event_keeps_the_cid_it_had_before_plural_authorship_was_readab
     // code would fail its own CID re-verification on the next read.
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/recipes.yaml", RECIPES);
     write(root, "docs/solo.md", &doc("solo"));
     git(root, &["init", "-q"]);
@@ -200,6 +218,12 @@ fn a_solo_produce_event_keeps_the_cid_it_had_before_plural_authorship_was_readab
 fn projecting_twice_over_unchanged_history_mints_nothing_the_second_time() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let path = recipes(root);
 
     project::project(root, &path).expect("first run");
@@ -225,6 +249,12 @@ fn an_act_already_recorded_without_its_roster_is_not_appended_a_second_time_with
     // which is exactly the divergence a CID-only guard cannot see.
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/recipes.yaml", RECIPES);
     write(root, "docs/solo.md", &doc("solo"));
     git(root, &["init", "-q"]);

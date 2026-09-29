@@ -103,9 +103,7 @@ use elohim_epr_rea::{
 use serde::Serialize;
 
 use super::project::WIP_FENCE_UNIT;
-use super::{
-    producing_commit, repo_agent, repo_scope_atom, FlowError, FlowResult, Labels, REPO_AGENT,
-};
+use super::{producing_commit, FlowError, FlowResult, Labels};
 
 /// The slot-0 tag on the WIP fence commitment `project` mints. One constant names the promise
 /// and finds it again, so the minting leg and the reading leg cannot drift on the spelling.
@@ -253,7 +251,8 @@ pub fn derive_commitment_view(
     records: &[(Cid, FlowRecord)],
 ) -> FlowResult<DerivedView> {
     let resource = commitment_stock_resource()?;
-    let scope = repo_scope_atom()?;
+    let scope = super::repository_scope(root)?;
+    let repository = super::repository_agent(root)?;
 
     // Pass 1 — the open promise set, in append order, and the discharge edges.
     let mut open: Vec<(Cid, &Commitment)> = Vec::new();
@@ -318,6 +317,7 @@ pub fn derive_commitment_view(
             }
         };
         events.push(stock_event(
+            repository.clone(),
             ReaVerb::Produce,
             resource,
             scope,
@@ -349,6 +349,7 @@ pub fn derive_commitment_view(
             }
         };
         events.push(stock_event(
+            repository.clone(),
             ReaVerb::Consume,
             resource,
             scope,
@@ -371,6 +372,7 @@ pub fn derive_commitment_view(
 /// is never appended, and inventing edges on an in-memory projection would be inviting someone
 /// to persist it later.
 fn stock_event(
+    repository: AgentRef,
     action: ReaVerb,
     resource: Cid,
     in_scope_of: Cid,
@@ -379,8 +381,8 @@ fn stock_event(
 ) -> FlowEvent {
     FlowEvent {
         action,
-        provider: AgentRef(REPO_AGENT.to_string()),
-        receiver: repo_agent(),
+        provider: repository.clone(),
+        receiver: repository,
         resource,
         quantity: Magnitude::Count {
             value: 1.0,
@@ -1229,7 +1231,7 @@ mod tests {
         FlowRecord::Commitment(Commitment {
             action: ReaVerb::Produce,
             provider: AgentRef("tool:a2o".into()),
-            receiver: repo_agent(),
+            receiver: crate::flow::repo_agent(),
             resource_spec: ResourceSpec {
                 classified_as: vec!["a2o:scenario-green".into(), "f.feature".into()],
                 quantity: None,
@@ -1247,7 +1249,7 @@ mod tests {
         FlowRecord::Event(FlowEvent {
             action,
             provider: AgentRef("ci".into()),
-            receiver: repo_agent(),
+            receiver: crate::flow::repo_agent(),
             resource: cid_of("artifact"),
             quantity: Magnitude::Count {
                 value: 1.0,
@@ -1521,6 +1523,7 @@ mod tests {
         let scope = cid_of("scope");
         let events = vec![
             stock_event(
+                crate::flow::repo_agent(),
                 ReaVerb::Produce,
                 resource,
                 scope,
@@ -1528,6 +1531,7 @@ mod tests {
                 "mint".into(),
             ),
             stock_event(
+                crate::flow::repo_agent(),
                 ReaVerb::Consume,
                 resource,
                 scope,
@@ -1559,6 +1563,7 @@ mod tests {
         let resource = cid_of("stock");
         let scope = cid_of("scope");
         let mut minted = stock_event(
+            crate::flow::repo_agent(),
             ReaVerb::Produce,
             resource,
             scope,

@@ -40,8 +40,8 @@ use serde::Serialize;
 use super::note::{named_identity, non_empty, resolve_attribution, NoteActor};
 use super::registers;
 use super::{
-    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent, short_cid,
-    FlowError, FlowResult,
+    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, short_cid, FlowError,
+    FlowResult,
 };
 
 /// Slot-0 tag on a claimed commitment — the same `gap:<state>` vocabulary the projection uses
@@ -149,10 +149,8 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
             let habits = registers::read_habits(root)?;
             if !habits.iter().any(|habit| habit.id == id) {
                 return Err(FlowError::InvalidArguments(format!(
-                    "unknown habit `{id}` — the register {} declares no such id; \
-                     a habit is DECLARED in its `.epr-meta` atom and projected there, \
-                     never invented at claim time",
-                    registers::HABITS_REGISTER_REL
+                    "unknown habit `{id}` — this repository declares no such habit; \
+                     a habit is DECLARED in its `.epr-meta` atom, never invented at claim time"
                 )));
             }
             Some(id.to_string())
@@ -203,7 +201,7 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     let commitment = Commitment {
         action: ReaVerb::Produce,
         provider: AgentRef(attribution.provider(&author)),
-        receiver: repo_agent(),
+        receiver: super::repository_agent(root)?,
         resource_spec: ResourceSpec {
             classified_as,
             quantity: None,

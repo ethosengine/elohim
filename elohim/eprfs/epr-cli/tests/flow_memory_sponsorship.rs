@@ -106,6 +106,12 @@ fn withdraw(root: &Path, member: &str, sponsor: Option<&str>) {
 fn fixture() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(
         root,
         ROOT,
@@ -298,6 +304,12 @@ fn a_contributor_or_a_withdrawn_steward_cannot_sponsor() {
 fn a_fixture_steward_sponsors_contributors_and_fixtures_never_standing_stewards() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     steward(root, "human:ruth", Some("human:adam"));
     let refused = refusals(root);
     assert!(
@@ -543,6 +555,12 @@ fn a_stewardless_child_is_refounded_by_a_steward_of_its_parent() {
 fn a_fixture_genesis_is_refused() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     std::fs::remove_file(root.join(memory::AFFILIATIONS_PATH)).unwrap();
     append(
         root,

@@ -18,6 +18,7 @@ pub mod env_scope;
 pub mod fulfill;
 pub mod gaps;
 pub mod governor;
+mod habit_census;
 pub mod ledger;
 pub mod measures;
 pub mod memory;
@@ -28,6 +29,8 @@ pub mod project;
 pub mod read;
 pub mod reconciliation;
 pub mod registers;
+pub mod repository;
+pub use repository::{repository_agent, repository_scope};
 pub mod registry;
 pub mod report;
 pub mod retract;
@@ -45,7 +48,8 @@ use cid::Cid;
 use elohim_epr_rea::{atom_cid, AgentRef, PinnedRef};
 use eprfs_core::BlobCid;
 
-/// The synthetic agent standing in for the repository as a whole.
+/// Historical Elohim scope; retained for decoding fixtures and old addresses.
+/// Production operations resolve the explicit local repository declaration.
 pub const REPO_AGENT: &str = "repo:ethosengine/elohim";
 
 /// Errors surfaced by the `flow` command family.
@@ -1445,7 +1449,7 @@ pub fn body_cid_of_file(path: &Path) -> Option<Cid> {
     Some(body_cid(&text))
 }
 
-/// The repo-scope atom CID — the container of last resort for repo-wide flows.
+/// Historical Elohim scope CID. New operations use [`repository_scope`].
 pub fn repo_scope_atom() -> FlowResult<Cid> {
     Ok(atom_cid(&PinnedRef {
         id: REPO_AGENT.to_string(),
@@ -1453,7 +1457,7 @@ pub fn repo_scope_atom() -> FlowResult<Cid> {
     })?)
 }
 
-/// The synthetic repository agent.
+/// Historical Elohim repository agent. New operations use [`repository_agent`].
 pub fn repo_agent() -> AgentRef {
     AgentRef(REPO_AGENT.to_string())
 }

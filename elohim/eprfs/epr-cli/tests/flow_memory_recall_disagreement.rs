@@ -32,6 +32,12 @@ const AGREEING_POLICY: &str = r#"{
 fn fixture(text: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, "docs/pool-policy.json", text);
     save_contract(root, contract_value(false));
     dir
