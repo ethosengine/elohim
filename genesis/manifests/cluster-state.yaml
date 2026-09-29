@@ -33,6 +33,13 @@ resources:
           the T3 runner sets ELOHIM_CAP_LOCAL_CONDUCTOR_STATUS=available after hc-start.sh --conductor
           reports its admin port (elohim/holochain/local-dev/.hc_ports).
 
+  doorway-tls:
+    role: a doorway's opt-in native TLS listener, reachable at E2E_DOORWAY_A_TLS
+    available: false
+    note: The shared alpha fleet does not declare a native TLS listener. The served-shell TLS
+          scenario is held until a run provisions that listener and supplies its HTTPS URL;
+          ELOHIM_CAP_DOORWAY_TLS_STATUS=available alone never supplies the required endpoint.
+
   shem:
     role: multi-tenant live P2P canvas — the cross-node proving ground   # project_shem_is_p2p_live_canvas
     available: true
