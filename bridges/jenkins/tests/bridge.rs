@@ -103,6 +103,11 @@ fn affiliate_line(
 fn fixture_with(offer: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
+    write(
+        root,
+        ".epr-meta/repository.yaml",
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    );
     write(root, ".epr-meta/collective.json", COLLECTIVE);
     write(root, DEFAULT_RECIPES, RECIPES);
     write(root, DEFAULT_OFFER, offer);

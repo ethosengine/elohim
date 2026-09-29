@@ -33,11 +33,17 @@ The native `epr` tool keeps two moments distinct:
 - `epr check` advises on local working-tree authoring and always leaves local agency intact.
 - `epr ready` evaluates the committed change set that is asking for reach and exits non-zero when a governance-floor finding blocks that boundary.
 
-First contact from a fresh clone is explicit and local-only:
+For repository contributors and adapter developers: start at the **Elohim
+repository root**, with Git, a native Rust toolchain compatible with this
+workspace, and the repository's Cargo registry access configured. The checked-in
+pre-push gate also uses Python 3, Node.js, pnpm and Just. First contact is local:
 
 ```bash
 env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target \
   cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli -- setup
+# Make the binary just built available in this shell; no global installation.
+export PATH="/tmp/eprfs-onboarding-target/debug:$PATH"
+epr doctor
 ```
 
 `setup` only points this clone's local Git configuration at the checked-in
@@ -59,13 +65,24 @@ refuse missing or malformed declarations. Elohim declares its historical
 `repo:ethosengine/elohim` value so existing record addresses remain unchanged;
 Brit declares its own value. No remote URL or sibling checkout supplies identity.
 
-Use the existing recipe projector to establish current work, then read context:
+A **recipe** declares intended work and its steps; a **habit** names a behavior
+with a runnable check; a **commitment** records an actor's claim on a step.
+Projecting recipes creates or refreshes private local work records, without
+claiming or accepting work.
+
+From the Elohim repository root, these are existing inputs, not placeholders:
 
 ```sh
-epr flow project --root . --recipes .epr-meta/recipes.yaml
-epr flow context docs/plans/feature.md --root .
-epr flow context docs/plans/feature.md --root . --json
+epr flow project --root . --recipes .claude/epr-meta/recipes.yaml
+epr flow context genesis/docs/superpowers/plans/2026-09-28-brit-governed-readiness.md --root .
+epr flow context genesis/docs/superpowers/plans/2026-09-28-brit-governed-readiness.md --root . --json
 ```
+
+For other work, replace the plan path with an existing plan or
+`.epr-meta/<id>.habit.md` in that repository. Successful context output identifies
+the target, its applicable gate and the evidence or unresolved work it finds;
+its `actionable` section names the next useful step. Missing evidence is a
+reported state, not a promise that the feature is ready.
 
 `brit context` delegates to this same installed evaluator. The additive
 `actionable` section explains covenant rank, authored order, current owners,
