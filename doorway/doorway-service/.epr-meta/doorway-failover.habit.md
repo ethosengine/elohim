@@ -32,6 +32,7 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-29 (RED preserved; publication withheld): epr-app-deliverability on conductor 26374c316 + leg-3 storage passed 3/5 scenarios, failed running-upgrade browser-pointer convergence and Jessica recovery health (sprint-report-household-20260929T195832Z-60ca98d8). Jessica/James retained old storage heads; torn record/election supply was correctly refused by the receiving conductor. Build/test overlap may affect recovery timing; subsequent health reads passed on all three peers. Narrow responder repair and quiet-host delivery proof pending; no fleet push.
 DELTA 2026-09-27 (peer-stage rung H, household stand-in, no offload proven, provider uhCAknbv, run peer-8d44ae1e, completion uhCkkNbE): doorway-failover passed=2 failed=0 — report genesis/a2o/reports/sprint-report-peer-stage-peer-8d44ae1e.json; receipt genesis/a2o/reports/peer-stage/2026-09-27/8d44ae1e5610cb7e51d5075c611cfd9a01d42150008ce0031ebcd8ad57503f21/receipt.json
 
 DELTA 2026-09-27 (peer-stage rung H, household stand-in, no offload proven, provider uhCAknbv, run peer-a804597e, completion uhCkkuHG): doorway-failover passed=2 failed=0 — report genesis/a2o/reports/sprint-report-peer-stage-peer-a804597e.json; receipt genesis/a2o/reports/peer-stage/2026-09-27/a804597eab3935148d055ebc84d2ce8509432196c9471c6703473860de28a2e2/receipt.json

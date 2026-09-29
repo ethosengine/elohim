@@ -51,7 +51,7 @@ use crate::views::{
 /// The `total` field reports the true row count when truncated.
 pub const PROJECTION_INVENTORY_CAP: i64 = 2000;
 
-/// Responder-side budget for the ONE conductor call a
+/// Responder-side budget for the conductor calls a
 /// [`ViewKind::ContentHeadRecord`] answer needs (`get_record_for_action`).
 ///
 /// MUST stay strictly BELOW the requester's
@@ -509,7 +509,7 @@ pub async fn build_response_slice(
 /// pre-flight only ever asks about ids a peer ADVERTISED, and the inventory that
 /// advertises them is already reach-filtered. The gate is defence in depth
 /// against a hand-crafted request.
-/// Run the ONE conductor call a `ContentHeadRecord` answer needs under
+/// Run the record call a `ContentHeadRecord` answer needs under
 /// [`HEAD_RECORD_CONDUCTOR_TIMEOUT`], collapsing every non-answer to the honest
 /// absence the payload already models (`record: null`, hash still served).
 ///
@@ -612,6 +612,82 @@ where
     }
 }
 
+async fn bounded_election_evidence<F>(
+    content_id: &str,
+    call: F,
+) -> Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire>
+where
+    F: std::future::Future<
+        Output = Result<
+            Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire>,
+            crate::error::StorageError,
+        >,
+    >,
+{
+    match tokio::time::timeout(HEAD_RECORD_CONDUCTOR_TIMEOUT, call).await {
+        Ok(Ok(evidence)) => evidence,
+        Ok(Err(e)) => {
+            tracing::debug!(
+                target: "elohim_storage::view_federation",
+                content_id = %content_id,
+                error = %e,
+                "ContentHeadRecord: conductor could not serve election evidence; answering without it"
+            );
+            None
+        }
+        Err(_elapsed) => {
+            tracing::info!(
+                target: "elohim_storage::view_federation",
+                content_id = %content_id,
+                budget_secs = HEAD_RECORD_CONDUCTOR_TIMEOUT.as_secs(),
+                "ContentHeadRecord: election-evidence fetch exceeded the responder budget; answering without it"
+            );
+            None
+        }
+    }
+}
+
+/// Both uncancellable conductor calls begin together. Each has the same five-second
+/// bound, so their composed wait remains below the requester's ten-second deadline.
+async fn bounded_head_supply<R, E>(
+    content_id: &str,
+    record_call: R,
+    election_call: E,
+) -> (
+    Option<String>,
+    Option<RecordAbsentReason>,
+    Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire>,
+)
+where
+    R: std::future::Future<
+        Output = Result<
+            Option<crate::services::conductor_writes::CarriedRecordWire>,
+            crate::error::StorageError,
+        >,
+    >,
+    E: std::future::Future<
+        Output = Result<
+            Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire>,
+            crate::error::StorageError,
+        >,
+    >,
+{
+    let ((record, reason), election) = tokio::join!(
+        bounded_record_b64(content_id, record_call),
+        bounded_election_evidence(content_id, election_call),
+    );
+    (record, reason, election)
+}
+
+/// A concurrent election may describe a newer declaration than the projected
+/// head sampled above. Never attach its proof to a different head.
+fn election_for_supplied_head(
+    head_action_hash: &str,
+    election: Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire>,
+) -> Option<crate::services::conductor_writes::CanonicalElectionEvidenceWire> {
+    election.filter(|ev| ev.election.winner_target.0 == head_action_hash)
+}
+
 async fn build_content_head_record_payload(
     pool: Option<&crate::db::DbPool>,
     hc_registry: Option<&crate::hc_client_registry::HcClientRegistry>,
@@ -710,67 +786,38 @@ async fn build_content_head_record_payload(
     // the requester can still use: `adopt_peer` falls back to the advertised hash
     // and the record-less declare succeeds whenever its own conductor can
     // retrieve the target.
-    let (record_b64, record_absent_reason) = match hc_registry.and_then(|r| r.lamad_client()) {
-        Some(hc) => {
-            bounded_record_b64(
-                content_id,
-                crate::services::conductor_writes::call_get_record_for_action(
-                    &hc,
-                    &head_action_hash,
-                ),
-            )
-            .await
-        }
-        // NO REASON, deliberately. A bridge-less responder never asked its
-        // conductor anything, so it has established NOTHING about whether the
-        // bytes exist. Answering `no_record` here would be a lie with teeth: the
-        // requester takes a 24h backoff on a stated structural absence, and this
-        // node is in no position to state one. Silence classifies as `unknown`
-        // and takes the ordinary window — which is exactly right.
-        None => (None, None),
-    };
+    let (record_b64, record_absent_reason, election) =
+        match hc_registry.and_then(|r| r.lamad_client()) {
+            Some(hc) => {
+                bounded_head_supply(
+                    content_id,
+                    crate::services::conductor_writes::call_get_record_for_action(
+                        &hc,
+                        &head_action_hash,
+                    ),
+                    crate::services::conductor_writes::call_get_canonical_election_evidence(
+                        &hc, content_id,
+                    ),
+                )
+                .await
+            }
+            // NO REASON, deliberately. A bridge-less responder never asked its
+            // conductor anything, so it has established NOTHING about whether the
+            // bytes exist. Answering `no_record` here would be a lie with teeth: the
+            // requester takes a 24h backoff on a stated structural absence, and this
+            // node is in no position to state one. Silence classifies as `unknown`
+            // and takes the ordinary window — which is exactly right.
+            None => (None, None, None),
+        };
 
     // Carry-the-election supply (ADDITIVE): serve this peer's canonical
     // election EVIDENCE — the winning declaration link's own signed Record —
     // so a requester whose conductor cannot see the election (links not
-    // gossiped in) can have its own wasm re-derive it. Best-effort under the
-    // same responder budget discipline as the record call: every failure is an
-    // honest absence (fields simply stay unset), never a transport error. The
-    // zome call is Local-only (one link gather + one local get), so the bound
-    // exists for latency honesty, not for work it could cancel.
-    let election = match hc_registry.and_then(|r| r.lamad_client()) {
-        Some(hc) => match tokio::time::timeout(
-            HEAD_RECORD_CONDUCTOR_TIMEOUT,
-            crate::services::conductor_writes::call_get_canonical_election_evidence(
-                &hc, content_id,
-            ),
-        )
-        .await
-        {
-            Ok(Ok(ev)) => ev,
-            Ok(Err(e)) => {
-                tracing::debug!(
-                    target: "elohim_storage::view_federation",
-                    content_id = %content_id,
-                    error = %e,
-                    "ContentHeadRecord: conductor could not serve election evidence; \
-                     answering without it"
-                );
-                None
-            }
-            Err(_elapsed) => {
-                tracing::info!(
-                    target: "elohim_storage::view_federation",
-                    content_id = %content_id,
-                    budget_secs = HEAD_RECORD_CONDUCTOR_TIMEOUT.as_secs(),
-                    "ContentHeadRecord: election-evidence fetch exceeded the responder \
-                     budget; answering without it"
-                );
-                None
-            }
-        },
-        None => None,
-    };
+    // gossiped in) can have its own wasm re-derive it. It was fetched beside
+    // the record under the SAME responder window. A concurrent publish can
+    // change the election after the row was sampled, so attach only evidence
+    // for the head actually supplied above.
+    let election = election_for_supplied_head(&head_action_hash, election);
     let (election_link_record, election_winner_target, election_declared_at, election_earned) =
         match election {
             Some(ev) => (
@@ -1483,6 +1530,66 @@ mod tests {
         assert!(
             elapsed < crate::p2p::head_record_client::HEAD_RECORD_TIMEOUT,
             "the responder must give up BEFORE the requester's deadline, not after"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn record_and_election_share_one_responder_window_without_losing_record_reason() {
+        let started = tokio::time::Instant::now();
+        let slow_record = async {
+            tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+            Ok(None)
+        };
+        let slow_election = async {
+            tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+            Ok(None)
+        };
+        let (record, reason, election) =
+            bounded_head_supply("slow-id", slow_record, slow_election).await;
+        assert!(record.is_none() && election.is_none());
+        assert_eq!(reason, Some(RecordAbsentReason::BudgetElapsed));
+        assert!(
+            started.elapsed() <= HEAD_RECORD_CONDUCTOR_TIMEOUT,
+            "two calls must share one responder window, not consume two sequential windows"
+        );
+
+        let started = tokio::time::Instant::now();
+        let (record, reason, election) =
+            bounded_head_supply("missing-id", async { Ok(None) }, async {
+                tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+                Ok(None)
+            })
+            .await;
+        assert!(record.is_none() && election.is_none());
+        assert_eq!(
+            reason,
+            Some(RecordAbsentReason::NoRecord),
+            "a slow election must not reclassify a clean missing-record answer"
+        );
+        assert!(started.elapsed() <= HEAD_RECORD_CONDUCTOR_TIMEOUT);
+    }
+
+    #[test]
+    fn election_supply_only_accompanies_its_matching_served_head() {
+        use crate::services::conductor_writes::{
+            CanonicalElectionEvidenceWire, CanonicalElectionWire,
+        };
+        let evidence = || CanonicalElectionEvidenceWire {
+            election: CanonicalElectionWire {
+                winner_target: crate::signals::HoloHashB64("uhCkk-head-a".to_string()),
+                canonical_declared_at: 42,
+                canonical_earned: true,
+                canonical_link_hash: None,
+                staging_candidate: None,
+                staging_candidate_declared_at: None,
+            },
+            link_record: vec![1, 2, 3],
+        };
+        let matching = election_for_supplied_head("uhCkk-head-a", Some(evidence()));
+        assert_eq!(matching.unwrap().link_record, vec![1, 2, 3]);
+        assert!(
+            election_for_supplied_head("uhCkk-head-b", Some(evidence())).is_none(),
+            "a newer conductor election cannot be paired with an older projected head"
         );
     }
 

@@ -231,8 +231,8 @@ both household doorways agreed. The peer-carried counter was absent before and a
 proves organic convergence, not that the carried-election arm caused it. This run-owned
 page is the campaign 1.4 fixture; it is not a claim that the public FCT page has recovered.
 
-**Immediate rollout candidate remains conductor-only.** No fork push, superproject pin move,
-or public fleet rollout has occurred. The public acceptance boundary remains Adam's independent
+**At this checkpoint the rollout candidate was conductor-only.** No fork push, superproject pin move,
+or public fleet rollout had occurred. The public acceptance boundary remains Adam's independent
 election answer plus both doorways serving the same v2 head and content.
 
 ### Separate storage findings preserved for follow-up
@@ -255,3 +255,39 @@ Both storage drafts are preserved, unapplied, at
 The three shared storage source files were restored to their pre-draft bytes. Raw proof artifacts
 are in the same recovery directory; the organic receipt is
 `genesis/a2o/reports/dataplane/carried-election-organic-receipt-2026-09-29T19-04-25-763Z.json`.
+
+### Pipeline rehearsal: publication remains gated on household proof
+
+The operator clarified that publication must follow local or hybrid proof of the complete
+delivery path, to avoid spending fleet pipeline wall time finding locally reproducible failures.
+The isolated integration candidate pins conductor `26374c316`; no remote push has occurred.
+The selected local gates passed (schema-DNA, sweettest compilation, DNA extern lints, storage,
+steward-node and Cargo coverage). Those checks do not substitute for delivery proof.
+
+The broader `epr-app-deliverability.feature` run on candidate `60ca98d88` failed: **3/5 scenarios
+passed**, 73 steps passed, 2 failed and 27 skipped, in 12m10.966s. Report:
+`sprint-report-household-20260929T195832Z-60ca98d8`. The running-renderer upgrade left the
+elohim.host doorway serving the old browser pointer past 75 seconds; Jessica and James still
+held that old storage head afterward. Jessica's recovery scenario then timed out on a two-second
+health read, with generic cleanup-hook timeouts. All three storage peers subsequently answered
+health 200. This run overlapped build gates and a CPU-heavy sweettest; recovery timing needs a
+quiet-host repeat, but the persisted pointer divergence is not explained away by that overlap.
+
+The responder assembled torn evidence during successive browser/server declarations: James
+received a record for `ak3kt` with an election for `igIH`, then a record for `igIH` with the final
+election for `b4Zz`. Its own conductor correctly refused both mismatches. The responder also
+waited on two sequential five-second calls within a ten-second requester deadline. The narrow
+repair under test runs those reads concurrently and omits mismatched election evidence; it
+preserves own-conductor verification, refusal memoization and matched election-only supply.
+It does not incorporate either separate storage draft above.
+
+Story-graph seam: app deliverability / between successive author declarations -> receiving peer
+adopts verified head / missing node: head-record supply carries a matching record/election pair
+within one responder budget, probed by concurrent slow-call and torn-pair regressions / current
+state: reproduced locally, repair pending executable and household proof.
+
+Two deterministic strict-CI harness failures were also reproduced locally and fixed in
+`461d4ed39`: escape the literal slash in the household step expression, and declare the absent
+native doorway TLS capability so its opt-in scenario is held. The exact CI selector dry-run
+resolves all 976 steps across 132 scenarios. Declaring TLS available without supplying its
+endpoint still fails; no TLS runtime proof is claimed.
