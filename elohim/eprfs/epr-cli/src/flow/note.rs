@@ -60,8 +60,8 @@ use serde::Serialize;
 
 use super::measures::{MeasureRef, Registry};
 use super::{
-    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent,
-    repo_scope_atom, short_cid, FlowError, FlowResult,
+    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, short_cid, FlowError,
+    FlowResult,
 };
 use std::collections::BTreeMap;
 
@@ -837,7 +837,7 @@ fn note_with_claim_guard(
     // MEASUREMENT is a different thing — it has no file to name, and `repo_scope_atom` is the
     // resource the flow plane already scopes every commitment to.
     let (resource, label) = if observation.is_some() && is_repo_root(root, on) {
-        (repo_scope_atom()?, REPO_SUBJECT.to_string())
+        (super::repository_scope(root)?, REPO_SUBJECT.to_string())
     } else {
         resolve_target(root, on, &records)?
     };
@@ -919,7 +919,7 @@ fn note_with_claim_guard(
         // already means regression on the a2o verdict path.
         action: ReaVerb::Cite,
         provider: AgentRef(attribution.provider(&author)),
-        receiver: repo_agent(),
+        receiver: super::repository_agent(root)?,
         resource,
         quantity: Magnitude::Count {
             value: 1.0,
@@ -928,7 +928,7 @@ fn note_with_claim_guard(
         // A note belongs to no recipe run: inventing a process would assert a stage that never
         // ran.
         process: None,
-        in_scope_of: repo_scope_atom()?,
+        in_scope_of: super::repository_scope(root)?,
         fulfills: Vec::new(),
         satisfies: Vec::new(),
         classified_as,
@@ -1266,8 +1266,10 @@ pub(crate) fn resolved_actor(root: &Path, actor: &NoteActor) -> FlowResult<Optio
 /// A declaration no longer names a steward (stewards are affiliation records, plural), so nothing
 /// is read from `.epr-meta/collective.json` here; a legacy declaration still carrying `steward` is
 /// refused by the collective's reader and never consulted by this slot. The git email never is.
-pub(crate) fn collective_steward(_root: &Path) -> String {
-    super::REPO_AGENT.to_string()
+pub(crate) fn collective_steward(root: &Path) -> String {
+    super::repository_agent(root)
+        .map(|agent| agent.0)
+        .unwrap_or_else(|_| "repo:undeclared".into())
 }
 
 /// Who registered for `session`, or `None` with one line on stderr saying why.
@@ -1679,6 +1681,12 @@ mod tests {
     fn witnessed_fixture() -> (tempfile::TempDir, tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
+        std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+        std::fs::write(
+            root.join(".epr-meta/repository.yaml"),
+            "version: 1\nagent: repo:ethosengine/elohim\n",
+        )
+        .unwrap();
         std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
         for args in [
             vec!["init", "-q"],
@@ -1758,6 +1766,12 @@ mod tests {
     fn m3_steward_slot_never_carries_an_email() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
+        std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+        std::fs::write(
+            root.join(".epr-meta/repository.yaml"),
+            "version: 1\nagent: repo:ethosengine/elohim\n",
+        )
+        .unwrap();
         std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
         for args in [
             vec!["init", "-q"],
@@ -1862,6 +1876,12 @@ mod tests {
     fn guarded_note_emits_the_validated_actor_snapshot_after_session_switch() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
+        std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+        std::fs::write(
+            root.join(".epr-meta/repository.yaml"),
+            "version: 1\nagent: repo:ethosengine/elohim\n",
+        )
+        .unwrap();
         std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
         for args in [
             vec!["init", "-q"],

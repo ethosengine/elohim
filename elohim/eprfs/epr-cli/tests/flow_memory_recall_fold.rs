@@ -657,6 +657,12 @@ fn an_unavailable_embedder_is_attested_failed_and_exits_zero() {
 fn fixture_and_pinned_stores_never_share() {
     let dir = tree();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let pinned = index::store_dir(root, &measure_cid(root), EmbedderChoice::Pinned);
     let files = [
         ("fold.sqlite", b"pinned store bytes".as_slice()),
@@ -930,6 +936,12 @@ fn pinned_status(root: &Path) -> Value {
 fn the_fixture_fold_truncates_nothing_and_says_so() {
     let dir = tree();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let report = fold(root);
     assert_eq!(report.truncated, Some(0));
     assert_eq!(status(root)["truncated"], 0);

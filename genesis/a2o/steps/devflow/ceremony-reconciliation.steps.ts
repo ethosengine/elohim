@@ -179,6 +179,7 @@ function createFixture(world: object): Fixture {
   });
   const state: Fixture = { root, env, view: {} };
   fixtures.set(world, state);
+  write(state, '.epr-meta/repository.yaml', 'version: 1\nagent: repo:ethosengine/elohim\n');
   write(
     state,
     upstream,

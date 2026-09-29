@@ -41,6 +41,12 @@ fn git_dated(root: &Path, args: &[&str], date: &str) {
 fn repo_with_habit(with_postdelta_change: bool) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
 
     write(
         root,

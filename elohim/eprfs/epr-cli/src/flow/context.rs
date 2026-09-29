@@ -15,6 +15,8 @@
 //! habits, gates and governance are all properties of a FILE IN THE TREE; an address has no
 //! path, and printing an empty section without saying why reads as "there are none".
 
+mod actionable;
+
 use std::path::Path;
 
 use cid::Cid;
@@ -124,7 +126,11 @@ pub struct Governance {
 #[derive(Debug, Serialize)]
 pub struct ContextResult {
     pub identity: Identity,
+    pub repository_agent: Option<String>,
+    pub repository_identity_issue: Option<String>,
     pub reconciliation: super::reconciliation::Reconciliation,
+    pub actionable: actionable::WorkQueue,
+    pub habit_read_issue: Option<String>,
     pub intents: Vec<ContextIntent>,
     pub commitments: Vec<ContextCommitment>,
     pub notes: Vec<NoteView>,
@@ -148,6 +154,10 @@ pub fn context(root: &Path, target: &str) -> FlowResult<ContextResult> {
 
 /// `context`, with the `--notes N` window the CLI passes through.
 pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<ContextResult> {
+    let (repository_agent, repository_identity_issue) = match super::repository_agent(root) {
+        Ok(agent) => (Some(agent.0), None),
+        Err(error) => (None, Some(error.to_string())),
+    };
     let store = SidecarFlowStore::open(root)?;
     let records = store.records()?;
     let (cid, path) = resolve_target(root, target, &records)?;
@@ -231,7 +241,10 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
     // Sections 6 and 7. The register is a GENERATED projection and is read as data; a missing
     // one is an honest empty section rather than a refusal, because `context` must still answer
     // for a repository that carries no habit register at all.
-    let register = registers::read_habits(root).unwrap_or_default();
+    let (register, habit_read_issue) = match registers::read_habits(root) {
+        Ok(rows) => (rows, None),
+        Err(error) => (vec![], Some(error.to_string())),
+    };
     let habits = path
         .as_deref()
         .map(|rel| habits_for(root, rel, &register))
@@ -252,7 +265,23 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
     });
 
     let reconciliation = super::reconciliation::reconcile(root, &cid, path.as_deref(), &records);
+    let mut actionable = actionable::derive(
+        root,
+        path.as_deref(),
+        &reconciliation,
+        &records,
+        &habits,
+        &register,
+        seals.as_ref(),
+    );
+    if let Some(scope) = &habit_scope {
+        actionable = actionable::for_habit(root, scope, &records, &habits, &register);
+    }
     Ok(ContextResult {
+        repository_agent,
+        repository_identity_issue,
+        actionable,
+        habit_read_issue,
         reconciliation,
         identity: Identity {
             path,
@@ -434,7 +463,15 @@ fn load_label(root: &Path, cid: &Cid) -> Vec<String> {
 fn habits_for(root: &Path, rel: &str, register: &[HabitEntry]) -> Vec<HabitView> {
     let mut views: Vec<HabitView> = registers::habits_covering(register, rel)
         .into_iter()
-        .map(|habit| habit_view(&habit, "register".to_string()))
+        .map(|habit| {
+            habit_view(
+                &habit,
+                habit
+                    .source
+                    .clone()
+                    .unwrap_or_else(|| "register".to_string()),
+            )
+        })
         .collect();
 
     let mut dir = std::path::PathBuf::from(rel);
@@ -573,6 +610,12 @@ impl ContextResult {
             .unwrap_or_else(|| short_cid_str(&self.identity.cid));
         println!("epr flow context — {target}");
         println!("  cid: {}", self.identity.cid);
+        if let Some(agent) = &self.repository_agent {
+            println!("  repository: {agent}");
+        }
+        if let Some(issue) = &self.repository_identity_issue {
+            println!("  repository identity unknown: {issue}");
+        }
         if let Some(label) = self.identity.labels.first() {
             println!("  label: {label}");
         }
@@ -580,7 +623,11 @@ impl ContextResult {
             println!("  note: {note}");
         }
 
+        print!("{}", self.actionable.render_text(RENDER_ROWS));
         print!("{}", self.reconciliation.render_text(RENDER_ROWS));
+        if let Some(issue) = &self.habit_read_issue {
+            println!("\n  HABIT EVIDENCE UNKNOWN — {issue}");
+        }
 
         println!("\n  NOTES ({} shown, newest first)", self.notes.len());
         for note in &self.notes {

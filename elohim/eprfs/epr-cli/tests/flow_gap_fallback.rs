@@ -41,6 +41,12 @@ fn agent_record(doc: &str, items: usize) -> String {
 fn fixture() -> TempDir {
     let tmp = TempDir::new().unwrap();
     let root = tmp.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     // A prose spec: no checkboxes, so its stations live only in the cache.
     write(
         root,

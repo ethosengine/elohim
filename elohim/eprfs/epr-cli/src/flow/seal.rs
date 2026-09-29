@@ -11,8 +11,7 @@ use serde::Serialize;
 use super::edges::{edge_verdict, governor_label, EdgeIndex, Verdict};
 use super::governor::{derive_governor, load_governor_registry};
 use super::{
-    body_cid_of_file, confine_under, head_commit_epoch, rel_to_root, repo_agent, FlowError,
-    FlowResult,
+    body_cid_of_file, confine_under, head_commit_epoch, rel_to_root, FlowError, FlowResult,
 };
 
 /// The machine-facing result of one seal/reseal/hold act (`--json` consumers read this).
@@ -179,7 +178,7 @@ pub fn seal(
         desc,
         governor,
         sealed_cid,
-        repo_agent(),
+        super::repository_agent(root)?,
         sealed_at,
         None,
     )?;
@@ -277,7 +276,7 @@ pub fn reseal(
             desc,
             Governor::CiteSeal,
             Some(sealed_cid),
-            repo_agent(),
+            super::repository_agent(root)?,
             sealed_at,
             None,
         )?;
@@ -311,7 +310,7 @@ pub fn hold(
         None,
         Governor::CiteSeal,
         Some(sealed_cid),
-        repo_agent(),
+        super::repository_agent(root)?,
         sealed_at,
         Some(EdgeStatus::Held {
             reason: reason.clone(),

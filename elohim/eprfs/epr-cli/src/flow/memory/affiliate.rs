@@ -176,6 +176,8 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         }
     };
 
+    super::validation::validate_affiliation_scope(&record, &governance.repository_agent)?;
+
     // The same rule the reader folds with — refused here is refused there.
     let admission = Fold::from_governance(&governance)
         .admit(&record)

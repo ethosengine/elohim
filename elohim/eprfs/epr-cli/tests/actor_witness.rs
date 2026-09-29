@@ -40,6 +40,12 @@ fn git(root: &Path, args: &[&str]) {
 /// A committed tempdir repo — a HEAD to date records against, and nothing else.
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join(".epr-meta")).unwrap();
+    std::fs::write(
+        dir.path().join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     std::fs::write(dir.path().join("README.md"), "fixture\n").unwrap();
     git(dir.path(), &["init", "-q"]);
     git(dir.path(), &["add", "-A"]);

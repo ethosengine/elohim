@@ -99,6 +99,12 @@ pub fn repo() -> TempDir {
         .tempdir_in("/tmp")
         .expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     for name in ["a", "b", "source"] {
         write(
             root,
@@ -341,6 +347,12 @@ pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
 pub fn repo_with_bank() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
 
     write(
         root,

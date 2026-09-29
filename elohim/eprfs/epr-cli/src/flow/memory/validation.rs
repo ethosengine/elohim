@@ -41,6 +41,7 @@ pub struct ReadFile {
 /// none is refused before any operation runs under it.
 #[derive(Clone)]
 pub struct Governance {
+    pub repository_agent: String,
     pub reference: FileRef,
     pub declaration: Collective,
     /// The current affiliation per member (the last ADMITTED sidecar line wins), with its CID.
@@ -153,7 +154,7 @@ impl Governance {
     pub fn acts_for(&self, affiliation: &Affiliation) -> String {
         affiliation.acts_for.clone().unwrap_or_else(|| {
             if self.is_root() {
-                crate::flow::REPO_AGENT.to_string()
+                self.repository_agent.clone()
             } else {
                 self.declaration.id.clone()
             }
@@ -164,7 +165,7 @@ impl Governance {
     /// the default `acts_for` of the collective's affiliations.
     pub fn default_steward(&self) -> String {
         if self.is_root() {
-            crate::flow::REPO_AGENT.to_string()
+            self.repository_agent.clone()
         } else {
             self.declaration.id.clone()
         }
@@ -823,6 +824,7 @@ impl Reader {
             )));
         }
         Ok(Governance {
+            repository_agent: crate::flow::repository_agent(&self.root)?.0,
             reference: file.reference,
             declaration,
             affiliations: outcome.current,
@@ -846,6 +848,7 @@ impl Reader {
         refounding: Refounding,
     ) -> FlowResult<(FoldOutcome, Vec<RefusedLine>)> {
         let mut fold = Fold::new(refounding);
+        let repository = crate::flow::repository_agent(&self.root)?.0;
         if !self.root.join(AFFILIATIONS_PATH).exists() {
             return Ok((fold.finish(), Vec::new()));
         }
@@ -873,6 +876,8 @@ impl Reader {
                 continue;
             }
             let verdict = fold.admit(&parsed.record).and_then(|admission| {
+                validate_affiliation_scope(&parsed.record, &repository)
+                    .map_err(|e| e.to_string())?;
                 self.signer_enrolled(&parsed)?;
                 Ok(admission)
             });
@@ -1439,6 +1444,16 @@ fn hex_decode(hex: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
+/// Default omission depends on the local repository, not the context-free wire shape.
+pub(super) fn validate_affiliation_scope(a: &Affiliation, repository: &str) -> FlowResult<()> {
+    if a.collective.path == COLLECTIVE_PATH && a.acts_for.as_deref() == Some(repository) {
+        return Err(refused(format!(
+            "affiliation acts_for `{repository}` is the root collective's default; omit it"
+        )));
+    }
+    Ok(())
+}
+
 pub fn validate_affiliation(a: &Affiliation) -> FlowResult<()> {
     version(a.version)?;
     if declaration_dir(&a.collective.path).is_none() {
@@ -1462,16 +1477,6 @@ pub fn validate_affiliation(a: &Affiliation) -> FlowResult<()> {
         return Err(refused(format!(
             "affiliation member `{}` is not a {:?} participant ref",
             a.member, a.member_kind
-        )));
-    }
-    // One meaning, one encoding: an absent `acts_for` on the root collective already means the
-    // repository agent, so spelling it out would mint a second address for the same affiliation.
-    if a.collective.path == COLLECTIVE_PATH
-        && a.acts_for.as_deref() == Some(crate::flow::REPO_AGENT)
-    {
-        return Err(refused(format!(
-            "affiliation acts_for `{}` is the root collective's default; omit it",
-            crate::flow::REPO_AGENT
         )));
     }
     for party in a.sponsor.iter().chain(&a.acts_for) {
@@ -1560,4 +1565,26 @@ pub fn strings(values: &[String], name: &str, count: usize, max: usize) -> FlowR
         bounded_text(value, name, max)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod repository_scope_tests {
+    use super::*;
+    #[test]
+    fn omission_rule_follows_each_repository_without_changing_wire_validation() {
+        let mut affiliation: Affiliation = serde_json::from_value(serde_json::json!({
+            "version":1,"collective":{"path":COLLECTIVE_PATH,"cid":"fixture"},
+            "member":"agent:reviewer","memberKind":"ElohimAgent","role":"Steward",
+            "standing":"Standing","since":"2026-09-28T00:00:00Z",
+            "actsFor":"repo:ethosengine/brit"
+        }))
+        .unwrap();
+        assert!(validate_affiliation_scope(&affiliation, "repo:ethosengine/brit").is_err());
+        assert!(validate_affiliation_scope(&affiliation, "repo:ethosengine/elohim").is_ok());
+        affiliation.acts_for = Some("repo:ethosengine/elohim".into());
+        assert!(validate_affiliation_scope(&affiliation, "repo:ethosengine/elohim").is_err());
+        assert!(validate_affiliation_scope(&affiliation, "repo:ethosengine/brit").is_ok());
+        affiliation.acts_for = None;
+        assert!(validate_affiliation_scope(&affiliation, "repo:ethosengine/brit").is_ok());
+    }
 }

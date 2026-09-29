@@ -33,6 +33,12 @@ fn git(root: &Path, args: &[&str]) {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     std::fs::create_dir_all(root.join("docs")).unwrap();
     std::fs::write(root.join("docs/up.md"), "upstream body\n").unwrap();
     git(root, &["init", "-q"]);

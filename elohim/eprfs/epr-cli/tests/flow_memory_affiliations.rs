@@ -100,6 +100,12 @@ fn git(root: &Path, args: &[&str]) {
 fn fixture() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ROOT, &declaration());
     write(
         root,
@@ -272,6 +278,12 @@ fn a_collective_with_no_steward_on_record_is_refused() {
 fn the_collective_view_names_each_steward_and_marks_the_fixture() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let view = memory::execute(root, "collective", None, None).unwrap();
     let stewards = view["stewards"].as_array().unwrap();
     assert_eq!(stewards.len(), 2);
@@ -402,6 +414,12 @@ fn graduate_approved_by_a_distinct_steward_passes_and_names_its_affiliation() {
 fn a_fixture_co_stewards_approval_runs_the_primitive_and_says_so() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     contribute(root);
     let review = verdict(root, "adam");
     let passed = graduate(root, &review).unwrap();
@@ -419,6 +437,12 @@ fn a_fixture_co_stewards_approval_runs_the_primitive_and_says_so() {
 fn one_real_and_one_fixture_steward_never_satisfy_a_two_steward_gate() {
     let dir = fixture();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     let matthew = affiliation(
         root,
         ROOT,

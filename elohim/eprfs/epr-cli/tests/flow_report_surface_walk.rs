@@ -99,6 +99,12 @@ fn stamp_at(root: &Path, epoch: f64) {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(root, ".claude/epr-meta/measures.yaml", MEASURES);
     write(root, "surface/one/a.md", "a\n");
     write(root, "surface/one/b.md", "b\n");

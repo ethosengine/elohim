@@ -78,6 +78,12 @@ fn git(root: &Path, args: &[&str]) {
 fn repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     write(
         root,
         ".epr-meta/collective.json",
@@ -1753,6 +1759,12 @@ fn steward_of_record_refuses_an_agent_session() {
 fn steward_of_record_refuses_a_fixture_steward() {
     let dir = repo();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     plant_entry(root, "feedback_ruling", None, "2026-09-25T09:00:00Z");
     actor::claim(root, FIXTURE_HUMAN, "fixture-human-session").expect("claim");
     let err = stand(
@@ -2549,6 +2561,12 @@ fn a_cross_author_fold_stays_pending_until_a_distinct_steward_approves() {
 fn a_steward_curator_cannot_approve_its_own_fold_and_a_fixture_approval_reads_bootstrap() {
     let dir = repo();
     let root = dir.path();
+    std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+    std::fs::write(
+        root.join(".epr-meta/repository.yaml"),
+        "version: 1\nagent: repo:ethosengine/elohim\n",
+    )
+    .unwrap();
     fold_claims(root);
     actor::claim_recorded_at(
         root,

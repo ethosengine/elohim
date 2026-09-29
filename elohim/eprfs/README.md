@@ -33,17 +33,71 @@ The native `epr` tool keeps two moments distinct:
 - `epr check` advises on local working-tree authoring and always leaves local agency intact.
 - `epr ready` evaluates the committed change set that is asking for reach and exits non-zero when a governance-floor finding blocks that boundary.
 
-First contact from a fresh clone is explicit and local-only:
+For repository contributors and adapter developers: start at the **Elohim
+repository root**, with Git, a native Rust toolchain compatible with this
+workspace, and the repository's Cargo registry access configured. The checked-in
+pre-push gate also uses Python 3, Node.js, pnpm and Just. First contact is local:
 
 ```bash
 env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-onboarding-target \
   cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p elohim-epr-cli -- setup
+# Make the binary just built available in this shell; no global installation.
+export PATH="/tmp/eprfs-onboarding-target/debug:$PATH"
+epr doctor
 ```
 
 `setup` only points this clone's local Git configuration at the checked-in
 `.husky/pre-push` gate. It does not publish, install global state, or change the
 working tree. The remaining commands are `doctor`, `explain <path>`, `check`,
 and `ready [--target <ref>] [--deep]`; every report is also available as JSON.
+
+## Native feature entry and repository attribution
+
+A repository declares its own flow container in `.epr-meta/repository.yaml`:
+
+```yaml
+version: 1
+agent: repo:example/project
+```
+
+This is local attribution, not a human identity or network authority. Flow writes
+refuse missing or malformed declarations. Elohim declares its historical
+`repo:ethosengine/elohim` value so existing record addresses remain unchanged;
+Brit declares its own value. No remote URL or sibling checkout supplies identity.
+
+A **recipe** declares intended work and its steps; a **habit** names a behavior
+with a runnable check; a **commitment** records an actor's claim on a step.
+Projecting recipes creates or refreshes private local work records, without
+claiming or accepting work.
+
+From the Elohim repository root, these are existing inputs, not placeholders:
+
+```sh
+epr flow project --root . --recipes .claude/epr-meta/recipes.yaml
+epr flow context genesis/docs/superpowers/plans/2026-09-28-brit-governed-readiness.md --root .
+epr flow context genesis/docs/superpowers/plans/2026-09-28-brit-governed-readiness.md --root . --json
+```
+
+For other work, replace the plan path with an existing plan or
+`.epr-meta/<id>.habit.md` in that repository. Successful context output identifies
+the target, its applicable gate and the evidence or unresolved work it finds;
+its `actionable` section names the next useful step. Missing evidence is a
+reported state, not a promise that the feature is ready.
+
+`brit context` delegates to this same installed evaluator. The additive
+`actionable` section explains covenant rank, authored order, current owners,
+environment/seal blockers and the next claim, resume, review or revalidation
+step. Missing identity/habit evidence is explicit. A habit atom as the target
+follows its declared `refs` and accounted commitments, with a disclosed scope
+limit. Context reads never claim work; source changes and rejected reviews
+remain visible independently of production and acceptance.
+
+Habit declarations under each directory's `.epr-meta` are authoritative and
+repository-local. The parent does not walk submodule habits. Generated legacy
+registers remain a compatibility input for undeclared archives, not a fallback
+that can resurrect a deleted modern declaration. `.eprfs/status` carries private
+local projections and flow records; keep it out of version control. Bounded
+memory recall can find further sources; similarity does not grant acceptance.
 
 ## Host Profiles
 
