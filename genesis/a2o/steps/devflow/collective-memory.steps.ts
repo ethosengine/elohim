@@ -140,6 +140,7 @@ function setup(world: object): MemoryFixture {
   });
   const f: MemoryFixture = { root, env, view: {}, collective: {}, claimBytes: '' };
   fixtures.set(world, f);
+  write(f, '.epr-meta/repository.yaml', 'version: 1\nagent: repo:ethosengine/elohim\n');
   write(
     f,
     '.epr-meta/collective.json',
