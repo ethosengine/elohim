@@ -210,7 +210,10 @@ where
 
 #[cfg(test)]
 mod head_declare_stamp_policy_tests {
-    use super::{head_declare_stamp_policy, HeadDeclareStampPolicy};
+    use super::{
+        delegated_head_declare_conductor_conflict, head_declare_stamp_policy,
+        HeadDeclareStampPolicy,
+    };
 
     fn declared() -> crate::services::conductor_writes::ContentHeadWire {
         serde_json::from_value(serde_json::json!({
@@ -251,6 +254,25 @@ mod head_declare_stamp_policy_tests {
                 crate::db::content_diesel::CanonicalOrdering::new(42, true)
             ))
         );
+    }
+
+    #[test]
+    fn delegated_route_refuses_a_conductor_that_is_already_authoritative() {
+        assert!(delegated_head_declare_conductor_conflict(
+            "uhCAk-root",
+            Some("uhCAk-root"),
+            false
+        ));
+        assert!(delegated_head_declare_conductor_conflict(
+            "uhCAk-progenitor",
+            Some("uhCAk-root"),
+            true
+        ));
+        assert!(!delegated_head_declare_conductor_conflict(
+            "uhCAk-neutral-device",
+            Some("uhCAk-root"),
+            false
+        ));
     }
 }
 
@@ -1266,6 +1288,17 @@ fn head_declare_stamp_policy(
         .canonical_ordering()
         .map(HeadDeclareStampPolicy::Canonical)
         .ok_or("Conductor returned no complete canonical election ordering; refusing an unordered delegated stamp")
+}
+
+/// A delegation must be exercised on the delegate's conductor. Forwarding it
+/// through the root author's or progenitor's conductor lets that conductor's
+/// own standing mask a forged request header/proof at the HTTP boundary.
+fn delegated_head_declare_conductor_conflict(
+    conductor_agent: &str,
+    root_author: Option<&str>,
+    conductor_is_progenitor: bool,
+) -> bool {
+    conductor_is_progenitor || root_author == Some(conductor_agent)
 }
 
 impl HttpServer {
@@ -9314,6 +9347,18 @@ impl HttpServer {
                             "a delegated head declare requires headActionHash (the delegate's \
                              target version)",
                         ));
+                    }
+                    let conductor_agent = hc.agent_key_uhcak();
+                    let conductor_is_progenitor =
+                        crate::services::conductor_writes::call_is_bootstrap_steward(&hc).await?;
+                    if delegated_head_declare_conductor_conflict(
+                        &conductor_agent,
+                        head.author.as_ref().map(|author| author.0.as_str()),
+                        conductor_is_progenitor,
+                    ) {
+                        return Ok(response::forbidden(&serde_json::json!({
+                            "error": "a delegated head declare must be sent to the delegate's conductor, not a root-author or progenitor conductor"
+                        })));
                     }
                     match d.into_wire() {
                         Ok(w) => Some(w),

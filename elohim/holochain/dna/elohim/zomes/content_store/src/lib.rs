@@ -3316,22 +3316,32 @@ fn gather_election_candidates(
              GetStrategy defect."
         )))
     })?;
-    let candidates: Vec<CanonicalCandidate> = links
-        .into_iter()
-        .filter_map(|link| {
-            let is_earned = canonical_link_is_earned(&link);
-            let link_hash = link.create_link_hash.clone();
-            let timestamp = link.timestamp;
-            ActionHash::try_from(link.target)
-                .ok()
-                .map(|target| CanonicalCandidate {
-                    is_earned,
-                    timestamp,
-                    link_hash,
-                    target,
-                })
-        })
-        .collect();
+    // An EARNED tag is a claim, not authority. Resolve the id's standing once
+    // for the whole link set, then authenticate every earned claimant. A
+    // forged/expired/out-of-scope claim stays visible as STAGING so it can
+    // never outrank an authenticated earned declaration.
+    let standing = if links.iter().any(canonical_link_is_earned) {
+        Some(earned_standing_for_id(id, strategy)?)
+    } else {
+        None
+    };
+    let mut candidates = Vec::with_capacity(links.len());
+    for link in links {
+        let claimed_earned = canonical_link_is_earned(&link);
+        let is_earned = claimed_earned
+            && standing.as_ref().is_some_and(|standing| {
+                holds_earned_declaration_standing(id, &link.author, link.tag.0.as_slice(), standing)
+            });
+        let Ok(target) = ActionHash::try_from(link.target) else {
+            continue;
+        };
+        candidates.push(CanonicalCandidate {
+            is_earned,
+            timestamp: link.timestamp,
+            link_hash: link.create_link_hash,
+            target,
+        });
+    }
     Ok(candidates)
 }
 
@@ -4245,14 +4255,15 @@ fn authorize_author_or_delegate(
     delegation: Option<&HeadDelegation>,
     what: &str,
 ) -> ExternResult<Option<HeadDelegation>> {
-    if me == root_author {
-        return Ok(None);
-    }
     match delegation {
         Some(d) => {
+            // A supplied proof is never ignored. In particular, a caller that
+            // reaches the root author's conductor cannot smuggle a junk
+            // delegation through the `me == root_author` shortcut.
             verify_head_delegation(d, me, root_author, id)?;
             Ok(Some(d.clone()))
         }
+        None if me == root_author => Ok(None),
         None => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "{what}: agent {me:?} is not the author of content '{id}' (author {root_author:?}) \
              and carries no head delegation"
@@ -6166,6 +6177,12 @@ pub fn declare_earned_canonical_head(
         ) {
             Ok(d) => Some(d),
             Err(author_err) => {
+                // A supplied delegation is an asserted proof and must stand on
+                // its own. Do not let root-author or progenitor authority mask
+                // a malformed, mismatched, expired, or out-of-scope grant.
+                if input.delegation.is_some() {
+                    return Err(author_err);
+                }
                 if am_i_bootstrap_steward().unwrap_or(false) {
                     Some(None)
                 } else {
@@ -6634,6 +6651,21 @@ pub fn verify_carried_election(
     let proven =
         prove_carried_declaration(&input.id, &input.link_record, "verify_carried_election")?;
 
+    if proven.candidate.is_earned {
+        let standing = earned_standing_for_id(&input.id, GetStrategy::Local)?;
+        if !holds_earned_declaration_standing(
+            &input.id,
+            &proven.declarer,
+            proven.tag.as_slice(),
+            &standing,
+        ) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "verify_carried_election: declarer {:?} holds no earned authoring standing for id '{}'",
+                proven.declarer, input.id
+            ))));
+        }
+    }
+
     // Merge the proven carried candidate with every candidate this conductor
     // already sees, and let the ONE shared ordering arbitrate. Duplicates are
     // harmless (identical keys order identically); a locally-visible earned
@@ -6693,6 +6725,51 @@ fn delegation_from_tag(tag: &[u8]) -> Option<HeadDelegation> {
         .position(|w| w == CANONICAL_TAG_DELEGATION_SEP)?;
     let bytes = tag[at + CANONICAL_TAG_DELEGATION_SEP.len()..].to_vec();
     HeadDelegation::try_from(SerializedBytes::from(UnsafeBytes::from(bytes))).ok()
+}
+
+/// Authority inputs shared by local/gossiped and carried election checks.
+struct EarnedStanding {
+    root_author: Option<AgentPubKey>,
+    progenitor: Option<AgentPubKey>,
+}
+
+fn earned_standing_for_id(id: &str, strategy: GetStrategy) -> ExternResult<EarnedStanding> {
+    Ok(EarnedStanding {
+        root_author: gather_content_chain(id, strategy)?.map(|(author, _)| author),
+        progenitor: maybe_bootstrap_steward()?,
+    })
+}
+
+/// Authenticate an EARNED tag's link author. A root author needs no suffix; a
+/// non-root author must carry a decodable, signed, in-scope, unexpired
+/// delegation. If a suffix is supplied by the root author it is verified too
+/// (and therefore rejected as a pointless self-delegation). The progenitor is
+/// independently authoritative and needs no delegation.
+fn holds_earned_declaration_standing(
+    id: &str,
+    declarer: &AgentPubKey,
+    tag: &[u8],
+    standing: &EarnedStanding,
+) -> bool {
+    if standing.progenitor.as_ref() == Some(declarer) {
+        return true;
+    }
+    let Some(root_author) = standing.root_author.as_ref() else {
+        return false;
+    };
+    let carries_delegation = tag
+        .windows(CANONICAL_TAG_DELEGATION_SEP.len())
+        .any(|window| window == CANONICAL_TAG_DELEGATION_SEP);
+    let delegated = if carries_delegation {
+        delegation_from_tag(tag)
+            .is_some_and(|grant| verify_head_delegation(&grant, declarer, root_author, id).is_ok())
+    } else {
+        false
+    };
+    if carries_delegation && declarer == root_author {
+        return false;
+    }
+    holds_authoring_standing(declarer, declarer, Some(root_author), delegated)
 }
 
 /// A carried canonical-head declaration, proven from its own bytes.

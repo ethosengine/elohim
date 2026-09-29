@@ -28,9 +28,11 @@ use anyhow::Result;
 // `Record` is used by the declare-carries-Record test to decode a served
 // record and construct the entry-swap forgery the coordinator must refuse.
 // 0.7: `Record::new` takes a `RecordEntry` (0.6 derived it from an Option<Entry>).
-use hdk::prelude::{Record, RecordEntry, Timestamp};
-use holo_hash::{ActionHash, ActionHashB64, AgentPubKey};
+use hdk::prelude::{ActionData, LinkTag, Record, RecordEntry, Timestamp};
+use holo_hash::{ActionHash, ActionHashB64, AgentPubKey, HashableContentExtSync};
+use holochain::prelude::{ChainOp, DhtOp, DhtOpHashed, SignedAction, SignedActionHashed};
 use holochain::sweettest::{await_consistency_s, SweetConductor};
+use holochain_keystore::AgentPubKeyExt;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -3036,6 +3038,12 @@ struct CanonicalElectionEvidenceOutput {
     pub link_record: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VerifyCarriedElectionInput {
+    pub id: String,
+    pub link_record: Vec<u8>,
+}
+
 /// Mirrors `content_store::VerifyCarriedHeadEvidenceInput`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct VerifyCarriedHeadEvidenceInput {
@@ -3049,6 +3057,333 @@ struct VerifyCarriedHeadEvidenceInput {
 struct CarriedHeadEvidenceOutput {
     pub election: CanonicalElectionOutput,
     pub head: Option<ContentHeadOutput>,
+}
+
+/// Turn a real staging declaration into the attack the integrity zome admits:
+/// the same author/base/target/link type, but an earned-prefixed tag signed by
+/// the non-author. Optionally insert its CreateLink op directly as integrated
+/// DHT data so coordinator reads see the same shape gossip would deliver.
+async fn forge_earned_link(
+    signer_conductor: &SweetConductor,
+    store_conductor: &SweetConductor,
+    dna_hash: &holo_hash::DnaHash,
+    author: &AgentPubKey,
+    cursor: &mut ForgedChainCursor,
+    staging_record: &[u8],
+    tag: Vec<u8>,
+) -> Vec<u8> {
+    let template: Record = holochain_serialized_bytes::decode(staging_record)
+        .expect("staging declaration record decodes");
+    let mut action = template.action().clone();
+    match &mut action.data {
+        ActionData::CreateLink(create) => create.tag = LinkTag::new(tag),
+        other => panic!("declaration template is {other:?}, not CreateLink"),
+    }
+    action.header.author = author.clone();
+    action.header.action_seq = cursor.next_seq;
+    action.header.prev_action = Some(cursor.prev_action.clone());
+    action.header.timestamp = cursor.next_timestamp;
+    let signature = author
+        .sign(&signer_conductor.keystore(), &action)
+        .await
+        .expect("attacker can sign its own forged link");
+    let signed = SignedAction::new(action.clone(), signature.clone());
+    let record = Record::new(
+        SignedActionHashed::with_presigned(action.into_hashed(), signature),
+        RecordEntry::NA,
+    );
+    cursor.prev_action = record.action_address().clone();
+    cursor.next_seq += 1;
+    cursor.next_timestamp = Timestamp::from_micros(cursor.next_timestamp.as_micros() + 1);
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateLink(signed)));
+    store_conductor
+        .get_dht_store(dna_hash)
+        .expect("lamad DHT store")
+        .test_insert_authored_chain_op(op, None, None, None)
+        .await
+        .expect("forged link op inserted as integrity-valid gossip");
+    holochain_serialized_bytes::encode(&record).expect("forged link record encodes")
+}
+
+/// The next valid source-chain position after the attacker's final honest
+/// declaration. Forged actions advance this cursor, so they model a malicious
+/// coordinator rather than a source-chain fork that sys validation would drop.
+struct ForgedChainCursor {
+    prev_action: ActionHash,
+    next_seq: u32,
+    next_timestamp: Timestamp,
+}
+
+impl ForgedChainCursor {
+    fn after(record: &[u8]) -> Self {
+        let record: Record =
+            holochain_serialized_bytes::decode(record).expect("cursor record decodes");
+        Self {
+            prev_action: record.action_address().clone(),
+            next_seq: record.action().action_seq() + 1,
+            next_timestamp: Timestamp::from_micros(record.action().timestamp().as_micros() + 1),
+        }
+    }
+}
+
+fn earned_tag_with_delegation<T: Serialize + std::fmt::Debug>(grant: &T) -> Vec<u8> {
+    let mut tag = b"canonical-head:earned|delegation:".to_vec();
+    tag.extend(
+        holochain_serialized_bytes::encode(grant)
+            .expect("delegation encodes")
+            .iter(),
+    );
+    tag
+}
+
+/// The earned tier is authority, not a caller-chosen tag. A non-author's
+/// self-signed earned link is demoted on ordinary reads and refused when
+/// carried; the root author's own earned declaration and a valid delegate keep
+/// the tier, while out-of-scope and expired grants do not.
+#[tokio::test(flavor = "multi_thread")]
+async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()> {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct GrantHeadDelegationInput {
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationPayloadMirror {
+        grantor: AgentPubKey,
+        delegate: AgentPubKey,
+        scope: String,
+        valid_until: Timestamp,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct HeadDelegationMirror {
+        payload: HeadDelegationPayloadMirror,
+        signature: hdk::prelude::Signature,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct DeclareEarnedWithDelegationInput {
+        id: String,
+        head_action_hash: String,
+        delegation: Option<HeadDelegationMirror>,
+    }
+
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    let seed = network_seed(DNA);
+    let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let dna_hash = dna_file.dna_hash().clone();
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
+        .await?;
+    let zome1 = app1.cells().first().unwrap().zome("content_store");
+    let zome2 = app2.cells().first().unwrap().zome("content_store");
+
+    // A non-author first authors a legitimate STAGING link, then rewrites only
+    // its tag and re-signs it — the exact forged link the integrity zome admits.
+    let id = unique_id("earned-tier-auth");
+    let root: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+    await_record(&c2, &zome2, &root.action_hash, "the attacker").await;
+    await_resolves(&c2, &zome2, &id, "the attacker").await;
+    let root_b64 = ActionHashB64::from(root.action_hash.clone()).to_string();
+    let _: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_canonical_content_head",
+            DeclareCanonicalHeadInput {
+                id: id.clone(),
+                head_action_hash: root_b64.clone(),
+            },
+        )
+        .await;
+    let staging: Option<CanonicalElectionEvidenceOutput> = c2
+        .call(&zome2, "get_canonical_election_evidence", id.clone())
+        .await;
+    let forged_template = staging.expect("attacker serves staging link").link_record;
+
+    // The root author's own earned declaration keeps its tier and wins over
+    // the forged link after that link is demoted to staging.
+    let _: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: root_b64.clone(),
+                delegation: None,
+            },
+        )
+        .await;
+    let head: Option<ContentHeadOutput> = c1.call(&zome1, "resolve_content_head", id.clone()).await;
+    let head = head.expect("root author's earned head resolves");
+    assert_eq!(head.head_action_hash, root.action_hash);
+    assert_eq!(head.canonical_earned, Some(true));
+
+    // A valid root-author delegation lets the delegate retain EARNED.
+    let valid_id = unique_id("earned-tier-valid-delegate");
+    let valid_root: ContentOutput = c1
+        .call(&zome1, "create_content", test_content(&valid_id))
+        .await;
+    await_record(&c2, &zome2, &valid_root.action_hash, "the delegate").await;
+    await_resolves(&c2, &zome2, &valid_id, "the delegate").await;
+    let valid_until = Timestamp::from_micros(Timestamp::now().as_micros() + 3_600_000_000);
+    let valid_grant: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "grant_head_delegation",
+            GrantHeadDelegationInput {
+                delegate: a2.clone(),
+                scope: valid_id.clone(),
+                valid_until,
+            },
+        )
+        .await;
+    let declared: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: valid_id.clone(),
+                head_action_hash: ActionHashB64::from(valid_root.action_hash).to_string(),
+                delegation: Some(valid_grant.clone()),
+            },
+        )
+        .await;
+    assert_eq!(declared.content_id, valid_id);
+    let delegated_head: Option<ContentHeadOutput> = c2
+        .call(&zome2, "resolve_content_head", valid_id.clone())
+        .await;
+    assert_eq!(
+        delegated_head.and_then(|head| head.canonical_earned),
+        Some(true)
+    );
+
+    let root_with_supplied_grant: std::result::Result<ContentHeadOutput, _> = c1
+        .call_fallible(
+            &zome1,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: valid_id.clone(),
+                head_action_hash: ActionHashB64::from(declared.head_action_hash).to_string(),
+                delegation: Some(valid_grant),
+            },
+        )
+        .await;
+    let error = format!(
+        "{:?}",
+        root_with_supplied_grant
+            .expect_err("the root author's conductor must not ignore a supplied delegation")
+    );
+    assert!(error.contains("delegate"), "{error}");
+
+    // Prepare every honest source-chain write before injecting adversarial
+    // actions. The forged actions then extend (rather than fork) that chain.
+    let mut bad_cases = Vec::new();
+    for (label, scope, lifetime_micros) in [
+        ("out-of-scope", "another-id".to_string(), 3_600_000_000),
+        ("expired", "*".to_string(), 50_000),
+    ] {
+        let bad_id = unique_id(&format!("earned-tier-{label}"));
+        let bad_root: ContentOutput = c1
+            .call(&zome1, "create_content", test_content(&bad_id))
+            .await;
+        await_record(&c2, &zome2, &bad_root.action_hash, label).await;
+        await_resolves(&c2, &zome2, &bad_id, label).await;
+        let bad_b64 = ActionHashB64::from(bad_root.action_hash).to_string();
+        let _: ContentHeadOutput = c2
+            .call(
+                &zome2,
+                "declare_canonical_content_head",
+                DeclareCanonicalHeadInput {
+                    id: bad_id.clone(),
+                    head_action_hash: bad_b64,
+                },
+            )
+            .await;
+        let staging: Option<CanonicalElectionEvidenceOutput> = c2
+            .call(&zome2, "get_canonical_election_evidence", bad_id.clone())
+            .await;
+        let grant: HeadDelegationMirror = c1
+            .call(
+                &zome1,
+                "grant_head_delegation",
+                GrantHeadDelegationInput {
+                    delegate: a2.clone(),
+                    scope,
+                    valid_until: Timestamp::from_micros(
+                        Timestamp::now().as_micros() + lifetime_micros,
+                    ),
+                },
+            )
+            .await;
+        if label == "expired" {
+            sleep(Duration::from_millis(75)).await;
+        }
+        bad_cases.push((
+            label,
+            bad_id,
+            staging.expect("attacker serves staging link").link_record,
+            grant,
+        ));
+    }
+
+    let mut cursor = ForgedChainCursor::after(&bad_cases.last().expect("bad delegation case").2);
+    let forged = forge_earned_link(
+        &c2,
+        &c1,
+        &dna_hash,
+        &a2,
+        &mut cursor,
+        &forged_template,
+        b"canonical-head:earned".to_vec(),
+    )
+    .await;
+
+    // The ordinary read demotes the forged link, leaving the genuine root
+    // declaration earned; carrying those same bytes is refused outright.
+    let head: Option<ContentHeadOutput> = c1.call(&zome1, "resolve_content_head", id.clone()).await;
+    assert_eq!(head.and_then(|head| head.canonical_earned), Some(true));
+    let carried: std::result::Result<Option<CanonicalElectionOutput>, _> = c1
+        .call_fallible(
+            &zome1,
+            "verify_carried_election",
+            VerifyCarriedElectionInput {
+                id: id.clone(),
+                link_record: forged,
+            },
+        )
+        .await;
+    let error = format!(
+        "{:?}",
+        carried.expect_err("a non-author's carried earned election is refused")
+    );
+    assert!(error.contains("no earned authoring standing"), "{error}");
+
+    // Out-of-scope and expired grants can be stamped into forged tags, but
+    // reads demote each declaration to staging.
+    for (label, bad_id, staging, grant) in bad_cases {
+        forge_earned_link(
+            &c2,
+            &c1,
+            &dna_hash,
+            &a2,
+            &mut cursor,
+            &staging,
+            earned_tag_with_delegation(&grant),
+        )
+        .await;
+        let read: Option<ContentHeadOutput> = c1
+            .call(&zome1, "resolve_content_head", bad_id.clone())
+            .await;
+        assert_eq!(
+            read.and_then(|head| head.canonical_earned),
+            Some(false),
+            "{label} delegation must not retain the earned tier"
+        );
+    }
+
+    Ok(())
 }
 
 /// Poll `conductor` until it holds `action` locally, or panic at the deadline.

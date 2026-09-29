@@ -1014,6 +1014,26 @@ pub async fn call_declare_earned_canonical_head(
     Ok(out)
 }
 
+/// Ask the local lamad cell whether its own agent is the configured bootstrap
+/// steward. The delegated HTTP branch uses this to avoid forwarding an
+/// untrusted caller's proof through a conductor that already holds progenitor
+/// authority and would therefore not need that proof.
+pub async fn call_is_bootstrap_steward(hc: &Arc<HcClient>) -> Result<bool, StorageError> {
+    let payload = rmp_serde::to_vec_named(&()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode is_bootstrap_steward input: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "is_bootstrap_steward", payload)
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode is_bootstrap_steward: {e}"
+        ))
+    })
+}
+
 /// Caller-input wire shape for the `content_store::get_record_for_action`
 /// coordinator — the SOURCE half of declare-carries-Record.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

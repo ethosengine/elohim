@@ -1698,6 +1698,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain",
+ "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",
  "qahal-types",
