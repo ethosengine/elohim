@@ -34,7 +34,10 @@ cites:
   - genesis/data/timeline/backlog/commons-holonic-stewardship-backlog.md
   - genesis/data/timeline/backlog/security-earned-election-tier-unauthenticated.md
   - genesis/data/timeline/backlog/lamad-teacher-authoring-backlog.md
-tags: [reach, authorization, delivery, confidentiality, custody, holons, security, design-session-input]
+  - genesis/seeder/src/corpus-trust.ts
+  - genesis/a2o/LAYERS.md
+  - elohim/elohim-storage/src/trust/stage.rs
+tags: [reach, authorization, delivery, confidentiality, custody, holons, security, design-session-input, network-stage, simulacra, fixtures, proving-ground]
 ---
 
 # Reach & delivery — the solutioning session's starting file
@@ -271,6 +274,106 @@ which tier, with what proof*. In Zanzibar the operator writes the tuples. Here t
 itself be governed by the holon the tuple is about. Spec §8 names federation of independently evolved
 vocabularies as unsolved field-wide; this is the same problem at the holon level.
 
+## 6a. The proving ground: simulacra, staging, test, dev and demo (a first-class dimension)
+
+Added 2026-09-29 at the operator's direction. Reach belongs to the trust substrate, as login and
+authorization do. We still have to:
+- **drive it from features in tests;**
+- **be deterministic about what one fixture human can do.** Adam (`human-adam-firstman`) is a test
+  fixture and the named grantor of simulacra trust.
+- **model it in test, staging and simulacra worlds;**
+- **let the founders demo the protocol** without accidentally creating a backdoor.
+
+This is the battle school for the real war: drills run the real rules, and only the world is
+different. Treat it as a design dimension equal to the tiers, not as test plumbing added later.
+
+### Evidence: the test path has been the attack path
+
+Every one of these was a convenience for development, seeding, CI or demos that became a live hole
+or live data:
+
+| Convenience | What it became | State |
+|---|---|---|
+| `DEV_MODE=true`, to make deployed doorways easy to drive | Anonymous callers were granted `Authenticated`; an unfiltered conductor admin socket was open to the internet; seed and admin-cache routes were open; a MongoDB outage minted **Admin** for any credentials; JWTs are forgeable with a secret visible in the source. | The first four are closed (2026-08-25/27). JWT forgery is open (`security-doorway-devmode-auth-bypass`). |
+| Self-asserted identity headers (`X-Agent-Cid`) as the storage-side identity carrier | Any direct caller to storage is whoever it claims to be, and `PATCH` re-signs through the node's conductor. | Open (`security-storage-direct-caller-unauthenticated`). |
+| The delegated head-declare shortcut | A forged **earned** election, which F19 then turned into widened reach. | Coordinator-mitigated; integrity gate pending. |
+| The genesis steward grade: a founder/operator tool that "grades" rows to their authored reach and "widens chainless rows as its own root" (`7526271f2`, `079ac0953`) | A bulk reach-widening authority exercised by PATCH through a node's own conductor. It is legitimate for the genesis corpus, but nothing *structural* stops the same shape being used elsewhere. | Live; undeclared as a stage-scoped grant. |
+| CI seed uploads | They went through the `dev_mode` hole unauthenticated for many builds, hidden by a Jenkinsfile bug (`47fb60f58`). | Closed. |
+| Seeder defaults | The two seeders disagree (`public` vs `private`); 1987 rows carry `familiar` from an unknown origin; alpha's live rows drifted from the seeds (11 landing pages 403). Test and seed data became live reach. | Open (§2c). |
+| Tests that pin behaviour | `every_other_reach_serves_unchanged` pins the shard-plane gap; a green test can entrench a gap. | Live. |
+
+### What already exists to build on
+
+- **`NetworkStage { Simulacra, Bootstrap, Coordinated, Enforced }`** is one shared type
+  (`seam_contracts::freshness::NetworkStage`; `elohim-storage/src/trust/stage.rs:36`):
+  - declared, never inferred;
+  - `Simulacra` only by an exact, positive declaration;
+  - absent or unparseable resolves to `Bootstrap`;
+  - `StageProvenance` is advertised on `/status.json`;
+  - never derived from `DEV_MODE`.
+
+  Doctrine: `2026-08-25-doorway-auth-posture-declared-stage.md` §"The rule", with an 8-question
+  checklist for adding a gate (fail closed, expire, which developer mode, whose account).
+- **Corpus trust declaration** (`genesis/seeder/src/corpus-trust.ts:19-27,258`): `simulacra` is legal
+  only under `environment: preproduction`. It needs a named grantor persona (`human-adam-firstman`)
+  and a scope equal to the corpus id. A malformed declaration is a hard error; no declaration means
+  nothing is minted.
+- **The habit's own invariant** (`reach-enforced-everywhere`): *"a declared dev stage may cheapen the
+  DEPTH at which identity and relationships are verified, never WHETHER the decision is made, and
+  never in the open direction."* The rule is already written; nothing enforces it.
+- **a2o acts map to stages** (`genesis/a2o/LAYERS.md:14`): Act I household mesh, Simulacra →
+  Bootstrap. Act II alpha, Coordinated. Act III shem, Enforced.
+- **Three developer modes** (auth-posture doc): native local-first, web workspace, e2e/CI. One
+  authority predicate, three carriers.
+
+### The gap
+
+**No reach gate reads the declared stage.** On 2026-09-29 a grep found no `NetworkStage` in
+`content_reach_gate.rs`, `epr_service.rs`, `blob_reach.rs`, `private_reach.rs`,
+`reach_authorization.rs`, `head_adoption.rs` or doorway `serve_eligibility.rs`. Stage today prices
+freshness and gates seed/admin authority only. So tests and demos drive reach through side doors:
+- seeds that stamp reach directly;
+- the steward grade's PATCH;
+- self-asserted headers;
+- fixture relationships written straight into storage SQLite over HTTP POST.
+
+Hosted humans signing in through the doorway are the legitimate path. They are not yet a
+declared-world path.
+
+### Requirements the design must meet (requirements, not a design)
+
+- **P1. One verifier at every stage.** Stage changes *inputs*: which holons exist, which proofs are
+  checked and how deeply. It never changes the verdict function, and never adds an `if test` branch
+  inside a gate.
+- **P2. Fixtures are real holons in a declared world.** Adam and the household cast hold real keys.
+  Their standing comes from real tuples and commitments minted *in that world*, not from an
+  override. "What Adam alone can do" is then exactly what his tuples authorize: deterministic,
+  reproducible, and something a test can state.
+- **P3. Worlds are sealed by construction.** A simulacra or demo world has its own network identity
+  (DNA properties / network seed / corpus id). Its tuples, keys, grants and verdicts cannot be
+  presented to a Bootstrap-or-higher network. This generalizes the corpus-trust rule
+  (preproduction trust never crosses into production) from seeds to tuples and keys.
+- **P4. A stage may only reduce depth, and the verdict records it.** For example: skip the
+  DHT-existence wait, or accept a fixture-signed membership without council ratification. A stage
+  never widens and never turns Deny into Permit. The explain/witness tree names the stage and the
+  depth it skipped, so a test report or a demo audience can see which world it ran in.
+- **P5. Every affordance is declared, scoped and expiring.** Each test, seed, CI or demo affordance
+  (steward grade, seed authority, grade-as-root) is a grant naming its stage, grantor, scope and
+  expiry, per auth-posture Q5. Today's side doors either become such grants or are retired.
+- **P6. Deterministic worlds.** A world can be minted from one declaration: cast, keys, tuples,
+  commitments, and a clock. The verdict fixture harness (§10 Q10) runs *offline* against it ("given
+  this world, Adam sees exactly {…}"). The same world then runs on the household mesh (Act I), alpha
+  (Act II) and a demo.
+- **P7. The founders demo without a founder override.** A demo either uses demo identities in a demo
+  world, or the founders' real identities with only their real standing. Progenitor powers
+  (`content_store/src/bootstrap_steward.rs` `progenitor_pubkey`, and the earned-link progenitor arm)
+  are listed and bounded: which acts, at which stage, with what expiry. No terminal authority
+  (memory `feedback_human_loop_not_terminal_authority`).
+- **P8. The drills include attacks.** Every stage runs the backdoor probes: forged bearer,
+  self-asserted headers, `DEV_MODE`, stage mis-declaration, a simulacra-minted grant presented to a
+  Bootstrap peer, a fixture key used outside its world. `reach-enforced-http.feature` is the seed of
+  this. Battle school practices the enemy's moves too.
+
 ## 7. Already decided: compose, don't re-litigate
 
 From `2026-07-22-reach-ontology-vocabulary-split-spec.md` (Draft) unless noted:
@@ -331,6 +434,13 @@ From `2026-07-22-reach-ontology-vocabulary-split-spec.md` (Draft) unless noted:
    ever reaches non-member DHT authorities.
 7. **Public vs commons, private vs self.** Keep 8 distinct serving classes, or declare the collapses
    canonical? Today each component chooses differently (D3, D4).
+8. **Stage as input vs stage as branch.** The habit invariant lets a stage reduce verification
+   *depth*. P1 forbids stage-conditional code in a gate. Settle where depth-reduction lives (in the
+   inputs/world, or in a declared depth parameter the verdict carries), so that "cheaper in test"
+   can never become "different in test".
+9. **Progenitor and founder authority vs "no terminal authority".** Genesis needs someone to plant
+   the first tuples, and the earned-link rule already admits the progenitor. Bound that power by
+   stage and expiry, or root it in a Mishpat commitment like every other delegation?
 
 ## 9. Test and scenario coverage today
 
@@ -379,6 +489,17 @@ that holding content does not mean being able to read it.
     leaks, and D1–D11 as invariants.
 11. **Migration.** Existing rows (the 1987 `familiar` rows, seeder defaults, alpha drift) moved
     data-aware. SpiceDB's lesson: a vocabulary migration must account for live data.
+12. **The proving ground (§6a).**
+    - How a world (simulacra / test / staging / demo) is declared, minted and sealed.
+    - The **stage × tier × check-depth matrix**: for each reach tier, which proofs each stage may
+      check less deeply, and none it may skip entirely.
+    - How Adam's and the cast's standing is minted as world-local tuples, so "what Adam alone can
+      do" is derivable.
+    - How the steward grade, seed authority and CI become declared, expiring grants.
+    - How the founders demo without an override.
+    - The side-door inventory: every a2o step and seeder path that sets identity or reach outside
+      the verifier (headers, direct SQLite relationships, grade PATCH, seed stamps), each with a
+      retirement order.
 
 ## 11. Definition of done for the solutioning session
 
@@ -391,11 +512,18 @@ The session is done when it has produced:
 - **(d)** a2o composition-law scenarios, with a `@concern:` tag the `reach-enforced-everywhere`
   habit's `checks:` can name;
 - **(e)** a re-evaluation of the F19 leg-3 storage safeguards: keep as an interim measure, or
-  retire once reach is versioned.
+  retire once reach is versioned;
+- **(f)** the proving-ground deliverables:
+  - the stage × tier × check-depth matrix;
+  - the world-declaration format (generalizing `corpus-trust.ts`);
+  - the side-door inventory with its retirement order;
+  - a2o scenarios proving that (i) a fixture world is deterministic, meaning Adam sees exactly the
+    declared set on two independent mints, and (ii) a simulacra-minted grant or fixture key is
+    refused by a Bootstrap-stage peer.
 
 ## 12. Pre-read (in this order)
 
-1. This item: §2b and §4.
+1. This item: §2b, §4 and §6a.
 2. `genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md`.
 3. `genesis/research/ontology-systems-survey-reach-reconciliation-2026-07-22.md` §2 and §4.
 4. `genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md` §5.5.
@@ -405,3 +533,7 @@ The session is done when it has produced:
 7. `elohim/elohim-storage/src/epr_service.rs:368-600` and
    `doorway/doorway-service/src/services/serve_eligibility.rs`: the two deciders that most need to
    agree.
+8. `genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md`
+   (the stage rule, the three developer modes, the 8 questions for adding a gate), then
+   `genesis/seeder/src/corpus-trust.ts` and `genesis/a2o/LAYERS.md`: the proving ground's existing
+   pieces.
