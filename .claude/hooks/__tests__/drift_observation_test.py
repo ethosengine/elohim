@@ -605,6 +605,8 @@ class GoldenReportCase(unittest.TestCase):
             shutil.copy(REPO / ".claude" / "epr-meta" / name, reg / name)
         meta = self.root / ".epr-meta"
         meta.mkdir()
+        (meta / "repository.yaml").write_text(
+            "version: 1\nagent: repo:ethosengine/elohim\n")
         (meta / "manifest.md").write_text(
             "---\nepr-meta-version: 1\nid: golden-fixture\nroot: true\n"
             "policy-recipe: .claude/epr-meta\n---\n")

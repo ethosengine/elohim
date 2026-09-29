@@ -622,6 +622,13 @@ class GoldenParityCase(unittest.TestCase):
             raise unittest.SkipTest(
                 f"`{cls.binary}` cannot project the index: "
                 f"{(r.stderr or r.stdout).strip().splitlines()[:1]}")
+        projection = json.loads(r.stdout)
+        population = projection["population"]
+        cls.unattributed_contributions = population["unattributed"]
+        total = population["contributions"]
+        if (type(cls.unattributed_contributions) is not int or type(total) is not int
+                or not 0 <= cls.unattributed_contributions <= total):
+            raise AssertionError("native projection returned an invalid contribution population")
         cls.native = out.read_bytes()
         out.unlink(missing_ok=True)
 
@@ -660,6 +667,11 @@ class GoldenParityCase(unittest.TestCase):
         that projecting again reproduces the index already committed — a rendering change shows
         up here as a diff rather than as silence.
         """
+        if self.unattributed_contributions:
+            self.skipTest(
+                f"live index equality requires local attributable contribution evidence: "
+                f"{self.unattributed_contributions} contributions lack it; "
+                "committed MEMORY.md is preserved and hermetic native projection tests still apply")
         self.assertEqual(hashlib.sha256(self.native).hexdigest(),
                          hashlib.sha256(self.live).hexdigest(),
                          "re-projecting the index rendered different bytes than the tree "

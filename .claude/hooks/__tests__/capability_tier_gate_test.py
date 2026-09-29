@@ -196,6 +196,7 @@ class CapabilityTierGateCase(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.proj = Path(self._tmp.name)
         _write_project(self.proj, FIXTURE_POLICY, actor_lines=[])
+        (self.proj / ".git").mkdir()
 
     # ── round 1 regressions: still denied ────────────────────────────────────────────────────
     ROUND1_BYPASSES = [
@@ -797,7 +798,7 @@ class CapabilityTierGateCase(unittest.TestCase):
         "git reset --hard 2>/dev/null",
         "cd /projects/elohim&&git reset --hard",
         "echo start;git clean -xfd",
-        "true&&rm -rf /projects/elohim",
+        "true&&rm -rf {repository}",
     ]
 
     # (b) `exec`/`builtin` were absent from the wrapper set; `exec -a NAME` additionally needs
@@ -821,7 +822,10 @@ class CapabilityTierGateCase(unittest.TestCase):
     ]
 
     def _assert_denied(self, cmds, tier="claude-haiku-4-5"):
+        import shlex
+
         for cmd in cmds:
+            cmd = cmd.replace("{repository}", shlex.quote(str(self.proj)))
             with self.subTest(cmd=cmd):
                 r = run_hook(cmd, self.proj, {"CLAUDE_MODEL": tier})
                 self.assertEqual(r.returncode, 0, r.stderr)
@@ -938,7 +942,7 @@ class CapabilityTierGateCase(unittest.TestCase):
         "git reset \\\n  --hard",
         "git \\\nreset \\\n--hard",
         "git \\\n  clean \\\n  -xfd",
-        "rm -rf \\\n  /projects/elohim",
+        "rm -rf \\\n  {repository}",
     ]
 
     # (b) `rm -rf` against a shell variable naming the working tree or the home directory: a bare
