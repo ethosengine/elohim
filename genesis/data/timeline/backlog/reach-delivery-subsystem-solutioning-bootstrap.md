@@ -55,6 +55,38 @@ exactly how reach is declared, derived, verified and delivered.
 - **Every authorization claim is backed by a holon with standing to make it:** private/self, intimate,
   community, or authoritative.
 
+**Operator clarification during the household proof (2026-09-29):** Matthew is the human
+operator of record for this development environment. Claude, Codex and Gemini work under his
+authorization and exercise delegated review/stewardship while the fuller network of human peer
+developers and Elohim inference is not yet participating. The developer effort and its public
+demonstrations have earned public reach under that authorization. A simulacra world may therefore
+legitimately reach the public web; simulated standing does not imply private delivery.
+
+Keep three facts distinct in the solutioning: who authorizes this developer effort (the real
+operator), which world's facts an actor may assert (Adam and the fixture cast have world-local
+standing), and who may read a published artifact (including everyone). Publicly publishing a
+simulation does not turn its memberships, grants or relationships into real-network authority.
+Real signatures on fixture acts prove those acts inside their world; a persona name or a matching
+display name does not identify the operator. The authorization stated here is session evidence,
+not a claim that the world-bound grant or holon-authority machinery is already implemented.
+
+The operator also explicitly accepts storage's `public`/`commons` equivalence. The F19 household
+baseline already served the same earned course head anonymously on all three peers, despite those
+different spellings. An exact-string mismatch is not by itself a reach refusal or a permission
+transition. The design must distinguish semantic verdict agreement, spelling drift between
+consumers, and an actual change in authorized readership; this does not resolve D3's other
+consumers automatically.
+
+**Authority trace clarified by the operator in the same session:** the claim, the human with
+standing to make it, and the network's Mishpat decision affirming it must be connected. The root
+`.epr-meta/manifest.md` now records this development context as explanatory prose. A reach inquiry
+at a descendant should trace the relevant local declarations back through that context, rather
+than treat a reach string as self-authorizing. Mature-network governance judges recognition of the
+claim. No network affirmation or verified identity-binding reference has yet been linked in that
+root declaration. The resolver's current ancestor walk stops at nested `root: true` manifests;
+cross-root authority provenance and network-decision resolution remain design work, not behavior
+implemented by this prose addition.
+
 **Habit served.** `reach-enforced-everywhere` (red). Its `retire-when` is the session's finish line:
 *"every egress plane derives authorization from one shared verifier it cannot bypass by construction."*
 
@@ -353,6 +385,10 @@ declared-world path.
   (DNA properties / network seed / corpus id). Its tuples, keys, grants and verdicts cannot be
   presented to a Bootstrap-or-higher network. This generalizes the corpus-trust rule
   (preproduction trust never crosses into production) from seeds to tuples and keys.
+  This seals authority, not public visibility: the operator may authorize publishing a simulation
+  or its artifacts on the public web without promoting its world-local standing. World identity
+  and verification stage must remain distinguishable; changing a stage label alone cannot confer
+  real-network authority.
 - **P4. A stage may only reduce depth, and the verdict records it.** For example: skip the
   DHT-existence wait, or accept a fixture-signed membership without council ratification. A stage
   never widens and never turns Deny into Permit. The explain/witness tree names the stage and the
@@ -402,6 +438,103 @@ declared-world path.
   | `7920095ed` every relationships read reach-gated → genesis #1586/#1587 `failed=8833` | The **anonymous** seeder could no longer read private sources' edges | `1b75cdedb` counts them as unverified rather than failing. Right call locally, but the seeder is still an undeclared actor; P2/P5 would give it a world identity instead. |
   | F19 leg 3 → `canonical_earned_head_adoption_widens_reach` `EXIT=1` (2026-09-29) | A synthetic fixture kept an old blob and still expected a widen | Side door closed: the fixture was corrected, not the rule. It took a reasoning agent to see that. |
   | `DEV_MODE=true` on every deployed doorway (the origin of the 2026-08 holes) | Deploys and devspaces needed to be drivable | The opposite call: **the gate was loosened to make things work**, and it became four internet-facing holes. This is the failure P9 exists to prevent. |
+
+### 6b. Foundational architecture: constructing and discovering authority
+
+Operator direction, 2026-09-29: **the claim, the human with standing to make it, and the network
+decision affirming that standing and claim — Mishpat.** How the network constructs, discovers and
+evaluates these relationships is foundational architecture, not an explain feature added after
+the reach gate. A reach word has meaning only in this context.
+
+The root `.epr-meta` is the local declaration of that context for this repository. An inquiry
+anywhere below it should find the applicable local reach claim, follow its relationships through
+the layers that claim authority, identify the accountable human and their standing in the
+relevant holon, and find the governance decision that affirms or bounds the claim. A layer may
+claim that its authority matters; whether it actually does is determined under the network's
+applicable governance, not by its position in a directory or its own assertion.
+
+The repository tree is one discoverable projection of these relationships. The network must also
+be able to discover them from an artifact and its provenance without possessing this checkout.
+Moving a file, publishing an artifact, serving it through a doorway, or copying a simulation must
+not silently replace its authorizing context. The solutioning must settle which existing
+EPR/holon/Commitment/decision mechanisms carry each relationship and how the filesystem projection
+points to them. Do not invent a parallel authority ledger or treat a path as the authority itself.
+
+Three distinct operations need an explicit contract:
+
+- **Construct:** who may make a claim; which human/holon has standing for the act; how delegated
+  agents act under that standing; and which governance process can affirm, limit, supersede or
+  withdraw it. A signed claim and an affirmed claim must remain distinguishable.
+- **Discover:** starting from the content/version and its local context, follow the attributable
+  relationships to the human's standing and the applicable Mishpat decision. Specify discovery
+  across nested governance roots and peer boundaries, not only nearest-directory lookup.
+- **Evaluate:** verify that the discovered standing and decision apply to this claim, act, world,
+  scope and version, including their freshness and withdrawal. A discovered assertion is input
+  to a decision, not proof that it was accepted. Missing or conflicting evidence must remain
+  visible; an unlinked affirmation cannot be fabricated from successful delivery.
+
+**Orientation from anywhere — the operator's gopher analogy.** An agent should be able to poke
+its head up at any location and quickly understand what really matters there. The first view must
+be bounded and relevant to that location: what this place is for, the work or invariant it serves,
+the applicable local and inherited constraints, the reach claim and world, the accountable human
+and holon's standing, and the Mishpat affirmation or explicit unresolved frontier. It should point
+to the next authoritative evidence rather than require loading the repository's entire history.
+Deeper traversal is progressive: follow a claim when its standing, scope, conflict or freshness
+matters to the task. A short orientation is not a substitute for verifying a consequential act.
+
+This should compose the existing `.epr-meta` cascade and bounded recall/discovery mechanisms,
+not create another root register, ranking script or parallel authority store. Starting below a
+nested root, inside a copied artifact, or on a peer without the original checkout must expose the
+boundary and the available provenance; it must not silently invent inherited standing. A useful
+first view distinguishes affirmed facts, operator declarations, world-local fixture facts and
+unknowns before an agent acts on them.
+
+**The current concrete case:** Matthew authorizes this developer effort. Claude, Codex and Gemini
+exercise delegated review/stewardship within it; the effort and its demonstrations have earned
+public reach under that authorization. Adam's simulacra can therefore be publicly visible.
+The public artifact carries that real operator context while Adam's simulated relationships and
+grants remain world-local. The public reach of the demonstration does not make a simulated
+relationship an authoritative relationship between real humans. The fuller network of real peer
+developers and Elohim inference will judge and affirm claims through its governance as it matures;
+today's operator declaration must not be misreported as an already-linked network decision.
+
+This requirement is about qualified standing, not making Matthew, a founder, a model, a keypair
+or the root directory an unlimited authority. Personhood is not conferred by a reach verdict;
+standing concerns a particular act in a particular context. The constituting authority and
+reviewability of each governance decision must themselves be discoverable, with a bounded
+resolution rule rather than circular self-affirmation or an unbounded walk.
+
+These are requirements and questions for the existing spec amendment. They do not declare a new
+entry type, route or implementation. In particular, the current `.epr-meta` resolver does not
+perform this network authority resolution.
+
+### Grounding questions after the operator clarification
+
+The first authority trace to explain is the one already operating here: Matthew authorizes the
+developer effort; delegated agents review and contribute within that effort, with publication
+under Matthew's operator authorization; a published simulation
+retains the provenance of its fictional actors and world-local facts. The trace must explain both
+why the public artifact is legitimate and why Adam's simulated standing does not authorize an act
+against a real human's content. This is a design input, not a new grant schema or an implemented
+authority chain.
+
+Three questions should be settled before another reach gate is changed:
+
+1. Which acts follow directly from Matthew's operator/author standing, and which require another
+   holon's constituting facts or consent? Record the scope and delegation of the development
+   agents explicitly, including how it is withdrawn; do not infer it from a model name or key.
+2. What evidence distinguishes publishing a fixture artifact from accepting a fixture's claim as
+   real authority? World provenance must survive public serving, caching and copies. Stage, world,
+   and audience are separate inputs even when they currently share one host.
+3. How does a test carry an independently established expected entitlement, so P9 can distinguish a
+   legitimate refusal from a legitimate caller incorrectly refused? A verifier's own refusal
+   cannot by itself prove which happened. Unknown world or missing authority evidence must remain
+   an explain gap, not be relabelled a security success.
+
+Concrete evidence: household HTTP reach run `20260929T130939Z-594179e9` passed all three active
+scenarios but reported `networkStage: unknown` and unknown `sut.dnaHash`. It proves those HTTP
+behaviors, not a sealed world or the authority chain above. The F19 report is
+`genesis/docs/superpowers/sprints/2026-09-29-f19-household-proof-report.md`.
 
 ## 7. Already decided: compose, don't re-litigate
 
@@ -529,6 +662,22 @@ that holding content does not mean being able to read it.
     - The side-door inventory: every a2o step and seeder path that sets identity or reach outside
       the verifier (headers, direct SQLite relationships, grade PATCH, seed stamps), each with a
       retirement order.
+13. **Constructing and discovering authority (§6b) — settle before choosing the verifier's data
+    model.**
+    - What represents the claim, the accountable human's standing, the agent's delegation, and
+      the Mishpat affirmation; which existing native primitives carry them?
+    - How does an inquiry from any repository descendant follow `.epr-meta` context to those
+      facts, including nested roots, and how does a peer discover them without the repository?
+    - What bounded first view lets an agent starting anywhere quickly orient to purpose, relevant
+      constraints, standing, decisions and unknowns, with progressively deeper evidence traversal?
+    - What proves that the human or holon can make this claim and that the affirming governance
+      process has standing to judge it? Where does the bounded verification terminate?
+    - What binds the affirmation to its precise claim, scope, world and version, and how are
+      competing, withdrawn, stale or not-yet-affirmed claims represented without self-certifying?
+    - How does operator-authorized public publication carry a simulator's provenance without
+      promoting its internal relationships into real-network authority?
+    - What is explicitly known today from Matthew's authorization, and what remains pending
+      network affirmation? The development agents must be able to explain that distinction.
 
 ## 11. Definition of done for the solutioning session
 
@@ -553,6 +702,18 @@ The session is done when it has produced:
   (SIDE-DOOR CLOSED / LEGITIMATE-REFUSED / UNCLASSIFIABLE), and where a gate or test report prints
   them. Acceptance: re-run the four past rounds in the P9 table against the design, and each sorts
   itself without a human or agent judging it.
+- **(h)** the claim/standing/Mishpat construction and discovery contract (§6b), incorporated into
+  the same spec amendment and the fixture harness. Acceptance traces start at (i) a repository
+  descendant, (ii) a publicly served simulacra artifact, and (iii) an artifact on another peer.
+  Each identifies the claim, accountable human and applicable standing/delegation, the governing
+  holon and affirmation decision or its explicit absence, and the resulting scope. Include an
+  unsupported local reach claim, a fixture grant presented as real standing, a superseded
+  affirmation, and Matthew's authorized public developer effort. File placement and public
+  availability must never substitute for an affirming decision.
+  Add an orientation test: start an agent at several unrelated descendants with no conversation
+  history; its bounded first view finds the relevant purpose, authority context, constraints and
+  unresolved evidence, with working links for deeper inquiry. The result must not require a full
+  repository scan or flatten every ancestor's context into an undifferentiated prompt.
 
 ## 12. Pre-read (in this order)
 

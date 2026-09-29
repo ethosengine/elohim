@@ -185,6 +185,41 @@ Carries the cross-cutting `ci-trigger:` ignore set (projected into `.ci-ignore` 
 `.claude/scripts/ci-ignore-projector.py`) and the author-time rules listed above. **`.ci-ignore` is GENERATED from
 this leg — never hand-edit it.**
 
+## Reach context — claim, human standing, Mishpat affirmation
+
+Operator declaration, 2026-09-29: Matthew is the human operator of record for this developer
+environment. The developer effort proceeds under his authorization. Claude, Codex and Gemini
+exercise delegated review and stewardship while the fuller network of human peer developers and
+Elohim inference is not yet participating. The claim is that this developer effort and its public
+demonstrations have earned public reach under that authorization.
+
+A reach inquiry anywhere in the repository should be able to follow the applicable local
+`.epr-meta` declarations through their authority context to three connected pieces of evidence:
+
+1. **The claim:** what is proposed to have which reach, for which artifact/version, world and act.
+2. **The human with standing:** who is accountable for the claim, the holon/context in which that
+   standing applies, and the delegation by which an agent acts for them.
+3. **The Mishpat affirmation:** the network governance decision affirming that claim and standing,
+   with its scope, bounds and applicable supersession or withdrawal evidence.
+
+This manifest records the operator's declaration; it does not certify its own claim. **No
+network-witnessed Mishpat decision or verified identity-binding reference is linked here yet.**
+That missing evidence remains explicit. Mature-network governance determines whether and where
+the claim is recognized; a filesystem location, persona name or stage flag is not that decision.
+
+Public delivery and world-local standing are distinct. A simulacra artifact can legitimately be
+published on the public web under the operator's authorization while Adam's simulated memberships
+and grants remain facts of that world. Publicly serving the artifact does not promote those facts
+into authority over real humans. More specific content and holon constraints still matter; this
+project claim is not a recursive disclosure grant for every byte beneath the directory.
+
+This is the manifest's explanatory context, not a new executable rule or frontmatter schema.
+Today's resolver follows filesystem ancestry and stops at `root: true` (and repository boundaries);
+it does not yet resolve the claim/standing/Mishpat trace across nested roots or verify network
+affirmations. The reach solutioning session must specify that trace without treating nearest-rule
+override as permission to manufacture standing. Its existing home is
+`genesis/data/timeline/backlog/reach-delivery-subsystem-solutioning-bootstrap.md`.
+
 ## rs-loc-ceiling — repo-wide source-file LoC ceiling (measure class)
 
 Binds `source-file-loc-ceiling@1` from the policy registry: `*.rs` writes are measured against a

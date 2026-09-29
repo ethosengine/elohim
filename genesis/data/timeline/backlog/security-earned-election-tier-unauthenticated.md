@@ -83,4 +83,11 @@ grade, preserves an authenticated election-ordering floor across both unordered 
 write paths, and widens only edges the adopted head restates. Those additional guards close four
 disclosure paths found by the independent local adversarial review. The integrity-layer
 canonical-head tag gate remains later work (it moves the DNA hash); this re-land changes storage
-only and still needs household proof before F19 is fixed.
+only. Household delivery was checked on 2026-09-29: the course serves the same earned head and body
+anonymously on all three rebuilt peers, and the active HTTP reach checks pass 3/3. This was already
+true before the rebuild: public and commons are equivalent here, as the operator confirmed.
+The run therefore does not prove a restricted-to-commons transition; F19 stays partly verified.
+Intimate reads remain 403 everywhere; private fixtures remain 403 on Matthew/Jessica, while James
+has no private fixture. Report: `genesis/docs/superpowers/sprints/2026-09-29-f19-household-proof-report.md`.
+World/standing/Mishpat affirmation remains distinct from these HTTP observations; the report
+records the a2o lane's unknown stage rather than claiming a sealed proving ground.
