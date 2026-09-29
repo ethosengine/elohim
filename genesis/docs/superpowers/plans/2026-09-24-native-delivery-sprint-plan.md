@@ -683,7 +683,7 @@ and WAL/main ≤ 1 after H3; `idle-is-free` gains a dated delta with both readin
 - [x] **H0 — conductor-store growth report and offline sniffer committed** (serves idle-is-free) — 553edab1f
 - [x] **H1 — stop the bleed: heartbeat probes only the live roster, self-deregistration verb, a2o receipt doorways deregister on teardown** (serves idle-is-free) — 89d7c7e86 7be4d4e37 97977b60b; review fixes 78a46bd01 fc441e497
 - [ ] **H2 — health samples leave the DHT: retention table, notarize only transitions, drop the type-index link** (serves idle-is-free)
-- [ ] **H3 — fork WAL checkpointing and O(1) storage_info on the Lane K branch** (serves idle-is-free)
+- [ ] **H3 — fork WAL checkpointing and O(1) storage_info on the Lane K branch** (serves idle-is-free) — WAL half landed 2026-09-28 on fork `fix/fleet-cpu-publish-livelock` (`30d424347` 60 s bounded passive/truncate checkpoint + `journal_size_limit` 64 MiB, `c8c17202c` bounded truncate), pinned and rolled to alpha by edge #1492. The O(1) `storage_info` half is still open.
 - [x] **H4 — store-growth sensors: dna-actions-per-day@1, wal-main-ratio@1, subject-anchor-links@1 with bounds** (serves idle-is-free) — 980ee25f6
 
 ---

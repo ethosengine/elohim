@@ -698,20 +698,29 @@ async function stampProvenance(
   let reachCircuitSkipped = 0;
 
   const patchContent = async (id: string, body: Record<string, string>): Promise<boolean> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PATCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      return response.ok;
-    } catch {
-      return false;
-    } finally {
-      clearTimeout(timer);
+    for (let waits = 0; ; waits++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PATCH_TIMEOUT_MS);
+      try {
+        const response = await fetch(`${STORAGE_URL}/db/content/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (response.ok) return true;
+        // A shed write (peer catching up) is not a conductor-path failure: wait,
+        // don't feed the circuit breaker.
+        if (isCatchingUp(response.status, await response.text()) && waits < CATCHING_UP_MAX_WAITS) {
+          await new Promise(resolve => setTimeout(resolve, catchingUpDelayMs(response.headers.get('Retry-After'))));
+          continue;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(timer);
+      }
     }
   };
 
@@ -861,6 +870,7 @@ async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T) => Prom
  */
 async function patchContentFields(id: string, patch: ContentFieldPatch): Promise<string | null> {
   let lastErr = 'unknown failure';
+  let catchingUpWaits = 0;
   for (let attempt = 0; attempt < LOOKUP_MAX_ATTEMPTS; attempt++) {
     let status: number | null = null;
     let bodyText = '';
@@ -874,6 +884,19 @@ async function patchContentFields(id: string, patch: ContentFieldPatch): Promise
       if (response.ok) return null;
       bodyText = await response.text();
       lastErr = `PATCH ${id}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
+      // A peer still catching up SHEDS writes (genesis #1589: adam's FCT path PATCH).
+      // The write was refused, not lost: wait it out on its own bounded ladder
+      // without spending an attempt (the same ladder seed-epr-atom.ts uses).
+      if (isCatchingUp(status, bodyText) && catchingUpWaits < CATCHING_UP_MAX_WAITS) {
+        const delay = catchingUpDelayMs(response.headers.get('Retry-After'));
+        catchingUpWaits++;
+        console.log(
+          `     ⏳ ${id}: peer catching-up (503) — wait ${catchingUpWaits}/${CATCHING_UP_MAX_WAITS} in ${delay / 1000}s`,
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt--;
+        continue;
+      }
     } catch (err) {
       lastErr = `PATCH ${id}: ${err instanceof Error ? err.message : String(err)}`;
       bodyText = lastErr;
@@ -882,6 +905,24 @@ async function patchContentFields(id: string, patch: ContentFieldPatch): Promise
     await backoffSleep(attempt);
   }
   return lastErr;
+}
+
+/** A peer whose projector is catching up sheds writes with 503 {"status":"catching-up"}. */
+const CATCHING_UP_MAX_WAITS = 24;
+
+function isCatchingUp(status: number | null, bodyText: string): boolean {
+  if (status !== 503) return false;
+  try {
+    return (JSON.parse(bodyText) as { status?: string })?.status === 'catching-up';
+  } catch {
+    return false;
+  }
+}
+
+/** Honour Retry-After (seconds), default 5 s, capped at 15 s. */
+function catchingUpDelayMs(retryAfter: string | null): number {
+  const secs = retryAfter ? parseInt(retryAfter, 10) : NaN;
+  return Math.min(Number.isFinite(secs) ? Math.max(secs, 2) * 1000 : 5000, 15000);
 }
 
 /**
@@ -993,7 +1034,11 @@ async function seedBatchIdempotent(
 const RELATIONSHIP_LIST_LIMIT = 500;
 const RELATIONSHIP_WRITE_BATCH = 500;
 
-type RelationshipLookup = { kind: 'ok'; rows: StoredRelationshipRow[] } | { kind: 'error'; message: string };
+type RelationshipLookup =
+  | { kind: 'ok'; rows: StoredRelationshipRow[] }
+  /** The reach gate refused the anonymous seeder: it cannot compare, so it writes nothing (as for content). */
+  | { kind: 'unreadable'; status: number }
+  | { kind: 'error'; message: string };
 
 /** Storage keys an edge on (source, target, type); so does the seeder. */
 const edgeKey = (e: { relationshipType: string; targetId: string }) => `${e.relationshipType}|${e.targetId}`;
@@ -1022,6 +1067,7 @@ async function listOutgoingRelationships(sourceId: string): Promise<Relationship
         }
         return { kind: 'ok', rows: body.items.filter(r => r.sourceId === sourceId) };
       }
+      if (status === 401 || status === 403) return { kind: 'unreadable', status };
       lastMessage = `GET relationships ${sourceId}: HTTP ${status}: ${bodyText.slice(0, 200)}`;
     } catch (err) {
       lastMessage = `GET relationships ${sourceId}: ${err instanceof Error ? err.message : String(err)}`;
@@ -1075,6 +1121,8 @@ interface RelationshipTally {
   updated: number;
   unchanged: number;
   failed: number;
+  /** The source is above the seeder's reach (403): its edges cannot be compared, so none are written. */
+  unverified: number;
   /** Stored reach differs from the source atom's — the bulk route cannot carry reach (reported, never written). */
   reachUncarried: number;
 }
@@ -1083,7 +1131,7 @@ function formatRelationshipTally(t: RelationshipTally, remaps: RelationshipRemap
   const remapSummary = remaps.summary();
   return (
     `Seed summary [relationships]: inserted=${t.inserted} updated=${t.updated} ` +
-    `unchanged=${t.unchanged} failed=${t.failed} reachUncarried=${t.reachUncarried} ` +
+    `unchanged=${t.unchanged} unverified=${t.unverified} failed=${t.failed} reachUncarried=${t.reachUncarried} ` +
     `remapped=${remaps.total()}${remapSummary ? ` (${remapSummary})` : ''}`
   );
 }
@@ -1096,7 +1144,14 @@ async function seedRelationships(
   concepts: ConceptJson[],
   remaps: RelationshipRemapLedger,
 ): Promise<{ tally: RelationshipTally; errors: string[] }> {
-  const tally: RelationshipTally = { inserted: 0, updated: 0, unchanged: 0, failed: 0, reachUncarried: 0 };
+  const tally: RelationshipTally = {
+    inserted: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    unverified: 0,
+    reachUncarried: 0,
+  };
   const errors: string[] = [];
 
   const bySource = concepts
@@ -1110,6 +1165,10 @@ async function seedRelationships(
   let plannedInserts = 0;
   bySource.forEach((source, i) => {
     const lookup = lookups[i];
+    if (lookup.kind === 'unreadable') {
+      tally.unverified += source.edges.length;
+      return;
+    }
     if (lookup.kind === 'error') {
       tally.failed += source.edges.length;
       errors.push(lookup.message);

@@ -47,15 +47,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+import { encodeHashToBase64 } from '@holochain/client';
 
-import {
-  buildContentInput,
-  buildPathInput,
-  type ConceptJson,
-  type PathJson,
-} from '../../seeder/src/content-input.js';
+import { buildContentInput, buildPathInput } from '../../seeder/src/content-input.js';
 
+import { connectConductor, type Conductor } from './lib/steward-conductor.js';
+import { expandClosure, loadRepoItem, type RepoItem } from './lib/steward-items.js';
 import {
   authoredReach,
   commonsFenceRefusal,
@@ -67,7 +64,6 @@ import {
 } from './lib/steward-publish-plan.js';
 
 import type { CreateContentInput } from '../../seeder/src/generated/create-content-input.js';
-import type { CellId } from '@holochain/client';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GENESIS_DIR = resolve(HERE, '..', '..');
@@ -186,32 +182,6 @@ function parseArgs(argv: string[]): Options {
   o.ids = [...new Set(o.ids)];
   if (o.ids.length === 0) usage('no ids given');
   return o;
-}
-
-// ─── repo items ─────────────────────────────────────────────────────────────
-
-interface RepoItem {
-  id: string;
-  kind: 'content' | 'path';
-  file: string;
-  json: ConceptJson & PathJson & { visibility?: string };
-}
-
-type Loaded = { item: RepoItem; error?: never } | { item?: never; error: string };
-
-function loadRepoItem(dataDir: string, id: string): Loaded {
-  const contentFile = join(dataDir, 'content', `${id}.json`);
-  const pathFile = join(dataDir, 'paths', `${id}.json`);
-  const hits = [contentFile, pathFile].filter(f => existsSync(f));
-  if (hits.length === 0) {
-    return { error: `${id}: no content/${id}.json or paths/${id}.json under ${dataDir}` };
-  }
-  if (hits.length === 2)
-    return { error: `${id}: ambiguous — both content/ and paths/ hold ${id}.json` };
-  const file = hits[0];
-  const json = JSON.parse(readFileSync(file, 'utf8')) as RepoItem['json'];
-  if (json.id !== id) return { error: `${id}: ${file} declares id "${json.id}"` };
-  return { item: { id, kind: file === pathFile ? 'path' : 'content', file, json } };
 }
 
 // ─── blob sources ───────────────────────────────────────────────────────────
@@ -336,75 +306,27 @@ async function ensureBlob(storage: string, blob: BlobSource): Promise<string> {
 
 // ─── conductor ──────────────────────────────────────────────────────────────
 
-interface Conductor {
-  agent: string;
-  declareEarned(
-    id: string,
-    head: string
-  ): Promise<{ head: string; author: string; canonical: boolean }>;
-  close(): Promise<void>;
-}
-
-async function connectConductor(o: Options): Promise<Conductor> {
-  const admin = await AdminWebsocket.connect({
-    url: new URL(o.adminWs),
-    wsClientOptions: { origin: o.appId },
-    defaultTimeout: 120_000,
+/** Sign `head` as the EARNED canonical head of `id` with the steward's agent. */
+async function declareEarned(
+  c: Conductor,
+  id: string,
+  head: string
+): Promise<{ head: string; author: string; canonical: boolean }> {
+  const out = await c.call<{
+    head_action_hash: Uint8Array;
+    author: Uint8Array;
+    canonical: boolean;
+  }>('declare_earned_canonical_head', {
+    id,
+    head_action_hash: head,
+    carried_record: null,
+    adopt_before_author: false,
+    delegation: null,
   });
-  const apps = await admin.listApps({});
-  const app = apps.find(a => a.installed_app_id === o.appId);
-  if (!app) {
-    throw new Error(
-      `no installed app "${o.appId}" (have: ${apps.map(a => a.installed_app_id).join(', ')})`
-    );
-  }
-  let cellId: CellId | undefined;
-  for (const [role, infos] of Object.entries(app.cell_info)) {
-    if (role !== o.role) continue;
-    for (const info of infos as { type: string; value?: { cell_id?: CellId } }[]) {
-      if (info.type === 'provisioned' && info.value?.cell_id) cellId = info.value.cell_id;
-    }
-  }
-  if (!cellId) {
-    throw new Error(
-      `app "${o.appId}" has no provisioned role "${o.role}" (roles: ${Object.keys(app.cell_info).join(', ')})`
-    );
-  }
-  await admin.authorizeSigningCredentials(cellId);
-  const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
-  const appWs = await AppWebsocket.connect({
-    url: new URL(o.appWs),
-    token: token.token,
-    wsClientOptions: { origin: o.appId },
-    defaultTimeout: 180_000,
-  });
-  const cell = cellId;
   return {
-    agent: encodeHashToBase64(cell[1]),
-    async declareEarned(id, head) {
-      const out: { head_action_hash: Uint8Array; author: Uint8Array; canonical: boolean } =
-        await appWs.callZome({
-          cell_id: cell,
-          zome_name: 'content_store',
-          fn_name: 'declare_earned_canonical_head',
-          payload: {
-            id,
-            head_action_hash: head,
-            carried_record: null,
-            adopt_before_author: false,
-            delegation: null,
-          },
-        });
-      return {
-        head: encodeHashToBase64(out.head_action_hash),
-        author: encodeHashToBase64(out.author),
-        canonical: out.canonical,
-      };
-    },
-    async close() {
-      await (appWs.client as unknown as { close(): Promise<unknown> }).close();
-      await admin.client.close();
-    },
+    head: encodeHashToBase64(out.head_action_hash),
+    author: encodeHashToBase64(out.author),
+    canonical: out.canonical,
   };
 }
 
@@ -482,7 +404,7 @@ async function publishOne(
   // row and declare the head it now holds, a few times, before calling it failed.
   for (let attempt = 1; ; attempt++) {
     try {
-      const out = await c.declareEarned(id, head);
+      const out = await declareEarned(c, id, head);
       if (out.head !== head) {
         throw new Error(`earned declaration elected ${out.head}, not the published head ${head}`);
       }
@@ -499,46 +421,6 @@ async function publishOne(
       head = landed.dhtAnchorHash;
     }
   }
-}
-
-/** Targets of the typed edges a content item authors (top-level or legacy metadata list). */
-function edgeTargets(json: Record<string, unknown>): string[] {
-  const lists = [
-    json.relationships,
-    (json.metadata as Record<string, unknown> | undefined)?.relationships,
-  ];
-  const out = new Set<string>();
-  for (const list of lists) {
-    if (!Array.isArray(list)) continue;
-    for (const edge of list as Record<string, unknown>[]) {
-      const target = edge?.target ?? edge?.targetId ?? edge?.target_id;
-      if (typeof target === 'string' && target && target !== json.id) out.add(target);
-    }
-  }
-  return [...out];
-}
-
-/**
- * Every item a path's walk names (chapter steps, module steps, section concept ids),
- * so `--closure` can publish a path together with everything it points at.
- */
-function pathReferences(json: Record<string, unknown>): string[] {
-  const out = new Set<string>();
-  const visit = (node: unknown): void => {
-    if (Array.isArray(node)) {
-      node.forEach(visit);
-      return;
-    }
-    if (!node || typeof node !== 'object') return;
-    const obj = node as Record<string, unknown>;
-    if (typeof obj.resourceId === 'string' && obj.resourceId) out.add(obj.resourceId);
-    if (Array.isArray(obj.conceptIds)) {
-      for (const c of obj.conceptIds) if (typeof c === 'string' && c) out.add(c);
-    }
-    for (const key of ['chapters', 'modules', 'sections', 'steps']) visit(obj[key]);
-  };
-  visit(json.chapters);
-  return [...out];
 }
 
 async function awaitPeer(
@@ -594,26 +476,10 @@ async function main(): Promise<void> {
   //    else touches a peer. One refusal refuses the batch.
   const items: RepoItem[] = [];
   let refused = 0;
-  const ids = [...new Set(o.ids)];
-  if (o.closure) {
-    // A path's walk, then one hop along every typed edge the named items author (a
-    // lesson's scripture, story, practice…), so nothing published points at an item
-    // no peer holds. Every added id still passes the commons fence below.
-    for (const id of [...ids]) {
-      const { item } = loadRepoItem(o.dataDir, id);
-      if (item?.kind !== 'path') continue;
-      for (const ref of pathReferences(item.json as unknown as Record<string, unknown>)) {
-        if (!ids.includes(ref)) ids.push(ref);
-      }
-    }
-    for (const id of [...ids]) {
-      const { item } = loadRepoItem(o.dataDir, id);
-      if (item?.kind !== 'content') continue;
-      for (const target of edgeTargets(item.json as unknown as Record<string, unknown>)) {
-        if (!ids.includes(target)) ids.push(target);
-      }
-    }
-  }
+  // A path's walk, then one hop along every typed edge the named items author, so
+  // nothing published points at an item no peer holds. Every added id still passes
+  // the commons fence below.
+  const ids = o.closure ? expandClosure(o.dataDir, o.ids) : [...new Set(o.ids)];
   for (const id of ids) {
     const { item: loaded, error } = loadRepoItem(o.dataDir, id);
     if (!loaded) {
