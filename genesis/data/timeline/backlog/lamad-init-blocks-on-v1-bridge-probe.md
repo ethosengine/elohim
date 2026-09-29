@@ -55,5 +55,24 @@ logged and swallowed, but the call itself can block — a cross-cell call from i
 
 ## Current decision
 
-Open. Blocks FCT v2 on the apex; the per-peer steward grade and seed are otherwise
-working (matthew: 55 FCT rows widened to commons, 16 content rows updated in #1593).
+Coordinator cure landed (2026-09-29): `content_store::init` no longer probes v1 — it
+only registers the entry-type providers (in-memory, no calls); `healing_impl::init_healing`
+is gone. v1 healing stays lazy inside the reads that miss (`healing_integration`).
+Coordinator-only: `content_store_integrity.wasm` byte-identical, packed lamad DNA hash
+unchanged (`uhC0kLJHygE_XFy1DFnLyMQMaWmpzR1hMX7gAFBmfWrnRUyI-iYlt` before and after).
+Proof: sweettest `lamad_init_nonblocking` — beside a `lamad-v1` cell whose
+`coordinator::is_data_present` sleeps 45 s, the pre-cure DNA took 45.8 s on the first
+call and a concurrent call got `CellError(InitTimeout)` at 30.0 s (the fleet's error);
+the cured DNA answers both in under 1 s. Still open until the fleet runs the new
+coordinator: the DNA pipeline builds it and `ALLOW_COORDINATOR_UPDATE` hot-swaps it
+(`sync_coordinators`, no re-key); adam's already-wedged cell also needs the operator
+conductor restart above, since a hot-swap does not interrupt an init already in flight.
+
+Follow-ups, not in this cure: (1) a `lamad-v1` cell that hangs still stalls each
+`get_content_by_id` *miss* (lazy `heal_content_from_v1` bridge call) until it answers —
+bounded to that read, not the init lock; (2) the hc_rna docs and generator teach the
+wedge — the `rna/rust/src/healing_orchestrator.rs` module doc, `rna/README.md`,
+`rna/rust/ARCHITECTURE.md`, `rna/rust/GENERATOR_QUICKSTART.md` and
+`rna/templates/self-healing.rs.template` all call `check_v1_on_startup` from `init()`.
+Editing hc_rna source is deferred on purpose: `content_store_integrity` depends on
+hc_rna, so even a doc edit there must be checked against the integrity wasm bytes.

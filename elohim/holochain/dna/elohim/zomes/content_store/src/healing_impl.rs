@@ -218,30 +218,9 @@ pub fn create_healing_orchestrator() -> HealingOrchestrator {
     )
 }
 
-// ============================================================================
-// Initialization
-// ============================================================================
-
-pub fn init_healing() -> ExternResult<()> {
-    let orchestrator = create_healing_orchestrator();
-
-    // Check if v1 has data
-    match orchestrator.check_v1_on_startup()? {
-        Some(has_data) => {
-            if has_data {
-                debug_log("Init: v1 DNA available with data, will heal on demand")?;
-                // Healing will happen lazily when entries are queried
-            } else {
-                debug_log("Init: v1 DNA available but empty")?;
-            }
-        }
-        None => {
-            debug_log("Init: no v1 bridge, fresh start")?;
-        }
-    }
-
-    Ok(())
-}
+// There is deliberately no init-time v1 probe here. `init()` must never make a
+// cross-cell call (see `init` in lib.rs); healing reaches v1 lazily, per read,
+// in `healing_integration`.
 
 // ============================================================================
 // Helper Functions

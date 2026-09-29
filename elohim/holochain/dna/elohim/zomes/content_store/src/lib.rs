@@ -1144,17 +1144,19 @@ pub struct AttestationOutput {
 // DNA Initialization - Sets up healing support and flexible architecture
 // =============================================================================
 
+/// Cell init. LOCAL ONLY: no cross-cell `call`, no network `get`.
+///
+/// Every zome call to this cell waits on init, and the conductor gives up on a
+/// waiting call after 30 s. A cross-cell call in here holds that lock for as
+/// long as the other cell takes to answer — adam's lamad cell answered nothing
+/// for ~11 h behind the old v1-bridge probe (`hc_rna` `check_v1_on_startup` →
+/// `call(OtherRole("lamad-v1"), "coordinator", "is_data_present")`), whose
+/// result nothing read. v1 healing stays lazy: `healing_integration` reaches
+/// the `lamad-v1` role only when a v2 read misses, inside that read.
+/// Pinned by sweettest `lamad_init_nonblocking`.
 #[hdk_extern]
 pub fn init() -> ExternResult<InitCallbackResult> {
-    // Initialize healing support - check if v1 is available. Best-effort: DNA init
-    // must still succeed (init_flexible_orchestrator below) even if the v1 bridge
-    // probe fails, so a failure here is logged rather than propagated.
-    if let Err(e) = healing_impl::init_healing() {
-        error!("init: healing_impl::init_healing failed — {:?}", e);
-    }
-
-    // Initialize flexible healing architecture
-    // Register all entry type providers
+    // Register all entry type providers (pure in-memory registry setup).
     init_flexible_orchestrator()?;
 
     Ok(InitCallbackResult::Pass)

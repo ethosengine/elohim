@@ -107,6 +107,12 @@ path = "src/tests/rea_commitment_replication.rs"
 name = "lamad_intent_event"
 path = "src/tests/lamad_intent_event.rs"
 
+# lamad init() never waits on another cell (backlog lamad-init-blocks-on-v1-bridge-probe):
+# the first zome call of a fresh cell stays prompt beside a lamad-v1 role that cannot answer.
+[[test]]
+name = "lamad_init_nonblocking"
+path = "src/tests/lamad_init_nonblocking.rs"
+
 # M-REA-3: recognition-participation intent → weighted EconomicEvent seatbelt
 [[test]]
 name = "recognition_participation_via_route"
