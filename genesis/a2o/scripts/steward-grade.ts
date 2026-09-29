@@ -400,6 +400,15 @@ function line(id: string, from: string, to: string, action: string, note = ''): 
 async function main(): Promise<void> {
   const o = parseArgs(process.argv.slice(2));
   const ids = expandClosure(o.dataDir, [...o.closures, ...o.ids]);
+  // Under a budget, a fixed order spends every run on the same prefix (genesis #1595:
+  // 100 ids reached, 157 deferred, 0 widened — the prefix is current or unanchored).
+  // Shuffle so successive runs cover the whole course.
+  if (o.budgetSeconds > 0) {
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+  }
 
   // Connected lazily (once, shared by every worker): an all-current run never connects.
   let stewardsP: Promise<{ conductor: Conductor; stewards: StewardSet }> | undefined;
