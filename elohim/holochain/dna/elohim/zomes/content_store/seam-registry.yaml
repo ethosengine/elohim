@@ -24,6 +24,46 @@ seamLocus: >
   (authorize_canonical_head_declarer).
 
 decisionPoints:
+  - name: verify_accepted_publication
+    kind: verdict-fn
+    sourceLocation:
+      file: src/head_delegation.rs
+      modulePath: content_store::head_delegation::verify_accepted_publication
+      line: 413
+    summary: >
+      Verifies historical recovery of one exact root-author accepted version by
+      resolving its immutable root and native lineage, then verifying both grant
+      and acceptance signatures, scope, DNA, delegate and native acceptance action.
+      The required root-author witness is an A2 IdToContent link on the immutable
+      root. Native signed action time fixes accepted_at; a contiguous signed author
+      chain to that root proves acceptance preceded any grant revocation. Lost
+      responses recover that same witness without authoring another action.
+      Current expiry or later grant revocation does not erase that acceptance.
+      New unaccepted work retains live-grant admission. Election rank remains the
+      signed acceptance time and exact head; late carriage cannot outrank a newer
+      root-author replacement. Reuses existing Content and canonical-link evidence;
+      no integrity entity or identity is added.
+    concernIds:
+      - { id: C0, status: answered, justification: "Native verification of existing signed Content/grant/declaration evidence; filesystem receipts are transport, not authority." }
+      - { id: C1, status: answered, justification: "A delegate cannot accept its own version; independent root-author signature and exact native root are required." }
+      - { id: C2, status: answered, justification: "Late recovery retains accepted_at/head ordering; the native replay regression keeps a newer root-author head dominant." }
+      - { id: C3, status: partial, justification: "Accepted exact versions remain recoverable after expiry, but unavailable native prerequisites explicitly block until observed." }
+      - { id: C4, status: answered, justification: "Unavailable root, mismatched lineage, truncated history and invalid signatures are errors, never an accepted receipt fallback." }
+      - { id: C5, status: answered, justification: "The receiver derives root and exact-head lineage through native reads; portable acceptance does not substitute for ancestry." }
+      - { id: C6a, status: partial, justification: "Existing lineage bound rejects truncation. Author history is capped at 4096 records and missing records remain pending. Root-scoped exact grant/head lookup caps 16 matching author witnesses, but host link collection is not paginated. One acceptance link per published grant/version, roughly 940 links/year for 94 items updated ten times; no new content heads." }
+      - { id: C6b, status: partial, justification: "Verification writes nothing and repeated accepted proof cannot improve rank; declaration recovery can append another proof link." }
+      - { id: C7, status: n-a, justification: "This verifier does not advertise content or endpoints." }
+      - { id: C8, status: partial, justification: "Existing zome refusal text identifies failed checks; no new typed decision metric is introduced." }
+      - { id: C9, status: answered, justification: "Grant remains bound to the same root, DNA and signing device; current binding is independently rechecked by the publisher." }
+      - { id: C10, status: answered, justification: "Optional accepted_head defaults absent, preserving live-grant preflight for existing callers; exact accepted head is mandatory in recovery." }
+      - { id: C11, status: n-a, justification: "No new retry or queue admission mechanism; callers retain their existing bounded deadline." }
+      - { id: C12, status: answered, justification: "Both signatures verify against the independently resolved root author; acceptance time equals its native witness and must precede expiry; the complete bounded signed author chain rules out earlier revocation even without Link metadata." }
+      - { id: C13, status: n-a, justification: "No additional standing, controller privilege or governance affirmation is granted." }
+      - { id: C14, status: partial, justification: "Failure propagates as a zome error and CLI receipt stays pending; no new distributed residual witness envelope." }
+    contractTests:
+      - { path: elohim/holochain/tests/sweettest/src/tests/lamad.rs, testName: delegated_device_moves_the_head, kind: sweettest }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/head_delegation.rs, testName: historical_receipt_is_bound_to_exact_head_and_prior_expiry, kind: unit }
+
   - name: observe_with
     kind: verdict-fn
     sourceLocation:

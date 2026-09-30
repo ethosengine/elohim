@@ -1213,10 +1213,120 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             AcceptDelegatedHeadMirror {
                 id: id.clone(),
                 head_action_hash: next.action_hash.clone(),
+                delegation: short.clone(),
+            },
+        )
+        .await;
+    // The caller loses the acceptance response: retain only the original grant.
+    let native_receipt = accepted.acceptance.clone().unwrap();
+    let before_recovery = c1
+        .dump_full_cell_state(cell1.cell_id(), None, Some(1))
+        .await?;
+    let remaining = expires
+        .as_micros()
+        .saturating_sub(Timestamp::now().as_micros());
+    if remaining > 0 {
+        sleep(Duration::from_micros(remaining as u64 + 100_000)).await;
+    }
+    let recovered: Option<HeadDelegationMirror> = c1
+        .call(
+            &zome1,
+            "get_accepted_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: next.action_hash.clone(),
+                delegation: short.clone(),
+            },
+        )
+        .await;
+    let accepted =
+        recovered.expect("lost response recovers the existing native witness after expiry");
+    let recovered_receipt = accepted.acceptance.as_ref().unwrap();
+    assert_eq!(
+        recovered_receipt.witness_action_hash,
+        native_receipt.witness_action_hash
+    );
+    assert_eq!(recovered_receipt.accepted_at, native_receipt.accepted_at);
+    assert_eq!(recovered_receipt.signature, native_receipt.signature);
+    let repeated: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: next.action_hash.clone(),
+                delegation: short.clone(),
+            },
+        )
+        .await;
+    assert_eq!(
+        repeated.acceptance.unwrap().witness_action_hash,
+        native_receipt.witness_action_hash
+    );
+    let after_recovery = c1
+        .dump_full_cell_state(cell1.cell_id(), None, Some(1))
+        .await?;
+    assert_eq!(
+        before_recovery.source_chain_dump.records, after_recovery.source_chain_dump.records,
+        "recovery signs the original witness without any new source-chain action"
+    );
+    // Interruption after root-author acceptance but BEFORE declaration.
+    // Recovery can carry only the same accepted version after expiry.
+    #[derive(Serialize, Debug)]
+    struct PreflightRecovery {
+        id: String,
+        expected_root: Option<ActionHash>,
+        delegation: Option<HeadDelegationMirror>,
+        accepted_head: Option<ActionHash>,
+    }
+    #[derive(Deserialize, Debug)]
+    struct PreflightAnswer {
+        root_action_hash: Option<ActionHash>,
+    }
+    let recovery: PreflightAnswer = c2
+        .call(
+            &zome2,
+            "preflight_head_publication",
+            PreflightRecovery {
+                id: id.clone(),
+                expected_root: Some(created.action_hash.clone()),
+                delegation: Some(accepted.clone()),
+                accepted_head: Some(next.action_hash.clone()),
+            },
+        )
+        .await;
+    assert_eq!(recovery.root_action_hash, Some(created.action_hash.clone()));
+    let new_work: std::result::Result<PreflightAnswer, _> = c2
+        .call_fallible(
+            &zome2,
+            "preflight_head_publication",
+            PreflightRecovery {
+                id: id.clone(),
+                expected_root: Some(created.action_hash.clone()),
+                delegation: Some(accepted.clone()),
+                accepted_head: None,
+            },
+        )
+        .await;
+    assert!(
+        format!("{:?}", new_work.expect_err("new work needs a live grant")).contains("expired")
+    );
+    let fresh_acceptance: std::result::Result<HeadDelegationMirror, _> = c1
+        .call_fallible(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: created.action_hash.clone(),
                 delegation: short,
             },
         )
         .await;
+    assert!(format!(
+        "{:?}",
+        fresh_acceptance.expect_err("expiry refuses new acceptance")
+    )
+    .contains("expired"));
     let _: ContentHeadOutput = c2
         .call(
             &zome2,
@@ -1232,12 +1342,6 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         .call(&zome2, "get_canonical_election_evidence", id.clone())
         .await;
     let evidence = evidence.expect("accepted declaration exists");
-    let remaining = expires
-        .as_micros()
-        .saturating_sub(Timestamp::now().as_micros());
-    if remaining > 0 {
-        sleep(Duration::from_micros(remaining as u64 + 100_000)).await;
-    }
     for (conductor, zome) in [(&c1, &zome1), (&c2, &zome2)] {
         let historical: Option<CanonicalElectionOutput> = conductor
             .call(
@@ -1256,22 +1360,6 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             ActionHashB64::from(next.action_hash.clone()).to_string()
         );
     }
-    let late: std::result::Result<ContentHeadOutput, _> = c2
-        .call_fallible(
-            &zome2,
-            "declare_earned_canonical_head",
-            DeclareEarnedWithDelegationInput {
-                id: id.clone(),
-                head_action_hash: ActionHashB64::from(next.action_hash).to_string(),
-                delegation: Some(accepted.clone()),
-            },
-        )
-        .await;
-    assert!(format!(
-        "{:?}",
-        late.expect_err("expired grant blocks even re-declaration")
-    )
-    .contains("expired"));
     // A malicious coordinator can bypass declare-time checks and append a
     // fresh signed link carrying the old, genuinely accepted, now expired
     // receipt. It still cannot refresh that version's election position.
@@ -1314,7 +1402,7 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             "verify_carried_election",
             VerifyCarriedElectionInput {
                 id: id.clone(),
-                link_record: replay,
+                link_record: replay.clone(),
             },
         )
         .await;
@@ -1339,7 +1427,9 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         unauthorized.is_err(),
         "delegate cannot invalidate grantor authority"
     );
-    let _: ActionHash = c1.call(&zome1, "revoke_head_delegation", accepted).await;
+    let _: ActionHash = c1
+        .call(&zome1, "revoke_head_delegation", accepted.clone())
+        .await;
     let invalidated: std::result::Result<Option<CanonicalElectionOutput>, _> = c1
         .call_fallible(
             &zome1,
@@ -1359,6 +1449,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     let _: ActionHash = c1
         .call(&zome1, "revoke_head_delegation", delegation.clone())
         .await;
+    let mut unaccepted = delegation.clone();
+    unaccepted.acceptance = None;
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         let revoked: std::result::Result<ContentHeadOutput, _> = c2
@@ -1368,7 +1460,7 @@ async fn delegated_device_moves_the_head() -> Result<()> {
                 DeclareEarnedWithDelegationInput {
                     id: id.clone(),
                     head_action_hash: ActionHashB64::from(created.action_hash.clone()).to_string(),
-                    delegation: Some(delegation.clone()),
+                    delegation: Some(unaccepted.clone()),
                 },
             )
             .await;
@@ -1381,6 +1473,182 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             "receiver did not observe root-author revocation: {error}"
         );
         sleep(Duration::from_millis(100)).await;
+    }
+
+    let recovered: PreflightAnswer = c2
+        .call(
+            &zome2,
+            "preflight_head_publication",
+            PreflightRecovery {
+                id: id.clone(),
+                expected_root: Some(created.action_hash.clone()),
+                delegation: Some(accepted),
+                accepted_head: Some(next.action_hash.clone()),
+            },
+        )
+        .await;
+    assert_eq!(
+        recovered.root_action_hash,
+        Some(created.action_hash.clone()),
+        "revocation cannot erase prior accepted publication"
+    );
+
+    // Model a signed witness arriving before the author's preceding record.
+    // No carried ancestry or absent revocation index can fill that local gap.
+    let root_bytes = await_record(&c1, &zome1, &created.action_hash, "root").await;
+    let root_record: Record = holochain_serialized_bytes::decode(&root_bytes)?;
+    let template_bytes = await_record(
+        &c1,
+        &zome1,
+        &native_receipt.witness_action_hash,
+        "native witness",
+    )
+    .await;
+    let template: Record = holochain_serialized_bytes::decode(&template_bytes)?;
+    let mut gap_action = template.action().clone();
+    gap_action.header.action_seq = root_record.action().action_seq() + 1;
+    gap_action.header.prev_action = Some(created.action_hash.clone());
+    gap_action.header.timestamp = Timestamp::now();
+    if let ActionData::CreateLink(link) = &mut gap_action.data {
+        link.target_address = a2.clone().into();
+        link.tag = LinkTag::new(
+            [
+                b"head-delegation-revoked:v1:".as_slice(),
+                delegation.signature.as_ref(),
+            ]
+            .concat(),
+        );
+    }
+    let gap_signature = a1.sign(&c1.keystore(), &gap_action).await?;
+    let gap_hash = ActionHash::with_data_sync(&gap_action);
+    let mut witness_action = template.action().clone();
+    witness_action.header.action_seq = gap_action.action_seq() + 1;
+    witness_action.header.prev_action = Some(gap_hash);
+    witness_action.header.timestamp =
+        Timestamp::from_micros(gap_action.timestamp().as_micros() + 1);
+    if let ActionData::CreateLink(link) = &mut witness_action.data {
+        link.target_address = later.action_hash.clone().into();
+        link.tag = LinkTag::new(
+            [
+                b"head-acceptance:v2:".as_slice(),
+                delegation.signature.as_ref(),
+                later.action_hash.get_raw_39(),
+            ]
+            .concat(),
+        );
+    }
+    let witness_signature = a1.sign(&c1.keystore(), &witness_action).await?;
+    let witness_hash = ActionHash::with_data_sync(&witness_action);
+    let mut dishonest = delegation.clone();
+    let mut receipt = HeadAcceptanceMirror {
+        head_action_hash: later.action_hash.clone(),
+        witness_action_hash: witness_hash,
+        accepted_at: witness_action.timestamp(),
+        signature: hdk::prelude::Signature([0; 64]),
+    };
+    #[derive(Debug, Serialize)]
+    struct Statement<'a> {
+        domain: &'static str,
+        grant: &'a HeadDelegationPayloadMirror,
+        grant_signature: &'a hdk::prelude::Signature,
+        head_action_hash: &'a ActionHash,
+        witness_action_hash: &'a ActionHash,
+        accepted_at: Timestamp,
+    }
+    receipt.signature = a1
+        .sign(
+            &c1.keystore(),
+            &Statement {
+                domain: "elohim:accepted-content-head:v2",
+                grant: &dishonest.payload,
+                grant_signature: &dishonest.signature,
+                head_action_hash: &receipt.head_action_hash,
+                witness_action_hash: &receipt.witness_action_hash,
+                accepted_at: receipt.accepted_at,
+            },
+        )
+        .await?;
+    dishonest.acceptance = Some(receipt.clone());
+    // Keep the carried declaration target equal to the accepted version;
+    // otherwise a mismatched-head refusal would mask the missing local proof.
+    let replay_record: Record = holochain_serialized_bytes::decode(&replay)?;
+    let mut carried_action = replay_record.action().clone();
+    if let ActionData::CreateLink(link) = &mut carried_action.data {
+        link.target_address = later.action_hash.clone().into();
+    }
+    let carried_template = holochain_serialized_bytes::encode(&Record::new(
+        SignedActionHashed::with_presigned(
+            carried_action.into_hashed(),
+            hdk::prelude::Signature([0; 64]),
+        ),
+        RecordEntry::NA,
+    ))?;
+    let carried = forge_earned_link(
+        &c2,
+        &c2,
+        &dna_hash,
+        &a2,
+        &mut cursor,
+        &carried_template,
+        earned_tag_with_delegation(&dishonest),
+    )
+    .await;
+    for phase in 0..3 {
+        if phase == 1 {
+            inject_acceptance_record(
+                &c2,
+                &dna_hash,
+                SignedAction::new(witness_action.clone(), witness_signature.clone()),
+            )
+            .await;
+        }
+        if phase == 2 {
+            // Record only: the revocation Link index stays absent. The actual
+            // signed chain nevertheless proves revocation preceded acceptance.
+            inject_acceptance_record(
+                &c2,
+                &dna_hash,
+                SignedAction::new(gap_action.clone(), gap_signature.clone()),
+            )
+            .await;
+        }
+        let admission: std::result::Result<PreflightAnswer, _> = c2
+            .call_fallible(
+                &zome2,
+                "preflight_head_publication",
+                PreflightRecovery {
+                    id: id.clone(),
+                    expected_root: Some(created.action_hash.clone()),
+                    delegation: Some(dishonest.clone()),
+                    accepted_head: Some(later.action_hash.clone()),
+                },
+            )
+            .await;
+        let reason = format!(
+            "{:?}",
+            admission.expect_err("incomplete or revoked witness is refused")
+        );
+        let expected = [
+            "acceptance witness not retrievable",
+            "acceptance author history not retrievable",
+            "acceptance did not precede",
+        ][phase];
+        assert!(
+            reason.contains(expected),
+            "phase {phase}: expected {expected}, got {reason}"
+        );
+        let result: std::result::Result<Option<CanonicalElectionOutput>, _> = c2
+            .call_fallible(
+                &zome2,
+                "verify_carried_election",
+                VerifyCarriedElectionInput {
+                    id: id.clone(),
+                    link_record: carried.clone(),
+                },
+            )
+            .await;
+        assert!(result.is_err(),
+            "phase {phase}: missing witness, missing author history, and pre-acceptance revocation each refuse earned admission");
     }
 
     Ok(())
@@ -3442,11 +3710,57 @@ async fn forge_earned_link(
         .record_app_validation_outcomes(vec![(op_hash, AppOutcome::Accepted)])
         .await
         .expect("forged link op passes app validation");
-    store
-        .integrate_ready_ops(Timestamp::now())
-        .await
-        .expect("forged link op integrates into the local link index");
+    // The live integration worker shares this isolated fixture database.
+    // Retry only transient writer collisions, never validation failures.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        match store.integrate_ready_ops(Timestamp::now()).await {
+            Ok(_) => break,
+            Err(error)
+                if error.to_string().contains("database is locked")
+                    && Instant::now() < deadline =>
+            {
+                sleep(Duration::from_millis(100)).await;
+            }
+            Err(error) => panic!("adversarial fixture integration failed: {error}"),
+        }
+    }
     holochain_serialized_bytes::encode(&record).expect("forged link record encodes")
+}
+
+// Test-only admitted native record, deliberately without a Link index. This
+// isolates coordinator proof admission from the fixture's validation setup.
+async fn inject_acceptance_record(conductor: &SweetConductor, dna: &DnaHash, action: SignedAction) {
+    let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateRecord(
+        action,
+        holochain::prelude::OpEntry::ActionOnly,
+    )));
+    let hash = op.as_hash().clone();
+    let store = conductor.get_dht_store(dna).unwrap();
+    store.record_incoming_ops(vec![(op, false)]).await.unwrap();
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(hash.clone(), SysOutcome::Accepted)])
+        .await
+        .unwrap();
+    store
+        .record_app_validation_outcomes(vec![(hash, AppOutcome::Accepted)])
+        .await
+        .unwrap();
+    // The live integration worker shares this isolated fixture database.
+    // Retry only transient writer collisions, never validation failures.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        match store.integrate_ready_ops(Timestamp::now()).await {
+            Ok(_) => break,
+            Err(error)
+                if error.to_string().contains("database is locked")
+                    && Instant::now() < deadline =>
+            {
+                sleep(Duration::from_millis(100)).await;
+            }
+            Err(error) => panic!("adversarial fixture integration failed: {error}"),
+        }
+    }
 }
 
 /// The next valid source-chain position after the attacker's final honest
@@ -4183,6 +4497,7 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct HeadAcceptanceMirror {
     head_action_hash: ActionHash,
+    witness_action_hash: ActionHash,
     accepted_at: Timestamp,
     signature: hdk::prelude::Signature,
 }

@@ -941,6 +941,7 @@ pub struct HeadDelegationWire {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HeadAcceptanceWire {
     pub head_action_hash: holochain_types::prelude::ActionHash,
+    pub witness_action_hash: holochain_types::prelude::ActionHash,
     pub accepted_at: holochain_types::prelude::Timestamp,
     pub signature: holochain_types::prelude::Signature,
 }
@@ -949,6 +950,7 @@ pub struct HeadAcceptanceWire {
 #[serde(rename_all = "camelCase")]
 pub struct HeadAcceptanceJson {
     pub head_action_hash: String,
+    pub witness_action_hash: String,
     pub accepted_at: i64,
     pub signature: String,
 }
@@ -1029,8 +1031,17 @@ impl HeadDelegationJson {
                         "delegation.acceptance.signature: expected 64 bytes".into(),
                     )
                 })?;
+                let witness_action_hash = holochain_types::prelude::ActionHash::try_from(
+                    receipt.witness_action_hash.as_str(),
+                )
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!(
+                        "delegation.acceptance.witnessActionHash: {e:?}"
+                    ))
+                })?;
                 Ok(HeadAcceptanceWire {
                     head_action_hash,
+                    witness_action_hash,
                     accepted_at: holochain_types::prelude::Timestamp::from_micros(
                         receipt.accepted_at,
                     ),
@@ -2078,7 +2089,7 @@ mod tests {
             "validUntil": 100, "rootActionHash": action(3),
             "dnaHash": DnaHash::from_raw_32(vec![4; 32]).to_string(),
             "signature": signature,
-            "acceptance": {"headActionHash": action(6), "acceptedAt": 99, "signature": signature},
+            "acceptance": {"headActionHash": action(6), "witnessActionHash": action(7), "acceptedAt": 99, "signature": signature},
         });
         let wire = serde_json::from_value::<super::HeadDelegationJson>(json.clone())
             .unwrap()
@@ -2111,6 +2122,10 @@ mod tests {
         assert_eq!(
             receipt.head_action_hash,
             ActionHash::from_raw_32(vec![6; 32])
+        );
+        assert_eq!(
+            receipt.witness_action_hash,
+            ActionHash::from_raw_32(vec![7; 32])
         );
         assert_eq!(receipt.accepted_at.as_micros(), 99);
         assert_eq!(receipt.signature, Signature([5; 64]));

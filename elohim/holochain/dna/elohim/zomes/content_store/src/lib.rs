@@ -4172,6 +4172,10 @@ pub struct PreflightHeadPublicationInput {
     pub id: String,
     pub expected_root: Option<ActionHash>,
     pub delegation: Option<HeadDelegation>,
+    /// Historical recovery only: requires a root-author signed acceptance for
+    /// this exact version. Omission retains live-grant preflight for new work.
+    #[serde(default)]
+    pub accepted_head: Option<ActionHash>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -4195,7 +4199,14 @@ pub fn preflight_head_publication(
         )));
     }
     let root_author = root.as_ref().map(|r| r.action().author().clone());
-    if let Some(author) = root_author.as_ref() {
+    if let Some(head) = input.accepted_head.as_ref() {
+        let grant = input.delegation.as_ref().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "accepted-head recovery requires signed acceptance".into()
+            ))
+        })?;
+        verify_accepted_publication(grant, &agent, &input.id, head)?;
+    } else if let Some(author) = root_author.as_ref() {
         authorize_author_or_delegate(
             &agent,
             author,
@@ -6123,59 +6134,73 @@ pub fn declare_earned_canonical_head(
     // by its authors, and the error names both refusals.
     let me = agent_info()?.agent_initial_pubkey;
     let root_author = gather_content_chain(&input.id, GetStrategy::Network)?.map(|(a, _)| a);
-    let delegation_used = match root_author {
-        Some(ref root) => match authorize_author_or_delegate(
-            &me,
-            root,
-            &input.id,
-            input.delegation.as_ref(),
-            "declare_earned_canonical_head",
-        ) {
-            Ok(d) => Some(d),
-            Err(author_err) => {
-                // A supplied delegation is an asserted proof and must stand on
-                // its own. Do not let root-author or progenitor authority mask
-                // a malformed, mismatched, expired, or out-of-scope grant.
-                if input.delegation.is_some() {
-                    return Err(author_err);
-                }
-                if am_i_bootstrap_steward().unwrap_or(false) {
-                    Some(None)
-                } else {
-                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+    let recovered =
+        if let Some(grant) = input.delegation.as_ref().filter(|g| g.acceptance.is_some()) {
+            verify_accepted_publication(
+                grant,
+                &me,
+                &input.id,
+                &ActionHash::from(input.head_action_hash.clone()),
+            )?;
+            Some(Some(grant.clone()))
+        } else {
+            None
+        };
+    let delegation_used = if recovered.is_some() {
+        recovered
+    } else {
+        match root_author {
+            Some(ref root) => match authorize_author_or_delegate(
+                &me,
+                root,
+                &input.id,
+                input.delegation.as_ref(),
+                "declare_earned_canonical_head",
+            ) {
+                Ok(d) => Some(d),
+                Err(author_err) => {
+                    // A supplied delegation is an asserted proof and must stand on
+                    // its own. Do not let root-author or progenitor authority mask
+                    // a malformed, mismatched, expired, or out-of-scope grant.
+                    if input.delegation.is_some() {
+                        return Err(author_err);
+                    }
+                    if am_i_bootstrap_steward().unwrap_or(false) {
+                        Some(None)
+                    } else {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "declare_earned_canonical_head: earned canonical declaration for id '{}' is \
                          restricted to the root author, a device it delegated, or the bootstrap \
                          steward (progenitor): {author_err}",
                         input.id
                     ))));
+                    }
                 }
-            }
-        },
-        // No chain retrievable here (the adopt-before-author residual): only the
-        // progenitor may declare, exactly as before.
-        None => {
-            if !am_i_bootstrap_steward()? {
-                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            },
+            // No chain retrievable here (the adopt-before-author residual): only the
+            // progenitor may declare, exactly as before.
+            None => {
+                if !am_i_bootstrap_steward()? {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "declare_earned_canonical_head: earned canonical declaration is restricted to the \
                      bootstrap steward (progenitor) for id '{}'",
                     input.id
                 ))));
+                }
+                Some(None)
             }
-            Some(None)
         }
     };
     if let Some(Some(grant)) = delegation_used.as_ref() {
-        let target = ActionHash::from(input.head_action_hash.clone());
-        // New declarations require a currently live grant (checked above) AND
-        // a root-author receipt for this exact version. Historical reads only
-        // need the latter; an expired grant cannot publish another action.
+        // An unsigned/unaccepted grant never suffices for an earned declaration.
+        // Valid acceptance survives expiry only for its exact version.
         verify_accepted_head(
             grant,
             &me,
             &grant.payload.grantor,
             &input.id,
             &grant.payload.root_action_hash,
-            &target,
+            &ActionHash::from(input.head_action_hash.clone()),
             GetStrategy::Network,
         )?;
     }

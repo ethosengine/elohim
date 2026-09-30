@@ -23,6 +23,8 @@ pub struct HeadDelegation {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HeadAcceptance {
     pub head_action_hash: ActionHash,
+    /// Root-author CreateLink witnessing this exact grant/version acceptance.
+    pub witness_action_hash: ActionHash,
     pub accepted_at: Timestamp,
     pub signature: Signature,
 }
@@ -36,6 +38,7 @@ struct AcceptanceStatement<'a> {
     grant: &'a HeadDelegationPayload,
     grant_signature: &'a Signature,
     head_action_hash: &'a ActionHash,
+    witness_action_hash: &'a ActionHash,
     accepted_at: Timestamp,
 }
 
@@ -44,10 +47,11 @@ fn statement<'a>(
     receipt: &'a HeadAcceptance,
 ) -> AcceptanceStatement<'a> {
     AcceptanceStatement {
-        domain: "elohim:accepted-content-head:v1",
+        domain: "elohim:accepted-content-head:v2",
         grant: &grant.payload,
         grant_signature: &grant.signature,
         head_action_hash: &receipt.head_action_hash,
+        witness_action_hash: &receipt.witness_action_hash,
         accepted_at: receipt.accepted_at,
     }
 }
@@ -138,12 +142,13 @@ fn revocation_tag(grant: &HeadDelegation) -> Vec<u8> {
 fn is_revoked(
     grant: &HeadDelegation,
     strategy: GetStrategy,
-    accepted_at: Option<Timestamp>,
+    accepted_sequence: Option<u32>,
 ) -> ExternResult<bool> {
     let query = LinkQuery::try_new(
         grant.payload.root_action_hash.clone(),
         LinkTypes::IdToContent,
-    )?;
+    )?
+    .tag_prefix(LinkTag::new(revocation_tag(grant)));
     // Deleted revocations still count. Existing integrity permits link deletion;
     // deletion by any agent cannot erase the root author's signed invalidation.
     let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> =
@@ -151,7 +156,7 @@ fn is_revoked(
     let tag = revocation_tag(grant);
     Ok(details.into_iter().any(|(create, _)| {
         create.action().author() == &grant.payload.grantor
-            && accepted_at.is_none_or(|accepted| create.action().timestamp() <= accepted)
+            && accepted_sequence.is_none_or(|accepted| create.action().action_seq() <= accepted)
             && matches!(&create.action().data, ActionData::CreateLink(link)
                 if link.tag.0 == tag && link.target_address == AnyLinkableHash::from(grant.payload.delegate.clone()))
     }))
@@ -201,6 +206,98 @@ pub(crate) fn verify_head_delegation(
     Ok(())
 }
 
+const ACCEPTANCE_WITNESS_TAG: &[u8] = b"head-acceptance:v2:";
+const MAX_ACCEPTANCE_WITNESSES: usize = 16;
+
+fn acceptance_tag(grant: &HeadDelegation, head: &ActionHash) -> Vec<u8> {
+    [
+        ACCEPTANCE_WITNESS_TAG,
+        grant.signature.as_ref(),
+        head.get_raw_39(),
+    ]
+    .concat()
+}
+
+/// Link integrity is generic, so every consumer verifies the actual action,
+/// not a supplied timestamp, author string, or a portable carried record.
+fn verify_acceptance_witness(
+    grant: &HeadDelegation,
+    head: &ActionHash,
+    witness: &Record,
+) -> ExternResult<()> {
+    let action = witness.action();
+    if action.author() != &grant.payload.grantor
+        || !verify_signature(action.author().clone(), witness.signature().clone(), action)?
+    {
+        return Err(refused(
+            "acceptance witness is not signed by the root author",
+        ));
+    }
+    let expected_type: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
+    if !matches!(&action.data, ActionData::CreateLink(link)
+        if link.base_address == AnyLinkableHash::from(grant.payload.root_action_hash.clone())
+            && link.target_address == AnyLinkableHash::from(head.clone())
+            && link.zome_index == expected_type.zome_index
+            && link.link_type == expected_type.zome_type
+            && link.tag.0 == acceptance_tag(grant, head))
+    {
+        return Err(refused(
+            "acceptance witness context does not match exact grant and head",
+        ));
+    }
+    if action.timestamp() >= grant.payload.valid_until {
+        return Err(refused("acceptance witness occurred after expiry"));
+    }
+    Ok(())
+}
+
+fn witnessed_acceptance(
+    grant: &HeadDelegation,
+    head: &ActionHash,
+    strategy: GetStrategy,
+) -> ExternResult<Option<Record>> {
+    let tag = acceptance_tag(grant, head);
+    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> = get_links_details(
+        LinkQuery::try_new(
+            grant.payload.root_action_hash.clone(),
+            LinkTypes::IdToContent,
+        )?
+        .tag_prefix(LinkTag::new(tag.clone())),
+        strategy,
+    )?
+    .into();
+    // Host get_links_details does not apply an author filter. Filter actual
+    // signed authors before the candidate cap; never trust link-supplied metadata.
+    // Deleted links still witness prior acceptance: deletion is not revocation.
+    let mut candidates: Vec<_> = details
+        .into_iter()
+        .map(|(create, _)| create)
+        .filter(|create| create.action().author() == &grant.payload.grantor)
+        .filter(|create| {
+            matches!(&create.action().data, ActionData::CreateLink(link)
+            if link.tag.0 == tag && link.target_address == AnyLinkableHash::from(head.clone()))
+        })
+        .collect();
+    candidates.sort_by_key(|create| (create.action().action_seq(), create.as_hash().clone()));
+    candidates.dedup_by(|a, b| a.as_hash() == b.as_hash());
+    if candidates.len() > MAX_ACCEPTANCE_WITNESSES {
+        return Err(refused("acceptance witness candidate budget exceeded"));
+    }
+    if candidates
+        .windows(2)
+        .any(|pair| pair[0].action().action_seq() == pair[1].action().action_seq())
+    {
+        return Err(refused("acceptance witness source-chain conflict"));
+    }
+    let Some(first) = candidates.into_iter().next() else {
+        return Ok(None);
+    };
+    let record = get(first.as_hash().clone(), GetOptions::from(strategy))?
+        .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
+    verify_acceptance_witness(grant, head, &record)?;
+    Ok(Some(record))
+}
+
 fn check_receipt(grant: &HeadDelegation, head: &ActionHash) -> Result<(), &'static str> {
     let receipt = grant
         .acceptance
@@ -213,6 +310,55 @@ fn check_receipt(grant: &HeadDelegation, head: &ActionHash) -> Result<(), &'stat
         return Err("acceptance occurred after expiry");
     }
     Ok(())
+}
+
+// A local link index cannot prove that an earlier revocation is absent. Walk
+// the actual signed author chain to the immutable root instead. This is bounded
+// native prerequisite work: missing records or an older root remain pending.
+const MAX_ACCEPTANCE_AUTHOR_HISTORY: usize = 4096;
+fn verify_acceptance_author_history(
+    grant: &HeadDelegation,
+    witness: &Record,
+    strategy: GetStrategy,
+) -> ExternResult<()> {
+    let mut current = witness.clone();
+    let tag = revocation_tag(grant);
+    let expected_type: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
+    for _ in 0..MAX_ACCEPTANCE_AUTHOR_HISTORY {
+        let action = current.action();
+        if action.author() != &grant.payload.grantor
+            || !verify_signature(action.author().clone(), current.signature().clone(), action)?
+        {
+            return Err(refused("acceptance author history signature differs"));
+        }
+        if current.action_address() == &grant.payload.root_action_hash {
+            return Ok(());
+        }
+        if matches!(&action.data, ActionData::CreateLink(link)
+            if link.base_address == AnyLinkableHash::from(grant.payload.root_action_hash.clone())
+                && link.target_address == AnyLinkableHash::from(grant.payload.delegate.clone())
+                && link.zome_index == expected_type.zome_index
+                && link.link_type == expected_type.zome_type && link.tag.0 == tag)
+        {
+            return Err(refused("acceptance did not precede root-author revocation"));
+        }
+        let previous = action
+            .prev_action()
+            .cloned()
+            .ok_or_else(|| refused("acceptance author history does not reach immutable root"))?;
+        let prior = get(previous.clone(), GetOptions::from(strategy))?
+            .ok_or_else(|| refused("acceptance author history not retrievable — PENDING"))?;
+        if prior.action_address() != &previous
+            || prior.action().action_seq().checked_add(1) != Some(action.action_seq())
+            || prior.action().timestamp() >= action.timestamp()
+        {
+            return Err(refused("acceptance author history sequence differs"));
+        }
+        current = prior;
+    }
+    Err(refused(
+        "acceptance author history budget exceeded — PENDING",
+    ))
 }
 
 /// Historical verification deliberately has no current-time expiry check. Its
@@ -242,14 +388,57 @@ pub(crate) fn verify_accepted_head(
             "acceptance signature does not verify against root author",
         ));
     }
-    // Revocation ends future exercise; a prior root-author acceptance remains
-    // valid. The compared clocks are both root-author signed, never supplied
-    // solely by the delegate. Withdrawal/replacement is a separate root-author
-    // canonical declaration, ordered by the same election.
-    if is_revoked(grant, strategy, Some(receipt.accepted_at))? {
+    let witness = get(
+        receipt.witness_action_hash.clone(),
+        GetOptions::from(strategy),
+    )?
+    .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
+    verify_acceptance_witness(grant, head, &witness)?;
+    if receipt.accepted_at != witness.action().timestamp() {
+        return Err(refused("acceptance time differs from its native witness"));
+    }
+    verify_acceptance_author_history(grant, &witness, strategy)?;
+    // Both actions belong to the root author's source chain. Sequence order,
+    // not caller timestamps, decides whether revocation preceded acceptance.
+    if is_revoked(grant, strategy, Some(witness.action().action_seq()))? {
         return Err(refused("acceptance did not precede root-author revocation"));
     }
     Ok(())
+}
+
+/// Recover only a root-author accepted exact version. The signed acceptance
+/// fixes its election priority; publishing the proof later cannot refresh it.
+/// Resolve both root and target through conductor record lookup,
+/// rather than treating the portable receipt as an ancestry substitute.
+pub(crate) fn verify_accepted_publication(
+    grant: &HeadDelegation,
+    me: &AgentPubKey,
+    id: &str,
+    head: &ActionHash,
+) -> ExternResult<()> {
+    let root = canonical_identity_root(id, GetStrategy::Network)?
+        .ok_or_else(|| refused("immutable root is not available"))?;
+    let lineage = correction::get_content_lineage(correction::GetContentLineageInput {
+        action_hash: head.clone(),
+        local: false,
+    })?;
+    if lineage.truncated
+        || lineage.content_id != id
+        || &lineage.root_action_hash != root.action_address()
+    {
+        return Err(refused(
+            "accepted version does not resolve to the immutable root",
+        ));
+    }
+    verify_accepted_head(
+        grant,
+        me,
+        root.action().author(),
+        id,
+        root.action_address(),
+        head,
+        GetStrategy::Network,
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -259,11 +448,74 @@ pub struct AcceptDelegatedHeadInput {
     pub delegation: HeadDelegation,
 }
 
+fn acceptance_from_witness(
+    mut input: AcceptDelegatedHeadInput,
+    witness: Record,
+) -> ExternResult<HeadDelegation> {
+    let head = input.head_action_hash.clone();
+    let mut receipt = HeadAcceptance {
+        head_action_hash: input.head_action_hash,
+        witness_action_hash: witness.action_address().clone(),
+        accepted_at: witness.action().timestamp(),
+        signature: Signature([0; 64]),
+    };
+    receipt.signature = sign(
+        input.delegation.payload.grantor.clone(),
+        &statement(&input.delegation, &receipt),
+    )?;
+    input.delegation.acceptance = Some(receipt);
+    verify_accepted_publication(
+        &input.delegation,
+        &input.delegation.payload.delegate,
+        &input.id,
+        &head,
+    )?;
+    Ok(input.delegation)
+}
+
+/// Read/reconstruct an existing root-author witness only. Signing the identical
+/// statement changes neither its native action nor its accepted time/priority.
 #[hdk_extern]
-pub fn accept_delegated_head(mut input: AcceptDelegatedHeadInput) -> ExternResult<HeadDelegation> {
+pub fn get_accepted_delegated_head(
+    input: AcceptDelegatedHeadInput,
+) -> ExternResult<Option<HeadDelegation>> {
+    let author = agent_info()?.agent_initial_pubkey;
+    if author != input.delegation.payload.grantor {
+        return Err(refused("only root author may retrieve acceptance"));
+    }
+    let root = canonical_identity_root(&input.id, GetStrategy::Network)?
+        .ok_or_else(|| refused("immutable root is not available"))?;
+    verify_grant(
+        &input.delegation,
+        &input.delegation.payload.delegate,
+        root.action().author(),
+        &input.id,
+        root.action_address(),
+        GetStrategy::Network,
+    )?;
+    let witness = witnessed_acceptance(
+        &input.delegation,
+        &input.head_action_hash,
+        GetStrategy::Network,
+    )?;
+    witness
+        .map(|witness| acceptance_from_witness(input, witness))
+        .transpose()
+}
+
+#[hdk_extern]
+pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<HeadDelegation> {
     let author = agent_info()?.agent_initial_pubkey;
     if author != input.delegation.payload.grantor {
         return Err(refused("only root author may accept"));
+    }
+    let lookup = AcceptDelegatedHeadInput {
+        id: input.id.clone(),
+        head_action_hash: input.head_action_hash.clone(),
+        delegation: input.delegation.clone(),
+    };
+    if let Some(prior) = get_accepted_delegated_head(lookup)? {
+        return Ok(prior);
     }
     verify_head_delegation(
         &input.delegation,
@@ -275,7 +527,8 @@ pub fn accept_delegated_head(mut input: AcceptDelegatedHeadInput) -> ExternResul
         action_hash: input.head_action_hash.clone(),
         local: false,
     })?;
-    if lineage.content_id != input.id
+    if lineage.truncated
+        || lineage.content_id != input.id
         || lineage.root_action_hash != input.delegation.payload.root_action_hash
     {
         return Err(refused(
@@ -291,17 +544,16 @@ pub fn accept_delegated_head(mut input: AcceptDelegatedHeadInput) -> ExternResul
             "accepted version was not authored by grantor or delegate",
         ));
     }
-    let mut receipt = HeadAcceptance {
-        head_action_hash: input.head_action_hash,
-        accepted_at: sys_time()?,
-        signature: Signature([0; 64]),
-    };
-    if receipt.accepted_at >= input.delegation.payload.valid_until {
-        return Err(refused("expired during acceptance"));
-    }
-    receipt.signature = sign(author, &statement(&input.delegation, &receipt))?;
-    input.delegation.acceptance = Some(receipt);
-    Ok(input.delegation)
+    let witness = create_link(
+        input.delegation.payload.root_action_hash.clone(),
+        input.head_action_hash.clone(),
+        LinkTypes::IdToContent,
+        LinkTag::new(acceptance_tag(&input.delegation, &input.head_action_hash)),
+    )?;
+    let record = get(witness, GetOptions::local())?
+        .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
+    verify_acceptance_witness(&input.delegation, &input.head_action_hash, &record)?;
+    acceptance_from_witness(input, record)
 }
 
 /// Explicit revocation ends future exercise, independently of expiry. Prior
@@ -368,6 +620,7 @@ mod tests {
             },
             signature: Signature([5; 64]),
             acceptance: Some(HeadAcceptance {
+                witness_action_hash: ActionHash::from_raw_36(vec![8; 36]),
                 head_action_hash: ActionHash::from_raw_36(vec![6; 36]),
                 accepted_at: Timestamp::from_micros(99),
                 signature: Signature([7; 64]),

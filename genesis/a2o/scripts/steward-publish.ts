@@ -68,7 +68,12 @@ import {
   type Conductor,
   type ConductorOptions,
 } from './lib/steward-conductor.js';
-import { delegationWire, type HeadDelegationDocument } from './lib/steward-delegation.js';
+import {
+  delegationWire,
+  delegationDocument,
+  type HeadDelegationDocument,
+  type HeadDelegationWire,
+} from './lib/steward-delegation.js';
 import {
   expandClosure,
   loadRepoItem,
@@ -422,7 +427,7 @@ interface Prepared {
   row?: ExistingRow;
   plan: ItemPlan;
   pending?: PublicationReceipt;
-  delegation?: unknown;
+  delegation?: HeadDelegationWire;
   grantor?: ConductorOptions;
 }
 
@@ -518,6 +523,7 @@ async function publishOne(
     storage: o.storage,
     head,
     authoredAt: new Date().toISOString(),
+    delegation: p.delegation ? delegationDocument(p.delegation) : undefined,
   };
   savePublication(o.receiptDir, receipt);
   if (o.stageLocal) {
@@ -525,7 +531,7 @@ async function publishOne(
       'publication pending: authored locally; connected acceptance and declaration required'
     );
   }
-  if (p.delegation) {
+  if (p.delegation && !receipt.acceptedDelegation) {
     if (!p.grantor) throw new Error('root-author acceptance connection missing');
     const author = await connect(p.grantor);
     try {
@@ -533,7 +539,7 @@ async function publishOne(
         const remaining = deadline - Date.now();
         if (remaining <= 0) throw new Error('publication pending: acceptance deadline elapsed');
         try {
-          p.delegation = await author.call(
+          const accepted: HeadDelegationWire = await author.call<HeadDelegationWire>(
             'accept_delegated_head',
             {
               id,
@@ -542,6 +548,12 @@ async function publishOne(
             },
             remaining
           );
+          const document = delegationDocument(accepted);
+          if (document.acceptance?.headActionHash !== head)
+            throw new Error('root-author acceptance names another version');
+          receipt.acceptedDelegation = document;
+          savePublication(o.receiptDir, receipt);
+          p.delegation = accepted;
           break;
         } catch (error) {
           // Missing integrated history can arrive later. Authorization failures
@@ -574,8 +586,14 @@ async function publishOne(
       return head;
     } catch (e) {
       const raced = /source chain head has moved/i.test(String(e));
-      if (!raced || attempt >= 4) throw e;
-      await new Promise(r => setTimeout(r, 1500 * attempt));
+      const witnessPending =
+        /acceptance (?:witness|author history) not retrievable.*PENDING/is.test(String(e));
+      if ((!raced && !witnessPending) || (raced && attempt >= 4)) throw e;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw e;
+      await new Promise(r =>
+        setTimeout(r, Math.min(witnessPending ? 1000 : 1500 * attempt, remaining))
+      );
       // Retry only this authored version. A source-chain race is not permission
       // to declare a different version that a concurrent writer has projected.
     }
@@ -906,20 +924,21 @@ export async function runStewardPublish(
     for (const p of prepared) {
       if (!['create', 'update', 'declare'].includes(p.plan.action)) continue;
       let root: Uint8Array | null = null;
-      if (p.row?.dhtAnchorHash) {
+      const reference = p.pending?.head ?? p.row?.dhtAnchorHash;
+      if (reference) {
         const lineage = await c.call<{
           root_action_hash: Uint8Array;
           root_author: Uint8Array;
           content_id: string;
           truncated: boolean;
         }>('get_content_lineage', {
-          action_hash: decodeHashFromBase64(p.row.dhtAnchorHash),
+          action_hash: decodeHashFromBase64(reference),
           local: true,
         });
         if (lineage.content_id !== p.input.id || lineage.truncated)
           throw new Error(`publication preflight: incomplete or wrong lineage for ${p.input.id}`);
         root = lineage.root_action_hash;
-        const grant = grants[p.input.id];
+        const grant = p.pending?.acceptedDelegation ?? p.pending?.delegation ?? grants[p.input.id];
         const author = encodeHashToBase64(lineage.root_author);
         if (grant) {
           if (
@@ -931,12 +950,35 @@ export async function runStewardPublish(
           )
             throw new Error(`publication preflight: grant context mismatch for ${p.input.id}`);
           p.delegation = delegationWire(grant);
-          if (!grantors[author])
-            throw new Error(`root-author acceptance connection missing for ${p.input.id}`);
-          p.grantor = { ...grantors[author], expectedAgent: author, expectedDna: c.dna };
-          if (!o.stageLocal) {
-            const signer = await connect(p.grantor);
-            await signer.close();
+          if (!p.pending?.acceptedDelegation) {
+            if (!grantors[author])
+              throw new Error(`root-author acceptance connection missing for ${p.input.id}`);
+            p.grantor = { ...grantors[author], expectedAgent: author, expectedDna: c.dna };
+            if (!o.stageLocal) {
+              const signer = await connect(p.grantor);
+              try {
+                if (p.pending) {
+                  const prior = await signer.call<HeadDelegationWire | null>(
+                    'get_accepted_delegated_head',
+                    {
+                      id: p.input.id,
+                      head_action_hash: decodeHashFromBase64(p.pending.head),
+                      delegation: p.delegation,
+                    }
+                  );
+                  if (prior) {
+                    const document = delegationDocument(prior);
+                    if (document.acceptance?.headActionHash !== p.pending.head)
+                      throw new Error('root-author prior acceptance names another version');
+                    p.pending.acceptedDelegation = document;
+                    savePublication(o.receiptDir, p.pending);
+                    p.delegation = prior;
+                  }
+                }
+              } finally {
+                await signer.close();
+              }
+            }
           }
         }
       } else if (grants[p.input.id]) {
@@ -945,6 +987,7 @@ export async function runStewardPublish(
       await c.call('preflight_head_publication', {
         id: p.input.id,
         expected_root: root,
+        accepted_head: p.pending?.acceptedDelegation ? decodeHashFromBase64(p.pending.head) : null,
         delegation: p.delegation ?? null,
       });
     }

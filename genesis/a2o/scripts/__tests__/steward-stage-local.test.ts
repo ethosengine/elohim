@@ -10,10 +10,14 @@ import { buildContentInput } from '../../../seeder/src/content-input.js';
 import { runStewardPublish } from '../steward-publish.js';
 
 import type { Conductor, ConductorOptions } from '../lib/steward-conductor.js';
+import type { HeadDelegationWire } from '../lib/steward-delegation.js';
 import type { PublicationReceipt } from '../lib/steward-publication-receipt.js';
 
 const REMOTE = 'ws://remote';
 const LOCAL = 'https://local';
+const GRANTS_FILE = 'grants.json';
+const GRANTORS_FILE = 'grantors.json';
+const STAGE_LOCAL = '--stage-local';
 const bytes = (n: number): Uint8Array => new Uint8Array(39).fill(n);
 const hash = (n: number): string => encodeHashToBase64(bytes(n));
 function fixture() {
@@ -40,7 +44,11 @@ function fixture() {
   const dials: string[] = [];
   let refuse: string | undefined;
   let offline = true;
+  let expired = false;
+  let nativeAcceptance: HeadDelegationWire | undefined;
+  let loseAcceptanceResponse = false;
   let patches = 0;
+  let delayedAuthorHistory = false;
   const profile = {
     adminWs: REMOTE,
     appWs: REMOTE,
@@ -49,7 +57,7 @@ function fixture() {
     signingCredentialsDir: dir,
   };
   writeFileSync(
-    join(dir, 'grants.json'),
+    join(dir, GRANTS_FILE),
     JSON.stringify({
       lesson: {
         grantor: hash(4),
@@ -62,7 +70,7 @@ function fixture() {
       },
     })
   );
-  writeFileSync(join(dir, 'grantors.json'), JSON.stringify({ [hash(4)]: profile }));
+  writeFileSync(join(dir, GRANTORS_FILE), JSON.stringify({ [hash(4)]: profile }));
   const argv = [
     'lesson',
     '--data-dir',
@@ -82,9 +90,9 @@ function fixture() {
     '--receipt-dir',
     join(dir, 'receipts'),
     '--delegations',
-    join(dir, 'grants.json'),
+    join(dir, GRANTS_FILE),
     '--grantor-connections',
-    join(dir, 'grantors.json'),
+    join(dir, GRANTORS_FILE),
   ];
   const connect = async (options: ConductorOptions): Promise<Conductor> => {
     await Promise.resolve();
@@ -108,14 +116,32 @@ function fixture() {
             truncated: false,
           } as T;
         if (name === 'resolve_content_head_local') return null as T;
+        if (name === 'get_accepted_delegated_head') return (nativeAcceptance ?? null) as T;
         if (name === 'accept_delegated_head') {
           assert.deepEqual(
             (payload as { head_action_hash: Uint8Array }).head_action_hash,
             bytes(6)
           );
-          return (payload as { delegation: unknown }).delegation as T;
+          if (nativeAcceptance) return nativeAcceptance as T;
+          if (expired) throw new Error('expired for new acceptance');
+          nativeAcceptance = {
+            ...(payload as { delegation: HeadDelegationWire }).delegation,
+            acceptance: {
+              head_action_hash: bytes(6),
+              witness_action_hash: bytes(8),
+              accepted_at: Date.now() * 1000,
+              signature: new Uint8Array(64),
+            },
+          };
+          if (loseAcceptanceResponse)
+            throw new Error('acceptance response lost after native witness');
+          return nativeAcceptance as T;
         }
         if (name === 'declare_earned_canonical_head') {
+          if (delayedAuthorHistory) {
+            delayedAuthorHistory = false;
+            throw new Error('acceptance author history not retrievable — PENDING');
+          }
           assert.equal((payload as { head_action_hash: string }).head_action_hash, hash(6));
           return {
             head_action_hash: bytes(6),
@@ -123,6 +149,16 @@ function fixture() {
             canonical: true,
             canonical_earned: true,
           } as T;
+        }
+        if (name === 'preflight_head_publication') {
+          const input = payload as {
+            accepted_head: Uint8Array | null;
+            delegation: HeadDelegationWire;
+          };
+          if (input.accepted_head) {
+            assert.deepEqual(input.accepted_head, bytes(6));
+            assert.deepEqual(input.delegation.acceptance?.head_action_hash, bytes(6));
+          } else if (expired) throw new Error('expired for new publication');
         }
         assert.ok(['verify_device_binding', 'preflight_head_publication'].includes(name));
         return {} as T;
@@ -151,6 +187,9 @@ function fixture() {
   return {
     dir,
     argv,
+    delayAuthorHistory: () => {
+      delayedAuthorHistory = true;
+    },
     connect,
     fetcher,
     calls,
@@ -161,6 +200,18 @@ function fixture() {
     },
     online: () => {
       offline = false;
+    },
+    expire: () => {
+      expired = true;
+    },
+    loseAcceptanceResponse: () => {
+      loseAcceptanceResponse = true;
+    },
+    expireAndDisconnect: () => {
+      expired = true;
+      offline = true;
+      writeFileSync(join(dir, GRANTORS_FILE), '{}');
+      writeFileSync(join(dir, GRANTS_FILE), '{}');
     },
     receipt: () =>
       JSON.parse(
@@ -177,7 +228,7 @@ void test('offline stage saves pending exact head and connected resume declares 
     await runStewardPublish(
       [
         ...f.argv,
-        '--stage-local',
+        STAGE_LOCAL,
         '--native-receivers',
         join(f.dir, 'missing.json'),
         '--await-peer',
@@ -218,10 +269,115 @@ for (const proof of [
     t.mock.method(globalThis, 'fetch', f.fetcher);
     f.refuse(proof);
     await assert.rejects(
-      runStewardPublish([...f.argv, '--stage-local'], f.connect),
+      runStewardPublish([...f.argv, STAGE_LOCAL], f.connect),
       /invalid or unavailable proof/
     );
     assert.equal(f.patches(), 0);
     assert.ok(!f.dials.includes(REMOTE));
   });
 }
+
+void test('accepted exact head survives interrupted declaration then expiry without fresh acceptance', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  f.online();
+  f.refuse('declare_earned_canonical_head');
+  assert.equal(await runStewardPublish(f.argv, f.connect), 1);
+  const receipt = f.receipt();
+  assert.equal(receipt.acceptedDelegation?.acceptance?.headActionHash, receipt.head);
+  assert.equal(receipt.declaredAt, undefined);
+  assert.equal(f.patches(), 1);
+  f.expireAndDisconnect();
+  f.refuse(undefined);
+  const priorDials = f.dials.length;
+  const acceptances = f.calls.filter(x => x === 'accept_delegated_head').length;
+  assert.equal(await runStewardPublish(f.argv, f.connect), 0);
+  assert.equal(f.patches(), 1);
+  assert.equal(f.calls.filter(x => x === 'accept_delegated_head').length, acceptances);
+  assert.ok(!f.dials.slice(priorDials).includes(REMOTE));
+  assert.deepEqual(f.receipt().acceptedDelegation, receipt.acceptedDelegation);
+  assert.ok(f.receipt().declaredAt);
+});
+
+for (const refusal of ['verify_device_binding', 'preflight_head_publication']) {
+  void test(`saved acceptance still requires native ${refusal}`, async t => {
+    const f = fixture();
+    t.after(f.cleanup);
+    t.mock.method(globalThis, 'fetch', f.fetcher);
+    f.online();
+    f.refuse('declare_earned_canonical_head');
+    assert.equal(await runStewardPublish(f.argv, f.connect), 1);
+    f.expireAndDisconnect();
+    f.refuse(refusal);
+    const declarations = f.calls.filter(x => x === 'declare_earned_canonical_head').length;
+    await assert.rejects(runStewardPublish(f.argv, f.connect), /invalid or unavailable proof/);
+    assert.equal(f.patches(), 1);
+    assert.equal(f.calls.filter(x => x === 'declare_earned_canonical_head').length, declarations);
+    assert.equal(f.receipt().declaredAt, undefined);
+  });
+}
+
+void test('unaccepted pending head refuses expired grant without another PATCH', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  assert.equal(await runStewardPublish([...f.argv, STAGE_LOCAL], f.connect), 1);
+  assert.equal(f.receipt().acceptedDelegation, undefined);
+  f.expire();
+  f.online();
+  await assert.rejects(runStewardPublish(f.argv, f.connect), /expired for new publication/);
+  assert.equal(f.patches(), 1);
+  assert.equal(f.receipt().declaredAt, undefined);
+});
+
+void test('receipt acceptance cannot be replayed onto a different pending head', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  f.online();
+  f.refuse('declare_earned_canonical_head');
+  assert.equal(await runStewardPublish(f.argv, f.connect), 1);
+  const receipt = f.receipt();
+  receipt.head = hash(7);
+  const path = join(f.dir, 'receipts', readdirSync(join(f.dir, 'receipts'))[0]);
+  writeFileSync(path, JSON.stringify(receipt));
+  f.refuse(undefined);
+  await assert.rejects(runStewardPublish(f.argv, f.connect), /acceptance names another head/);
+  assert.equal(f.patches(), 1);
+});
+
+void test('lost native acceptance response recovers the same witness after expiry without a new approval', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  f.online();
+  f.loseAcceptanceResponse();
+  assert.equal(await runStewardPublish(f.argv, f.connect), 1);
+  assert.equal(f.receipt().acceptedDelegation, undefined);
+  assert.ok(f.receipt().delegation, 'original full grant persists before requesting acceptance');
+  const original = f.receipt().delegation;
+  writeFileSync(join(f.dir, GRANTS_FILE), '{}');
+  f.expire();
+  assert.equal(await runStewardPublish(f.argv, f.connect), 0);
+  assert.equal(f.patches(), 1);
+  assert.equal(f.calls.filter(x => x === 'accept_delegated_head').length, 1);
+  assert.equal(f.calls.filter(x => x === 'get_accepted_delegated_head').length, 1);
+  assert.deepEqual(f.receipt().delegation, original);
+  assert.equal(f.receipt().acceptedDelegation?.acceptance?.witnessActionHash, hash(8));
+  assert.ok(f.receipt().declaredAt);
+});
+
+void test('delayed native author history retries only the exact accepted version', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  f.online();
+  f.delayAuthorHistory();
+  assert.equal(await runStewardPublish(f.argv, f.connect), 0);
+  assert.equal(f.patches(), 1);
+  assert.equal(f.calls.filter(call => call === 'accept_delegated_head').length, 1);
+  assert.equal(f.calls.filter(call => call === 'declare_earned_canonical_head').length, 2);
+  assert.equal(f.receipt().acceptedDelegation?.acceptance?.witnessActionHash, hash(8));
+  assert.ok(f.receipt().declaredAt);
+});

@@ -1,5 +1,5 @@
 /** Portable signed grants. Decoding never substitutes for conductor verification. */
-import { decodeHashFromBase64 } from '@holochain/client';
+import { decodeHashFromBase64, encodeHashToBase64 } from '@holochain/client';
 
 export interface HeadDelegationDocument {
   grantor: string;
@@ -9,10 +9,56 @@ export interface HeadDelegationDocument {
   rootActionHash: string;
   dnaHash: string;
   signature: string;
-  acceptance?: { headActionHash: string; acceptedAt: number; signature: string };
+  acceptance?: {
+    headActionHash: string;
+    witnessActionHash: string;
+    acceptedAt: number;
+    signature: string;
+  };
 }
 
-export function delegationWire(grant: HeadDelegationDocument): unknown {
+export interface HeadDelegationWire {
+  payload: {
+    grantor: Uint8Array;
+    delegate: Uint8Array;
+    scope: string;
+    valid_until: number;
+    root_action_hash: Uint8Array;
+    dna_hash: Uint8Array;
+  };
+  signature: Uint8Array;
+  acceptance: {
+    head_action_hash: Uint8Array;
+    witness_action_hash: Uint8Array;
+    accepted_at: number;
+    signature: Uint8Array;
+  } | null;
+}
+
+/** Preserve the conductor's complete signed statement in a portable receipt. */
+export function delegationDocument(grant: HeadDelegationWire): HeadDelegationDocument {
+  const document: HeadDelegationDocument = {
+    grantor: encodeHashToBase64(grant.payload.grantor),
+    delegate: encodeHashToBase64(grant.payload.delegate),
+    scope: grant.payload.scope,
+    validUntil: grant.payload.valid_until,
+    rootActionHash: encodeHashToBase64(grant.payload.root_action_hash),
+    dnaHash: encodeHashToBase64(grant.payload.dna_hash),
+    signature: Buffer.from(grant.signature).toString('base64'),
+    acceptance: grant.acceptance
+      ? {
+          headActionHash: encodeHashToBase64(grant.acceptance.head_action_hash),
+          witnessActionHash: encodeHashToBase64(grant.acceptance.witness_action_hash),
+          acceptedAt: grant.acceptance.accepted_at,
+          signature: Buffer.from(grant.acceptance.signature).toString('base64'),
+        }
+      : undefined,
+  };
+  delegationWire(document);
+  return document;
+}
+
+export function delegationWire(grant: HeadDelegationDocument): HeadDelegationWire {
   const signature = (value: string): Uint8Array => {
     const bytes = Buffer.from(value, 'base64');
     if (bytes.length !== 64 || bytes.toString('base64') !== value)
@@ -34,6 +80,7 @@ export function delegationWire(grant: HeadDelegationDocument): unknown {
     acceptance: grant.acceptance
       ? {
           head_action_hash: decodeHashFromBase64(grant.acceptance.headActionHash),
+          witness_action_hash: decodeHashFromBase64(grant.acceptance.witnessActionHash),
           accepted_at: grant.acceptance.acceptedAt,
           signature: signature(grant.acceptance.signature),
         }

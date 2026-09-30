@@ -12,6 +12,8 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 
+import type { HeadDelegationDocument } from './steward-delegation.js';
+
 export interface PublicationReceipt {
   id: string;
   seedHash: string;
@@ -21,6 +23,10 @@ export interface PublicationReceipt {
   head: string;
   authoredAt: string;
   declaredAt?: string;
+  /** Portable evidence only; native verification is mandatory on recovery. */
+  acceptedDelegation?: HeadDelegationDocument;
+  /** Original exact grant, retained before requesting native acceptance. */
+  delegation?: HeadDelegationDocument;
 }
 
 function receiptPath(dir: string, id: string): string {
@@ -44,6 +50,13 @@ export function pendingPublication(
   }
   if (typeof saved.head !== 'string' || !saved.head || typeof saved.authoredAt !== 'string')
     throw new Error(`invalid pending publication receipt for ${context.id}`);
+  if (
+    saved.acceptedDelegation?.acceptance?.headActionHash !== undefined &&
+    saved.acceptedDelegation.acceptance.headActionHash !== saved.head
+  )
+    throw new Error(`pending publication ${context.id}: acceptance names another head`);
+  if (saved.acceptedDelegation && !saved.acceptedDelegation.acceptance)
+    throw new Error(`pending publication ${context.id}: signed acceptance missing`);
   return saved;
 }
 
