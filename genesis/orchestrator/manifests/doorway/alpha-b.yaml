@@ -141,17 +141,13 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
-  # EXPLICIT for the same reason as alpha.yaml's twin: the node-key PVC's safety rests
-  # on maxUnavailable:0 (the serving pod is never terminated before the surge pod is
-  # Ready), so a doorway that cannot mount or write its key file fails the rollout
-  # without interrupting the apex.
-  # Covers the ROLLOUT path only — not eviction, node loss, or a pod that turns Ready
-  # and fails later. Never `Recreate`.
+  # The CSI driver for this existing node-key volume cannot mount it in two
+  # pods concurrently, even on the same node (edge #1509: FailedMount while the
+  # old pod still held the volume). Release the old mount before starting its
+  # replacement. Doorway-B stops serving until its replacement is Ready; the existing
+  # PVC and node key are retained, and doorway-A continues serving independently.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    type: Recreate
   selector:
     matchLabels:
       app: elohim-doorway-b
