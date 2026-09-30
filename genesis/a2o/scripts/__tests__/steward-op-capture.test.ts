@@ -163,10 +163,14 @@ void test('bounded larger pages retain complete evidence and the original accept
       capturePageSize,
     });
     const captured = JSON.parse(readFileSync(path, 'utf8')) as {
+      content_id: string;
+      dna: number[];
       deadline_micros: number;
       state_pages: string[];
       timing_pages: string[];
     };
+    assert.equal(captured.content_id, proof.target.id);
+    assert.deepEqual(captured.dna, Array.from(dna));
     assert.equal(captured.deadline_micros, proof.deadlineMs * 1000);
     assert.equal(captured.state_pages.length, 2);
     assert.equal(captured.timing_pages.length, 1);

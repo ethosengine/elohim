@@ -167,6 +167,8 @@ export async function captureReceiverOps(
   await writeFile(
     path,
     dumpJson({
+      content_id: proof.target.id,
+      dna: decodeHashFromBase64(proof.dna),
       head: decodeHashFromBase64(proof.target.head),
       root: decodeHashFromBase64(proof.target.root),
       election_link: decodeHashFromBase64(proof.electionLink),
