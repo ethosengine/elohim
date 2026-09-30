@@ -51,6 +51,8 @@
 #                            join-alpha defaults to its durable deployed bundle;
 #                            isolated mode defaults to the local HAPP_PATH.
 #   STORAGE_HAPP_PATH         Explicit persistent hApp candidate for storage bootstrap.
+#   CONDUCTOR_ADMIN_PORT      join-alpha admin port (1..65535); resume defaults
+#                             to the recorded .hc_ports port, preserving pairing.
 #                            Unset preserves the existing storage bootstrap default.
 #   CONDUCTOR_ENROLL=1       join-alpha only: explicitly authorize creation of
 #                            this workspace's first persistent conductor identity.
@@ -104,6 +106,18 @@ hc_start_storage_happ_args() {
         fi
         STORAGE_HAPP_ARGS=(--happ-path "$selected")
     fi
+}
+
+# Return a validated port for hc's global --force-admin-ports option. Keeping
+# the recorded port across a resume preserves existing storage/admin clients.
+hc_start_join_admin_port() {
+    local selected="${1:-${2:-}}"
+    [ -n "$selected" ] || return 0
+    if [[ ! "$selected" =~ ^[0-9]{1,5}$ ]] || (( 10#$selected < 1 || 10#$selected > 65535 )); then
+        echo "REFUSED: CONDUCTOR_ADMIN_PORT or recorded admin port must be 1..65535" >&2
+        return 1
+    fi
+    printf '%s\n' "$((10#$selected))"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -188,6 +202,7 @@ fi
 
 # Stop remains usable even if a previously selected bundle was removed.
 hc_start_storage_happ_args "${STORAGE_HAPP_PATH:-}" || exit 1
+hc_start_join_admin_port "${CONDUCTOR_ADMIN_PORT:-}" "" >/dev/null || exit 1
 
 # Native binaries belong in the governed cargo pool. DNA/WASM builds below
 # deliberately remain in-tree because `hc dna pack` canonicalizes ./target.
@@ -649,6 +664,12 @@ echo "│ Step 1: Holochain Conductor                                   │"
 echo "└──────────────────────────────────────────────────────────────┘"
 
 ADMIN_PORT=$(get_admin_port)
+JOIN_ADMIN_PORT=""
+if [ "$NETWORK_PROFILE" = join-alpha ]; then
+    _recorded_admin_port=""
+    [ ! -f "$HC_PORTS_FILE" ] || _recorded_admin_port=$(sed -n 's/^admin_port=//p' "$HC_PORTS_FILE" | head -1)
+    JOIN_ADMIN_PORT="$(hc_start_join_admin_port "${CONDUCTOR_ADMIN_PORT:-}" "$_recorded_admin_port")" || exit 1
+fi
 CONDUCTOR_RUNNING=false
 
 # 2026-09-06: `hc sandbox call --running` needs a matching hc CLI/schema and can
@@ -670,6 +691,10 @@ elif [ -n "$ADMIN_PORT" ] && hc sandbox call --running "$ADMIN_PORT" list-apps >
 fi
 
 if [ "$CONDUCTOR_RUNNING" = true ] && [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+    if [ -n "${CONDUCTOR_ADMIN_PORT:-}" ] && [ "$JOIN_ADMIN_PORT" != "$ADMIN_PORT" ]; then
+        echo "REFUSED: running conductor admin port differs from CONDUCTOR_ADMIN_PORT; stop the owned conductor before changing its port." >&2
+        exit 1
+    fi
     echo "   ⚠️  NETWORK_PROFILE=join-alpha requested, but the network profile"
     echo "      only applies at sandbox generate time. This conductor keeps"
     echo "      whatever network config it was generated with."
@@ -752,7 +777,7 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
         case "$JOIN_SANDBOX_MODE" in
             generate)
                 echo "   🆕 Explicit enrollment authorized; creating $T3_SANDBOX_PATH"
-                JOIN_SANDBOX_COMMAND="exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT \"$JOIN_HAPP_PATH\" $NETWORK_TAIL"
+                JOIN_SANDBOX_COMMAND="exec hc sandbox ${JOIN_ADMIN_PORT:+--force-admin-ports=$JOIN_ADMIN_PORT} generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT \"$JOIN_HAPP_PATH\" $NETWORK_TAIL"
                 ;;
             resume\|*)
                 JOIN_SANDBOX_INDEX="${JOIN_SANDBOX_MODE#*|}"
@@ -760,7 +785,7 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
                 # The generate-time -r interface is already persistent in the
                 # conductor config. `run --ports` adds another interface; do
                 # not duplicate the recorded app port on every restart.
-                JOIN_SANDBOX_COMMAND="exec hc sandbox run $JOIN_SANDBOX_INDEX"
+                JOIN_SANDBOX_COMMAND="exec hc sandbox ${JOIN_ADMIN_PORT:+--force-admin-ports=$JOIN_ADMIN_PORT} run $JOIN_SANDBOX_INDEX"
                 ;;
             *)
                 echo "❌ REFUSED: unexpected join-alpha sandbox classification: $JOIN_SANDBOX_MODE" >&2

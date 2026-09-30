@@ -66,6 +66,44 @@ pool_line="$(grep -n '^source "$REPO_ROOT/genesis/agentic/bin/pool-lib.sh"' "$sc
 [[ "$validation_line" -lt "$pool_line" ]]
 echo "ok   storage candidate validated before launch (stop remains usable) and passed intact on both launch branches"
 
+awk '
+  /^hc_start_join_admin_port\(\)/ { capture=1 }
+  capture { print }
+  capture && /^}$/ { exit }
+' "$script" > "$tmp/admin-port.sh"
+source "$tmp/admin-port.sh"
+[[ "$(hc_start_join_admin_port 39097 37303)" == 39097 ]]
+[[ "$(hc_start_join_admin_port "" 39097)" == 39097 ]]
+[[ -z "$(hc_start_join_admin_port "" "")" ]]
+[[ "$(hc_start_join_admin_port 00001 "")" == 1 ]]
+[[ "$(hc_start_join_admin_port 65535 "")" == 65535 ]]
+for invalid in 0 65536 -1 1.5 abc '39097;exit' 999999999999999999999; do
+  if hc_start_join_admin_port "$invalid" "" >/dev/null 2>&1; then
+    echo "FAIL invalid admin port accepted: $invalid" >&2; exit 1
+  fi
+done
+if hc_start_join_admin_port "" corrupt >/dev/null 2>&1; then
+  echo "FAIL corrupt recorded admin port accepted" >&2; exit 1
+fi
+echo "ok   explicit and recorded admin ports preserve pairing; missing port keeps first-enrollment defaults and invalid ports refuse"
+
+# Execute the maintained resume command against a stub CLI to check global
+# flag placement and exact sandbox index, without launching or enrolling.
+mkdir "$tmp/bin"
+cat > "$tmp/bin/hc" <<'SH'
+#!/bin/sh
+printf '%s\n' "$@"
+SH
+chmod +x "$tmp/bin/hc"
+JOIN_ADMIN_PORT=39097 JOIN_SANDBOX_INDEX=1
+resume_assignment="$(grep 'JOIN_SANDBOX_COMMAND="exec hc sandbox .* run \$JOIN_SANDBOX_INDEX"' "$script")"
+eval "$resume_assignment"
+[[ "$(PATH="$tmp/bin:$PATH" bash -c "$JOIN_SANDBOX_COMMAND")" == $'sandbox\n--force-admin-ports=39097\nrun\n1' ]]
+JOIN_ADMIN_PORT=""
+eval "$resume_assignment"
+[[ "$(PATH="$tmp/bin:$PATH" bash -c "$JOIN_SANDBOX_COMMAND")" == $'sandbox\nrun\n1' ]]
+echo "ok   maintained resume passes hc global admin-port option and exact existing sandbox index"
+
 root="$tmp/local-dev"
 mkdir -p "$root"
 
@@ -116,7 +154,7 @@ echo "ok   duplicate registration refuses without overwrite"
 # mode continues using the original generate invocation.
 grep -Fq 'hc_start_join_alpha_sandbox "$LOCAL_DEV_DIR" "$T3_SANDBOX_NAME" "${CONDUCTOR_ENROLL:-0}"' "$script"
 grep -Fq 'exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT "$HAPP_PATH"' "$script"
-grep -Fq 'exec hc sandbox run $JOIN_SANDBOX_INDEX' "$script"
+grep -Fq 'exec hc sandbox ${JOIN_ADMIN_PORT:+--force-admin-ports=$JOIN_ADMIN_PORT} run $JOIN_SANDBOX_INDEX' "$script"
 echo "ok   join-alpha generation/resume and isolated generation launch branches are present"
 
 grep -Fq 'export HOLOCHAIN_APP_URL="ws://localhost:$CONDUCTOR_APP_PORT"' "$script"
