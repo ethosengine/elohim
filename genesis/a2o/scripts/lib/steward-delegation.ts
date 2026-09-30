@@ -8,6 +8,8 @@ export interface HeadDelegationDocument {
   validUntil: number;
   rootActionHash: string;
   dnaHash: string;
+  /** Native grant-issuance action; absent only on historical v2 receipts. */
+  issuanceActionHash?: string;
   signature: string;
   acceptance?: {
     headActionHash: string;
@@ -25,6 +27,7 @@ export interface HeadDelegationWire {
     valid_until: number;
     root_action_hash: Uint8Array;
     dna_hash: Uint8Array;
+    issuance_action_hash?: Uint8Array | null;
   };
   signature: Uint8Array;
   acceptance: {
@@ -44,6 +47,9 @@ export function delegationDocument(grant: HeadDelegationWire): HeadDelegationDoc
     validUntil: grant.payload.valid_until,
     rootActionHash: encodeHashToBase64(grant.payload.root_action_hash),
     dnaHash: encodeHashToBase64(grant.payload.dna_hash),
+    ...(grant.payload.issuance_action_hash
+      ? { issuanceActionHash: encodeHashToBase64(grant.payload.issuance_action_hash) }
+      : {}),
     signature: Buffer.from(grant.signature).toString('base64'),
     acceptance: grant.acceptance
       ? {
@@ -75,6 +81,9 @@ export function delegationWire(grant: HeadDelegationDocument): HeadDelegationWir
       valid_until: grant.validUntil,
       root_action_hash: decodeHashFromBase64(grant.rootActionHash),
       dna_hash: decodeHashFromBase64(grant.dnaHash),
+      ...(grant.issuanceActionHash
+        ? { issuance_action_hash: decodeHashFromBase64(grant.issuanceActionHash) }
+        : {}),
     },
     signature: signature(grant.signature),
     acceptance: grant.acceptance

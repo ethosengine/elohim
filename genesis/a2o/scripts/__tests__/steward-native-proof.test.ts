@@ -78,3 +78,12 @@ void test('refuses another DNA before any native read', async () => {
   );
   assert.equal(calls.length, 0);
 });
+void test('a v3 native grant proof carries both its issuance and acceptance actions', async () => {
+  const { c, calls, timing } = fixture();
+  const grantTarget = {
+    ...target,
+    issuanceActionHash: encodeHashToBase64(new Uint8Array(39).fill(8)),
+  };
+  await assert.rejects(awaitNativeReceiver(c, grantTarget, 2000, timing), /acceptance witness/);
+  assert.equal(calls.length, 0);
+});

@@ -399,7 +399,7 @@ function parseJsonArg(value: string | undefined): Record<string, unknown> {
 }
 
 /** Optional arm-2 authority: a device-ceremony.ts-shaped delegation file
- * ({ grantor, delegate, scope, validUntil, signature }, all base64) decoded
+ * (including its root, DNA and optional v3 issuance action) decoded
  * into the zome's HeadDelegation wire shape. Not exercised by the DoD's
  * required run (which uses the root-author arm); supported for completeness
  * and documented as such — see the atom's Implementation notes. */
@@ -412,6 +412,11 @@ function loadDelegation(path: string | undefined): any {
       delegate: decodeHashFromBase64(json.delegate),
       scope: json.scope,
       valid_until: json.validUntil,
+      root_action_hash: decodeHashFromBase64(json.rootActionHash),
+      dna_hash: decodeHashFromBase64(json.dnaHash),
+      ...(json.issuanceActionHash
+        ? { issuance_action_hash: decodeHashFromBase64(json.issuanceActionHash) }
+        : {}),
     },
     signature: new Uint8Array(Buffer.from(json.signature, 'base64')),
   };

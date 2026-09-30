@@ -927,6 +927,9 @@ pub struct HeadDelegationPayloadWire {
     pub valid_until: holochain_types::prelude::Timestamp,
     pub root_action_hash: holochain_types::prelude::ActionHash,
     pub dna_hash: holochain_types::prelude::DnaHash,
+    /// Additive v3 issuance anchor; omitted on historical v2 receipts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuance_action_hash: Option<holochain_types::prelude::ActionHash>,
 }
 
 /// Mirror of `content_store::HeadDelegation`.
@@ -971,6 +974,8 @@ pub struct HeadDelegationJson {
     pub root_action_hash: String,
     pub dna_hash: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuance_action_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acceptance: Option<HeadAcceptanceJson>,
     /// Standard base64 of the 64 signature bytes.
     pub signature: String,
@@ -1006,6 +1011,14 @@ impl HeadDelegationJson {
                 })?;
         let dna_hash = holochain_types::prelude::DnaHash::try_from(self.dna_hash.as_str())
             .map_err(|e| StorageError::InvalidInput(format!("delegation.dnaHash: {e:?}")))?;
+        let issuance_action_hash = self
+            .issuance_action_hash
+            .as_deref()
+            .map(holochain_types::prelude::ActionHash::try_from)
+            .transpose()
+            .map_err(|e| {
+                StorageError::InvalidInput(format!("delegation.issuanceActionHash: {e:?}"))
+            })?;
         let acceptance = self
             .acceptance
             .map(|receipt| -> Result<HeadAcceptanceWire, StorageError> {
@@ -1057,6 +1070,7 @@ impl HeadDelegationJson {
                 valid_until: holochain_types::prelude::Timestamp::from_micros(self.valid_until),
                 root_action_hash,
                 dna_hash,
+                issuance_action_hash,
             },
             signature: holochain_types::prelude::Signature(sig),
             acceptance,
@@ -2088,6 +2102,7 @@ mod tests {
             "grantor": agent(1), "delegate": agent(2), "scope": "fct-course",
             "validUntil": 100, "rootActionHash": action(3),
             "dnaHash": DnaHash::from_raw_32(vec![4; 32]).to_string(),
+            "issuanceActionHash": action(8),
             "signature": signature,
             "acceptance": {"headActionHash": action(6), "witnessActionHash": action(7), "acceptedAt": 99, "signature": signature},
         });
@@ -2100,6 +2115,10 @@ mod tests {
             ActionHash::from_raw_32(vec![3; 32])
         );
         assert_eq!(wire.payload.dna_hash, DnaHash::from_raw_32(vec![4; 32]));
+        assert_eq!(
+            wire.payload.issuance_action_hash,
+            Some(ActionHash::from_raw_32(vec![8; 32]))
+        );
         let bytes = rmp_serde::to_vec_named(&wire).unwrap();
         let decoded: super::HeadDelegationWire = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(
@@ -2117,6 +2136,10 @@ mod tests {
             wire.payload.root_action_hash
         );
         assert_eq!(decoded.payload.dna_hash, wire.payload.dna_hash);
+        assert_eq!(
+            decoded.payload.issuance_action_hash,
+            wire.payload.issuance_action_hash
+        );
         assert_eq!(decoded.signature, Signature([5; 64]));
         let receipt = decoded.acceptance.unwrap();
         assert_eq!(
@@ -2135,6 +2158,28 @@ mod tests {
             .unwrap()
             .into_wire()
             .is_err());
+    }
+
+    #[test]
+    fn legacy_v2_delegation_json_omits_the_optional_issuance_anchor() {
+        use base64::Engine as _;
+        use holochain_types::prelude::*;
+        let agent = |byte| AgentPubKey::from_raw_32(vec![byte; 32]).to_string();
+        let action = |byte| ActionHash::from_raw_32(vec![byte; 32]).to_string();
+        let json = serde_json::json!({
+            "grantor": agent(1), "delegate": agent(2), "scope": "fct-course",
+            "validUntil": 100, "rootActionHash": action(3),
+            "dnaHash": DnaHash::from_raw_32(vec![4; 32]).to_string(),
+            "signature": base64::engine::general_purpose::STANDARD.encode([5; 64]),
+        });
+        let wire = serde_json::from_value::<super::HeadDelegationJson>(json)
+            .unwrap()
+            .into_wire()
+            .unwrap();
+        assert_eq!(wire.payload.issuance_action_hash, None);
+        let encoded = rmp_serde::to_vec_named(&wire).unwrap();
+        let decoded: super::HeadDelegationWire = rmp_serde::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.payload.issuance_action_hash, None);
     }
 
     /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a

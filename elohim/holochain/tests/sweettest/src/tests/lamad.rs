@@ -915,6 +915,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         valid_until: Timestamp,
         root_action_hash: ActionHash,
         dna_hash: DnaHash,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        issuance_action_hash: Option<ActionHash>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {
@@ -1495,8 +1497,13 @@ async fn delegated_device_moves_the_head() -> Result<()> {
 
     // Model a signed witness arriving before the author's preceding record.
     // No carried ancestry or absent revocation index can fill that local gap.
-    let root_bytes = await_record(&c1, &zome1, &created.action_hash, "root").await;
-    let root_record: Record = holochain_serialized_bytes::decode(&root_bytes)?;
+    let issuance_hash = delegation
+        .payload
+        .issuance_action_hash
+        .clone()
+        .expect("new grants carry their native issuance action");
+    let issuance_bytes = await_record(&c1, &zome1, &issuance_hash, "grant issuance").await;
+    let issuance_record: Record = holochain_serialized_bytes::decode(&issuance_bytes)?;
     let template_bytes = await_record(
         &c1,
         &zome1,
@@ -1506,15 +1513,15 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     .await;
     let template: Record = holochain_serialized_bytes::decode(&template_bytes)?;
     let mut gap_action = template.action().clone();
-    gap_action.header.action_seq = root_record.action().action_seq() + 1;
-    gap_action.header.prev_action = Some(created.action_hash.clone());
+    gap_action.header.action_seq = issuance_record.action().action_seq() + 1;
+    gap_action.header.prev_action = Some(issuance_hash.clone());
     gap_action.header.timestamp = Timestamp::now();
     if let ActionData::CreateLink(link) = &mut gap_action.data {
         link.target_address = a2.clone().into();
         link.tag = LinkTag::new(
             [
-                b"head-delegation-revoked:v1:".as_slice(),
-                delegation.signature.as_ref(),
+                b"head-delegation-revoked:v2:".as_slice(),
+                issuance_hash.get_raw_39(),
             ]
             .concat(),
         );
@@ -1559,7 +1566,7 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         .sign(
             &c1.keystore(),
             &Statement {
-                domain: "elohim:accepted-content-head:v2",
+                domain: "elohim:accepted-content-head:v3",
                 grant: &dishonest.payload,
                 grant_signature: &dishonest.signature,
                 head_action_hash: &receipt.head_action_hash,
@@ -3815,6 +3822,8 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
         valid_until: Timestamp,
         root_action_hash: ActionHash,
         dna_hash: DnaHash,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        issuance_action_hash: Option<ActionHash>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {
@@ -4352,6 +4361,8 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
         valid_until: Timestamp,
         root_action_hash: ActionHash,
         dna_hash: DnaHash,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        issuance_action_hash: Option<ActionHash>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {

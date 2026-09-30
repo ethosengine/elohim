@@ -585,6 +585,7 @@ async function grantContent(config: Config, state: BindingState): Promise<void> 
             valid_until: number;
             root_action_hash: Uint8Array;
             dna_hash: Uint8Array;
+            issuance_action_hash?: Uint8Array;
           };
           signature: Uint8Array;
         }>('grant_head_delegation', {
@@ -600,6 +601,9 @@ async function grantContent(config: Config, state: BindingState): Promise<void> 
           validUntil: grant.payload.valid_until,
           rootActionHash: encoded(grant.payload.root_action_hash),
           dnaHash: encoded(grant.payload.dna_hash),
+          ...(grant.payload.issuance_action_hash
+            ? { issuanceActionHash: encoded(grant.payload.issuance_action_hash) }
+            : {}),
           signature: Buffer.from(grant.signature).toString('base64'),
         };
         const temporary = `${outputPath}.tmp`;

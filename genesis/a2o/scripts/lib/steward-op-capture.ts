@@ -165,6 +165,12 @@ export async function captureReceiverOps(
       head: decodeHashFromBase64(proof.target.head),
       root: decodeHashFromBase64(proof.target.root),
       election_link: decodeHashFromBase64(proof.electionLink),
+      issuance_action_hash: proof.target.issuanceActionHash
+        ? decodeHashFromBase64(proof.target.issuanceActionHash)
+        : undefined,
+      acceptance_witness_hash: proof.target.acceptanceWitnessHash
+        ? decodeHashFromBase64(proof.target.acceptanceWitnessHash)
+        : undefined,
       deadline_micros: proof.deadlineMs * 1000,
       state_pages: statePages,
       timing_pages: timingPages,

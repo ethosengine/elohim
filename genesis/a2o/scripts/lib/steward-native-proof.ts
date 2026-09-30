@@ -9,6 +9,9 @@ export interface NativePublicationTarget {
   head: string;
   root: string;
   dna: string;
+  /** Grant actions included in the receiver-local integration evidence request. */
+  issuanceActionHash?: string;
+  acceptanceWitnessHash?: string;
 }
 export interface NativeReceiverProof {
   agent: string;
@@ -67,6 +70,8 @@ export async function awaitNativeReceiver(
   };
   if (receiver.dna !== target.dna) throw new Error('Native receiver DNA mismatch');
   if (!Number.isFinite(deadlineMs)) throw new Error('Native receiver deadline must be finite');
+  if (target.issuanceActionHash && !target.acceptanceWitnessHash)
+    throw new Error('Native grant proof requires its exact acceptance witness');
   const headHash = decodeHashFromBase64(target.head);
   while (timing.now() < deadlineMs) {
     try {

@@ -21,6 +21,8 @@ const proof: NativeReceiverProof = {
     head: encodeHashToBase64(agent),
     root: encodeHashToBase64(dna),
     dna: encodeHashToBase64(dna),
+    issuanceActionHash: encodeHashToBase64(new Uint8Array(39).fill(8)),
+    acceptanceWitnessHash: encodeHashToBase64(new Uint8Array(39).fill(9)),
   },
   accepted: true,
   acceptedAt: 1200,
@@ -83,9 +85,13 @@ void test('captures fork pages for exact native cell without source-chain secret
     deadline_micros: number;
     head: number[];
     state_pages: string[];
+    issuance_action_hash: number[];
+    acceptance_witness_hash: number[];
   };
   assert.equal(request.deadline_micros, 1234000);
   assert.deepEqual(request.head, Array.from(agent));
+  assert.deepEqual(request.issuance_action_hash, Array.from(new Uint8Array(39).fill(8)));
+  assert.deepEqual(request.acceptance_witness_hash, Array.from(new Uint8Array(39).fill(9)));
   assert.equal(request.state_pages.length, 2);
   const state = readFileSync(request.state_pages[0], 'utf8');
   assert.ok(!state.includes('secret'));

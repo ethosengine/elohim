@@ -10,6 +10,10 @@ pub struct HeadDelegationPayload {
     pub valid_until: Timestamp,
     pub root_action_hash: ActionHash,
     pub dna_hash: DnaHash,
+    /// Unique root-author source-chain action that issued this grant. Omitted
+    /// only on legacy v2 receipts so their original signature bytes survive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuance_action_hash: Option<ActionHash>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
@@ -47,7 +51,11 @@ fn statement<'a>(
     receipt: &'a HeadAcceptance,
 ) -> AcceptanceStatement<'a> {
     AcceptanceStatement {
-        domain: "elohim:accepted-content-head:v2",
+        domain: if grant.payload.issuance_action_hash.is_some() {
+            "elohim:accepted-content-head:v3"
+        } else {
+            "elohim:accepted-content-head:v2"
+        },
         grant: &grant.payload,
         grant_signature: &grant.signature,
         head_action_hash: &receipt.head_action_hash,
@@ -87,6 +95,16 @@ pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<He
     if input.valid_until <= sys_time()? {
         return Err(refused("expired: valid_until must be in the future"));
     }
+    // The root-author-signed CreateLink is the unique issuance anchor. Its
+    // ActionHash is not known until after the source-chain write, so the grant
+    // signature is made over that hash in the following step. The root and
+    // delegate are in the action itself; the compact tag fixes the expiry.
+    let issuance_action_hash = create_link(
+        input.root_action_hash.clone(),
+        input.delegate.clone(),
+        LinkTypes::IdToContent,
+        LinkTag::new(issuance_tag(input.valid_until)),
+    )?;
     let payload = HeadDelegationPayload {
         grantor: grantor.clone(),
         delegate: input.delegate,
@@ -94,6 +112,7 @@ pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<He
         valid_until: input.valid_until,
         root_action_hash: input.root_action_hash,
         dna_hash: dna_info()?.hash,
+        issuance_action_hash: Some(issuance_action_hash),
     };
     let signature = sign(grantor, &payload)?;
     Ok(HeadDelegation {
@@ -134,9 +153,80 @@ fn check_subject(
     Ok(())
 }
 
-const REVOCATION_TAG: &[u8] = b"head-delegation-revoked:v1:";
+const ISSUANCE_TAG: &[u8] = b"head-delegation-issued:v1:";
+fn issuance_tag(valid_until: Timestamp) -> Vec<u8> {
+    [ISSUANCE_TAG, &valid_until.as_micros().to_be_bytes()].concat()
+}
+
+const REVOCATION_TAG_V1: &[u8] = b"head-delegation-revoked:v1:";
+const REVOCATION_TAG_V2: &[u8] = b"head-delegation-revoked:v2:";
 fn revocation_tag(grant: &HeadDelegation) -> Vec<u8> {
-    [REVOCATION_TAG, grant.signature.as_ref()].concat()
+    match &grant.payload.issuance_action_hash {
+        Some(issuance) => [REVOCATION_TAG_V2, issuance.get_raw_39()].concat(),
+        None => [REVOCATION_TAG_V1, grant.signature.as_ref()].concat(),
+    }
+}
+
+fn acceptance_history_anchor(grant: &HeadDelegation) -> &ActionHash {
+    grant
+        .payload
+        .issuance_action_hash
+        .as_ref()
+        .unwrap_or(&grant.payload.root_action_hash)
+}
+
+fn history_predecessor_matches(
+    prior_sequence: u32,
+    prior_timestamp: Timestamp,
+    current_sequence: u32,
+    current_timestamp: Timestamp,
+) -> bool {
+    prior_sequence.checked_add(1) == Some(current_sequence) && prior_timestamp < current_timestamp
+}
+
+fn issuance_action_matches(grant: &HeadDelegation, record: &Record) -> bool {
+    let Some(expected_hash) = &grant.payload.issuance_action_hash else {
+        return false;
+    };
+    if record.action_address() != expected_hash
+        || record.action().author() != &grant.payload.grantor
+        || !matches!(&record.action().data, ActionData::CreateLink(link)
+            if link.base_address == AnyLinkableHash::from(grant.payload.root_action_hash.clone())
+                && link.target_address == AnyLinkableHash::from(grant.payload.delegate.clone())
+                && link.tag.0 == issuance_tag(grant.payload.valid_until))
+    {
+        return false;
+    }
+    let Ok(expected_type): Result<ScopedLinkType, _> = LinkTypes::IdToContent.try_into() else {
+        return false;
+    };
+    matches!(&record.action().data, ActionData::CreateLink(link)
+        if link.zome_index == expected_type.zome_index
+            && link.link_type == expected_type.zome_type)
+}
+
+fn verify_issuance_record(
+    grant: &HeadDelegation,
+    root: &Record,
+    record: &Record,
+) -> ExternResult<()> {
+    if !issuance_action_matches(grant, record)
+        || !verify_signature(
+            grant.payload.grantor.clone(),
+            record.signature().clone(),
+            record.action(),
+        )?
+        || root.action_address() != &grant.payload.root_action_hash
+        || root.action().author() != &grant.payload.grantor
+        || root.action().action_seq() >= record.action().action_seq()
+        || root.action().timestamp() >= record.action().timestamp()
+        || record.action().timestamp() >= grant.payload.valid_until
+    {
+        return Err(refused(
+            "native issuance action does not follow the immutable root or match the signed grant",
+        ));
+    }
+    Ok(())
 }
 
 fn is_revoked(
@@ -191,6 +281,7 @@ pub(crate) fn verify_head_delegation(
     author: &AgentPubKey,
     id: &str,
 ) -> ExternResult<()> {
+    let budget = AcceptanceBudget::start()?;
     let root = canonical_identity_root(id, GetStrategy::Network)?
         .ok_or_else(|| refused("immutable root is not available"))?;
     verify_grant(
@@ -201,7 +292,16 @@ pub(crate) fn verify_head_delegation(
         root.action_address(),
         GetStrategy::Network,
     )?;
-    if is_revoked(grant, GetStrategy::Network, None, None)? {
+    let issuance_hash = grant
+        .payload
+        .issuance_action_hash
+        .as_ref()
+        .ok_or_else(|| refused("legacy grant cannot authorize a new publication"))?;
+    let issuance = budget
+        .record(issuance_hash.clone(), GetStrategy::Network)?
+        .ok_or_else(|| refused("grant issuance action not retrievable — PENDING"))?;
+    verify_issuance_record(grant, &root, &issuance)?;
+    if is_revoked(grant, GetStrategy::Network, None, Some(&budget))? {
         return Err(refused("revoked for new publication by root author"));
     }
     if grant.payload.valid_until <= sys_time()? {
@@ -375,9 +475,10 @@ fn check_receipt(grant: &HeadDelegation, head: &ActionHash) -> Result<(), &'stat
     Ok(())
 }
 
-// A local link index cannot prove that an earlier revocation is absent. Walk
-// the actual signed author chain to the immutable root instead. This is bounded
-// native prerequisite work: missing records or an older root remain pending.
+// A local link index cannot prove that an earlier revocation is absent. For v3,
+// walk from the actual acceptance witness to the unique signed issuance action;
+// legacy v2 receipts retain their original root-bounded path. Missing history is
+// PENDING, never inferred from timestamps or a link-index miss.
 const MAX_ACCEPTANCE_AUTHOR_HISTORY: usize = 4096;
 fn verify_acceptance_author_history(
     grant: &HeadDelegation,
@@ -387,6 +488,16 @@ fn verify_acceptance_author_history(
 ) -> ExternResult<()> {
     let mut current = witness.clone();
     let tag = revocation_tag(grant);
+    let stop_at = acceptance_history_anchor(grant);
+    let root_record = if grant.payload.issuance_action_hash.is_some() {
+        Some(
+            budget
+                .record(grant.payload.root_action_hash.clone(), strategy)?
+                .ok_or_else(|| refused("immutable root action not retrievable — PENDING"))?,
+        )
+    } else {
+        None
+    };
     let expected_type: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
     for _ in 0..MAX_ACCEPTANCE_AUTHOR_HISTORY {
         budget.options(strategy)?;
@@ -396,7 +507,18 @@ fn verify_acceptance_author_history(
         {
             return Err(refused("acceptance author history signature differs"));
         }
-        if current.action_address() == &grant.payload.root_action_hash {
+        if current.action_address() == stop_at {
+            if grant.payload.issuance_action_hash.is_some() {
+                verify_issuance_record(
+                    grant,
+                    root_record
+                        .as_ref()
+                        .expect("v3 issuance verification fetched the root record"),
+                    &current,
+                )?;
+            } else if current.action_address() != &grant.payload.root_action_hash {
+                return Err(refused("legacy acceptance history missed immutable root"));
+            }
             return Ok(());
         }
         if matches!(&action.data, ActionData::CreateLink(link)
@@ -410,13 +532,17 @@ fn verify_acceptance_author_history(
         let previous = action
             .prev_action()
             .cloned()
-            .ok_or_else(|| refused("acceptance author history does not reach immutable root"))?;
+            .ok_or_else(|| refused("acceptance author history does not reach grant anchor"))?;
         let prior = budget
             .record(previous.clone(), strategy)?
             .ok_or_else(|| refused("acceptance author history not retrievable — PENDING"))?;
         if prior.action_address() != &previous
-            || prior.action().action_seq().checked_add(1) != Some(action.action_seq())
-            || prior.action().timestamp() >= action.timestamp()
+            || !history_predecessor_matches(
+                prior.action().action_seq(),
+                prior.action().timestamp(),
+                action.action_seq(),
+                action.timestamp(),
+            )
         {
             return Err(refused("acceptance author history sequence differs"));
         }
@@ -465,12 +591,17 @@ pub(crate) fn verify_accepted_head(
     verify_acceptance_author_history(grant, &witness, strategy, &budget)?;
     // Both actions belong to the root author's source chain. Sequence order,
     // not caller timestamps, decides whether revocation preceded acceptance.
-    if is_revoked(
-        grant,
-        strategy,
-        Some(witness.action().action_seq()),
-        Some(&budget),
-    )? {
+    // The v3 chain walk above sees every root-author revocation between this
+    // issuance and witness, even when its link op is absent from the local index.
+    // Keep the indexed legacy check for v2 compatibility only.
+    if grant.payload.issuance_action_hash.is_none()
+        && is_revoked(
+            grant,
+            strategy,
+            Some(witness.action().action_seq()),
+            Some(&budget),
+        )?
+    {
         return Err(refused("acceptance did not precede root-author revocation"));
     }
     Ok(())
@@ -687,6 +818,7 @@ mod tests {
                 valid_until: Timestamp::from_micros(100),
                 root_action_hash: ActionHash::from_raw_36(vec![3; 36]),
                 dna_hash: DnaHash::from_raw_36(vec![4; 36]),
+                issuance_action_hash: None,
             },
             signature: Signature([5; 64]),
             acceptance: Some(HeadAcceptance {
@@ -790,6 +922,103 @@ mod tests {
         other = g.clone();
         other.payload.dna_hash = DnaHash::from_raw_36(vec![9; 36]);
         assert_ne!(original, bytes(&other));
+    }
+
+    #[test]
+    fn legacy_v2_payload_and_acceptance_bytes_remain_unchanged() {
+        #[derive(Serialize)]
+        struct LegacyPayload {
+            grantor: AgentPubKey,
+            delegate: AgentPubKey,
+            scope: String,
+            valid_until: Timestamp,
+            root_action_hash: ActionHash,
+            dna_hash: DnaHash,
+        }
+        #[derive(Serialize)]
+        struct LegacyStatement<'a> {
+            domain: &'static str,
+            grant: &'a LegacyPayload,
+            grant_signature: &'a Signature,
+            head_action_hash: &'a ActionHash,
+            witness_action_hash: &'a ActionHash,
+            accepted_at: Timestamp,
+        }
+
+        let g = grant();
+        let legacy = LegacyPayload {
+            grantor: g.payload.grantor.clone(),
+            delegate: g.payload.delegate.clone(),
+            scope: g.payload.scope.clone(),
+            valid_until: g.payload.valid_until,
+            root_action_hash: g.payload.root_action_hash.clone(),
+            dna_hash: g.payload.dna_hash.clone(),
+        };
+        let actual_payload = holochain_serialized_bytes::encode(&g.payload).unwrap();
+        let legacy_payload = holochain_serialized_bytes::encode(&legacy).unwrap();
+        assert_eq!(actual_payload, legacy_payload);
+
+        let receipt = g.acceptance.as_ref().unwrap();
+        let old_statement = LegacyStatement {
+            domain: "elohim:accepted-content-head:v2",
+            grant: &legacy,
+            grant_signature: &g.signature,
+            head_action_hash: &receipt.head_action_hash,
+            witness_action_hash: &receipt.witness_action_hash,
+            accepted_at: receipt.accepted_at,
+        };
+        assert_eq!(
+            holochain_serialized_bytes::encode(&statement(&g, receipt)).unwrap(),
+            holochain_serialized_bytes::encode(&old_statement).unwrap()
+        );
+    }
+
+    #[test]
+    fn new_grant_history_is_anchored_at_its_unique_issuance_action() {
+        let mut g = grant();
+        let ancient_root = g.payload.root_action_hash.clone();
+        let issuance = ActionHash::from_raw_36(vec![9; 36]);
+        g.payload.issuance_action_hash = Some(issuance.clone());
+        assert_eq!(acceptance_history_anchor(&g), &issuance);
+        assert_ne!(acceptance_history_anchor(&g), &ancient_root);
+
+        let tag = revocation_tag(&g);
+        let mut another_issuance = g.clone();
+        another_issuance.payload.issuance_action_hash = Some(ActionHash::from_raw_36(vec![10; 36]));
+        assert_ne!(tag, revocation_tag(&another_issuance));
+        assert_ne!(tag, revocation_tag(&grant()));
+    }
+
+    #[test]
+    fn short_issuer_history_is_valid_even_when_the_content_root_is_ancient() {
+        let root_sequence = 319;
+        let issuance_sequence = 29_502;
+        let witness_sequence = 29_504;
+        let root_at = Timestamp::from_micros(1_000);
+        let issuance_at = Timestamp::from_micros(2_000);
+        let revocation_at = Timestamp::from_micros(3_000);
+        let witness_at = Timestamp::from_micros(4_000);
+
+        assert!(root_sequence < issuance_sequence);
+        assert!(root_at < issuance_at);
+        assert!(history_predecessor_matches(
+            issuance_sequence,
+            issuance_at,
+            issuance_sequence + 1,
+            revocation_at,
+        ));
+        assert!(history_predecessor_matches(
+            issuance_sequence + 1,
+            revocation_at,
+            witness_sequence,
+            witness_at,
+        ));
+        assert!(!history_predecessor_matches(
+            issuance_sequence,
+            issuance_at,
+            witness_sequence,
+            witness_at,
+        ));
     }
 
     #[test]

@@ -6,8 +6,9 @@
 //! Continue with `--cursor WHEN_RECEIVED HASH` from, respectively,
 //! `integration_dump.dht_ops_cursor` and `cursor` until all necessary ops are present.
 //! Both cursors expose `when_received` and `hash`; retain every captured page.
-//! Request JSON fields: head, root, election_link (raw 39-byte arrays), deadline_micros, state_pages,
-//! timing_pages. Use the native observer's EXACT hashes and shared deadlineMs * 1000;
+//! Request JSON fields: content_id, dna, head, root, election_link, optional issuance_action_hash and
+//! acceptance_witness_hash (raw 39-byte arrays), deadline_micros,
+//! state_pages, timing_pages. Use the native observer's EXACT hashes and shared deadlineMs * 1000;
 //! page lists are local file paths. Missing history, cache-only ops, rejected ops,
 //! and integration after that deadline all fail. Capture may occur later: recorded
 //! integration clocks establish timing, not the time the dump was downloaded.
@@ -23,9 +24,15 @@ use std::path::PathBuf;
 
 #[derive(Deserialize)]
 struct Request {
+    content_id: String,
+    dna: DnaHash,
     head: ActionHash,
     root: ActionHash,
     election_link: ActionHash,
+    #[serde(default)]
+    issuance_action_hash: Option<ActionHash>,
+    #[serde(default)]
+    acceptance_witness_hash: Option<ActionHash>,
     deadline_micros: i64,
     state_pages: Vec<PathBuf>,
     timing_pages: Vec<PathBuf>,
@@ -59,12 +66,15 @@ struct ProvenOp {
 }
 #[derive(Serialize)]
 struct Evidence {
+    content_id: String,
+    dna: DnaHash,
     head: ActionHash,
     root: ActionHash,
     election_link: ActionHash,
     deadline_micros: i64,
     history: Vec<ProvenOp>,
     election: ProvenOp,
+    issuance: Option<ProvenOp>,
     acceptance: Option<ProvenOp>,
     acceptance_author_history: Vec<ProvenOp>,
 }
@@ -77,7 +87,14 @@ struct DelegationEvidence {
 }
 #[derive(Deserialize, Serialize, Debug)]
 struct DelegationPayloadEvidence {
+    grantor: AgentPubKey,
     delegate: AgentPubKey,
+    scope: String,
+    valid_until: Timestamp,
+    root_action_hash: ActionHash,
+    dna_hash: DnaHash,
+    #[serde(default)]
+    issuance_action_hash: Option<ActionHash>,
 }
 #[derive(Deserialize, Serialize, Debug)]
 struct AcceptanceEvidence {
@@ -103,15 +120,28 @@ fn required_acceptance(tag: &[u8]) -> Result<Option<DelegationEvidence>> {
 fn verify_witness_context(
     witness: &ChainOp,
     grant: &DelegationEvidence,
-    root: &ActionHash,
+    root_hash: &ActionHash,
     head: &ActionHash,
     root_author: &AgentPubKey,
+    content_id: &str,
+    dna: &DnaHash,
     election_type: (ZomeIndex, LinkType),
 ) -> Result<()> {
     let action = witness.signed_action();
     ensure!(
         action.data().author() == root_author,
         "acceptance witness has another author"
+    );
+    ensure!(
+        &grant.payload.grantor == root_author
+            && grant.payload.scope == content_id
+            && &grant.payload.root_action_hash == root_hash
+            && &grant.payload.dna_hash == dna,
+        "acceptance grant context differs"
+    );
+    ensure!(
+        grant.acceptance.accepted_at < grant.payload.valid_until,
+        "acceptance is not before grant expiry"
     );
     ensure!(
         action.data().timestamp() == grant.acceptance.accepted_at,
@@ -125,7 +155,7 @@ fn verify_witness_context(
         anyhow::bail!("acceptance witness is not CreateLink");
     };
     ensure!(
-        link.base_address.clone().into_action_hash().as_ref() == Some(root)
+        link.base_address.clone().into_action_hash().as_ref() == Some(root_hash)
             && link.target_address.clone().into_action_hash().as_ref() == Some(head),
         "acceptance witness names another root/head"
     );
@@ -142,6 +172,63 @@ fn verify_witness_context(
     ensure!(
         link.tag.0 == tag,
         "acceptance witness tag differs from exact grant/head"
+    );
+    Ok(())
+}
+
+fn verify_issuance_context(
+    issuer: &ChainOp,
+    grant: &DelegationEvidence,
+    root_record: &ChainOp,
+    root_hash: &ActionHash,
+    root_author: &AgentPubKey,
+    link_type: (ZomeIndex, LinkType),
+) -> Result<()> {
+    let expected_hash = grant
+        .payload
+        .issuance_action_hash
+        .as_ref()
+        .context("v3 grant has no issuance action hash")?;
+    let action = issuer.signed_action().data();
+    ensure!(
+        &ActionHash::with_data_sync(action) == expected_hash,
+        "grant issuance action hash differs"
+    );
+    ensure!(
+        action.author() == root_author,
+        "grant issuance has another author"
+    );
+    let root = root_record.signed_action().data();
+    ensure!(
+        &ActionHash::with_data_sync(root) == root_hash,
+        "root record mismatch"
+    );
+    ensure!(
+        root.action_seq() < action.action_seq() && root.timestamp() < action.timestamp(),
+        "grant issuance does not follow immutable root"
+    );
+    ensure!(
+        action.timestamp() < grant.payload.valid_until,
+        "grant issuance is at or after expiry"
+    );
+    let ActionData::CreateLink(link) = &action.data else {
+        anyhow::bail!("grant issuance is not CreateLink");
+    };
+    let expected_tag = [
+        b"head-delegation-issued:v1:".as_slice(),
+        &grant.payload.valid_until.as_micros().to_be_bytes(),
+    ]
+    .concat();
+    ensure!(
+        link.base_address.clone().into_action_hash().as_ref() == Some(root_hash)
+            && link.target_address == AnyLinkableHash::from(grant.payload.delegate.clone())
+            && (link.zome_index, link.link_type) == link_type
+            && link.tag.0 == expected_tag,
+        "grant issuance link context differs"
+    );
+    ensure!(
+        &grant.payload.root_action_hash == root_hash,
+        "grant issuance payload names another root"
     );
     Ok(())
 }
@@ -186,9 +273,9 @@ fn correlate(
     for op in ops {
         if let DhtOp::ChainOp(op) = op {
             let action = ActionHash::with_data_sync(op.signed_action().data());
-            if matches!(op.as_ref(), ChainOp::CreateRecord(..)) {
-                author_records.insert(action.clone(), op.clone());
-            }
+            // Every signed source-chain action can be a predecessor, including
+            // CreateLink issue and revoke actions.
+            author_records.insert(action.clone(), op.clone());
             match op.as_ref() {
                 ChainOp::CreateRecord(_, OpEntry::Present(_)) => {
                     records.insert(action, op);
@@ -245,7 +332,16 @@ fn correlate(
         timing: verified_timing(link, &timings, request.deadline_micros)?,
     };
     let mut acceptance_author_history = Vec::new();
+    let mut issuance = None;
     let acceptance = if let Some(grant) = required_acceptance(&data.tag.0)? {
+        ensure!(
+            request.acceptance_witness_hash.as_ref() == Some(&grant.acceptance.witness_action_hash),
+            "capture request witness differs from integrated election grant"
+        );
+        ensure!(
+            request.issuance_action_hash == grant.payload.issuance_action_hash,
+            "capture request issuance differs from integrated election grant"
+        );
         let witness = links
             .get(&grant.acceptance.witness_action_hash)
             .ok_or_else(|| anyhow!("acceptance CreateLink not integrated"))?;
@@ -258,22 +354,52 @@ fn correlate(
             &request.root,
             &request.head,
             root_record.signed_action().data().author(),
+            &request.content_id,
+            &request.dna,
             (data.zome_index, data.link_type),
         )?;
+        let history_anchor = if let Some(issuance_hash) = &grant.payload.issuance_action_hash {
+            let issuer = links
+                .get(issuance_hash)
+                .ok_or_else(|| anyhow!("grant issuance CreateLink not integrated"))?;
+            verify_issuance_context(
+                issuer,
+                &grant,
+                root_record,
+                &request.root,
+                root_record.signed_action().data().author(),
+                (data.zome_index, data.link_type),
+            )?;
+            issuance = Some(ProvenOp {
+                action: issuance_hash.clone(),
+                kind: "CreateLink:grant-issuance",
+                timing: verified_timing(issuer, &timings, request.deadline_micros)?,
+            });
+            issuance_hash.clone()
+        } else {
+            request.root.clone()
+        };
         let mut current = witness.signed_action().data().clone();
-        let revocation_tag = [
-            b"head-delegation-revoked:v1:".as_slice(),
-            grant.signature.as_ref(),
-        ]
-        .concat();
+        let revocation_tag = match &grant.payload.issuance_action_hash {
+            Some(issuance_hash) => [
+                b"head-delegation-revoked:v2:".as_slice(),
+                issuance_hash.get_raw_39(),
+            ]
+            .concat(),
+            None => [
+                b"head-delegation-revoked:v1:".as_slice(),
+                grant.signature.as_ref(),
+            ]
+            .concat(),
+        };
         // Match native 4096 total records, including the witness itself.
         for _ in 1..4096 {
             let previous = current
                 .prev_action()
-                .context("acceptance author history has no root")?;
+                .context("acceptance author history has no grant anchor")?;
             let prior = author_records
                 .get(previous)
-                .context("acceptance author history CreateRecord not integrated")?;
+                .context("acceptance author history action not integrated")?;
             let action = prior.signed_action();
             ensure!(
                 action.data().author() == root_record.signed_action().data().author()
@@ -291,10 +417,14 @@ fn correlate(
             );
             acceptance_author_history.push(ProvenOp {
                 action: previous.clone(),
-                kind: "CreateRecord:acceptance-author-history",
+                kind: if previous == &history_anchor {
+                    "grant-anchor:issuance-or-root"
+                } else {
+                    "acceptance-author-history"
+                },
                 timing: verified_timing(prior, &timings, request.deadline_micros)?,
             });
-            if previous == &request.root {
+            if previous == &history_anchor {
                 break;
             }
             current = action.data().clone();
@@ -302,7 +432,7 @@ fn correlate(
         ensure!(
             acceptance_author_history
                 .last()
-                .is_some_and(|op| op.action == request.root),
+                .is_some_and(|op| op.action == history_anchor),
             "acceptance author history budget exceeded"
         );
         Some(ProvenOp {
@@ -311,15 +441,22 @@ fn correlate(
             timing: verified_timing(witness, &timings, request.deadline_micros)?,
         })
     } else {
+        ensure!(
+            request.issuance_action_hash.is_none() && request.acceptance_witness_hash.is_none(),
+            "capture request carries grant actions for an un-delegated election"
+        );
         None
     };
     Ok(Evidence {
+        content_id: request.content_id,
+        dna: request.dna,
         head: request.head,
         root: request.root,
         election_link: request.election_link,
         deadline_micros: request.deadline_micros,
         history,
         election,
+        issuance,
         acceptance,
         acceptance_author_history,
     })
@@ -400,31 +537,84 @@ mod tests {
         assert!(verified_timing(&op, &timings, 20).is_err());
     }
     #[test]
-    fn delegated_capture_requires_native_witness_and_complete_author_history() {
-        let (root_op, _) = fixture();
-        let mut root_op = root_op;
-        if let ChainOp::CreateRecord(_, entry) = &mut root_op {
-            *entry = OpEntry::Present(Entry::Agent(AgentPubKey::from_raw_32(vec![1; 32])));
-        }
-        let root_action = root_op.signed_action().data().clone();
+    fn v3_capture_anchors_at_integrated_issuance_after_ancient_root() {
+        let author = AgentPubKey::from_raw_32(vec![1; 32]);
+        let delegate = AgentPubKey::from_raw_32(vec![2; 32]);
+        let dna = DnaHash::from_raw_32(vec![4; 32]);
+        let root_action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(1),
+                action_seq: 319,
+                prev_action: Some(ActionHash::from_raw_32(vec![3; 32])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_32(vec![5; 32]),
+            }),
+        };
         let root = ActionHash::with_data_sync(&root_action);
-        let head = root.clone();
-        let signature = Signature([7; 64]);
-        let mut prior_action = root_action.clone();
-        prior_action.header.action_seq += 1;
-        prior_action.header.prev_action = Some(root.clone());
-        prior_action.header.timestamp = Timestamp::from_micros(2);
+        let root_op = ChainOp::CreateRecord(
+            SignedAction::new(root_action.clone(), Signature([0; 64])),
+            OpEntry::Present(Entry::Agent(author.clone())),
+        );
+        let valid_until = Timestamp::from_micros(100_000);
+        let issuance_action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(2),
+                action_seq: 29_502,
+                prev_action: Some(root.clone()),
+            },
+            data: ActionData::CreateLink(CreateLinkData {
+                base_address: root.clone().into(),
+                target_address: AnyLinkableHash::from(delegate.clone()),
+                zome_index: 0.into(),
+                link_type: 0.into(),
+                tag: LinkTag::new(
+                    [
+                        b"head-delegation-issued:v1:".as_slice(),
+                        &valid_until.as_micros().to_be_bytes(),
+                    ]
+                    .concat(),
+                ),
+            }),
+        };
+        let issuance_hash = ActionHash::with_data_sync(&issuance_action);
+        let issuance = ChainOp::CreateLink(SignedAction::new(issuance_action, Signature([6; 64])));
+        let prior_action = Action {
+            header: ActionHeader {
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(3),
+                action_seq: 29_503,
+                prev_action: Some(issuance_hash.clone()),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    0.into(),
+                    1.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_32(vec![7; 32]),
+            }),
+        };
         let prior_hash = ActionHash::with_data_sync(&prior_action);
         let prior = ChainOp::CreateRecord(
             SignedAction::new(prior_action, Signature([0; 64])),
             OpEntry::ActionOnly,
         );
+        let head = root.clone();
+        let signature = Signature([8; 64]);
         let witness_action = Action {
             header: ActionHeader {
-                author: root_action.author().clone(),
-                timestamp: Timestamp::from_micros(3),
-                action_seq: root_action.action_seq() + 2,
-                prev_action: Some(prior_hash),
+                author: author.clone(),
+                timestamp: Timestamp::from_micros(4),
+                action_seq: 29_504,
+                prev_action: Some(prior_hash.clone()),
             },
             data: ActionData::CreateLink(CreateLinkData {
                 base_address: root.clone().into(),
@@ -444,70 +634,97 @@ mod tests {
         let witness_hash = ActionHash::with_data_sync(&witness_action);
         let grant = DelegationEvidence {
             payload: DelegationPayloadEvidence {
-                delegate: AgentPubKey::from_raw_32(vec![2; 32]),
+                grantor: author.clone(),
+                delegate: delegate.clone(),
+                scope: "lesson-1".to_string(),
+                valid_until,
+                root_action_hash: root.clone(),
+                dna_hash: dna.clone(),
+                issuance_action_hash: Some(issuance_hash.clone()),
+            },
+            signature: signature.clone(),
+            acceptance: AcceptanceEvidence {
+                head_action_hash: head.clone(),
+                witness_action_hash: witness_hash.clone(),
+                accepted_at: Timestamp::from_micros(4),
+            },
+        };
+        let mut election_tag = b"canonical-head:earned|delegation:".to_vec();
+        election_tag.extend(holochain_serialized_bytes::encode(&grant).unwrap());
+        let election_action = Action {
+            header: ActionHeader {
+                author: delegate,
+                timestamp: Timestamp::from_micros(5),
+                action_seq: 0,
+                prev_action: None,
+            },
+            data: ActionData::CreateLink(CreateLinkData {
+                base_address: root.clone().into(),
+                target_address: head.clone().into(),
+                zome_index: 0.into(),
+                link_type: 0.into(),
+                tag: LinkTag::new(election_tag),
+            }),
+        };
+        let election_hash = ActionHash::with_data_sync(&election_action);
+        let witness = ChainOp::CreateLink(SignedAction::new(witness_action, Signature([0; 64])));
+        let election = ChainOp::CreateLink(SignedAction::new(election_action, Signature([0; 64])));
+        assert!(verify_issuance_context(
+            &issuance,
+            &grant,
+            &root_op,
+            &root,
+            &author,
+            (0.into(), 0.into()),
+        )
+        .is_ok());
+        let mut wrong_grant = DelegationEvidence {
+            payload: DelegationPayloadEvidence {
+                grantor: author.clone(),
+                delegate: AgentPubKey::from_raw_32(vec![9; 32]),
+                scope: "lesson-1".to_string(),
+                valid_until,
+                root_action_hash: root.clone(),
+                dna_hash: dna.clone(),
+                issuance_action_hash: Some(issuance_hash.clone()),
             },
             signature,
             acceptance: AcceptanceEvidence {
                 head_action_hash: head.clone(),
                 witness_action_hash: witness_hash.clone(),
-                accepted_at: Timestamp::from_micros(3),
+                accepted_at: Timestamp::from_micros(4),
             },
         };
-        let mut tag = b"canonical-head:earned|delegation:".to_vec();
-        tag.extend(holochain_serialized_bytes::encode(&grant).unwrap());
-        let mut election_action = witness_action.clone();
-        election_action.header.author = AgentPubKey::from_raw_32(vec![2; 32]);
-        election_action.header.timestamp = Timestamp::from_micros(4);
-        if let ActionData::CreateLink(link) = &mut election_action.data {
-            link.tag = LinkTag::new(tag);
-        }
-        let election_hash = ActionHash::with_data_sync(&election_action);
-        let witness = ChainOp::CreateLink(SignedAction::new(witness_action, Signature([0; 64])));
-        let election = ChainOp::CreateLink(SignedAction::new(election_action, Signature([0; 64])));
-        assert!(verify_witness_context(
-            &witness,
-            &grant,
+        assert!(verify_issuance_context(
+            &issuance,
+            &wrong_grant,
+            &root_op,
             &root,
-            &head,
-            root_action.author(),
-            (0.into(), 0.into())
-        )
-        .is_ok());
-        assert!(verify_witness_context(
-            &witness,
-            &grant,
-            &root,
-            &head,
-            root_action.author(),
-            (0.into(), 1.into())
+            &author,
+            (0.into(), 0.into()),
         )
         .is_err());
-        assert!(verify_witness_context(
-            &witness,
-            &grant,
+        wrong_grant.payload.delegate = grant.payload.delegate.clone();
+        wrong_grant.payload.valid_until = Timestamp::from_micros(2);
+        assert!(verify_issuance_context(
+            &issuance,
+            &wrong_grant,
+            &root_op,
             &root,
-            &ActionHash::from_raw_32(vec![9; 32]),
-            root_action.author(),
-            (0.into(), 0.into())
+            &author,
+            (0.into(), 0.into()),
         )
         .is_err());
-        assert!(verify_witness_context(
-            &witness,
-            &grant,
-            &root,
-            &head,
-            &grant.payload.delegate,
-            (0.into(), 0.into())
-        )
-        .is_err());
-        let ops = vec![root_op, witness, election, prior];
+
+        let ops: Vec<ChainOp> = vec![root_op, issuance, prior, witness, election];
         let timings: HashMap<_, _> = ops
             .iter()
             .map(|op| {
+                let hash = op.to_hash();
                 (
-                    op.to_hash(),
+                    hash.clone(),
                     Timing {
-                        op_hash: op.to_hash(),
+                        op_hash: hash,
                         when_received: Timestamp::from_micros(10),
                         when_integrated: Some(Timestamp::from_micros(20)),
                         abandoned_at: None,
@@ -518,31 +735,49 @@ mod tests {
             })
             .collect();
         let request = || Request {
+            content_id: "lesson-1".to_string(),
+            dna: dna.clone(),
             head: head.clone(),
             root: root.clone(),
             election_link: election_hash.clone(),
+            issuance_action_hash: Some(issuance_hash.clone()),
+            acceptance_witness_hash: Some(witness_hash.clone()),
             deadline_micros: 20,
             state_pages: vec![],
             timing_pages: vec![],
         };
         let full: Vec<_> = ops.iter().cloned().map(DhtOp::from).collect();
-        assert!(correlate(request(), full.clone(), timings.clone()).is_ok());
-        let without_witness = vec![full[0].clone(), full[2].clone()];
-        assert!(correlate(request(), without_witness, timings.clone())
+        let evidence = correlate(request(), full.clone(), timings.clone()).unwrap();
+        assert_eq!(evidence.issuance.unwrap().action, issuance_hash);
+        assert_eq!(
+            evidence.acceptance_author_history.last().unwrap().action,
+            issuance_hash
+        );
+        assert_eq!(evidence.acceptance_author_history.len(), 2);
+        let without_issuer = vec![
+            full[0].clone(),
+            full[2].clone(),
+            full[3].clone(),
+            full[4].clone(),
+        ];
+        assert!(correlate(request(), without_issuer, timings.clone())
             .err()
             .unwrap()
             .to_string()
-            .contains("acceptance CreateLink"));
-        let without_author_history = full[..3].to_vec();
-        assert!(
-            correlate(request(), without_author_history, timings.clone())
-                .err()
-                .unwrap()
-                .to_string()
-                .contains("author history")
-        );
+            .contains("issuance CreateLink not integrated"));
+        let without_prior = vec![
+            full[0].clone(),
+            full[1].clone(),
+            full[3].clone(),
+            full[4].clone(),
+        ];
+        assert!(correlate(request(), without_prior, timings.clone())
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("author history action not integrated"));
         let mut late = timings.clone();
-        late.get_mut(&ops[1].to_hash()).unwrap().when_integrated = Some(Timestamp::from_micros(21));
+        late.get_mut(&ops[3].to_hash()).unwrap().when_integrated = Some(Timestamp::from_micros(21));
         assert!(correlate(request(), full, late).is_err());
         assert!(required_acceptance(b"canonical-head:earned|delegation:invalid").is_err());
     }

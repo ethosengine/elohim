@@ -722,6 +722,12 @@ async function awaitReceivers(
             head,
             root: encodeHashToBase64(lineage.root_action_hash),
             dna: source.dna,
+            issuanceActionHash: p.delegation?.payload.issuance_action_hash
+              ? encodeHashToBase64(p.delegation.payload.issuance_action_hash)
+              : undefined,
+            acceptanceWitnessHash: p.delegation?.acceptance?.witness_action_hash
+              ? encodeHashToBase64(p.delegation.acceptance.witness_action_hash)
+              : undefined,
           },
           deadline
         );
