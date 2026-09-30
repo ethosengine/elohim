@@ -534,8 +534,11 @@ describe('orchestrator Jenkinsfile wiring', () => {
     }
   });
 
-  test('the cron is still the one daily slot (a 30-min timer would abortPrevious a live run)', () => {
+  test('the daily cron queues behind an active release instead of aborting it', () => {
     assert.match(jf, /cron\('0 9 \* \* \*'\)/);
-    assert.match(jf, /disableConcurrentBuilds\(abortPrevious: true\)/);
+    assert.match(jf, /disableConcurrentBuilds\(\)/);
+    assert.doesNotMatch(jf, /disableConcurrentBuilds\(abortPrevious:\s*true\)/);
+    assert.match(jf, /milestone\(ordinal: 1, label: 'Build Started'\)/);
+    assert.match(jf, /milestone\(ordinal: 2, label: 'Checkout Complete'\)/);
   });
 });

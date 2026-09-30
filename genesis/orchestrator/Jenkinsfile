@@ -2445,7 +2445,10 @@ spec:
         // Longest-chain sum of downstream budgets + own stages; see pipeline-budget.test.mjs.
         // 630 = conductor 90 → max(DNA, edge) 240 → app 180 → genesis 90, +30 (BARRIER_PAIRS; was 780).
         timeout(time: 630, unit: 'MINUTES')
-        disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
+        // Keep the daily timer from aborting an active webhook's release cascade.
+        // Later orchestrator runs queue; their existing trigger, changeset, and
+        // baseline logic runs unchanged once the active run has finished.
+        disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
         // timeout has been exhausting on the 316MB / 65k-object repo (multiple

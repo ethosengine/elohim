@@ -297,6 +297,8 @@ The opening banner of every orchestrator run prints the run kind on its
 A person who starts the job with a `MODE` other than `auto` (see
 [Starting a run by hand](#starting-a-run-by-hand)) gets that mode's fixed
 pipeline list, and `[build:*]` and `[conductor:…]` do not add to it.
+The `[edge:validate-only]` commit tag overrides that fixed list and dispatches
+only Edge; `[skip ci]` still suppresses all pipeline dispatch.
 
 `[deploy-only]` and `[reseed]` are limited to webhook runs so that a timer run
 or a replay of the same commit cannot redeploy or wipe content again unasked.
@@ -391,13 +393,16 @@ branch job with the cause `Push event to branch <name>`: a webhook run. That job
 indexes `dev` and pull-request branches; other branch names never reach it. The
 only trigger the orchestrator Jenkinsfile declares is a daily cron at 09:00 UTC,
 which exists for the iroh parity soak (a nightly stage that runs
-`elohim-storage`'s `iroh_*` tests with the iroh features), so one push starts one
-run. A timer run plans like any other run and honors the tip commit's tags as
-[Which runs honor which tags](#which-runs-honor-which-tags) shows. Like every
-run, it then applies the already-built filter (see [Baseline state](#baseline-state)),
-unless a `[build:*]` or `[conductor:…]` tag forces the pipeline. The anti-patterns museum linked
-under [Troubleshooting](#troubleshooting) records the retired webhook
-double-fire trap.
+`elohim-storage`'s `iroh_*` tests with the iroh features). The branch job serializes
+orchestrator runs: if a release cascade is active, a timer run or newer webhook
+queues until it finishes rather than aborting it. Once started, each run uses the
+existing milestones, trigger and tag checks, changeset analysis, and per-pipeline
+baseline logic. A timer run plans like any other run and honors the tip commit's
+tags as [Which runs honor which tags](#which-runs-honor-which-tags) shows. Like
+every run, it then applies the already-built filter (see [Baseline state](#baseline-state)),
+unless a `[build:*]` or `[conductor:…]` tag forces the pipeline. The anti-patterns
+museum linked under [Troubleshooting](#troubleshooting) records the retired
+webhook double-fire trap.
 
 ### Starting a run by hand
 
