@@ -14,7 +14,7 @@
  *   pnpm exec tsx scripts/steward-publish.ts <id> [<id> …] [--manifest ids.txt]
  *       [--dry-run] [--await-peer http://localhost:8091 …] [--await-timeout 600]
  *       [--storage URL] [--admin-ws URL] [--app-ws URL] [--app-id elohim] [--role lamad]
- *       [--data-dir DIR] [--redeclare] [--closure]
+ *       [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--redeclare] [--closure]
  *
  *   ids        resolved to <data-dir>/content/<id>.json or <data-dir>/paths/<id>.json
  *   --manifest a file listing ids (one per line, or a JSON array; `#` comments allowed)
@@ -35,6 +35,7 @@
  *   STEWARD_APP_WS       ws://localhost:4445     (conductor app interface)
  *   STEWARD_APP_ID       elohim                  (installed app the storage bridge uses)
  *   STEWARD_ROLE         lamad                   (role whose cell holds the content_store zome)
+ *   STEWARD_SIGNING_CREDENTIALS_DIR  required for writes; existing exact-cell credentials
  *   DATA_DIR             genesis/data/lamad      (repo-relative)
  *
  * Output: one line per item — `<id>  reach=<reach>  action=<action>  head=<hash>` where
@@ -78,6 +79,9 @@ interface Options {
   appWs: string;
   appId: string;
   role: string;
+  signingCredentialsDir?: string;
+  expectedAgent?: string;
+  expectedDna?: string;
   dryRun: boolean;
   redeclare: boolean;
   closure: boolean;
@@ -90,7 +94,7 @@ function usage(msg?: string): never {
   console.error(
     'usage: steward-publish.ts <id>… [--manifest FILE] [--dry-run] [--redeclare] [--closure] ' +
       '[--await-peer URL]… [--await-timeout S] [--storage URL] [--admin-ws URL] ' +
-      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR]'
+      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH]'
   );
   process.exit(2);
 }
@@ -154,6 +158,15 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--role':
         o.role = val();
+        break;
+      case '--signing-credentials-dir':
+        o.signingCredentialsDir = resolve(val());
+        break;
+      case '--device-agent':
+        o.expectedAgent = val();
+        break;
+      case '--dna-hash':
+        o.expectedDna = val();
         break;
       case '--dry-run':
         o.dryRun = true;
@@ -536,7 +549,7 @@ async function main(): Promise<void> {
 
   // 3. Execute. The conductor is connected BEFORE the first write, so a wrong port,
   //    app or role fails with nothing written; an all-unchanged run never connects
-  //    (authorizing signing credentials is itself a write to the steward's chain).
+  //    Existing credentials are reused; this connection creates no signing grant.
   let conductor: Conductor | undefined;
   const getConductor = async (): Promise<Conductor> => {
     if (!conductor) {
