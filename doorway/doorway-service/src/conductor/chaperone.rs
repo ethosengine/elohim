@@ -39,8 +39,9 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::auth::{extract_token_from_header, TokenInput};
+use crate::conductor::decode_key_bytes;
 use crate::conductor::grant_memory::{grant_memory, GrantDecision, GrantMemory};
-use crate::conductor::typed_admin::TypedAdminClient;
+use crate::conductor::typed_admin::{AppInfoDetailed, TypedAdminClient};
 use crate::conductor::AgentProvisioner;
 use crate::server::http::AppState;
 
@@ -213,10 +214,16 @@ pub async fn handle_hc_connect(
     // Try conductor_id from JWT claims first
     let (conductor_id, admin_url, installed_app_id) = if let Some(ref cid) = claims.conductor_id {
         if let Some(info) = registry.get_conductor_info(cid) {
-            let app_id = claims
-                .installed_app_id
-                .clone()
-                .unwrap_or_else(|| state.args.installed_app_id.clone());
+            let Some(app_id) = installed_app_id_for_claim(&claims, &registry, cid) else {
+                warn!(
+                    conductor = %cid,
+                    "Chaperone: JWT has no installed-app binding and registry has no matching agent mapping"
+                );
+                return json_error(
+                    StatusCode::UNAUTHORIZED,
+                    "Session is missing its installed app binding",
+                );
+            };
             (cid.clone(), info.admin_url, app_id)
         } else {
             // Unknown conductor_id. If the claim was minted by a sibling
@@ -282,6 +289,12 @@ pub async fn handle_hc_connect(
         for attempt in 1..=max_polls {
             match admin.get_app_info(&installed_app_id).await {
                 Ok(info) => {
+                    // Check the complete grant-target list before readiness recovery
+                    // or any capability write. A stale app pin is not actor authority.
+                    if let Err(status) = ensure_app_actor(&claims.agent_pub_key, &info) {
+                        warn!("Chaperone: native app or grant-target cell differs from authenticated actor");
+                        return json_error(status, "Authenticated actor does not match native app");
+                    }
                     app_found = true;
 
                     // Unrecoverable is terminal upstream: this app cannot be
@@ -848,6 +861,34 @@ fn unknown_conductor_response(
     )
 }
 
+/// Require the authenticated actor to own the native app and every cell that
+/// Step 4 will grant. This does not infer authority from the registry app pin.
+fn ensure_app_actor(claimed_agent: &str, app: &AppInfoDetailed) -> Result<(), StatusCode> {
+    let actor = decode_key_bytes(claimed_agent).ok_or(StatusCode::UNAUTHORIZED)?;
+    holo_hash::AgentPubKey::try_from_raw_39(actor.clone()).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if app.agent_pub_key != actor || app.cell_ids.iter().any(|(_, (_, agent))| agent != &actor) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(())
+}
+
+/// Resolve the app pinned by an authenticated conductor claim. New tokens
+/// carry `installed_app_id` directly. For older tokens only, recover it from
+/// the existing agent registry when both the agent and conductor match; a
+/// missing or stale mapping must not fall back to the doorway-wide app.
+fn installed_app_id_for_claim(
+    claims: &crate::auth::jwt::Claims,
+    registry: &crate::conductor::ConductorRegistry,
+    conductor_id: &str,
+) -> Option<String> {
+    if let Some(app_id) = claims.installed_app_id.as_ref() {
+        return Some(app_id.clone());
+    }
+
+    let entry = registry.get_conductor_for_agent(&claims.agent_pub_key)?;
+    (entry.conductor_id == conductor_id).then_some(entry.app_id)
+}
+
 /// Resolve a conductor for the user via the idempotent provisioner.
 ///
 /// Returns `(conductor_id, admin_url, installed_app_id)` on success, or a
@@ -1073,6 +1114,73 @@ mod tests {
         }
     }
 
+    fn actor_app(agent: &[u8]) -> AppInfoDetailed {
+        AppInfoDetailed {
+            installed_app_id: "existing-hosted-app".into(),
+            agent_pub_key: agent.to_vec(),
+            cell_ids: vec![
+                ("lamad".into(), (vec![1; 39], agent.to_vec())),
+                ("imagodei".into(), (vec![2; 39], agent.to_vec())),
+            ],
+            status: Some("running".into()),
+            unrecoverable_cell_id: None,
+            unrecoverable_reason: None,
+        }
+    }
+
+    #[test]
+    fn native_app_actor_accepts_canonical_and_legacy_key_encodings() {
+        let actor = holo_hash::AgentPubKey::from_raw_32(vec![251; 32]);
+        let app = actor_app(actor.get_raw_39());
+        for claim in [actor.to_string(), BASE64.encode(actor.get_raw_39())] {
+            assert_eq!(ensure_app_actor(&claim, &app), Ok(()));
+        }
+    }
+
+    #[test]
+    fn native_app_actor_refuses_stale_app_and_any_foreign_grant_target() {
+        let actor = holo_hash::AgentPubKey::from_raw_32(vec![251; 32]);
+        let other = holo_hash::AgentPubKey::from_raw_32(vec![9; 32]);
+        let claim = actor.to_string();
+        let mut stale_app = actor_app(actor.get_raw_39());
+        stale_app.agent_pub_key = other.get_raw_39().to_vec();
+        assert_eq!(
+            ensure_app_actor(&claim, &stale_app),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+
+        // A matching first cell must not allow a later foreign cell to receive
+        // a grant. The guard runs before the grant loop, not once per write.
+        let mut mixed_cells = actor_app(actor.get_raw_39());
+        mixed_cells.cell_ids[1].1 .1 = other.get_raw_39().to_vec();
+        assert_eq!(
+            ensure_app_actor(&claim, &mixed_cells),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+    }
+
+    #[test]
+    fn native_app_actor_refuses_malformed_claims_and_wrong_hash_types() {
+        let actor = holo_hash::AgentPubKey::from_raw_32(vec![251; 32]);
+        let app = actor_app(actor.get_raw_39());
+        for claim in [
+            "not-a-key".into(),
+            BASE64.encode([0; 32]),
+            BASE64.encode([0; 39]),
+        ] {
+            assert_eq!(
+                ensure_app_actor(&claim, &app),
+                Err(StatusCode::UNAUTHORIZED)
+            );
+        }
+        let wrong_type = holo_hash::DnaHash::from_raw_32(vec![251; 32]);
+        let malformed_native = actor_app(wrong_type.get_raw_39());
+        assert_eq!(
+            ensure_app_actor(&wrong_type.to_string(), &malformed_native),
+            Err(StatusCode::UNAUTHORIZED)
+        );
+    }
+
     /// AppState carrying `self_doorway_id` as its own `DOORWAY_ID` and the
     /// given (possibly empty) conductor registry.
     fn test_state(self_doorway_id: Option<&str>, registry: ConductorRegistry) -> Arc<AppState> {
@@ -1082,6 +1190,50 @@ mod tests {
         let mut state = AppState::new(args);
         state.conductor_registry = Some(Arc::new(registry));
         Arc::new(state)
+    }
+
+    #[tokio::test]
+    async fn legacy_conductor_claim_requires_matching_agent_app_mapping() {
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-4".into(),
+            conductor_url: "ws://c4:4445".into(),
+            admin_url: "ws://c4:4444".into(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+        registry
+            .register_agent("uhCAk-test", "conductor-4", "elohim-conductor-4-927dff")
+            .await
+            .expect("register legacy agent mapping");
+
+        let mut claims = test_claims(Some("self-doorway"), None);
+        claims.conductor_id = Some("conductor-4".into());
+        assert_eq!(
+            installed_app_id_for_claim(&claims, &registry, "conductor-4").as_deref(),
+            Some("elohim-conductor-4-927dff"),
+            "legacy app context comes from the exact agent/conductor registry row"
+        );
+
+        assert_eq!(
+            installed_app_id_for_claim(&claims, &registry, "conductor-3"),
+            None,
+            "an agent mapping on another conductor cannot satisfy this claim"
+        );
+
+        claims.agent_pub_key = "uhCAk-unmapped".into();
+        assert_eq!(
+            installed_app_id_for_claim(&claims, &registry, "conductor-4"),
+            None,
+            "an unmapped agent fails closed instead of using the doorway-wide app"
+        );
+
+        claims.installed_app_id = Some("explicit-app-context".into());
+        assert_eq!(
+            installed_app_id_for_claim(&claims, &registry, "conductor-4").as_deref(),
+            Some("explicit-app-context"),
+            "an explicit signed app claim remains authoritative"
+        );
     }
 
     async fn body_json(resp: Response<Full<Bytes>>) -> serde_json::Value {

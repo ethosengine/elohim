@@ -2794,6 +2794,109 @@ decisionPoints:
         testName: should_provision_is_false_without_a_pool
         kind: unit
 
+  - name: registration_conductor_claims
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::registration_conductor_claims
+      line: 985
+    summary: >
+      Carries a provisioned installed-app/conductor pair into a registration JWT only when the
+      provisioner's agent key matches the identity returned by registration; a mismatch refuses
+      token issuance instead of pinning the account to another agent's app. Reuses the existing
+      installed_app_id claim and conductor registry, creating no persistent record.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral session-routing context; existing conductor installation and registry remain the sources of truth." }
+      - { id: C1, status: n-a, justification: "No canonical content head is selected." }
+      - { id: C2, status: n-a, justification: "No DHT ordering or publication clock changes." }
+      - { id: C3, status: n-a, justification: "No new content replication or liveness behavior." }
+      - { id: C4, status: answered, justification: "The regression proves matching agent, conductor, and app claims survive token minting; a mismatched agent returns an error." }
+      - { id: C5, status: partial, justification: "A JWT routing pin is not receiver-local native history or a publication receipt." }
+      - { id: C6a, status: answered, justification: "One in-memory equality check; no loop or retry." }
+      - { id: C6b, status: answered, justification: "No key creation, signing grant, DHT action, or content write is added." }
+      - { id: C7, status: answered, justification: "The token carries the same installed app that was provisioned for its agent." }
+      - { id: C8, status: partial, justification: "The mismatch is logged without credentials; no dedicated metric is added." }
+      - { id: C9, status: answered, justification: "The agent key is checked, not minted, copied, or rotated." }
+      - { id: C10, status: answered, justification: "Uses the existing conductor_id and installed_app_id JWT claims; wire schema is unchanged." }
+      - { id: C11, status: n-a, justification: "No queue, retry, or transport behavior is introduced." }
+      - { id: C12, status: partial, justification: "The exact app pin prevents wrong-cell routing; existing JWT and chaperone authorization remain responsible for access." }
+      - { id: C13, status: n-a, justification: "No new authority tier or operator standing is created." }
+      - { id: C14, status: partial, justification: "A mismatch returns an explicit 500 before issuing a token, though registration's earlier provisioning/account effects may already exist." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: registration_token_carries_the_provisioned_app_for_its_agent
+        kind: unit
+
+  - name: ensure_app_actor
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/chaperone.rs
+      modulePath: conductor::chaperone::ensure_app_actor
+      line: 866
+    summary: >
+      Before readiness recovery or capability grants, require the authenticated JWT actor's
+      decoded raw agent key to equal the native app agent and every projected grant-target cell.
+      A stale explicit app pin or legacy registry binding cannot authorize another actor's cells.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral chaperone authorization over native AppInfo, not a new identity or SQL authority." }
+      - { id: C1, status: n-a, justification: "No content author or head election." }
+      - { id: C2, status: n-a, justification: "No canonical head ordering or controller-policy change." }
+      - { id: C3, status: n-a, justification: "No replication or retry mechanism added." }
+      - { id: C4, status: answered, justification: "Malformed keys and mismatched native actors fail 401; unavailable app info retains existing failure handling." }
+      - { id: C5, status: answered, justification: "Registry and JWT app pins select a lookup but never replace native actor equality." }
+      - { id: C6a, status: answered, justification: "One bounded-format key decode and one linear pass over the existing grant-target list; no extra network work." }
+      - { id: C6b, status: answered, justification: "Pure check executes before any capability write, including when a later target mismatches." }
+      - { id: C7, status: answered, justification: "Checks exactly the native app and cells the existing grant loop will use; skipped clones are not claimed as covered." }
+      - { id: C8, status: partial, justification: "401 and a generic warning expose refusal without credential contents; no new metric." }
+      - { id: C9, status: answered, justification: "Compares existing raw keys across canonical and historical encodings without creating or rotating identity." }
+      - { id: C10, status: answered, justification: "Accepts both existing URL-multibase and standard base64 agent encodings; no new wire type." }
+      - { id: C11, status: n-a, justification: "No queue or transport backpressure behavior." }
+      - { id: C12, status: answered, justification: "The caller may obtain capabilities only for its authenticated native actor; all grant targets must match." }
+      - { id: C13, status: n-a, justification: "No social standing or delegated identity administration introduced." }
+      - { id: C14, status: answered, justification: "Explicit 401 precedes grants; a matching first cell cannot mask another actor later in the list." }
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/chaperone.rs
+        testName: native_app_actor_accepts_canonical_and_legacy_key_encodings
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/chaperone.rs
+        testName: native_app_actor_refuses_stale_app_and_any_foreign_grant_target
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/chaperone.rs
+        testName: native_app_actor_refuses_malformed_claims_and_wrong_hash_types
+        kind: unit
+
+  - name: installed_app_id_for_claim
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/chaperone.rs
+      modulePath: conductor::chaperone::installed_app_id_for_claim
+      line: 861
+    summary: >
+      Resolves a legacy JWT that lacks installed_app_id only through an existing registry row
+      matching both agent key and pinned conductor. Missing or mismatched rows refuse /hc/connect;
+      the doorway-wide default app is never substituted for an agent-bound claim.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral context resolution over existing JWT claims and ConductorRegistry; no new persistent entity." }
+      - { id: C1, status: n-a, justification: "Does not choose a content author or head." }
+      - { id: C2, status: n-a, justification: "No canonical head ordering changes." }
+      - { id: C3, status: n-a, justification: "No DHT replication or recovery path changes." }
+      - { id: C4, status: answered, justification: "Tests prove exact legacy agent/conductor recovery and refusal on mismatch or absent mapping." }
+      - { id: C5, status: partial, justification: "A successful route selection does not prove receiver-local history or content publication." }
+      - { id: C6a, status: answered, justification: "A signed claim read and one registry lookup; no retry or scan beyond the registry's existing key normalization." }
+      - { id: C6b, status: answered, justification: "The resolver itself performs no writes or grants." }
+      - { id: C7, status: answered, justification: "Returns only the exact installed app recorded for the same agent/conductor pair." }
+      - { id: C8, status: partial, justification: "Refusal is logged without credentials; no new outcome metric is added." }
+      - { id: C9, status: answered, justification: "No human or agent key is created, renamed, or rotated." }
+      - { id: C10, status: answered, justification: "New tokens use the existing claim; legacy resolution changes no JWT wire shape." }
+      - { id: C11, status: n-a, justification: "No request queue or retry behavior is added." }
+      - { id: C12, status: answered, justification: "Existing JWT authentication remains required, and absent binding now returns 401 instead of selecting a shared app." }
+      - { id: C13, status: n-a, justification: "No standing or social-authority tier is introduced." }
+      - { id: C14, status: answered, justification: "Missing or mismatched mapping produces an explicit refusal before app-token issuance or capability work." }
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/chaperone.rs
+        testName: legacy_conductor_claim_requires_matching_agent_app_mapping
+        kind: unit
+
   - name: synthetic_identity_fallback_allowed
     kind: pure-decision-predicate
     sourceLocation:

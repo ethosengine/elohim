@@ -25,7 +25,7 @@ use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
     PermissionLevel, TokenInput,
 };
-use crate::conductor::AgentProvisioner;
+use crate::conductor::{AgentProvisioner, ProvisionedAgent};
 use crate::custodial_keys::{CustodialKeyService, KeyExportFormat};
 use crate::db::schemas::{
     get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
@@ -879,6 +879,41 @@ fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody
         .unwrap()
 }
 
+/// Ephemeral browser chrome projection, reconstructed after verified login/refresh.
+/// This is public display data, never a credential or authorization input. The
+/// existing Session consumer reads it via document.cookie; bearer JWT validation
+/// remains authoritative. No capabilities or reach are inferred from a login.
+fn with_browser_session_projection(
+    mut response: Response<BoxBody>,
+    human_id: &str,
+    expires_at: u64,
+    now: u64,
+    secure: bool,
+) -> Response<BoxBody> {
+    let remaining = expires_at.saturating_sub(now);
+    let value = if remaining > 0 {
+        urlencoding::encode(
+            &serde_json::json!({ "humanId": human_id, "capabilities": [], "reach": "" })
+                .to_string(),
+        )
+        .into_owned()
+    } else {
+        String::new()
+    };
+    let cookie = format!(
+        "elohim_session={value}; Path=/; Max-Age={remaining}; SameSite=Lax{}",
+        if secure { "; Secure" } else { "" },
+    );
+    // JSON is percent-encoded, including any untrusted human-id bytes.
+    response.headers_mut().append(
+        hyper::header::SET_COOKIE,
+        cookie
+            .parse()
+            .expect("percent-encoded session cookie is a valid header"),
+    );
+    response
+}
+
 fn full_body(data: impl Into<Bytes>) -> BoxBody {
     Full::new(data.into())
         .map_err(|never| match never {})
@@ -977,6 +1012,23 @@ fn password_too_weak(password: &str) -> bool {
 pub(crate) fn should_provision(registry_configured: bool, dev_mode: bool) -> bool {
     let _ = dev_mode; // deliberately unread: see above
     registry_configured
+}
+
+/// Carry the exact conductor/app provisioned for this registered agent into
+/// the browser session token. A provisioner result for a different agent is
+/// an invariant violation; do not mint a token with a mismatched routing pin.
+fn registration_conductor_claims(
+    provisioned: Option<&ProvisionedAgent>,
+    agent_pub_key: &str,
+) -> Result<(Option<String>, Option<String>), ()> {
+    match provisioned {
+        None => Ok((None, None)),
+        Some(p) if p.agent_pub_key == agent_pub_key => Ok((
+            Some(p.installed_app_id.clone()),
+            Some(p.conductor_id.clone()),
+        )),
+        Some(_) => Err(()),
+    }
 }
 
 /// Whether the cheap synthetic-identity fallback is reachable when the imagodei
@@ -1937,6 +1989,23 @@ async fn handle_register(
     // stop being two unlinked identities.
     bind_human_projection_key(&state, &human_id, &actual_agent_pub_key, &body.human_id).await;
 
+    let (installed_app_id, conductor_id) =
+        match registration_conductor_claims(provisioned.as_ref(), &actual_agent_pub_key) {
+            Ok(context) => context,
+            Err(()) => {
+                error!(
+                    "Registration provisioner returned a different agent than the identity flow"
+                );
+                return json_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &ErrorResponse {
+                        error: "Provisioned conductor identity does not match registration".into(),
+                        code: Some("PROVISIONED_AGENT_MISMATCH".into()),
+                    },
+                );
+            }
+        };
+
     generate_auth_response(
         &jwt,
         &state,
@@ -1947,8 +2016,8 @@ async fn handle_register(
         StatusCode::CREATED,
         profile,
         user_permission_level,
-        None,
-        provisioned.as_ref().map(|p| p.conductor_id.clone()),
+        installed_app_id,
+        conductor_id,
         false, // New registrations are never stewards
         false,
         hosted_cell.as_ref(),
@@ -2361,19 +2430,24 @@ async fn handle_login(
 /// POST /auth/logout
 ///
 /// Logout (primarily client-side, but can be used for token blacklisting).
-/// For now, this is a no-op as tokens are stateless.
+/// Stateless bearer revocation remains client-side; clear the browser display projection.
 async fn handle_logout(
     _req: Request<hyper::body::Incoming>,
     _state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    // In the future, we could implement token blacklisting here
-    // For now, logout is handled client-side by removing the token
-    json_response(
-        StatusCode::OK,
-        &SuccessResponse {
-            success: true,
-            message: "Logged out successfully".into(),
-        },
+    // Clearing chrome grants no authority and does not revoke other devices.
+    with_browser_session_projection(
+        json_response(
+            StatusCode::OK,
+            &SuccessResponse {
+                success: true,
+                message: "Logged out successfully".into(),
+            },
+        ),
+        "",
+        0,
+        0,
+        false,
     )
 }
 
@@ -5387,18 +5461,12 @@ async fn generate_auth_response(
             let claims = jwt.verify_token(&token);
             let expires_at = claims.claims.map(|c| c.exp).unwrap_or(0);
 
-            // Single choke point for register/login/refresh/native-handoff: the
-            // `token` field below is what the doorway-app stores under the
-            // `doorway_auth_token` localStorage key, and minting it is the real
-            // event the peer-oauth-portal flow's not-yet-wired `elohim_session`
-            // cookie will eventually ride on. See metrics.rs for why both
-            // counters live here. See also
-            // `genesis/a2o/steps/auth/agency.steps.ts` and
-            // `genesis/a2o/steps/peer-oauth-portal/rp-consent.steps.ts`.
+            // Shared verified-auth choke point: JWT issuance and its public
+            // browser display projection are refreshed together.
             crate::metrics::inc_auth_token_issued();
             crate::metrics::inc_elohim_session_established();
 
-            json_response(
+            let response = json_response(
                 status,
                 &AuthResponse {
                     token,
@@ -5415,6 +5483,20 @@ async fn generate_auth_response(
                     hosted_cell_grant_cid: hosted_cell.map(|g| g.grant_cid.clone()),
                     hosted_cell_valid_until: hosted_cell.map(|g| g.valid_until.clone()),
                 },
+            );
+            with_browser_session_projection(
+                response,
+                human_id,
+                expires_at,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                state
+                    .args
+                    .doorway_url
+                    .as_deref()
+                    .is_some_and(|url| url.starts_with("https://")),
             )
         }
         Err(e) => json_response(
@@ -5560,6 +5642,54 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn browser_session_projection_is_public_encoded_and_expires_with_auth() {
+        let human = "human-matthew;\r\nX-Injected: no";
+        let response = with_browser_session_projection(
+            json_response(StatusCode::OK, &serde_json::json!({"token":"private-jwt"})),
+            human,
+            160,
+            100,
+            true,
+        );
+        let cookie = response.headers()[hyper::header::SET_COOKIE]
+            .to_str()
+            .unwrap();
+        assert!(cookie.contains("Path=/; Max-Age=60; SameSite=Lax; Secure"));
+        assert!(!cookie.contains("HttpOnly")); // existing browser chrome reads document.cookie
+        assert!(!cookie.contains("private-jwt"));
+        assert!(!cookie.contains('\r') && !cookie.contains('\n'));
+        let encoded = cookie
+            .split(';')
+            .next()
+            .unwrap()
+            .strip_prefix("elohim_session=")
+            .unwrap();
+        let view: serde_json::Value =
+            serde_json::from_str(&urlencoding::decode(encoded).unwrap()).unwrap();
+        assert_eq!(
+            view,
+            serde_json::json!({"humanId":human,"capabilities":[],"reach":""})
+        );
+    }
+
+    #[test]
+    fn browser_session_projection_expiry_and_logout_clear_same_origin_cookie() {
+        for (expires_at, now) in [(99, 100), (100, 100), (0, 0)] {
+            let response = with_browser_session_projection(
+                json_response(StatusCode::OK, &serde_json::json!({"success":true})),
+                "human-matthew",
+                expires_at,
+                now,
+                false,
+            );
+            assert_eq!(
+                response.headers()[hyper::header::SET_COOKIE],
+                "elohim_session=; Path=/; Max-Age=0; SameSite=Lax"
+            );
+        }
+    }
 
     // ── the registration→projection binding ───────────────────────────────
     //
@@ -6177,6 +6307,53 @@ mod tests {
     fn should_provision_is_false_without_a_pool() {
         assert!(!super::should_provision(false, true));
         assert!(!super::should_provision(false, false));
+    }
+
+    #[test]
+    fn registration_token_carries_the_provisioned_app_for_its_agent() {
+        let provisioned = ProvisionedAgent {
+            agent_pub_key: "uhCAk-registered-agent".into(),
+            conductor_id: "conductor-4".into(),
+            conductor_url: "ws://c4:4445".into(),
+            admin_url: "ws://c4:4444".into(),
+            installed_app_id: "elohim-conductor-4-927dff".into(),
+        };
+        let (installed_app_id, conductor_id) =
+            registration_conductor_claims(Some(&provisioned), "uhCAk-registered-agent")
+                .expect("provisioned identity must match the registration agent");
+
+        let validator = JwtValidator::new_dev();
+        let token = validator
+            .generate_token(TokenInput {
+                human_id: "human-registration".into(),
+                agent_pub_key: provisioned.agent_pub_key.clone(),
+                identifier: "registered@example.test".into(),
+                permission_level: PermissionLevel::Authenticated,
+                session_id: None,
+                doorway_id: Some("doorway-alpha".into()),
+                doorway_url: Some("https://doorway-alpha.elohim.host".into()),
+                conductor_id,
+                installed_app_id,
+                is_steward: false,
+                has_local_conductor: false,
+            })
+            .expect("registration JWT");
+        let claims = validator
+            .verify_token(&token)
+            .claims
+            .expect("minted registration token verifies");
+
+        assert_eq!(claims.agent_pub_key, provisioned.agent_pub_key);
+        assert_eq!(claims.conductor_id.as_deref(), Some("conductor-4"));
+        assert_eq!(
+            claims.installed_app_id.as_deref(),
+            Some("elohim-conductor-4-927dff")
+        );
+        assert_eq!(
+            registration_conductor_claims(Some(&provisioned), "uhCAk-other-agent"),
+            Err(()),
+            "a different provisioned agent must not receive this routing context"
+        );
     }
 
     /// The synthetic-identity fallback is reachable ONLY under a DECLARED
