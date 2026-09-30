@@ -300,6 +300,48 @@ describe('AuthService', () => {
   // ==========================================================================
 
   describe('logout', () => {
+    beforeEach(() => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('clears the doorway display projection with the current bearer before local reset', async () => {
+      service.registerProvider(createMockProvider());
+      await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'pw',
+      });
+      const fetchSpy = vi.mocked(globalThis.fetch);
+      await service.logout();
+      const [url, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+      expect(String(url)).toBe('http://localhost:8888/auth/logout');
+      expect(init.method).toBe('POST');
+      expect((init.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer test-token-123'
+      );
+      expect(service.isAuthenticated()).toBe(false);
+      expect(localStorageMock[AUTH_TOKEN_KEY]).toBeUndefined();
+    });
+
+    it('clears local session even when the doorway logout request fails', async () => {
+      service.registerProvider(createMockProvider());
+      await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'pw',
+      });
+      vi.mocked(globalThis.fetch).mockRejectedValue(new Error('doorway offline'));
+      await expect(service.logout()).resolves.toBeUndefined();
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.token()).toBeNull();
+      expect(localStorageMock[AUTH_TOKEN_KEY]).toBeUndefined();
+      expect(localStorageMock[AUTH_PROVIDER_KEY]).toBeUndefined();
+    });
     it('should clear authentication state', async () => {
       // First login
       const provider = createMockProvider('password');

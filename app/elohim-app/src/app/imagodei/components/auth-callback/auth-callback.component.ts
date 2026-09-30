@@ -33,8 +33,10 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import 'elohim-imagodei/register';
+
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 
 import { type AuthResult } from '../../models/auth.model';
 import { AuthService } from '../../services/auth.service';
@@ -61,7 +63,7 @@ import { SessionMigrationService } from '../../services/session-migration.servic
 })
 export class AuthCallbackComponent implements OnInit, AfterViewInit {
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
+  private readonly nav = inject(EprNavService);
   private readonly oauth = inject(OAuthAuthProvider);
   private readonly authService = inject(AuthService);
   private readonly migration = inject(SessionMigrationService);
@@ -123,7 +125,8 @@ export class AuthCallbackComponent implements OnInit, AfterViewInit {
     }
 
     const returnUrl = this.oauth.consumeReturnUrl() ?? '/lamad'; // route-literal-ok: default post-auth return mount (bundle nav target), not a minted content link
-    void this.router.navigate([returnUrl]);
+    // Lamad is a separately served bundle: the shared seam performs its load.
+    this.nav.navigate(returnUrl);
   }
 
   onError(e: Event): void {

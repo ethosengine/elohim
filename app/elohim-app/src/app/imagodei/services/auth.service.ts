@@ -265,7 +265,18 @@ export class AuthService {
     // Clear timer
     this.clearRefreshTimer();
 
-    // Clear persisted state (same key set clearPersistedAuth always removed)
+    // Clear the doorway's public browser projection through the same session
+    // client before removing the bearer. HTTP failure must never trap a local
+    // session or revoke the human, native key, or another device.
+    if (this.token()) {
+      try {
+        await this.getSessionClient(this.deriveAuthBaseUrl() ?? '').logout();
+      } catch {
+        // Local logout still completes when the doorway is unavailable.
+      }
+    }
+
+    // The client also clears in finally; retain this for signed-out/local paths.
     this.sessionStore.clear();
 
     // Reset state

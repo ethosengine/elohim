@@ -10,9 +10,11 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
+
+import { EprNavService } from '@app/elohim/services/epr-nav.service';
 
 import { AuthCallbackComponent } from './auth-callback.component';
 import { AuthService } from '../../services/auth.service';
@@ -42,7 +44,7 @@ function makeRoute(params: Record<string, string> = {}) {
 describe('AuthCallbackComponent (Lit wrapper)', () => {
   let fixture: ComponentFixture<AuthCallbackComponent>;
   let component: AuthCallbackComponent;
-  let router: Router;
+  let nav: { navigate: ReturnType<typeof vi.fn> };
 
   let mockOAuth: {
     handleCallback: ReturnType<typeof vi.fn>;
@@ -72,6 +74,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
   async function setup(
     queryParams: Record<string, string> = { code: 'abc', state: 'xyz', provider: 'github' }
   ) {
+    nav = { navigate: vi.fn() };
     mockOAuth = {
       handleCallback: vi.fn().mockResolvedValue(successResult),
       clearCallbackParams: vi.fn(),
@@ -92,15 +95,13 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
       imports: [AuthCallbackComponent],
       providers: [
         provideRouter([]),
+        { provide: EprNavService, useValue: nav },
         { provide: OAuthAuthProvider, useValue: mockOAuth },
         { provide: AuthService, useValue: mockAuthService },
         { provide: SessionMigrationService, useValue: mockMigration },
         { provide: ActivatedRoute, useValue: makeRoute(queryParams) },
       ],
     }).compileComponents();
-
-    router = TestBed.inject(Router);
-    vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     fixture = TestBed.createComponent(AuthCallbackComponent);
     component = fixture.componentInstance;
@@ -290,7 +291,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
     await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
-    expect(router.navigate).toHaveBeenCalledWith(['/lamad']);
+    expect(nav.navigate).toHaveBeenCalledWith('/lamad');
   });
 
   it('navigates to stored returnUrl when present', async () => {
@@ -299,7 +300,15 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
     await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
-    expect(router.navigate).toHaveBeenCalledWith(['/community/governance']);
+    expect(nav.navigate).toHaveBeenCalledWith('/community/governance');
+  });
+
+  it('hands the course return URL to the existing cross-bundle navigation seam', async () => {
+    await setup();
+    const course = '/lamad/path/foundations-christian-technology?chapter=1#start';
+    mockOAuth.consumeReturnUrl.mockReturnValue(course);
+    await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
+    expect(nav.navigate).toHaveBeenCalledWith(course);
   });
 
   it('consumes the return URL (calls consumeReturnUrl) on success', async () => {
@@ -334,7 +343,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
     await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
     expect(mockMigration.applySessionToProfile).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalled();
   });
 
   it('still lands the human somewhere when the carry-over fails', async () => {
@@ -348,7 +357,7 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
 
     await component.onSuccess(new CustomEvent('success', { detail: { session: successResult } }));
 
-    expect(router.navigate).toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
   });
 
@@ -387,6 +396,6 @@ describe('AuthCallbackComponent (Lit wrapper)', () => {
       new CustomEvent('error', { detail: { reason: 'access_denied', recoverable: false } })
     );
 
-    expect(router.navigate).not.toHaveBeenCalled();
+    expect(nav.navigate).not.toHaveBeenCalled();
   });
 });
