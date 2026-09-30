@@ -184,7 +184,11 @@ fn history_predecessor_matches(
     prior_sequence.checked_add(1) == Some(current_sequence) && prior_timestamp < current_timestamp
 }
 
-fn issuance_action_matches(grant: &HeadDelegation, record: &Record) -> bool {
+fn issuance_action_matches(
+    grant: &HeadDelegation,
+    record: &Record,
+    expected_type: ScopedLinkType,
+) -> bool {
     let Some(expected_hash) = &grant.payload.issuance_action_hash else {
         return false;
     };
@@ -197,9 +201,6 @@ fn issuance_action_matches(grant: &HeadDelegation, record: &Record) -> bool {
     {
         return false;
     }
-    let Ok(expected_type): Result<ScopedLinkType, _> = LinkTypes::IdToContent.try_into() else {
-        return false;
-    };
     matches!(&record.action().data, ActionData::CreateLink(link)
         if link.zome_index == expected_type.zome_index
             && link.link_type == expected_type.zome_type)
@@ -210,23 +211,36 @@ fn verify_issuance_record(
     root: &Record,
     record: &Record,
 ) -> ExternResult<()> {
-    if !issuance_action_matches(grant, record)
+    let expected_type: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
+    if !issuance_context_matches(grant, root, record, expected_type)
         || !verify_signature(
             grant.payload.grantor.clone(),
             record.signature().clone(),
             record.action(),
         )?
-        || root.action_address() != &grant.payload.root_action_hash
-        || root.action().author() != &grant.payload.grantor
-        || root.action().action_seq() >= record.action().action_seq()
-        || root.action().timestamp() >= record.action().timestamp()
-        || record.action().timestamp() >= grant.payload.valid_until
     {
         return Err(refused(
             "native issuance action does not follow the immutable root or match the signed grant",
         ));
     }
     Ok(())
+}
+
+/// Pure native-record boundary shared by issuance verification and regression
+/// tests. Cryptographic authenticity is checked immediately after this
+/// predicate by `verify_issuance_record` through Holochain's signature host.
+fn issuance_context_matches(
+    grant: &HeadDelegation,
+    root: &Record,
+    record: &Record,
+    expected_type: ScopedLinkType,
+) -> bool {
+    issuance_action_matches(grant, record, expected_type)
+        && root.action_address() == &grant.payload.root_action_hash
+        && root.action().author() == &grant.payload.grantor
+        && root.action().action_seq() < record.action().action_seq()
+        && root.action().timestamp() < record.action().timestamp()
+        && record.action().timestamp() < grant.payload.valid_until
 }
 
 fn is_revoked(
@@ -926,7 +940,7 @@ mod tests {
 
     #[test]
     fn legacy_v2_payload_and_acceptance_bytes_remain_unchanged() {
-        #[derive(Serialize)]
+        #[derive(Debug, Serialize)]
         struct LegacyPayload {
             grantor: AgentPubKey,
             delegate: AgentPubKey,
@@ -935,7 +949,7 @@ mod tests {
             root_action_hash: ActionHash,
             dna_hash: DnaHash,
         }
-        #[derive(Serialize)]
+        #[derive(Debug, Serialize)]
         struct LegacyStatement<'a> {
             domain: &'static str,
             grant: &'a LegacyPayload,
@@ -1019,6 +1033,245 @@ mod tests {
             witness_sequence,
             witness_at,
         ));
+    }
+
+    fn signed_test_record(action: Action) -> Record {
+        let hash = ActionHash::with_data_sync(&action);
+        Record::new(
+            SignedActionHashed::with_presigned(
+                ActionHashed::with_pre_hashed(action, hash),
+                Signature([0; 64]),
+            ),
+            RecordEntry::NotStored,
+        )
+    }
+
+    fn issuance_records(
+        root_action: Action,
+        issuer_action: Action,
+        grant_root: Option<ActionHash>,
+        grant_delegate: AgentPubKey,
+        valid_until: Timestamp,
+    ) -> (HeadDelegation, Record, Record) {
+        let root = signed_test_record(root_action);
+        let root_hash = grant_root.unwrap_or_else(|| root.action_address().clone());
+        let issuer = signed_test_record(issuer_action);
+        let grant = HeadDelegation {
+            payload: HeadDelegationPayload {
+                grantor: root.action().author().clone(),
+                delegate: grant_delegate,
+                scope: "lesson-1".into(),
+                valid_until,
+                root_action_hash: root_hash,
+                dna_hash: DnaHash::from_raw_36(vec![4; 36]),
+                issuance_action_hash: Some(issuer.action_address().clone()),
+            },
+            signature: Signature([1; 64]),
+            acceptance: None,
+        };
+        (grant, root, issuer)
+    }
+
+    fn issuance_fixture() -> (Action, Action, AgentPubKey, Timestamp, ScopedLinkType) {
+        let grantor = AgentPubKey::from_raw_36(vec![1; 36]);
+        let delegate = AgentPubKey::from_raw_36(vec![2; 36]);
+        let valid_until = Timestamp::from_micros(100_000);
+        let root = Action {
+            header: ActionHeader {
+                author: grantor.clone(),
+                timestamp: Timestamp::from_micros(1_000),
+                action_seq: 319,
+                prev_action: Some(ActionHash::from_raw_36(vec![3; 36])),
+            },
+            data: ActionData::Create(CreateData {
+                entry_type: EntryType::App(AppEntryDef::new(
+                    EntryDefIndex(0),
+                    ZomeIndex(0),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: EntryHash::from_raw_36(vec![5; 36]),
+            }),
+        };
+        let root_hash = ActionHash::with_data_sync(&root);
+        // IdToContent is the first link in this sole zome's `#[hdk_link_types]`
+        // declaration. Unit tests have no HDK zome scope registry to query.
+        let link_type = ScopedLinkType {
+            zome_index: 0.into(),
+            zome_type: 0.into(),
+        };
+        let issuer = Action {
+            header: ActionHeader {
+                author: grantor,
+                timestamp: Timestamp::from_micros(2_000),
+                action_seq: 29_502,
+                prev_action: Some(ActionHash::from_raw_36(vec![6; 36])),
+            },
+            data: ActionData::CreateLink(CreateLinkData {
+                base_address: AnyLinkableHash::from(root_hash),
+                target_address: AnyLinkableHash::from(delegate.clone()),
+                zome_index: link_type.zome_index,
+                link_type: link_type.zome_type,
+                tag: LinkTag::new(issuance_tag(valid_until)),
+            }),
+        };
+        (root, issuer, delegate, valid_until, link_type)
+    }
+
+    #[test]
+    fn native_issuance_record_rejects_wrong_author_root_delegate_tag_and_link_type() {
+        let (root_action, issuer_action, delegate, valid_until, expected_link_type) =
+            issuance_fixture();
+        let (valid, root, record) = issuance_records(
+            root_action.clone(),
+            issuer_action.clone(),
+            None,
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(issuance_context_matches(
+            &valid,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        let mut wrong_author = issuer_action.clone();
+        wrong_author.header.author = AgentPubKey::from_raw_36(vec![8; 36]);
+        let (grant, root, record) = issuance_records(
+            root_action.clone(),
+            wrong_author,
+            None,
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(!issuance_context_matches(
+            &grant,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        let wrong_base = ActionHash::from_raw_36(vec![9; 36]);
+        let mut wrong_root_link = issuer_action.clone();
+        if let ActionData::CreateLink(link) = &mut wrong_root_link.data {
+            link.base_address = AnyLinkableHash::from(wrong_base.clone());
+        }
+        let (grant, root, record) = issuance_records(
+            root_action.clone(),
+            wrong_root_link,
+            None,
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(!issuance_context_matches(
+            &grant,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        let mut issuer_for_wrong_grant_root = issuer_action.clone();
+        if let ActionData::CreateLink(link) = &mut issuer_for_wrong_grant_root.data {
+            link.base_address = AnyLinkableHash::from(wrong_base.clone());
+        }
+        let (grant, root, record) = issuance_records(
+            root_action.clone(),
+            issuer_for_wrong_grant_root,
+            Some(wrong_base),
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(!issuance_context_matches(
+            &grant,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        let mut wrong_delegate = issuer_action.clone();
+        if let ActionData::CreateLink(link) = &mut wrong_delegate.data {
+            link.target_address = AnyLinkableHash::from(AgentPubKey::from_raw_36(vec![10; 36]));
+        }
+        let (grant, root, record) = issuance_records(
+            root_action.clone(),
+            wrong_delegate,
+            None,
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(!issuance_context_matches(
+            &grant,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        let mut wrong_tag = issuer_action.clone();
+        if let ActionData::CreateLink(link) = &mut wrong_tag.data {
+            link.tag = LinkTag::new(issuance_tag(Timestamp::from_micros(99_999)));
+        }
+        let (grant, root, record) = issuance_records(
+            root_action.clone(),
+            wrong_tag,
+            None,
+            delegate.clone(),
+            valid_until,
+        );
+        assert!(!issuance_context_matches(
+            &grant,
+            &root,
+            &record,
+            expected_link_type
+        ));
+
+        for (zome_index, link_type) in [(1.into(), 0.into()), (0.into(), 1.into())] {
+            let mut wrong_type = issuer_action.clone();
+            if let ActionData::CreateLink(link) = &mut wrong_type.data {
+                link.zome_index = zome_index;
+                link.link_type = link_type;
+            }
+            let (grant, root, record) = issuance_records(
+                root_action.clone(),
+                wrong_type,
+                None,
+                delegate.clone(),
+                valid_until,
+            );
+            assert!(!issuance_context_matches(
+                &grant,
+                &root,
+                &record,
+                expected_link_type
+            ));
+        }
+    }
+
+    #[test]
+    fn native_issuance_record_must_follow_root_and_precede_expiry() {
+        let (root_action, issuer_action, delegate, valid_until, expected_link_type) =
+            issuance_fixture();
+        for (action_seq, timestamp, should_match) in [
+            (318, 2_000, false),
+            (29_502, 1_000, false),
+            (29_502, 100_000, false),
+            (29_502, 2_000, true),
+        ] {
+            let mut issuer = issuer_action.clone();
+            issuer.header.action_seq = action_seq;
+            issuer.header.timestamp = Timestamp::from_micros(timestamp);
+            let (grant, root, record) = issuance_records(
+                root_action.clone(),
+                issuer,
+                None,
+                delegate.clone(),
+                valid_until,
+            );
+            assert_eq!(
+                issuance_context_matches(&grant, &root, &record, expected_link_type),
+                should_match,
+                "seq={action_seq}, timestamp={timestamp}"
+            );
+        }
     }
 
     #[test]
