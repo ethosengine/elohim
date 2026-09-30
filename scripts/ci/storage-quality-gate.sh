@@ -6,7 +6,8 @@
 # storage-logic regression rode to prod as long as it compiled (found
 # 2026-07-01, crdt-content-dataplane handoff §3). Mirrors the doorway gate:
 # `--target check` reuses the BuildKit dep-layer cache, so no Rust toolchain
-# is needed in the CI builder image.
+# is needed in the CI builder image. This check-only solve omits the image
+# exporter: its result is the exit status, not a runtime artifact.
 #
 # Deliberately NO CACHE_BUST: COPY layers key on content hashes, so an
 # unchanged source tree is a full cache hit (seconds) and a changed tree
@@ -28,10 +29,11 @@ bash "$WORKSPACE_ROOT/scripts/ci/dead-config-lint.sh"
 
 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-# Tagged so superseded gate runs become prunable dangling images instead of
-# accumulating anonymous ones in the k8s.io namespace.
-BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
-    nerdctl -n k8s.io build \
-    --target check \
-    -t elohim-storage-check:ci \
-    -f elohim/elohim-storage/Dockerfile .
+cd "${WORKSPACE_ROOT}"
+buildctl --addr unix:///run/buildkit/buildkitd.sock build \
+    --frontend dockerfile.v0 \
+    --local context=. \
+    --local dockerfile=. \
+    --opt filename=elohim/elohim-storage/Dockerfile \
+    --opt target=check \
+    --progress plain

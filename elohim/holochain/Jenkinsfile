@@ -397,6 +397,9 @@ def runDoorwayQualityGate() {
  * non-blocking; the storage gate keeps its own timeout.
  */
 def runQualityGates() {
+    if (shouldRunStep('cargo-build-doorway') || shouldRunStep('cargo-build-storage')) {
+        sh "bash '${env.WORKSPACE}/scripts/ci/quality-gate-no-image-export.test.sh'"
+    }
     def gates = [doorway: { runDoorwayQualityGate() }]
     if (shouldRunStep('cargo-build-storage')) {
         gates.storage = { runStorageQualityGate() }
