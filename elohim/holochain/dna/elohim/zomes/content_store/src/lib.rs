@@ -2515,11 +2515,32 @@ pub(crate) fn latest_id_to_content_link(mut links: Vec<Link>) -> Option<Link> {
 /// vocabulary.
 #[hdk_extern]
 pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> {
-    // 1. Locate the latest action_hash via the content_id anchor link.
+    // Resolve identity before choosing a version: a newer same-id link may name
+    // a different immutable root. Preserve the existing link ordering WITHIN
+    // the canonical root, including successive locally authored updates.
+    let root = canonical_identity_root(&input.id, GetStrategy::Network)?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "update_content: canonical root history unavailable — PENDING".to_string()
+        ))
+    })?;
     let anchor = StringAnchor::new("content_id", &input.id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let mut links = Vec::new();
+    for link in get_links(query, GetStrategy::Network)? {
+        let Ok(target) = ActionHash::try_from(link.target.clone()) else {
+            continue;
+        };
+        let candidate_root = correction::resolve_root_create(target, GetStrategy::Network)?
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "update_content: candidate root history unavailable — PENDING".to_string()
+                ))
+            })?;
+        if candidate_root.action_address() == root.action_address() {
+            links.push(link);
+        }
+    }
     let link = latest_id_to_content_link(links).ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
             "update_content: no Content entry found for id '{}'. Call create_content first \

@@ -16,7 +16,7 @@
  *       [--storage URL] [--admin-ws URL] [--app-ws URL] [--app-id elohim] [--role lamad]
  *       [--data-dir DIR] [--signing-credentials-dir DIR] [--receipt-dir DIR]
  *       --device-agent KEY --dna-hash HASH --binding ACTION_HASH
- *       [--delegations FILE] [--grantor-connections FILE] [--redeclare] [--closure]
+ *       [--canonical-roots FILE] [--delegations FILE] [--grantor-connections FILE] [--redeclare] [--closure]
  *
  *   ids        resolved to <data-dir>/content/<id>.json or <data-dir>/paths/<id>.json
  *   --manifest a file listing ids (one per line, or a JSON array; `#` comments allowed)
@@ -69,6 +69,8 @@ import {
   type ConductorOptions,
 } from './lib/steward-conductor.js';
 import {
+  canonicalRootHints,
+  verifyRootHint,
   delegationWire,
   delegationDocument,
   type HeadDelegationDocument,
@@ -118,6 +120,7 @@ interface Options {
   receiptDir: string;
   binding?: string;
   delegationsFile?: string;
+  canonicalRootsFile?: string;
   grantorsFile?: string;
   nativeReceiversFile?: string;
   stageLocal: boolean;
@@ -133,7 +136,7 @@ function usage(msg?: string): never {
   console.error(
     'usage: steward-publish.ts <id>… [--manifest FILE] [--stage-local] [--dry-run] [--redeclare] [--closure] ' +
       '[--await-peer URL]… [--await-timeout S] [--storage URL] [--admin-ws URL] ' +
-      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--receipt-dir DIR] [--binding ACTION] [--delegations FILE] [--grantor-connections FILE] [--native-receivers FILE]'
+      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--receipt-dir DIR] [--binding ACTION] [--canonical-roots FILE] [--delegations FILE] [--grantor-connections FILE] [--native-receivers FILE]'
   );
   process.exit(2);
 }
@@ -211,6 +214,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--binding':
         o.binding = val();
+        break;
+      case '--canonical-roots':
+        o.canonicalRootsFile = resolve(val());
         break;
       case '--delegations':
         o.delegationsFile = resolve(val());
@@ -926,11 +932,21 @@ export async function runStewardPublish(
     const grantors = o.grantorsFile
       ? (JSON.parse(readFileSync(o.grantorsFile, 'utf8')) as Record<string, ConductorOptions>)
       : {};
+    const rootHints = o.canonicalRootsFile
+      ? canonicalRootHints(JSON.parse(readFileSync(o.canonicalRootsFile, 'utf8')) as unknown)
+      : undefined;
     // Validate the entire batch before uploading a blob or changing a row.
     for (const p of prepared) {
       if (!['create', 'update', 'declare'].includes(p.plan.action)) continue;
       let root: Uint8Array | null = null;
-      const reference = p.pending?.head ?? p.row?.dhtAnchorHash;
+      const grant = p.pending?.acceptedDelegation ?? p.pending?.delegation ?? grants[p.input.id];
+      const hint =
+        rootHints?.[p.input.id] ??
+        (grant ? { root: grant.rootActionHash, rootAuthor: grant.grantor } : undefined);
+      if (rootHints && !rootHints[p.input.id])
+        throw new Error(`publication preflight: canonical root hint missing for ${p.input.id}`);
+      if (hint) await verifyRootHint(c, p.input.id, hint);
+      const reference = hint?.root ?? p.pending?.head ?? p.row?.dhtAnchorHash;
       if (reference) {
         const lineage = await c.call<{
           root_action_hash: Uint8Array;
@@ -939,13 +955,30 @@ export async function runStewardPublish(
           truncated: boolean;
         }>('get_content_lineage', {
           action_hash: decodeHashFromBase64(reference),
-          local: true,
+          local: !hint,
         });
         if (lineage.content_id !== p.input.id || lineage.truncated)
           throw new Error(`publication preflight: incomplete or wrong lineage for ${p.input.id}`);
         root = lineage.root_action_hash;
-        const grant = p.pending?.acceptedDelegation ?? p.pending?.delegation ?? grants[p.input.id];
         const author = encodeHashToBase64(lineage.root_author);
+        if (p.pending) {
+          const pendingLineage = await c.call<{
+            content_id: string;
+            root_action_hash: Uint8Array;
+            truncated: boolean;
+          }>('get_content_lineage', {
+            action_hash: decodeHashFromBase64(p.pending.head),
+            local: true,
+          });
+          if (
+            pendingLineage.content_id !== p.input.id ||
+            pendingLineage.truncated ||
+            encodeHashToBase64(pendingLineage.root_action_hash) !== encodeHashToBase64(root)
+          )
+            throw new Error(
+              `publication preflight: pending head is outside canonical root for ${p.input.id}`
+            );
+        }
         if (grant) {
           if (
             grant.rootActionHash !== encodeHashToBase64(root) ||

@@ -110,7 +110,11 @@ function fixture() {
         if (name === refuse) throw new Error(`${name}: invalid or unavailable proof`);
         if (name === 'get_content_lineage')
           return {
-            root_action_hash: bytes(3),
+            referenced_action_hash: (payload as { action_hash: Uint8Array }).action_hash,
+            root_action_hash:
+              encodeHashToBase64((payload as { action_hash: Uint8Array }).action_hash) === hash(9)
+                ? bytes(9)
+                : bytes(3),
             root_author: bytes(4),
             content_id: 'lesson',
             truncated: false,
@@ -186,6 +190,9 @@ function fixture() {
   };
   return {
     dir,
+    competingRow: () => {
+      row.dhtAnchorHash = hash(9);
+    },
     argv,
     delayAuthorHistory: () => {
       delayedAuthorHistory = true;
@@ -380,4 +387,38 @@ void test('delayed native author history retries only the exact accepted version
   assert.equal(f.calls.filter(call => call === 'declare_earned_canonical_head').length, 2);
   assert.equal(f.receipt().acceptedDelegation?.acceptance?.witnessActionHash, hash(8));
   assert.ok(f.receipt().declaredAt);
+});
+
+void test('signed canonical grant root overrides a competing HTTP staging lineage before writes', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  f.competingRow();
+  const previous = globalThis.fetch;
+  globalThis.fetch = f.fetcher;
+  t.after(() => {
+    globalThis.fetch = previous;
+  });
+  assert.equal(await runStewardPublish([...f.argv, STAGE_LOCAL], f.connect), 1);
+  assert.equal(f.patches(), 1);
+  assert.equal(f.receipt().delegation?.rootActionHash, hash(3));
+});
+
+void test('canonical grant cannot reparent a previously authored pending head from another root', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  const previous = globalThis.fetch;
+  globalThis.fetch = f.fetcher;
+  t.after(() => {
+    globalThis.fetch = previous;
+  });
+  assert.equal(await runStewardPublish([...f.argv, STAGE_LOCAL], f.connect), 1);
+  const receiptPath = join(f.dir, 'receipts', readdirSync(join(f.dir, 'receipts'))[0]);
+  const pending = JSON.parse(readFileSync(receiptPath, 'utf8')) as PublicationReceipt;
+  pending.head = hash(9);
+  writeFileSync(receiptPath, JSON.stringify(pending));
+  await assert.rejects(
+    runStewardPublish([...f.argv, STAGE_LOCAL], f.connect),
+    /pending head is outside canonical root/
+  );
+  assert.equal(f.patches(), 1, 'no rewrite or reparent of existing pending version');
 });

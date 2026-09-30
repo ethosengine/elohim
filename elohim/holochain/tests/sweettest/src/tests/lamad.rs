@@ -4518,3 +4518,66 @@ struct AcceptDelegatedHeadMirror<T> {
     head_action_hash: ActionHash,
     delegation: T,
 }
+
+/// A later independent root must not capture the parent of a canonical-root
+/// update. Two successive updates remain a chain after both roots integrate.
+#[tokio::test(flavor = "multi_thread")]
+async fn updates_stay_on_canonical_root_after_competing_root_gossips() -> Result<()> {
+    let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors_isolated().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+    let app1 = c1
+        .setup_app_for_agent("lamad-app", a1, &[dna.clone()])
+        .await?;
+    let app2 = c2.setup_app_for_agent("lamad-app", a2, &[dna]).await?;
+    let cell1 = app1.cells().first().unwrap().clone();
+    let cell2 = app2.cells().first().unwrap().clone();
+    let zome1 = cell1.zome("content_store");
+    let zome2 = cell2.zome("content_store");
+    let id = unique_id("canonical-update-parent");
+    let root: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+    let competing: ContentOutput = c2.call(&zome2, "create_content", test_content(&id)).await;
+    assert_ne!(root.action_hash, competing.action_hash);
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while !SweetConductor::exchange_peer_info([&c1, &c2]).await {
+            sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await?;
+    await_consistency_s(60, [&cell1, &cell2])
+        .await
+        .map_err(|e| anyhow::anyhow!("independent roots did not integrate: {e}"))?;
+    // c2's later CreateLink was the old implementation's chosen parent.
+    let mut previous = root.action_hash;
+    for title in ["canonical version one", "canonical version two"] {
+        let updated: ContentOutput = c1
+            .call(
+                &zome1,
+                "update_content",
+                UpdateContentInput {
+                    id: id.clone(),
+                    title: Some(title.into()),
+                },
+            )
+            .await;
+        let carried: CarriedRecordOutput = c1
+            .call(
+                &zome1,
+                "get_record_for_action",
+                GetRecordForActionInput {
+                    action_hash: ActionHashB64::from(updated.action_hash.clone()).to_string(),
+                },
+            )
+            .await;
+        let record: Record = holochain_serialized_bytes::decode(&carried.record)?;
+        let ActionData::Update(update) = &record.action().data else {
+            panic!("expected native Update")
+        };
+        assert_eq!(
+            update.original_action_address, previous,
+            "canonical root then latest descendant must be the parent"
+        );
+        assert_ne!(update.original_action_address, competing.action_hash);
+        previous = updated.action_hash;
+    }
+    Ok(())
+}

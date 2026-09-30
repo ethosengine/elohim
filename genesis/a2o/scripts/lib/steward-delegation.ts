@@ -96,3 +96,64 @@ export function delegationWire(grant: HeadDelegationDocument): HeadDelegationWir
       : null,
   };
 }
+
+/** Private discovery hints, never a registry or substitute for native preflight. */
+export interface CanonicalRootHint {
+  root: string;
+  rootAuthor: string;
+}
+export function canonicalRootHints(value: unknown): Record<string, CanonicalRootHint> {
+  const rows = (value as { canonicalRoots?: unknown } | null)?.canonicalRoots;
+  if (!Array.isArray(rows)) throw new Error('Canonical roots must contain a canonicalRoots array');
+  const result: Record<string, CanonicalRootHint> = Object.create(null) as Record<
+    string,
+    CanonicalRootHint
+  >;
+  for (const row of rows as unknown[]) {
+    const item = row as { id?: unknown; root?: unknown; rootAuthor?: unknown } | null;
+    if (
+      !item ||
+      typeof item.id !== 'string' ||
+      !item.id ||
+      typeof item.root !== 'string' ||
+      typeof item.rootAuthor !== 'string' ||
+      Object.hasOwn(result, item.id)
+    )
+      throw new Error('Invalid or duplicate canonical root hint');
+    for (const [text, prefix] of [
+      [item.root, 41],
+      [item.rootAuthor, 32],
+    ] as const) {
+      const bytes = decodeHashFromBase64(text);
+      if (bytes.length !== 39 || bytes[0] !== 132 || bytes[1] !== prefix || bytes[2] !== 36)
+        throw new Error('Canonical hint must name a native Create action and author key');
+    }
+    result[item.id] = { root: item.root, rootAuthor: item.rootAuthor };
+  }
+  return result;
+}
+
+/** Verify the exact native Create lineage. Canonical-ID authority is checked
+ * separately by preflight_head_publication, never inferred from this read. */
+export async function verifyRootHint(
+  conductor: Pick<import('./steward-conductor.js').Conductor, 'call'>,
+  id: string,
+  hint: CanonicalRootHint,
+  local = false
+): Promise<void> {
+  const lineage = await conductor.call<{
+    content_id: string;
+    referenced_action_hash: Uint8Array;
+    root_action_hash: Uint8Array;
+    root_author: Uint8Array;
+    truncated: boolean;
+  }>('get_content_lineage', { action_hash: decodeHashFromBase64(hint.root), local });
+  if (
+    lineage.content_id !== id ||
+    lineage.truncated ||
+    encodeHashToBase64(lineage.referenced_action_hash) !== hint.root ||
+    encodeHashToBase64(lineage.root_action_hash) !== hint.root ||
+    encodeHashToBase64(lineage.root_author) !== hint.rootAuthor
+  )
+    throw new Error(`Incomplete or mismatched native root hint for ${id}`);
+}

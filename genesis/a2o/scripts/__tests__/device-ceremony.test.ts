@@ -224,3 +224,114 @@ it('explicit resume cannot generate a new signer when durable state is missing',
     await f.cleanup();
   }
 });
+
+it('all seven competing-root scopes pass native author preflight before any issuance', async () => {
+  const { grantContent } = await import('../device-ceremony.js');
+  const dir = await mkdtemp(join(tmpdir(), 'canonical-grants-'));
+  try {
+    const dna = encodeHashToBase64(hash(45, 1));
+    const author = encodeHashToBase64(hash(32, 2));
+    const delegate = encodeHashToBase64(hash(32, 3));
+    const roots = Array.from({ length: 7 }, (_, i) => ({
+      id: `competing-${i}`,
+      root: encodeHashToBase64(hash(41, 10 + i)),
+      rootAuthor: author,
+    }));
+    await writeFile(join(dir, 'ids.json'), JSON.stringify(roots.map(r => r.id)));
+    await writeFile(join(dir, 'roots.json'), JSON.stringify({ canonicalRoots: roots }));
+    const profile = {
+      expectedAgent: author,
+      signingCredentialsDir: dir,
+      adminWs: 'ws://unused',
+      appWs: 'ws://unused',
+      appId: 'native',
+      role: 'lamad',
+    };
+    const config = {
+      operator: profile,
+      device: profile,
+      humanAction: 'unused',
+      contentDna: dna,
+      stateDir: dir,
+      contentGrant: {
+        manifest: join(dir, 'ids.json'),
+        canonicalRoots: join(dir, 'roots.json'),
+        storage: 'https://must-not-read-http-staging-head',
+        source: profile,
+        grantors: { [author]: profile },
+        validUntil: Date.now() * 1000 + 60000000,
+      },
+    };
+    const checked = new Set<string>();
+    let writes = 0,
+      refuseLast = true;
+    const connect = (async (options: { expectedAgent?: string }) =>
+      Promise.resolve({
+        agent: options.expectedAgent ?? delegate,
+        dna,
+        close: async () => Promise.resolve(),
+        call: async (
+          fn: string,
+          input: {
+            action_hash?: Uint8Array;
+            id?: string;
+            scope?: string;
+            root_action_hash?: Uint8Array;
+          }
+        ) => {
+          await Promise.resolve();
+          if (fn === 'get_content_lineage') {
+            const root = roots.find(r => r.root === encodeHashToBase64(input.action_hash!));
+            assert(root, 'must resolve explicit canonical Create, never stale HTTP head');
+            return {
+              content_id: root.id,
+              referenced_action_hash: input.action_hash,
+              root_action_hash: input.action_hash,
+              root_author: hash(32, 2),
+              truncated: false,
+            };
+          }
+          if (fn === 'preflight_head_publication') {
+            assert.equal(options.expectedAgent, author);
+            if (refuseLast && input.id === roots[6].id) throw Error('canonical root differs');
+            checked.add(input.id!);
+            return {};
+          }
+          assert.equal(fn, 'grant_head_delegation');
+          assert.equal(checked.size, 7, 'ALL scopes must be authorized before FIRST grant');
+          writes++;
+          return {
+            payload: {
+              grantor: hash(32, 2),
+              delegate: hash(32, 3),
+              scope: input.scope,
+              valid_until: config.contentGrant.validUntil,
+              root_action_hash: input.root_action_hash,
+              dna_hash: hash(45, 1),
+              issuance_action_hash: hash(41, 30 + writes),
+            },
+            signature: new Uint8Array(64),
+            acceptance: null,
+          };
+        },
+      })) as unknown as typeof import('../lib/steward-conductor.js').connectConductor;
+    await assert.rejects(
+      grantContent(config, { deviceAgent: delegate }, connect),
+      /canonical root differs/
+    );
+    assert.equal(writes, 0, 'one stale canonical hint refuses the complete issuance batch');
+    refuseLast = false;
+    checked.clear();
+    await grantContent(config, { deviceAgent: delegate }, connect);
+    assert.equal(writes, 7);
+    const saved = JSON.parse(await readFile(join(dir, 'grants.json'), 'utf8')) as Record<
+      string,
+      { rootActionHash: string }
+    >;
+    for (const root of roots) assert.equal(saved[root.id].rootActionHash, root.root);
+    await grantContent(config, { deviceAgent: delegate }, connect);
+    assert.equal(writes, 7, 'exact existing receipts resume without issuing again');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

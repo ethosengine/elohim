@@ -21,9 +21,18 @@ import {
   conductorSocketOptions,
   loadSigningCredentials,
 } from './lib/steward-conductor.js';
+import {
+  canonicalRootHints,
+  verifyRootHint,
+  delegationDocument,
+} from './lib/steward-delegation.js';
 
 import type { ConductorOptions, HostedConductorReceipt } from './lib/steward-conductor.js';
-import type { HeadDelegationDocument } from './lib/steward-delegation.js';
+import type {
+  CanonicalRootHint,
+  HeadDelegationDocument,
+  HeadDelegationWire,
+} from './lib/steward-delegation.js';
 import type {
   AppInfo,
   CellId,
@@ -40,6 +49,7 @@ interface Config {
   supersedes?: string;
   contentGrant?: {
     manifest: string;
+    canonicalRoots?: string;
     storage: string;
     source: ConductorOptions;
     grantors: Record<string, ConductorOptions>;
@@ -510,7 +520,11 @@ async function hostedCredentials(config: ConductorOptions): Promise<void> {
 }
 
 /** Content stewardship is a separate act by each immutable root's author. */
-async function grantContent(config: Config, state: BindingState): Promise<void> {
+export async function grantContent(
+  config: Config,
+  state: Pick<BindingState, 'deviceAgent'>,
+  connect: typeof connectConductor = connectConductor
+): Promise<void> {
   const input = config.contentGrant;
   if (!input || !Number.isSafeInteger(input.validUntil) || input.validUntil <= Date.now() * 1000)
     throw new Error(
@@ -526,95 +540,110 @@ async function grantContent(config: Config, state: BindingState): Promise<void> 
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
-  const source = await connectConductor({
+  const hints = input.canonicalRoots
+    ? canonicalRootHints(JSON.parse(await readFile(input.canonicalRoots, 'utf8')) as unknown)
+    : undefined;
+  if (new Set(ids).size !== ids.length) throw new Error('Duplicate content grant scope');
+  const source = await connect({
     ...options(input.source, 'lamad'),
     expectedDna: config.contentDna,
   });
+  const signers = new Map<string, Awaited<ReturnType<typeof connectConductor>>>();
+  const ready: {
+    id: string;
+    hint: CanonicalRootHint;
+    signer: Awaited<ReturnType<typeof connectConductor>>;
+  }[] = [];
   try {
+    // Resolve and authorize EVERY exact scope before the first issuance write.
     for (const id of ids) {
-      const response = await fetch(`${input.storage}/db/content/${encodeURIComponent(id)}`, {
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!response.ok)
-        throw new Error(`Cannot resolve immutable content root for ${id}: HTTP ${response.status}`);
-      const row = (await response.json()) as {
-        dhtAnchorHash?: string;
-        content?: { dhtAnchorHash?: string };
-      };
-      const anchor = row.content?.dhtAnchorHash ?? row.dhtAnchorHash;
-      if (!anchor) throw new Error(`Cannot grant unanchored content ${id}`);
-      const lineage = await source.call<{
-        root_action_hash: Uint8Array;
-        root_author: Uint8Array;
-        content_id: string;
-        truncated: boolean;
-      }>('get_content_lineage', { action_hash: hash(anchor), local: false });
-      if (lineage.content_id !== id || lineage.truncated)
-        throw new Error(`Incomplete or mismatched lineage for ${id}`);
-      const root = encoded(lineage.root_action_hash);
-      const author = encoded(lineage.root_author);
+      let hint = hints?.[id];
+      if (hints && !hint) throw new Error(`Canonical root hint missing for ${id}`);
+      if (!hint) {
+        const response = await fetch(`${input.storage}/db/content/${encodeURIComponent(id)}`, {
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!response.ok)
+          throw new Error(`Cannot discover root for ${id}: HTTP ${response.status}`);
+        const row = (await response.json()) as {
+          dhtAnchorHash?: string;
+          content?: { dhtAnchorHash?: string };
+        };
+        const anchor = row.content?.dhtAnchorHash ?? row.dhtAnchorHash;
+        if (!anchor) throw new Error(`Cannot grant unanchored content ${id}`);
+        const lineage = await source.call<{
+          root_action_hash: Uint8Array;
+          root_author: Uint8Array;
+        }>('get_content_lineage', { action_hash: hash(anchor), local: false });
+        hint = {
+          root: encoded(lineage.root_action_hash),
+          rootAuthor: encoded(lineage.root_author),
+        };
+      }
+      await verifyRootHint(source, id, hint);
       const previous = grants[id];
-      if (previous) {
-        if (
-          previous.rootActionHash !== root ||
-          previous.grantor !== author ||
+      if (
+        previous &&
+        (previous.rootActionHash !== hint.root ||
+          previous.grantor !== hint.rootAuthor ||
           previous.delegate !== state.deviceAgent ||
           previous.dnaHash !== config.contentDna ||
           previous.scope !== id ||
-          previous.validUntil !== input.validUntil
-        )
+          previous.validUntil !== input.validUntil)
+      )
+        throw new Error(
+          `Existing grant ${id} differs; retain its receipt and use an explicit new grant state directory`
+        );
+      let signer = signers.get(hint.rootAuthor);
+      if (!signer) {
+        const profile = input.grantors[hint.rootAuthor];
+        if (!profile)
           throw new Error(
-            `Existing grant ${id} differs; retain its receipt and use an explicit new grant state directory`
+            `No explicitly configured root-author signer for ${id} (${hint.rootAuthor})`
           );
-        continue;
-      }
-      const profile = input.grantors[author];
-      if (!profile)
-        throw new Error(`No explicitly configured root-author signer for ${id} (${author})`);
-      const grantor = await connectConductor({
-        ...options(profile, 'lamad'),
-        expectedAgent: author,
-        expectedDna: config.contentDna,
-      });
-      try {
-        const grant = await grantor.call<{
-          payload: {
-            grantor: Uint8Array;
-            delegate: Uint8Array;
-            scope: string;
-            valid_until: number;
-            root_action_hash: Uint8Array;
-            dna_hash: Uint8Array;
-            issuance_action_hash?: Uint8Array;
-          };
-          signature: Uint8Array;
-        }>('grant_head_delegation', {
-          delegate: hash(state.deviceAgent),
-          scope: id,
-          valid_until: input.validUntil,
-          root_action_hash: lineage.root_action_hash,
+        signer = await connect({
+          ...options(profile, 'lamad'),
+          expectedAgent: hint.rootAuthor,
+          expectedDna: config.contentDna,
         });
-        grants[id] = {
-          grantor: encoded(grant.payload.grantor),
-          delegate: encoded(grant.payload.delegate),
-          scope: grant.payload.scope,
-          validUntil: grant.payload.valid_until,
-          rootActionHash: encoded(grant.payload.root_action_hash),
-          dnaHash: encoded(grant.payload.dna_hash),
-          ...(grant.payload.issuance_action_hash
-            ? { issuanceActionHash: encoded(grant.payload.issuance_action_hash) }
-            : {}),
-          signature: Buffer.from(grant.signature).toString('base64'),
-        };
-        const temporary = `${outputPath}.tmp`;
-        await writeFile(temporary, `${JSON.stringify(grants, null, 2)}\n`, { mode: 0o600 });
-        await rename(temporary, outputPath);
-        console.log(`Content-scoped grant recorded for ${id}, root ${root}`);
-      } finally {
-        await grantor.close();
+        signers.set(hint.rootAuthor, signer);
       }
+      // The actual native root author verifies canonical ID selection, independently
+      // of the HTTP projection and the caller-supplied hint.
+      await signer.call('preflight_head_publication', {
+        id,
+        expected_root: hash(hint.root),
+        accepted_head: null,
+        delegation: null,
+      });
+      ready.push({ id, hint, signer });
+    }
+    for (const { id, hint, signer } of ready) {
+      if (grants[id]) continue;
+      const wire = await signer.call<HeadDelegationWire>('grant_head_delegation', {
+        delegate: hash(state.deviceAgent),
+        scope: id,
+        valid_until: input.validUntil,
+        root_action_hash: hash(hint.root),
+      });
+      const grant = delegationDocument(wire);
+      if (
+        grant.rootActionHash !== hint.root ||
+        grant.grantor !== hint.rootAuthor ||
+        grant.delegate !== state.deviceAgent ||
+        grant.dnaHash !== config.contentDna ||
+        grant.scope !== id ||
+        grant.validUntil !== input.validUntil
+      )
+        throw new Error(`Issued grant context mismatch for ${id}; preserve native evidence`);
+      grants[id] = grant;
+      const temporary = `${outputPath}.tmp`;
+      await writeFile(temporary, `${JSON.stringify(grants, null, 2)}\n`, { mode: 0o600 });
+      await rename(temporary, outputPath);
+      console.log(`Content-scoped grant recorded for ${id}, root ${hint.root}`);
     }
   } finally {
+    await Promise.allSettled([...signers.values()].map(async signer => signer.close()));
     await source.close();
   }
 }

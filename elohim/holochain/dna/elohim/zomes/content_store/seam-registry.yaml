@@ -24,6 +24,40 @@ seamLocus: >
   (authorize_canonical_head_declarer).
 
 decisionPoints:
+  - name: update_content
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: content_store::update_content
+    summary: >
+      Selects the update parent only among native descendants of the canonical
+      immutable Content root. Preserves existing within-root CreateLink timestamp
+      and hash ordering, including successive updates. An unresolved candidate
+      ancestry is pending, never permission to adopt another root. This authors a
+      version; root-author acceptance and earned declaration separately authorize
+      publication. CLI canonical hints remain private discovery inputs verified
+      through native exact-Create lineage and canonical preflight before grants.
+    concernIds:
+      - { id: C0, status: answered, justification: "Native Content version ancestry, not HTTP projection or identity administration." }
+      - { id: C1, status: n-a, justification: "Writing an Update does not elect or accept it for publication." }
+      - { id: C2, status: answered, justification: "Canonical root selection is reused; within-root order remains signed link timestamp then hash, not arrival order." }
+      - { id: C3, status: partial, justification: "Missing ancestry refuses as pending; existing callers must retry after prerequisites integrate." }
+      - { id: C4, status: answered, justification: "Unresolved candidate roots error before any update rather than selecting a fallback root." }
+      - { id: C5, status: answered, justification: "Every candidate root is derived through native action ancestry; manifest hints cannot determine the parent." }
+      - { id: C6a, status: partial, justification: "Reuses bounded root walks, but the existing host link collection is not paginated; no added head entries or background sweep." }
+      - { id: C6b, status: partial, justification: "Update calls intentionally author versions; publisher durable pending receipts prevent reauthoring after interruption." }
+      - { id: C7, status: n-a, justification: "No availability advertisement or serving endpoint is added." }
+      - { id: C8, status: partial, justification: "Explicit existing guest-error channel identifies pending ancestry; no typed counter added." }
+      - { id: C9, status: n-a, justification: "No human identity or controller mapping changes." }
+      - { id: C10, status: answered, justification: "Native update input and grant payload remain unchanged; optional CLI hints are explicitly parsed and verified." }
+      - { id: C11, status: partial, justification: "No new queue or overload policy; existing conductor admission applies." }
+      - { id: C12, status: answered, justification: "Parent selection confers no publication permission; root-author delegation and native preflight remain required." }
+      - { id: C13, status: n-a, justification: "No authority tier, scaffold or privilege is introduced." }
+      - { id: C14, status: partial, justification: "Errors remain visible in existing pending publication receipts, without a new distributed residual envelope." }
+    contractTests:
+      - { path: elohim/holochain/tests/sweettest/src/tests/lamad.rs, testName: updates_stay_on_canonical_root_after_competing_root_gossips, kind: sweettest }
+      - { path: elohim/holochain/tests/sweettest/src/tests/lamad.rs, testName: update_of_update_supersedes_previous_version_not_root, kind: sweettest }
+
   - name: verify_accepted_publication
     kind: verdict-fn
     sourceLocation:
