@@ -26,6 +26,7 @@
  *   --binding  verified additive device enrollment; never an administration grant
  *   --delegations  JSON map: content id -> root-author signed, root/DNA-scoped grant
  *   --grantor-connections  JSON map: root author -> existing conductor credentials
+ *   --stage-local          Author locally and save an exact-head pending receipt; no grantor/receiver connection.
  *   --native-receivers     JSON map: receiver name -> existing conductor credentials;
  *                          observes native election/history within the same deadline
  *              used to acknowledge the exact version; never mints a new grant
@@ -56,7 +57,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { decodeHashFromBase64, encodeHashToBase64 } from '@holochain/client';
 
@@ -114,6 +115,7 @@ interface Options {
   delegationsFile?: string;
   grantorsFile?: string;
   nativeReceiversFile?: string;
+  stageLocal: boolean;
   dryRun: boolean;
   redeclare: boolean;
   closure: boolean;
@@ -124,7 +126,7 @@ interface Options {
 function usage(msg?: string): never {
   if (msg) console.error(`steward-publish: ${msg}`);
   console.error(
-    'usage: steward-publish.ts <id>… [--manifest FILE] [--dry-run] [--redeclare] [--closure] ' +
+    'usage: steward-publish.ts <id>… [--manifest FILE] [--stage-local] [--dry-run] [--redeclare] [--closure] ' +
       '[--await-peer URL]… [--await-timeout S] [--storage URL] [--admin-ws URL] ' +
       '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--receipt-dir DIR] [--binding ACTION] [--delegations FILE] [--grantor-connections FILE] [--native-receivers FILE]'
   );
@@ -158,6 +160,7 @@ function parseArgs(argv: string[]): Options {
     appId: env.STEWARD_APP_ID ?? 'elohim',
     role: env.STEWARD_ROLE ?? 'lamad',
     receiptDir: env.STEWARD_RECEIPT_DIR ?? '',
+    stageLocal: false,
     dryRun: false,
     redeclare: false,
     closure: false,
@@ -215,6 +218,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--receipt-dir':
         o.receiptDir = resolve(val());
+        break;
+      case '--stage-local':
+        o.stageLocal = true;
         break;
       case '--dry-run':
         o.dryRun = true;
@@ -440,8 +446,12 @@ function norm(v: string | null | undefined): string | null {
   return v === undefined || v === null || v === '' ? null : v;
 }
 
-async function verifyBinding(o: Options, c: Conductor): Promise<void> {
-  const identity = await connectConductor({
+async function verifyBinding(
+  o: Options,
+  c: Conductor,
+  connect: typeof connectConductor
+): Promise<void> {
+  const identity = await connect({
     ...o,
     role: 'mishpat',
     zome: 'mishpat',
@@ -462,12 +472,13 @@ async function publishOne(
   o: Options,
   p: Prepared,
   conductor: () => Promise<Conductor>,
-  deadline: number
+  deadline: number,
+  connect: typeof connectConductor
 ): Promise<string> {
   const { input, plan } = p;
   const id = input.id;
   const c = await conductor();
-  await verifyBinding(o, c);
+  await verifyBinding(o, c, connect);
   let head = p.pending?.head ?? p.row?.dhtAnchorHash ?? '';
   if (!p.pending && (plan.action === 'create' || plan.action === 'update')) {
     if (p.blob) await ensureBlob(o.storage, p.blob);
@@ -509,9 +520,14 @@ async function publishOne(
     authoredAt: new Date().toISOString(),
   };
   savePublication(o.receiptDir, receipt);
+  if (o.stageLocal) {
+    throw new Error(
+      'publication pending: authored locally; connected acceptance and declaration required'
+    );
+  }
   if (p.delegation) {
     if (!p.grantor) throw new Error('root-author acceptance connection missing');
-    const author = await connectConductor(p.grantor);
+    const author = await connect(p.grantor);
     try {
       for (;;) {
         const remaining = deadline - Date.now();
@@ -707,8 +723,11 @@ async function awaitReceivers(
   return [...httpResults, ...nativeResults].every(Boolean);
 }
 
-async function main(): Promise<void> {
-  const o = parseArgs(process.argv.slice(2));
+export async function runStewardPublish(
+  argv: string[],
+  connect: typeof connectConductor = connectConductor
+): Promise<number> {
+  const o = parseArgs(argv);
 
   // 1. Resolve every id and apply the commons fence to ALL of them before anything
   //    else touches a peer. One refusal refuses the batch.
@@ -737,7 +756,7 @@ async function main(): Promise<void> {
     console.error(
       `steward-publish: ${refused} item(s) refused by the commons fence — nothing was written`
     );
-    process.exit(2);
+    return 2;
   }
 
   // 2. Build each input with the seeder's own builders, resolve its linked blob, read
@@ -761,7 +780,7 @@ async function main(): Promise<void> {
         '',
         `builder resolved reach "${input.reach}"`
       );
-      process.exit(2);
+      return 2;
     }
     const row = await getRow(o.storage, item.id);
     let earned: string | undefined;
@@ -779,7 +798,7 @@ async function main(): Promise<void> {
   let conductor: Conductor | undefined;
   const getConductor = async (): Promise<Conductor> => {
     if (!conductor) {
-      conductor = await connectConductor(o);
+      conductor = await connect(o);
       console.log(
         `steward agent ${conductor.agent} (app ${o.appId}, role ${o.role}, ${o.adminWs})`
       );
@@ -787,7 +806,7 @@ async function main(): Promise<void> {
     return conductor;
   };
   const receivers = new Map<string, Conductor>();
-  if (!o.dryRun && o.nativeReceiversFile) {
+  if (!o.dryRun && !o.stageLocal && o.nativeReceiversFile) {
     const profiles = JSON.parse(readFileSync(o.nativeReceiversFile, 'utf8')) as Record<
       string,
       ConductorOptions
@@ -802,7 +821,7 @@ async function main(): Promise<void> {
         throw new Error(
           `Native receiver ${name} requires its explicit agent, matching DNA and existing credentials`
         );
-      const receiver = await connectConductor(profile);
+      const receiver = await connect(profile);
       if (
         receiver.agent === source.agent ||
         [...receivers.values()].some(peer => peer.agent === receiver.agent)
@@ -873,7 +892,7 @@ async function main(): Promise<void> {
       throw new Error(
         'publication preflight: storage/conductor agent or DNA pairing is not verified'
       );
-    await verifyBinding(o, c);
+    await verifyBinding(o, c, connect);
     const grants = o.delegationsFile
       ? (JSON.parse(readFileSync(o.delegationsFile, 'utf8')) as Record<
           string,
@@ -915,8 +934,10 @@ async function main(): Promise<void> {
           if (!grantors[author])
             throw new Error(`root-author acceptance connection missing for ${p.input.id}`);
           p.grantor = { ...grantors[author], expectedAgent: author, expectedDna: c.dna };
-          const signer = await connectConductor(p.grantor);
-          await signer.close();
+          if (!o.stageLocal) {
+            const signer = await connect(p.grantor);
+            await signer.close();
+          }
         }
       } else if (grants[p.input.id]) {
         throw new Error(`publication preflight: grant supplied for unresolved root ${p.input.id}`);
@@ -937,7 +958,7 @@ async function main(): Promise<void> {
     if (action === 'unchanged') {
       line(id, reach, 'unchanged', p.row?.dhtAnchorHash ?? '', 'seedHash matches; no writes');
       heads.set(id, p.row?.dhtAnchorHash ?? '');
-      if (!o.dryRun) {
+      if (!o.dryRun && !o.stageLocal) {
         const deadline = Date.now() + o.awaitTimeoutS * 1000;
         if (!(await awaitReceivers(o, p, heads, receivers, getConductor, deadline))) {
           problems++;
@@ -984,7 +1005,7 @@ async function main(): Promise<void> {
         }
       }
       const deadline = Date.now() + o.awaitTimeoutS * 1000;
-      const head = await publishOne(o, p, getConductor, deadline);
+      const head = await publishOne(o, p, getConductor, deadline, connect);
       line(id, reach, action === 'declare' ? 'declared' : 'published', head);
       heads.set(id, head);
       if (!(await awaitReceivers(o, p, heads, receivers, getConductor, deadline))) {
@@ -1014,12 +1035,18 @@ async function main(): Promise<void> {
   await Promise.all([...receivers.values()].map(receiver => receiver.close()));
   if (conductor) await conductor.close();
 
-  process.exit(problems > 0 ? 1 : 0);
+  return problems > 0 ? 1 : 0;
 }
 
-main().catch(e => {
-  console.error(
-    `steward-publish: ${String(e instanceof Error ? (e.stack ?? e.message) : e).slice(0, 1200)}`
-  );
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  runStewardPublish(process.argv.slice(2))
+    .then(code => {
+      process.exit(code);
+    })
+    .catch(e => {
+      console.error(
+        `steward-publish: ${String(e instanceof Error ? (e.stack ?? e.message) : e).slice(0, 1200)}`
+      );
+      process.exit(1);
+    });
+}
