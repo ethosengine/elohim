@@ -91,6 +91,14 @@ describe('planItem', () => {
     assert.deepEqual(plan.uncarried, []);
   });
 
+  it('bootstraps a seeded SQL row even when its seed hash already matches', () => {
+    const row = anchoredRow({ dhtAnchorHash: null, metadata: { seedHash: seedHashFor(content) } });
+    const plan = planItem(content, row);
+    assert.equal(plan.action, 'update');
+    assert.deepEqual(plan.uncarried, []);
+    assert.equal(planItem(content, { ...row, contentType: 'path' }).action, 'blocked');
+  });
+
   it('updates an anchored row whose body changed — update_content carries the body', () => {
     const plan = planItem(content, anchoredRow({ contentBody: '# older body' }));
     assert.equal(plan.action, 'update');

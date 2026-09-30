@@ -139,7 +139,9 @@ export function planItem(
 ): ItemPlan {
   const seedHash = seedHashFor(input);
   if (!row) return { action: 'create', seedHash, uncarried: [] };
-  if (asObject(row.metadata)[SEED_HASH_KEY] === seedHash) {
+  // A SQL seed marker is not a native version. Bootstrap unanchored rows
+  // through the existing PATCH/create_content path before declaring a head.
+  if (row.dhtAnchorHash && asObject(row.metadata)[SEED_HASH_KEY] === seedHash) {
     const declared = Boolean(row.dhtAnchorHash) && earnedHead === row.dhtAnchorHash;
     return { action: declared ? 'unchanged' : 'declare', seedHash, uncarried: [] };
   }
