@@ -1978,7 +1978,8 @@ impl CanonicalOrdering {
     }
 }
 
-/// A declaration link's hash as the election's tiebreak orders it: the 39 raw
+/// The election's effective tiebreak (legacy type name): a root-accepted head
+/// action for delegates, otherwise the declaration link hash. These are 39 raw
 /// bytes, compared lexicographically — `HoloHash`'s own `Ord`, which is what
 /// `select_arbitrated_winner` sorts on in the zome. Comparing the base64 text
 /// instead would not agree with it (the alphabet `-`/`_` does not sort in

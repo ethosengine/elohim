@@ -2605,7 +2605,8 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     // law (integrity floor 7 binds a successor to its predecessor's type), so
     // an ordinary update may neither enter nor leave those classes.
     if let Some(v) = input.content_type {
-        let special = |t: &str| t.starts_with("attestation:") || t.starts_with("governance-action:");
+        let special =
+            |t: &str| t.starts_with("attestation:") || t.starts_with("governance-action:");
         if v != content.content_type && (special(&v) || special(&content.content_type)) {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "update_content: content_type '{}' -> '{}' crosses the attestation / \
@@ -2676,7 +2677,8 @@ pub struct ContentHeadOutput {
     /// output (no field) deserializing as false — the safe reading.
     #[serde(default)]
     pub canonical: bool,
-    /// The WINNING canonical-head declaration's DHT LINK timestamp — the exact
+    /// The winning authority clock: root-author signed acceptance time for a
+    /// delegated version, otherwise the DHT declaration link timestamp — the exact
     /// ordering [`select_canonical_winner`] arbitrated on.
     ///
     /// `Some` on the canonical branch of [`resolve_content_head_inner`] and on a
@@ -2694,7 +2696,7 @@ pub struct ContentHeadOutput {
     /// [`declare_canonical_head_inner`] it is deliberately overwritten with the
     /// receiving conductor's `sys_time()`. Three different clocks share that one
     /// field, so it cannot order two DECLARATIONS. This field carries the one
-    /// clock that can: the notarized link timestamp every peer sees identically.
+    /// clock that can: the signed authority clock every peer sees identically.
     /// The storage projection's monotonic heal guard keys off THIS, not
     /// `declared_at`.
     #[serde(default)]
@@ -2707,9 +2709,9 @@ pub struct ContentHeadOutput {
     /// re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
-    /// The WINNING declaration's create-link hash — the third field of
-    /// [`select_canonical_winner`]'s key, the tiebreak between two declarations
-    /// of the same tier at the same link timestamp. `Some` exactly when
+    /// The WINNING declaration's actual create-link hash, used to retrieve its
+    /// proof. It is also the legacy tiebreak; delegated declarations carry a
+    /// separate stable `canonical_ordering_hash`. `Some` exactly when
     /// [`Self::canonical_declared_at`] is `Some` from this coordinator; `None`
     /// from an older one via `serde(default)`.
     ///
@@ -2718,6 +2720,9 @@ pub struct ContentHeadOutput {
     /// as "not newer" forever. With it the projection replays the whole key.
     #[serde(default)]
     pub canonical_link_hash: Option<holo_hash::ActionHashB64>,
+    /// Root-accepted version key; None preserves the legacy create-link key.
+    #[serde(default)]
+    pub canonical_ordering_hash: Option<holo_hash::ActionHashB64>,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion. See
     /// [`select_staging_candidate`] for the (pure, per-peer identical) rule.
@@ -3054,12 +3059,20 @@ fn create_canonical_head_link(
             "create_canonical_head_link: declaration tag carries no canonical tier".to_string()
         ))
     })?;
-    Ok(CanonicalCandidate {
+    let mut candidate = CanonicalCandidate {
         is_earned,
         timestamp,
         link_hash,
         target: target.clone(),
-    })
+        ordering_hash: None,
+    };
+    // The publication gate has already verified this supplied grant/receipt.
+    if is_earned {
+        if let Some(grant) = delegation_from_tag(tag) {
+            use_accepted_ordering(&mut candidate, &grant);
+        }
+    }
+    Ok(candidate)
 }
 
 // RETIRED (long-lived-channel candidate): `newest_canonical_link`, the
@@ -3098,10 +3111,13 @@ fn canonical_link_is_earned(link: &Link) -> bool {
 struct CanonicalCandidate {
     /// True iff the declaration carries the EARNED provenance marker.
     is_earned: bool,
-    /// DHT link creation timestamp (newest-within-tier wins).
+    /// Root-signed acceptance timestamp for delegates, otherwise link time.
     timestamp: Timestamp,
-    /// The create-link action hash — deterministic tiebreak for equal timestamps.
+    /// Actual create-link action hash, retained for proof retrieval.
     link_hash: ActionHash,
+    /// Stable accepted-version tiebreak for delegates; None uses the legacy
+    /// create-link hash for root-author and staging declarations.
+    ordering_hash: Option<ActionHash>,
     /// The declared canonical head target (a Content action).
     target: ActionHash,
 }
@@ -3145,7 +3161,9 @@ struct CanonicalCandidate {
 /// `a83b35079` (2026-07-29) shape, where the same "latest by arrival order"
 /// defect re-minted itself in the epr-cli/REA sidecar.
 ///
-/// Behaviour is unchanged, byte for byte. The extracted predicate carries a
+/// Root-author/staging behavior retains the legacy link key. Delegated
+/// publications use the root-signed accepted-at and exact-version key, so
+/// replaying a declaration cannot refresh an old version's authority. The extracted predicate carries a
 /// field-for-field port of this module's own `canonical_head_selector_tests`
 /// (same test names, same fixture seeds), and additionally runs under the
 /// `Arbitrated` property harness — permutation-invariance over ALL 24 orderings
@@ -3163,7 +3181,7 @@ fn select_canonical_winner(candidates: Vec<CanonicalCandidate>) -> Option<Canoni
         clock: c.timestamp,
         // Content-addressed discriminator. Cloned once per candidate (the key is
         // computed once, not once per comparison), never per comparison.
-        tiebreak: c.link_hash.clone(),
+        tiebreak: c.ordering_hash.as_ref().unwrap_or(&c.link_hash).clone(),
     })
 }
 
@@ -3264,12 +3282,13 @@ fn election_after_declaration(
 /// declaration times, and refused every forward move it should have taken.
 pub(crate) struct CanonicalHeadAnswer {
     pub(crate) record: Record,
-    /// The winning declaration LINK's DHT timestamp.
+    /// Signed acceptance time for delegates, otherwise the declaration link time.
     declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     is_earned: bool,
-    /// The winning declaration's create-link hash — the selector's tiebreak.
+    /// The winning declaration's actual create-link hash (proof locator).
     link_hash: ActionHash,
+    ordering_hash: Option<ActionHash>,
     /// The staging declaration standing beneath an EARNED winner, if any — see
     /// [`select_staging_candidate`]. Carried through so the read path can report
     /// the candidate WITHOUT a second link gather.
@@ -3350,8 +3369,8 @@ fn gather_election_candidates(
     })?;
     // An EARNED tag is a claim, not authority. Resolve the id's standing once
     // for the whole link set, then authenticate every earned claimant. A
-    // forged/expired/out-of-scope claim stays visible as STAGING so it can
-    // never outrank an authenticated earned declaration.
+    // Bare unauthorized claims remain STAGING. A failed asserted delegation
+    // is excluded entirely; it cannot manufacture authority through fallback.
     let standing = if links.iter().any(canonical_link_is_earned) {
         Some(earned_standing_for_id(id, strategy)?)
     } else {
@@ -3359,20 +3378,45 @@ fn gather_election_candidates(
     };
     let mut candidates = Vec::with_capacity(links.len());
     for link in links {
+        let Ok(target) = ActionHash::try_from(link.target.clone()) else {
+            continue;
+        };
         let claimed_earned = canonical_link_is_earned(&link);
         let is_earned = claimed_earned
             && standing.as_ref().is_some_and(|standing| {
-                holds_earned_declaration_standing(id, &link.author, link.tag.0.as_slice(), standing)
+                holds_earned_declaration_standing(
+                    id,
+                    &link.author,
+                    &target,
+                    link.tag.0.as_slice(),
+                    standing,
+                )
             });
-        let Ok(target) = ActionHash::try_from(link.target) else {
+        // A failed asserted grant cannot manufacture authority by falling
+        // through into staging. Ordinary staging links keep their old rules.
+        if claimed_earned
+            && !is_earned
+            && link
+                .tag
+                .0
+                .windows(CANONICAL_TAG_DELEGATION_SEP.len())
+                .any(|w| w == CANONICAL_TAG_DELEGATION_SEP)
+        {
             continue;
-        };
-        candidates.push(CanonicalCandidate {
+        }
+        let mut candidate = CanonicalCandidate {
             is_earned,
             timestamp: link.timestamp,
             link_hash: link.create_link_hash,
             target,
-        });
+            ordering_hash: None,
+        };
+        if is_earned {
+            if let Some(standing) = standing.as_ref() {
+                normalize_verified_delegate(&mut candidate, &link.author, &link.tag.0, standing);
+            }
+        }
+        candidates.push(candidate);
     }
     Ok(candidates)
 }
@@ -3404,6 +3448,7 @@ pub(crate) fn gather_canonical_head_record(
             declared_at: winner.timestamp,
             is_earned: winner.is_earned,
             link_hash: winner.link_hash,
+            ordering_hash: winner.ordering_hash,
             staging_candidate,
         })),
         None => Ok(None),
@@ -3493,6 +3538,7 @@ mod canonical_head_selector_tests {
         CanonicalCandidate {
             is_earned,
             timestamp: Timestamp::from_micros(ts),
+            ordering_hash: None,
             link_hash: ah(link_seed),
             target: ah(target_seed),
         }
@@ -3731,11 +3777,8 @@ mod canonical_head_selector_tests {
     #[test]
     fn declaration_receipt_uses_the_exact_new_link_action() {
         let declared = cand(false, 300, 3, 30);
-        let outcome = election_after_declaration(
-            vec![cand(false, 100, 1, 10)],
-            declared.clone(),
-        )
-        .expect("declaration makes the election non-empty");
+        let outcome = election_after_declaration(vec![cand(false, 100, 1, 10)], declared.clone())
+            .expect("declaration makes the election non-empty");
         assert_eq!(outcome.winner.link_hash, declared.link_hash);
         assert_eq!(outcome.winner.target, declared.target);
         assert_eq!(outcome.winner.timestamp, Timestamp::from_micros(300));
@@ -4118,194 +4161,59 @@ fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()
     Ok(())
 }
 
-// =============================================================================
-// Head delegation — a root author lets one of its own devices act for it
-// (stewarded-device-sync.feature station 3; spec workspace-stewarded-device-peer)
-// =============================================================================
-//
-// A human's second device holds a NEW agent key (never a copy of the first), so
-// every author gate above — `me == root_author` — refuses it. The delegation is
-// the root author's SIGNED statement "agent D may move heads I authored, within
-// this scope, until this time". It is verified in-wasm by every peer that
-// consults it (`verify_signature` against the ROOT AUTHOR's key — the key that
-// created the content, which is the only authority the chain itself names), so
-// a forged or expired proof is refused identically everywhere. Coordinator-only:
-// no entry type, no link type, no DNA-hash move. The proof also rides the
-// canonical-head link tag (`CANONICAL_TAG_EARNED` + `|delegation:` + bytes) so
-// an electing peer can see WHY a non-author's head was accepted (C5 evidence).
-//
-// What it deliberately does NOT do: it does not let a delegate mint a delegation
-// (only the root author's key signs — C1), it cannot outlive `valid_until` (C2
-// bounded), and revocation is the mishpat `revokes-commitment` on the
-// `binds-identity` record that carries the same payload — storage stops
-// presenting the proof; the in-wasm window bounds the residual.
+mod head_delegation;
+pub use head_delegation::*;
 
-/// The bytes the root author signs. Canonical field order is the struct order;
-/// `sign`/`verify_signature` serialize it the same way on both sides.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct HeadDelegationPayload {
-    /// The ROOT AUTHOR granting the delegation (must equal the content chain's
-    /// root Create author at verify time).
-    pub grantor: AgentPubKey,
-    /// The device agent allowed to act.
-    pub delegate: AgentPubKey,
-    /// `"*"` (any content this grantor authored) or an exact content id, or an
-    /// id prefix ending in `*` (e.g. `"elohim-protocol/*"`).
-    pub scope: String,
-    /// Absolute expiry (microseconds since epoch, the DHT `Timestamp` unit).
-    pub valid_until: Timestamp,
-}
-
-/// A signed delegation: the payload plus the grantor's signature over it.
-#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
-pub struct HeadDelegation {
-    pub payload: HeadDelegationPayload,
-    pub signature: Signature,
-}
-
-/// Input to [`grant_head_delegation`]: the caller (root author) names the
-/// delegate, scope and expiry; the conductor signs with the caller's key.
+/// Read-only authorization before a publisher writes blobs or changes its projection.
+/// The expected root comes from the referenced version's independently resolved
+/// lineage, not from a grantor supplied by the caller.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GrantHeadDelegationInput {
-    pub delegate: AgentPubKey,
-    #[serde(default = "default_delegation_scope")]
-    pub scope: String,
-    pub valid_until: Timestamp,
+pub struct PreflightHeadPublicationInput {
+    pub id: String,
+    pub expected_root: Option<ActionHash>,
+    pub delegation: Option<HeadDelegation>,
 }
 
-fn default_delegation_scope() -> String {
-    "*".to_string()
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PreflightHeadPublicationOutput {
+    pub agent: AgentPubKey,
+    pub dna_hash: DnaHash,
+    pub root_action_hash: Option<ActionHash>,
+    pub root_author: Option<AgentPubKey>,
 }
 
-/// Mint a signed head delegation from THIS agent (the grantor) to `delegate`.
-///
-/// The signature is produced by the conductor's keystore for
-/// `agent_info().agent_initial_pubkey` — only the key holder can call this on
-/// its own conductor, which is what makes the proof a statement BY the root
-/// author rather than about one. Nothing is committed to the source chain:
-/// the delegation is a capability the delegate carries, and the witnessed
-/// governance record of the same act is the mishpat `binds-identity`
-/// commitment the primary device creates alongside it.
-///
-/// Errors (Guest): a `valid_until` at or before now; a delegate equal to the
-/// grantor (a self-delegation is meaningless and is refused so it can never
-/// be mistaken for a grant).
 #[hdk_extern]
-pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<HeadDelegation> {
-    let grantor = agent_info()?.agent_initial_pubkey;
-    if input.delegate == grantor {
+pub fn preflight_head_publication(
+    input: PreflightHeadPublicationInput,
+) -> ExternResult<PreflightHeadPublicationOutput> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let root = canonical_identity_root(&input.id, GetStrategy::Network)?;
+    let actual_root = root.as_ref().map(|r| r.action_address().clone());
+    if actual_root != input.expected_root {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "grant_head_delegation: delegate must differ from the grantor".to_string(),
+            "publication preflight: immutable root differs or its history is not available".into()
         )));
     }
-    let now = sys_time()?;
-    if input.valid_until <= now {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "grant_head_delegation: valid_until {:?} is not in the future (now {:?})",
-            input.valid_until, now
-        ))));
-    }
-    let payload = HeadDelegationPayload {
-        grantor: grantor.clone(),
-        delegate: input.delegate,
-        scope: input.scope,
-        valid_until: input.valid_until,
-    };
-    let signature = sign(grantor, &payload)?;
-    Ok(HeadDelegation { payload, signature })
-}
-
-/// Does `scope` cover content `id`? `"*"` covers everything; a trailing `*`
-/// is a prefix match; anything else is an exact id match.
-fn delegation_scope_covers(scope: &str, id: &str) -> bool {
-    if scope == "*" {
-        return true;
-    }
-    if let Some(prefix) = scope.strip_suffix('*') {
-        return id.starts_with(prefix);
-    }
-    scope == id
-}
-
-/// Verify a delegation licenses `me` to act as `root_author` on content `id`.
-///
-/// Every failure is a Guest error naming the reason, so the HTTP layer (and a
-/// human reading the log) sees WHICH check refused: wrong grantor, wrong
-/// delegate, scope, expiry, or signature. The signature check runs LAST — the
-/// cheap structural checks refuse first, and a valid signature over the wrong
-/// grantor is still a refusal (the chain's root author, not the payload, says
-/// who may grant).
-fn verify_head_delegation(
-    delegation: &HeadDelegation,
-    me: &AgentPubKey,
-    root_author: &AgentPubKey,
-    id: &str,
-) -> ExternResult<()> {
-    let p = &delegation.payload;
-    if p.grantor == p.delegate {
+    let root_author = root.as_ref().map(|r| r.action().author().clone());
+    if let Some(author) = root_author.as_ref() {
+        authorize_author_or_delegate(
+            &agent,
+            author,
+            &input.id,
+            input.delegation.as_ref(),
+            "publication preflight",
+        )?;
+    } else if input.delegation.is_some() {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "head delegation: delegate must differ from the grantor".to_string(),
+            "publication preflight: cannot delegate an unresolved root".into()
         )));
     }
-    if &p.grantor != root_author {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "head delegation: grantor {:?} is not the root author {:?} of content '{id}'",
-            p.grantor, root_author
-        ))));
-    }
-    if &p.delegate != me {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "head delegation: delegate {:?} is not the caller {:?}",
-            p.delegate, me
-        ))));
-    }
-    if !delegation_scope_covers(&p.scope, id) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "head delegation: scope '{}' does not cover content '{id}'",
-            p.scope
-        ))));
-    }
-    let now = sys_time()?;
-    if p.valid_until <= now {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "head delegation: expired at {:?} (now {:?})",
-            p.valid_until, now
-        ))));
-    }
-    if !verify_signature(p.grantor.clone(), delegation.signature.clone(), p)? {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "head delegation: signature does not verify against grantor {:?}",
-            p.grantor
-        ))));
-    }
-    Ok(())
-}
-
-/// The author gate shared by every head-moving extern: the caller IS the root
-/// author, or carries a delegation the root author signed for it. Returns the
-/// verified delegation (if one was used) so the caller can record its
-/// provenance.
-fn authorize_author_or_delegate(
-    me: &AgentPubKey,
-    root_author: &AgentPubKey,
-    id: &str,
-    delegation: Option<&HeadDelegation>,
-    what: &str,
-) -> ExternResult<Option<HeadDelegation>> {
-    match delegation {
-        Some(d) => {
-            // A supplied proof is never ignored. In particular, a caller that
-            // reaches the root author's conductor cannot smuggle a junk
-            // delegation through the `me == root_author` shortcut.
-            verify_head_delegation(d, me, root_author, id)?;
-            Ok(Some(d.clone()))
-        }
-        None if me == root_author => Ok(None),
-        None => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "{what}: agent {me:?} is not the author of content '{id}' (author {root_author:?}) \
-             and carries no head delegation"
-        )))),
-    }
+    Ok(PreflightHeadPublicationOutput {
+        agent,
+        dna_hash: dna_info()?.hash,
+        root_action_hash: actual_root,
+        root_author,
+    })
 }
 
 /// Link-tag separator between the provenance marker and an attached delegation.
@@ -4399,6 +4307,7 @@ fn build_content_head_output(
         canonical_declared_at: None,
         canonical_earned: None,
         canonical_link_hash: None,
+        canonical_ordering_hash: None,
         // Same rule, same reason: only the canonical branch of
         // `resolve_content_head_inner` holds an election, so only it can name a
         // candidate beneath the winner.
@@ -4429,6 +4338,7 @@ fn resolve_content_head_inner(
         out.canonical_declared_at = Some(answer.declared_at);
         out.canonical_earned = Some(answer.is_earned);
         out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(answer.link_hash));
+        out.canonical_ordering_hash = answer.ordering_hash.map(holo_hash::ActionHashB64::from);
         // ...and the candidate standing beneath it, when the winner is earned.
         // Both fields move together (see `staging_candidate`'s doc): a consumer
         // reading one without the other could not order the candidate.
@@ -5638,6 +5548,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
                 canonical_declared_at: None,
                 canonical_earned: None,
                 canonical_link_hash: None,
+                canonical_ordering_hash: None,
             })?;
             return Ok(out);
         }
@@ -5667,6 +5578,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
             canonical_declared_at: None,
             canonical_earned: None,
             canonical_link_hash: None,
+            canonical_ordering_hash: None,
         })?;
         return Ok(out);
     }
@@ -5712,6 +5624,7 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
         canonical_declared_at: None,
         canonical_earned: None,
         canonical_link_hash: None,
+        canonical_ordering_hash: None,
     })?;
     Ok(out)
 }
@@ -5989,6 +5902,11 @@ fn declare_canonical_head_inner(
     out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(
         election.winner.link_hash.clone(),
     ));
+    out.canonical_ordering_hash = election
+        .winner
+        .ordering_hash
+        .clone()
+        .map(holo_hash::ActionHashB64::from);
     if let Some(candidate) = election.staging_candidate {
         out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target));
         out.staging_candidate_declared_at = Some(candidate.timestamp);
@@ -6015,6 +5933,7 @@ fn declare_canonical_head_inner(
         canonical_declared_at: out.canonical_declared_at,
         canonical_earned: out.canonical_earned,
         canonical_link_hash: out.canonical_link_hash.clone().map(ActionHash::from),
+        canonical_ordering_hash: out.canonical_ordering_hash.clone().map(ActionHash::from),
     })?;
     Ok(out)
 }
@@ -6245,10 +6164,30 @@ pub fn declare_earned_canonical_head(
             Some(None)
         }
     };
+    if let Some(Some(grant)) = delegation_used.as_ref() {
+        let target = ActionHash::from(input.head_action_hash.clone());
+        // New declarations require a currently live grant (checked above) AND
+        // a root-author receipt for this exact version. Historical reads only
+        // need the latter; an expired grant cannot publish another action.
+        verify_accepted_head(
+            grant,
+            &me,
+            &grant.payload.grantor,
+            &input.id,
+            &grant.payload.root_action_hash,
+            &target,
+            GetStrategy::Network,
+        )?;
+    }
     let tag = canonical_tag_with_delegation(
         CANONICAL_TAG_EARNED,
         delegation_used.as_ref().and_then(|d| d.as_ref()),
     );
+    if tag.len() > MAX_CARRIED_LINK_TAG_BYTES {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "delegation receipt exceeds link tag limit".into()
+        )));
+    }
     declare_canonical_head_inner(
         &input.id,
         input.head_action_hash,
@@ -6320,15 +6259,18 @@ pub fn get_record_for_action(
 pub struct CanonicalElectionOutput {
     /// The Content action the election chose as canonical head.
     pub winner_target: holo_hash::ActionHashB64,
-    /// The winning declaration LINK's notarized DHT timestamp — the ordering
+    /// Root-author accepted-at for delegated versions, otherwise the winning
+    /// declaration link's notarized DHT timestamp — the ordering
     /// [`select_canonical_winner`] arbitrated on, and the value the storage
     /// projection's monotonic heal guard keys off.
     pub canonical_declared_at: Timestamp,
     /// Whether the winning declaration carried the EARNED provenance marker.
     pub canonical_earned: bool,
-    /// The winning declaration's create-link hash — the election's tiebreak.
+    /// Actual winning declaration link, retained for proof retrieval.
     /// See [`ContentHeadOutput::canonical_link_hash`].
     pub canonical_link_hash: holo_hash::ActionHashB64,
+    #[serde(default)]
+    pub canonical_ordering_hash: Option<holo_hash::ActionHashB64>,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion. See
     /// [`select_staging_candidate`]: a pure function of the same link set, so
@@ -6357,6 +6299,11 @@ impl CanonicalElectionOutput {
             canonical_declared_at: outcome.winner.timestamp,
             canonical_earned: outcome.winner.is_earned,
             canonical_link_hash: holo_hash::ActionHashB64::from(outcome.winner.link_hash.clone()),
+            canonical_ordering_hash: outcome
+                .winner
+                .ordering_hash
+                .clone()
+                .map(holo_hash::ActionHashB64::from),
             staging_candidate: outcome
                 .staging_candidate
                 .as_ref()
@@ -6685,7 +6632,7 @@ pub fn canonical_tag_tier(tag: &[u8]) -> Option<bool> {
 pub fn verify_carried_election(
     input: VerifyCarriedElectionInput,
 ) -> ExternResult<Option<CanonicalElectionOutput>> {
-    let proven =
+    let mut proven =
         prove_carried_declaration(&input.id, &input.link_record, "verify_carried_election")?;
 
     if proven.candidate.is_earned {
@@ -6693,6 +6640,7 @@ pub fn verify_carried_election(
         if !holds_earned_declaration_standing(
             &input.id,
             &proven.declarer,
+            &proven.candidate.target,
             proven.tag.as_slice(),
             &standing,
         ) {
@@ -6701,6 +6649,12 @@ pub fn verify_carried_election(
                 proven.declarer, input.id
             ))));
         }
+        normalize_verified_delegate(
+            &mut proven.candidate,
+            &proven.declarer,
+            &proven.tag,
+            &standing,
+        );
     }
 
     // Merge the proven carried candidate with every candidate this conductor
@@ -6766,26 +6720,34 @@ fn delegation_from_tag(tag: &[u8]) -> Option<HeadDelegation> {
 
 /// Authority inputs shared by local/gossiped and carried election checks.
 struct EarnedStanding {
+    root_action: Option<ActionHash>,
+    strategy: GetStrategy,
     root_author: Option<AgentPubKey>,
     progenitor: Option<AgentPubKey>,
 }
 
 fn earned_standing_for_id(id: &str, strategy: GetStrategy) -> ExternResult<EarnedStanding> {
+    let root = canonical_identity_root(id, strategy)?;
     Ok(EarnedStanding {
-        root_author: canonical_identity_root(id, strategy)?
-            .map(|root| root.action().author().clone()),
+        root_action: root.as_ref().map(|r| r.action_address().clone()),
+        strategy,
+        root_author: root.map(|root| root.action().author().clone()),
         progenitor: maybe_bootstrap_steward()?,
     })
 }
 
 /// Authenticate an EARNED tag's link author. A root author needs no suffix; a
-/// non-root author must carry a decodable, signed, in-scope, unexpired
-/// delegation. If a suffix is supplied by the root author it is verified too
+/// non-root author must carry a decodable, signed, in-scope delegation and
+/// the root author's acceptance of this exact target. Ordinary expiry stops
+/// new declarations; revocation also ends future exercise while preserving
+/// exact versions accepted before the root-author revocation.
+/// If a suffix is supplied by the root author it is verified too
 /// (and therefore rejected as a pointless self-delegation). The progenitor is
 /// independently authoritative and needs no delegation.
 fn holds_earned_declaration_standing(
     id: &str,
     declarer: &AgentPubKey,
+    target: &ActionHash,
     tag: &[u8],
     standing: &EarnedStanding,
 ) -> bool {
@@ -6799,8 +6761,20 @@ fn holds_earned_declaration_standing(
         .windows(CANONICAL_TAG_DELEGATION_SEP.len())
         .any(|window| window == CANONICAL_TAG_DELEGATION_SEP);
     let delegated = if carries_delegation {
-        delegation_from_tag(tag)
-            .is_some_and(|grant| verify_head_delegation(&grant, declarer, root_author, id).is_ok())
+        delegation_from_tag(tag).is_some_and(|grant| {
+            standing.root_action.as_ref().is_some_and(|root| {
+                verify_accepted_head(
+                    &grant,
+                    declarer,
+                    root_author,
+                    id,
+                    root,
+                    target,
+                    standing.strategy,
+                )
+                .is_ok()
+            })
+        })
     } else {
         false
     };
@@ -6808,6 +6782,33 @@ fn holds_earned_declaration_standing(
         return false;
     }
     holds_authoring_standing(declarer, declarer, Some(root_author), delegated)
+}
+
+/// Apply only an already verified root-author acceptance. A delegate's fresh
+/// link or self-selected timestamp cannot give an old accepted version a new
+/// election position. The real link hash remains the evidence locator.
+fn use_accepted_ordering(candidate: &mut CanonicalCandidate, grant: &HeadDelegation) {
+    if let Some(receipt) = grant.acceptance.as_ref() {
+        candidate.timestamp = receipt.accepted_at;
+        candidate.ordering_hash = Some(receipt.head_action_hash.clone());
+    }
+}
+
+fn normalize_verified_delegate(
+    candidate: &mut CanonicalCandidate,
+    declarer: &AgentPubKey,
+    tag: &[u8],
+    standing: &EarnedStanding,
+) {
+    // Root/progenitor standing does not depend on a grant. Never interpret an
+    // unchecked suffix on their independently authorized declaration as rank.
+    if standing.root_author.as_ref() != Some(declarer)
+        && standing.progenitor.as_ref() != Some(declarer)
+    {
+        if let Some(grant) = delegation_from_tag(tag) {
+            use_accepted_ordering(candidate, &grant);
+        }
+    }
 }
 
 /// A carried canonical-head declaration, proven from its own bytes.
@@ -6921,6 +6922,7 @@ fn prove_carried_declaration(
             is_earned,
             timestamp: record.action().timestamp(),
             link_hash: computed,
+            ordering_hash: None,
             target,
         },
         declarer: author,
@@ -6984,7 +6986,7 @@ pub fn verify_carried_head_evidence(
 ) -> ExternResult<Option<CarriedHeadEvidenceOutput>> {
     const CALLER: &str = "verify_carried_head_evidence";
     let id = input.id.as_str();
-    let declaration = prove_carried_declaration(id, &input.link_record, CALLER)?;
+    let mut declaration = prove_carried_declaration(id, &input.link_record, CALLER)?;
     let target = declaration.candidate.target.clone();
 
     let record = validate_carried_record(&target, &input.head_record).map_err(|e| {
@@ -7060,7 +7062,18 @@ pub fn verify_carried_head_evidence(
     let root_author = root.as_ref().map(|r| r.action().author().clone());
     let delegated = match (&root_author, delegation_from_tag(&declaration.tag)) {
         (Some(root), Some(grant)) if &declaration.declarer != root => {
-            verify_head_delegation(&grant, &declaration.declarer, root, id).is_ok()
+            identity_root.as_ref().is_some_and(|identity| {
+                verify_accepted_head(
+                    &grant,
+                    &declaration.declarer,
+                    root,
+                    id,
+                    identity.action_address(),
+                    &target,
+                    GetStrategy::Local,
+                )
+                .is_ok()
+            })
         }
         _ => false,
     };
@@ -7082,6 +7095,7 @@ pub fn verify_carried_head_evidence(
         if !holds_earned_declaration_standing(
             id,
             &declaration.declarer,
+            &declaration.candidate.target,
             declaration.tag.as_slice(),
             &standing,
         ) {
@@ -7090,6 +7104,12 @@ pub fn verify_carried_head_evidence(
                 declaration.declarer
             ))));
         }
+        normalize_verified_delegate(
+            &mut declaration.candidate,
+            &declaration.declarer,
+            &declaration.tag,
+            &standing,
+        );
     }
 
     let carried_link = declaration.candidate.link_hash.clone();
@@ -7109,6 +7129,11 @@ pub fn verify_carried_head_evidence(
         out.canonical_link_hash = Some(holo_hash::ActionHashB64::from(
             outcome.winner.link_hash.clone(),
         ));
+        out.canonical_ordering_hash = outcome
+            .winner
+            .ordering_hash
+            .clone()
+            .map(holo_hash::ActionHashB64::from);
         if let Some(candidate) = &outcome.staging_candidate {
             out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target.clone()));
             out.staging_candidate_declared_at = Some(candidate.timestamp);
@@ -7995,6 +8020,43 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
 // to follow the update chain via `get_details` before relying on this gate.
 // =============================================================================
 
+/// Negative enrollment boundary, not affirmative legacy recovery authority.
+/// Native evidence failures propagate; absence of the verifier never grants access.
+pub(crate) fn legacy_identity_admin_allowed(author: AgentPubKey) -> ExternResult<bool> {
+    match call(
+        CallTargetCell::OtherRole("imagodei".into()),
+        ZomeName::from("imagodei"),
+        "legacy_identity_admin_allowed".into(),
+        None,
+        author,
+    )? {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| wasm_error!(e)),
+        _ => Err(wasm_error!(WasmErrorInner::Guest(
+            "native identity administration boundary unavailable".into()
+        ))),
+    }
+}
+
+fn retain_legacy_identity_admin_records(
+    candidates: Vec<ContentOutput>,
+) -> ExternResult<Vec<ContentOutput>> {
+    let mut accepted = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        // author_id / initiated_by is caller-supplied metadata. Test the actual
+        // signed action author, including when generic Content bypasses a producer.
+        let record =
+            get(candidate.action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "identity administration action unavailable".into()
+                ))
+            })?;
+        if legacy_identity_admin_allowed(record.action().author().clone())? {
+            accepted.push(candidate);
+        }
+    }
+    Ok(accepted)
+}
+
 /// Query elohim DNA for an effective `governance-action:key-revocation` Content
 /// entry covering `revoked_key`.
 ///
@@ -8040,6 +8102,7 @@ pub fn query_effective_revocation_for_key(
             threshold_reached || effective_at_set
         })
         .collect();
+    matched = retain_legacy_identity_admin_records(matched)?;
 
     // Most-recent first by Content.updated_at (RFC3339-ish format, lexicographic
     // sort is correct for ISO-8601 / RFC3339 timestamps).
@@ -8088,6 +8151,7 @@ pub fn query_effective_identity_freeze_for_human(
                 .unwrap_or(false)
         })
         .collect();
+    matched = retain_legacy_identity_admin_records(matched)?;
 
     matched.sort_by(|a, b| b.content.updated_at.cmp(&a.content.updated_at));
     Ok(matched.into_iter().next())
@@ -15122,6 +15186,8 @@ pub enum ProjectionSignal {
         /// fields above — the election's tiebreak.
         #[serde(default)]
         canonical_link_hash: Option<ActionHash>,
+        #[serde(default)]
+        canonical_ordering_hash: Option<ActionHash>,
     },
     /// Manifest entry was created or updated (Phase 3 P3.2).
     ManifestCommitted {

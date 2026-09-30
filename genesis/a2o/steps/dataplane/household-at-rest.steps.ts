@@ -231,7 +231,7 @@ function readings(world: E2EWorld): { before: RestReading; after: RestReading; s
   return { before: s.before, after: s.after, s };
 }
 
-Given("the household's three storage peer\\/conductor pairs", function (this: E2EWorld) {
+Given(String.raw`the household's three storage peer\/conductor pairs`, function (this: E2EWorld) {
   const declared = process.env.PEER_STORAGE_URLS;
   if (!declared) return 'pending';
   const s = state(this);

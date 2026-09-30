@@ -1700,6 +1700,7 @@ dependencies = [
  "holochain",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_state",
  "holochain_types",
  "qahal-types",
  "serde",

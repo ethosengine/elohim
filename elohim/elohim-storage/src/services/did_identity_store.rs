@@ -28,27 +28,13 @@
 //!   (distinct write-set) owns its `service` entries.
 //! - **`document_metadata`** — the `humans` row's `created`/`updated` stamps when
 //!   a row exists; otherwise the default empty (we never manufacture timestamps).
-//! - **`identity_head`** (Wave C1 — phase-2) — the newest NOTARIZED `binds-identity`
-//!   declaration whose `head_key` is this `agent_cid` (`identity_heads` projection),
-//!   read **revocation-inclusive**:
-//!   - live declaration → `Declared` (chain-root + controller set). The raw
-//!     controller ids are framed as `did:elohim:<id>` controller DIDs here (storage
-//!     owns the identity-namespace mapping; the resolver stays namespace-agnostic).
-//!     Controllers come straight from the declaration — the community-recovery
-//!     quorum is a controller, never an override (ontology guard).
-//!   - revoked declaration → `Revoked` (chain-root + head + any named successor),
-//!     which the resolver assembles as a **deactivated** document. Reading the
-//!     live-only query here would hide the revocation and serve a fully-armed,
-//!     implicitly self-controlled document instead — see
-//!     `db::identity_heads::find_head_by_head_key`'s warning.
-//!   - no row → `NeverDeclared` (the common case today) → the resolver keeps the
-//!     phase-1 implicit-self document unchanged. A missing row on a gossip-fed
-//!     projection is a *documented limitation*, not a settled claim; the catch-up
-//!     signal it needs does not exist for this pipeline yet (ledgered at
-//!     `genesis/data/timeline/backlog/identity-head-projection-catchup-signal-gap.md`).
-//!
-//!   An un-notarized (`dht_anchor_hash IS NULL`) declaration surfaces as neither —
-//!   fail-closed, unchanged.
+//! - **`identity_head`** — device relationships resolve through the native
+//!   verifier on every request. The result names the stable Human root and its
+//!   unchanged controller policy. Legacy SQL `binds-identity` rows were only
+//!   shape-checked, so their presence yields `Unresolvable`, never authority.
+//!   Their evidence and policy values remain intact for explicit reconciliation.
+//!   A revoked or unavailable native binding also fails closed. Existing Humans
+//!   without an enrolled-device declaration retain the ordinary self DID path.
 //!
 //! Identity-namespace hazard (see `elohim-storage/CLAUDE.md` — "Identity &
 //! Transport-Identity Coherence"): the DID method-specific-id and `agent_cid`
@@ -60,7 +46,7 @@
 use async_trait::async_trait;
 use did_bridge::{
     DidDocumentMetadata, ElohimIdentityStore, ElohimStoreError, IdentityHead, IdentityHeadAnswer,
-    RevokedIdentity, ServiceRef,
+    ServiceRef,
 };
 use did_types::Did;
 
@@ -68,11 +54,50 @@ use crate::db::context::HUMANS_HAPP_ID;
 use crate::db::models::Human;
 use crate::db::{humans, DbPool};
 
+#[derive(serde::Deserialize)]
+struct VerifiedDevice {
+    identity_root: holochain_types::prelude::ActionHash,
+    device_key: holochain_types::prelude::AgentPubKey,
+    controllers: Vec<holochain_types::prelude::AgentPubKey>,
+}
+
+#[derive(serde::Deserialize)]
+struct HumanRootEvidence {
+    human_action_hash: holochain_types::prelude::ActionHash,
+    author: holochain_types::prelude::AgentPubKey,
+}
+
+fn verified_device_head(
+    device: VerifiedDevice,
+    root: HumanRootEvidence,
+) -> Result<IdentityHead, ElohimStoreError> {
+    if root.human_action_hash != device.identity_root {
+        return Err(ElohimStoreError::Backend(
+            "Human root evidence mismatch".into(),
+        ));
+    }
+    let controllers = device
+        .controllers
+        .iter()
+        .map(|key| Did::parse(&format!("did:elohim:{key}")))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+    Ok(IdentityHead {
+        // did:elohim is an agent-key DID. Keep the immutable Human ActionHash
+        // as native identity, and expose its original author's resolvable alias.
+        chain_root: root.author.to_string(),
+        head: device.device_key.to_string(),
+        controllers,
+    })
+}
+
 /// Storage-side [`ElohimIdentityStore`] — assembles `did:elohim` documents from
 /// the `humans` projection plus this node's own identity seams.
 pub struct DidIdentityStore {
     /// Diesel pool for the `humans` projection joins.
     pool: DbPool,
+    device_conductor: Option<std::sync::Arc<crate::hc_client::HcClient>>,
+    require_native_verification: bool,
     /// This node's own conductor cell key (`uhCAk…`), if known. Drives the
     /// "own cell key" resolvable branch and marks which `agent_cid` is *self*.
     /// `None` when the conductor bridge is unavailable — resolution then relies
@@ -97,10 +122,72 @@ impl DidIdentityStore {
     ) -> Self {
         DidIdentityStore {
             pool,
+            device_conductor: None,
+            require_native_verification: false,
             self_agent_cid,
             self_transport_ids,
             public_base_url,
         }
+    }
+
+    /// Device association is resolved from notarized bindings by the native
+    /// verifier. SQL and signal payloads never establish this authority.
+    pub fn with_device_conductor(
+        mut self,
+        conductor: Option<std::sync::Arc<crate::hc_client::HcClient>>,
+    ) -> Self {
+        self.device_conductor = conductor;
+        self.require_native_verification = true;
+        self
+    }
+
+    async fn verified_device(
+        &self,
+        agent: &str,
+    ) -> Result<Option<VerifiedDevice>, ElohimStoreError> {
+        let Some(hc) = &self.device_conductor else {
+            if self.require_native_verification {
+                return Err(ElohimStoreError::Backend(
+                    "device identity verification unavailable: imagodei conductor missing".into(),
+                ));
+            }
+            return Ok(None);
+        };
+        let key = holochain_types::prelude::AgentPubKey::try_from(agent)
+            .map_err(|_| ElohimStoreError::Backend("invalid device agent key".into()))?;
+        let payload =
+            rmp_serde::to_vec_named(&key).map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+        let result = hc
+            .call_zome_imagodei("imagodei", "resolve_device_identity", payload)
+            .await
+            .map_err(|e| {
+                ElohimStoreError::Backend(format!("device identity verification unavailable: {e}"))
+            })?;
+        rmp_serde::from_slice(&result).map_err(|e| ElohimStoreError::Backend(e.to_string()))
+    }
+
+    async fn native_human_exists(&self, agent: &str) -> Result<bool, ElohimStoreError> {
+        let Some(hc) = &self.device_conductor else {
+            return Ok(false);
+        };
+        let key = holochain_types::prelude::AgentPubKey::try_from(agent)
+            .map_err(|_| ElohimStoreError::Backend("invalid device agent key".into()))?;
+        let payload =
+            rmp_serde::to_vec_named(&key).map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+        let result = hc
+            .call_zome_imagodei("imagodei", "get_human_by_agent_key", payload)
+            .await
+            .map_err(|e| {
+                ElohimStoreError::Backend(format!("native Human verification unavailable: {e}"))
+            })?;
+        #[derive(serde::Deserialize)]
+        struct NativeHuman {
+            #[allow(dead_code)]
+            action_hash: holochain_types::prelude::ActionHash,
+        }
+        let human: Option<NativeHuman> =
+            rmp_serde::from_slice(&result).map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+        Ok(human.is_some())
     }
 
     /// Whether `agent_cid` is this node's own conductor cell key.
@@ -125,7 +212,10 @@ impl DidIdentityStore {
 #[async_trait]
 impl ElohimIdentityStore for DidIdentityStore {
     async fn agent_exists(&self, agent_cid: &str) -> Result<bool, ElohimStoreError> {
-        if self.is_self(agent_cid) {
+        if self.verified_device(agent_cid).await?.is_some() {
+            return Ok(true);
+        }
+        if self.native_human_exists(agent_cid).await? || self.is_self(agent_cid) {
             return Ok(true);
         }
         Ok(self.lookup_human(agent_cid)?.is_some())
@@ -192,6 +282,25 @@ impl ElohimIdentityStore for DidIdentityStore {
     }
 
     async fn identity_head(&self, agent_cid: &str) -> Result<IdentityHeadAnswer, ElohimStoreError> {
+        if let Some(device) = self.verified_device(agent_cid).await? {
+            let hc = self
+                .device_conductor
+                .as_ref()
+                .ok_or_else(|| ElohimStoreError::Backend("device conductor unavailable".into()))?;
+            let payload = rmp_serde::to_vec_named(&device.identity_root)
+                .map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+            let result = hc
+                .call_zome_imagodei("imagodei", "get_human_root_evidence", payload)
+                .await
+                .map_err(|e| {
+                    ElohimStoreError::Backend(format!("Human root verification unavailable: {e}"))
+                })?;
+            let root: HumanRootEvidence = rmp_serde::from_slice(&result)
+                .map_err(|e| ElohimStoreError::Backend(e.to_string()))?;
+            return Ok(IdentityHeadAnswer::Declared(verified_device_head(
+                device, root,
+            )?));
+        }
         // The newest NOTARIZED `binds-identity` declaration whose head is this agent
         // — revoked or not (`find_notarized_head_by_head_key`). Reading the
         // revocation-INCLUSIVE query is the whole point: the live-head query hides a
@@ -242,56 +351,13 @@ impl ElohimIdentityStore for DidIdentityStore {
             return Ok(IdentityHeadAnswer::NeverDeclared);
         };
 
-        // Revoked ⇒ the head is revoked, and the resolver assembles a DEACTIVATED
-        // document (no key material, no relationships, no services, lineage aliases
-        // only). C9's two halves ride the row: `chain_root` re-anchors the lineage,
-        // and `successor_head_key` re-anchors the continuation when the declaration
-        // named one. An ABSENT successor stays honestly `None` — that is a TERMINAL
-        // revocation, not an unknown one: we determined it by reading the column.
-        // (A store that could not determine it must answer `Unresolvable`; a read
-        // failure lands in the `Backend` error above, never here.)
-        if let Some(revoked_at) = row.revoked_at.as_deref() {
-            tracing::debug!(
-                head_key = %agent_cid,
-                cid = %row.cid,
-                revoked_at = %revoked_at,
-                successor = ?row.successor_head_key,
-                "did:elohim identity_head: revoked head → deactivated document (confers nothing)"
-            );
-            return Ok(IdentityHeadAnswer::Revoked(RevokedIdentity {
-                chain_root: row.chain_root,
-                head: row.head_key,
-                successor: row.successor_head_key,
-            }));
-        }
-
-        // Controllers come straight from the declaration. Frame each raw controller
-        // id as a `did:elohim:<id>` controller DID (storage owns the namespace
-        // mapping). A controller id that cannot form a valid DID is skipped rather
-        // than aborting the whole resolution — the validator already guarantees
-        // non-empty ids, so this is a defensive filter, not a lossy transform. On the
-        // recovery-quorum path a dropped controller IS data loss, so it is warned
-        // (never silent).
-        let controller_ids: Vec<String> = serde_json::from_str(&row.controllers_json)
-            .map_err(|e| ElohimStoreError::Backend(format!("controllers_json parse: {e}")))?;
-        let mut controllers = Vec::with_capacity(controller_ids.len());
-        for c in &controller_ids {
-            match Did::parse(&format!("did:elohim:{c}")) {
-                Ok(did) => controllers.push(did),
-                Err(e) => tracing::warn!(
-                    controller_id = %c,
-                    head_key = %agent_cid,
-                    error = %e,
-                    "did:elohim identity_head: dropping a controller id that cannot form a valid did:elohim DID"
-                ),
-            }
-        }
-
-        Ok(IdentityHeadAnswer::Declared(IdentityHead {
-            chain_root: row.chain_root,
-            head: row.head_key,
-            controllers,
-        }))
+        // Legacy rows preserve the declared policy as evidence, but the old
+        // coordinator checked only payload shape. An anchor is not controller
+        // authorization, and neither a live nor revoked SQL row confers it.
+        Ok(IdentityHeadAnswer::Unresolvable(format!(
+            "legacy identity declaration {} lacks verified controller authorization",
+            row.cid
+        )))
     }
 }
 
@@ -342,6 +408,37 @@ mod tests {
             },
         )
         .expect("insert human");
+    }
+
+    #[test]
+    fn device_alias_uses_original_human_agent_not_action_hash() {
+        use holochain_types::prelude::{ActionHash, AgentPubKey};
+        let root = ActionHash::from_raw_32(vec![1; 32]);
+        let author = AgentPubKey::from_raw_32(vec![2; 32]);
+        let device = || VerifiedDevice {
+            identity_root: root.clone(),
+            device_key: AgentPubKey::from_raw_32(vec![3; 32]),
+            controllers: vec![author.clone()],
+        };
+        let head = verified_device_head(
+            device(),
+            HumanRootEvidence {
+                human_action_hash: root.clone(),
+                author: author.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(head.chain_root, author.to_string());
+        assert!(AgentPubKey::try_from(head.chain_root.as_str()).is_ok());
+        assert_ne!(head.chain_root, root.to_string());
+        assert!(verified_device_head(
+            device(),
+            HumanRootEvidence {
+                human_action_hash: ActionHash::from_raw_32(vec![4; 32]),
+                author
+            }
+        )
+        .is_err());
     }
 
     #[tokio::test]
@@ -510,26 +607,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn identity_head_resolves_controllers_from_binds_identity() {
-        // Wave C1: a minted binds-identity head is read back with the right
-        // chain_root + controllers (as did:elohim controller DIDs).
-        const RECOVERY: &str = "uhCAkRecoveryQuorumKey0000";
+    async fn forged_notarized_legacy_row_does_not_authorize_controllers() {
         let pool = test_pool();
-        insert_identity_head(&pool, "ih:1", AGENT_KEY, &[AGENT_KEY, RECOVERY]);
+        insert_identity_head(&pool, "ih:forged", AGENT_KEY, &["attacker"]);
         let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
+        assert!(matches!(
+            store.identity_head(AGENT_KEY).await.unwrap(),
+            IdentityHeadAnswer::Unresolvable(_)
+        ));
+    }
 
-        let IdentityHeadAnswer::Declared(head) = store.identity_head(AGENT_KEY).await.unwrap()
-        else {
-            panic!("a live notarized head must resolve as Declared");
-        };
-        assert_eq!(head.chain_root, "bafyreichainrootgenesis0000");
-        assert_eq!(head.head, AGENT_KEY);
-        // Controllers framed as did:elohim DIDs, straight from the declaration.
-        let expected_self = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
-        let expected_recovery = Did::parse(&format!("did:elohim:{RECOVERY}")).unwrap();
-        assert_eq!(head.controllers.len(), 2);
-        assert!(head.controllers.contains(&expected_self));
-        assert!(head.controllers.contains(&expected_recovery));
+    #[tokio::test]
+    async fn configured_native_verification_missing_refuses_self_authority() {
+        let store = DidIdentityStore::new(test_pool(), Some(AGENT_KEY.to_string()), vec![], None)
+            .with_device_conductor(None);
+        assert!(store.identity_head(AGENT_KEY).await.is_err());
+        assert!(store.agent_exists(AGENT_KEY).await.is_err());
     }
 
     #[tokio::test]
@@ -552,70 +645,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn identity_head_fail_closed_on_revoked() {
-        // THE row-8 assertion. A revoked head must surface as `Revoked` — NOT as
-        // `NeverDeclared`.
-        //
-        // Asserting NeverDeclared here would launder the vulnerability into a green
-        // test: an absent `controller` in a DID document means THE SUBJECT CONTROLS
-        // IT, so a revoked identity answering NeverDeclared assembles the phase-1
-        // implicit-self document — fully armed, implicitly self-controlled — and the
-        // revocation disappears into the same silence as never having declared.
+    async fn legacy_revoked_identity_remains_unresolvable_not_self_controlled() {
         let pool = test_pool();
         insert_identity_head(&pool, "ih:rev", AGENT_KEY, &[AGENT_KEY]);
-        {
-            let mut conn = pool.get().unwrap();
-            crate::db::identity_heads::set_revoked_at(&mut conn, "ih:rev", "2026-07-17T03:00:00Z")
-                .expect("revoke");
-        }
+        crate::db::identity_heads::set_revoked_at(
+            &mut pool.get().unwrap(),
+            "ih:rev",
+            "2026-09-30T00:00:00Z",
+        )
+        .unwrap();
         let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
-
-        assert_eq!(
+        assert!(matches!(
             store.identity_head(AGENT_KEY).await.unwrap(),
-            IdentityHeadAnswer::Revoked(RevokedIdentity {
-                chain_root: "bafyreichainrootgenesis0000".to_string(),
-                head: AGENT_KEY.to_string(),
-                // Honest absence: this declaration named no successor, so the
-                // revocation is TERMINAL. `None` here is a determination (we read
-                // the column), never "unknown".
-                successor: None,
-            }),
-            "a revoked head must answer Revoked; NeverDeclared would serve a \
-             fully-armed implicitly self-controlled document"
-        );
+            IdentityHeadAnswer::Unresolvable(_)
+        ));
     }
 
     #[tokio::test]
-    async fn identity_head_revoked_carries_the_named_successor() {
-        // C9's re-anchor half: when the declaration names a continuation, a reference
-        // keyed on the revoked head can follow the identity forward instead of
-        // dead-ending. (No producer declares one today — the column is seeded
-        // directly; see `insert_identity_head_with_successor`.)
-        const SUCCESSOR: &str = "uhCAkSuccessorHeadKey0000";
+    async fn legacy_successor_is_preserved_without_authorizing_it() {
         let pool = test_pool();
         insert_identity_head_with_successor(
             &pool,
             "ih:rotated",
             AGENT_KEY,
             &[AGENT_KEY],
-            Some(SUCCESSOR),
+            Some("unverified-successor"),
         );
-        {
-            let mut conn = pool.get().unwrap();
-            crate::db::identity_heads::set_revoked_at(
-                &mut conn,
-                "ih:rotated",
-                "2026-07-17T03:00:00Z",
-            )
-            .expect("revoke");
-        }
-        let store = DidIdentityStore::new(pool, Some(AGENT_KEY.to_string()), vec![], None);
-
-        let IdentityHeadAnswer::Revoked(revoked) = store.identity_head(AGENT_KEY).await.unwrap()
-        else {
-            panic!("a revoked head must answer Revoked");
-        };
-        assert_eq!(revoked.successor.as_deref(), Some(SUCCESSOR));
+        let store = DidIdentityStore::new(pool.clone(), Some(AGENT_KEY.to_string()), vec![], None);
+        assert!(matches!(
+            store.identity_head(AGENT_KEY).await.unwrap(),
+            IdentityHeadAnswer::Unresolvable(_)
+        ));
+        let row = crate::db::identity_heads::get_by_cid(&mut pool.get().unwrap(), "ih:rotated")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.successor_head_key.as_deref(),
+            Some("unverified-successor")
+        );
     }
 
     #[tokio::test]
@@ -656,57 +723,27 @@ mod tests {
     /// `did:elohim` document with verification methods, services and transport ids —
     /// a fully-armed, implicitly self-controlled identity whose head was revoked.
     #[tokio::test]
-    async fn revoked_head_resolves_to_a_deactivated_document_that_confers_nothing() {
+    async fn unverified_revocation_never_emits_an_authenticated_document() {
         use did_bridge::{DidResolver, ElohimResolver};
-        use did_types::Did;
-
         let pool = test_pool();
         insert_human(&pool, "human-self", AGENT_KEY);
         insert_identity_head(&pool, "ih:rev", AGENT_KEY, &[AGENT_KEY]);
-        {
-            let mut conn = pool.get().unwrap();
-            crate::db::identity_heads::set_revoked_at(&mut conn, "ih:rev", "2026-07-17T03:00:00Z")
-                .expect("revoke");
-        }
-        let store = DidIdentityStore::new(
+        crate::db::identity_heads::set_revoked_at(
+            &mut pool.get().unwrap(),
+            "ih:rev",
+            "2026-09-30T00:00:00Z",
+        )
+        .unwrap();
+        let resolver = ElohimResolver::new(DidIdentityStore::new(
             pool,
             Some(AGENT_KEY.to_string()),
-            vec!["12D3KooWSelfPeerId".to_string()],
-            Some("https://node.example.host".to_string()),
-        );
-        let resolver = ElohimResolver::new(store);
-        let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
-
-        // Deactivation is a SUCCESSFUL resolution (DID Core), not a notFound: the DID
-        // exists and its state is knowable.
-        let result = resolver.resolve(&did).await.expect("deactivation resolves");
-        assert_eq!(
-            result.did_document_metadata.deactivated,
-            Some(true),
-            "the standards-registered deactivation signal must be set"
-        );
-        let doc = result.did_document.expect("a document, not a 404");
-
-        // Nothing to act with — belt and braces, for a consumer that ignores metadata.
-        assert!(doc.verification_method.is_none(), "no key material");
-        assert!(doc.authentication.is_none(), "no authentication");
-        assert!(doc.assertion_method.is_none(), "no assertionMethod");
-        assert!(doc.capability_invocation.is_none());
-        assert!(doc.capability_delegation.is_none());
-        assert!(doc.service.is_none(), "no endpoints projected");
-        assert!(
-            doc.controller.is_none(),
-            "no controller set is asserted for a revoked head"
-        );
-
-        // Lineage stays followable (C9): the chain-root alias, and NOT the live
-        // transport ids — a revoked identity's transports must not be advertised.
-        let aka = doc.also_known_as.expect("chain-root lineage alias");
-        assert!(aka.contains(&"did:elohim:bafyreichainrootgenesis0000".to_string()));
-        assert!(
-            !aka.iter().any(|a| a.contains("12D3KooW")),
-            "a revoked identity's transport ids must not be projected: {aka:?}"
-        );
+            vec![],
+            None,
+        ));
+        assert!(resolver
+            .resolve(&Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap())
+            .await
+            .is_err());
     }
 
     /// The load-bearing contract test: a fully-assembled `did:elohim` document
@@ -761,63 +798,20 @@ mod tests {
     /// WITH a notarized `binds-identity` head has its `controller` populated from the
     /// declaration and still validates against the W3C DID 1.1 schema.
     #[tokio::test]
-    async fn assembled_document_with_head_populates_controllers_and_conforms() {
+    async fn unverified_legacy_head_is_refused_by_real_did_resolver() {
         use did_bridge::{DidResolver, ElohimResolver};
-        use did_types::{Controller, Did};
-        use serde_json::Value;
-
-        const SCHEMA: &str =
-            include_str!("../../../../bridges/did/schemas/did-document-1.1.schema.json");
-        const RECOVERY: &str = "uhCAkRecoveryQuorumKey0000";
-
         let pool = test_pool();
         insert_human(&pool, "human-self", AGENT_KEY);
-        insert_identity_head(&pool, "ih:conf", AGENT_KEY, &[AGENT_KEY, RECOVERY]);
-        let store = DidIdentityStore::new(
+        insert_identity_head(&pool, "ih:forged", AGENT_KEY, &["attacker"]);
+        let resolver = ElohimResolver::new(DidIdentityStore::new(
             pool,
             Some(AGENT_KEY.to_string()),
-            vec!["12D3KooWSelfPeerId".to_string()],
-            Some("https://node.example.host".to_string()),
-        );
-        let resolver = ElohimResolver::new(store);
-        let did = Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap();
-
-        let doc = resolver
-            .resolve(&did)
+            vec![],
+            None,
+        ));
+        assert!(resolver
+            .resolve(&Did::parse(&format!("did:elohim:{AGENT_KEY}")).unwrap())
             .await
-            .expect("resolution succeeds")
-            .did_document
-            .expect("document present");
-
-        // controller populated from the declared set (self + recovery quorum).
-        match doc
-            .controller
-            .as_ref()
-            .expect("controller populated from head")
-        {
-            Controller::Many(cs) => assert_eq!(cs.len(), 2),
-            other => panic!("expected Controller::Many, got {other:?}"),
-        }
-        // Lineage: the chain-root surfaces as an alsoKnownAs alias next to transport ids.
-        let aka = doc.also_known_as.as_ref().unwrap();
-        assert!(
-            aka.iter()
-                .any(|a| a == "did:elohim:bafyreichainrootgenesis0000"),
-            "chain-root lineage alias present: {aka:?}"
-        );
-
-        // Conformance: the with-controllers document still validates against DID 1.1.
-        let schema: Value = serde_json::from_str(SCHEMA).expect("schema is valid JSON");
-        let validator = jsonschema::validator_for(&schema).expect("schema compiles");
-        let instance = serde_json::to_value(&doc).unwrap();
-        let errors: Vec<String> = validator
-            .iter_errors(&instance)
-            .map(|e| format!("{e} (at {})", e.instance_path))
-            .collect();
-        assert!(
-            errors.is_empty(),
-            "with-controllers did:elohim document violates DID 1.1 schema:\n  - {}",
-            errors.join("\n  - ")
-        );
+            .is_err());
     }
 }

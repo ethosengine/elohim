@@ -3228,20 +3228,30 @@ impl HttpServer {
             // doorway `/health` `dhtBacking` block is the honest home for the
             // backing; read `dnaHashes` together with it for the full identity.
             let mut dna_hashes = serde_json::Map::new();
+            let mut agent_keys = serde_json::Map::new();
             if let Some(reg) = self.hc_registry.as_ref() {
                 if let Some(hc) = reg.infrastructure_client() {
+                    agent_keys.insert(
+                        "infrastructure".to_string(),
+                        serde_json::json!(hc.agent_key_uhcak()),
+                    );
                     dna_hashes.insert(
                         "infrastructure".to_string(),
                         serde_json::json!(hc.cell_id().dna_hash().to_string()),
                     );
                 }
                 if let Some(hc) = reg.imagodei_client() {
+                    agent_keys.insert(
+                        "imagodei".to_string(),
+                        serde_json::json!(hc.agent_key_uhcak()),
+                    );
                     dna_hashes.insert(
                         "imagodei".to_string(),
                         serde_json::json!(hc.cell_id().dna_hash().to_string()),
                     );
                 }
                 if let Some(hc) = reg.lamad_client() {
+                    agent_keys.insert("lamad".to_string(), serde_json::json!(hc.agent_key_uhcak()));
                     dna_hashes.insert(
                         "lamad".to_string(),
                         serde_json::json!(hc.cell_id().dna_hash().to_string()),
@@ -3250,6 +3260,9 @@ impl HttpServer {
             }
             body["dhtParticipation"] = serde_json::json!({
                 "dnaHashes": dna_hashes,
+                // Public cell keys let a native publisher verify that storage
+                // authors through the same agent as its signing connection.
+                "agentKeys": agent_keys,
                 // The discovery backing is NOT observable from storage's plane.
                 "backingVisible": false,
                 "backingSource": "doorway /health dhtBacking",
@@ -8530,6 +8543,11 @@ impl HttpServer {
             self_agent_cid,
             self_transport_ids,
             public_base_url,
+        )
+        .with_device_conductor(
+            self.hc_registry
+                .as_ref()
+                .and_then(|registry| registry.imagodei_client()),
         );
         let resolver = ElohimResolver::new(store);
 

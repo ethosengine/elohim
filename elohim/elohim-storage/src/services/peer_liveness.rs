@@ -464,12 +464,26 @@ mod tests {
         arm(
             "peer:self".into(),
             vec!["agent:self".into()],
-            Duration::from_millis(50),
+            Duration::from_secs(60),
         );
         record_connected("12D3KooWJessica", vec!["agent:jessica".into()]);
-        std::thread::sleep(Duration::from_millis(30));
+        // Model an elapsed TTL directly. Wall-clock sleeps made this assertion
+        // depend on getting scheduled within 20ms on a busy build host.
+        registry()
+            .write()
+            .unwrap()
+            .armed
+            .as_mut()
+            .unwrap()
+            .peers
+            .get_mut("12D3KooWJessica")
+            .unwrap()
+            .last_seen = Instant::now() - Duration::from_secs(120);
+        assert!(!connected_snapshot()
+            .unwrap()
+            .labels
+            .contains("agent:jessica"));
         touch("12D3KooWJessica");
-        std::thread::sleep(Duration::from_millis(30));
         assert!(
             connected_snapshot()
                 .unwrap()

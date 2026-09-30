@@ -13,12 +13,26 @@ import {
   AdminWebsocket,
   AppWebsocket,
   encodeHashToBase64,
+  decodeHashFromBase64,
   setSigningCredentials,
 } from '@holochain/client';
 
-import type { CellId, SigningCredentials } from '@holochain/client';
+import type { AppInfo, CellId, SigningCredentials } from '@holochain/client';
+
+export interface HostedConductorReceipt {
+  doorway: string;
+  appToken: string;
+  appPort: number;
+  agentPubKey: string;
+  installedAppId: string;
+  cellIds: Record<string, [string, string]>;
+  token: string;
+  expiresAt: number;
+}
 
 export interface ConductorOptions {
+  /** Explicit ceremony output; ordinary connections never call /hc/connect. */
+  hosted?: { doorway: string; receipt: string; authFile: string; signingFile: string };
   /** Conductor admin interface, e.g. ws://localhost:4444 */
   adminWs: string;
   /** Conductor app interface, e.g. ws://localhost:4445 */
@@ -27,6 +41,8 @@ export interface ConductorOptions {
   appId: string;
   /** Role whose cell holds the content_store zome (`lamad`). */
   role: string;
+  /** Coordinator for this role; publication uses content_store. */
+  zome?: string;
   /** Existing storage closed-chain-fence credentials, indexed by exact cell id. */
   signingCredentialsDir?: string;
   /** Refuse accidental connection to a different device or DNA. */
@@ -39,7 +55,7 @@ export interface Conductor {
   agent: string;
   dna: string;
   /** Call a `content_store` fn on the role's cell as this node's agent. */
-  call<T>(fnName: string, payload: unknown): Promise<T>;
+  call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T>;
   close(): Promise<void>;
 }
 
@@ -52,6 +68,10 @@ async function findCell(admin: AdminWebsocket, appId: string, role: string): Pro
       `no installed app "${appId}" (have: ${apps.map(a => a.installed_app_id).join(', ')})`
     );
   }
+  return provisionedCell(app, role);
+}
+
+function provisionedCell(app: AppInfo, role: string): CellId {
   let cellId: CellId | undefined;
   for (const [r, infos] of Object.entries(app.cell_info)) {
     if (r !== role) continue;
@@ -61,7 +81,7 @@ async function findCell(admin: AdminWebsocket, appId: string, role: string): Pro
   }
   if (!cellId) {
     throw new Error(
-      `app "${appId}" has no provisioned role "${role}" (roles: ${Object.keys(app.cell_info).join(', ')})`
+      `app "${app.installed_app_id}" has no provisioned role "${role}" (roles: ${Object.keys(app.cell_info).join(', ')})`
     );
   }
   return cellId;
@@ -120,6 +140,7 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
       'existing signing credentials required: set STEWARD_SIGNING_CREDENTIALS_DIR or --signing-credentials-dir'
     );
   }
+  if (o.hosted) return connectHosted(o, dir);
   const admin = await AdminWebsocket.connect({
     url: new URL(o.adminWs),
     wsClientOptions: { origin: o.appId },
@@ -145,13 +166,16 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
     return {
       agent,
       dna,
-      async call<T>(fnName: string, payload: unknown): Promise<T> {
-        return connected.callZome<T>({
-          cell_id: cell,
-          zome_name: 'content_store',
-          fn_name: fnName,
-          payload,
-        });
+      async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
+        return connected.callZome<T>(
+          {
+            cell_id: cell,
+            zome_name: o.zome ?? 'content_store',
+            fn_name: fnName,
+            payload,
+          },
+          timeoutMs
+        );
       },
       async close() {
         try {
@@ -166,6 +190,63 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
     await admin.client.close();
     throw error;
   }
+}
+
+async function connectHosted(o: ConductorOptions, dir: string): Promise<Conductor> {
+  const hosted = o.hosted!;
+  const receipt = JSON.parse(await readFile(hosted.receipt, 'utf8')) as HostedConductorReceipt;
+  if (receipt.doorway !== hosted.doorway || receipt.installedAppId !== o.appId)
+    throw new Error('Hosted receipt context mismatch');
+  if (!Number.isFinite(receipt.expiresAt) || Date.now() >= receipt.expiresAt)
+    throw new Error('Hosted app token expired; explicit credentials ceremony required');
+  const pair = receipt.cellIds[o.role];
+  if (!pair) throw new Error('Hosted receipt missing requested role');
+  const cell: CellId = [decodeHashFromBase64(pair[0]), decodeHashFromBase64(pair[1])];
+  const agent = encodeHashToBase64(cell[1]);
+  const dna = encodeHashToBase64(cell[0]);
+  if (!o.expectedAgent || agent !== o.expectedAgent || agent !== receipt.agentPubKey)
+    throw new Error('Hosted device key mismatch');
+  if (o.expectedDna && dna !== o.expectedDna) throw new Error('Hosted DNA context mismatch');
+  setSigningCredentials(cell, await loadSigningCredentials(dir, cell));
+  const url = new URL(`/hc/app/${receipt.appPort}`, hosted.doorway);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.searchParams.set('token', receipt.token);
+  const app = await AppWebsocket.connect({
+    url,
+    token: Array.from(Buffer.from(receipt.appToken, 'base64')),
+    wsClientOptions: { origin: new URL(hosted.doorway).origin },
+    defaultTimeout: 180_000,
+  }).catch(() => {
+    throw new Error(
+      'Hosted app connection failed; renew the explicit credentials ceremony if expired'
+    );
+  });
+  try {
+    const info = await app.appInfo();
+    const actual = provisionedCell(info, o.role);
+    if (
+      info.installed_app_id !== o.appId ||
+      encodeHashToBase64(actual[0]) !== dna ||
+      encodeHashToBase64(actual[1]) !== agent
+    )
+      throw new Error('Hosted conductor differs from enrolled app/cell');
+  } catch (error) {
+    await (app.client as unknown as { close(): Promise<unknown> }).close();
+    throw error;
+  }
+  return {
+    agent,
+    dna,
+    async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
+      return app.callZome<T>(
+        { cell_id: cell, zome_name: o.zome ?? 'content_store', fn_name: fnName, payload },
+        timeoutMs
+      );
+    },
+    async close() {
+      await (app.client as unknown as { close(): Promise<unknown> }).close();
+    },
+  };
 }
 
 /**

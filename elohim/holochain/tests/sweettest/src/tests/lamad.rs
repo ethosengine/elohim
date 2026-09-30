@@ -29,10 +29,11 @@ use anyhow::Result;
 // record and construct the entry-swap forgery the coordinator must refuse.
 // 0.7: `Record::new` takes a `RecordEntry` (0.6 derived it from an Option<Entry>).
 use hdk::prelude::{ActionData, LinkTag, Record, RecordEntry, Timestamp};
-use holo_hash::{ActionHash, ActionHashB64, AgentPubKey, HashableContentExtSync};
+use holo_hash::{ActionHash, ActionHashB64, AgentPubKey, DnaHash, HasHash, HashableContentExtSync};
 use holochain::prelude::{ChainOp, DhtOp, DhtOpHashed, SignedAction, SignedActionHashed};
 use holochain::sweettest::{await_consistency_s, SweetConductor};
 use holochain_keystore::AgentPubKeyExt;
+use holochain_state::dht_store::{AppOutcome, SysOutcome};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -229,6 +230,9 @@ struct CanonicalElectionOutput {
     pub winner_target: String,
     pub canonical_declared_at: Timestamp,
     pub canonical_earned: bool,
+    /// Lets adversarial tests prove the exact forged link reached the reader's
+    /// local election index before asserting how that reader classified it.
+    pub canonical_link_hash: String,
     #[serde(default)]
     pub staging_candidate: Option<String>,
     #[serde(default)]
@@ -603,7 +607,10 @@ async fn update_content_carries_a_changed_type_and_tags() -> Result<()> {
         updated.content.tags,
         vec!["fct".to_string(), "recomposed".to_string()]
     );
-    assert_eq!(updated.content.content, created.content.content, "body untouched");
+    assert_eq!(
+        updated.content.content, created.content.content,
+        "body untouched"
+    );
 
     let by_id: Option<ContentBodyOutput> = conductor
         .call(
@@ -894,6 +901,7 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
     }
     // Opaque mirror: the zome returns { payload: {...}, signature: ... }; we
     // round-trip it verbatim into the declare input, so the test cannot drift
@@ -905,11 +913,15 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
+        dna_hash: DnaHash,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {
         payload: HeadDelegationPayloadMirror,
         signature: hdk::prelude::Signature,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        acceptance: Option<HeadAcceptanceMirror>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct DeclareEarnedWithDelegationInput {
@@ -918,15 +930,30 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         delegation: Option<HeadDelegationMirror>,
     }
 
+    let measured = Instant::now();
+    eprintln!("delegation-proof: creating isolated conductors");
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
+    eprintln!(
+        "delegation-proof: conductors ready {:?}",
+        measured.elapsed()
+    );
     let seed = network_seed(DNA);
     let dna_file = load_dna(DNA, &seed, Some(a1.clone())).await?;
+    let dna_hash = dna_file.dna_hash().clone();
     let app1 = c1
         .setup_app_for_agent("lamad-app", a1.clone(), &[dna_file.clone()])
         .await?;
+    eprintln!(
+        "delegation-proof: grantor DNA installed {:?}",
+        measured.elapsed()
+    );
     let app2 = c2
         .setup_app_for_agent("lamad-app", a2.clone(), &[dna_file])
         .await?;
+    eprintln!(
+        "delegation-proof: both DNAs installed {:?}",
+        measured.elapsed()
+    );
     let cell1 = app1.cells().first().unwrap().clone();
     let cell2 = app2.cells().first().unwrap().clone();
     let zome1 = cell1.zome("content_store");
@@ -936,7 +963,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
     // unique_id: a nextest retry shares the process-global mem-bootstrap DHT,
     // so a fixed id would self-poison the retry (dna #1357).
     let id = unique_id("device-1");
-    let _created: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+    let created: ContentOutput = c1.call(&zome1, "create_content", test_content(&id)).await;
+    eprintln!("delegation-proof: root created {:?}", measured.elapsed());
     let valid_until = Timestamp::from_micros(Timestamp::now().as_micros() + 3_600_000_000);
     let delegation: HeadDelegationMirror = c1
         .call(
@@ -944,11 +972,16 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             "grant_head_delegation",
             GrantHeadDelegationInput {
                 delegate: a2.clone(),
-                scope: "*".to_string(),
+                scope: id.clone(),
                 valid_until,
+                root_action_hash: created.action_hash.clone(),
             },
         )
         .await;
+    eprintln!(
+        "delegation-proof: scoped grant minted {:?}",
+        measured.elapsed()
+    );
     assert_eq!(delegation.payload.grantor, a1);
     assert_eq!(delegation.payload.delegate, a2);
 
@@ -979,6 +1012,18 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         )
         .await;
     let b_action = b_update.action_hash.clone();
+    await_record(&c1, &zome1, &b_action, "grantor acceptance").await;
+    let delegation: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: b_action.clone(),
+                delegation,
+            },
+        )
+        .await;
     let declared: ContentHeadOutput = c2
         .call(
             &zome2,
@@ -990,6 +1035,10 @@ async fn delegated_device_moves_the_head() -> Result<()> {
             },
         )
         .await;
+    eprintln!(
+        "delegation-proof: first delegated head accepted {:?}",
+        measured.elapsed()
+    );
     assert_eq!(declared.head_action_hash, b_action);
 
     // (c) Both conductors converge on B's update as the head.
@@ -1031,17 +1080,8 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         "refusal must name the authority rule; got: {err}"
     );
 
-    let wrong_scope: HeadDelegationMirror = c1
-        .call(
-            &zome1,
-            "grant_head_delegation",
-            GrantHeadDelegationInput {
-                delegate: a2.clone(),
-                scope: "some-other-id".to_string(),
-                valid_until,
-            },
-        )
-        .await;
+    let mut wrong_scope = delegation.clone();
+    wrong_scope.payload.scope = "some-other-id".into();
     let scoped: std::result::Result<ContentHeadOutput, _> = c2
         .call_fallible(
             &zome2,
@@ -1061,6 +1101,287 @@ async fn delegated_device_moves_the_head() -> Result<()> {
         err.contains("scope"),
         "refusal must name the scope; got: {err}"
     );
+
+    // The root author independently accepts a second exact version under a
+    // short-lived grant. Expiry cannot demote that already accepted version.
+    let next: ContentOutput = c2
+        .call(
+            &zome2,
+            "update_content",
+            UpdateContentInput {
+                id: id.clone(),
+                title: Some("Second accepted device version".into()),
+            },
+        )
+        .await;
+    await_record(&c1, &zome1, &next.action_hash, "second acceptance").await;
+    let accepted: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: next.action_hash.clone(),
+                delegation: delegation.clone(),
+            },
+        )
+        .await;
+    // Full signatures and context are checked, including a forged receipt and
+    // replaying a genuine receipt onto a different exact head.
+    for (label, grant, target) in [
+        (
+            "wrong DNA",
+            {
+                let mut g = accepted.clone();
+                g.payload.dna_hash = DnaHash::from_raw_36(vec![9; 36]);
+                g
+            },
+            next.action_hash.clone(),
+        ),
+        (
+            "wrong root",
+            {
+                let mut g = accepted.clone();
+                g.payload.root_action_hash = next.action_hash.clone();
+                g
+            },
+            next.action_hash.clone(),
+        ),
+        (
+            "forged signature",
+            {
+                let mut g = accepted.clone();
+                g.signature = hdk::prelude::Signature([9; 64]);
+                g
+            },
+            next.action_hash.clone(),
+        ),
+        (
+            "forged acceptance",
+            {
+                let mut g = accepted.clone();
+                g.acceptance.as_mut().unwrap().signature = hdk::prelude::Signature([9; 64]);
+                g
+            },
+            next.action_hash.clone(),
+        ),
+        (
+            "backdated acceptance",
+            {
+                let mut g = accepted.clone();
+                g.acceptance.as_mut().unwrap().accepted_at = Timestamp::from_micros(1);
+                g
+            },
+            next.action_hash.clone(),
+        ),
+        (
+            "receipt replay",
+            accepted.clone(),
+            created.action_hash.clone(),
+        ),
+    ] {
+        let bad: std::result::Result<ContentHeadOutput, _> = c2
+            .call_fallible(
+                &zome2,
+                "declare_earned_canonical_head",
+                DeclareEarnedWithDelegationInput {
+                    id: id.clone(),
+                    head_action_hash: ActionHashB64::from(target).to_string(),
+                    delegation: Some(grant),
+                },
+            )
+            .await;
+        assert!(bad.is_err(), "{label} must be refused");
+    }
+    let expires = Timestamp::from_micros(Timestamp::now().as_micros() + 15_000_000);
+    let short: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "grant_head_delegation",
+            GrantHeadDelegationInput {
+                delegate: a2.clone(),
+                scope: id.clone(),
+                valid_until: expires,
+                root_action_hash: created.action_hash.clone(),
+            },
+        )
+        .await;
+    let accepted: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: id.clone(),
+                head_action_hash: next.action_hash.clone(),
+                delegation: short,
+            },
+        )
+        .await;
+    let _: ContentHeadOutput = c2
+        .call(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(next.action_hash.clone()).to_string(),
+                delegation: Some(accepted.clone()),
+            },
+        )
+        .await;
+    let evidence: Option<CanonicalElectionEvidenceOutput> = c2
+        .call(&zome2, "get_canonical_election_evidence", id.clone())
+        .await;
+    let evidence = evidence.expect("accepted declaration exists");
+    let remaining = expires
+        .as_micros()
+        .saturating_sub(Timestamp::now().as_micros());
+    if remaining > 0 {
+        sleep(Duration::from_micros(remaining as u64 + 100_000)).await;
+    }
+    for (conductor, zome) in [(&c1, &zome1), (&c2, &zome2)] {
+        let historical: Option<CanonicalElectionOutput> = conductor
+            .call(
+                zome,
+                "verify_carried_election",
+                VerifyCarriedElectionInput {
+                    id: id.clone(),
+                    link_record: evidence.link_record.clone(),
+                },
+            )
+            .await;
+        let historical = historical.expect("historical acceptance survives expiry");
+        assert!(historical.canonical_earned);
+        assert_eq!(
+            historical.winner_target,
+            ActionHashB64::from(next.action_hash.clone()).to_string()
+        );
+    }
+    let late: std::result::Result<ContentHeadOutput, _> = c2
+        .call_fallible(
+            &zome2,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(next.action_hash).to_string(),
+                delegation: Some(accepted.clone()),
+            },
+        )
+        .await;
+    assert!(format!(
+        "{:?}",
+        late.expect_err("expired grant blocks even re-declaration")
+    )
+    .contains("expired"));
+    // A malicious coordinator can bypass declare-time checks and append a
+    // fresh signed link carrying the old, genuinely accepted, now expired
+    // receipt. It still cannot refresh that version's election position.
+    let later: ContentOutput = c1
+        .call(
+            &zome1,
+            "update_content",
+            UpdateContentInput {
+                id: id.clone(),
+                title: Some("Root author published after delegated grant expired".into()),
+            },
+        )
+        .await;
+    let _: ContentHeadOutput = c1
+        .call(
+            &zome1,
+            "declare_earned_canonical_head",
+            DeclareEarnedWithDelegationInput {
+                id: id.clone(),
+                head_action_hash: ActionHashB64::from(later.action_hash.clone()).to_string(),
+                delegation: None,
+            },
+        )
+        .await;
+    let mut cursor = ForgedChainCursor::after(&evidence.link_record);
+    cursor.next_timestamp = Timestamp::now();
+    let replay = forge_earned_link(
+        &c2,
+        &c1,
+        &dna_hash,
+        &a2,
+        &mut cursor,
+        &evidence.link_record,
+        earned_tag_with_delegation(&accepted),
+    )
+    .await;
+    let replayed: Option<CanonicalElectionOutput> = c1
+        .call(
+            &zome1,
+            "verify_carried_election",
+            VerifyCarriedElectionInput {
+                id: id.clone(),
+                link_record: replay,
+            },
+        )
+        .await;
+    assert_eq!(
+        replayed.unwrap().winner_target,
+        ActionHashB64::from(later.action_hash.clone()).to_string(),
+        "a fresh link cannot give an expired historical receipt a new election position"
+    );
+    let local: Option<ContentHeadOutput> = c1
+        .call(&zome1, "resolve_content_head_local", id.clone())
+        .await;
+    assert_eq!(
+        local.unwrap().head_action_hash,
+        later.action_hash,
+        "gossiped and carried replay share ordering"
+    );
+
+    let unauthorized: std::result::Result<ActionHash, _> = c2
+        .call_fallible(&zome2, "revoke_head_delegation", accepted.clone())
+        .await;
+    assert!(
+        unauthorized.is_err(),
+        "delegate cannot invalidate grantor authority"
+    );
+    let _: ActionHash = c1.call(&zome1, "revoke_head_delegation", accepted).await;
+    let invalidated: std::result::Result<Option<CanonicalElectionOutput>, _> = c1
+        .call_fallible(
+            &zome1,
+            "verify_carried_election",
+            VerifyCarriedElectionInput {
+                id: id.clone(),
+                link_record: evidence.link_record,
+            },
+        )
+        .await;
+    assert!(
+        invalidated.is_ok(),
+        "revocation ends future exercise without erasing previously accepted versions"
+    );
+    // Revocation is independently enforced while the grant is still live;
+    // this refusal must not merely be the expiry check happening to fail.
+    let _: ActionHash = c1
+        .call(&zome1, "revoke_head_delegation", delegation.clone())
+        .await;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let revoked: std::result::Result<ContentHeadOutput, _> = c2
+            .call_fallible(
+                &zome2,
+                "declare_earned_canonical_head",
+                DeclareEarnedWithDelegationInput {
+                    id: id.clone(),
+                    head_action_hash: ActionHashB64::from(created.action_hash.clone()).to_string(),
+                    delegation: Some(delegation.clone()),
+                },
+            )
+            .await;
+        let error = format!("{:?}", revoked.expect_err("revoked live grant is refused"));
+        if error.contains("revoked") {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "receiver did not observe root-author revocation: {error}"
+        );
+        sleep(Duration::from_millis(100)).await;
+    }
 
     Ok(())
 }
@@ -1671,7 +1992,10 @@ async fn long_lived_channel_takes_a_second_candidate_beneath_its_earned_head() -
         .await;
     let unchanged = unchanged.expect("election still resolves");
     assert_eq!(unchanged.winner_target, e_cid);
-    assert_eq!(unchanged.staging_candidate.as_deref(), Some(s1_cid.as_str()));
+    assert_eq!(
+        unchanged.staging_candidate.as_deref(),
+        Some(s1_cid.as_str())
+    );
 
     // --- (e) PROMOTION moves the head. Declaring S1 earned crowns it and
     // empties the candidate slot — S1 does not remain a candidate beneath
@@ -3099,12 +3423,29 @@ async fn forge_earned_link(
     cursor.next_seq += 1;
     cursor.next_timestamp = Timestamp::from_micros(cursor.next_timestamp.as_micros() + 1);
     let op = DhtOpHashed::from_content_sync(DhtOp::from(ChainOp::CreateLink(signed)));
-    store_conductor
+    let op_hash = op.as_hash().clone();
+    let store = store_conductor
         .get_dht_store(dna_hash)
-        .expect("lamad DHT store")
-        .test_insert_authored_chain_op(op, None, None, None)
+        .expect("lamad DHT store");
+    // The authored-only test helper writes Action/ChainOp but never populates
+    // the Link index that get_links reads. Drive the existing incoming-op
+    // integration path: its accepted CreateLink is indexed just like gossip.
+    store
+        .record_incoming_ops(vec![(op, false)])
         .await
-        .expect("forged link op inserted as integrity-valid gossip");
+        .expect("forged link op enters validation limbo");
+    store
+        .record_chain_op_sys_validation_outcomes(vec![(op_hash.clone(), SysOutcome::Accepted)])
+        .await
+        .expect("forged link op passes integrity validation");
+    store
+        .record_app_validation_outcomes(vec![(op_hash, AppOutcome::Accepted)])
+        .await
+        .expect("forged link op passes app validation");
+    store
+        .integrate_ready_ops(Timestamp::now())
+        .await
+        .expect("forged link op integrates into the local link index");
     holochain_serialized_bytes::encode(&record).expect("forged link record encodes")
 }
 
@@ -3150,6 +3491,7 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationPayloadMirror {
@@ -3157,11 +3499,15 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
+        dna_hash: DnaHash,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {
         payload: HeadDelegationPayloadMirror,
         signature: hdk::prelude::Signature,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        acceptance: Option<HeadAcceptanceMirror>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct DeclareEarnedWithDelegationInput {
@@ -3243,6 +3589,18 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
                 delegate: a2.clone(),
                 scope: valid_id.clone(),
                 valid_until,
+                root_action_hash: valid_root.action_hash.clone(),
+            },
+        )
+        .await;
+    let valid_grant: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: valid_id.clone(),
+                head_action_hash: valid_root.action_hash.clone(),
+                delegation: valid_grant,
             },
         )
         .await;
@@ -3289,7 +3647,7 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
     let mut bad_cases = Vec::new();
     for (label, scope, lifetime_micros) in [
         ("out-of-scope", "another-id".to_string(), 3_600_000_000),
-        ("expired", "*".to_string(), 50_000),
+        ("expired", "*".to_string(), 2_000_000),
     ] {
         let bad_id = unique_id(&format!("earned-tier-{label}"));
         let bad_root: ContentOutput = c1
@@ -3297,7 +3655,7 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
             .await;
         await_record(&c2, &zome2, &bad_root.action_hash, label).await;
         await_resolves(&c2, &zome2, &bad_id, label).await;
-        let bad_b64 = ActionHashB64::from(bad_root.action_hash).to_string();
+        let bad_b64 = ActionHashB64::from(bad_root.action_hash.clone()).to_string();
         let _: ContentHeadOutput = c2
             .call(
                 &zome2,
@@ -3311,28 +3669,33 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
         let staging: Option<CanonicalElectionEvidenceOutput> = c2
             .call(&zome2, "get_canonical_election_evidence", bad_id.clone())
             .await;
-        let grant: HeadDelegationMirror = c1
+        let staging = staging.expect("attacker serves staging link");
+        let staging_record: Record = holochain_serialized_bytes::decode(&staging.link_record)
+            .expect("staging link record decodes");
+        let staging_link = ActionHashB64::from(staging_record.action_address().clone()).to_string();
+        let observed = await_election_link(&c1, &zome1, &bad_id, &staging_link, label).await;
+        assert!(!observed.canonical_earned, "{label} starts as staging");
+        let mut grant: HeadDelegationMirror = c1
             .call(
                 &zome1,
                 "grant_head_delegation",
                 GrantHeadDelegationInput {
                     delegate: a2.clone(),
-                    scope,
+                    scope: bad_id.clone(),
+                    root_action_hash: bad_root.action_hash,
                     valid_until: Timestamp::from_micros(
                         Timestamp::now().as_micros() + lifetime_micros,
                     ),
                 },
             )
             .await;
-        if label == "expired" {
-            sleep(Duration::from_millis(75)).await;
+        if label == "out-of-scope" {
+            grant.payload.scope = scope;
         }
-        bad_cases.push((
-            label,
-            bad_id,
-            staging.expect("attacker serves staging link").link_record,
-            grant,
-        ));
+        if label == "expired" {
+            sleep(Duration::from_millis(2_100)).await;
+        }
+        bad_cases.push((label, bad_id, staging.link_record, grant));
     }
 
     let mut cursor = ForgedChainCursor::after(&bad_cases.last().expect("bad delegation case").2);
@@ -3346,9 +3709,10 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
         b"canonical-head:earned".to_vec(),
     )
     .await;
-
-    // The ordinary read demotes the forged link, leaving the genuine root
-    // declaration earned; carrying those same bytes is refused outright.
+    // The ordinary read still elects the genuine root-author declaration.
+    // This same-target forgery cannot appear as a staging successor, so the
+    // read alone does not prove its local index visibility. The carried
+    // verifier below directly refuses the forged bytes on authoring standing.
     let head: Option<ContentHeadOutput> = c1.call(&zome1, "resolve_content_head", id.clone()).await;
     let head = head.expect("genuine root-author declaration remains elected");
     assert_eq!(head.canonical_earned, Some(true));
@@ -3373,9 +3737,9 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
     assert!(error.contains("no earned authoring standing"), "{error}");
 
     // Out-of-scope and expired grants can be stamped into forged tags, but
-    // reads demote each declaration to staging.
+    // reads exclude the failed asserted proof instead of conferring staging authority.
     for (label, bad_id, staging, grant) in bad_cases {
-        forge_earned_link(
+        let forged = forge_earned_link(
             &c2,
             &c1,
             &dna_hash,
@@ -3385,17 +3749,64 @@ async fn earned_election_tier_rechecks_the_link_authors_standing() -> Result<()>
             earned_tag_with_delegation(&grant),
         )
         .await;
+        let forged_record: Record =
+            holochain_serialized_bytes::decode(&forged).expect("forged link record decodes");
+        let forged_link = ActionHashB64::from(forged_record.action_address().clone()).to_string();
+        let legitimate: Record = holochain_serialized_bytes::decode(&staging).unwrap();
+        let legitimate_link = ActionHashB64::from(legitimate.action_address().clone()).to_string();
         let read: Option<ContentHeadOutput> = c1
             .call(&zome1, "resolve_content_head", bad_id.clone())
             .await;
+        let read = read.expect("the independently valid staging declaration remains");
         assert_eq!(
-            read.and_then(|head| head.canonical_earned),
+            read.canonical_link_hash.as_deref(),
+            Some(legitimate_link.as_str()),
+            "{label} failed proof cannot confer even staging authority"
+        );
+        assert_ne!(
+            read.canonical_link_hash.as_deref(),
+            Some(forged_link.as_str())
+        );
+        assert_eq!(
+            read.canonical_earned,
             Some(false),
             "{label} delegation must not retain the earned tier"
         );
     }
 
     Ok(())
+}
+
+/// Wait for this exact link to win in the reader's local election index.
+/// An incorrectly earned forged link also wins, so the caller asserts its
+/// tier separately rather than waiting for the bad classification to vanish.
+async fn await_election_link(
+    conductor: &SweetConductor,
+    zome: &holochain::sweettest::SweetZome,
+    id: &str,
+    link_hash: &str,
+    who: &str,
+) -> CanonicalElectionOutput {
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let mut last = None;
+    loop {
+        let election: Option<CanonicalElectionOutput> = conductor
+            .call(zome, "resolve_canonical_election", id.to_string())
+            .await;
+        if let Some(election) = election {
+            if election.canonical_link_hash == link_hash {
+                return election;
+            }
+            last = Some(election);
+        }
+        if Instant::now() >= deadline {
+            panic!(
+                "{who} link {link_hash} did not win the local election within 120s; \
+                 last observed election: {last:?}"
+            );
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
 }
 
 /// Poll `conductor` until it holds `action` locally, or panic at the deadline.
@@ -3617,6 +4028,7 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationPayloadMirror {
@@ -3624,11 +4036,15 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
         delegate: AgentPubKey,
         scope: String,
         valid_until: Timestamp,
+        root_action_hash: ActionHash,
+        dna_hash: DnaHash,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct HeadDelegationMirror {
         payload: HeadDelegationPayloadMirror,
         signature: hdk::prelude::Signature,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        acceptance: Option<HeadAcceptanceMirror>,
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct DeclareEarnedWithDelegationInput {
@@ -3647,8 +4063,9 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
             "grant_head_delegation",
             GrantHeadDelegationInput {
                 delegate: a2.clone(),
-                scope: "*".to_string(),
+                scope: delegated.clone(),
                 valid_until,
+                root_action_hash: delegated_root.action_hash.clone(),
             },
         )
         .await;
@@ -3665,6 +4082,24 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
         )
         .await;
     let delegate_b64 = ActionHashB64::from(delegate_version.action_hash.clone()).to_string();
+    await_record(
+        &c1,
+        &zome1,
+        &delegate_version.action_hash,
+        "grantor acceptance",
+    )
+    .await;
+    let grant: HeadDelegationMirror = c1
+        .call(
+            &zome1,
+            "accept_delegated_head",
+            AcceptDelegatedHeadMirror {
+                id: delegated.clone(),
+                head_action_hash: delegate_version.action_hash.clone(),
+                delegation: grant,
+            },
+        )
+        .await;
     let _: ContentHeadOutput = c2
         .call(
             &zome2,
@@ -3743,4 +4178,17 @@ async fn carried_head_evidence_admits_only_an_authors_own_election() -> Result<(
     );
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HeadAcceptanceMirror {
+    head_action_hash: ActionHash,
+    accepted_at: Timestamp,
+    signature: hdk::prelude::Signature,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AcceptDelegatedHeadMirror<T> {
+    id: String,
+    head_action_hash: ActionHash,
+    delegation: T,
 }

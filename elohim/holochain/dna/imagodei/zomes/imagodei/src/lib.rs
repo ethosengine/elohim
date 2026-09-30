@@ -462,14 +462,62 @@ pub fn get_my_human(_: ()) -> ExternResult<Option<HumanOutput>> {
     get_human_by_agent_key(agent_info.agent_initial_pubkey)
 }
 
+// Keep deleted index links visible: deletion is not a signed device revocation,
+// and must not make an enrolled identity disappear and silently get recreated.
+fn identity_agent_links(agent: AgentPubKey) -> ExternResult<Vec<Link>> {
+    let details = get_links_details(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentKeyToHuman)?,
+        GetStrategy::Network,
+    )?
+    .into_inner();
+    let details: Vec<_> = details
+        .into_iter()
+        .filter(|(create, _)| create.action().author() == &agent)
+        .collect();
+    if details.len() > 64 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "identity index bound exceeded".into()
+        )));
+    }
+    Ok(details
+        .into_iter()
+        .filter_map(|(create, _)| match &create.action().data {
+            ActionData::CreateLink(link) => Some(Link {
+                author: create.action().author().clone(),
+                base: link.base_address.clone(),
+                target: link.target_address.clone(),
+                timestamp: create.action().timestamp(),
+                zome_index: link.zome_index,
+                link_type: link.link_type,
+                tag: link.tag.clone(),
+                create_link_hash: create.as_hash().clone(),
+            }),
+            _ => None,
+        })
+        .collect())
+}
+
 /// Get Human by agent public key
 #[hdk_extern]
 pub fn get_human_by_agent_key(agent_key: AgentPubKey) -> ExternResult<Option<HumanOutput>> {
-    let query = LinkQuery::try_new(agent_key, LinkTypes::AgentKeyToHuman)?;
-    let links = get_links(query, GetStrategy::default())?;
+    // Explicit verified enrollment wins over a historical self-profile. Revoked
+    // or contested enrollment cannot silently fall back to that old identity.
+    let enrolled = resolve_device_identity(agent_key.clone())?;
+    let links = identity_agent_links(agent_key.clone())?;
 
-    if let Some(link) = links.first() {
+    let mut invalid_binding = enrolled.is_some();
+    for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if enrolled
+                .as_ref()
+                .is_some_and(|binding| binding.human_action_hash != action_hash)
+            {
+                continue;
+            }
+            if verify_human_agent_link(&link, &agent_key, &action_hash).is_err() {
+                invalid_binding = true;
+                continue;
+            }
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
                     return Ok(Some(HumanOutput {
@@ -490,7 +538,201 @@ pub fn get_human_by_agent_key(agent_key: AgentPubKey) -> ExternResult<Option<Hum
         }
     }
 
+    if invalid_binding {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Human binding revoked or unverifiable; explicit reenrollment required".into()
+        )));
+    }
     Ok(None)
+}
+
+/// Only the exact Human creator's untagged legacy link or a verified additive
+/// binding establishes the agent-to-Human relationship. A forged index link is
+/// never identity authority.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RegisterDeviceIdentityInput {
+    pub binding: ActionHash,
+    pub expected_content_dna: DnaHash,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifiedDeviceIdentity {
+    pub controllers: Vec<AgentPubKey>,
+    pub human_id: String,
+    pub human_action_hash: ActionHash,
+    pub identity_root: ActionHash,
+    pub device_key: AgentPubKey,
+    pub authority_action_hash: ActionHash,
+    pub binding_action_hash: ActionHash,
+    pub network_dna: DnaHash,
+    pub content_dna: DnaHash,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct DeviceIdentityQuery {
+    binding: ActionHash,
+    expected_device: AgentPubKey,
+    expected_content_dna: DnaHash,
+}
+fn verified_device(
+    input: &RegisterDeviceIdentityInput,
+    device: AgentPubKey,
+) -> ExternResult<VerifiedDeviceIdentity> {
+    match call(
+        CallTargetCell::OtherRole("mishpat".into()),
+        ZomeName::from("mishpat"),
+        "verify_device_binding".into(),
+        None,
+        DeviceIdentityQuery {
+            binding: input.binding.clone(),
+            expected_device: device,
+            expected_content_dna: input.expected_content_dna.clone(),
+        },
+    )? {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "device identity evidence decode failed".into()
+            ))
+        }),
+        _ => Err(wasm_error!(WasmErrorInner::Guest(
+            "device identity binding unavailable or refused".into()
+        ))),
+    }
+}
+fn verify_human_agent_link(
+    link: &Link,
+    agent: &AgentPubKey,
+    human: &ActionHash,
+) -> ExternResult<()> {
+    if link.tag.0.is_empty() {
+        let root = get_human_root_evidence(human.clone())?;
+        if &link.author != agent || &root.author != agent {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "unverified Human agent link".into()
+            )));
+        }
+    } else {
+        let input: RegisterDeviceIdentityInput =
+            serde_json::from_slice(&link.tag.0).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("invalid device identity link".into()))
+            })?;
+        let verified = verified_device(&input, agent.clone())?;
+        if verified.human_action_hash != *human {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "device binding names another Human".into()
+            )));
+        }
+    }
+    Ok(())
+}
+/// Public read used by DID and authenticated-session resolution. It discovers
+/// candidates through the existing index and repeats Mishpat authorization.
+#[hdk_extern]
+pub fn resolve_device_identity(agent: AgentPubKey) -> ExternResult<Option<VerifiedDeviceIdentity>> {
+    let links = identity_agent_links(agent.clone())?;
+    if links.len() > 64 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "device identity candidate bound exceeded".into()
+        )));
+    }
+    let mut answer: Option<VerifiedDeviceIdentity> = None;
+    let mut saw_binding = false;
+    for link in links {
+        if link.tag.0.is_empty() {
+            continue;
+        }
+        saw_binding = true;
+        let Ok(input) = serde_json::from_slice::<RegisterDeviceIdentityInput>(&link.tag.0) else {
+            continue;
+        };
+        let Ok(verified) = verified_device(&input, agent.clone()) else {
+            continue;
+        };
+        if link.target.clone().into_action_hash().as_ref() != Some(&verified.human_action_hash) {
+            continue;
+        }
+        if answer
+            .as_ref()
+            .is_some_and(|a| a.human_action_hash != verified.human_action_hash)
+        {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "device identity is contested".into()
+            )));
+        }
+        answer = Some(verified);
+    }
+    if saw_binding && answer.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "device identity is revoked or unverifiable".into()
+        )));
+    }
+    Ok(answer)
+}
+
+/// Reuses the existing AgentKeyToHuman index; never creates a Human per device.
+#[hdk_extern]
+pub fn register_device_identity(
+    input: RegisterDeviceIdentityInput,
+) -> ExternResult<VerifiedDeviceIdentity> {
+    let me = agent_info()?.agent_initial_pubkey;
+    let verified = verified_device(&input, me.clone())?;
+    let tag = serde_json::to_vec(&input).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "device identity encoding failed".into()
+        ))
+    })?;
+    let links = get_links(
+        LinkQuery::try_new(me.clone(), LinkTypes::AgentKeyToHuman)?,
+        GetStrategy::Network,
+    )?;
+    if !links.iter().any(|link| {
+        link.tag.0 == tag
+            && link.target.clone().into_action_hash().as_ref() == Some(&verified.human_action_hash)
+    }) {
+        create_link(
+            me,
+            verified.human_action_hash.clone(),
+            LinkTypes::AgentKeyToHuman,
+            LinkTag::new(tag),
+        )?;
+    }
+    Ok(verified)
+}
+
+/// Exact immutable Human root evidence for cross-DNA identity enrollment.
+/// Slug lookup and caller-carried authors are never authority evidence.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HumanRootEvidence {
+    pub human_action_hash: ActionHash,
+    pub human_id: String,
+    pub author: AgentPubKey,
+    pub dna_hash: DnaHash,
+    pub timestamp: Timestamp,
+}
+
+#[hdk_extern]
+pub fn get_human_root_evidence(action_hash: ActionHash) -> ExternResult<HumanRootEvidence> {
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Human root unavailable".into())))?;
+    let expected: ScopedEntryDefIndex = UnitEntryTypes::Human.try_into()?;
+    if !matches!(&record.action().data, ActionData::Create(CreateData {
+        entry_type: EntryType::App(def), ..
+    }) if def.zome_index == expected.zome_index && def.entry_index == expected.zome_type)
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "expected Human Create root".into()
+        )));
+    }
+    let human = record
+        .entry()
+        .to_app_option::<Human>()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Human root entry unavailable".into())))?;
+    Ok(HumanRootEvidence {
+        human_action_hash: action_hash,
+        human_id: human.id,
+        author: record.action().author().clone(),
+        dna_hash: dna_info()?.hash,
+        timestamp: record.action().timestamp(),
+    })
 }
 
 /// Get Human by ID
@@ -2580,39 +2822,17 @@ pub struct SubmitIntimateWitnessOutput {
 // Recovery Protocol Phase 2 — M3 Helpers
 // =============================================================================
 
-/// Resolve an `AgentPubKey` to the `human_id` String by traversing
-/// `AgentKeyToHuman` link → Human entry → human.id. Returns a coordinator
-/// error if no Human is bound to the given pubkey.
+/// Resolve recovery participants through the same verified identity path as
+/// authenticated sessions. Revoked enrollments cannot reuse stale index links.
 fn resolve_human_id_for_agent(agent_pubkey: &AgentPubKey) -> ExternResult<String> {
-    let links = get_links(
-        LinkQuery::try_new(agent_pubkey.clone(), LinkTypes::AgentKeyToHuman)?,
-        GetStrategy::default(),
-    )?;
-    let first = links
-        .first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-            "No Human bound to agent pubkey {}",
-            agent_pubkey
-        ))))?;
-    let action_hash =
-        first
-            .target
-            .clone()
-            .into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "AgentKeyToHuman target is not an action hash".into()
-            )))?;
-    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Human entry missing".into())
-    ))?;
-    let human: Human = record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Human entry deserialize failed".into()
-        )))?;
-    Ok(human.id)
+    get_human_by_agent_key(agent_pubkey.clone())?
+        .map(|output| output.human.id)
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "No verified Human bound to agent pubkey {}",
+                agent_pubkey
+            )))
+        })
 }
 
 /// Count the human's active `HumanRelationship` entries where
@@ -2893,6 +3113,30 @@ mod self_revocation_reason_tests {
     }
 }
 
+/// Negative boundary only: even revoked/deleted enrollment markers exclude a
+/// key from legacy single-cell identity administration. Fetch failures propagate
+/// so consumers distinguish an excluded candidate from unavailable evidence.
+#[hdk_extern]
+pub fn legacy_identity_admin_allowed(agent: AgentPubKey) -> ExternResult<bool> {
+    Ok(!identity_agent_links(agent)?
+        .iter()
+        .any(|link| !link.tag.0.is_empty()))
+}
+
+/// Boundary guard for legacy identity-administration consumers. This is not
+/// affirmative legacy controller authorization: their existing policy checks
+/// still apply. Explicit enrolled devices must use Mishpat's controller policy,
+/// and revoked/contested enrollment must never fall back to a legacy path.
+#[hdk_extern]
+pub fn verify_legacy_identity_admin(agent: AgentPubKey) -> ExternResult<()> {
+    if !legacy_identity_admin_allowed(agent)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "enrolled device has no identity administration authority; use controller-authorized device revocation".into()
+        )));
+    }
+    Ok(())
+}
+
 /// M4: Self-revocation. A human with a valid agent key voluntarily revokes
 /// a different (compromised) key they control. Single-cell authority, no
 /// quorum, no witnesses.
@@ -2914,6 +3158,7 @@ pub fn create_self_revocation(
     input: CreateSelfRevocationInput,
 ) -> ExternResult<KeyRevocationOutput> {
     let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    verify_legacy_identity_admin(caller_pubkey.clone())?;
     let human_id = resolve_human_id_for_agent(&caller_pubkey)?;
 
     // Gate: revoked_key must belong to the same human.

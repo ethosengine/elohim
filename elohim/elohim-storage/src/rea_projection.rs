@@ -206,6 +206,9 @@ pub enum ReaProjectionSignal {
         /// fields above; absent from an older coordinator.
         #[serde(default)]
         canonical_link_hash: Option<HoloHashB64>,
+        /// Root-accepted version tiebreak; absent preserves legacy link ordering.
+        #[serde(default)]
+        canonical_ordering_hash: Option<HoloHashB64>,
     },
 }
 
@@ -757,6 +760,7 @@ pub async fn handle_authenticated_content_head_signal(
         canonical_declared_at: Some(canonical_declared_at),
         canonical_earned: Some(canonical_earned),
         canonical_link_hash,
+        canonical_ordering_hash,
         ..
     } = signal
     else {
@@ -789,8 +793,9 @@ pub async fn handle_authenticated_content_head_signal(
         &content_id,
         &head_action_hash,
         content_diesel::CanonicalOrdering::new(canonical_declared_at, canonical_earned).with_link(
-            canonical_link_hash
+            canonical_ordering_hash
                 .as_ref()
+                .or(canonical_link_hash.as_ref())
                 .and_then(|h| content_diesel::ElectionLink::from_b64(&h.0)),
         ),
         head,
@@ -1194,6 +1199,29 @@ mod tests {
         .expect("ContentHeadWire fixture must deserialize")
     }
 
+    #[test]
+    fn accepted_version_ordering_survives_authenticated_signal_projection() {
+        let stable = content_diesel::ElectionLink::from_raw(&[2; 39]).unwrap();
+        let proof = content_diesel::ElectionLink::from_raw(&[9; 39]).unwrap();
+        let rank = content_diesel::CanonicalOrdering::new(100, true).with_link(Some(stable));
+        let mut head = ordered_head("accepted", "head", "blob", rank);
+        head.canonical_link_hash = Some(HoloHashB64(proof.to_b64()));
+        head.canonical_ordering_hash = Some(HoloHashB64(stable.to_b64()));
+        let decoded: ReaProjectionSignal = serde_json::from_value(serde_json::json!({
+            "type": "ContentHeadDeclared", "payload": {
+                "content_id": "accepted", "head_action_hash": "head",
+                "canonical_declared_at": 100, "canonical_earned": true,
+                "canonical_link_hash": proof.to_b64(), "canonical_ordering_hash": stable.to_b64(),
+            }
+        }))
+        .unwrap();
+        assert!(requires_authenticated_head_projection(&decoded));
+        assert!(
+            validate_ordered_content_head("accepted", &HoloHashB64("head".into()), rank, head)
+                .is_ok()
+        );
+    }
+
     fn seed_content(pool: &DbPool, id: &str, blob: &str) {
         let mut conn = pool.get().expect("connection");
         crate::db::content_diesel::create_content(
@@ -1229,6 +1257,7 @@ mod tests {
             canonical_declared_at: at,
             canonical_earned: earned,
             canonical_link_hash: None,
+            canonical_ordering_hash: None,
         };
         assert!(requires_authenticated_head_projection(&signal(
             Some(10),
@@ -1255,6 +1284,7 @@ mod tests {
                 canonical_declared_at: Some(10),
                 canonical_earned: Some(true),
                 canonical_link_hash: None,
+                canonical_ordering_hash: None,
             },
             &registry,
             &pool,
@@ -1489,6 +1519,7 @@ mod tests {
                 canonical_declared_at: None,
                 canonical_earned: None,
                 canonical_link_hash: None,
+                canonical_ordering_hash: None,
             },
             &pool,
             &ctx,

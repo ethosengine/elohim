@@ -1,4 +1,4 @@
-//! @dna-scope: imagodei
+//! @dna-scope: imagodei,mishpat
 //! Sweettest — Identity Head + Key Lineage (Wave B of the identity-head plan).
 //!
 //! Conductor-side proof of the NEW coordinator surface:
@@ -15,8 +15,8 @@
 //!       the un-mintable-KeyRotation constraint downstream, asserted precisely);
 //!       steward-set is Wave C; the chain-root is unchanged by a rotation attempt.
 //!   B0  the imagodei↔mishpat reference: a mishpat binds-identity commitment
-//!       referencing the imagodei chain-root is accepted (a CID reference, not a
-//!       runtime bridge — resolving the B0 escalation point as workable).
+//!       references the exact imagodei Human Create after controller verification;
+//!       a shape-only legacy claim is refused.
 //!
 //! Per the DNA sweettest convention these carry `#[ignore]` so local `cargo test`
 //! skips the packed-DNA conductor cost; CI runs them via `--run-ignored all`.
@@ -322,8 +322,8 @@ async fn rotate_identity_key_recovery_quorum_stub_authority_refused() -> Result<
 }
 
 // ---------------------------------------------------------------------------
-// B0 — the imagodei↔mishpat reference: a mishpat binds-identity commitment can
-// reference the imagodei chain-root (a CID reference, not a runtime bridge).
+// B0 — the imagodei↔mishpat reference: only a controller-verified commitment
+// may bind the exact authored Human Create; a key-shaped payload is insufficient.
 // ---------------------------------------------------------------------------
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires packed imagodei.dna + mishpat.dna — CI runs via --run-ignored all"]
@@ -363,9 +363,8 @@ async fn binds_identity_references_imagodei_chain_root() -> Result<()> {
         )
         .await;
 
-    // A mishpat binds-identity commitment referencing that chain-root. The
-    // reference is a content/CID string — imagodei owns the lineage, mishpat owns
-    // the declaration; they meet at the root reference, not a runtime bridge.
+    // Legacy shape-only declarations cannot establish controller authorization.
+    // The typed bootstrap below resolves the exact Human record across roles.
     let payload = serde_json::json!({
         "action": "binds-identity",
         "chain_root": chain_root.to_string(),
@@ -378,12 +377,35 @@ async fn binds_identity_references_imagodei_chain_root() -> Result<()> {
         payload_json: payload.to_string(),
         signed_at: "2026-07-17T00:00:00Z".to_string(),
     };
+    let refused = conductor
+        .call_fallible::<_, CommitmentOutput>(
+            &mishpat_cell.zome("mishpat"),
+            "create_commitment",
+            input,
+        )
+        .await;
+    assert!(
+        refused.is_err(),
+        "shape-only legacy binding must not authorize identity"
+    );
+    let human: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            serde_json::json!({"id":"lineage-operator", "display_name":"Matthew", "bio":null,
+          "affinities":[], "profile_reach":"public", "location":null}),
+        )
+        .await;
     let output: CommitmentOutput = conductor
-        .call(&mishpat_cell.zome("mishpat"), "create_commitment", input)
+        .call(
+            &mishpat_cell.zome("mishpat"),
+            "bootstrap_device_identity",
+            human,
+        )
         .await;
     assert!(
         !output.action_hash.to_string().is_empty(),
-        "binds-identity referencing the imagodei chain-root must be accepted on mishpat"
+        "verified authority references the exact authored imagodei Human Create"
     );
     Ok(())
 }

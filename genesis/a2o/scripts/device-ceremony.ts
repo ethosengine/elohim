@@ -1,209 +1,502 @@
-/**
- * Station-3 ceremony — run with:  cd /projects/elohim/genesis/a2o && pnpm exec tsx <this file> <phase>
- *
- * Phases:
- *   grant    — on MATTHEW'S FLEET CONDUCTOR (via the doorway-alpha admin proxy):
- *              1. content_store.grant_head_delegation(delegate=W, scope, valid_until)
- *              2. mishpat.create_commitment(binds-identity) — the witnessed governance
- *                 record of the same act (chain_root/head_key = matthew, controllers += W)
- *              Prints the delegation as JSON (base64 keys + signature) for the declare phase.
- *   declare  — on the WORKSPACE PEER (localhost:8090): PATCH the manifesto to the repo's
- *              latest bytes with reach=commons, then POST …/head with the delegation as W.
- *
- * The grant phase is the "primary device act": it runs against matthew's own conductor,
- * whose lair signs the delegation. The declare phase is the second device acting under it.
+/** Explicit additive enrollment and a separate root-author content grant ceremony.
+ * Usage: device-ceremony.ts credentials|bootstrap|enroll|verify|revoke|grant CONFIG.json
+ * CONFIG names operator/device ConductorOptions, humanAction, contentDna and a
+ * durable stateDir outside build artifacts. Existing browser identities persist.
  */
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import {
   AdminWebsocket,
-  AppWebsocket,
-  encodeHashToBase64,
   decodeHashFromBase64,
+  encodeHashToBase64,
+  getSigningCredentials,
+  generateSigningKeyPair,
+  randomCapSecret,
 } from '@holochain/client';
 
-const W = process.env.DEVICE_AGENT ?? 'uhCAkDRf5_8rAphi2xekEmRCrfw4dIUkKG0B01WiNSdp31LFIwZcX'; // override with DEVICE_AGENT after a conductor re-key
-const configuredCeremonyDir = process.env.DEVICE_CEREMONY_DIR;
-const CEREMONY_DIR =
-  configuredCeremonyDir !== undefined && configuredCeremonyDir !== ''
-    ? configuredCeremonyDir
-    : fileURLToPath(new URL('../../local-dev/device-ceremony', import.meta.url));
-const DELEGATION_PATH = join(CEREMONY_DIR, 'delegation.json');
-const APP_ID = 'elohim';
+import { connectConductor, loadSigningCredentials } from './lib/steward-conductor.js';
 
-function b64FromBytes(u8: Uint8Array): string {
-  return Buffer.from(u8).toString('base64');
-}
+import type { ConductorOptions, HostedConductorReceipt } from './lib/steward-conductor.js';
+import type { HeadDelegationDocument } from './lib/steward-delegation.js';
 
-async function grant() {
-  // Grantor = matthew's conductor. Reach it directly (a `kubectl port-forward`
-  // of matthew's pod's admin+app ports to localhost is the reliable path —
-  // FLEET_ADMIN_URL=ws://127.0.0.1:4444, FLEET_APP_PORT=4445, no api-key needed
-  // on a loopback admin socket). The doorway admin proxy is permission-gated and
-  // does not route app-interface zome calls, so the port-forward is preferred.
-  const adminUrl = process.env.FLEET_ADMIN_URL ?? 'wss://doorway-alpha.elohim.host/hc/admin';
-  const appPort = Number(process.env.FLEET_APP_PORT ?? 4445);
-  const adminKey = process.env.API_KEY_ADMIN; // doorway wants it as an x-api-key HEADER
-  const wsOpts: any = { origin: APP_ID };
-  if (adminKey) wsOpts.headers = { 'x-api-key': adminKey };
-  const admin = await AdminWebsocket.connect({ url: new URL(adminUrl), wsClientOptions: wsOpts });
-  const apps = await admin.listApps({});
-  const app = apps.find(a => a.installed_app_id === APP_ID) ?? apps[0];
-  if (!app)
-    throw new Error(
-      `no app on fleet conductor (saw ${apps.map(a => a.installed_app_id).join(',')})`
-    );
-  const cells = new Map<string, any>();
-  for (const [role, infos] of Object.entries(app.cell_info)) {
-    for (const info of infos as any[]) {
-      if (info.type === 'provisioned' && info.value?.cell_id) cells.set(role, info.value.cell_id);
-    }
-  }
-  const lamad = cells.get('lamad');
-  const mishpat = cells.get('mishpat');
-  if (!lamad) throw new Error(`no lamad cell (roles: ${[...cells.keys()].join(',')})`);
-  const matthewKey = encodeHashToBase64(lamad[1]);
-  console.log(`fleet agent (grantor / matthew's conductor key): ${matthewKey}`);
-
-  // Signing credentials for the lamad cell — the missing step my earlier draft
-  // skipped (the app zome call is refused without it).
-  await admin.authorizeSigningCredentials(lamad);
-  // Ensure an app interface exists on the expected port, then connect to it.
-  const ifaces = await admin.listAppInterfaces();
-  if (!ifaces.some((i: any) => (i.port ?? i) === appPort)) {
-    await admin.attachAppInterface({ port: appPort, allowed_origins: APP_ID });
-  }
-  const token = await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id });
-  const au = new URL(adminUrl);
-  const loopback = au.hostname === '127.0.0.1' || au.hostname === 'localhost';
-  // Direct conductor → its own app port; through the doorway → the /hc/app/{port} proxy.
-  const appUrl = loopback
-    ? new URL(`ws://${au.hostname}:${appPort}`)
-    : new URL(`${au.protocol}//${au.host}/hc/app/${appPort}`);
-  const appWs = await AppWebsocket.connect({
-    url: appUrl,
-    token: token.token,
-    wsClientOptions: wsOpts,
-  });
-
-  const validUntil = (Date.now() + 30 * 24 * 3600 * 1000) * 1000; // 30 days, µs
-  const delegation: any = await appWs.callZome({
-    cell_id: lamad,
-    zome_name: 'content_store',
-    fn_name: 'grant_head_delegation',
-    payload: { delegate: decodeHashFromBase64(W), scope: '*', valid_until: validUntil },
-  });
-  const json = {
-    grantor: encodeHashToBase64(delegation.payload.grantor),
-    delegate: encodeHashToBase64(delegation.payload.delegate),
-    scope: delegation.payload.scope,
-    validUntil: Number(delegation.payload.valid_until),
-    signature: b64FromBytes(delegation.signature),
+interface Config {
+  operator: ConductorOptions;
+  device: ConductorOptions;
+  humanAction: string;
+  contentDna: string;
+  stateDir: string;
+  supersedes?: string;
+  contentGrant?: {
+    manifest: string;
+    storage: string;
+    source: ConductorOptions;
+    grantors: Record<string, ConductorOptions>;
+    validUntil: number;
   };
-  mkdirSync(CEREMONY_DIR, { recursive: true, mode: 0o700 });
-  chmodSync(CEREMONY_DIR, 0o700);
-  writeFileSync(DELEGATION_PATH, JSON.stringify(json, null, 2), { mode: 0o600 });
-  chmodSync(DELEGATION_PATH, 0o600);
-  console.log('delegation minted →', DELEGATION_PATH);
-  console.log(JSON.stringify(json));
+}
+interface Receipt {
+  action_hash: Uint8Array;
+  entry_hash: Uint8Array;
+}
+interface Proof {
+  agent: Uint8Array;
+  signature: Uint8Array;
+}
+interface AuthorityState {
+  humanAction: string;
+  authority: string;
+  operatorAgent: string;
+  networkDna: string;
+}
+type BindingState = AuthorityState & { binding: string; deviceAgent: string; contentDna: string };
+const hash = decodeHashFromBase64;
+const encoded = encodeHashToBase64;
 
-  if (mishpat) {
-    // Witnessed governance record: binds-identity naming W a controller.
-    const payload = {
-      action: 'binds-identity',
-      chain_root: matthewKey,
-      head_key: matthewKey,
-      controllers: [matthewKey, W],
-      controller_policy: 'self+stewarded-device',
-      device_delegation: json,
-      signed_at: new Date().toISOString(),
-    };
-    try {
-      const out: any = await appWs.callZome({
-        cell_id: mishpat,
-        zome_name: 'mishpat',
-        fn_name: 'create_commitment',
-        payload: {
-          action: 'binds-identity',
-          payload_json: JSON.stringify(payload),
-          signed_at: payload.signed_at,
-        },
-      });
-      console.log('binds-identity commitment:', JSON.stringify(out).slice(0, 200));
-    } catch (e) {
-      console.log(
-        'binds-identity commitment failed (non-fatal for the ceremony):',
-        String(e).slice(0, 300)
-      );
-    }
+async function readState<T>(path: string): Promise<T> {
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as T;
+  } catch {
+    throw new Error(`Missing durable identity state ${path}; explicit enrollment is required`);
   }
-  process.exit(0);
+}
+async function persist(path: string, value: unknown): Promise<void> {
+  // Exclusive write: restart never overwrites an identity or replaces a key.
+  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+}
+function options(config: ConductorOptions, role: string): ConductorOptions {
+  if (!config.expectedAgent || !config.signingCredentialsDir) {
+    throw new Error(
+      'Every ceremony participant must explicitly name expectedAgent and signingCredentialsDir'
+    );
+  }
+  return {
+    ...config,
+    role,
+    zome: role === 'lamad' ? 'content_store' : role,
+    // expectedDna describes the profile's named role. Cross-role context is
+    // separately verified by the signed binding and explicit contentDna.
+    expectedDna: config.role === role ? config.expectedDna : undefined,
+  };
 }
 
-async function declare() {
-  const delegation = JSON.parse(readFileSync(DELEGATION_PATH, 'utf8'));
-  const md = readFileSync(
-    '/projects/elohim/genesis/docs/content/elohim-protocol/manifesto.md',
-    'utf8'
-  );
-  // The seeder strips frontmatter; manifesto.md has none beyond the cites block? Use the
-  // CID twin's canonical content so bytes match the fleet's declared blobHash.
-  const twin = JSON.parse(
-    readFileSync('/projects/elohim/genesis/data/lamad/content/manifesto.json', 'utf8')
-  );
-  const node = Array.isArray(twin) ? twin[0] : twin;
-  const base = 'http://localhost:8090';
-
-  // 1. PATCH the workspace's manifesto row to the latest bytes + commons reach
-  //    (the workspace has no `manifesto` row yet → create it first via bulk).
-  const r = await fetch(`${base}/db/content/manifesto`, { method: 'GET' });
-  if (r.status === 404) {
-    const bulk = await fetch(`${base}/db/content/bulk`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
-      body: JSON.stringify([{ ...node, id: 'manifesto' }]),
-    });
-    console.log('bulk create manifesto:', bulk.status, (await bulk.text()).slice(0, 150));
+async function credentials(config: ConductorOptions): Promise<void> {
+  const checked = options(config, config.role);
+  const dir = checked.signingCredentialsDir!;
+  if (checked.hosted) {
+    await hostedCredentials(checked);
+    return;
   }
-  const patch = await fetch(`${base}/db/content/manifesto`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
+  const admin = await AdminWebsocket.connect({ url: new URL(checked.adminWs) });
+  try {
+    const apps = await admin.listApps({});
+    const app = apps.find(a => a.installed_app_id === checked.appId);
+    if (!app) throw new Error('Explicit credential ceremony app is not installed');
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    for (const infos of Object.values(app.cell_info)) {
+      for (const info of infos) {
+        if (info.type !== 'provisioned') continue;
+        const cell = info.value.cell_id;
+        if (encoded(cell[1]) !== checked.expectedAgent)
+          throw new Error('Credential ceremony agent mismatch');
+        const path = join(dir, `${cell.map(h => Buffer.from(h).toString('hex')).join('-')}.json`);
+        try {
+          await readFile(path);
+          await loadSigningCredentials(dir, cell);
+          continue;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+        // This is the ONLY explicit phase permitted to create app signing grants.
+        await admin.authorizeSigningCredentials(cell);
+        const signing = getSigningCredentials(cell);
+        if (!signing) throw new Error('Conductor did not return signing credentials');
+        await persist(path, {
+          keypair: Buffer.from(signing.keyPair.privateKey.slice(0, 32)).toString('hex'),
+          signingAgentKey: Buffer.from(signing.signingKey).toString('hex'),
+          capSecret: Buffer.from(signing.capSecret).toString('hex'),
+        });
+      }
+    }
+  } finally {
+    await admin.client.close();
+  }
+}
+
+async function hostedCredentials(config: ConductorOptions): Promise<void> {
+  const hosted = config.hosted!;
+  const auth = await readState<{ token: string }>(hosted.authFile);
+  const sessionResponse = await fetch(new URL('/auth/me', hosted.doorway), {
+    headers: { Authorization: `Bearer ${auth.token}` },
+  });
+  if (!sessionResponse.ok)
+    throw new Error('Hosted credentials require a current authenticated session');
+  const session = (await sessionResponse.json()) as { agentPubKey: string };
+  const sessionAgent = session.agentPubKey.startsWith('u')
+    ? session.agentPubKey
+    : encoded(new Uint8Array(Buffer.from(session.agentPubKey, 'base64')));
+  if (sessionAgent !== config.expectedAgent)
+    throw new Error('Authenticated hosted account differs from expected signing agent');
+  let stored: { keypair: string; signingAgentKey: string; capSecret: string };
+  try {
+    stored = JSON.parse(await readFile(hosted.signingFile, 'utf8')) as typeof stored;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      await readFile(hosted.receipt);
+      throw new Error(
+        'Hosted signing state is missing for an existing receipt; explicit reenrollment required'
+      );
+    } catch (receiptError) {
+      if ((receiptError as NodeJS.ErrnoException).code !== 'ENOENT') throw receiptError;
+    }
+    const [keyPair, signingKey] = await generateSigningKeyPair();
+    stored = {
+      keypair: Buffer.from(keyPair.privateKey.slice(0, 32)).toString('hex'),
+      signingAgentKey: Buffer.from(signingKey).toString('hex'),
+      capSecret: Buffer.from(await randomCapSecret()).toString('hex'),
+    };
+    await persist(hosted.signingFile, stored);
+  }
+  const response = await fetch(new URL('/hc/connect', hosted.doorway), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contentBody: node.content ?? md,
-      blobHash: node.blobHash,
-      reach: 'commons',
-      description: node.description,
+      signingKey: Buffer.from(stored.signingAgentKey, 'hex').toString('base64'),
+      capSecret: Buffer.from(stored.capSecret, 'hex').toString('base64'),
     }),
   });
-  const patched: any = await patch.json().catch(() => ({}));
-  console.log('PATCH manifesto:', patch.status, JSON.stringify(patched).slice(0, 200));
-  const target = patched.dhtAnchorHash;
-  if (!target) throw new Error('no dhtAnchorHash after PATCH — conductor anchor did not land');
+  if (!response.ok) throw new Error(`Hosted credential ceremony refused: HTTP ${response.status}`);
+  const receipt = (await response.json()) as HostedConductorReceipt;
+  // Chaperone's transport hashes are STANDARD base64 bytes, not Holochain
+  // multibase strings. Persist canonical hashes for the existing native helper.
+  const chaperoneHash = (value: string): string => {
+    const raw = new Uint8Array(Buffer.from(value, 'base64'));
+    if (raw.length !== 39) throw new Error('Invalid hosted cell hash length');
+    return encoded(raw);
+  };
+  receipt.agentPubKey = chaperoneHash(receipt.agentPubKey);
+  for (const [role, pair] of Object.entries(receipt.cellIds)) {
+    receipt.cellIds[role] = [chaperoneHash(pair[0]), chaperoneHash(pair[1])];
+  }
 
-  // 2. Declare the EARNED canonical head as W under matthew's delegation.
-  const head = await fetch(`${base}/db/content/manifesto/head`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'X-Agent-Cid': W },
-    body: JSON.stringify({ headActionHash: target, delegation }),
-  });
-  console.log('DECLARE head (delegated):', head.status, (await head.text()).slice(0, 300));
-  process.exit(head.ok ? 0 : 1);
+  if (receipt.agentPubKey !== config.expectedAgent || receipt.installedAppId !== config.appId)
+    throw new Error('Hosted credential ceremony agent/app mismatch');
+  const requested = receipt.cellIds[config.role];
+  if (!requested || (config.expectedDna && requested[0] !== config.expectedDna))
+    throw new Error('Hosted credential ceremony DNA mismatch');
+  await mkdir(config.signingCredentialsDir!, { recursive: true, mode: 0o700 });
+  for (const pair of Object.values(receipt.cellIds)) {
+    if (pair[1] !== config.expectedAgent) throw new Error('Hosted role agent mismatch');
+    const cell = pair.map(hash) as [Uint8Array, Uint8Array];
+    const path = join(
+      config.signingCredentialsDir!,
+      `${cell.map(h => Buffer.from(h).toString('hex')).join('-')}.json`
+    );
+    try {
+      const existing = JSON.parse(await readFile(path, 'utf8')) as typeof stored;
+      if (JSON.stringify(existing) !== JSON.stringify(stored))
+        throw new Error('Existing hosted cell credentials differ; refusing replacement');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      await persist(path, stored);
+    }
+    await loadSigningCredentials(config.signingCredentialsDir!, cell);
+  }
+  receipt.doorway = hosted.doorway;
+  // Chaperone issues a reusable one-hour token. Keep a conservative expiry.
+  receipt.expiresAt = Date.now() + 3_500_000;
+  const temporary = `${hosted.receipt}.pending`;
+  await writeFile(temporary, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+  await rename(temporary, hosted.receipt);
 }
 
-const phase = process.argv[2];
-if (phase === 'grant')
-  grant().catch(e => {
-    console.error(e);
-    process.exit(1);
+/** Content stewardship is a separate act by each immutable root's author. */
+async function grantContent(config: Config, state: BindingState): Promise<void> {
+  const input = config.contentGrant;
+  if (!input || !Number.isSafeInteger(input.validUntil) || input.validUntil <= Date.now() * 1000)
+    throw new Error(
+      'grant requires an explicit contentGrant manifest, source, grantors and future validUntil'
+    );
+  const ids: unknown = JSON.parse(await readFile(input.manifest, 'utf8'));
+  if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string'))
+    throw new Error('content grant manifest must be an array of exact content ids');
+  const outputPath = join(config.stateDir, 'grants.json');
+  let grants: Record<string, HeadDelegationDocument> = {};
+  try {
+    grants = JSON.parse(await readFile(outputPath, 'utf8')) as typeof grants;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const source = await connectConductor({
+    ...options(input.source, 'lamad'),
+    expectedDna: config.contentDna,
   });
-else if (phase === 'declare')
-  declare().catch(e => {
-    console.error(e);
-    process.exit(1);
+  try {
+    for (const id of ids) {
+      const response = await fetch(`${input.storage}/db/content/${encodeURIComponent(id)}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!response.ok)
+        throw new Error(`Cannot resolve immutable content root for ${id}: HTTP ${response.status}`);
+      const row = (await response.json()) as {
+        dhtAnchorHash?: string;
+        content?: { dhtAnchorHash?: string };
+      };
+      const anchor = row.content?.dhtAnchorHash ?? row.dhtAnchorHash;
+      if (!anchor) throw new Error(`Cannot grant unanchored content ${id}`);
+      const lineage = await source.call<{
+        root_action_hash: Uint8Array;
+        root_author: Uint8Array;
+        content_id: string;
+        truncated: boolean;
+      }>('get_content_lineage', { action_hash: hash(anchor), local: false });
+      if (lineage.content_id !== id || lineage.truncated)
+        throw new Error(`Incomplete or mismatched lineage for ${id}`);
+      const root = encoded(lineage.root_action_hash);
+      const author = encoded(lineage.root_author);
+      const previous = grants[id];
+      if (previous) {
+        if (
+          previous.rootActionHash !== root ||
+          previous.grantor !== author ||
+          previous.delegate !== state.deviceAgent ||
+          previous.dnaHash !== config.contentDna ||
+          previous.scope !== id ||
+          previous.validUntil !== input.validUntil
+        )
+          throw new Error(
+            `Existing grant ${id} differs; retain its receipt and use an explicit new grant state directory`
+          );
+        continue;
+      }
+      const profile = input.grantors[author];
+      if (!profile)
+        throw new Error(`No explicitly configured root-author signer for ${id} (${author})`);
+      const grantor = await connectConductor({
+        ...options(profile, 'lamad'),
+        expectedAgent: author,
+        expectedDna: config.contentDna,
+      });
+      try {
+        const grant = await grantor.call<{
+          payload: {
+            grantor: Uint8Array;
+            delegate: Uint8Array;
+            scope: string;
+            valid_until: number;
+            root_action_hash: Uint8Array;
+            dna_hash: Uint8Array;
+          };
+          signature: Uint8Array;
+        }>('grant_head_delegation', {
+          delegate: hash(state.deviceAgent),
+          scope: id,
+          valid_until: input.validUntil,
+          root_action_hash: lineage.root_action_hash,
+        });
+        grants[id] = {
+          grantor: encoded(grant.payload.grantor),
+          delegate: encoded(grant.payload.delegate),
+          scope: grant.payload.scope,
+          validUntil: grant.payload.valid_until,
+          rootActionHash: encoded(grant.payload.root_action_hash),
+          dnaHash: encoded(grant.payload.dna_hash),
+          signature: Buffer.from(grant.signature).toString('base64'),
+        };
+        const temporary = `${outputPath}.tmp`;
+        await writeFile(temporary, `${JSON.stringify(grants, null, 2)}\n`, { mode: 0o600 });
+        await rename(temporary, outputPath);
+        console.log(`Content-scoped grant recorded for ${id}, root ${root}`);
+      } finally {
+        await grantor.close();
+      }
+    }
+  } finally {
+    await source.close();
+  }
+}
+
+async function ceremony(phase: string, config: Config): Promise<void> {
+  const stateDir = resolve(config.stateDir);
+  if (/(^|\/)(target|dist|node_modules|build)(\/|$)/.test(stateDir)) {
+    throw new Error('Identity state must live outside disposable build artifacts');
+  }
+  const authorityPath = join(stateDir, 'authority.json');
+  const bindingPath = join(stateDir, 'binding.json');
+  if (phase === 'credentials') {
+    await credentials(config.device);
+    await credentials(config.operator);
+    return;
+  }
+  if (phase === 'bootstrap') {
+    const operator = await connectConductor(options(config.operator, 'mishpat'));
+    try {
+      await mkdir(stateDir, { recursive: true, mode: 0o700 });
+      // Require absence BEFORE any notarization; existing state is never replaced.
+      try {
+        await readFile(authorityPath);
+        throw new Error('Identity already bootstrapped');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      const result = await operator.call<Receipt>(
+        'bootstrap_device_identity',
+        hash(config.humanAction)
+      );
+      await persist(authorityPath, {
+        humanAction: config.humanAction,
+        authority: encoded(result.action_hash),
+        operatorAgent: operator.agent,
+        networkDna: operator.dna,
+        authorization: 'development-network',
+      });
+      console.log(`Development-network identity authority recorded: ${authorityPath}`);
+    } finally {
+      await operator.close();
+    }
+    return;
+  }
+  const authority = await readState<AuthorityState>(authorityPath);
+  if (
+    authority.humanAction !== config.humanAction ||
+    authority.operatorAgent !== config.operator.expectedAgent
+  ) {
+    throw new Error('Configured operator identity differs from durable authority');
+  }
+  const device = await connectConductor({
+    ...options(config.device, 'mishpat'),
+    expectedDna: authority.networkDna,
   });
-else {
-  console.error('usage: device-ceremony.ts grant|declare');
-  process.exit(2);
+  try {
+    if (phase === 'enroll') {
+      try {
+        await readFile(bindingPath);
+        throw new Error(
+          'Device already enrolled; use its existing binding or explicit reenrollment state directory'
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      const content = await connectConductor({
+        ...options(config.device, 'lamad'),
+        expectedDna: config.contentDna,
+      });
+      await content.close();
+      const intent = {
+        domain: 'elohim:device-enrollment:v1',
+        authority: hash(authority.authority),
+        identity_root: hash(authority.humanAction),
+        device_key: hash(device.agent),
+        network_dna: hash(device.dna),
+        content_dna: hash(config.contentDna),
+        issued_at: Date.now() * 1000,
+        supersedes: config.supersedes ? hash(config.supersedes) : null,
+      };
+      const possession = await device.call<Proof>('sign_device_enrollment', intent);
+      const operator = await connectConductor({
+        ...options(config.operator, 'mishpat'),
+        expectedDna: device.dna,
+      });
+      let controller: Proof;
+      try {
+        controller = await operator.call<Proof>('sign_device_enrollment', intent);
+      } finally {
+        await operator.close();
+      }
+      const binding = await device.call<Receipt>('enroll_identity_device', {
+        action: 'binds-identity',
+        binding_kind: 'device-v1',
+        intent,
+        controllers: [controller],
+        possession,
+      });
+      const state: BindingState = {
+        ...authority,
+        binding: encoded(binding.action_hash),
+        deviceAgent: device.agent,
+        contentDna: config.contentDna,
+      };
+      // Persist the exact authored reference BEFORE linking; an interrupted link
+      // is resumed by verify, never by creating another identity or binding.
+      await persist(bindingPath, state);
+    }
+    const state = await readState<BindingState>(bindingPath);
+    if (state.deviceAgent !== device.agent || state.contentDna !== config.contentDna)
+      throw new Error('Durable binding does not match actual device/DNA');
+    if (phase === 'grant') {
+      await device.call('verify_device_binding', {
+        binding: hash(state.binding),
+        expected_device: hash(device.agent),
+        expected_content_dna: hash(config.contentDna),
+      });
+      await grantContent(config, state);
+      return;
+    }
+    if (phase === 'revoke') {
+      const operator = await connectConductor({
+        ...options(config.operator, 'mishpat'),
+        expectedDna: device.dna,
+      });
+      try {
+        const revocation = {
+          action: 'revokes-commitment',
+          binding_kind: 'device-revocation-v1',
+          target: hash(state.binding),
+          authority: hash(state.authority),
+          network_dna: hash(device.dna),
+          signatures: [] as Proof[],
+        };
+        revocation.signatures.push(
+          await operator.call<Proof>('sign_device_revocation', revocation)
+        );
+        const result = await operator.call<Receipt>('revoke_identity_device', revocation);
+        await persist(join(stateDir, 'revocation.json'), {
+          binding: state.binding,
+          action: encoded(result.action_hash),
+        });
+      } finally {
+        await operator.close();
+      }
+      return;
+    }
+    if (phase !== 'enroll' && phase !== 'verify')
+      throw new Error(`Unknown ceremony phase: ${phase}`);
+    const verification = await device.call('verify_device_binding', {
+      binding: hash(state.binding),
+      expected_device: hash(device.agent),
+      expected_content_dna: hash(config.contentDna),
+    });
+    const identity = await connectConductor(options(config.device, 'imagodei'));
+    try {
+      // Idempotent reference registration; this never creates another Human.
+      await identity.call('register_device_identity', {
+        binding: hash(state.binding),
+        expected_content_dna: hash(config.contentDna),
+      });
+      const human = await identity.call('get_my_human', null);
+      console.log(
+        JSON.stringify({ binding: state.binding, deviceAgent: device.agent, human, verification })
+      );
+    } finally {
+      await identity.close();
+    }
+  } finally {
+    await device.close();
+  }
+}
+
+const [phase, configPath] = process.argv.slice(2);
+if (!phase || !configPath) {
+  console.error(
+    'usage: device-ceremony.ts credentials|bootstrap|enroll|verify|revoke|grant CONFIG.json'
+  );
+  process.exitCode = 2;
+} else {
+  readState<Config>(configPath)
+    .then(async config => ceremony(phase, config))
+    .catch(error => {
+      console.error(error instanceof Error ? error.message : 'Device ceremony failed');
+      process.exitCode = 1;
+    });
 }

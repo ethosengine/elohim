@@ -574,20 +574,20 @@ pub async fn courier_obey(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::services::head_adoption::CarriedHeadRecord;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    const ID: &str = "landing";
-    const COURIER: &str = "12D3KooWcourier";
-    const HEAD_A: &str = "uhCkkA";
-    const HEAD_B: &str = "uhCkkB";
+    pub(crate) const ID: &str = "landing";
+    pub(crate) const COURIER: &str = "12D3KooWcourier";
+    pub(crate) const HEAD_A: &str = "uhCkkA";
+    pub(crate) const HEAD_B: &str = "uhCkkB";
     /// Election clocks: A's is older than B's.
-    const AT_A: i64 = 1_000;
-    const AT_B: i64 = 2_000;
+    pub(crate) const AT_A: i64 = 1_000;
+    pub(crate) const AT_B: i64 = 2_000;
 
-    fn pool_with_row_at_a() -> DbPool {
+    pub(crate) fn pool_with_row_at_a() -> DbPool {
         let pool = crate::test_util::test_pool();
         let mut conn = pool.get().unwrap();
         let ctx = AppContext::default_lamad();
@@ -629,7 +629,7 @@ mod tests {
         pool
     }
 
-    fn row(pool: &DbPool) -> (Option<String>, Option<String>, Option<i64>) {
+    pub(crate) fn row(pool: &DbPool) -> (Option<String>, Option<String>, Option<i64>) {
         let mut conn = pool.get().unwrap();
         let c = content_diesel::get_content(
             &mut conn,
@@ -646,7 +646,11 @@ mod tests {
         )
     }
 
-    fn evidence(head: Option<&str>, blob: Option<&str>, at: i64) -> CarriedHeadEvidenceWire {
+    pub(crate) fn evidence(
+        head: Option<&str>,
+        blob: Option<&str>,
+        at: i64,
+    ) -> CarriedHeadEvidenceWire {
         let head_json = head.map(|h| {
             serde_json::json!({
                 "content_id": ID,
@@ -677,7 +681,7 @@ mod tests {
         .expect("evidence fixture")
     }
 
-    struct Courier {
+    pub(crate) struct Courier {
         serves: &'static str,
         asked: AtomicUsize,
     }
@@ -695,19 +699,19 @@ mod tests {
         }
     }
 
-    fn courier(serves: &'static str) -> Courier {
+    pub(crate) fn courier(serves: &'static str) -> Courier {
         Courier {
             serves,
             asked: AtomicUsize::new(0),
         }
     }
 
-    enum Verdict {
+    pub(crate) enum Verdict {
         Proves(CarriedHeadEvidenceWire),
         Refuses(&'static str),
     }
 
-    struct Verifier {
+    pub(crate) struct Verifier {
         verdict: Verdict,
         calls: AtomicUsize,
     }
@@ -728,14 +732,14 @@ mod tests {
         }
     }
 
-    fn verifier(verdict: Verdict) -> Verifier {
+    pub(crate) fn verifier(verdict: Verdict) -> Verifier {
         Verifier {
             verdict,
             calls: AtomicUsize::new(0),
         }
     }
 
-    struct Bytes {
+    pub(crate) struct Bytes {
         held: bool,
         requested: Mutex<Vec<(String, String)>>,
     }
@@ -753,18 +757,18 @@ mod tests {
         }
     }
 
-    fn bytes(held: bool) -> Bytes {
+    pub(crate) fn bytes(held: bool) -> Bytes {
         Bytes {
             held,
             requested: Mutex::new(Vec::new()),
         }
     }
 
-    fn memo() -> RefusalMemo {
+    pub(crate) fn memo() -> RefusalMemo {
         RefusalMemo::new(REFUSAL_CAP, REFUSAL_TTL, COURIER_REFUSAL_LIMIT)
     }
 
-    async fn run(
+    pub(crate) async fn run(
         v: &Verifier,
         f: &Courier,
         b: &Bytes,

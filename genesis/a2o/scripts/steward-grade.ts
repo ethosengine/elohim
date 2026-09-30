@@ -29,8 +29,8 @@
  *              steward-publish walks
  *   --dry-run  read and decide only: no row is patched. It still connects to the
  *              conductor when a row needs the authorship proof, and connecting
- *              authorizes signing credentials (a capability grant on the node's chain,
- *              not content); an all-current run never connects.
+ *              reuses existing exact-cell signing credentials; missing credentials
+ *              require the explicit device ceremony. An all-current run never connects.
  *   --co-steward-admin-ws  another genesis peer's conductor admin WS (repeatable). Its
  *              app's cell agent is read there (read-only: no grant, no app interface) and
  *              admitted as a co-author. An unreachable co-steward is logged and left out.
@@ -51,6 +51,7 @@
  * nothing failed (refusals are reported and counted, not failures), 1 otherwise, 2 on
  * bad usage.
  */
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -405,7 +406,7 @@ async function main(): Promise<void> {
   // Shuffle so successive runs cover the whole course.
   if (o.budgetSeconds > 0) {
     for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = randomInt(i + 1);
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
   }

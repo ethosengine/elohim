@@ -238,6 +238,11 @@ pub fn parse_commitment_payload(
         "revokes-commitment" => parse_revokes_commitment(&payload),
         "author-lens" => parse_author_lens(&payload, entry_hash, action_hash)
             .map(CommitmentProjection::UpsertLens),
+        // Additive device authority is resolved by the native verifier. These
+        // proofs must never enter identity_heads and become admin controllers.
+        "binds-identity" if payload.get("binding_kind").is_some() => Err(
+            "verified device identity commitments are resolved natively, not projected as admin identity heads".into(),
+        ),
         "binds-identity" => parse_binds_identity(&payload, entry_hash, action_hash)
             .map(CommitmentProjection::UpsertIdentityHead),
         other => {
@@ -2410,5 +2415,22 @@ mod lineage_projection_tests {
             panic!("delegates-compute projects a commitment row");
         };
         assert_eq!(row.state, "proposed");
+    }
+    #[test]
+    fn additive_device_binding_never_projects_as_identity_administration() {
+        for kind in ["device-v1", "authority-v1"] {
+            let payload = serde_json::json!({
+                "action": "binds-identity", "binding_kind": kind,
+                "chain_root": "human-root", "head_key": "device",
+                "controllers": ["attacker"], "controller_policy": {"kind": "self"}
+            });
+            assert!(parse_commitment_payload(
+                "binds-identity",
+                &payload.to_string(),
+                "entry",
+                "action"
+            )
+            .is_err());
+        }
     }
 }

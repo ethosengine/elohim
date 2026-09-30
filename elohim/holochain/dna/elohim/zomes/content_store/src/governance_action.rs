@@ -152,7 +152,17 @@ pub fn propose_recovery_governance_action(
         ))));
     }
 
-    let proposer_cid = agent_info()?.agent_initial_pubkey.to_string();
+    let proposer = agent_info()?.agent_initial_pubkey;
+    if matches!(
+        input.governance_kind.as_str(),
+        "governance-action:key-revocation" | "governance-action:identity-freeze"
+    ) && !crate::legacy_identity_admin_allowed(proposer.clone())?
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "enrolled devices cannot exercise legacy identity administration".into()
+        )));
+    }
+    let proposer_cid = proposer.to_string();
 
     // Compose metadata: caller-supplied fields at the top level, plus the
     // governance bookkeeping fields the readers also look at.

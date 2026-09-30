@@ -100,3 +100,28 @@ export function expandClosure(dataDir: string, given: string[]): string[] {
   }
   return ids;
 }
+
+/** Publish the leaves before their course composition; reject cyclic path composition. */
+export function publicationOrder(items: RepoItem[]): RepoItem[] {
+  const byId = new Map(items.map(item => [item.id, item]));
+  const emitted = new Set<string>();
+  const visiting = new Set<string>();
+  const ordered: RepoItem[] = [];
+  const visit = (item: RepoItem): void => {
+    if (emitted.has(item.id)) return;
+    if (visiting.has(item.id)) throw new Error(`cyclic course composition at ${item.id}`);
+    visiting.add(item.id);
+    if (item.kind === 'path') {
+      for (const id of pathReferences(item.json as unknown as Record<string, unknown>)) {
+        const dependency = byId.get(id);
+        if (dependency) visit(dependency);
+      }
+    }
+    visiting.delete(item.id);
+    emitted.add(item.id);
+    ordered.push(item);
+  };
+  items.filter(item => item.kind === 'content').forEach(visit);
+  items.filter(item => item.kind === 'path').forEach(visit);
+  return ordered;
+}

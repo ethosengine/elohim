@@ -330,6 +330,12 @@ const CRATE_READ_FNS: &[&str] = &[
     "get_collab_qahal_cid_for_agreement",
     "get_collab_status",
     "get_collective_by_action",
+    // Native device resolution traverses existing Human/binding records and
+    // verifies controller proofs across imagodei and mishpat; none of these
+    // read paths register a device, repair links, or author a commitment.
+    "get_human_by_agent_key",
+    "get_human_root_evidence",
+    "resolve_device_identity",
     "get_membership_by_action",
     "get_my_household_collective_cids",
     "list_memberships_for_collective_cid",

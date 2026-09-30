@@ -15,6 +15,7 @@ pub mod bootstrap_steward;
 // Commitment coordinator — REA compute delegation primitive (Z.D deploy flow).
 pub mod commitment_record;
 pub mod commitments;
+pub mod device_enrollment;
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties,

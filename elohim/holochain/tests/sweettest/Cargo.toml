@@ -178,6 +178,10 @@ path = "src/tests/identity_lineage.rs"
 name = "happ_lineage_migration"
 path = "src/tests/happ_lineage_migration.rs"
 
+[[test]]
+name = "device_enrollment"
+path = "src/tests/device_enrollment.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.7.0 / HDI 0.8.0).
@@ -205,6 +209,7 @@ holochain = { version = "=0.7.0", default-features = false, features = [
   "schema",
   "wasmer-sys-cranelift",
 ] }
+holochain_state = "=0.7.0"
 holochain_types = "=0.7.0"
 hdk = "=0.7.0"
 hdi = "=0.8.0"

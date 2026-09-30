@@ -1723,6 +1723,162 @@ mod tests {
         assert_eq!(gate.pending_retries(), 0, "the slot is released on fire");
     }
 
+    /// Exercise actual timer/queue handoff and SQL projection together. The
+    /// verifier initially refuses because LOCAL integrated ancestry is absent;
+    /// carried bytes never stand in for that prerequisite. Only its later
+    /// positive verdict permits the projection to move.
+    #[tokio::test]
+    async fn delayed_prerequisites_retry_and_release_claim_for_successive_heads() {
+        use crate::services::courier_obey::tests as fixture;
+        use crate::services::courier_obey::CourierOutcome;
+        use fixture::{AT_A, AT_B, COURIER, HEAD_A, HEAD_B, ID};
+
+        tokio::time::pause();
+        let pool = fixture::pool_with_row_at_a();
+        let memo = fixture::memo();
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        assert_eq!(
+            gate.claim_and_send(ID, COURIER, Instant::now()),
+            EnqueueDecision::Enqueued
+        );
+        assert_eq!(
+            gate.claim_and_send(ID, COURIER, Instant::now()),
+            EnqueueDecision::Deduped
+        );
+        let initial = rx.recv().await.unwrap();
+        let missing_history = fixture::verifier(fixture::Verdict::Refuses(
+            "verify_carried_head_evidence: lineage-not-held: local history is not integrated",
+        ));
+        let outcome = fixture::run(
+            &missing_history,
+            &fixture::courier(HEAD_B),
+            &fixture::bytes(true),
+            &memo,
+            &pool,
+            HEAD_B,
+        )
+        .await;
+        assert_eq!(outcome, CourierOutcome::VerifyUnavailable);
+        assert!(outcome.retry_warranted());
+        assert_eq!(
+            fixture::row(&pool),
+            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+        );
+        assert_eq!(
+            gate.schedule_retry(initial),
+            RetryPlan::After(Duration::from_secs(1))
+        );
+        let history_retry = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history_retry.attempt, 1);
+        assert_eq!(gate.pending_retries(), 0);
+
+        // Local ancestry is now integrated, but version B's bytes arrive later.
+        let accepted_b = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
+            Some(HEAD_B),
+            Some("sha256-bbbb"),
+            AT_B,
+        )));
+        let outcome = fixture::run(
+            &accepted_b,
+            &fixture::courier(HEAD_B),
+            &fixture::bytes(false),
+            &memo,
+            &pool,
+            HEAD_B,
+        )
+        .await;
+        assert_eq!(outcome, CourierOutcome::AwaitingBytes);
+        assert!(outcome.retry_warranted());
+        assert_eq!(fixture::row(&pool).0.as_deref(), Some(HEAD_A));
+        assert_eq!(
+            gate.schedule_retry(history_retry),
+            RetryPlan::After(Duration::from_secs(2))
+        );
+        let bytes_retry = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(bytes_retry.attempt, 2);
+        let outcome = fixture::run(
+            &accepted_b,
+            &fixture::courier(HEAD_B),
+            &fixture::bytes(true),
+            &memo,
+            &pool,
+            HEAD_B,
+        )
+        .await;
+        assert_eq!(
+            outcome,
+            CourierOutcome::Stamped,
+            "missing ancestry must not poison the refusal memo"
+        );
+        assert!(!outcome.retry_warranted());
+        assert_eq!(
+            fixture::row(&pool),
+            (Some(HEAD_B.into()), Some("sha256-bbbb".into()), Some(AT_B))
+        );
+        gate.release(&bytes_retry.content_id); // same terminal branch as process_trigger
+        assert_eq!(gate.claim_count(), 0);
+
+        // A successive publication arrives inside the original claim window.
+        assert_eq!(
+            gate.claim_and_send(ID, COURIER, Instant::now()),
+            EnqueueDecision::Enqueued
+        );
+        let next = rx.recv().await.unwrap();
+        assert_eq!(next.attempt, 0);
+        let accepted_c = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
+            Some("uhCkkC"),
+            Some("sha256-cccc"),
+            AT_B + 1,
+        )));
+        let outcome = fixture::run(
+            &accepted_c,
+            &fixture::courier("uhCkkC"),
+            &fixture::bytes(true),
+            &memo,
+            &pool,
+            "uhCkkC",
+        )
+        .await;
+        assert_eq!(outcome, CourierOutcome::Stamped);
+        gate.release(&next.content_id);
+        let current = fixture::row(&pool);
+        assert_eq!(
+            current,
+            (
+                Some("uhCkkC".into()),
+                Some("sha256-cccc".into()),
+                Some(AT_B + 1)
+            )
+        );
+        let stale = fixture::run(
+            &accepted_b,
+            &fixture::courier(HEAD_B),
+            &fixture::bytes(true),
+            &memo,
+            &pool,
+            HEAD_B,
+        )
+        .await;
+        assert_ne!(
+            stale,
+            CourierOutcome::Stamped,
+            "late B evidence cannot roll C back"
+        );
+        assert_eq!(fixture::row(&pool), current);
+        assert_eq!(gate.pending_retries(), 0);
+        assert_eq!(gate.claim_count(), 0);
+        assert!(
+            rx.try_recv().is_err(),
+            "successful adoption leaves no queued retry"
+        );
+    }
+
     // ── B1: a peer-named id this node holds no row for is TERMINAL ──────────
 
     /// The row shape `decide` takes for a present row.

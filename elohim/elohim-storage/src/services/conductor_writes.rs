@@ -514,7 +514,8 @@ pub struct ContentHeadWire {
     /// old-coordinator wire output (no field) reading as false — safe.
     #[serde(default)]
     pub canonical: bool,
-    /// The winning canonical-head declaration LINK's notarized DHT timestamp —
+    /// The winning authority clock: root-author acceptance time for delegated
+    /// versions, otherwise the canonical declaration link's DHT timestamp —
     /// the exact ordering `content_store::select_canonical_winner` arbitrated on.
     ///
     /// `Some` only when [`Self::canonical`] is true AND the coordinator is
@@ -535,12 +536,16 @@ pub struct ContentHeadWire {
     /// regardless of recency) without re-reading the DHT.
     #[serde(default)]
     pub canonical_earned: Option<bool>,
-    /// The winning declaration's create-link hash — the election's tiebreak
-    /// between two declarations of the same tier at the same clock. `None` from
+    /// The winning declaration's actual create-link hash, retained for proof
+    /// lookup and used as the legacy tiebreak without an ordering hash. `None` from
     /// an older coordinator (via `serde(default)`), which leaves the ordering
     /// able to decide everything except an exact tie.
     #[serde(default)]
     pub canonical_link_hash: Option<HoloHashB64>,
+    /// Stable root-accepted version key for delegated publications. The actual
+    /// link above remains the proof locator. Absent uses the legacy link key.
+    #[serde(default)]
+    pub canonical_ordering_hash: Option<HoloHashB64>,
     /// The STAGING declaration standing BENEATH an earned winner — the next
     /// release on this channel awaiting promotion
     /// (`content_store::select_staging_candidate`, a pure function of the same
@@ -572,8 +577,9 @@ impl ContentHeadWire {
     pub fn canonical_ordering(&self) -> Option<crate::db::content_diesel::CanonicalOrdering> {
         use crate::db::content_diesel::{CanonicalOrdering, ElectionLink};
         let link = self
-            .canonical_link_hash
+            .canonical_ordering_hash
             .as_ref()
+            .or(self.canonical_link_hash.as_ref())
             .and_then(|h| ElectionLink::from_b64(&h.0));
         self.canonical_declared_at
             .zip(self.canonical_earned)
@@ -614,7 +620,8 @@ pub struct DeclareContentHeadInput {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CanonicalElectionWire {
     pub winner_target: HoloHashB64,
-    /// The winning declaration LINK's notarized timestamp — feeds
+    /// Root-author accepted-at for delegated versions, otherwise the winning
+    /// declaration link's notarized timestamp — feeds
     /// `content_diesel::CanonicalOrdering` directly.
     pub canonical_declared_at: i64,
     pub canonical_earned: bool,
@@ -622,6 +629,10 @@ pub struct CanonicalElectionWire {
     /// `ContentHeadWire::canonical_link_hash`.
     #[serde(default)]
     pub canonical_link_hash: Option<HoloHashB64>,
+    /// Stable root-accepted version key for delegated publications. The actual
+    /// link above remains the proof locator. Absent uses the legacy link key.
+    #[serde(default)]
+    pub canonical_ordering_hash: Option<HoloHashB64>,
     /// The STAGING declaration standing beneath an earned winner — see
     /// `ContentHeadWire::staging_candidate` for the full contract. Additive and
     /// `serde(default)`: a pre-candidate coordinator omits the key and it reads
@@ -639,8 +650,9 @@ impl CanonicalElectionWire {
     pub fn ordering(&self) -> crate::db::content_diesel::CanonicalOrdering {
         use crate::db::content_diesel::{CanonicalOrdering, ElectionLink};
         CanonicalOrdering::new(self.canonical_declared_at, self.canonical_earned).with_link(
-            self.canonical_link_hash
+            self.canonical_ordering_hash
                 .as_ref()
+                .or(self.canonical_link_hash.as_ref())
                 .and_then(|h| ElectionLink::from_b64(&h.0)),
         )
     }
@@ -913,6 +925,8 @@ pub struct HeadDelegationPayloadWire {
     pub delegate: holochain_types::prelude::AgentPubKey,
     pub scope: String,
     pub valid_until: holochain_types::prelude::Timestamp,
+    pub root_action_hash: holochain_types::prelude::ActionHash,
+    pub dna_hash: holochain_types::prelude::DnaHash,
 }
 
 /// Mirror of `content_store::HeadDelegation`.
@@ -920,6 +934,23 @@ pub struct HeadDelegationPayloadWire {
 pub struct HeadDelegationWire {
     pub payload: HeadDelegationPayloadWire,
     pub signature: holochain_types::prelude::Signature,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acceptance: Option<HeadAcceptanceWire>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HeadAcceptanceWire {
+    pub head_action_hash: holochain_types::prelude::ActionHash,
+    pub accepted_at: holochain_types::prelude::Timestamp,
+    pub signature: holochain_types::prelude::Signature,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeadAcceptanceJson {
+    pub head_action_hash: String,
+    pub accepted_at: i64,
+    pub signature: String,
 }
 
 /// The HTTP/JSON form of a delegation as a device carries it: agent keys and
@@ -935,6 +966,10 @@ pub struct HeadDelegationJson {
     #[serde(default = "HeadDelegationJson::default_scope")]
     pub scope: String,
     pub valid_until: i64,
+    pub root_action_hash: String,
+    pub dna_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acceptance: Option<HeadAcceptanceJson>,
     /// Standard base64 of the 64 signature bytes.
     pub signature: String,
 }
@@ -962,14 +997,58 @@ impl HeadDelegationJson {
                 sig_bytes.len()
             ))
         })?;
+        let root_action_hash =
+            holochain_types::prelude::ActionHash::try_from(self.root_action_hash.as_str())
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!("delegation.rootActionHash: {e:?}"))
+                })?;
+        let dna_hash = holochain_types::prelude::DnaHash::try_from(self.dna_hash.as_str())
+            .map_err(|e| StorageError::InvalidInput(format!("delegation.dnaHash: {e:?}")))?;
+        let acceptance = self
+            .acceptance
+            .map(|receipt| -> Result<HeadAcceptanceWire, StorageError> {
+                let head_action_hash = holochain_types::prelude::ActionHash::try_from(
+                    receipt.head_action_hash.as_str(),
+                )
+                .map_err(|e| {
+                    StorageError::InvalidInput(format!(
+                        "delegation.acceptance.headActionHash: {e:?}"
+                    ))
+                })?;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(receipt.signature.as_bytes())
+                    .or_else(|_| {
+                        base64::engine::general_purpose::URL_SAFE_NO_PAD
+                            .decode(receipt.signature.as_bytes())
+                    })
+                    .map_err(|e| {
+                        StorageError::InvalidInput(format!("delegation.acceptance.signature: {e}"))
+                    })?;
+                let sig: [u8; 64] = bytes.as_slice().try_into().map_err(|_| {
+                    StorageError::InvalidInput(
+                        "delegation.acceptance.signature: expected 64 bytes".into(),
+                    )
+                })?;
+                Ok(HeadAcceptanceWire {
+                    head_action_hash,
+                    accepted_at: holochain_types::prelude::Timestamp::from_micros(
+                        receipt.accepted_at,
+                    ),
+                    signature: holochain_types::prelude::Signature(sig),
+                })
+            })
+            .transpose()?;
         Ok(HeadDelegationWire {
             payload: HeadDelegationPayloadWire {
                 grantor,
                 delegate,
                 scope: self.scope,
                 valid_until: holochain_types::prelude::Timestamp::from_micros(self.valid_until),
+                root_action_hash,
+                dna_hash,
             },
             signature: holochain_types::prelude::Signature(sig),
+            acceptance,
         })
     }
 }
@@ -1986,6 +2065,63 @@ mod collective_cid_tests {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn accepted_head_delegation_preserves_all_signed_fields_at_http_boundary() {
+        use base64::Engine as _;
+        use holochain_types::prelude::*;
+        // Compute valid DHT-location checksums for the strict HTTP hash parser.
+        let agent = |byte| AgentPubKey::from_raw_32(vec![byte; 32]).to_string();
+        let action = |byte| ActionHash::from_raw_32(vec![byte; 32]).to_string();
+        let signature = base64::engine::general_purpose::STANDARD.encode([5; 64]);
+        let json = serde_json::json!({
+            "grantor": agent(1), "delegate": agent(2), "scope": "fct-course",
+            "validUntil": 100, "rootActionHash": action(3),
+            "dnaHash": DnaHash::from_raw_32(vec![4; 32]).to_string(),
+            "signature": signature,
+            "acceptance": {"headActionHash": action(6), "acceptedAt": 99, "signature": signature},
+        });
+        let wire = serde_json::from_value::<super::HeadDelegationJson>(json.clone())
+            .unwrap()
+            .into_wire()
+            .unwrap();
+        assert_eq!(
+            wire.payload.root_action_hash,
+            ActionHash::from_raw_32(vec![3; 32])
+        );
+        assert_eq!(wire.payload.dna_hash, DnaHash::from_raw_32(vec![4; 32]));
+        let bytes = rmp_serde::to_vec_named(&wire).unwrap();
+        let decoded: super::HeadDelegationWire = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(
+            decoded.payload.grantor,
+            AgentPubKey::from_raw_32(vec![1; 32])
+        );
+        assert_eq!(
+            decoded.payload.delegate,
+            AgentPubKey::from_raw_32(vec![2; 32])
+        );
+        assert_eq!(decoded.payload.scope, "fct-course");
+        assert_eq!(decoded.payload.valid_until.as_micros(), 100);
+        assert_eq!(
+            decoded.payload.root_action_hash,
+            wire.payload.root_action_hash
+        );
+        assert_eq!(decoded.payload.dna_hash, wire.payload.dna_hash);
+        assert_eq!(decoded.signature, Signature([5; 64]));
+        let receipt = decoded.acceptance.unwrap();
+        assert_eq!(
+            receipt.head_action_hash,
+            ActionHash::from_raw_32(vec![6; 32])
+        );
+        assert_eq!(receipt.accepted_at.as_micros(), 99);
+        assert_eq!(receipt.signature, Signature([5; 64]));
+        let mut bad = json;
+        bad["acceptance"]["signature"] = serde_json::json!("AA==");
+        assert!(serde_json::from_value::<super::HeadDelegationJson>(bad)
+            .unwrap()
+            .into_wire()
+            .is_err());
+    }
+
     /// Asserts that `shefa_types::CreateReaCommitmentInput` survives a
     /// MessagePack named-fields round-trip via `rmp_serde::to_vec_named` →
     /// `rmp_serde::from_slice`. This is the wire-shape contract between
@@ -2092,6 +2228,23 @@ mod tests {
             head.canonical_ordering(),
             Some(crate::db::content_diesel::CanonicalOrdering::new(2, false))
         );
+        use crate::db::content_diesel::ElectionLink;
+        let actual = ElectionLink::from_raw(&[1; 39]).unwrap();
+        let stable = ElectionLink::from_raw(&[2; 39]).unwrap();
+        head.canonical_link_hash = Some(super::HoloHashB64(actual.to_b64()));
+        assert_eq!(head.canonical_ordering().unwrap().link, Some(actual));
+        head.canonical_ordering_hash = Some(super::HoloHashB64(stable.to_b64()));
+        assert_eq!(head.canonical_ordering().unwrap().link, Some(stable));
+        assert_eq!(head.canonical_link_hash.unwrap().0, actual.to_b64());
+        let mut election: super::CanonicalElectionWire =
+            serde_json::from_value(serde_json::json!({
+                "winner_target": "head", "canonical_declared_at": 2, "canonical_earned": true,
+                "canonical_link_hash": actual.to_b64(), "canonical_ordering_hash": stable.to_b64(),
+            }))
+            .unwrap();
+        assert_eq!(election.ordering().link, Some(stable));
+        election.canonical_ordering_hash = None;
+        assert_eq!(election.ordering().link, Some(actual));
     }
 }
 

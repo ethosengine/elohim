@@ -30,6 +30,11 @@ pub struct CommitmentOutput {
 
 #[hdk_extern]
 pub fn create_commitment(input: CreateCommitmentInput) -> ExternResult<CommitmentOutput> {
+    if input.action == "binds-identity" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "identity bindings require bootstrap_device_identity or enroll_identity_device; payload shape is not authorization".into()
+        )));
+    }
     validate_commitment_payload(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let entry = Commitment {

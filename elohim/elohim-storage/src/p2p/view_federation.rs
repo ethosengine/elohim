@@ -1580,6 +1580,7 @@ mod tests {
                 canonical_declared_at: 42,
                 canonical_earned: true,
                 canonical_link_hash: None,
+                canonical_ordering_hash: None,
                 staging_candidate: None,
                 staging_candidate_declared_at: None,
             },

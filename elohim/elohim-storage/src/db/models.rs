@@ -181,7 +181,10 @@ pub struct Content {
     #[serde(skip)]
     #[ts(skip)]
     pub dht_anchor_checked_at: Option<String>,
-    /// The winning declaration link's hash behind `canonical_declared_at` —
+    /// Legacy column name for the effective election tiebreak: a root-accepted
+    /// head action for delegated declarations, otherwise the winning link.
+    /// This is not a proof locator; conductor wire retains the actual link.
+    /// The key behind `canonical_declared_at` —
     /// the election's tiebreak, stored in Holochain's `u`-prefixed base64 and
     /// decoded to raw bytes before any comparison. NULL = unknown (an election
     /// recorded before the tiebreak travelled). Internal-only. Classification: A.

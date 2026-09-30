@@ -47,6 +47,15 @@
 #                            channelId=observe|apply|canary). Unset = this
 #                            peer follows no release channel. See GET
 #                            /admin/adoption on the storage peer.
+#   HAPP_BUNDLE_PATH          Optional hApp bundle for doorway hosted provisioning.
+#                            join-alpha defaults to its durable deployed bundle;
+#                            isolated mode defaults to the local HAPP_PATH.
+#   CONDUCTOR_ENROLL=1       join-alpha only: explicitly authorize creation of
+#                            this workspace's first persistent conductor identity.
+#   HOLOCHAIN_BIN            join-alpha conductor executable or a directory
+#                            containing the conductor and matching `hc` CLI.
+#   HC_CLI_BIN               Optional matching `hc` executable when the
+#                            conductor binary is supplied separately.
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -167,7 +176,6 @@ source "$REPO_ROOT/genesis/agentic/bin/pool-lib.sh"
 POOL_FAMILY="$(detect_family "$REPO_ROOT")"
 STORAGE_TARGET_DIR="$(slot_path "$POOL_FAMILY" "elohim/elohim-storage" release)"
 DOORWAY_TARGET_DIR="$(slot_path "$POOL_FAMILY" "doorway/doorway-service" release)"
-mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_DIR")"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # T3 workspace peer beside the household mesh (sprint 2026-09-08, T2). The mesh
@@ -253,6 +261,90 @@ MONGO_DIR="$LOCAL_DEV_DIR/mongo"
 DOORWAY_STATE_DIR="$LOCAL_DEV_DIR/doorway"
 JWT_SECRET_FILE="$DOORWAY_STATE_DIR/jwt-secret"
 ADMIN_KEY_FILE="$DOORWAY_STATE_DIR/api-key-admin"
+
+# The integration workspace's local-dev directory is a symlink to the durable
+# /projects runtime root; keep storage beside that sandbox on the same volume.
+if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+    : "${STORAGE_DIR:=$LOCAL_DEV_DIR/storage}"
+    export STORAGE_DIR
+fi
+
+# Classify the durable alpha sandbox without ever replacing an identity. This
+# helper is kept pure with respect to runtime state so its refusal boundaries
+# can be exercised by the focused shell test without launching Holochain.
+hc_start_resolve_doorway_happ() { # <profile> <local-happ> <join-happ> <explicit-happ>
+    local profile="$1" local_happ="$2" join_happ="$3" explicit_happ="$4"
+    if [ -n "$explicit_happ" ]; then
+        if [ ! -s "$explicit_happ" ]; then
+            echo "REFUSED: HAPP_BUNDLE_PATH is not a readable bundle: $explicit_happ" >&2
+            return 1
+        fi
+        printf '%s\n' "$explicit_happ"
+    elif [ "$profile" = join-alpha ]; then
+        if [ ! -s "$join_happ" ]; then
+            echo "REFUSED: join-alpha doorway bundle is missing: $join_happ" >&2
+            return 1
+        fi
+        printf '%s\n' "$join_happ"
+    else
+        printf '%s\n' "$local_happ"
+    fi
+}
+
+hc_start_join_alpha_sandbox() { # <root> <name> <enroll> -> `generate` or `resume|<index>`
+    local root="$1" name="$2" enroll="$3" registry="$1/.hc"
+    local target="$1/$2" target_real entry entry_real index=0 matches=0 found_index=""
+    local target_exists=false registry_exists=false registry_present=false
+
+    { [ -e "$target" ] || [ -L "$target" ]; } && target_exists=true
+    { [ -e "$registry" ] || [ -L "$registry" ]; } && registry_present=true
+    [ -f "$registry" ] && registry_exists=true
+    if [ "$registry_present" = true ] && [ "$registry_exists" != true ]; then
+        echo "REFUSED: join-alpha sandbox registry is not a regular file: $registry" >&2
+        return 1
+    fi
+    if [ "$registry_exists" = true ]; then
+        while IFS= read -r entry || [ -n "$entry" ]; do
+            [ -n "$entry" ] || continue
+            case "$entry" in
+                /*) entry_real="$(readlink -m -- "$entry")" ;;
+                *) entry_real="$(readlink -m -- "$root/$entry")" ;;
+            esac
+            target_real="$(readlink -m -- "$target")"
+            if [ "$entry_real" = "$target_real" ]; then
+                matches=$((matches + 1))
+                found_index="$index"
+            fi
+            index=$((index + 1))
+        done < "$registry"
+    fi
+
+    if [ "$target_exists" = false ] && [ "$matches" -eq 0 ]; then
+        if [ "$enroll" = 1 ]; then
+            printf 'generate\n'
+            return 0
+        fi
+        echo "REFUSED: join-alpha identity is missing at $target; set CONDUCTOR_ENROLL=1 to explicitly enroll a new identity." >&2
+        return 1
+    fi
+
+    if [ "$target_exists" != true ] || [ "$matches" -ne 1 ] || [ ! -d "$target" ] || \
+       [ ! -s "$target/conductor-config.yaml" ] || [ ! -s "$target/ks/store_file" ] || \
+       [ ! -s "$target/databases/conductor.db" ]; then
+        echo "REFUSED: join-alpha sandbox state is incomplete or inconsistently registered at $target; refusing to overwrite it." >&2
+        return 1
+    fi
+
+    printf 'resume|%s\n' "$found_index"
+}
+
+# Hosted registration uses the same bundle as join-alpha by default, while an
+# explicit HAPP_BUNDLE_PATH is a doorway-only override. It never changes which
+# hApp the conductor sandbox installs or resumes.
+DOORWAY_HAPP_PATH="$HAPP_PATH"
+if [ "$NETWORK_PROFILE" != join-alpha ]; then
+    DOORWAY_HAPP_PATH="$(hc_start_resolve_doorway_happ "$NETWORK_PROFILE" "$HAPP_PATH" "" "${HAPP_BUNDLE_PATH:-}")" || exit 1
+fi
 
 # Options
 RUN_SEED=false
@@ -353,18 +445,52 @@ if [ "$NETWORK_PROFILE" = "join-alpha" ]; then : "${CONDUCTOR_APP_PORT:=4485}"; 
 # whole of "can the workspace read elohim-host-landing within 3 minutes".
 : "${CONDUCTOR_ARC_FACTOR:=1}"
 FORK_BIN_DIR=""
-_fork_candidates="${HOLOCHAIN_BIN:-}:${MESH_FORK_BIN_DIRS:-}:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin"
-for _d in /projects/.cargo-target-pool/family/*/crates/*/release; do _fork_candidates="$_fork_candidates:$_d"; done
-IFS=':' read -ra _fork_dirs <<< "$_fork_candidates"
-for _d in "${_fork_dirs[@]}"; do
-    [ -n "$_d" ] || continue
-    [ -f "$_d" ] && _d="$(dirname "$_d")"
-    if [ -x "$_d/holochain" ] && [ -x "$_d/hc" ]; then FORK_BIN_DIR="$_d"; break; fi
-done
+CUSTOM_HOLOCHAIN_BIN=""
+if [ -n "${HC_CLI_BIN:-}" ]; then
+    # A tested conductor build may be installed separately from its schema-
+    # compatible CLI. Keep the two explicit so `hc` writes the config schema
+    # that this conductor understands.
+    if [ -z "${HOLOCHAIN_BIN:-}" ]; then
+        echo "❌ HC_CLI_BIN requires HOLOCHAIN_BIN to name the conductor executable or its directory." >&2
+        exit 1
+    fi
+    if [ -d "$HOLOCHAIN_BIN" ]; then
+        CUSTOM_HOLOCHAIN_BIN="$HOLOCHAIN_BIN/holochain"
+    else
+        CUSTOM_HOLOCHAIN_BIN="$HOLOCHAIN_BIN"
+    fi
+    if [ ! -x "$CUSTOM_HOLOCHAIN_BIN" ]; then
+        echo "❌ HOLOCHAIN_BIN is not executable: $CUSTOM_HOLOCHAIN_BIN" >&2
+        exit 1
+    fi
+    if [ ! -x "$HC_CLI_BIN" ]; then
+        echo "❌ HC_CLI_BIN is not executable: $HC_CLI_BIN" >&2
+        exit 1
+    fi
+    _hc_cli_version="$("$HC_CLI_BIN" --version 2>/dev/null | awk '{print $NF}')"
+    _holochain_version="$("$CUSTOM_HOLOCHAIN_BIN" --version 2>/dev/null | awk '{print $NF}')"
+    if [ -z "$_hc_cli_version" ] || [ "$_hc_cli_version" != "$_holochain_version" ]; then
+        echo "❌ custom conductor/CLI version mismatch: holochain=${_holochain_version:-unknown} hc=${_hc_cli_version:-unknown}" >&2
+        exit 1
+    fi
+    export HC_HOLOCHAIN_PATH="$CUSTOM_HOLOCHAIN_BIN"
+    export PATH="$(dirname "$HC_CLI_BIN"):$PATH"
+else
+    _fork_candidates="${HOLOCHAIN_BIN:-}:${MESH_FORK_BIN_DIRS:-}:$REPO_ROOT/.fork-bin:/opt/elohim/fork-bin"
+    for _d in /projects/.cargo-target-pool/family/*/crates/*/release; do _fork_candidates="$_fork_candidates:$_d"; done
+    IFS=':' read -ra _fork_dirs <<< "$_fork_candidates"
+    for _d in "${_fork_dirs[@]}"; do
+        [ -n "$_d" ] || continue
+        [ -f "$_d" ] && _d="$(dirname "$_d")"
+        if [ -x "$_d/holochain" ] && [ -x "$_d/hc" ]; then FORK_BIN_DIR="$_d"; break; fi
+    done
+fi
 if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
     echo ""
     echo "   ── device-peer preflight ───────────────────────────────────────"
-    if [ -n "$FORK_BIN_DIR" ]; then
+    if [ -n "$CUSTOM_HOLOCHAIN_BIN" ]; then
+        echo "   ✓ fork pair: conductor=$CUSTOM_HOLOCHAIN_BIN hc=$HC_CLI_BIN"
+    elif [ -n "$FORK_BIN_DIR" ]; then
         echo "   ✓ fork holochain+hc pair: $FORK_BIN_DIR"
     else
         echo "   ✗ fork holochain+hc pair: none found (refused below unless ALLOW_STOCK_JOIN=1)"
@@ -391,7 +517,9 @@ if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
     echo "   ─────────────────────────────────────────────────────────────"
 fi
 
-if [ -n "$FORK_BIN_DIR" ]; then
+if [ -n "$CUSTOM_HOLOCHAIN_BIN" ]; then
+    echo "   🔧 conductor: explicit fork pair $CUSTOM_HOLOCHAIN_BIN ($("$CUSTOM_HOLOCHAIN_BIN" --version 2>/dev/null | head -1))"
+elif [ -n "$FORK_BIN_DIR" ]; then
     export HC_HOLOCHAIN_PATH="$FORK_BIN_DIR/holochain"
     export PATH="$FORK_BIN_DIR:$PATH"
     echo "   🔧 conductor: FORK pair $FORK_BIN_DIR ($("$FORK_BIN_DIR/holochain" --version 2>/dev/null | head -1))"
@@ -550,11 +678,11 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
     # T3-beside-the-mesh (T2): give this sandbox an explicit name + root distinct
     # from any mesh peer (hc-mesh.sh names its own sandboxes matthew/jessica/james
     # directly under the same local-dev/) instead of `hc`'s random directory name.
-    # Only engaged when the mesh is actually up — the plain isolated/join-alpha
-    # solo case keeps today's `hc sandbox generate` invocation byte-identical.
+    # join-alpha always uses that persistent path; isolated retains its old
+    # solo behavior and only names a sandbox when the household mesh is up.
     T3_SANDBOX_FLAGS=""
     T3_SANDBOX_PATH=""
-    if [ "$MESH_IS_UP" = true ]; then
+    if [ "$NETWORK_PROFILE" = "join-alpha" ] || [ "$MESH_IS_UP" = true ]; then
         T3_SANDBOX_NAME="t3-$NETWORK_PROFILE"
         T3_SANDBOX_FLAGS="-d \"$T3_SANDBOX_NAME\" --root \"$LOCAL_DEV_DIR\""
         T3_SANDBOX_PATH="$LOCAL_DEV_DIR/$T3_SANDBOX_NAME"
@@ -597,14 +725,34 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
             echo "      risk explicitly with FORCE_LOCAL_HAPP=1."
             exit 1
         fi
+        DOORWAY_HAPP_PATH="$(hc_start_resolve_doorway_happ "$NETWORK_PROFILE" "$HAPP_PATH" "$JOIN_HAPP_PATH" "${HAPP_BUNDLE_PATH:-}")" || exit 1
         # Holochain 0.7 has one transport. The matching hc CLI writes bootstrap,
         # relay, and arc settings in the conductor's 0.7 schema.
         NETWORK_TAIL="network --bootstrap \"$CONDUCTOR_BOOTSTRAP_URL\" --target-arc-factor $CONDUCTOR_ARC_FACTOR quic \"$CONDUCTOR_RELAY_URL\""
+        JOIN_SANDBOX_MODE="$(hc_start_join_alpha_sandbox "$LOCAL_DEV_DIR" "$T3_SANDBOX_NAME" "${CONDUCTOR_ENROLL:-0}")" || exit 1
+        case "$JOIN_SANDBOX_MODE" in
+            generate)
+                echo "   🆕 Explicit enrollment authorized; creating $T3_SANDBOX_PATH"
+                JOIN_SANDBOX_COMMAND="exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT \"$JOIN_HAPP_PATH\" $NETWORK_TAIL"
+                ;;
+            resume\|*)
+                JOIN_SANDBOX_INDEX="${JOIN_SANDBOX_MODE#*|}"
+                echo "   ♻️  Resuming persistent join-alpha sandbox at index $JOIN_SANDBOX_INDEX"
+                # The generate-time -r interface is already persistent in the
+                # conductor config. `run --ports` adds another interface; do
+                # not duplicate the recorded app port on every restart.
+                JOIN_SANDBOX_COMMAND="exec hc sandbox run $JOIN_SANDBOX_INDEX"
+                ;;
+            *)
+                echo "❌ REFUSED: unexpected join-alpha sandbox classification: $JOIN_SANDBOX_MODE" >&2
+                exit 1
+                ;;
+        esac
         cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
 export PATH="$PATH"
 ${HC_HOLOCHAIN_PATH:+export HC_HOLOCHAIN_PATH="$HC_HOLOCHAIN_PATH"}
-exec hc sandbox generate --app-id elohim --in-process-lair $T3_SANDBOX_FLAGS -r=$CONDUCTOR_APP_PORT "$JOIN_HAPP_PATH" $NETWORK_TAIL
+$JOIN_SANDBOX_COMMAND
 EOF
     else
         cat > "$HC_WRAPPER" << EOF
@@ -702,6 +850,7 @@ if [ ! -f "$STORAGE_BIN" ] && [ "$FORCE_BUILD" != true ] && [ -f "$STORAGE_DEBUG
     STORAGE_BIN="$STORAGE_DEBUG_BIN"
 elif [ ! -f "$STORAGE_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building elohim-storage..."
+    mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")"
     cd "$STORAGE_CRATE_DIR"
     CARGO_TARGET_DIR="$STORAGE_TARGET_DIR" \
       RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
@@ -718,6 +867,10 @@ else
 
     # Start storage with content database enabled
     export HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT"
+    # The join-alpha conductor uses a T3 app socket (4485 by default), while
+    # the household conductor owns the stock 4445 socket. Keep storage paired
+    # with this sandbox instead of its historical default.
+    export HOLOCHAIN_APP_URL="ws://localhost:$CONDUCTOR_APP_PORT"
     export ENABLE_IMPORT_API=true
     export ENABLE_CONTENT_DB=true
 
@@ -766,7 +919,13 @@ echo "│ Step 2.5: Elohim Agent SDK (Inference Sidecar)                │"
 echo "└──────────────────────────────────────────────────────────────┘"
 
 AGENT_SDK_DIR="$APP_DIR/../../elohim/elohim-agent/elohim-agent-sdk"
-AGENT_SDK_PORT="${ELOHIM_AGENT_PORT:-8095}"
+if [ "$NETWORK_PROFILE" = "join-alpha" ]; then
+    # T3 reserves 8095 for its storage peer; keep the optional SDK sidecar on
+    # its own port unless the operator selects another one explicitly.
+    AGENT_SDK_PORT="${ELOHIM_AGENT_PORT:-8096}"
+else
+    AGENT_SDK_PORT="${ELOHIM_AGENT_PORT:-8095}"
+fi
 
 if [ -z "$ANTHROPIC_API_KEY" ]; then
     echo "   ⚠️  ANTHROPIC_API_KEY not set — sidecar skipped (gate falls back to PassThrough)"
@@ -823,6 +982,7 @@ if [ ! -f "$DOORWAY_BIN" ] && [ "$FORCE_BUILD" != true ] && [ -f "$DOORWAY_DEBUG
     DOORWAY_BIN="$DOORWAY_DEBUG_BIN"
 elif [ ! -f "$DOORWAY_BIN" ] || [ "$FORCE_BUILD" = true ]; then
     echo "   🔨 Building doorway..."
+    mkdir -p "$(readlink -m "$DOORWAY_TARGET_DIR")"
     cd "$DOORWAY_DIR"
     CARGO_TARGET_DIR="$DOORWAY_TARGET_DIR" RUSTFLAGS="" cargo build --release
     echo "   ✅ Build complete"
@@ -918,7 +1078,7 @@ else
             "MONGODB_DB=doorway-dev"
             "JWT_SECRET=$(cat "$JWT_SECRET_FILE")"
             "API_KEY_ADMIN=$(cat "$ADMIN_KEY_FILE")"
-            "HAPP_BUNDLE_PATH=$HAPP_PATH"
+            "HAPP_BUNDLE_PATH=$DOORWAY_HAPP_PATH"
             "DOORWAY_ID=${DOORWAY_ID:-workspace-local}"
         )
     fi
@@ -939,6 +1099,8 @@ else
         --listen "0.0.0.0:$DOORWAY_PORT" \
         --conductor-url "ws://localhost:$CONDUCTOR_APP_PORT" \
         --conductor-admin-url "ws://localhost:$ADMIN_PORT" \
+        --app-port-min "$CONDUCTOR_APP_PORT" \
+        --app-port-max "$CONDUCTOR_APP_PORT" \
         --storage-url "http://localhost:$STORAGE_PORT" &
 
     echo -n "   ⏳ Waiting for doorway"

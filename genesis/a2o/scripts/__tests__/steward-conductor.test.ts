@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { it } from 'node:test';
 
+import { encodeHashToBase64 } from '@holochain/client';
+
 import { connectConductor, loadSigningCredentials } from '../lib/steward-conductor.js';
 
 import type { CellId } from '@holochain/client';
@@ -68,5 +70,57 @@ it('refuses absent credentials before contacting the admin socket', async () => 
     );
   } finally {
     if (previous !== undefined) process.env.STEWARD_SIGNING_CREDENTIALS_DIR = previous;
+  }
+});
+
+it('refuses expired or mismatched hosted receipts before sockets without exposing tokens', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hosted-receipt-'));
+  const agent = encodeHashToBase64(new Uint8Array(39).fill(2));
+  const dna = encodeHashToBase64(new Uint8Array(39).fill(1));
+  const receipt = {
+    doorway: 'not-a-url',
+    appToken: 'private-app-token',
+    appPort: 1,
+    agentPubKey: agent,
+    installedAppId: 'operator',
+    cellIds: { lamad: [dna, agent] },
+    token: 'private-jwt',
+    expiresAt: Date.now() + 60000,
+  };
+  const options = {
+    adminWs: 'not-a-url',
+    appWs: 'not-a-url',
+    appId: 'operator',
+    role: 'lamad',
+    expectedAgent: agent,
+    expectedDna: dna,
+    signingCredentialsDir: dir,
+    hosted: {
+      doorway: receipt.doorway,
+      receipt: join(dir, 'receipt.json'),
+      authFile: '',
+      signingFile: '',
+    },
+  };
+  try {
+    for (const patch of [
+      { expiresAt: 0 },
+      { installedAppId: 'wrong' },
+      { agentPubKey: 'wrong' },
+      { cellIds: { lamad: [encodeHashToBase64(new Uint8Array(39).fill(3)), agent] } },
+    ]) {
+      writeFileSync(options.hosted.receipt, JSON.stringify({ ...receipt, ...patch }), {
+        mode: 0o600,
+      });
+      await assert.rejects(connectConductor(options), error => {
+        const message = (error as Error).message;
+        assert.match(message, /expired|mismatch/);
+        assert.ok(!message.includes(receipt.token) && !message.includes(receipt.appToken));
+        assert.ok(!message.includes(receipt.doorway));
+        return true;
+      });
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
   }
 });
