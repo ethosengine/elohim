@@ -34,6 +34,7 @@ import {
   channelRootRecord,
   doorwayBindPatch,
   doorwayPublishRefusal,
+  doorwayRequestWithRetry,
   doorwayTransportRefusal,
   isCatchingUp,
   mergeReleaseBinding,
@@ -846,5 +847,72 @@ describe('channel create --transport doorway — resumes a half-created channel'
     } finally {
       server.close();
     }
+  });
+});
+
+describe('doorway request deadlines and ambiguous outcomes', () => {
+  it('uses 60s only for content PATCH, retaining bounded reads and other mutations', async t => {
+    const deadlines: number[] = [];
+    t.mock.method(AbortSignal, 'timeout', (ms: number) => {
+      deadlines.push(ms);
+      return new AbortController().signal;
+    });
+    t.mock.method(globalThis, 'fetch', () => Promise.resolve(new Response('{}')));
+    for (const [method, path] of [
+      ['PATCH', '/db/content/channel'],
+      ['GET', '/db/content/channel'],
+      ['POST', '/db/content/channel/canonical-head'],
+      ['PATCH', '/db/content/channel/head'],
+    ]) {
+      await doorwayRequestWithRetry('publish', `https://example.test${path}`, { method }, 5_000);
+    }
+    assert.deepEqual(deadlines, [60_000, 15_000, 15_000, 15_000]);
+  });
+
+  it('reports actual signal abort with safe context and never retries an ambiguous PATCH', async t => {
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    t.mock.method(AbortSignal, 'timeout', () => realTimeout(1));
+    let attempts = 0;
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+      attempts++;
+      return new Promise((_resolve, reject) => {
+        const keepAlive = setTimeout(() => reject(new Error('test deadline')), 1_000);
+        init.signal!.addEventListener('abort', () => {
+          clearTimeout(keepAlive);
+          reject(init.signal!.reason);
+        });
+      });
+    });
+    await assert.rejects(
+      doorwayRequestWithRetry(
+        'publish',
+        'https://private:secret@example.test/db/content/channel?token=secret',
+        { method: 'PATCH', headers: { authorization: 'private-secret' } },
+        5_000
+      ),
+      {
+        message:
+          'PATCH /db/content/channel timed out (request deadline 60000ms); outcome unknown: reconcile the existing channel/head and manifest before retrying',
+      }
+    );
+    assert.equal(attempts, 1);
+  });
+
+  it('labels unknown transport failure without leaking upstream error text or retrying', async t => {
+    let attempts = 0;
+    t.mock.method(globalThis, 'fetch', () => {
+      attempts++;
+      return Promise.reject(new Error('secret upstream URL'));
+    });
+    await assert.rejects(
+      doorwayRequestWithRetry(
+        'publish',
+        'https://example.test/db/content/channel',
+        { method: 'GET' },
+        5_000
+      ),
+      { message: 'GET /db/content/channel failed (request deadline 15000ms)' }
+    );
+    assert.equal(attempts, 1);
   });
 });

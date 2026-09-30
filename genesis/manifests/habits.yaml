@@ -4672,6 +4672,8 @@ habits:
       current state: observed, not diagnosed. And: the workspace peer follows its own channel at `observe`, so it never records an adoption —
       with single-role releases it CAN adopt (its lamad matched every appliesTo tonight); flipping it to `apply` closes the
       adopt-before-author wedge for publishing over an earned head (`runtime-steward-adoption-of-fleet-cut-release.md`).
+
+      DELTA 2026-09-30 (App #1744 timeout boundary; no status change): the release ceremony uses the existing gateway 60-second deadline only for single-content PATCH, retains read deadlines, and reports method/path/deadline without credentials on ambiguous transport failure; no mutation retry is added. Focused release-ceremony tests pass 30/30, including actual signal abort and one-attempt refusal. This does not prove deployed release adoption; reconcile the original manifest, channel head and canonical election before retrying a lost response.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
