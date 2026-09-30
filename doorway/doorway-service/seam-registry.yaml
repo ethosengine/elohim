@@ -22,6 +22,44 @@ seamLocus: >
   TransportManifestStore::accept_at/AcceptOutcome/ManifestVerifyError).
 
 decisionPoints:
+  - name: is_content_patch
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/storage_proxy.rs
+      modulePath: routes::storage_proxy::is_content_patch
+      line: 57
+    summary: >
+      Classifies only single-item content PATCH requests for a 60-second response
+      budget, allowing the native commit and synchronous author election to return
+      together. Reads and other routes retain the pooled 12-second deadline;
+      connect remains 3 seconds. This ephemeral transport decision creates no
+      identity, content authority, DHT entity, or new acceptance clock. The caller's
+      shared 75-second publication deadline is unchanged.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral gateway request-budget classification; native Content and election authority remain in the conductor." }
+      - { id: C1, status: n-a, justification: "The predicate selects a timeout, never an elected content head." }
+      - { id: C2, status: n-a, justification: "No head ordering or authority clock is changed; synchronous native election remains upstream." }
+      - { id: C3, status: partial, justification: "A delayed committed response can complete after the read deadline; upstream failure or completion beyond 60 seconds still requires recovery." }
+      - { id: C4, status: partial, justification: "Existing forwarding preserves explicit upstream responses, but a transport timeout cannot determine whether an upstream write committed." }
+      - { id: C5, status: n-a, justification: "A returned HTTP response is not receiver-local history or publication acceptance evidence; those checks remain independent." }
+      - { id: C6a, status: answered, justification: "One forward attempt receives a finite 60-second timeout only on the exact PATCH route; other routes retain their existing budgets. The delayed-response regression exercises the production override." }
+      - { id: C6b, status: partial, justification: "The proxy sends the PATCH once, pinned by an upstream write counter. Client retries after a later timeout can still create another version; no end-to-end idempotency claim." }
+      - { id: C7, status: n-a, justification: "No advertised content, capability, or serving selection is modified." }
+      - { id: C8, status: partial, justification: "Existing proxy hop timing and error metrics include the request; no distinct typed timeout-class counter is added." }
+      - { id: C9, status: n-a, justification: "No key, identity, or lineage transition occurs at this predicate." }
+      - { id: C10, status: n-a, justification: "No new wire field or version is introduced; existing method and path select the budget." }
+      - { id: C11, status: answered, justification: "Existing breaker admission and upstream backpressure handling remain in the forwarding path; the timeout override adds no retry or bypass." }
+      - { id: C12, status: n-a, justification: "Budget selection grants no permission; existing gateway and storage authorization remain mandatory." }
+      - { id: C13, status: n-a, justification: "No authority scaffold or standing tier is introduced." }
+      - { id: C14, status: partial, justification: "Existing timeout failures remain explicit responses and metrics; a timeout carries no definitive native commit outcome or cross-node residual witness." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: content_patch_budget_excludes_reads_and_other_routes
+        kind: unit
+      - path: doorway/doorway-service/src/routes/storage_proxy.rs
+        testName: content_patch_receives_committed_response_after_read_deadline
+        kind: unit
+
   - name: selected_conductor
     kind: verdict-fn
     sourceLocation:
