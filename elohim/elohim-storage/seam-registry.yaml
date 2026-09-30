@@ -1398,8 +1398,51 @@ decisionPoints:
       genesis/a2o/reports/recovery/serving-edge-20260919/household-at-rest-named.log): that one
       zome fn was ~80% of every conductor call the node made at rest, 80-120/min, because
       discovery re-enqueues the divergent id every sweep and the per-sweep GapTracker that
-      recorded the adjudication is thrown away with it.
+      recorded the adjudication is thrown away with it. Also stably orders verified-read
+      candidates so already-held anchor/lifecycle divergences precede missing rows. The
+      reproduced 2026-09-30 root cancellation missed its 75-second serving bound while
+      1146 old misses consumed two 45-second REA legs. Every candidate and its within-class
+      queue order remain intact; inventory priority is never projection authority.
     concernIds:
+      - id: C0
+        status: answered
+        justification: "Operational scheduling of an ephemeral projection queue; notarized Commitment state remains authoritative in the own conductor."
+      - id: C1
+        status: n-a
+        justification: "No self-candidacy, head election, authorship or publication path is introduced by read ordering."
+      - id: C2
+        status: answered
+        justification: "Read order cannot advance a row. Existing own-record signature, immutable undertaking and signed lineage checks plus CAS decide lifecycle advancement."
+      - id: C4
+        status: answered
+        justification: "Missing, refused and deferred native reads keep their existing outcomes; scheduling never completes a pending candidate."
+      - id: C5
+        status: answered
+        justification: "Peer inventory is only a scheduling hint. heal_one still loads and verifies exact records from the own conductor; missing and tampered records cannot project."
+      - id: C6b
+        status: answered
+        justification: "The stable partition drops no candidate and writes no projection; replayed verdict effects and native projection idempotence are unchanged."
+      - id: C7
+        status: answered
+        justification: "All prior pending candidates remain in to_read or the same remembered-verdict class; no work or convergence claim is removed."
+      - id: C9
+        status: n-a
+        justification: "No agent identifier, lineage reference, key or identity resolution changes."
+      - id: C10
+        status: n-a
+        justification: "No wire, persistent schema, configuration or serialization contract changes; the divergent set is internal ephemeral discovery state."
+      - id: C11
+        status: answered
+        justification: "Existing reserved leg budget and native timeout circuit remain the load policy. Priority changes work order without expanding or bypassing either bound."
+      - id: C12
+        status: answered
+        justification: "Ordering confers no authority. Shared native record verification still refuses foreign authors, changed immutable terms and unavailable incoming records before projection."
+      - id: C13
+        status: n-a
+        justification: "No authority gate or social-tier scaffold is introduced or changed."
+      - id: C14
+        status: answered
+        justification: "Existing per-read failure/refusal outcomes and bounded-leg logs remain; the reproduced failure retains its full red sprint receipt and exact timing evidence."
       - id: C3
         status: answered
         justification: >
@@ -1407,10 +1450,12 @@ decisionPoints:
           changed peer evidence and a changed local row both re-admit on the very NEXT sweep
           (the evidence is part of the key, so neither waits for expiry), the window always
           lapses, and note_progress clears on an advance. Process restart is a fifth by
-          construction — the ledger is in-memory only. Window 0 is the OFF switch and restores
-          the pre-fix leg byte-for-byte. A skipped id stays a divergent gap, stays on
+          construction — the ledger is in-memory only. Window 0 disables verdict replay
+          while retaining the lifecycle scheduling priority. A skipped id stays a divergent gap, stays on
           known_divergent, and is never exhausted or written off — the MissLedger's terminality
-          bookkeeping is untouched by this decision.
+          bookkeeping is untouched by this decision. The 1146-miss regression additionally
+          proves recent anchor/lifecycle changes claim before that backlog and all missing
+          records remain eligible; stable ordering preserves their relative queue order.
       - id: C6a
         status: answered
         justification: >
@@ -1432,9 +1477,22 @@ decisionPoints:
           one divergent_refused per replayed id, exactly as the arm it stands in for, so
           caughtUp / converged / /p2p/status read IDENTICALLY whether the call was made or
           replayed. The per-id repeat log drops to debug! and a per-sweep roll-up line carries
-          to_read vs replayed — the identical WARN/INFO firing 124x per 10 minutes is part of
-          why the treadmill hid.
+          queued to_read, prioritized_divergent, attempted_records and replayed, distinguishing
+          eligible work from actual reads when the bounded leg yields. The identical WARN/INFO
+          firing 124x per 10 minutes is part of why the treadmill hid.
     contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: recent_lifecycle_changes_are_claimed_before_1146_missing_records
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs
+        testName: missing_incoming_record_never_inserts_a_projection
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs
+        testName: rejects_tampered_record_before_projection
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs
+        testName: foreign_author_root_and_changed_undertaking_are_refused
+        kind: unit
       - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
         testName: a_verdict_is_not_re_read_while_its_evidence_is_unchanged
         kind: unit

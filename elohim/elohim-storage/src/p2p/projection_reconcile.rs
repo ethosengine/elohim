@@ -1931,6 +1931,9 @@ impl ProjectionReconcileState {
 pub struct ReaDiscovery {
     tracker: GapTracker,
     discovered_by: std::collections::HashMap<String, String>,
+    /// Already-held rows whose peer-advertised anchor or lifecycle changed.
+    /// Scheduling evidence only: the heal leg still verifies its own conductor.
+    divergent_ids: std::collections::HashSet<String>,
     peers_asked: usize,
     ids_discovered: usize,
     divergent_anchor: usize,
@@ -2018,6 +2021,7 @@ impl ReaDiscovery {
         Self {
             tracker: GapTracker::new(MAX_RETRIES),
             discovered_by: std::collections::HashMap::new(),
+            divergent_ids: std::collections::HashSet::new(),
             peers_asked: 0,
             ids_discovered: 0,
             divergent_anchor: 0,
@@ -2444,6 +2448,7 @@ pub async fn run_heal(
     let ReaDiscovery {
         mut tracker,
         discovered_by,
+        divergent_ids: rea_divergent_ids,
         peers_asked,
         ids_discovered,
         divergent_anchor: rea_divergent,
@@ -2490,6 +2495,7 @@ pub async fn run_heal(
         &mut tracker,
         ReaHealContext {
             discovered_by: &discovered_by,
+            divergent_ids: &rea_divergent_ids,
             exhausting_divergent: &rea_exhausting_divergent,
             heal_evidence: &rea_heal_evidence,
             miss_facts: &rea_miss_facts,
@@ -3780,6 +3786,7 @@ async fn discover_rea(
     ReaDiscovery {
         tracker,
         discovered_by,
+        divergent_ids,
         peers_asked,
         ids_discovered,
         divergent_anchor,
@@ -3848,6 +3855,7 @@ fn rea_heal_evidence_for(
 /// lands in the first returned vector.
 fn partition_rea_gap_ids(
     gap_ids: Vec<String>,
+    divergent_ids: &std::collections::HashSet<String>,
     heal_evidence: &std::collections::HashMap<String, String>,
     window: std::time::Duration,
 ) -> (Vec<String>, Vec<(String, crate::metrics::ReaHealSkip)>) {
@@ -3860,6 +3868,11 @@ fn partition_rea_gap_ids(
             None => to_read.push(id),
         }
     }
+    // A recent lifecycle change must reach the own-conductor verification
+    // before old missing records can consume this leg's wall-clock budget.
+    // Stable ordering keeps every candidate and preserves each class's queue
+    // order; it grants no authority and changes neither retries nor pacing.
+    to_read.sort_by_key(|id| !divergent_ids.contains(id));
     (to_read, remembered)
 }
 
@@ -3912,6 +3925,7 @@ fn apply_remembered_rea_refusals(
 /// and travel together; the heal leg reads them and never writes them.
 struct ReaHealContext<'a> {
     discovered_by: &'a std::collections::HashMap<String, String>,
+    divergent_ids: &'a std::collections::HashSet<String>,
     exhausting_divergent: &'a std::collections::HashSet<String>,
     heal_evidence: &'a std::collections::HashMap<String, String>,
     miss_facts: &'a MissLedgerFacts,
@@ -3926,6 +3940,7 @@ async fn heal_rea(
 ) -> ReaHealOutcome {
     let ReaHealContext {
         discovered_by,
+        divergent_ids,
         exhausting_divergent,
         heal_evidence,
         miss_facts,
@@ -3946,12 +3961,22 @@ async fn heal_rea(
     // NOT an exclusion and NOT a terminality claim: see
     // `services::rea_verdict_backoff` for the four automated exits.
     let replay_window = crate::config::heal_missing_backoff_window();
-    let (gap_ids, remembered) =
-        partition_rea_gap_ids(tracker.pending_ids(), heal_evidence, replay_window);
+    let (gap_ids, remembered) = partition_rea_gap_ids(
+        tracker.pending_ids(),
+        divergent_ids,
+        heal_evidence,
+        replay_window,
+    );
     divergent_refused += apply_remembered_rea_refusals(&remembered, tracker);
     let to_read_total = gap_ids.len();
+    let prioritized_divergent = gap_ids
+        .iter()
+        .filter(|id| divergent_ids.contains(*id))
+        .count();
+    let mut attempted_records = 0usize;
     let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for id in gap_ids {
+        attempted_records += 1;
         let evidence = rea_heal_evidence_for(heal_evidence, &id);
         let attempt = call_with_retry(pacing, || {
             crate::services::conductor_writes::get_rea_commitment_classed(
@@ -4177,6 +4202,8 @@ async fn heal_rea(
     tracing::info!(
         target: "elohim_storage::projection_reconcile",
         to_read = to_read_total,
+        prioritized_divergent,
+        attempted_records,
         replayed = remembered.len(),
         divergent_refused,
         replay_window_secs = replay_window.as_secs(),
@@ -4184,8 +4211,10 @@ async fn heal_rea(
         miss_dormant = miss_facts.dormant,
         miss_readmitted = miss_facts.readmitted,
         miss_longest_dormancy_secs = miss_facts.longest_dormancy.as_secs(),
-        "projection-reconcile[rea]: heal leg finished (to_read = ids that cost a \
-         get_rea_commitment round-trip this sweep; replayed = ids whose adjudicated refusal \
+        "projection-reconcile[rea]: heal leg finished (to_read = eligible ids queued for \
+         own-conductor reads; attempted_records = ids actually read before the leg yielded; \
+         prioritized_divergent = queued held-row changes scheduled first; \
+         replayed = ids whose adjudicated refusal \
          was reused against unchanged evidence, adjudicated identically and still counted as \
          divergence; miss_dormant = ids the cross-sweep ledger is holding back on its \
          wall-clock dormancy ladder, miss_readmitted = ids whose dormancy lapsed this sweep \
@@ -11575,6 +11604,48 @@ mod tests {
 
     const REA_W: std::time::Duration = std::time::Duration::from_secs(600);
 
+    #[test]
+    fn recent_lifecycle_changes_are_claimed_before_1146_missing_records() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let missing: Vec<String> = (0..1146).map(|i| format!("missing-native:{i}")).collect();
+        let cancellation = "recent-cancellation".to_string();
+        let anchor_change = "recent-anchor-change".to_string();
+        let divergent =
+            std::collections::HashSet::from([cancellation.clone(), anchor_change.clone()]);
+        // Deliberately put the two changes after the entire measured miss
+        // backlog. A short leg can afford only its first claim.
+        let mut pending = missing.clone();
+        pending.extend([cancellation.clone(), anchor_change.clone()]);
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(pending.clone());
+        let (to_read, remembered) = partition_rea_gap_ids(
+            pending,
+            &divergent,
+            &std::collections::HashMap::new(),
+            REA_W,
+        );
+        assert_eq!(to_read[0], cancellation);
+        assert_eq!(to_read[1], anchor_change);
+        assert_eq!(&to_read[2..], missing.as_slice());
+        assert!(remembered.is_empty());
+        assert_eq!(tracker.counts().pending, 1148);
+        // Scheduling has not accepted carried lifecycle state. Completion
+        // still belongs to the existing own-conductor verification path.
+        assert!(tracker.wants(&cancellation));
+        tracker.mark_completed(&cancellation);
+        assert!(missing.iter().all(|id| tracker.wants(id)));
+        let (next, _) = partition_rea_gap_ids(
+            tracker.pending_ids(),
+            &divergent,
+            &std::collections::HashMap::new(),
+            REA_W,
+        );
+        assert_eq!(next[0], anchor_change);
+        assert_eq!(next.len(), 1147);
+        assert!(missing.iter().all(|id| next.contains(id)));
+    }
+
     /// THE MEASURED DEFECT, as one assertion. At rest, discovery re-enqueues the
     /// same divergent commitment every sweep and the heal leg re-reads it from
     /// the OWN conductor to reach the verdict it already reached — 80-120
@@ -11589,7 +11660,12 @@ mod tests {
         let ev = evidence_map(&[(id, "peerAnchor|active|localAnchor|active")]);
 
         // Sweep 1: nothing is remembered, so the id costs a round-trip.
-        let (to_read, remembered) = partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W);
+        let (to_read, remembered) = partition_rea_gap_ids(
+            vec![id.to_string()],
+            &std::collections::HashSet::new(),
+            &ev,
+            REA_W,
+        );
         assert_eq!(to_read, vec![id.to_string()]);
         assert!(remembered.is_empty());
 
@@ -11601,7 +11677,12 @@ mod tests {
         );
 
         // Sweep 2, nothing changed anywhere: ZERO reads.
-        let (to_read, remembered) = partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W);
+        let (to_read, remembered) = partition_rea_gap_ids(
+            vec![id.to_string()],
+            &std::collections::HashSet::new(),
+            &ev,
+            REA_W,
+        );
         assert!(
             to_read.is_empty(),
             "a verdict the leg already adjudicated must cost no conductor read while the \
@@ -11633,8 +11714,12 @@ mod tests {
             "anchorA|settled|anchorL|active", // a graduation at the same anchor
             "||anchorL|active",               // the advertiser went away
         ] {
-            let (to_read, remembered) =
-                partition_rea_gap_ids(vec![id.to_string()], &evidence_map(&[(id, moved)]), REA_W);
+            let (to_read, remembered) = partition_rea_gap_ids(
+                vec![id.to_string()],
+                &std::collections::HashSet::new(),
+                &evidence_map(&[(id, moved)]),
+                REA_W,
+            );
             assert_eq!(
                 to_read,
                 vec![id.to_string()],
@@ -11663,8 +11748,12 @@ mod tests {
             "anchorA|active|anchorL|cancelled", // local standing graduated
             "anchorA|active|anchorQ|active",    // local anchor advanced
         ] {
-            let (to_read, _) =
-                partition_rea_gap_ids(vec![id.to_string()], &evidence_map(&[(id, moved)]), REA_W);
+            let (to_read, _) = partition_rea_gap_ids(
+                vec![id.to_string()],
+                &std::collections::HashSet::new(),
+                &evidence_map(&[(id, moved)]),
+                REA_W,
+            );
             assert_eq!(
                 to_read,
                 vec![id.to_string()],
@@ -11686,13 +11775,19 @@ mod tests {
             "a|b|c|d",
             crate::metrics::ReaHealSkip::NoAdvance,
         );
-        assert!(partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W)
-            .0
-            .is_empty());
+        assert!(partition_rea_gap_ids(
+            vec![id.to_string()],
+            &std::collections::HashSet::new(),
+            &ev,
+            REA_W
+        )
+        .0
+        .is_empty());
 
         std::thread::sleep(std::time::Duration::from_millis(5));
         let (to_read, _) = partition_rea_gap_ids(
             vec![id.to_string()],
+            &std::collections::HashSet::new(),
             &ev,
             std::time::Duration::from_millis(1),
         );
@@ -11707,8 +11802,12 @@ mod tests {
             "a|b|c|d",
             crate::metrics::ReaHealSkip::NoAdvance,
         );
-        let (to_read, _) =
-            partition_rea_gap_ids(vec![id.to_string()], &ev, std::time::Duration::ZERO);
+        let (to_read, _) = partition_rea_gap_ids(
+            vec![id.to_string()],
+            &std::collections::HashSet::new(),
+            &ev,
+            std::time::Duration::ZERO,
+        );
         assert_eq!(
             to_read,
             vec![id.to_string()],
@@ -11750,6 +11849,7 @@ mod tests {
             crate::services::rea_verdict_backoff::note_settled(&id, "a|b|c|d", *verdict);
             let (to_read, remembered) = partition_rea_gap_ids(
                 vec![id.clone()],
+                &std::collections::HashSet::new(),
                 &evidence_map(&[(id.as_str(), "a|b|c|d")]),
                 REA_W,
             );
@@ -11834,6 +11934,7 @@ mod tests {
         );
         let (to_read, _) = partition_rea_gap_ids(
             vec!["heal-rea:cap:0".to_string()],
+            &std::collections::HashSet::new(),
             &evidence_map(&[("heal-rea:cap:0", "a|b|c|d")]),
             REA_W,
         );
