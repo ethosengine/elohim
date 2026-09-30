@@ -34,14 +34,27 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Prefer Compose v2; retain standalone v1 support for older hosts.
+# Select by availability only: a failed operation must never retry via v1.
+compose() {
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        log_error "Docker Compose is required: install the docker compose plugin or docker-compose."
+        return 127
+    fi
+}
+
 cmd_start() {
     log_info "Starting elohim-node cluster simulation..."
 
     if [[ "$1" == "--latency" ]]; then
         log_info "Starting with WAN latency simulation (50ms)"
-        docker-compose --profile latency up -d
+        compose --profile latency up -d
     else
-        docker-compose up -d
+        compose up -d
     fi
 
     log_info "Waiting for nodes to be healthy..."
@@ -52,11 +65,11 @@ cmd_start() {
 
 cmd_stop() {
     log_info "Stopping simulation..."
-    docker-compose down
+    compose down
 }
 
 cmd_logs() {
-    docker-compose logs -f "$@"
+    compose logs -f "$@"
 }
 
 cmd_status() {
@@ -110,7 +123,7 @@ cmd_heal() {
 
 cmd_clean() {
     log_warn "Stopping and removing all simulation resources..."
-    docker-compose down -v --rmi local --remove-orphans
+    compose down -v --rmi local --remove-orphans
     log_info "Cleanup complete."
 }
 
