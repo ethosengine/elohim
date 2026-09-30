@@ -143,6 +143,7 @@ fn is_revoked(
     grant: &HeadDelegation,
     strategy: GetStrategy,
     accepted_sequence: Option<u32>,
+    budget: Option<&AcceptanceBudget>,
 ) -> ExternResult<bool> {
     let query = LinkQuery::try_new(
         grant.payload.root_action_hash.clone(),
@@ -151,8 +152,11 @@ fn is_revoked(
     .tag_prefix(LinkTag::new(revocation_tag(grant)));
     // Deleted revocations still count. Existing integrity permits link deletion;
     // deletion by any agent cannot erase the root author's signed invalidation.
-    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> =
-        get_links_details(query, strategy)?.into();
+    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> = match budget {
+        Some(budget) => budget.links(query, strategy)?,
+        None => get_links_details(query, strategy)?,
+    }
+    .into();
     let tag = revocation_tag(grant);
     Ok(details.into_iter().any(|(create, _)| {
         create.action().author() == &grant.payload.grantor
@@ -197,13 +201,69 @@ pub(crate) fn verify_head_delegation(
         root.action_address(),
         GetStrategy::Network,
     )?;
-    if is_revoked(grant, GetStrategy::Network, None)? {
+    if is_revoked(grant, GetStrategy::Network, None, None)? {
         return Err(refused("revoked for new publication by root author"));
     }
     if grant.payload.valid_until <= sys_time()? {
         return Err(refused("expired for new publication"));
     }
     Ok(())
+}
+
+/// Reuse the native batch resolver's wall budget. A record cap alone cannot
+/// bound sequential network waits. Check before every host read and pass only
+/// the remaining allowance to network requests; one host/database operation can
+/// still overshoot because HDK host calls are synchronous and not cancellable.
+struct AcceptanceBudget(Timestamp);
+impl AcceptanceBudget {
+    fn start() -> ExternResult<Self> {
+        Ok(Self(sys_time()?))
+    }
+
+    fn options(&self, strategy: GetStrategy) -> ExternResult<GetOptions> {
+        acceptance_get_options(self.0, sys_time()?, strategy)
+            .ok_or_else(|| refused("acceptance verification time budget exceeded — PENDING"))
+    }
+
+    fn record(&self, hash: ActionHash, strategy: GetStrategy) -> ExternResult<Option<Record>> {
+        let result = get(hash, self.options(strategy)?);
+        self.options(strategy)?;
+        result.map_err(|error| {
+            refused(&format!(
+                "acceptance record lookup failed — PENDING: {error:?}"
+            ))
+        })
+    }
+
+    fn links(&self, query: LinkQuery, strategy: GetStrategy) -> ExternResult<LinkDetails> {
+        let input = GetLinksInput::from_query(query, self.options(strategy)?);
+        let result = HDK.with(|h| h.borrow().get_links_details(vec![input]));
+        self.options(strategy)?;
+        result
+            .map_err(|error| {
+                refused(&format!(
+                    "acceptance link lookup failed — PENDING: {error:?}"
+                ))
+            })?
+            .into_iter()
+            .next()
+            .ok_or_else(|| refused("acceptance link history not retrievable — PENDING"))
+    }
+}
+
+fn acceptance_remaining_ms(start: Timestamp, now: Timestamp) -> Option<u32> {
+    BATCH_BUDGET_DEFAULT_MS
+        .checked_sub(elapsed_ms_since(start, now))
+        .filter(|remaining| *remaining > 0)
+}
+
+fn acceptance_get_options(
+    start: Timestamp,
+    now: Timestamp,
+    strategy: GetStrategy,
+) -> Option<GetOptions> {
+    acceptance_remaining_ms(start, now)
+        .map(|remaining| GetOptions::from(strategy).with_timeout_ms(u64::from(remaining)))
 }
 
 const ACCEPTANCE_WITNESS_TAG: &[u8] = b"head-acceptance:v2:";
@@ -256,16 +316,18 @@ fn witnessed_acceptance(
     head: &ActionHash,
     strategy: GetStrategy,
 ) -> ExternResult<Option<Record>> {
+    let budget = AcceptanceBudget::start()?;
     let tag = acceptance_tag(grant, head);
-    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> = get_links_details(
-        LinkQuery::try_new(
-            grant.payload.root_action_hash.clone(),
-            LinkTypes::IdToContent,
+    let details: Vec<(SignedActionHashed, Vec<SignedActionHashed>)> = budget
+        .links(
+            LinkQuery::try_new(
+                grant.payload.root_action_hash.clone(),
+                LinkTypes::IdToContent,
+            )?
+            .tag_prefix(LinkTag::new(tag.clone())),
+            strategy,
         )?
-        .tag_prefix(LinkTag::new(tag.clone())),
-        strategy,
-    )?
-    .into();
+        .into();
     // Host get_links_details does not apply an author filter. Filter actual
     // signed authors before the candidate cap; never trust link-supplied metadata.
     // Deleted links still witness prior acceptance: deletion is not revocation.
@@ -292,7 +354,8 @@ fn witnessed_acceptance(
     let Some(first) = candidates.into_iter().next() else {
         return Ok(None);
     };
-    let record = get(first.as_hash().clone(), GetOptions::from(strategy))?
+    let record = budget
+        .record(first.as_hash().clone(), strategy)?
         .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
     verify_acceptance_witness(grant, head, &record)?;
     Ok(Some(record))
@@ -320,11 +383,13 @@ fn verify_acceptance_author_history(
     grant: &HeadDelegation,
     witness: &Record,
     strategy: GetStrategy,
+    budget: &AcceptanceBudget,
 ) -> ExternResult<()> {
     let mut current = witness.clone();
     let tag = revocation_tag(grant);
     let expected_type: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
     for _ in 0..MAX_ACCEPTANCE_AUTHOR_HISTORY {
+        budget.options(strategy)?;
         let action = current.action();
         if action.author() != &grant.payload.grantor
             || !verify_signature(action.author().clone(), current.signature().clone(), action)?
@@ -346,7 +411,8 @@ fn verify_acceptance_author_history(
             .prev_action()
             .cloned()
             .ok_or_else(|| refused("acceptance author history does not reach immutable root"))?;
-        let prior = get(previous.clone(), GetOptions::from(strategy))?
+        let prior = budget
+            .record(previous.clone(), strategy)?
             .ok_or_else(|| refused("acceptance author history not retrievable — PENDING"))?;
         if prior.action_address() != &previous
             || prior.action().action_seq().checked_add(1) != Some(action.action_seq())
@@ -373,6 +439,7 @@ pub(crate) fn verify_accepted_head(
     head: &ActionHash,
     strategy: GetStrategy,
 ) -> ExternResult<()> {
+    let budget = AcceptanceBudget::start()?;
     verify_grant(grant, me, author, id, root, strategy)?;
     check_receipt(grant, head).map_err(refused)?;
     let receipt = grant
@@ -388,19 +455,22 @@ pub(crate) fn verify_accepted_head(
             "acceptance signature does not verify against root author",
         ));
     }
-    let witness = get(
-        receipt.witness_action_hash.clone(),
-        GetOptions::from(strategy),
-    )?
-    .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
+    let witness = budget
+        .record(receipt.witness_action_hash.clone(), strategy)?
+        .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
     verify_acceptance_witness(grant, head, &witness)?;
     if receipt.accepted_at != witness.action().timestamp() {
         return Err(refused("acceptance time differs from its native witness"));
     }
-    verify_acceptance_author_history(grant, &witness, strategy)?;
+    verify_acceptance_author_history(grant, &witness, strategy, &budget)?;
     // Both actions belong to the root author's source chain. Sequence order,
     // not caller timestamps, decides whether revocation preceded acceptance.
-    if is_revoked(grant, strategy, Some(witness.action().action_seq()))? {
+    if is_revoked(
+        grant,
+        strategy,
+        Some(witness.action().action_seq()),
+        Some(&budget),
+    )? {
         return Err(refused("acceptance did not precede root-author revocation"));
     }
     Ok(())
@@ -626,6 +696,29 @@ mod tests {
                 signature: Signature([7; 64]),
             }),
         }
+    }
+
+    #[test]
+    fn acceptance_reads_spend_one_budget_and_stop_before_another_host_call() {
+        let start = Timestamp::from_micros(10_000_000);
+        let at = |ms: i64| Timestamp::from_micros(10_000_000 + ms * 1000);
+        let first = acceptance_get_options(start, at(0), GetStrategy::Network).unwrap();
+        assert_eq!(first.timeout_ms(), Some(u64::from(BATCH_BUDGET_DEFAULT_MS)));
+        let next = acceptance_get_options(start, at(3_999), GetStrategy::Network).unwrap();
+        assert_eq!(next.timeout_ms(), Some(1));
+        assert_eq!(next.strategy(), GetStrategy::Network);
+        assert!(acceptance_get_options(start, at(4_000), GetStrategy::Network).is_none());
+        assert!(acceptance_get_options(start, at(60_000), GetStrategy::Local).is_none());
+        let local = acceptance_get_options(start, at(1), GetStrategy::Local).unwrap();
+        assert_eq!(local.strategy(), GetStrategy::Local);
+        // Backward wall-clock steps never grant more than the original budget;
+        // the independent record cap remains effective too.
+        assert_eq!(
+            acceptance_get_options(start, at(-1), GetStrategy::Network)
+                .unwrap()
+                .timeout_ms(),
+            first.timeout_ms()
+        );
     }
 
     #[test]
