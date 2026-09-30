@@ -51,9 +51,9 @@
 #                            join-alpha defaults to its durable deployed bundle;
 #                            isolated mode defaults to the local HAPP_PATH.
 #   STORAGE_HAPP_PATH         Explicit persistent hApp candidate for storage bootstrap.
+#                            Unset preserves the existing storage bootstrap default.
 #   CONDUCTOR_ADMIN_PORT      join-alpha admin port (1..65535); resume defaults
 #                             to the recorded .hc_ports port, preserving pairing.
-#                            Unset preserves the existing storage bootstrap default.
 #   CONDUCTOR_ENROLL=1       join-alpha only: explicitly authorize creation of
 #                            this workspace's first persistent conductor identity.
 #   HOLOCHAIN_BIN            join-alpha conductor executable or a directory
