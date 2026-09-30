@@ -48,6 +48,18 @@ use crate::routes::UpstreamBreakers;
 pub const STORAGE_PROXY_CONNECT_TIMEOUT_SECS: u64 = 3;
 /// Whole-request timeout — browser-facing, well under warm-up's 45s.
 pub const STORAGE_PROXY_REQUEST_TIMEOUT_SECS: u64 = 12;
+/// A content PATCH waits for both its native commit and synchronous author
+/// election. The read deadline can expire between those writes, hiding a
+/// committed version and inducing another write on retry. Keep this bounded
+/// below the publication's shared 75-second acceptance deadline.
+const CONTENT_PATCH_TIMEOUT_SECS: u64 = 60;
+
+fn is_content_patch(method: &Method, path: &str) -> bool {
+    *method == Method::PATCH
+        && path
+            .strip_prefix("/db/content/")
+            .is_some_and(|id| !id.is_empty() && !id.contains('/'))
+}
 
 /// Public operational fields only; newly added operator fields stay private.
 fn project_adoption(report: &serde_json::Value) -> serde_json::Value {
@@ -590,6 +602,10 @@ where
                 .unwrap();
         }
     };
+
+    if is_content_patch(&method, path) {
+        builder = builder.timeout(Duration::from_secs(CONTENT_PATCH_TIMEOUT_SECS));
+    }
 
     if let Some(ct) = req.headers().get("content-type") {
         if let Ok(ct_str) = ct.to_str() {
@@ -3017,6 +3033,97 @@ mod tests {
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::from_static(br#"{"state":"active"}"#)))
             .unwrap()
+    }
+
+    #[test]
+    fn content_patch_budget_excludes_reads_and_other_routes() {
+        assert!(is_content_patch(&Method::PATCH, "/db/content/course"));
+        for (method, path) in [
+            (Method::GET, "/db/content/course"),
+            (Method::POST, "/db/content/course/head"),
+            (Method::PATCH, "/db/content/course/head"),
+            (Method::PATCH, "/db/content/"),
+            (Method::PATCH, "/api/v1/commitments/course"),
+        ] {
+            assert!(!is_content_patch(&method, path));
+        }
+    }
+
+    /// Exercise the real forwarding path with storage committing immediately
+    /// then withholding its response while an election finishes. A read on the
+    /// same client still expires; PATCH returns the one authored action.
+    #[tokio::test]
+    async fn content_patch_receives_committed_response_after_read_deadline() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let storage_url = format!("http://{}", listener.local_addr().unwrap());
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        let server = tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let writes = observed.clone();
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            TokioIo::new(stream),
+                            service_fn(move |req: Request<hyper::body::Incoming>| {
+                                let writes = writes.clone();
+                                async move {
+                                    if req.method() == Method::PATCH {
+                                        writes.fetch_add(1, Ordering::SeqCst);
+                                    }
+                                    let _ = req.collect().await.unwrap();
+                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                    Ok::<_, Infallible>(Response::new(Full::new(
+                                        Bytes::from_static(
+                                            br#"{"dhtAnchorHash":"committed-exact-version"}"#,
+                                        ),
+                                    )))
+                                }
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+        // Scale the pooled read deadline down to keep the regression fast;
+        // the production PATCH override is exercised without a test override.
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(STORAGE_PROXY_CONNECT_TIMEOUT_SECS))
+            .timeout(Duration::from_millis(50))
+            .build()
+            .unwrap();
+        let path = "/db/content/course";
+        let breakers = UpstreamBreakers::default();
+        let read = forward_to_storage(
+            make_get_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(read.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let patch = forward_to_storage(
+            make_patch_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(patch.status(), StatusCode::OK);
+        let body = patch.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], br#"{"dhtAnchorHash":"committed-exact-version"}"#);
+        assert_eq!(
+            writes.load(Ordering::SeqCst),
+            1,
+            "forwarding never retries a write"
+        );
+        server.abort();
     }
 
     /// A storage 503 that declares NO backpressure is storage REPORTING a
