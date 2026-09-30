@@ -149,3 +149,79 @@ void test('unselected pooled admin route cannot mix another conductor timing pag
   );
   assert.equal(requests.length, 0);
 });
+
+void test('bounded larger pages retain complete evidence and the original acceptance deadline', async t => {
+  for (const capturePageSize of [1024, 4096]) {
+    const directory = mkdtempSync(join(tmpdir(), 'op-capture-sized-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const { admin, requests } = fixture();
+    const path = await captureReceiverOps(admin, proof, {
+      appId: 'native',
+      role: 'lamad',
+      directory,
+      captureDeadlineMs: Date.now() + 10000,
+      capturePageSize,
+    });
+    const captured = JSON.parse(readFileSync(path, 'utf8')) as {
+      deadline_micros: number;
+      state_pages: string[];
+      timing_pages: string[];
+    };
+    assert.equal(captured.deadline_micros, proof.deadlineMs * 1000);
+    assert.equal(captured.state_pages.length, 2);
+    assert.equal(captured.timing_pages.length, 1);
+    assert.ok(requests.every(r => r.value.limit === capturePageSize));
+    for (const page of captured.state_pages) {
+      const bytes = readFileSync(page, 'utf8');
+      assert.ok(!bytes.includes('do-not-persist'));
+      assert.deepEqual(JSON.parse(bytes), {
+        integration_dump: {
+          integrated: [{ bytes: [3, 4] }],
+          validation_limbo: [],
+          integration_limbo: [],
+          dht_ops_cursor:
+            page === captured.state_pages[0]
+              ? { when_received: 10, hash: Array.from(agent) }
+              : null,
+        },
+      });
+    }
+  }
+});
+void test('invalid page sizes refuse before any native request', async () => {
+  for (const capturePageSize of [0, -1, 1.5, 4097, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const { admin, requests } = fixture();
+    admin.listApps = () => {
+      throw new Error('must refuse before native inspection');
+    };
+    await assert.rejects(
+      captureReceiverOps(admin, proof, {
+        appId: 'native',
+        role: 'lamad',
+        directory: '/unused',
+        captureDeadlineMs: Date.now() + 10000,
+        capturePageSize,
+      }),
+      /Invalid capture page size/
+    );
+    assert.equal(requests.length, 0);
+  }
+});
+void test('larger pages cannot hide exhaustion of the completeness budget', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'op-capture-budget-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const { admin, requests } = fixture();
+  await assert.rejects(
+    captureReceiverOps(admin, proof, {
+      appId: 'native',
+      role: 'lamad',
+      directory,
+      captureDeadlineMs: Date.now() + 10000,
+      capturePageSize: 4096,
+      maxPages: 1,
+    }),
+    /Incomplete state capture: page budget exhausted/
+  );
+  assert.equal(requests.length, 1);
+  assert.throws(() => readFileSync(join(directory, 'request.json')));
+});

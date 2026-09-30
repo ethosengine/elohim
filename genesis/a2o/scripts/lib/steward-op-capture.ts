@@ -33,6 +33,8 @@ interface CaptureOptions {
   /** Separate bounded capture budget; may run after the publication deadline. */
   captureDeadlineMs: number;
   maxPages?: number;
+  /** Native records per page, bounded to keep individual responses manageable. */
+  capturePageSize?: number;
 }
 
 /** Core serde accepts byte arrays. Preserve every byte, including entry payloads,
@@ -99,6 +101,9 @@ export async function captureReceiverOps(
   ) {
     throw new Error('Capture requires a direct admin endpoint or explicit conductor_id route');
   }
+  const pageSize = options.capturePageSize ?? 256;
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 4096)
+    throw new Error('Invalid capture page size');
   const maxPages = options.maxPages ?? 256;
   if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 4096)
     throw new Error('Invalid capture page budget');
@@ -131,14 +136,14 @@ export async function captureReceiverOps(
               {
                 cell_id: [decodeHashFromBase64(proof.dna), decodeHashFromBase64(proof.agent)],
                 dht_ops_cursor: cursor,
-                limit: 256,
+                limit: pageSize,
               },
               options.captureDeadlineMs
             )
           : await request<Timings>(
               admin,
               'dump_op_timings',
-              { dna_hash: decodeHashFromBase64(proof.dna), cursor, limit: 256 },
+              { dna_hash: decodeHashFromBase64(proof.dna), cursor, limit: pageSize },
               options.captureDeadlineMs
             );
       const path = join(options.directory, `${kind}-${page}.json`);
