@@ -144,7 +144,8 @@ that run it (`executor`, with `null` for an inline stage).
    pipeline does not appear in the preview at all).
 5. Commit the manifest, Jenkinsfile, generated `pipeline-list.json`, and any
    necessary graph/test updates together. After pushing, confirm the orchestrator
-   build for that commit dispatched the same pipelines the preview predicted.
+   build for that commit dispatched the expected pipelines, allowing the
+   documented Genesis inclusion and step dependency propagation described below.
 
 The orchestrator automatically discovers all manifests at startup. In Jenkins,
 `build-graph.groovy` finds each `build-manifest.json` and builds the pipeline
@@ -324,8 +325,8 @@ never reached a verdict, so neither is a pass. A downstream build ends
 aborted, which is what superseding that run does; a long-running pipeline keeps
 running even then. A downstream readiness or measure step must not read
 `NOT_BUILT`, `ABORTED`, or `UNSTABLE` as green or as zero failures. Before
-trusting a pass, require `lastBuild.commit == HEAD` and a result other than
-`NOT_BUILT` or `ABORTED`.
+trusting an authoritative pass, require `lastBuild.commit == HEAD` and a
+terminal `SUCCESS` result. Advisory classifications do not establish readiness.
 
 ### Baseline state
 
