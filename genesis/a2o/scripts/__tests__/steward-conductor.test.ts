@@ -7,9 +7,67 @@ import { it } from 'node:test';
 
 import { encodeHashToBase64 } from '@holochain/client';
 
-import { connectConductor, loadSigningCredentials } from '../lib/steward-conductor.js';
+import {
+  connectConductor,
+  conductorSocketOptions,
+  loadSigningCredentials,
+} from '../lib/steward-conductor.js';
 
 import type { CellId } from '@holochain/client';
+
+it('sends a gateway session only to its issuing origin and refuses unsafe receipts without secrets', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gateway-session-'));
+  const gatewayOrigin = 'https://doorway.example';
+  const options = {
+    adminWs: 'wss://doorway.example/hc/admin?conductor_id=conductor-0',
+    appWs: 'wss://doorway.example/hc/app/4445?conductor_id=conductor-0',
+    appId: 'elohim',
+    role: 'lamad',
+    gatewayAuth: { doorway: gatewayOrigin, authFile: join(dir, 'auth.json') },
+  };
+  const saved = {
+    doorwayUrl: gatewayOrigin,
+    token: 'private-fixture-token',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  };
+  const save = (receipt = saved) =>
+    writeFileSync(options.gatewayAuth.authFile, JSON.stringify(receipt), { mode: 0o600 });
+  try {
+    save();
+    for (const endpoint of [options.adminWs, options.appWs]) {
+      assert.deepEqual(await conductorSocketOptions(options, endpoint), {
+        origin: gatewayOrigin,
+        headers: { Authorization: 'Bearer private-fixture-token' },
+      });
+    }
+    for (const endpoint of [
+      'wss://other.example/hc/admin',
+      'ws://doorway.example/hc/admin',
+      'wss://user:password@doorway.example/hc/admin',
+      `${options.adminWs}&token=private-url-token`,
+    ]) {
+      await assert.rejects(conductorSocketOptions(options, endpoint), {
+        message: 'gateway credential origin or receipt is invalid',
+      });
+    }
+    for (const receipt of [
+      { ...saved, doorwayUrl: 'https://other.example' },
+      { ...saved, expiresAt: 0 },
+      { ...saved, token: 'private-token\r\ninjected-header' },
+    ]) {
+      save(receipt);
+      await assert.rejects(conductorSocketOptions(options, options.adminWs), {
+        message: 'gateway credential origin or receipt is invalid',
+      });
+    }
+    assert.deepEqual(
+      await conductorSocketOptions({ ...options, gatewayAuth: undefined }, 'ws://localhost:4444'),
+      { origin: 'elohim' }
+    );
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
 
 it('reuses per-cell credentials and refuses a different cell or corrupt key without exposing secrets', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'steward-credentials-'));

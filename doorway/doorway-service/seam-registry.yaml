@@ -22,6 +22,42 @@ seamLocus: >
   TransportManifestStore::accept_at/AcceptOutcome/ManifestVerifyError).
 
 decisionPoints:
+  - name: selected_conductor
+    kind: verdict-fn
+    sourceLocation:
+      file: src/server/websocket.rs
+      modulePath: server::websocket::selected_conductor
+      line: 224
+    summary: >
+      Pins an explicitly Admin-authorized websocket to an exact existing registry ID.
+      Missing query selection retains legacy affinity; malformed, duplicate, unknown,
+      or unauthorized selectors refuse before upgrade rather than using the shared pool.
+      This is ephemeral routing, not identity assignment or content authority.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral gateway routing over existing ConductorRegistry; no notary entity or content head." }
+      - { id: C1, status: n-a, justification: "Selects a transport endpoint, never a canonical content candidate." }
+      - { id: C2, status: n-a, justification: "No ordered head or identity-policy transition occurs." }
+      - { id: C3, status: partial, justification: "Known endpoints can reconnect; an unavailable registered conductor remains an explicit transport failure, with repair owned by existing deployment mechanisms." }
+      - { id: C4, status: answered, justification: "Malformed, unauthorized, forbidden, unknown ID, and unavailable registry have distinct HTTP statuses; none falls back." }
+      - { id: C5, status: partial, justification: "ID selection is not receiver evidence; capture separately verifies native cell and integrated operations. Routing alone never certifies a publication." }
+      - { id: C6a, status: answered, justification: "Query limited to 16 KiB and ID to 128 bytes; one registry lookup and no retry loop." }
+      - { id: C6b, status: answered, justification: "Read-only selection creates no assignment, key, signing grant, or content record." }
+      - { id: C7, status: answered, justification: "Both interfaces use the selected registry entry's exact endpoints, avoiding per-message pool redirection." }
+      - { id: C8, status: partial, justification: "Success and refusal log conductor/status/reason without credentials; dedicated typed outcome counters remain absent." }
+      - { id: C9, status: n-a, justification: "No human or signing-key identity is created or rotated." }
+      - { id: C10, status: answered, justification: "Present invalid or duplicate selectors are rejected explicitly, including encoded duplicate keys." }
+      - { id: C11, status: n-a, justification: "No new work queue or load-shedding policy; existing websocket proxy owns transport backpressure." }
+      - { id: C12, status: partial, justification: "Existing verified Admin JWT/API-key authority is mandatory; this operational credential does not claim notarized social or content-publishing authority." }
+      - { id: C13, status: n-a, justification: "Existing operational administration boundary, not a new social standing tier or bootstrap publishing scaffold." }
+      - { id: C14, status: partial, justification: "Explicit HTTP refusal and trace preserve failures; cross-node RCA capsule delivery is not implemented at this existing gateway seam." }
+    contractTests:
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: exact_admin_selector_pins_registered_native_conductor_for_both_interfaces
+        kind: unit
+      - path: doorway/doorway-service/src/server/websocket.rs
+        testName: conductor_selector_refuses_bad_authority_and_never_falls_back
+        kind: unit
+
   - name: decide_reconcile
     kind: pure-decision-predicate
     sourceLocation:

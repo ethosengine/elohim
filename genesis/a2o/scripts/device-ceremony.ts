@@ -15,7 +15,11 @@ import {
   randomCapSecret,
 } from '@holochain/client';
 
-import { connectConductor, loadSigningCredentials } from './lib/steward-conductor.js';
+import {
+  connectConductor,
+  conductorSocketOptions,
+  loadSigningCredentials,
+} from './lib/steward-conductor.js';
 
 import type { ConductorOptions, HostedConductorReceipt } from './lib/steward-conductor.js';
 import type { HeadDelegationDocument } from './lib/steward-delegation.js';
@@ -87,7 +91,10 @@ async function credentials(config: ConductorOptions): Promise<void> {
     await hostedCredentials(checked);
     return;
   }
-  const admin = await AdminWebsocket.connect({ url: new URL(checked.adminWs) });
+  const admin = await AdminWebsocket.connect({
+    url: new URL(checked.adminWs),
+    wsClientOptions: await conductorSocketOptions(checked, checked.adminWs),
+  });
   try {
     const apps = await admin.listApps({});
     const app = apps.find(a => a.installed_app_id === checked.appId);

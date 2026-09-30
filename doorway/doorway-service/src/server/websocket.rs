@@ -41,8 +41,15 @@ pub async fn handle_admin_upgrade(
     // a second, `dev_mode`-keyed one, and the proxy a third.
     let auth_result = extract_permission(&state, &req, peer_is_loopback);
 
-    // Check if this agent has a conductor assignment for affinity routing
-    let assigned_admin_url = resolve_admin_url(&state, &req);
+    // Explicit selection pins every request to one registered conductor; it never
+    // falls through to the per-message pool on an invalid or unauthorized ID.
+    let selected = match selected_conductor(&state, &req) {
+        Ok(selected) => selected,
+        Err((status, message)) => return selector_refusal(status, message),
+    };
+    let assigned_admin_url = selected
+        .map(|info| info.admin_url)
+        .or_else(|| resolve_admin_url(&state, &req));
 
     match auth_result {
         Ok(permission_level) => {
@@ -151,8 +158,19 @@ pub async fn handle_app_upgrade(
     // Preserve query parameters (like auth token)
     let query = req.uri().query().map(|q| q.to_string());
 
-    // Route to the agent's assigned conductor if JWT present, else use default
-    let (conductor_host, conductor_port) = resolve_conductor_for_app(&state, &req, port);
+    let (conductor_host, conductor_port) = match selected_conductor(&state, &req) {
+        Ok(Some(info)) => match extract_host_and_port(&info.conductor_url) {
+            Some(address) => address,
+            None => {
+                return selector_refusal(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Registered conductor app address is invalid",
+                )
+            }
+        },
+        Ok(None) => resolve_conductor_for_app(&state, &req, port),
+        Err((status, message)) => return selector_refusal(status, message),
+    };
 
     info!(
         "App WebSocket upgrade request for port {} (origin: {:?}, conductor: {}:{})",
@@ -197,6 +215,79 @@ pub async fn handle_app_upgrade(
                 .unwrap()
         }
     }
+}
+
+/// Admin-only, exact registry selection. This is ephemeral routing, never an
+/// identity assignment or a capability grant. Absence retains existing routing;
+/// a PRESENT malformed, unauthorized, or unknown selector never falls back.
+/// Explicit selection requires a credential, including on local-first boxes.
+fn selected_conductor<B>(
+    state: &AppState,
+    req: &Request<B>,
+) -> Result<Option<crate::conductor::registry::ConductorInfo>, (StatusCode, &'static str)> {
+    let query = req.uri().query().unwrap_or("");
+    if query.len() > 16_384 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Routing query exceeds 16 KiB budget",
+        ));
+    }
+    let mut selected = None;
+    for part in query.split('&') {
+        let (key, value) = part.split_once('=').unwrap_or((part, ""));
+        let key = urlencoding::decode(key)
+            .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query encoding"))?;
+        if key != "conductor_id" {
+            continue;
+        }
+        if selected.is_some() {
+            return Err((StatusCode::BAD_REQUEST, "Duplicate conductor_id"));
+        }
+        let id = urlencoding::decode(value)
+            .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid conductor_id encoding"))?;
+        if id.is_empty()
+            || id.len() > 128
+            || !id
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+        {
+            return Err((StatusCode::BAD_REQUEST, "Invalid or missing conductor_id"));
+        }
+        selected = Some(id.into_owned());
+    }
+    let Some(id) = selected else {
+        return Ok(None);
+    };
+    let permission = extract_permission(state, req, false).map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            "Admin credential required for conductor selection",
+        )
+    })?;
+    if permission != PermissionLevel::Admin {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Admin permission required for conductor selection",
+        ));
+    }
+    let registry = state.conductor_registry.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Conductor registry unavailable",
+    ))?;
+    let info = registry
+        .get_conductor_info(&id)
+        .ok_or((StatusCode::NOT_FOUND, "Unknown registered conductor_id"))?;
+    info!(conductor = %id, "Admin selected registered conductor for WebSocket");
+    Ok(Some(info))
+}
+
+fn selector_refusal(status: StatusCode, message: &'static str) -> Response<Full<Bytes>> {
+    warn!(%status, reason = message, "Conductor selector refused");
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "text/plain")
+        .body(Full::new(Bytes::from_static(message.as_bytes())))
+        .unwrap()
 }
 
 /// Resolve the conductor host and port for an app WebSocket request.
@@ -619,5 +710,88 @@ mod tests {
             extract_permission(&state, &anonymous_request(), false).is_err(),
             "no API keys configured must not mean no authentication required"
         );
+    }
+    async fn selector_state() -> AppState {
+        let mut state = state_with(NetworkStage::Bootstrap, Some("declared-secret"), true);
+        state.args.api_key_admin = Some("admin-test-key".into());
+        state.args.api_key_authenticated = Some("hosted-test-key".into());
+        let registry = crate::conductor::ConductorRegistry::new(None).await;
+        for id in ["conductor-0", "conductor-4"] {
+            registry.register_conductor(crate::conductor::ConductorInfo {
+                conductor_id: id.into(),
+                conductor_url: format!("ws://{id}:4445"),
+                admin_url: format!("ws://{id}:4444"),
+                capacity_used: 0,
+                capacity_max: 50,
+            });
+        }
+        state.conductor_registry = Some(Arc::new(registry));
+        state
+    }
+
+    fn selector_request(path: &str, query: &str, key: Option<&str>) -> Request<()> {
+        let mut builder = Request::builder().uri(format!("{path}?{query}"));
+        if let Some(key) = key {
+            builder = builder.header("x-api-key", key);
+        }
+        builder.body(()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn exact_admin_selector_pins_registered_native_conductor_for_both_interfaces() {
+        let state = selector_state().await;
+        for path in ["/hc/admin", "/hc/app/4445"] {
+            let req = selector_request(path, "conductor_id=conductor-0", Some("admin-test-key"));
+            let selected = selected_conductor(&state, &req).unwrap().unwrap();
+            assert_eq!(selected.conductor_id, "conductor-0");
+            assert_eq!(selected.admin_url, "ws://conductor-0:4444");
+            assert_eq!(
+                extract_host_and_port(&selected.conductor_url),
+                Some(("conductor-0".into(), 4445))
+            );
+            assert!(
+                selected_conductor(&state, &selector_request(path, "", None))
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn conductor_selector_refuses_bad_authority_and_never_falls_back() {
+        let state = selector_state().await;
+        let huge = selector_request("/hc/admin", &"x".repeat(16_385), Some("admin-test-key"));
+        assert_eq!(
+            selected_conductor(&state, &huge).unwrap_err().0,
+            StatusCode::BAD_REQUEST
+        );
+        for path in ["/hc/admin", "/hc/app/4445"] {
+            for (key, status) in [
+                (None, StatusCode::UNAUTHORIZED),
+                (Some("bad-key"), StatusCode::UNAUTHORIZED),
+                (Some("hosted-test-key"), StatusCode::FORBIDDEN),
+            ] {
+                let req = selector_request(path, "conductor_id=conductor-0", key);
+                assert_eq!(selected_conductor(&state, &req).unwrap_err().0, status);
+            }
+            for query in [
+                "conductor_id",
+                "conductor_id=",
+                "conductor_id=conductor-0&conductor_id=conductor-4",
+                "conductor_id=conductor-0&conductor%5Fid=conductor-4",
+                "conductor_id=ws%3A%2F%2Fevil%3A4444",
+            ] {
+                let req = selector_request(path, query, Some("admin-test-key"));
+                assert_eq!(
+                    selected_conductor(&state, &req).unwrap_err().0,
+                    StatusCode::BAD_REQUEST
+                );
+            }
+            let req = selector_request(path, "conductor_id=unknown", Some("admin-test-key"));
+            assert_eq!(
+                selected_conductor(&state, &req).unwrap_err().0,
+                StatusCode::NOT_FOUND
+            );
+        }
     }
 }

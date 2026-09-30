@@ -6,7 +6,7 @@
 //! Continue with `--cursor WHEN_RECEIVED HASH` from, respectively,
 //! `integration_dump.dht_ops_cursor` and `cursor` until all necessary ops are present.
 //! Both cursors expose `when_received` and `hash`; retain every captured page.
-//! Request JSON fields: head, root, election_link, deadline_micros, state_pages,
+//! Request JSON fields: head, root, election_link (raw 39-byte arrays), deadline_micros, state_pages,
 //! timing_pages. Use the native observer's EXACT hashes and shared deadlineMs * 1000;
 //! page lists are local file paths. Missing history, cache-only ops, rejected ops,
 //! and integration after that deadline all fail. Capture may occur later: recorded

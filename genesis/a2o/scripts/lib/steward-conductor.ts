@@ -31,6 +31,8 @@ export interface HostedConductorReceipt {
 }
 
 export interface ConductorOptions {
+  /** Existing gateway session, sent only to its issuing HTTPS origin. */
+  gatewayAuth?: { doorway: string; authFile: string };
   /** Explicit ceremony output; ordinary connections never call /hc/connect. */
   hosted?: { doorway: string; receipt: string; authFile: string; signingFile: string };
   /** Conductor admin interface, e.g. ws://localhost:4444 */
@@ -57,6 +59,50 @@ export interface Conductor {
   /** Call a `content_store` fn on the role's cell as this node's agent. */
   call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T>;
   close(): Promise<void>;
+}
+
+/** Keep gateway credentials out of URLs, logs and unrelated origins. This
+ * authenticates transport only; it never authorizes a zome signing grant. */
+export async function conductorSocketOptions(
+  options: ConductorOptions,
+  endpoint: string
+): Promise<{ origin: string; headers?: Record<string, string> }> {
+  if (!options.gatewayAuth) return { origin: options.appId };
+  const refusal = 'gateway credential origin or receipt is invalid';
+  try {
+    const doorway = new URL(options.gatewayAuth.doorway);
+    const socket = new URL(endpoint);
+    if (
+      doorway.protocol !== 'https:' ||
+      socket.protocol !== 'wss:' ||
+      doorway.host !== socket.host ||
+      doorway.username ||
+      doorway.password ||
+      socket.username ||
+      socket.password ||
+      socket.searchParams.has('token')
+    )
+      throw new Error(refusal);
+    const saved = JSON.parse(await readFile(options.gatewayAuth.authFile, 'utf8')) as {
+      doorwayUrl?: string;
+      token?: string;
+      expiresAt?: number;
+    };
+    if (
+      !saved.doorwayUrl ||
+      new URL(saved.doorwayUrl).origin !== doorway.origin ||
+      typeof saved.token !== 'string' ||
+      !saved.token ||
+      /[\r\n]/.test(saved.token) ||
+      typeof saved.expiresAt !== 'number' ||
+      !Number.isFinite(saved.expiresAt) ||
+      saved.expiresAt * 1000 <= Date.now()
+    )
+      throw new Error(refusal);
+    return { origin: doorway.origin, headers: { Authorization: `Bearer ${saved.token}` } };
+  } catch {
+    throw new Error(refusal);
+  }
 }
 
 /** Find the provisioned cell of `role` in the installed app `appId`, or throw. */
@@ -143,7 +189,7 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
   if (o.hosted) return connectHosted(o, dir);
   const admin = await AdminWebsocket.connect({
     url: new URL(o.adminWs),
-    wsClientOptions: { origin: o.appId },
+    wsClientOptions: await conductorSocketOptions(o, o.adminWs),
     defaultTimeout: 120_000,
   });
   let appWs: AppWebsocket | undefined;
@@ -159,7 +205,7 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
     appWs = await AppWebsocket.connect({
       url: new URL(o.appWs),
       token: token.token,
-      wsClientOptions: { origin: o.appId },
+      wsClientOptions: await conductorSocketOptions(o, o.appWs),
       defaultTimeout: 180_000,
     });
     const connected = appWs;

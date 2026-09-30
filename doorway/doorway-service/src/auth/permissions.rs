@@ -52,7 +52,8 @@ pub fn get_required_permission(operation: &str) -> Option<PermissionLevel> {
         | "list_cell_ids"
         | "get_dna_definition"
         | "dump_state"
-        | "dump_full_state" => Some(PermissionLevel::Authenticated),
+        | "dump_full_state"
+        | "dump_op_timings" => Some(PermissionLevel::Authenticated),
 
         // Admin - dangerous/destructive operations
         "install_app"
@@ -99,6 +100,7 @@ pub fn get_operation_description(operation: &str) -> &'static str {
         "get_dna_definition" => "Get DNA definition",
         "dump_state" => "Dump state",
         "dump_full_state" => "Dump full state",
+        "dump_op_timings" => "Dump DHT operation timings",
 
         // Admin
         "install_app" => "Install app",
@@ -141,6 +143,28 @@ mod tests {
         assert!(is_operation_allowed(
             "generate_agent_pub_key",
             PermissionLevel::Admin
+        ));
+    }
+
+    #[test]
+    fn operation_timings_require_the_same_permission_as_full_state() {
+        for level in [
+            PermissionLevel::Public,
+            PermissionLevel::Authenticated,
+            PermissionLevel::Admin,
+        ] {
+            assert_eq!(
+                is_operation_allowed("dump_op_timings", level),
+                is_operation_allowed("dump_full_state", level)
+            );
+        }
+        assert!(!is_operation_allowed(
+            "dump_op_timings",
+            PermissionLevel::Public
+        ));
+        assert!(is_operation_allowed(
+            "dump_op_timings",
+            PermissionLevel::Authenticated
         ));
     }
 
