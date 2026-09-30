@@ -1460,7 +1460,15 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         "s|HOST_ALIASES_PLACEHOLDER|${hostAliases}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
         // Node-local storage class — P2P dataplane owns replication, not k8s.
-        "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
+        // Remote humans (nodeTypes contains 'remote' = shem) land on `shem-zfs`
+        // (ZFS-LocalPV on shem's `tank/k8s` mirror, hourly snapshots replicated
+        // to the backup pool); everyone else stays on `openebs-hostpath`. A
+        // per-human `storageClass` in deployments.json wins verbatim. Changing a
+        // live human's class is a volumeClaimTemplates edit: the Forbidden-drift
+        // path orphan-deletes and reapplies the STS, and existing PVCs are reused
+        // by name, so the class only takes effect for NEWLY minted claims —
+        // migrate existing data before flipping (done for alpha 2026-09-30).
+        "s|STORAGE_CLASS_PLACEHOLDER|${humanConfig.storageClass ?: ((humanConfig.nodeTypes ?: []).contains('remote') ? 'shem-zfs' : 'openebs-hostpath')}|g",
         // Per-human placeholders (no-ops on the consolidated manifest, which
         // has these values hand-coded for Adam).
         "s|HUMAN_LABEL_PLACEHOLDER|${humanConfig.humanLabel}|g",

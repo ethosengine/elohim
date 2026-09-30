@@ -96,6 +96,13 @@ stringData:
 # node-type=remote (shem) with no fallback, so the node-local volume adds no
 # availability risk it does not already carry — if shem is unhealthy this pod is
 # already Pending by design.
+#
+# Storage: `shem-zfs` (ZFS-LocalPV on shem's `tank/k8s` mirror, hourly snapshots
+# replicated to the backup pool) rather than doorway-A's `openebs-hostpath`, because
+# the key lives on shem and shem's root disk is not snapshotted. Migrated in place
+# 2026-09-30 (same claim name, bytes copied and checksum-verified). storageClassName
+# is immutable on a PVC, so this line must match the live claim or `kubectl apply`
+# fails.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -112,10 +119,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-hostpath
+  storageClassName: shem-zfs
   resources:
     requests:
-      # One 32-byte file; must never change (hostpath PVCs cannot be expanded).
+      # One 32-byte file; must never change (keep equal to the live claim).
       storage: 64Mi
 ---
 apiVersion: apps/v1
