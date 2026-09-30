@@ -1,4 +1,6 @@
 import test from "node:test";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -74,8 +76,12 @@ async function writeFittingFixtureRepo() {
   const root = await mkdtemp(join(tmpdir(), "compute-worker-fixture-"));
   const orchestratorDir = join(root, "genesis", "orchestrator");
   await mkdir(join(orchestratorDir, "data"), { recursive: true });
-  await mkdir(join(orchestratorDir, "manifests", "runtime"), { recursive: true });
-  await mkdir(join(orchestratorDir, "manifests", "humans"), { recursive: true });
+  await mkdir(join(orchestratorDir, "manifests", "runtime"), {
+    recursive: true,
+  });
+  await mkdir(join(orchestratorDir, "manifests", "humans"), {
+    recursive: true,
+  });
   await writeFile(
     join(orchestratorDir, "data", "deployments.json"),
     JSON.stringify({
@@ -94,11 +100,18 @@ async function writeFittingFixtureRepo() {
   await writeFile(
     join(orchestratorDir, "manifests", "runtime", "adam.manifest.json"),
     JSON.stringify({
-      envelope: { bound: { memory_bytes: 100 * 1024 * 1024 * 1024, cpu_millis: 100000 } },
+      envelope: {
+        bound: { memory_bytes: 100 * 1024 * 1024 * 1024, cpu_millis: 100000 },
+      },
     }),
   );
   await writeFile(
-    join(orchestratorDir, "manifests", "humans", "adam-firstman-conductor.yaml"),
+    join(
+      orchestratorDir,
+      "manifests",
+      "humans",
+      "adam-firstman-conductor.yaml",
+    ),
     "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: adam-conductor-fixture\nspec:\n  template:\n    spec:\n      containers: []\n",
   );
   return root;
@@ -156,4 +169,47 @@ test("a slice that fits renders the worker with the slice as limits and slice en
     ).resources,
   );
   assert.equal(worker.volumeMounts.length, 1);
+});
+
+test("deploy-only provisions the renderer owner before any human rollout", async () => {
+  const edge = await readFile(
+    new URL("../../elohim/holochain/Jenkinsfile", import.meta.url),
+    "utf8",
+  );
+  const start = edge.indexOf("def deployHumansInParallel(");
+  const install = edge.indexOf(
+    "sh 'pnpm install --frozen-lockfile --filter elohim-orchestrator'",
+    start,
+  );
+  const branches = edge.indexOf("humans.each", start);
+  assert.ok(start >= 0 && install > start && install < branches);
+  const prefix = edge.slice(start, install);
+  assert.ok(
+    !/skipBuildStages|DEPLOY_ONLY|isValidateOnly/.test(prefix),
+    "provisioning is not gated by build mode",
+  );
+  const owner = JSON.parse(
+    await readFile(new URL("./package.json", import.meta.url), "utf8"),
+  );
+  assert.equal(owner.dependencies.yaml, "2.8.3");
+});
+
+test("the deploy renderer CLI reads its YAML dependency and preserves disabled fixture bytes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "compute-worker-cli-"));
+  try {
+    const manifest = join(dir, "adam.yaml");
+    const config = join(dir, "disabled.json");
+    await writeFile(manifest, source);
+    await writeFile(config, JSON.stringify({ enabled: false }));
+    execFileSync(process.execPath, [
+      fileURLToPath(
+        new URL("./scripts/render-compute-worker.mjs", import.meta.url),
+      ),
+      manifest,
+      config,
+    ]);
+    assert.equal(await readFile(manifest, "utf8"), source);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

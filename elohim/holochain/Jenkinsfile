@@ -955,6 +955,9 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
         echo "deployHumansInParallel: no humans to deploy — skipping"
         return
     }
+    // Deploy-only skips frontend installs. Provision the manifest renderer's
+    // owning workspace before any parallel rollout can reach Adam's renderer.
+    sh 'pnpm install --frozen-lockfile --filter elohim-orchestrator'
     // Synchronized map: parallel branches each write their own key, no
     // collisions, but the wrapper guarantees memory visibility on read.
     def outcomes = java.util.Collections.synchronizedMap([:])
