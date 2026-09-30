@@ -3,8 +3,9 @@
  * CONFIG names operator/device ConductorOptions, humanAction, contentDna and a
  * durable stateDir outside build artifacts. Existing browser identities persist.
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import {
   AdminWebsocket,
@@ -23,6 +24,12 @@ import {
 
 import type { ConductorOptions, HostedConductorReceipt } from './lib/steward-conductor.js';
 import type { HeadDelegationDocument } from './lib/steward-delegation.js';
+import type {
+  AppInfo,
+  CellId,
+  CapGrantInfo,
+  GrantZomeCallCapabilityRequest,
+} from '@holochain/client';
 
 interface Config {
   operator: ConductorOptions;
@@ -39,6 +46,278 @@ interface Config {
     validUntil: number;
   };
 }
+export interface ScopedCredentialTarget {
+  conductor: ConductorOptions;
+  functions: string[];
+}
+export interface ScopedCredentialsConfig {
+  credentialTargets: ScopedCredentialTarget[];
+  /** Recover an interrupted call only from its existing exact native grant. */
+  resumePending?: boolean;
+}
+export interface ScopedCredentialAdmin {
+  listApps(): Promise<AppInfo[]>;
+  listGrants(appId: string): Promise<[CellId, CapGrantInfo[]][]>;
+  grant(request: GrantZomeCallCapabilityRequest): Promise<Uint8Array>;
+  close(): Promise<void>;
+}
+interface ScopedReceipt {
+  version: 1;
+  context: {
+    adminWs: string;
+    appWs: string;
+    appId: string;
+    role: string;
+    zome: string;
+    agent: string;
+    dna: string;
+    functions: string[];
+  };
+  keypair: string;
+  signingAgentKey: string;
+  capSecret: string;
+  tag: string;
+  capActionHash?: string;
+}
+const scopedFunctions = new Set([
+  'grant_head_delegation',
+  'accept_delegated_head',
+  'get_accepted_delegated_head',
+  'get_content_lineage',
+  'get_record_for_action',
+  'preflight_head_publication',
+  'resolve_content_head_local',
+  'resolve_canonical_election',
+]);
+async function scopedAdmin(config: ConductorOptions): Promise<ScopedCredentialAdmin> {
+  const admin = await AdminWebsocket.connect({
+    url: new URL(config.adminWs),
+    wsClientOptions: await conductorSocketOptions(config, config.adminWs),
+  });
+  return {
+    listApps: async () => admin.listApps({}),
+    listGrants: async appId =>
+      admin.listCapabilityGrants({ installed_app_id: appId, include_revoked: true }),
+    grant: async input => admin.grantZomeCallCapability(input),
+    close: async () => {
+      await admin.client.close();
+    },
+  };
+}
+async function optionalReceipt(path: string): Promise<ScopedReceipt | undefined> {
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as ScopedReceipt;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw new Error('Scoped credential receipt is unreadable; refusing replacement');
+  }
+}
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return Buffer.from(a).equals(Buffer.from(b));
+}
+function matchingCap(
+  receipt: ScopedReceipt,
+  cell: CellId,
+  grants: [CellId, CapGrantInfo[]][]
+): CapGrantInfo | undefined {
+  const signer = Buffer.from(receipt.signingAgentKey, 'hex');
+  const candidates = grants
+    .flatMap(([id, values]) =>
+      sameBytes(id[0], cell[0]) && sameBytes(id[1], cell[1]) ? values : []
+    )
+    .filter(
+      ({ cap_grant: cap }) =>
+        cap.tag === receipt.tag ||
+        (cap.access.type === 'assigned' &&
+          cap.access.value.assignees.some(a => sameBytes(a, signer)))
+    );
+  if (!candidates.length) return undefined;
+  if (candidates.length !== 1)
+    throw new Error('Ambiguous native signing grants; refusing replacement');
+  const candidate = candidates[0];
+  const cap = candidate.cap_grant;
+  const expected = receipt.context.functions.map(fn => ['content_store', fn]);
+  const actual =
+    cap.functions.type === 'listed'
+      ? [...cap.functions.value].sort((a, b) => a[1].localeCompare(b[1]))
+      : null;
+  if (
+    (candidate.revoked_at ?? undefined) !== undefined ||
+    cap.tag !== receipt.tag ||
+    cap.access.type !== 'assigned' ||
+    cap.access.value.assignees.length !== 1 ||
+    !sameBytes(cap.access.value.assignees[0], signer) ||
+    !sameBytes(cap.access.value.secret, Buffer.from(receipt.capSecret, 'hex')) ||
+    JSON.stringify(actual) !== JSON.stringify(expected) ||
+    (receipt.capActionHash && receipt.capActionHash !== encoded(candidate.action_hash))
+  ) {
+    throw new Error('Native signing grant is revoked or differs from the scoped receipt');
+  }
+  return candidate;
+}
+
+/** Explicit capability ceremony. Ordinary publication never calls this function. */
+export async function scopedCredentials(
+  config: ScopedCredentialsConfig,
+  connect: (options: ConductorOptions) => Promise<ScopedCredentialAdmin> = scopedAdmin
+): Promise<{ agent: string; dna: string; functions: string[]; capActionHash: string }[]> {
+  if (!Array.isArray(config.credentialTargets) || !config.credentialTargets.length)
+    throw new Error('Explicit scoped credential targets are required');
+  const connections: ScopedCredentialAdmin[] = [];
+  const plans: {
+    admin: ScopedCredentialAdmin;
+    cell: CellId;
+    dir: string;
+    path: string;
+    pendingPath: string;
+    context: ScopedReceipt['context'];
+    receipt?: ScopedReceipt;
+    recovered?: CapGrantInfo;
+  }[] = [];
+  const paths = new Set<string>();
+  try {
+    // Preflight every native target AND every existing receipt before any write.
+    for (const target of config.credentialTargets) {
+      const c = target.conductor;
+      if (
+        c.hosted ||
+        c.role !== 'lamad' ||
+        c.zome !== 'content_store' ||
+        !c.expectedAgent ||
+        !c.expectedDna ||
+        !c.signingCredentialsDir ||
+        !Array.isArray(target.functions) ||
+        !target.functions.length ||
+        target.functions.some(fn => !scopedFunctions.has(fn)) ||
+        new Set(target.functions).size !== target.functions.length
+      )
+        throw new Error(
+          'Scoped credentials require an exact Lamad cell and listed content functions'
+        );
+      const dir = resolve(c.signingCredentialsDir);
+      if (/(^|\/)(target|dist|node_modules|build)(\/|$)/.test(dir))
+        throw new Error('Scoped credentials require durable state outside build artifacts');
+      // Validate both endpoints before connecting; bearer credentials never enter URLs.
+      await conductorSocketOptions(c, c.appWs);
+      const admin = await connect(c);
+      connections.push(admin);
+      const app = (await admin.listApps()).find(a => a.installed_app_id === c.appId);
+      const cells = app?.cell_info[c.role]?.filter(info => info.type === 'provisioned') ?? [];
+      if (!app || encoded(app.agent_pub_key) !== c.expectedAgent || cells.length !== 1)
+        throw new Error('Scoped credential native app or role mismatch');
+      const info = cells[0];
+      if (info.type !== 'provisioned') throw new Error('Scoped credential cell is not provisioned');
+      const cell = info.value.cell_id;
+      if (encoded(cell[1]) !== c.expectedAgent || encoded(cell[0]) !== c.expectedDna)
+        throw new Error('Scoped credential native cell agent or DNA mismatch');
+      const name = `${cell.map(h => Buffer.from(h).toString('hex')).join('-')}.json`;
+      const path = join(dir, name),
+        pendingPath = join(dir, 'pending', name);
+      if (paths.has(path)) throw new Error('Duplicate scoped credential target');
+      paths.add(path);
+      const context = {
+        adminWs: c.adminWs,
+        appWs: c.appWs,
+        appId: c.appId,
+        role: c.role,
+        zome: c.zome,
+        agent: c.expectedAgent,
+        dna: c.expectedDna,
+        functions: [...target.functions].sort((a, b) => a.localeCompare(b)),
+      };
+      const active = await optionalReceipt(path),
+        pending = await optionalReceipt(pendingPath);
+      for (const saved of [active, pending]) {
+        if (
+          saved &&
+          (saved.version !== 1 || JSON.stringify(saved.context) !== JSON.stringify(context))
+        )
+          throw new Error('Existing credential scope differs; refusing replacement');
+      }
+      if (active && !active.capActionHash)
+        throw new Error('Existing credential lacks native cap action');
+      if (
+        active &&
+        pending &&
+        (active.signingAgentKey !== pending.signingAgentKey ||
+          active.capSecret !== pending.capSecret)
+      )
+        throw new Error('Pending and active credentials differ');
+      if (!active && pending && config.resumePending !== true)
+        throw new Error('Pending grant requires explicit resumePending; no new grant issued');
+      if (!active && !pending && config.resumePending === true)
+        throw new Error(
+          'Missing durable pending state; resume cannot mint replacement credentials'
+        );
+      const receipt = active ?? pending;
+      if (receipt) await loadSigningCredentials(active ? dir : join(dir, 'pending'), cell);
+      const grants = await admin.listGrants(c.appId);
+      const recovered = receipt ? matchingCap(receipt, cell, grants) : undefined;
+      if (receipt && !recovered)
+        throw new Error(
+          'Existing native grant not found; receipt remains pending, no grant retried'
+        );
+      plans.push({ admin, cell, dir, path, pendingPath, context, receipt, recovered });
+    }
+    const results = [];
+    for (const plan of plans) {
+      let receipt = plan.receipt;
+      if (!receipt) {
+        const [keyPair, signingKey] = await generateSigningKeyPair();
+        receipt = {
+          version: 1,
+          context: plan.context,
+          keypair: Buffer.from(keyPair.privateKey.slice(0, 32)).toString('hex'),
+          signingAgentKey: Buffer.from(signingKey).toString('hex'),
+          capSecret: Buffer.from(await randomCapSecret()).toString('hex'),
+          tag: `scoped-content-signing:${encoded(signingKey)}`,
+        };
+        await mkdir(join(plan.dir, 'pending'), { recursive: true, mode: 0o700 });
+        await persist(plan.pendingPath, receipt);
+        try {
+          const action = await plan.admin.grant({
+            cell_id: plan.cell,
+            cap_grant: {
+              tag: receipt.tag,
+              functions: {
+                type: 'listed',
+                value: receipt.context.functions.map(fn => ['content_store', fn]),
+              },
+              access: {
+                type: 'assigned',
+                value: {
+                  secret: Buffer.from(receipt.capSecret, 'hex'),
+                  assignees: [Buffer.from(receipt.signingAgentKey, 'hex')],
+                },
+              },
+            },
+          });
+          receipt = { ...receipt, capActionHash: encoded(action) };
+          if (!matchingCap(receipt, plan.cell, await plan.admin.listGrants(receipt.context.appId)))
+            throw new Error('Native grant confirmation remains pending');
+        } catch {
+          throw new Error(
+            'Grant response unavailable; pending signer preserved, explicit resume required'
+          );
+        }
+      } else if (plan.recovered) {
+        receipt = { ...receipt, capActionHash: encoded(plan.recovered.action_hash) };
+      }
+      if (!receipt.capActionHash) throw new Error('Native cap action receipt is missing');
+      if (!(await optionalReceipt(plan.path))) await persist(plan.path, receipt);
+      results.push({
+        agent: receipt.context.agent,
+        dna: receipt.context.dna,
+        functions: receipt.context.functions,
+        capActionHash: receipt.capActionHash,
+      });
+    }
+    return results;
+  } finally {
+    await Promise.all(connections.map(async admin => admin.close()));
+  }
+}
+
 interface Receipt {
   action_hash: Uint8Array;
   entry_hash: Uint8Array;
@@ -66,7 +345,19 @@ async function readState<T>(path: string): Promise<T> {
 }
 async function persist(path: string, value: unknown): Promise<void> {
   // Exclusive write: restart never overwrites an identity or replaces a key.
-  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+  const file = await open(path, 'wx', 0o600);
+  try {
+    await file.writeFile(`${JSON.stringify(value, null, 2)}\n`);
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+  const directory = await open(dirname(path), 'r');
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
 }
 function options(config: ConductorOptions, role: string): ConductorOptions {
   if (!config.expectedAgent || !config.signingCredentialsDir) {
@@ -493,17 +784,26 @@ async function ceremony(phase: string, config: Config): Promise<void> {
   }
 }
 
-const [phase, configPath] = process.argv.slice(2);
-if (!phase || !configPath) {
-  console.error(
-    'usage: device-ceremony.ts credentials|bootstrap|enroll|verify|revoke|grant CONFIG.json'
-  );
-  process.exitCode = 2;
-} else {
-  readState<Config>(configPath)
-    .then(async config => ceremony(phase, config))
-    .catch(error => {
-      console.error(error instanceof Error ? error.message : 'Device ceremony failed');
-      process.exitCode = 1;
-    });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const [phase, configPath] = process.argv.slice(2);
+  if (!phase || !configPath) {
+    console.error(
+      'usage: device-ceremony.ts credentials|bootstrap|enroll|verify|revoke|grant CONFIG.json'
+    );
+    process.exitCode = 2;
+  } else {
+    readState<Config | ScopedCredentialsConfig>(configPath)
+      .then(async config => {
+        if ('credentialTargets' in config) {
+          if (phase !== 'credentials')
+            throw new Error('Scoped targets support only the explicit credentials phase');
+          const receipts = await scopedCredentials(config);
+          console.log(JSON.stringify(receipts));
+        } else await ceremony(phase, config);
+      })
+      .catch(error => {
+        console.error(error instanceof Error ? error.message : 'Device ceremony failed');
+        process.exitCode = 1;
+      });
+  }
 }
