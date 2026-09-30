@@ -1,19 +1,121 @@
 /* eslint-disable @typescript-eslint/no-floating-promises -- node:test owns test promises. */
 import { strict as assert } from 'node:assert';
+import { createHash, createPrivateKey, createPublicKey, verify } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { it } from 'node:test';
 
-import { encodeHashToBase64 } from '@holochain/client';
+import { AppWebsocket, encodeHashToBase64, setSigningCredentials } from '@holochain/client';
 
 import {
   connectConductor,
+  callZomeWithCredentials,
   conductorSocketOptions,
   loadSigningCredentials,
 } from '../lib/steward-conductor.js';
 
-import type { CellId } from '@holochain/client';
+import type { AppClientTransport, AppInfo, CellId, SigningCredentials } from '@holochain/client';
+
+function testSigningCredentials(seedHex: string, cell: CellId, capSecretByte: number) {
+  const seed = Buffer.from(seedHex, 'hex');
+  const privateKey = createPrivateKey({
+    key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed]),
+    format: 'der',
+    type: 'pkcs8',
+  });
+  const publicKey = new Uint8Array(
+    createPublicKey(privateKey).export({ format: 'der', type: 'spki' }).subarray(-32)
+  );
+  const signingKey = new Uint8Array(
+    Buffer.concat([
+      Buffer.from([0x84, 0x20, 0x24]),
+      Buffer.from(publicKey),
+      Buffer.from(cell[1].slice(35)),
+    ])
+  );
+  return {
+    seed,
+    credentials: {
+      signingKey,
+      keyPair: {
+        publicKey,
+        privateKey: new Uint8Array(Buffer.concat([seed, Buffer.from(publicKey)])),
+        keyType: 'ed25519' as const,
+      },
+      capSecret: new Uint8Array(64).fill(capSecretByte),
+    } satisfies SigningCredentials,
+  };
+}
+
+function signedCallVerifies(request: unknown, seed: Buffer): boolean {
+  const signed = (request as { value: { bytes: Uint8Array; signature: Uint8Array } }).value;
+  const privateKey = createPrivateKey({
+    key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed]),
+    format: 'der',
+    type: 'pkcs8',
+  });
+  return verify(
+    null,
+    createHash('sha512').update(signed.bytes).digest(),
+    createPublicKey(privateKey),
+    signed.signature
+  );
+}
+
+function fakeAppWebsocket(calls: unknown[]): AppWebsocket {
+  const transport = {
+    on: () => () => undefined,
+    request(request: unknown) {
+      calls.push(request);
+      return Promise.resolve({ type: 'success', value: new Uint8Array([0xc0]) });
+    },
+  };
+  // AppWebsocket's constructor is private in the public declaration but is the
+  // real SDK implementation used after connect() obtains its transport/appInfo.
+  const TestAppWebsocket = AppWebsocket as unknown as new (
+    client: AppClientTransport,
+    appInfo: AppInfo
+  ) => AppWebsocket;
+  return new TestAppWebsocket(
+    transport as never,
+    { installed_app_id: 'same-app', agent_pub_key: new Uint8Array(39).fill(2) } as AppInfo
+  );
+}
+
+it('keeps same-cell concurrent zome calls bound to each connection signing profile', async () => {
+  const cell: CellId = [new Uint8Array(39).fill(1), new Uint8Array(39).fill(2)];
+  const signerA = testSigningCredentials(
+    '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60',
+    cell,
+    0x11
+  );
+  const signerB = testSigningCredentials(
+    '4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb',
+    cell,
+    0x22
+  );
+  const callsA: unknown[] = [];
+  const callsB: unknown[] = [];
+  const appA = fakeAppWebsocket(callsA);
+  const appB = fakeAppWebsocket(callsB);
+
+  // Model two established profiles for the same cell. The latest global write
+  // would make appA sign with B unless each connection restores its own profile.
+  setSigningCredentials(cell, signerA.credentials);
+  setSigningCredentials(cell, signerB.credentials);
+  await Promise.all([
+    callZomeWithCredentials(appA, cell, signerA.credentials, 'content_store', 'read_a', {}),
+    callZomeWithCredentials(appB, cell, signerB.credentials, 'content_store', 'read_b', {}),
+  ]);
+
+  assert.equal(callsA.length, 1);
+  assert.equal(callsB.length, 1);
+  assert.equal(signedCallVerifies(callsA[0], signerA.seed), true);
+  assert.equal(signedCallVerifies(callsA[0], signerB.seed), false);
+  assert.equal(signedCallVerifies(callsB[0], signerB.seed), true);
+  assert.equal(signedCallVerifies(callsB[0], signerA.seed), false);
+});
 
 it('sends a gateway session only to its issuing origin and refuses unsafe receipts without secrets', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'gateway-session-'));

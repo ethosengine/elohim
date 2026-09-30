@@ -61,6 +61,28 @@ export interface Conductor {
   close(): Promise<void>;
 }
 
+/**
+ * The Holochain client stores zome-call credentials in a process-global map
+ * keyed only by cell id. Re-select this connection's existing credentials
+ * immediately before each explicit-cell call. AppWebsocket signs synchronously
+ * before its first await, so concurrent callers snapshot the intended profile.
+ */
+export function callZomeWithCredentials<T>(
+  app: AppWebsocket,
+  cell: CellId,
+  credentials: SigningCredentials,
+  zomeName: string,
+  fnName: string,
+  payload: unknown,
+  timeoutMs?: number
+): Promise<T> {
+  setSigningCredentials(cell, credentials);
+  return app.callZome<T>(
+    { cell_id: cell, zome_name: zomeName, fn_name: fnName, payload },
+    timeoutMs
+  );
+}
+
 /** Keep gateway credentials out of URLs, logs and unrelated origins. This
  * authenticates transport only; it never authorizes a zome signing grant. */
 export async function conductorSocketOptions(
@@ -200,7 +222,7 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
     if (o.expectedAgent && agent !== o.expectedAgent)
       throw new Error('conductor device key mismatch');
     if (o.expectedDna && dna !== o.expectedDna) throw new Error('conductor DNA context mismatch');
-    setSigningCredentials(cell, await loadSigningCredentials(dir, cell));
+    const signingCredentials = await loadSigningCredentials(dir, cell);
     const token = await admin.issueAppAuthenticationToken({ installed_app_id: o.appId });
     appWs = await AppWebsocket.connect({
       url: new URL(o.appWs),
@@ -213,13 +235,13 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
       agent,
       dna,
       async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
-        return connected.callZome<T>(
-          {
-            cell_id: cell,
-            zome_name: o.zome ?? 'content_store',
-            fn_name: fnName,
-            payload,
-          },
+        return callZomeWithCredentials<T>(
+          connected,
+          cell,
+          signingCredentials,
+          o.zome ?? 'content_store',
+          fnName,
+          payload,
           timeoutMs
         );
       },
@@ -253,7 +275,7 @@ async function connectHosted(o: ConductorOptions, dir: string): Promise<Conducto
   if (!o.expectedAgent || agent !== o.expectedAgent || agent !== receipt.agentPubKey)
     throw new Error('Hosted device key mismatch');
   if (o.expectedDna && dna !== o.expectedDna) throw new Error('Hosted DNA context mismatch');
-  setSigningCredentials(cell, await loadSigningCredentials(dir, cell));
+  const signingCredentials = await loadSigningCredentials(dir, cell);
   const url = new URL(`/hc/app/${receipt.appPort}`, hosted.doorway);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.searchParams.set('token', receipt.token);
@@ -284,8 +306,13 @@ async function connectHosted(o: ConductorOptions, dir: string): Promise<Conducto
     agent,
     dna,
     async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
-      return app.callZome<T>(
-        { cell_id: cell, zome_name: o.zome ?? 'content_store', fn_name: fnName, payload },
+      return callZomeWithCredentials<T>(
+        app,
+        cell,
+        signingCredentials,
+        o.zome ?? 'content_store',
+        fnName,
+        payload,
         timeoutMs
       );
     },
