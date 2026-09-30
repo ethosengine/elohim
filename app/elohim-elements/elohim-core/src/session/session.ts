@@ -8,10 +8,10 @@
  * Cookie shape (set by doorway after successful imagodei auth):
  *   elohim_session={"humanId":"...","capabilities":[...],"reach":"..."}
  *
- * In practice the cookie is signed/encrypted by doorway; this class
- * parses the public JSON portion. Verification of authenticity is
- * doorway's responsibility — by the time the cookie reaches us, it
- * is trusted within the browser's origin boundary.
+ * This is an ephemeral public display projection, not an authenticated
+ * credential. The doorway's bearer-token validation remains authoritative;
+ * editing this cookie cannot grant access. Login/refresh reconstruct it and
+ * its browser lifetime is bounded by the authenticated token's expiry.
  */
 
 export interface CurrentUserView {

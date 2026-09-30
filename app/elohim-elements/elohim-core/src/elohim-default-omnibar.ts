@@ -117,6 +117,18 @@ export class ElohimDefaultOmnibar extends LitElement {
     document.removeEventListener('visibilitychange', this._visibilityHandler);
   }
 
+  private get signInHref(): string {
+    const location = globalThis.location;
+    const path = location?.pathname ?? '/';
+    // Carry only the current origin's relative path through the existing OAuth
+    // callback. A protocol-relative return target must never leave this origin.
+    const returnUrl =
+      path.startsWith('/') && !path.startsWith('//')
+        ? `${path}${location?.search ?? ''}${location?.hash ?? ''}`
+        : '/';
+    return `/identity/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+  }
+
   override render() {
     return html`
       <span class="brand" part="brand">elohim.host</span>
@@ -137,8 +149,8 @@ export class ElohimDefaultOmnibar extends LitElement {
                 <span part="user-name">${this._user.humanId}</span>
               `
             : html`
-                <!-- /auth/* is doorway-owned service vocabulary (same class as /epr) — uniform across deployments, NOT app routing. -->
-                <a href="/auth/signin">sign in</a>
+                <!-- The app resolver delegates to the doorway portal and restores this page through OAuth. -->
+                <a href=${this.signInHref}>sign in</a>
               `}
         </span>
       </span>

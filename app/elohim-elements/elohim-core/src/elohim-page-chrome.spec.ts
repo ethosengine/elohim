@@ -174,9 +174,32 @@ describe('<elohim-default-omnibar>', () => {
     const el = await fixture(html`
       <elohim-default-omnibar></elohim-default-omnibar>
     `);
-    const link = el.shadowRoot!.querySelector('a[href="/auth/signin"]');
+    const link = el.shadowRoot!.querySelector('a[href^="/identity/login?"]');
     expect(link).to.exist;
     expect(link!.textContent!.trim()).to.equal('sign in');
+  });
+
+  it('returns to the current same-origin course page after the existing OAuth login', async () => {
+    const previous = globalThis.location.href;
+    try {
+      history.replaceState(
+        null,
+        '',
+        '/lamad/path/foundations-christian-technology?chapter=1#start'
+      );
+      const el = await fixture(html`
+        <elohim-default-omnibar></elohim-default-omnibar>
+      `);
+      const link = el.shadowRoot!.querySelector('a')!;
+      const login = new URL(link.href);
+      expect(login.origin).to.equal(globalThis.location.origin);
+      expect(login.pathname).to.equal('/identity/login');
+      const target = login.searchParams.get('returnUrl')!;
+      expect(target).to.equal('/lamad/path/foundations-christian-technology?chapter=1#start');
+      expect(new URL(target, login).origin).to.equal(login.origin);
+    } finally {
+      history.replaceState(null, '', previous);
+    }
   });
 
   it('renders the user humanId when session cookie is present', async () => {
@@ -198,7 +221,7 @@ describe('<elohim-default-omnibar>', () => {
     const el = await fixture(html`
       <elohim-default-omnibar></elohim-default-omnibar>
     `);
-    const link = el.shadowRoot!.querySelector('a[href="/auth/signin"]');
+    const link = el.shadowRoot!.querySelector('a[href^="/identity/login?"]');
     expect(link).to.be.null;
   });
 
