@@ -134,6 +134,7 @@ just dev start                # isolated conductor + storage + doorway
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
+STORAGE_HAPP_PATH=/absolute/path/to/app.happ just dev conductor alpha  # storage --happ-path in ordinary/release-channel launches; readable file required, unset keeps the storage default; HAPP_BUNDLE_PATH selects doorway provisioning only
 just mesh status              # local multi-peer mesh
 just mesh storage-restart <peer…> | conductors-restart   # restart arms (export MESH_TRANSPORT_BACKEND for the run; MESH_HAPP_PATH installs the deployed bundle)
 just mesh doorway-restart <a|b|c>  # re-exec one doorway on the binary now at its path, with its captured env — how a rebuilt doorway (`cargo build --bin doorway` in the pool slot) reaches the running household

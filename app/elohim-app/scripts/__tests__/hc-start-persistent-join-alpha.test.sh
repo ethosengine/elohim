@@ -41,6 +41,31 @@ fi
 [[ "$out" == *"HAPP_BUNDLE_PATH"* ]] || { echo "FAIL missing bundle refusal did not name the setting" >&2; exit 1; }
 echo "ok   doorway bundle defaults and explicit override are isolated from conductor hApp selection"
 
+# Exercise the exact argument array consumed by both maintained storage launch
+# branches; a candidate containing spaces must remain one argument.
+awk '
+  /^hc_start_storage_happ_args\(\)/ { capture=1 }
+  capture { print }
+  capture && /^}$/ { exit }
+' "$script" > "$tmp/storage-bundle.sh"
+source "$tmp/storage-bundle.sh"
+cp "$tmp/override.happ" "$tmp/persistent candidate.happ"
+hc_start_storage_happ_args "$tmp/persistent candidate.happ"
+[[ "${#STORAGE_HAPP_ARGS[@]}" == 2 && "${STORAGE_HAPP_ARGS[0]}" == --happ-path && "${STORAGE_HAPP_ARGS[1]}" == "$tmp/persistent candidate.happ" ]]
+hc_start_storage_happ_args ""
+[[ "${#STORAGE_HAPP_ARGS[@]}" == 0 ]]
+if out="$(hc_start_storage_happ_args "$tmp/missing.happ" 2>&1)"; then
+  echo "FAIL missing storage bundle accepted" >&2; exit 1
+fi
+[[ "$out" == *STORAGE_HAPP_PATH* ]]
+[[ "$(grep -Fc '"$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &' "$script")" == 2 ]]
+validation_line="$(grep -n '^hc_start_storage_happ_args "${STORAGE_HAPP_PATH:-}"' "$script" | cut -d: -f1)"
+stop_line="$(grep -n '^if \[ "${1:-}" = "--stop"' "$script" | cut -d: -f1)"
+[[ "$validation_line" -gt "$stop_line" ]]
+pool_line="$(grep -n '^source "$REPO_ROOT/genesis/agentic/bin/pool-lib.sh"' "$script" | cut -d: -f1)"
+[[ "$validation_line" -lt "$pool_line" ]]
+echo "ok   storage candidate validated before launch (stop remains usable) and passed intact on both launch branches"
+
 root="$tmp/local-dev"
 mkdir -p "$root"
 

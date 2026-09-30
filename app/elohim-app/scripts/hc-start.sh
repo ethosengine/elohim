@@ -50,6 +50,8 @@
 #   HAPP_BUNDLE_PATH          Optional hApp bundle for doorway hosted provisioning.
 #                            join-alpha defaults to its durable deployed bundle;
 #                            isolated mode defaults to the local HAPP_PATH.
+#   STORAGE_HAPP_PATH         Explicit persistent hApp candidate for storage bootstrap.
+#                            Unset preserves the existing storage bootstrap default.
 #   CONDUCTOR_ENROLL=1       join-alpha only: explicitly authorize creation of
 #                            this workspace's first persistent conductor identity.
 #   HOLOCHAIN_BIN            join-alpha conductor executable or a directory
@@ -89,6 +91,20 @@ HC_DIR="$APP_DIR/../../elohim/holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
+
+# Existing-app bootstrap can sync coordinators. Preserve an explicitly selected
+# storage candidate independently of the local build and doorway bundle.
+hc_start_storage_happ_args() {
+    local selected="${1:-}"
+    STORAGE_HAPP_ARGS=()
+    if [ -n "$selected" ]; then
+        if [ ! -f "$selected" ] || [ ! -r "$selected" ]; then
+            echo "REFUSED: STORAGE_HAPP_PATH is not a readable bundle: $selected" >&2
+            return 1
+        fi
+        STORAGE_HAPP_ARGS=(--happ-path "$selected")
+    fi
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Scoped stop (sprint 2026-09-08 follow-up). `just dev stop` used to be
@@ -169,6 +185,9 @@ if [ "${1:-}" = "--stop" ]; then
     hc_start_stop
     exit 0
 fi
+
+# Stop remains usable even if a previously selected bundle was removed.
+hc_start_storage_happ_args "${STORAGE_HAPP_PATH:-}" || exit 1
 
 # Native binaries belong in the governed cargo pool. DNA/WASM builds below
 # deliberately remain in-tree because `hc dna pack` canonicalizes ./target.
@@ -887,10 +906,10 @@ else
     # below must not inherit it).
     if [ -n "${CONDUCTOR_RELEASE_CHANNELS:-}" ]; then
         echo "   following: $CONDUCTOR_RELEASE_CHANNELS"
-        ELOHIM_RELEASE_CHANNELS="$CONDUCTOR_RELEASE_CHANNELS" "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
+        ELOHIM_RELEASE_CHANNELS="$CONDUCTOR_RELEASE_CHANNELS" "$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &
     else
         echo "   following: (none — set CONDUCTOR_RELEASE_CHANNELS=<channel>=observe to ride a release channel)"
-        "$STORAGE_BIN" --http-port "$STORAGE_PORT" &
+        "$STORAGE_BIN" --http-port "$STORAGE_PORT" "${STORAGE_HAPP_ARGS[@]}" &
     fi
 
     echo -n "   ⏳ Waiting for storage"
