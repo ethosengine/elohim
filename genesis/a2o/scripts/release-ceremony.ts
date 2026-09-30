@@ -991,23 +991,41 @@ async function doorwayRequest(
   init: RequestInit,
   timeoutMs: number
 ): Promise<{ status: number; body: any }> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.STORAGE_API_KEY_ADMIN ?? '',
-      ...((init.headers as Record<string, string>) ?? {}),
-    },
-    signal: AbortSignal.timeout(Math.max(timeoutMs, 15_000)),
-  });
-  const text = await response.text();
-  let body: any = text;
+  const method = (init.method ?? 'GET').toUpperCase();
+  const path = new URL(url).pathname;
+  // Match the gateway's single-content PATCH boundary: native authoring and
+  // election can outlive the read deadline. This is not an acceptance window.
+  const contentPatch = method === 'PATCH' && /^\/db\/content\/[^/]+$/.test(path);
+  const deadlineMs = contentPatch ? 60_000 : Math.max(timeoutMs, 15_000);
   try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    /* keep the text */
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': process.env.STORAGE_API_KEY_ADMIN ?? '',
+        ...((init.headers as Record<string, string>) ?? {}),
+      },
+      signal: AbortSignal.timeout(deadlineMs),
+    });
+    const text = await response.text();
+    let body: any = text;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      /* keep the text */
+    }
+    return { status: response.status, body };
+  } catch (error) {
+    // Do not echo headers, bodies, URL credentials/query, or an upstream error
+    // message. A lost mutation response is ambiguous and must not be retried.
+    const reason = error instanceof Error && error.name === 'TimeoutError' ? 'timed out' : 'failed';
+    throw new Error(
+      `${method} ${path} ${reason} (request deadline ${deadlineMs}ms)` +
+        (method === 'GET'
+          ? ''
+          : '; outcome unknown: reconcile the existing channel/head and manifest before retrying')
+    );
   }
-  return { status: response.status, body };
 }
 
 /** The doorway's "ask again shortly" answer: a 503 whose JSON body says
