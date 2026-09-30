@@ -57,7 +57,8 @@ orchestrator Jenkinsfile" is `genesis/orchestrator/Jenkinsfile`.
 5. **Record and reconcile.** Predicted and actual graph artifacts retain the
    plan, downstream results, timings, and stage annotations.
 
-For example, an app-only selection runs only `elohim`; its absent edge and
+For example, an app-only selection selects only `elohim` before automatic
+Genesis inclusion on eligible branches; its absent edge and
 Sophia prerequisites are not added. A change that selects DNA, edge, and app is
 ordered DNA → edge → app → Genesis. Step dependencies can make downstream steps
 stale in Jenkins; the pipeline-level `cascades` field is retained as registry
@@ -131,6 +132,7 @@ that run it (`executor`, with `null` for an inline stage).
 4. From the repository root, regenerate and validate:
 
    ```bash
+   git submodule update --init sophia
    node genesis/orchestrator/scripts/generate-pipeline-list.mjs
    just _gate-rakia-validate
    just _gate-pipeline-list-fresh
@@ -138,8 +140,8 @@ that run it (`executor`, with `null` for an inline stage).
    node genesis/orchestrator/preview.mjs origin/dev
    ```
 
-   The schema validator must accept every manifest, the generated list must have
-   no diff after regeneration, the orchestrator gate must pass, and the preview
+   The schema validator must accept every manifest, the freshness check must
+   pass against the regenerated list, the orchestrator gate must pass, and the preview
    must show the new pipeline only for its declared inputs (a manual-only
    pipeline does not appear in the preview at all).
 5. Commit the manifest, Jenkinsfile, generated `pipeline-list.json`, and any
@@ -257,9 +259,10 @@ can repeat:
 git commit --allow-empty -m "build(conductor): allocator profile [conductor:prof,canary]"
 ```
 
-Two things are deliberately not expressible in a tag. The **conductor commit**
-always comes from this repo's submodule pointers, which is what makes the built
-image correspond to committed source. The **default feature set** stays in the
+The **conductor commit** comes from this repo's submodule pointer when readable,
+so the image corresponds to committed source. If that pointer is unreadable,
+the documented `hc=<branch>` fallback can select branch source instead.
+The **default feature set** stays in the
 job: a second copy here would drift, and the feature set without `jemalloc` is
 the one carrying the conductor heap leak, so it must not be reachable by
 mistyping a tag.
@@ -493,7 +496,8 @@ when a build-process file's hash changed and propagates staleness through step
 dependencies, while the local walker matches build-process files only when they
 appear in the diff and does not propagate. Jenkins adds Genesis on eligible
 branches, never dispatches the orchestrator itself, cannot see the Sophia
-manifest, and on a timer run drops pipelines already built at the commit. To
+manifest, and on every run drops pipelines already built at the commit unless
+force-dispatched. To
 compare Jenkins's own plan with what it dispatched, read the
 `build-graph-reconciliation.json` that `reconcile-build-graph.mjs` archives on
 the orchestrator build.
