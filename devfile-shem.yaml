@@ -132,7 +132,7 @@ components:
       #                                       sccache, just, cached nix-installer
       # Built via Jenkins (devspaces-udi-plus, devspaces-rust-nix-dev). Image name
       # rust-nix-dev:latest is historical — current source folder is rust-dev/.
-      image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
+      image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:v2-latest
       # Memory is not shem's constraint (110Gi allocatable, ~5Gi requested, 2026-10-01);
       # 40Gi clears the 30Gi ceiling the LAN workspace keeps hitting without reserving more.
       memoryLimit: 40Gi
