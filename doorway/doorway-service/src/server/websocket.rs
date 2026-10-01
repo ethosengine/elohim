@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::auth::{
-    extract_token_from_header, ApiKeyValidator, Claims, JwtValidator, PermissionLevel,
+    extract_token_from_header, AdminCaller, ApiKeyValidator, Claims, JwtValidator, PermissionLevel,
 };
 use crate::proxy;
 use crate::server::http::AppState;
@@ -39,7 +39,7 @@ pub async fn handle_admin_upgrade(
     // Extract auth from request. This is now the SINGLE authorization decision
     // for the conductor admin socket — the route arm in `http.rs` used to carry
     // a second, `dev_mode`-keyed one, and the proxy a third.
-    let auth_result = extract_permission(&state, &req, peer_is_loopback);
+    let auth_result = extract_caller(&state, &req, peer_is_loopback);
 
     // Explicit selection pins every request to one registered conductor; it never
     // falls through to the per-message pool on an invalid or unauthorized ID.
@@ -52,7 +52,7 @@ pub async fn handle_admin_upgrade(
         .or_else(|| resolve_admin_url(&state, &req));
 
     match auth_result {
-        Ok(permission_level) => {
+        Ok((permission_level, caller)) => {
             info!(
                 "Admin WebSocket upgrade request (origin: {:?}, permission: {}, affinity: {})",
                 origin,
@@ -78,6 +78,7 @@ pub async fn handle_admin_upgrade(
                                         admin_url,
                                         origin,
                                         permission_level,
+                                        caller,
                                     )
                                     .await
                                     {
@@ -91,6 +92,7 @@ pub async fn handle_admin_upgrade(
                                         p,
                                         origin,
                                         permission_level,
+                                        caller,
                                     )
                                     .await
                                     {
@@ -103,6 +105,7 @@ pub async fn handle_admin_upgrade(
                                     &conductor_url,
                                     origin,
                                     permission_level,
+                                    caller,
                                 )
                                 .await
                                 {
@@ -507,20 +510,41 @@ fn native_local_first_operator(state: &AppState, peer_is_loopback: bool) -> bool
         && state.args.configured_jwt_secret().is_none()
 }
 
-/// Authentication sources (in order of precedence):
-/// 1. JWT token from query string (?token=...)
-/// 2. JWT token from Authorization header
-/// 3. API key from X-API-Key header
-/// 4. No credential ⇒ [`native_local_first_operator`] or refuse.
+/// Permission level only — see [`extract_caller`] for the full decision.
 fn extract_permission<B>(
     state: &AppState,
     req: &Request<B>,
     peer_is_loopback: bool,
 ) -> Result<PermissionLevel, String> {
+    extract_caller(state, req, peer_is_loopback).map(|(level, _)| level)
+}
+
+/// The level and identity a verified JWT grants. The agent key is decoded to its
+/// raw 39 bytes; an undecodable claim leaves `agent` unset (scoped ops fail closed).
+fn caller_from_claims(claims: &Claims) -> (PermissionLevel, AdminCaller) {
+    (
+        claims.permission_level,
+        AdminCaller {
+            agent: crate::conductor::agent_key::decode_key_bytes(&claims.agent_pub_key),
+            installed_app_id: claims.installed_app_id.clone(),
+        },
+    )
+}
+
+/// Authentication sources (in order of precedence):
+/// 1. JWT token from query string (?token=...)
+/// 2. JWT token from Authorization header
+/// 3. API key from X-API-Key header
+/// 4. No credential ⇒ [`native_local_first_operator`] or refuse.
+fn extract_caller<B>(
+    state: &AppState,
+    req: &Request<B>,
+    peer_is_loopback: bool,
+) -> Result<(PermissionLevel, AdminCaller), String> {
     // Try JWT token from query string
     if let Some(token) = extract_token_from_query(req.uri().query()) {
-        if let Some(claims) = validate_jwt(state, &token) {
-            return Ok(claims);
+        if let Some(claims) = validate_jwt_claims(state, &token) {
+            return Ok(caller_from_claims(&claims));
         }
     }
 
@@ -531,8 +555,8 @@ fn extract_permission<B>(
         .and_then(|v| v.to_str().ok());
 
     if let Some(token) = extract_token_from_header(auth_header) {
-        if let Some(claims) = validate_jwt(state, token) {
-            return Ok(claims);
+        if let Some(claims) = validate_jwt_claims(state, token) {
+            return Ok(caller_from_claims(&claims));
         }
     }
 
@@ -553,14 +577,15 @@ fn extract_permission<B>(
     // either one alone leaves the ladder open through the other.
     if api_key.is_some() {
         if let Some(permission) = api_validator.validate(api_key) {
-            return Ok(permission);
+            // An API key binds no agent or app: scoped operations fail closed.
+            return Ok((permission, AdminCaller::default()));
         }
     }
 
     // No credential presented.
     if native_local_first_operator(state, peer_is_loopback) {
         info!("Native local-first operator (loopback, pre-coordination, no declared JWT secret): granting admin access to this box's own conductor");
-        return Ok(PermissionLevel::Admin);
+        return Ok((PermissionLevel::Admin, AdminCaller::default()));
     }
 
     Err("Authentication required. Use POST /hc/connect.".to_string())
@@ -580,7 +605,7 @@ fn extract_token_from_query(query: Option<&str>) -> Option<String> {
 }
 
 /// Validate JWT token and return permission level
-fn validate_jwt(state: &AppState, token: &str) -> Option<PermissionLevel> {
+fn validate_jwt_claims(state: &AppState, token: &str) -> Option<Claims> {
     let jwt = JwtValidator::from_config(
         state.args.configured_jwt_secret(),
         state.args.jwt_expiry_seconds,
@@ -589,7 +614,7 @@ fn validate_jwt(state: &AppState, token: &str) -> Option<PermissionLevel> {
 
     let result = jwt.verify_token(token);
     if result.valid {
-        result.claims.map(|c| c.permission_level)
+        result.claims
     } else {
         None
     }

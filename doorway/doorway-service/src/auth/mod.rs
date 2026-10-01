@@ -25,4 +25,6 @@ pub use operator::{
     WILDCARD_CAPABILITY,
 };
 pub use password::{hash_password, verify_password};
-pub use permissions::{get_required_permission, is_operation_allowed, PermissionLevel};
+pub use permissions::{
+    get_required_permission, is_operation_allowed, AdminCaller, PermissionLevel,
+};

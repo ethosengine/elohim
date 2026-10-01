@@ -30,6 +30,19 @@ impl fmt::Display for PermissionLevel {
     }
 }
 
+/// Who is on the other end of an admin socket, beyond their permission level.
+///
+/// Below `Admin`, cell- and app-bearing admin operations are scoped to the
+/// caller's own cell/app. Both fields are `None` for a caller whose credential
+/// does not bind an identity (API key, no credential); those callers fail closed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AdminCaller {
+    /// Raw 39-byte agent public key the credential is bound to.
+    pub agent: Option<Vec<u8>>,
+    /// Installed app id the credential is bound to.
+    pub installed_app_id: Option<String>,
+}
+
 /// Get the required permission level for a Holochain admin operation.
 /// Returns None for unknown operations (which should be blocked).
 pub fn get_required_permission(operation: &str) -> Option<PermissionLevel> {
