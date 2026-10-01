@@ -47,6 +47,8 @@ export interface ConductorOptions {
   zome?: string;
   /** Existing storage closed-chain-fence credentials, indexed by exact cell id. */
   signingCredentialsDir?: string;
+  /** Existing identity-role custody used for read-only binding verification. */
+  identitySigningCredentialsDir?: string;
   /** Refuse accidental connection to a different device or DNA. */
   expectedAgent?: string;
   expectedDna?: string;
@@ -56,6 +58,8 @@ export interface Conductor {
   /** The cell's agent key, base64 (`uhCAk…`). */
   agent: string;
   dna: string;
+  /** Authenticated calling key; distinct from the executing cell agent. */
+  requester?: string;
   /** Call a `content_store` fn on the role's cell as this node's agent. */
   call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T>;
   close(): Promise<void>;
@@ -234,6 +238,7 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
     return {
       agent,
       dna,
+      requester: encodeHashToBase64(signingCredentials.signingKey),
       async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
         return callZomeWithCredentials<T>(
           connected,
@@ -305,6 +310,7 @@ async function connectHosted(o: ConductorOptions, dir: string): Promise<Conducto
   return {
     agent,
     dna,
+    requester: encodeHashToBase64(signingCredentials.signingKey),
     async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
       return callZomeWithCredentials<T>(
         app,

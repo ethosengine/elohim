@@ -16,6 +16,7 @@ pub mod bootstrap_steward;
 pub mod commitment_record;
 pub mod commitments;
 pub mod device_enrollment;
+mod invocation;
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties,

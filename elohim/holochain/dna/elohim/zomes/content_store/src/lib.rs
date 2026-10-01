@@ -4183,6 +4183,7 @@ fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()
 }
 
 mod head_delegation;
+mod invocation;
 pub use head_delegation::*;
 
 /// Read-only authorization before a publisher writes blobs or changes its projection.
@@ -4220,13 +4221,55 @@ pub fn preflight_head_publication(
         )));
     }
     let root_author = root.as_ref().map(|r| r.action().author().clone());
-    if let Some(head) = input.accepted_head.as_ref() {
+    let witnessed_at = if let Some(head) = &input.accepted_head {
         let grant = input.delegation.as_ref().ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
                 "accepted-head recovery requires signed acceptance".into()
             ))
         })?;
         verify_accepted_publication(grant, &agent, &input.id, head)?;
+        grant.acceptance.as_ref().map(|receipt| receipt.accepted_at)
+    } else {
+        None
+    };
+    if let Some(root) = root.as_ref() {
+        let mandate = invocation::authorize_at(
+            "preflight_head_publication",
+            &input.id,
+            root.action_address(),
+            &agent,
+            None,
+            witnessed_at,
+        )?;
+        if let (Some(m), Some(grant)) = (mandate.as_ref(), input.delegation.as_ref()) {
+            if input.accepted_head.is_some() {
+                head_delegation::require_mandate_binding(m, grant)?;
+            }
+        }
+        if input.accepted_head.is_none() {
+            if let Some(m) = mandate {
+                let binding = holo_hash::ActionHashB64::from_b64_str(
+                    m.binding.as_deref().unwrap_or_default(),
+                )
+                .map(ActionHash::from)
+                .map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest(
+                        "invalid invocation device binding".into()
+                    ))
+                })?;
+                invocation::verify_device(binding, agent.clone())?;
+            }
+        }
+    } else {
+        let me = agent_info()?.agent_initial_pubkey;
+        let caller = call_info()?;
+        if !matches!(caller.cap_grant, CapGrant::ChainAuthor(ref owner) if owner == &me && caller.provenance == me)
+        {
+            return Err(wasm_error!(WasmErrorInner::Guest("publication preflight: scoped invocation requires an independently resolved root — PENDING".into())));
+        }
+    }
+    if input.accepted_head.is_some() {
+        // Exact historical authorization was independently verified above.
     } else if let Some(author) = root_author.as_ref() {
         authorize_author_or_delegate(
             &agent,
@@ -6145,6 +6188,56 @@ pub fn declare_canonical_content_head(
 pub fn declare_earned_canonical_head(
     input: DeclareCanonicalHeadInput,
 ) -> ExternResult<ContentHeadOutput> {
+    // The invocation key is distinct from the cell author. A function-scoped
+    // credential must not exercise all roots this cell happens to have authored.
+    let identity_root =
+        canonical_identity_root(&input.id, GetStrategy::Network)?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "earned publication root unavailable — PENDING".into()
+            ))
+        })?;
+    let witnessed_at =
+        if let Some(grant) = input.delegation.as_ref().filter(|g| g.acceptance.is_some()) {
+            verify_accepted_publication(
+                grant,
+                &agent_info()?.agent_initial_pubkey,
+                &input.id,
+                &ActionHash::from(input.head_action_hash.clone()),
+            )?;
+            grant.acceptance.as_ref().map(|receipt| receipt.accepted_at)
+        } else {
+            None
+        };
+    let mandate = invocation::authorize_at(
+        "declare_earned_canonical_head",
+        &input.id,
+        identity_root.action_address(),
+        &agent_info()?.agent_initial_pubkey,
+        None,
+        witnessed_at,
+    )?;
+    if let (Some(m), Some(grant)) = (mandate.as_ref(), input.delegation.as_ref()) {
+        if grant.acceptance.is_some() {
+            head_delegation::require_mandate_binding(m, grant)?;
+        }
+    }
+    if input
+        .delegation
+        .as_ref()
+        .is_none_or(|g| g.acceptance.is_none())
+    {
+        if let Some(m) = mandate {
+            let binding =
+                holo_hash::ActionHashB64::from_b64_str(m.binding.as_deref().unwrap_or_default())
+                    .map(ActionHash::from)
+                    .map_err(|_| {
+                        wasm_error!(WasmErrorInner::Guest(
+                            "invalid invocation device binding".into()
+                        ))
+                    })?;
+            invocation::verify_device(binding, agent_info()?.agent_initial_pubkey)?;
+        }
+    }
     // EARNED-AUTHORITY GATE (Tier-1 progenitor stand-in for Plan C5), widened
     // for station 3: the id's ROOT AUTHOR, or a device carrying the root
     // author's signed delegation, may also declare the earned head — the
@@ -6157,12 +6250,7 @@ pub fn declare_earned_canonical_head(
     let root_author = gather_content_chain(&input.id, GetStrategy::Network)?.map(|(a, _)| a);
     let recovered =
         if let Some(grant) = input.delegation.as_ref().filter(|g| g.acceptance.is_some()) {
-            verify_accepted_publication(
-                grant,
-                &me,
-                &input.id,
-                &ActionHash::from(input.head_action_hash.clone()),
-            )?;
+            // Verified above before using its native witness for invocation recovery.
             Some(Some(grant.clone()))
         } else {
             None

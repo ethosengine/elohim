@@ -26,6 +26,7 @@ hc-rna = { path = "../../../../rna/rust" }
 lamad-types = { path = "../../../../../sdk/domains/lamad/types" }
 shefa-types = { path = "../../../../../sdk/domains/shefa/types" }
 avodah-types = { path = "../../../../../sdk/domains/avodah/types" }
+qahal-types = { path = "../../../../../sdk/domains/qahal/types" }
 gate-client-zome = { version = "0.1.0", path = "../../../../../elohim-agent/gate-client-zome" }
 
 [dev-dependencies]

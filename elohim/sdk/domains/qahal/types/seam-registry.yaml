@@ -1,0 +1,71 @@
+seamRegistryVersion: 1
+crate: qahal-types
+crateRoot: elohim/sdk/domains/qahal/types
+seamLocus: Pure invocation mandate containment; native adapters supply authenticated context.
+decisionPoints:
+- name: check
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/invocation_mandate.rs
+    modulePath: invocation_mandate::InvocationMandate::check
+  summary: Pure exact-bounds predicate shared by peer native invocation adapters; it does not infer human
+    standing or validate host evidence.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Pure containment is separate from the native host adapters; supplying this predicate
+      arbitrary context never grants host permission.
+  - id: C1
+    status: n-a
+    justification: No candidate election or canonical move.
+  - id: C2
+    status: n-a
+    justification: No stored authority ordering or head transition.
+  - id: C3
+    status: n-a
+    justification: Stateless predicate, no queue or state-machine liveness.
+  - id: C4
+    status: answered
+    justification: Missing exact payload or subject/binding fails instead of authorizing.
+  - id: C5
+    status: partial
+    justification: Checks containment only; authenticated evidence must be supplied by the native adapter.
+  - id: C6a
+    status: answered
+    justification: At most 128 subjects and 8 operations; no network IO or recursion.
+  - id: C6b
+    status: answered
+    justification: Deterministic pure evaluation has no side effects.
+  - id: C7
+    status: n-a
+    justification: No advertised runtime capacity or serving surface.
+  - id: C8
+    status: unbound
+    justification: Returns reason strings; native counters remain unwired.
+  - id: C9
+    status: answered
+    justification: Issuer, requester and DNA must match exactly; no cross-network or key-equivalence inference.
+  - id: C10
+    status: partial
+    justification: Unknown fields deny at serde decoding; no wire-version migration proof yet.
+  - id: C11
+    status: n-a
+    justification: No asynchronous work or external traffic admission; adapter caps input bytes before
+      decoding.
+  - id: C12
+    status: answered
+    justification: Exact operation, root, delegate, expiry ceiling and identity payload are pinned by
+      refusal regressions.
+  - id: C13
+    status: n-a
+    justification: No human agency tier is added.
+  - id: C14
+    status: n-a
+    justification: Pure errors do not create witnessed state; the invoking adapter owns disposition.
+  contractTests:
+  - path: elohim/sdk/domains/qahal/types/src/invocation_mandate.rs
+    testName: stolen_invocation_cannot_expand_payload_or_context
+    kind: unit
+  - path: elohim/sdk/domains/qahal/types/src/invocation_mandate.rs
+    testName: enrollment_does_not_implicitly_authorize_another_payload
+    kind: unit

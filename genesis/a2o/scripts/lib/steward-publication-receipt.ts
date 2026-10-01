@@ -22,6 +22,13 @@ export interface PublicationReceipt {
   storage: string;
   head: string;
   authoredAt: string;
+  execution?: {
+    requester: string;
+    executor: string;
+    humanId: string;
+    humanAction: string;
+    binding: string;
+  };
   declaredAt?: string;
   /** Portable evidence only; native verification is mandatory on recovery. */
   acceptedDelegation?: HeadDelegationDocument;

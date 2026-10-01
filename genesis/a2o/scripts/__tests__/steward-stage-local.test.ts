@@ -101,6 +101,7 @@ function fixture() {
     return {
       agent: options.expectedAgent ?? hash(1),
       dna: hash(2),
+      requester: hash(7),
       close: async () => {
         await Promise.resolve();
       },
@@ -120,6 +121,8 @@ function fixture() {
             truncated: false,
           } as T;
         if (name === 'resolve_content_head_local') return null as T;
+        if (name === 'verify_device_binding' || name === 'verify_historical_device_binding')
+          return { human_id: 'matthew', human_action_hash: bytes(10) } as T;
         if (name === 'get_accepted_delegated_head') return (nativeAcceptance ?? null) as T;
         if (name === 'accept_delegated_head') {
           assert.deepEqual(
@@ -296,7 +299,9 @@ void test('accepted exact head survives interrupted declaration then expiry with
   assert.equal(receipt.declaredAt, undefined);
   assert.equal(f.patches(), 1);
   f.expireAndDisconnect();
-  f.refuse(undefined);
+  // Live withdrawal blocks new exercise, but native historical checks recover
+  // the previously accepted exact version.
+  f.refuse('verify_device_binding');
   const priorDials = f.dials.length;
   const acceptances = f.calls.filter(x => x === 'accept_delegated_head').length;
   assert.equal(await runStewardPublish(f.argv, f.connect), 0);
@@ -307,7 +312,7 @@ void test('accepted exact head survives interrupted declaration then expiry with
   assert.ok(f.receipt().declaredAt);
 });
 
-for (const refusal of ['verify_device_binding', 'preflight_head_publication']) {
+for (const refusal of ['verify_historical_device_binding', 'preflight_head_publication']) {
   void test(`saved acceptance still requires native ${refusal}`, async t => {
     const f = fixture();
     t.after(f.cleanup);

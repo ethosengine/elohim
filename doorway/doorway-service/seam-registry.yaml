@@ -5175,3 +5175,80 @@ decisionPoints:
       - path: doorway/doorway-service/src/server/http.rs
         testName: name_routing_a_name_this_doorway_does_not_stand_for_is_421_naming_members
         kind: integration
+
+  - name: handle_hc_connect
+    kind: verdict-fn
+    sourceLocation:
+      file: src/conductor/chaperone.rs
+      modulePath: chaperone::handle_hc_connect
+    summary: Explicit reuseCredentials refresh resolves the JWT-bound existing peer and transport token
+      while skipping all native capability issuance. Native runtime remains the authority boundary.
+    concernIds:
+    - id: C0
+      status: partial
+      justification: The selected native CapGrant is private invocation authority; public root grants and
+        existing Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+    - id: C1
+      status: n-a
+      justification: This boundary does not elect a canonical head or nominate candidates.
+    - id: C2
+      status: partial
+      justification: Exact historical witnesses retain their original time; complete device-controller history
+        is still an admission prerequisite.
+    - id: C3
+      status: partial
+      justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending
+        and needs an explicit controller witness.
+    - id: C4
+      status: partial
+      justification: Missing fetched records refuse; incomplete lifecycle discovery cannot yet establish
+        absence of withdrawal.
+    - id: C5
+      status: partial
+      justification: Native issuer, provenance, DNA and exact subject are independently checked; an end-to-end
+        remote invocation proof is still owed.
+    - id: C6a
+      status: partial
+      justification: Private tags are capped at 32768 bytes, 128 subjects and 8 operations; controller ancestry
+        is capped at 32 and lifecycle at 64; host network waits remain conductor-bounded.
+    - id: C6b
+      status: partial
+      justification: Exact accepted versions reuse their native witness; credential issuance reserves durable
+        custody but a lost admin response still requires reconciliation.
+    - id: C7
+      status: partial
+      justification: No collective admission or portable network authority is advertised; household and
+        deployed publishing proofs are outstanding.
+    - id: C8
+      status: unbound
+      justification: Native refusals identify the reason but no labeled decision counters are wired.
+    - id: C9
+      status: partial
+      justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct;
+        complete historical controller/key-rotation evidence is owed.
+    - id: C10
+      status: partial
+      justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3
+        signed bytes. Native compatibility proof remains owed.
+    - id: C11
+      status: partial
+      justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable
+        host waits and needs load evidence.
+    - id: C12
+      status: partial
+      justification: Selected Assigned/Listed CapGrant must match exact payload bounds and native device
+        evidence; lifecycle-index absence is not a complete non-withdrawal proof.
+    - id: C13
+      status: n-a
+      justification: This mechanism conveys exact publication or identity ceremony bounds, without adding
+        a human agency tier or collective admission policy.
+    - id: C14
+      status: partial
+      justification: Invocation provenance and original acceptance are retained; private interrupted custody
+        records require explicit reconciliation rather than silent reissue.
+    contractTests:
+    - path: doorway/doorway-service/src/conductor/chaperone.rs
+      testName: transport_refresh_is_explicit_and_old_connect_requests_keep_their_contract
+      kind: unit
+    gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication
+      and independent receiver verification remain unproven; unit and WASM checks are not those proofs.

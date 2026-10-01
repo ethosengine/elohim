@@ -10,11 +10,14 @@ export interface HeadDelegationDocument {
   dnaHash: string;
   /** Native grant-issuance action; absent only on historical v2 receipts. */
   issuanceActionHash?: string;
+  deviceBinding?: string;
+  exercise?: { requester: string; executor: string; policy: string };
   signature: string;
   acceptance?: {
     headActionHash: string;
     witnessActionHash: string;
     acceptedAt: number;
+    deviceWitnessActionHash?: string;
     signature: string;
   };
 }
@@ -28,12 +31,15 @@ export interface HeadDelegationWire {
     root_action_hash: Uint8Array;
     dna_hash: Uint8Array;
     issuance_action_hash?: Uint8Array | null;
+    device_binding?: Uint8Array | null;
+    exercise?: { requester: Uint8Array; executor: Uint8Array; policy: string } | null;
   };
   signature: Uint8Array;
   acceptance: {
     head_action_hash: Uint8Array;
     witness_action_hash: Uint8Array;
     accepted_at: number;
+    device_witness_action_hash?: Uint8Array | null;
     signature: Uint8Array;
   } | null;
 }
@@ -51,11 +57,30 @@ export function delegationDocument(grant: HeadDelegationWire): HeadDelegationDoc
       ? { issuanceActionHash: encodeHashToBase64(grant.payload.issuance_action_hash) }
       : {}),
     signature: Buffer.from(grant.signature).toString('base64'),
+    ...(grant.payload.device_binding
+      ? { deviceBinding: encodeHashToBase64(grant.payload.device_binding) }
+      : {}),
+    ...(grant.payload.exercise
+      ? {
+          exercise: {
+            requester: encodeHashToBase64(grant.payload.exercise.requester),
+            executor: encodeHashToBase64(grant.payload.exercise.executor),
+            policy: grant.payload.exercise.policy,
+          },
+        }
+      : {}),
     acceptance: grant.acceptance
       ? {
           headActionHash: encodeHashToBase64(grant.acceptance.head_action_hash),
           witnessActionHash: encodeHashToBase64(grant.acceptance.witness_action_hash),
           acceptedAt: grant.acceptance.accepted_at,
+          ...(grant.acceptance.device_witness_action_hash
+            ? {
+                deviceWitnessActionHash: encodeHashToBase64(
+                  grant.acceptance.device_witness_action_hash
+                ),
+              }
+            : {}),
           signature: Buffer.from(grant.acceptance.signature).toString('base64'),
         }
       : undefined,
@@ -84,6 +109,16 @@ export function delegationWire(grant: HeadDelegationDocument): HeadDelegationWir
       ...(grant.issuanceActionHash
         ? { issuance_action_hash: decodeHashFromBase64(grant.issuanceActionHash) }
         : {}),
+      ...(grant.deviceBinding ? { device_binding: decodeHashFromBase64(grant.deviceBinding) } : {}),
+      ...(grant.exercise
+        ? {
+            exercise: {
+              requester: decodeHashFromBase64(grant.exercise.requester),
+              executor: decodeHashFromBase64(grant.exercise.executor),
+              policy: grant.exercise.policy,
+            },
+          }
+        : {}),
     },
     signature: signature(grant.signature),
     acceptance: grant.acceptance
@@ -91,6 +126,13 @@ export function delegationWire(grant: HeadDelegationDocument): HeadDelegationWir
           head_action_hash: decodeHashFromBase64(grant.acceptance.headActionHash),
           witness_action_hash: decodeHashFromBase64(grant.acceptance.witnessActionHash),
           accepted_at: grant.acceptance.acceptedAt,
+          ...(grant.acceptance.deviceWitnessActionHash
+            ? {
+                device_witness_action_hash: decodeHashFromBase64(
+                  grant.acceptance.deviceWitnessActionHash
+                ),
+              }
+            : {}),
           signature: signature(grant.acceptance.signature),
         }
       : null,

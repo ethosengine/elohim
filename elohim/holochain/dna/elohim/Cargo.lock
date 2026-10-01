@@ -140,6 +140,7 @@ dependencies = [
  "hdk",
  "holochain_serialized_bytes",
  "lamad-types",
+ "qahal-types",
  "rmp-serde",
  "serde",
  "serde_bytes",
@@ -812,6 +813,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "qahal-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
 ]
 
 [[package]]

@@ -25,6 +25,7 @@
  *              publication for the seed hash, body and exact head (repeatable)
  *   --binding  verified additive device enrollment; never an administration grant
  *   --delegations  JSON map: content id -> root-author signed, root/DNA-scoped grant
+ *   --device-witnesses    Explicit controller witnesses: id -> {head, witness}; never minted by publish.
  *   --grantor-connections  JSON map: root author -> existing conductor credentials
  *   --stage-local          Author locally and save an exact-head pending receipt; no grantor/receiver connection.
  *   --native-receivers     JSON map: receiver name -> existing conductor credentials;
@@ -114,7 +115,10 @@ interface Options {
   appWs: string;
   appId: string;
   role: string;
+  gatewayAuth?: ConductorOptions['gatewayAuth'];
+  hosted?: ConductorOptions['hosted'];
   signingCredentialsDir?: string;
+  identitySigningCredentialsDir?: string;
   expectedAgent?: string;
   expectedDna?: string;
   receiptDir: string;
@@ -122,6 +126,7 @@ interface Options {
   delegationsFile?: string;
   canonicalRootsFile?: string;
   grantorsFile?: string;
+  deviceWitnessesFile?: string;
   nativeReceiversFile?: string;
   stageLocal: boolean;
   dryRun: boolean;
@@ -136,7 +141,7 @@ function usage(msg?: string): never {
   console.error(
     'usage: steward-publish.ts <id>… [--manifest FILE] [--stage-local] [--dry-run] [--redeclare] [--closure] ' +
       '[--await-peer URL]… [--await-timeout S] [--storage URL] [--admin-ws URL] ' +
-      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--receipt-dir DIR] [--binding ACTION] [--canonical-roots FILE] [--delegations FILE] [--grantor-connections FILE] [--native-receivers FILE]'
+      '[--app-ws URL] [--app-id ID] [--role ROLE] [--data-dir DIR] [--signing-credentials-dir DIR] [--device-agent KEY] [--dna-hash HASH] [--receipt-dir DIR] [--binding ACTION] [--canonical-roots FILE] [--delegations FILE] [--grantor-connections FILE] [--native-receivers FILE] [--device-witnesses FILE]'
   );
   process.exit(2);
 }
@@ -182,6 +187,27 @@ function parseArgs(argv: string[]): Options {
       return argv[++i];
     };
     switch (a) {
+      case '--connection': {
+        const saved = JSON.parse(readFileSync(val(), 'utf8')) as ConductorOptions & {
+          connection?: ConductorOptions;
+        };
+        const profile = saved.connection ?? saved;
+        for (const key of [
+          'adminWs',
+          'appWs',
+          'appId',
+          'role',
+          'gatewayAuth',
+          'hosted',
+          'signingCredentialsDir',
+          'identitySigningCredentialsDir',
+          'expectedAgent',
+          'expectedDna',
+        ] as const) {
+          if (profile[key] !== undefined) Object.assign(o, { [key]: profile[key] });
+        }
+        break;
+      }
       case '--manifest':
         o.ids.push(...readManifest(val()));
         break;
@@ -220,6 +246,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--delegations':
         o.delegationsFile = resolve(val());
+        break;
+      case '--device-witnesses':
+        o.deviceWitnessesFile = resolve(val());
         break;
       case '--grantor-connections':
         o.grantorsFile = resolve(val());
@@ -394,6 +423,18 @@ async function ensureBlob(storage: string, blob: BlobSource): Promise<string> {
 // ─── conductor ──────────────────────────────────────────────────────────────
 
 /** Sign `head` as the EARNED canonical head of `id` with the steward's agent. */
+function publicationDeviceWitness(o: Options, id: string, head: string): Uint8Array | null {
+  if (!o.deviceWitnessesFile) return null;
+  const witnesses = JSON.parse(readFileSync(o.deviceWitnessesFile, 'utf8')) as Record<
+    string,
+    { head: string; witness: string }
+  >;
+  const proof = witnesses[id];
+  if (proof?.head !== head)
+    throw new Error('controller publication witness missing or names another version');
+  return decodeHashFromBase64(proof.witness);
+}
+
 async function declareEarned(
   c: Conductor,
   id: string,
@@ -460,20 +501,40 @@ function norm(v: string | null | undefined): string | null {
 async function verifyBinding(
   o: Options,
   c: Conductor,
-  connect: typeof connectConductor
-): Promise<void> {
+  connect: typeof connectConductor,
+  accepted?: HeadDelegationDocument
+): Promise<{ human_id: string; human_action_hash: Uint8Array }> {
   const identity = await connect({
     ...o,
     role: 'mishpat',
     zome: 'mishpat',
     expectedDna: undefined,
+    signingCredentialsDir: o.identitySigningCredentialsDir ?? o.signingCredentialsDir,
   });
   try {
-    await identity.call('verify_device_binding', {
+    const device = {
       binding: decodeHashFromBase64(o.binding!),
       expected_device: decodeHashFromBase64(c.agent),
       expected_content_dna: decodeHashFromBase64(c.dna),
-    });
+    };
+    if (accepted?.acceptance?.deviceWitnessActionHash) {
+      const proof = await identity.call<{
+        device: { human_id: string; human_action_hash: Uint8Array };
+      }>('verify_device_publication', {
+        publication: {
+          device,
+          content_root: decodeHashFromBase64(accepted.rootActionHash),
+          content_head: decodeHashFromBase64(accepted.acceptance.headActionHash),
+        },
+        witness: decodeHashFromBase64(accepted.acceptance.deviceWitnessActionHash),
+      });
+      return proof.device;
+    }
+    const witnessedAt = accepted?.acceptance?.acceptedAt;
+    return await identity.call(
+      witnessedAt === undefined ? 'verify_device_binding' : 'verify_historical_device_binding',
+      witnessedAt === undefined ? device : { device, witnessed_at: witnessedAt }
+    );
   } finally {
     await identity.close();
   }
@@ -489,7 +550,8 @@ async function publishOne(
   const { input, plan } = p;
   const id = input.id;
   const c = await conductor();
-  await verifyBinding(o, c, connect);
+  const identity = await verifyBinding(o, c, connect, p.pending?.acceptedDelegation);
+  if (!c.requester) throw new Error('authenticated invocation requester missing from connection');
   let head = p.pending?.head ?? p.row?.dhtAnchorHash ?? '';
   if (!p.pending && (plan.action === 'create' || plan.action === 'update')) {
     if (p.blob) await ensureBlob(o.storage, p.blob);
@@ -529,6 +591,13 @@ async function publishOne(
     storage: o.storage,
     head,
     authoredAt: new Date().toISOString(),
+    execution: {
+      requester: c.requester,
+      executor: c.agent,
+      humanId: identity.human_id,
+      humanAction: encodeHashToBase64(identity.human_action_hash),
+      binding: o.binding!,
+    },
     delegation: p.delegation ? delegationDocument(p.delegation) : undefined,
   };
   savePublication(o.receiptDir, receipt);
@@ -551,6 +620,7 @@ async function publishOne(
               id,
               head_action_hash: decodeHashFromBase64(head),
               delegation: p.delegation,
+              device_witness_action_hash: publicationDeviceWitness(o, id, head),
             },
             remaining
           );
@@ -922,7 +992,6 @@ export async function runStewardPublish(
       throw new Error(
         'publication preflight: storage/conductor agent or DNA pairing is not verified'
       );
-    await verifyBinding(o, c, connect);
     const grants = o.delegationsFile
       ? (JSON.parse(readFileSync(o.delegationsFile, 'utf8')) as Record<
           string,
@@ -1003,6 +1072,11 @@ export async function runStewardPublish(
                       id: p.input.id,
                       head_action_hash: decodeHashFromBase64(p.pending.head),
                       delegation: p.delegation,
+                      device_witness_action_hash: publicationDeviceWitness(
+                        o,
+                        p.input.id,
+                        p.pending.head
+                      ),
                     }
                   );
                   if (prior) {
@@ -1029,6 +1103,7 @@ export async function runStewardPublish(
         accepted_head: p.pending?.acceptedDelegation ? decodeHashFromBase64(p.pending.head) : null,
         delegation: p.delegation ?? null,
       });
+      await verifyBinding(o, c, connect, p.pending?.acceptedDelegation);
     }
   }
   let problems = 0;

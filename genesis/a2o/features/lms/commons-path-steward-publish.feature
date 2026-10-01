@@ -1,4 +1,4 @@
-@e2e @lamad @act:i @wip
+@e2e @lamad @act:i @wip @concern:commons-path-steward-publish
 Feature: A steward publishes a commons learning path from his own peer, and seeding never overrides what he signed
   Matthew is the steward of "Foundations for Christian Technology": the person
   who holds the authority to publish updates to it. Every piece of content
@@ -24,7 +24,7 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   The course's items are written as files in the repository. Matthew publishes
   them from his own peer, his own node on the network, by running the
   steward-publish command there: it reads those files and writes them to his
-  peer. No build pipeline is involved. Matthew's agent (the identity his node
+  peer. No build pipeline is involved. Matthew's publishing peer's agent (the specific key his node
   signs with) signs each item and declares it the version every peer should
   serve. That signed version is the item's head: each peer records the head it
   serves and whose agent signed it, and a different head means a different
@@ -53,6 +53,30 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   through which a browser, or this test, reaches the peers. The feature is
   tagged work in progress until its steps are wired to the running household.
 
+  Matthew can recognize an independently keyed workspace peer as another device
+  of his existing identity. Matthew is that identity's controller: he can affirm
+  or withdraw the device relationship without replacing the person. A signing
+  key requests work; the peer that executes it signs under its own agent key.
+  These keys and Matthew's continuing identity are distinct.
+
+  Each course item's root is its original signed creation record. Its root
+  author is the peer that signed that record; the author peer must grant a
+  device permission for that exact item and accept the exact updated version.
+  A credential lists those original records, the device, the permitted actions
+  and this network. Calling a function alone confers no wider permission.
+  The first four scenarios use Matthew's original publishing peer and its exact
+  agent key. The workspace scenarios use the workspace peer's different key;
+  recognizing it as Matthew's device does not make those keys interchangeable.
+  An acceptance records the version and the original time its author approved it.
+
+  Complete controller history means a signed witness for the exact update plus
+  every consecutive signed record back to Matthew's identity-authority checkpoint.
+  Peers verify the authors, predecessor hashes and ordering and inspect the records
+  for withdrawal or a changed controller policy. A missing record or exhausted
+  verification budget leaves the update pending; a discovery-link miss is no proof
+  that withdrawal never happened. The scenarios below remain work in progress
+  until those native witnesses and household checks are wired.
+
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And the learning path "foundations-christian-technology" is declared at commons reach
@@ -62,7 +86,7 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   Scenario: Matthew's update reaches another peer without the pipeline
     Given Matthew has reworked "foundations-christian-technology" into five movements
     When Matthew runs steward-publish for the reworked path and its items
-    Then Jessica's peer serves the path's head signed by Matthew's agent
+    Then Jessica's peer serves the path's head signed by Matthew's publishing peer's agent
     And the path's movements on Jessica's peer are "Waking Up", "Turning", "Reordering Loves", "Rebuilding Common Life" and "Abundant Life & Sending"
     And the lesson of "The Church Dilemma", the first module of "Waking Up", on Jessica's peer links to its anchor scripture, its story, its discussion and its practice
     And the "evolution-of-trust" simulation is still on the path
@@ -72,18 +96,50 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     And nobody has changed the course in the repository since
     When the peers are seeded from the repository
     Then seeding reports every item of the course as already current
-    And every item of the course on Jessica's peer keeps the head Matthew's agent signed
+    And every item of the course on Jessica's peer keeps the head Matthew's publishing peer's agent signed
 
   Scenario: A correction to a signed item is published by its steward, not by seeding
     Given Matthew has run steward-publish for the reworked path and its items
     And a developer then corrects the text of the lesson of "The Church Dilemma" in the repository
     When the peers are seeded from the repository
     Then seeding reports that lesson as stewarded and writes nothing for it
-    And every item of the course on Jessica's peer keeps the head Matthew's agent signed
+    And every item of the course on Jessica's peer keeps the head Matthew's publishing peer's agent signed
     When Matthew runs steward-publish for that lesson
-    Then Jessica's peer serves the corrected text under a new head signed by Matthew's agent
+    Then Jessica's peer serves the corrected text under a new head signed by Matthew's publishing peer's agent
 
   Scenario: steward-publish refuses anything held at intimate reach
     When Matthew runs steward-publish for "love-map-matthew-jessica"
     Then the command refuses before writing anything, naming the love map's intimate reach
     And the love map on every peer keeps its head and its intimate reach
+
+  # Constraint: access to a function does not authorize every root the peer authored.
+  @regression
+  Scenario: Matthew's publishing credential cannot authorize another course
+    Given Matthew recognizes his workspace peer as a device of his existing identity
+    And Matthew authorizes its signing key for the exact roots of "foundations-christian-technology"
+    When the signing key asks the author peer to grant publishing authority for a different course
+    Then the author peer refuses before signing a grant or recording acceptance
+    And the other course keeps its head
+
+  # Constraint: later withdrawal stops new exercise while preserving exact accepted history.
+  @regression
+  Scenario: An interrupted accepted update remains recoverable after device withdrawal
+    Given Matthew's workspace peer authored a course update
+    And its root author accepted that exact version before the device was withdrawn
+    And publication stopped before that version was declared
+    When Matthew withdraws that device's publishing authority
+    And the workspace peer resumes the interrupted publication
+    Then the workspace peer declares the accepted version under its own agent key
+    And the declaration carries its root author's original acceptance time
+    And an update authored after withdrawal cannot obtain new acceptance
+    And Matthew's identity and his other devices retain their standing
+
+  # Constraint: absent lifecycle links cannot prove that a withdrawal never happened.
+  @regression
+  Scenario: Missing withdrawal history does not become publishing permission
+    Given Matthew withdrew his workspace device before an update was accepted
+    And another peer has the device binding but lacks its withdrawal discovery link
+    And it cannot obtain a required signed record in the controller history
+    When that peer verifies the claimed authorization for the update
+    Then it requires the controller's complete witnessed history for that exact exercise
+    And missing history leaves publication pending

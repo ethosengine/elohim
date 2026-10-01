@@ -150,3 +150,447 @@ decisionPoints:
   - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/commitment_record.rs
     testName: exact_read_requires_commitment_create_type_and_present_entry
     kind: unit
+
+- name: authorize
+  kind: verdict-fn
+  sourceLocation:
+    file: src/invocation.rs
+    modulePath: mishpat::invocation::authorize
+  summary: Identity signing requires an explicit selected native mandate for the exact serialized ceremony input;
+    function access alone is insufficient.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing fetched records refuse; incomplete lifecycle discovery cannot yet establish absence of
+      withdrawal.
+  - id: C5
+    status: partial
+    justification: Native issuer, provenance, DNA and exact subject are independently checked; an end-to-end remote
+      invocation proof is still owed.
+  - id: C6a
+    status: partial
+    justification: Private tags are capped at 32768 bytes, 128 subjects and 8 operations; controller ancestry is
+      capped at 32 and lifecycle at 64; host network waits remain conductor-bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: No collective admission or portable network authority is advertised; household and deployed publishing
+      proofs are outstanding.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Selected Assigned/Listed CapGrant must match exact payload bounds and native device evidence;
+      lifecycle-index absence is not a complete non-withdrawal proof.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: verify_historical_device_binding
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::verify_historical_device_binding
+  summary: Reads the immutable device binding, verifies native ordering, controller ancestry, policy supersession
+    and discovered withdrawals as of an already authenticated witness. Discovery alone does not establish complete
+    history.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing fetched records refuse; incomplete lifecycle discovery cannot yet establish absence of
+      withdrawal.
+  - id: C5
+    status: partial
+    justification: Native issuer, provenance, DNA and exact subject are independently checked; an end-to-end remote
+      invocation proof is still owed.
+  - id: C6a
+    status: partial
+    justification: Private tags are capped at 32768 bytes, 128 subjects and 8 operations; controller ancestry is
+      capped at 32 and lifecycle at 64; host network waits remain conductor-bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: No collective admission or portable network authority is advertised; household and deployed publishing
+      proofs are outstanding.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Selected Assigned/Listed CapGrant must match exact payload bounds and native device evidence;
+      lifecycle-index absence is not a complete non-withdrawal proof.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: authority_at
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::authority_at
+  summary: Evaluates controller policy at native witness time; later successor policies preserve history, earlier
+    successor or competing branch refuses.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing fetched records refuse; incomplete lifecycle discovery cannot yet establish absence of
+      withdrawal.
+  - id: C5
+    status: partial
+    justification: Native issuer, provenance, DNA and exact subject are independently checked; an end-to-end remote
+      invocation proof is still owed.
+  - id: C6a
+    status: partial
+    justification: Private tags are capped at 32768 bytes, 128 subjects and 8 operations; controller ancestry is
+      capped at 32 and lifecycle at 64; host network waits remain conductor-bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: No collective admission or portable network authority is advertised; household and deployed publishing
+      proofs are outstanding.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Selected Assigned/Listed CapGrant must match exact payload bounds and native device evidence;
+      lifecycle-index absence is not a complete non-withdrawal proof.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: verify_device_affirmation
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::verify_device_affirmation
+  summary: Verifies peer-authored device relationship evidence without conferring collective admission or content
+    publishing authority.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing fetched records refuse; incomplete lifecycle discovery cannot yet establish absence of
+      withdrawal.
+  - id: C5
+    status: partial
+    justification: Native issuer, provenance, DNA and exact subject are independently checked; an end-to-end remote
+      invocation proof is still owed.
+  - id: C6a
+    status: partial
+    justification: Private tags are capped at 32768 bytes, 128 subjects and 8 operations; controller ancestry is
+      capped at 32 and lifecycle at 64; host network waits remain conductor-bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: No collective admission or portable network authority is advertised; household and deployed publishing
+      proofs are outstanding.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Selected Assigned/Listed CapGrant must match exact payload bounds and native device evidence;
+      lifecycle-index absence is not a complete non-withdrawal proof.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: witness_device_publication
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::witness_device_publication
+    line: 926
+  summary: Exact publication controller witness, bound to native device/root/head and bounded complete signed self-controller
+    history. Existing Commitment; no DNA hash move or content head.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing witness, action, lifecycle payload or exhausted 4096-action history refuses; no lifecycle
+      link miss authorizes publishing.
+  - id: C5
+    status: partial
+    justification: 'Self-controller bootstrap only: signatures, predecessor hashes, sequence and ordering independently
+      checked; all controller Commitment writes inspected for withdrawal/policy change. Native regression awaits
+      execution.'
+  - id: C6a
+    status: partial
+    justification: 4096 actions maximum from witness to exact bootstrap checkpoint; request lifetime remains conductor
+      bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: Witness binds exact content DNA, device binding, root and head; content verifier checks native
+      head precedes root approval, which precedes controller reconciliation; provisional approval alone is insufficient.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Later withdrawal preserves only this already-witnessed exact exercise; no proof reuse on another
+      head. General controller rotations/quorums are unsupported.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: verify_device_publication
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::verify_device_publication
+    line: 980
+  summary: Exact publication controller witness, bound to native device/root/head and bounded complete signed self-controller
+    history. Existing Commitment; no DNA hash move or content head.
+  concernIds:
+  - id: C0
+    status: partial
+    justification: The selected native CapGrant is private invocation authority; public root grants and existing
+      Mishpat Commitments remain separate evidence. Live ceremony coverage remains owed.
+  - id: C1
+    status: n-a
+    justification: This boundary does not elect a canonical head or nominate candidates.
+  - id: C2
+    status: partial
+    justification: Exact historical witnesses retain their original time; complete device-controller history is
+      still an admission prerequisite.
+  - id: C3
+    status: partial
+    justification: Expired exact acceptance can be recovered; incomplete controller evidence remains pending and
+      needs an explicit controller witness.
+  - id: C4
+    status: partial
+    justification: Missing witness, action, lifecycle payload or exhausted 4096-action history refuses; no lifecycle
+      link miss authorizes publishing.
+  - id: C5
+    status: partial
+    justification: 'Self-controller bootstrap only: signatures, predecessor hashes, sequence and ordering independently
+      checked; all controller Commitment writes inspected for withdrawal/policy change. Native regression awaits
+      execution.'
+  - id: C6a
+    status: partial
+    justification: 4096 actions maximum from witness to exact bootstrap checkpoint; request lifetime remains conductor
+      bounded.
+  - id: C6b
+    status: partial
+    justification: Exact accepted versions reuse their native witness; credential issuance reserves durable custody
+      but a lost admin response still requires reconciliation.
+  - id: C7
+    status: partial
+    justification: Witness binds exact content DNA, device binding, root and head; content verifier checks native
+      head precedes root approval, which precedes controller reconciliation; provisional approval alone is insufficient.
+  - id: C8
+    status: unbound
+    justification: Native refusals identify the reason but no labeled decision counters are wired.
+  - id: C9
+    status: partial
+    justification: Requester signing key, executor, immutable Human, device binding and DNA remain distinct; complete
+      historical controller/key-rotation evidence is owed.
+  - id: C10
+    status: partial
+    justification: Mandate rejects unknown fields; absent optional device/exercise fields preserve v2/v3 signed
+      bytes. Native compatibility proof remains owed.
+  - id: C11
+    status: partial
+    justification: Tag and local traversal counts are bounded; shared conductor admission owns uncancellable host
+      waits and needs load evidence.
+  - id: C12
+    status: partial
+    justification: Later withdrawal preserves only this already-witnessed exact exercise; no proof reuse on another
+      head. General controller rotations/quorums are unsupported.
+  - id: C13
+    status: n-a
+    justification: This mechanism conveys exact publication or identity ceremony bounds, without adding a human
+      agency tier or collective admission policy.
+  - id: C14
+    status: partial
+    justification: Invocation provenance and original acceptance are retained; private interrupted custody records
+      require explicit reconciliation rather than silent reissue.
+  contractTests: null
+  gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
+    receiver verification remain unproven; unit and WASM checks are not those proofs.

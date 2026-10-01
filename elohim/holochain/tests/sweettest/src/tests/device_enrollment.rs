@@ -86,6 +86,56 @@ pub struct VerifiedDevice {
     pub content_dna: DnaHash,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct PublicationGrantPayload {
+    grantor: AgentPubKey,
+    delegate: AgentPubKey,
+    scope: String,
+    valid_until: Timestamp,
+    root_action_hash: ActionHash,
+    dna_hash: DnaHash,
+    issuance_action_hash: Option<ActionHash>,
+    device_binding: Option<ActionHash>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    exercise: Option<PublicationExercise>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PublicationExercise {
+    requester: AgentPubKey,
+    executor: AgentPubKey,
+    policy: String,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PublicationGrant {
+    payload: PublicationGrantPayload,
+    signature: Signature,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    acceptance: Option<PublicationAcceptance>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PublicationAcceptance {
+    head_action_hash: ActionHash,
+    witness_action_hash: ActionHash,
+    accepted_at: Timestamp,
+    signature: Signature,
+    device_witness_action_hash: Option<ActionHash>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct PublicationPreflight {
+    agent: AgentPubKey,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct PublicationApproval {
+    witness_action_hash: ActionHash,
+    accepted_at: Timestamp,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct VerifiedPublication {
+    device: VerifiedDevice,
+    witnessed_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeviceRevocation {
     pub action: String,
     pub binding_kind: String,
@@ -515,9 +565,27 @@ async fn device_content_admin_is_denied(
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn independently_keyed_devices_share_one_human_and_revocation_cannot_be_erased() -> Result<()>
-{
+#[test]
+fn independently_keyed_devices_share_one_human_and_revocation_cannot_be_erased() -> Result<()> {
+    // The multi-cell proof's future exceeds libtest's default 2 MiB stack.
+    // Keep this bound local to the proof, including CI/nextest execution.
+    const PROOF_STACK_BYTES: usize = 32 * 1024 * 1024;
+    std::thread::Builder::new()
+        .name("device-enrollment-proof".into())
+        .stack_size(PROOF_STACK_BYTES)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .thread_stack_size(PROOF_STACK_BYTES)
+                .enable_all()
+                .build()?
+                .block_on(device_enrollment_proof())
+        })?
+        .join()
+        .expect("device enrollment proof thread panicked")
+}
+
+async fn device_enrollment_proof() -> Result<()> {
     let (mut c, operator) = single_agent_conductor().await?;
     let che = SweetAgents::one(c.keystore()).await;
     let second = SweetAgents::one(c.keystore()).await;
@@ -636,6 +704,237 @@ async fn independently_keyed_devices_share_one_human_and_revocation_cannot_be_er
         assert_eq!(mine.unwrap().human["id"], "real-matthew-device-proof");
     }
     eprintln!("identity proof: both keys resolve operator, including prior self-profile");
+    // Exact controller witness must survive later withdrawal, but cannot be
+    // reused for a different head or created by the enrolled device itself.
+    let publication_root: ContentAction = c.call(&cells[0].2.zome("content_store"),
+        "create_content", serde_json::json!({
+            "id":"device-publication-root", "content_type":"concept", "title":"Publication proof",
+            "description":"isolated authorization regression", "content":"", "content_format":"markdown",
+            "reach":"commons", "metadata_json":"{}", "tags":[], "related_node_ids":[],
+        })).await;
+    let requester = cells[2].2.agent_pubkey().clone();
+    let secret = CapSecret::from([42; 64]);
+    let broad_secret = CapSecret::from([43; 64]);
+    let expires = Timestamp::from_micros(Timestamp::now().as_micros() + 300_000_000);
+    let functions: std::collections::HashSet<GrantedFunction> = [
+        "grant_head_delegation",
+        "stage_delegated_head_acceptance",
+        "accept_delegated_head",
+        "get_accepted_delegated_head",
+    ]
+    .into_iter()
+    .map(|f| (ZomeName::from("content_store"), FunctionName::from(f)))
+    .collect();
+    let mandate = serde_json::json!({
+        "issuer":operator.to_string(), "requester":requester.to_string(),
+        "dna":content.to_string(), "delegate":che.to_string(),
+        "subjects":[{"id":"device-publication-root", "root":publication_root.action_hash.to_string()}],
+        "operations":["grant_head_delegation", "stage_delegated_head_acceptance",
+            "accept_delegated_head", "get_accepted_delegated_head"],
+        "valid_until":expires.as_micros(), "binding":che_binding.action_hash.to_string(),
+        "policy":"fct-native-regression", "exact_payload_json":null,
+    });
+    for (tag, capability) in [
+        (
+            format!("elohim:invocation-mandate:v1:{}", mandate),
+            secret.clone(),
+        ),
+        ("signing_key".into(), broad_secret.clone()),
+    ] {
+        let cap_grant = ZomeCallCapGrant {
+            tag,
+            functions: GrantedFunctions::Listed(functions.clone()),
+            access: CapAccess::Assigned {
+                secret: capability,
+                assignees: std::collections::BTreeSet::from([requester.clone()]),
+            },
+        };
+        c.raw_handle()
+            .grant_zome_call_capability(serde_json::from_value(serde_json::json!({
+                "cell_id":cells[0].2.cell_id(), "cap_grant":cap_grant,
+            }))?)
+            .await?;
+    }
+    let grant_input = serde_json::json!({
+        "delegate":che, "scope":"device-publication-root",
+        "root_action_hash":publication_root.action_hash, "valid_until":expires,
+        "device_binding":che_binding.action_hash,
+    });
+    assert!(
+        c.call_from_fallible::<_, PublicationGrant>(
+            &requester,
+            Some(broad_secret),
+            &cells[0].2.zome("content_store"),
+            "grant_head_delegation",
+            grant_input.clone()
+        )
+        .await
+        .is_err(),
+        "function-listed transport permission alone must not issue publication authority"
+    );
+    let mut expanded = grant_input.clone();
+    expanded["scope"] = "another-course".into();
+    assert!(
+        c.call_from_fallible::<_, PublicationGrant>(
+            &requester,
+            Some(secret.clone()),
+            &cells[0].2.zome("content_store"),
+            "grant_head_delegation",
+            expanded
+        )
+        .await
+        .is_err(),
+        "selected mandate must reject an expanded course scope"
+    );
+    let publication_grant: PublicationGrant = c
+        .call_from(
+            &requester,
+            Some(secret.clone()),
+            &cells[0].2.zome("content_store"),
+            "grant_head_delegation",
+            grant_input,
+        )
+        .await;
+    let acceptance_input = serde_json::json!({"id":"device-publication-root",
+        "head_action_hash":publication_root.action_hash, "delegation":publication_grant});
+    let root_approval: PublicationApproval = c
+        .call_from(
+            &requester,
+            Some(secret.clone()),
+            &cells[0].2.zome("content_store"),
+            "stage_delegated_head_acceptance",
+            acceptance_input.clone(),
+        )
+        .await;
+    assert!(
+        c.call_from_fallible::<_, PublicationGrant>(
+            &requester,
+            Some(secret.clone()),
+            &cells[0].2.zome("content_store"),
+            "accept_delegated_head",
+            acceptance_input
+        )
+        .await
+        .is_err(),
+        "provisional approval alone must not complete authorization"
+    );
+    let publication = serde_json::json!({
+        "device": query(&che_binding, &cells[1].1, &content),
+        "content_root": publication_root.action_hash,
+        "content_head": publication_root.action_hash,
+        "root_acceptance": root_approval.witness_action_hash,
+    });
+    assert!(c
+        .call_fallible::<_, Receipt>(
+            &cells[1].1.zome("mishpat"),
+            "witness_device_publication",
+            publication.clone()
+        )
+        .await
+        .is_err());
+    let publication_witness: Receipt = c
+        .call(
+            &cells[0].1.zome("mishpat"),
+            "witness_device_publication",
+            publication.clone(),
+        )
+        .await;
+    let verified_publication: VerifiedPublication = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_publication",
+            serde_json::json!({
+                "publication": publication, "witness": publication_witness.action_hash,
+            }),
+        )
+        .await;
+    assert_eq!(
+        verified_publication.device.human_id,
+        "real-matthew-device-proof"
+    );
+    let accepted_publication: PublicationGrant = c.call_from(&requester, Some(secret.clone()),
+        &cells[0].2.zome("content_store"), "accept_delegated_head",
+        serde_json::json!({"id":"device-publication-root", "head_action_hash":publication_root.action_hash,
+            "delegation":publication_grant, "device_witness_action_hash":publication_witness.action_hash})
+    ).await;
+    let accepted = accepted_publication.acceptance.as_ref().unwrap();
+    assert_eq!(
+        accepted.witness_action_hash,
+        root_approval.witness_action_hash
+    );
+    assert_eq!(accepted.accepted_at, root_approval.accepted_at);
+    assert_eq!(
+        accepted.device_witness_action_hash,
+        Some(publication_witness.action_hash.clone())
+    );
+    // Historical public acceptance still requires the private mandate's binding.
+    let mut publisher_mandate = mandate.clone();
+    publisher_mandate["issuer"] = che.to_string().into();
+    publisher_mandate["operations"] = serde_json::json!(["preflight_head_publication"]);
+    let preflight_input = serde_json::json!({"id":"device-publication-root",
+        "expected_root":publication_root.action_hash, "accepted_head":publication_root.action_hash,
+        "delegation":accepted_publication});
+    for (device_binding, capability, should_accept) in [
+        (
+            che_binding.action_hash.clone(),
+            CapSecret::from([44; 64]),
+            true,
+        ),
+        (
+            second_binding.action_hash.clone(),
+            CapSecret::from([45; 64]),
+            false,
+        ),
+    ] {
+        publisher_mandate["binding"] = device_binding.to_string().into();
+        let cap_grant = ZomeCallCapGrant {
+            tag: format!("elohim:invocation-mandate:v1:{}", publisher_mandate),
+            functions: GrantedFunctions::Listed(std::collections::HashSet::from([(
+                ZomeName::from("content_store"),
+                FunctionName::from("preflight_head_publication"),
+            )])),
+            access: CapAccess::Assigned {
+                secret: capability.clone(),
+                assignees: std::collections::BTreeSet::from([requester.clone()]),
+            },
+        };
+        c.raw_handle()
+            .grant_zome_call_capability(serde_json::from_value(serde_json::json!({
+                "cell_id":cells[1].2.cell_id(), "cap_grant":cap_grant,
+            }))?)
+            .await?;
+        let result = c
+            .call_from_fallible::<_, PublicationPreflight>(
+                &requester,
+                Some(capability),
+                &cells[1].2.zome("content_store"),
+                "preflight_head_publication",
+                preflight_input.clone(),
+            )
+            .await;
+        if should_accept {
+            assert_eq!(result?.agent, che);
+        } else {
+            assert!(
+                result.is_err(),
+                "historical acceptance must retain the selected credential binding"
+            );
+        }
+    }
+    let mut wrong_publication = publication.clone();
+    wrong_publication["content_head"] =
+        serde_json::to_value(ActionHash::from_raw_32(vec![63; 32]))?;
+    assert!(c
+        .call_fallible::<_, VerifiedPublication>(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_publication",
+            serde_json::json!({
+                "publication": wrong_publication, "witness": publication_witness.action_hash,
+            })
+        )
+        .await
+        .is_err());
+
     let original_admin_allowed: bool = c
         .call(
             &cells[0].0.zome("imagodei"),
@@ -929,6 +1228,27 @@ async fn independently_keyed_devices_share_one_human_and_revocation_cannot_be_er
     eprintln!(
         "identity proof: revocation survived link deletion; other participant and Human preserved"
     );
+    let historical: VerifiedPublication = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_publication",
+            serde_json::json!({
+                "publication": publication, "witness": publication_witness.action_hash,
+            }),
+        )
+        .await;
+    assert_eq!(historical.device.human_id, "real-matthew-device-proof");
+    assert!(
+        c.call_fallible::<_, Receipt>(
+            &cells[0].1.zome("mishpat"),
+            "witness_device_publication",
+            publication
+        )
+        .await
+        .is_err(),
+        "withdrawal fences new controller exercise even after link deletion"
+    );
+
     // A correctly authorized successor policy fences the old bootstrap entry,
     // including a new Create action containing the same deterministic root.
     let root_evidence: HumanRootEvidence = c

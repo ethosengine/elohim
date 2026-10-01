@@ -46,6 +46,20 @@ void test('legacy v2 grant round-trip keeps issuance field omitted', () => {
   assert.equal(Object.hasOwn(decoded.payload, 'issuance_action_hash'), false);
 });
 
+void test('portable witnessed-device grant preserves native attribution and binding in the signed payload', () => {
+  const original = wire(hash(8));
+  const grant = {
+    ...original,
+    payload: {
+      ...original.payload,
+      device_binding: hash(9),
+      exercise: { requester: hash(10), executor: hash(1), policy: 'fct-commons-v1' },
+    },
+  };
+  const decoded = delegationWire(delegationDocument(grant));
+  assert.deepEqual(decoded, grant);
+});
+
 void test('canonical hints reject duplicates and native lineage cannot certify a different root or author', async () => {
   const { canonicalRootHints, verifyRootHint } = await import('../lib/steward-delegation.js');
   const native = (prefix: number, byte: number) =>
@@ -83,4 +97,18 @@ void test('canonical hints reject duplicates and native lineage cannot certify a
     } as unknown as Pick<import('../lib/steward-conductor.js').Conductor, 'call'>;
     await assert.rejects(verifyRootHint(conductor, 'lesson', hint), /mismatched native root/);
   }
+});
+
+void test('exact controller publication witness survives portable receipt recovery', () => {
+  const original = wire(hash(8));
+  const accepted = {
+    ...original,
+    acceptance: {
+      ...original.acceptance,
+      device_witness_action_hash: hash(11),
+    },
+  };
+  const document = delegationDocument(accepted);
+  assert.equal(document.acceptance?.deviceWitnessActionHash, encodeHashToBase64(hash(11)));
+  assert.deepEqual(delegationWire(document), accepted);
 });

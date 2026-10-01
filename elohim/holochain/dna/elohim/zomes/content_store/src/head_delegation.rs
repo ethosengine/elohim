@@ -14,6 +14,18 @@ pub struct HeadDelegationPayload {
     /// only on legacy v2 receipts so their original signature bytes survive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub issuance_action_hash: Option<ActionHash>,
+    /// Present on witnessed-device grants; omission preserves legacy signature bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_binding: Option<ActionHash>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exercise: Option<HeadExercise>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct HeadExercise {
+    pub requester: AgentPubKey,
+    pub executor: AgentPubKey,
+    pub policy: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
@@ -30,6 +42,8 @@ pub struct HeadAcceptance {
     /// Root-author CreateLink witnessing this exact grant/version acceptance.
     pub witness_action_hash: ActionHash,
     pub accepted_at: Timestamp,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_witness_action_hash: Option<ActionHash>,
     pub signature: Signature,
 }
 
@@ -44,6 +58,8 @@ struct AcceptanceStatement<'a> {
     head_action_hash: &'a ActionHash,
     witness_action_hash: &'a ActionHash,
     accepted_at: Timestamp,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device_witness_action_hash: Option<&'a ActionHash>,
 }
 
 fn statement<'a>(
@@ -51,7 +67,9 @@ fn statement<'a>(
     receipt: &'a HeadAcceptance,
 ) -> AcceptanceStatement<'a> {
     AcceptanceStatement {
-        domain: if grant.payload.issuance_action_hash.is_some() {
+        domain: if grant.payload.device_binding.is_some() {
+            "elohim:accepted-content-head:v4"
+        } else if grant.payload.issuance_action_hash.is_some() {
             "elohim:accepted-content-head:v3"
         } else {
             "elohim:accepted-content-head:v2"
@@ -61,6 +79,7 @@ fn statement<'a>(
         head_action_hash: &receipt.head_action_hash,
         witness_action_hash: &receipt.witness_action_hash,
         accepted_at: receipt.accepted_at,
+        device_witness_action_hash: receipt.device_witness_action_hash.as_ref(),
     }
 }
 
@@ -70,6 +89,8 @@ pub struct GrantHeadDelegationInput {
     pub scope: String,
     pub valid_until: Timestamp,
     pub root_action_hash: ActionHash,
+    #[serde(default)]
+    pub device_binding: Option<ActionHash>,
 }
 
 fn refused(reason: &str) -> WasmError {
@@ -78,6 +99,28 @@ fn refused(reason: &str) -> WasmError {
 
 #[hdk_extern]
 pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<HeadDelegation> {
+    let mandate = crate::invocation::authorize(
+        "grant_head_delegation",
+        &input.scope,
+        &input.root_action_hash,
+        &input.delegate,
+        Some(input.valid_until),
+    )?;
+    let requester = call_info()?.provenance;
+    if let Some(m) = &mandate {
+        if input
+            .device_binding
+            .as_ref()
+            .map(ToString::to_string)
+            .as_deref()
+            != m.binding.as_deref()
+        {
+            return Err(refused("device binding differs from invocation mandate"));
+        }
+    }
+    if let Some(binding) = &input.device_binding {
+        crate::invocation::verify_device(binding.clone(), input.delegate.clone())?;
+    }
     let grantor = agent_info()?.agent_initial_pubkey;
     if input.delegate == grantor {
         return Err(refused("delegate must differ from the grantor"));
@@ -113,6 +156,12 @@ pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<He
         root_action_hash: input.root_action_hash,
         dna_hash: dna_info()?.hash,
         issuance_action_hash: Some(issuance_action_hash),
+        device_binding: input.device_binding,
+        exercise: mandate.map(|m| HeadExercise {
+            requester,
+            executor: grantor.clone(),
+            policy: m.policy,
+        }),
     };
     let signature = sign(grantor, &payload)?;
     Ok(HeadDelegation {
@@ -320,6 +369,9 @@ pub(crate) fn verify_head_delegation(
     }
     if grant.payload.valid_until <= sys_time()? {
         return Err(refused("expired for new publication"));
+    }
+    if let Some(binding) = &grant.payload.device_binding {
+        crate::invocation::verify_device(binding.clone(), me.clone())?;
     }
     Ok(())
 }
@@ -603,6 +655,30 @@ pub(crate) fn verify_accepted_head(
         return Err(refused("acceptance time differs from its native witness"));
     }
     verify_acceptance_author_history(grant, &witness, strategy, &budget)?;
+    if let Some(binding) = &grant.payload.device_binding {
+        let device_witness = receipt
+            .device_witness_action_hash
+            .clone()
+            .ok_or_else(|| refused("exact controller publication witness required — PENDING"))?;
+        let verified = crate::invocation::verify_device_publication(
+            binding.clone(),
+            me.clone(),
+            root.clone(),
+            head.clone(),
+            device_witness,
+            receipt.witness_action_hash.clone(),
+        )?;
+        let version = budget
+            .record(head.clone(), strategy)?
+            .ok_or_else(|| refused("witnessed content version unavailable — PENDING"))?;
+        if version.action().timestamp() > witness.action().timestamp()
+            || verified.witnessed_at < witness.action().timestamp().as_micros()
+        {
+            return Err(refused(
+                "controller reconciliation does not follow native root approval and version",
+            ));
+        }
+    }
     // Both actions belong to the root author's source chain. Sequence order,
     // not caller timestamps, decides whether revocation preceded acceptance.
     // The v3 chain walk above sees every root-author revocation between this
@@ -656,11 +732,13 @@ pub(crate) fn verify_accepted_publication(
     )
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AcceptDelegatedHeadInput {
     pub id: String,
     pub head_action_hash: ActionHash,
     pub delegation: HeadDelegation,
+    #[serde(default)]
+    pub device_witness_action_hash: Option<ActionHash>,
 }
 
 fn acceptance_from_witness(
@@ -673,6 +751,7 @@ fn acceptance_from_witness(
         witness_action_hash: witness.action_address().clone(),
         accepted_at: witness.action().timestamp(),
         signature: Signature([0; 64]),
+        device_witness_action_hash: input.device_witness_action_hash,
     };
     receipt.signature = sign(
         input.delegation.payload.grantor.clone(),
@@ -694,6 +773,13 @@ fn acceptance_from_witness(
 pub fn get_accepted_delegated_head(
     input: AcceptDelegatedHeadInput,
 ) -> ExternResult<Option<HeadDelegation>> {
+    accepted_delegated_head_inner(input, true)
+}
+
+fn accepted_delegated_head_inner(
+    input: AcceptDelegatedHeadInput,
+    authorize_recovery: bool,
+) -> ExternResult<Option<HeadDelegation>> {
     let author = agent_info()?.agent_initial_pubkey;
     if author != input.delegation.payload.grantor {
         return Err(refused("only root author may retrieve acceptance"));
@@ -713,24 +799,95 @@ pub fn get_accepted_delegated_head(
         &input.head_action_hash,
         GetStrategy::Network,
     )?;
-    witness
-        .map(|witness| acceptance_from_witness(input, witness))
-        .transpose()
+    if let Some(witness) = witness {
+        verify_acceptance_witness(&input.delegation, &input.head_action_hash, &witness)?;
+        verify_acceptance_author_history(
+            &input.delegation,
+            &witness,
+            GetStrategy::Network,
+            &AcceptanceBudget::start()?,
+        )?;
+        if authorize_recovery {
+            let mandate = crate::invocation::authorize_at(
+                "get_accepted_delegated_head",
+                &input.id,
+                &input.delegation.payload.root_action_hash,
+                &input.delegation.payload.delegate,
+                None,
+                Some(witness.action().timestamp()),
+            )?;
+            if let Some(m) = mandate {
+                require_mandate_binding(&m, &input.delegation)?;
+            }
+        }
+        Ok(Some(acceptance_from_witness(input, witness)?))
+    } else {
+        // Even a read-only absence does not turn a broad invocation into an issuer.
+        if authorize_recovery {
+            crate::invocation::authorize(
+                "get_accepted_delegated_head",
+                &input.id,
+                &input.delegation.payload.root_action_hash,
+                &input.delegation.payload.delegate,
+                None,
+            )?;
+        }
+        Ok(None)
+    }
 }
 
-#[hdk_extern]
-pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<HeadDelegation> {
+pub(crate) fn require_mandate_binding(
+    m: &qahal_types::invocation_mandate::InvocationMandate,
+    grant: &HeadDelegation,
+) -> ExternResult<()> {
+    if grant
+        .payload
+        .device_binding
+        .as_ref()
+        .map(ToString::to_string)
+        .as_deref()
+        != m.binding.as_deref()
+    {
+        return Err(refused(
+            "historical recovery binding differs from invocation mandate",
+        ));
+    }
+    Ok(())
+}
+
+fn stage_acceptance(input: AcceptDelegatedHeadInput, operation: &str) -> ExternResult<Record> {
+    if let Some(exercise) = &input.delegation.payload.exercise {
+        if exercise.requester != call_info()?.provenance
+            || exercise.executor != agent_info()?.agent_initial_pubkey
+        {
+            return Err(refused(
+                "acceptance requester or executor differs from issuance ceremony",
+            ));
+        }
+    }
     let author = agent_info()?.agent_initial_pubkey;
     if author != input.delegation.payload.grantor {
         return Err(refused("only root author may accept"));
     }
-    let lookup = AcceptDelegatedHeadInput {
-        id: input.id.clone(),
-        head_action_hash: input.head_action_hash.clone(),
-        delegation: input.delegation.clone(),
-    };
-    if let Some(prior) = get_accepted_delegated_head(lookup)? {
-        return Ok(prior);
+    let mandate = crate::invocation::authorize(
+        operation,
+        &input.id,
+        &input.delegation.payload.root_action_hash,
+        &input.delegation.payload.delegate,
+        Some(input.delegation.payload.valid_until),
+    )?;
+    if let Some(m) = mandate {
+        if input
+            .delegation
+            .payload
+            .device_binding
+            .as_ref()
+            .map(ToString::to_string)
+            .as_deref()
+            != m.binding.as_deref()
+        {
+            return Err(refused("device binding differs from acceptance mandate"));
+        }
     }
     verify_head_delegation(
         &input.delegation,
@@ -759,6 +916,14 @@ pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<He
             "accepted version was not authored by grantor or delegate",
         ));
     }
+    if let Some(prior) = witnessed_acceptance(
+        &input.delegation,
+        &input.head_action_hash,
+        GetStrategy::Network,
+    )? {
+        verify_acceptance_witness(&input.delegation, &input.head_action_hash, &prior)?;
+        return Ok(prior);
+    }
     let witness = create_link(
         input.delegation.payload.root_action_hash.clone(),
         input.head_action_hash.clone(),
@@ -768,7 +933,92 @@ pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<He
     let record = get(witness, GetOptions::local())?
         .ok_or_else(|| refused("acceptance witness not retrievable — PENDING"))?;
     verify_acceptance_witness(&input.delegation, &input.head_action_hash, &record)?;
+    Ok(record)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HeadAcceptanceStage {
+    pub witness_action_hash: ActionHash,
+    pub accepted_at: Timestamp,
+}
+
+/// Provisional root approval. It is not complete device authorization and
+/// cannot move an earned head without subsequent controller reconciliation.
+#[hdk_extern]
+pub fn stage_delegated_head_acceptance(
+    input: AcceptDelegatedHeadInput,
+) -> ExternResult<HeadAcceptanceStage> {
+    let record = stage_acceptance(input, "stage_delegated_head_acceptance")?;
+    Ok(HeadAcceptanceStage {
+        witness_action_hash: record.action_address().clone(),
+        accepted_at: record.action().timestamp(),
+    })
+}
+
+#[hdk_extern]
+pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<HeadDelegation> {
+    if let Some(prior) = accepted_delegated_head_inner(input.clone(), false)? {
+        let mandate = crate::invocation::authorize_at(
+            "accept_delegated_head",
+            &input.id,
+            &prior.payload.root_action_hash,
+            &prior.payload.delegate,
+            Some(prior.payload.valid_until),
+            prior.acceptance.as_ref().map(|a| a.accepted_at),
+        )?;
+        if let Some(m) = mandate {
+            require_mandate_binding(&m, &prior)?;
+        }
+        return Ok(prior);
+    }
+    if input.delegation.payload.device_binding.is_some() {
+        return Err(refused(
+            "provisional root approval and controller reconciliation required — PENDING",
+        ));
+    }
+    let record = stage_acceptance(input.clone(), "accept_delegated_head")?;
     acceptance_from_witness(input, record)
+}
+
+/// Native root approval evidence used by the controller's explicit ceremony.
+/// Read-only; it grants neither invocation nor publication authority.
+#[hdk_extern]
+pub fn get_device_publication_approval(
+    input: qahal_types::DevicePublicationInput,
+) -> ExternResult<Record> {
+    if input.device.expected_content_dna != dna_info()?.hash {
+        return Err(refused("publication approval DNA differs"));
+    }
+    let lineage = correction::get_content_lineage(correction::GetContentLineageInput {
+        action_hash: input.content_head.clone(),
+        local: false,
+    })?;
+    if lineage.truncated || lineage.root_action_hash != input.content_root {
+        return Err(refused(
+            "publication approval head does not descend from root",
+        ));
+    }
+    let root = canonical_identity_root(&lineage.content_id, GetStrategy::Network)?
+        .ok_or_else(|| refused("publication approval root unavailable — PENDING"))?;
+    let record = get(input.root_acceptance.clone(), GetOptions::default())?
+        .ok_or_else(|| refused("publication root approval unavailable — PENDING"))?;
+    let ty: ScopedLinkType = LinkTypes::IdToContent.try_into()?;
+    let action = record.action();
+    if record.action_address() != &input.root_acceptance
+        || hash_action(action.clone())? != input.root_acceptance
+        || action.author() != root.action().author()
+        || !verify_signature(action.author().clone(), record.signature().clone(), action)?
+        || !matches!(&action.data, ActionData::CreateLink(link)
+            if link.base_address == AnyLinkableHash::from(input.content_root.clone())
+                && link.target_address == AnyLinkableHash::from(input.content_head.clone())
+                && link.zome_index == ty.zome_index && link.link_type == ty.zome_type
+                && link.tag.0.starts_with(ACCEPTANCE_WITNESS_TAG))
+    {
+        return Err(refused(
+            "publication root approval is not the exact signed root-author act",
+        ));
+    }
+    Ok(record)
 }
 
 /// Explicit revocation ends future exercise, independently of expiry. Prior
@@ -777,6 +1027,13 @@ pub fn accept_delegated_head(input: AcceptDelegatedHeadInput) -> ExternResult<He
 /// No administrative credential or enrolled-device status grants this power.
 #[hdk_extern]
 pub fn revoke_head_delegation(grant: HeadDelegation) -> ExternResult<ActionHash> {
+    crate::invocation::authorize(
+        "revoke_head_delegation",
+        &grant.payload.scope,
+        &grant.payload.root_action_hash,
+        &grant.payload.delegate,
+        None,
+    )?;
     let author = agent_info()?.agent_initial_pubkey;
     if author != grant.payload.grantor {
         return Err(refused("only root author may revoke"));
@@ -833,11 +1090,14 @@ mod tests {
                 root_action_hash: ActionHash::from_raw_36(vec![3; 36]),
                 dna_hash: DnaHash::from_raw_36(vec![4; 36]),
                 issuance_action_hash: None,
+                device_binding: None,
+                exercise: None,
             },
             signature: Signature([5; 64]),
             acceptance: Some(HeadAcceptance {
                 witness_action_hash: ActionHash::from_raw_36(vec![8; 36]),
                 head_action_hash: ActionHash::from_raw_36(vec![6; 36]),
+                device_witness_action_hash: None,
                 accepted_at: Timestamp::from_micros(99),
                 signature: Signature([7; 64]),
             }),
@@ -1065,6 +1325,8 @@ mod tests {
                 root_action_hash: root_hash,
                 dna_hash: DnaHash::from_raw_36(vec![4; 36]),
                 issuance_action_hash: Some(issuer.action_address().clone()),
+                device_binding: None,
+                exercise: None,
             },
             signature: Signature([1; 64]),
             acceptance: None,

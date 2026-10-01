@@ -11,6 +11,57 @@
 use holo_hash::{ActionHash, AgentPubKey};
 use serde::{Deserialize, Serialize};
 
+pub mod invocation_mandate;
+
+/// Shared native boundary for verification of an existing notarized relationship.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyDeviceInput {
+    pub binding: ActionHash,
+    pub expected_device: AgentPubKey,
+    pub expected_content_dna: holo_hash::DnaHash,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyHistoricalDeviceInput {
+    pub device: VerifyDeviceInput,
+    /// Native acceptance/affirmation action time, independently verified by caller.
+    pub witnessed_at: i64,
+}
+
+/// Controller authorization for one already-authored content version.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DevicePublicationInput {
+    pub device: VerifyDeviceInput,
+    pub content_root: ActionHash,
+    pub content_head: ActionHash,
+    pub root_acceptance: ActionHash,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyDevicePublicationInput {
+    pub publication: DevicePublicationInput,
+    pub witness: ActionHash,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifiedDevicePublication {
+    pub device: VerifiedDevice,
+    pub witnessed_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifiedDevice {
+    pub controllers: Vec<AgentPubKey>,
+    pub human_id: String,
+    pub human_action_hash: ActionHash,
+    pub identity_root: ActionHash,
+    pub device_key: AgentPubKey,
+    pub authority_action_hash: ActionHash,
+    pub binding_action_hash: ActionHash,
+    pub network_dna: holo_hash::DnaHash,
+    pub content_dna: holo_hash::DnaHash,
+}
+
 // =============================================================================
 // Challenge Types
 // =============================================================================
@@ -1222,7 +1273,6 @@ mod tests {
         assert_eq!(decoded.limit, Some(50));
     }
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "ts")]
