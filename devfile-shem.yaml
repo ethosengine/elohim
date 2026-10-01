@@ -37,8 +37,15 @@ metadata:
 #     output would fill it. The dataset name exists only once the PVC is created.
 #   - `shem-zfs` is Retain: deleting the workspace leaves the PV, zfsvolume and dataset
 #     behind for manual removal.
-#   - node: a selector alone does not change the storage class, and the toleration is what
-#     lets the pod through shem's remote-wan taint.
+#   - node: placement is node AFFINITY, not nodeSelector. Che's CheCluster
+#     devEnvironments.nodeSelector REPLACES any nodeSelector a devfile sets (tested
+#     2026-10-01: a hostname=shem selector came out as node-type=performance and the pod
+#     went to ethosengine). Affinity survives, but is ANDed with that selector, so this
+#     workspace stays Pending until the CheCluster selector admits shem (e.g. a
+#     che-workspaces=true label on both nodes). Changing that selector alters every
+#     workspace's pod template and restarts running workspaces at the next reconcile.
+#     The toleration is what lets the pod through shem's remote-wan taint; ordinary
+#     workspaces lack it and stay on the LAN node.
 # A new workspace is a new device: it has its own conductor key and enrols as its own
 # device. Never copy another workspace's keystore or signing credentials into it.
 attributes:
@@ -48,8 +55,15 @@ attributes:
     namespace: eclipse-che
   pod-overrides:
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: shem
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - shem
       tolerations:
         - key: remote-wan
           operator: Equal
