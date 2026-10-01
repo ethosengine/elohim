@@ -1071,20 +1071,32 @@ async fn process_trigger(
         return;
     }
 
-    // THE conductor read — made HERE rather than inside the adoption path, which
+    // Verify the courier before waiting for the election to gossip into the own
+    // conductor. Otherwise a slow local resolve consumes the visitor's whole
+    // adoption window before the already-signed evidence can even be considered.
+    // The existing verifier still requires locally held ancestry, authoring
+    // standing, election ordering and all version bytes before any stamp.
+    let (courier_outcome, probe) = courier_before_local_probe(
+        try_courier(trigger, &hc, pool, ctx, courier, memo, doc_hint.as_deref()),
+        conductor_writes::call_resolve_content_head_classed(
+            &hc,
+            id,
+            crate::conductor_admission::AdmissionClass::Background,
+        ),
+    )
+    .await;
+    let Some(probe) = probe else {
+        gate.release(id);
+        return;
+    };
+
+    // THE fallback conductor read — made HERE rather than inside the adoption path, which
     // is what `LocalResolve::Probe` would otherwise have done. Two reasons:
     // taking it ourselves is what lets the stale-head guard exist, and it lets us
     // pick the CLASS. `Background` is mandatory, not stylistic: this probe's rate
     // is influenced by remote peers, so borrowing the Interactive lane would let
     // a peer's doc traffic queue ahead of a person's read — the exact starvation
     // the admission classes exist to prevent.
-    let probe = conductor_writes::call_resolve_content_head_classed(
-        &hc,
-        id,
-        crate::conductor_admission::AdmissionClass::Background,
-    )
-    .await;
-
     let resolved = match probe {
         Ok(head) => head,
         Err(e) => {
@@ -1120,21 +1132,9 @@ async fn process_trigger(
             "head-adoption trigger: the own conductor cannot yet walk the head this doc \
              names — NOT declaring a stale head; re-probing"
         );
-        // THE COURIER. The peer whose apply raised this trigger declared the head
-        // the doc names and holds its evidence. Ask it, verify read-only in the
-        // own conductor, and stamp only once the bytes are here. A settled answer
-        // ends the ladder; anything else leaves it to the next rung.
-        if let Some(outcome) =
-            try_courier(trigger, &hc, pool, ctx, courier, memo, doc_hint.as_deref()).await
-        {
-            if matches!(
-                outcome,
-                crate::services::courier_obey::CourierOutcome::Stamped
-                    | crate::services::courier_obey::CourierOutcome::Current
-            ) {
-                // The row now names the doc's head; the next change is new.
-                gate.release(id);
-            }
+        // The courier was already verified before this fallback. Never re-ask it
+        // within one attempt; preserve its original refusal/retry decision.
+        if let Some(outcome) = courier_outcome {
             if !outcome.retry_warranted() {
                 return;
             }
@@ -1264,6 +1264,32 @@ async fn process_trigger(
                 local_declared.as_deref(),
             );
         }
+    }
+}
+
+/// A verified courier may settle the head without polling a slow local resolve.
+/// Every other result preserves the own-conductor fallback; missing or refused
+/// evidence never becomes permission to stamp a peer's advertised hash.
+async fn courier_before_local_probe<C, P>(
+    courier: C,
+    probe: P,
+) -> (
+    Option<crate::services::courier_obey::CourierOutcome>,
+    Option<P::Output>,
+)
+where
+    C: std::future::Future<Output = Option<crate::services::courier_obey::CourierOutcome>>,
+    P: std::future::Future,
+{
+    use crate::services::courier_obey::CourierOutcome;
+    let outcome = courier.await;
+    if matches!(
+        outcome,
+        Some(CourierOutcome::Stamped | CourierOutcome::Current)
+    ) {
+        (outcome, None)
+    } else {
+        (outcome, Some(probe.await))
     }
 }
 
@@ -1721,6 +1747,116 @@ mod tests {
             "raised_at is preserved so trigger_to_adopt_ms measures from the sync apply"
         );
         assert_eq!(gate.pending_retries(), 0, "the slot is released on fire");
+    }
+
+    #[tokio::test]
+    async fn verified_courier_adopts_without_polling_a_stalled_local_probe() {
+        use crate::services::courier_obey::tests as fixture;
+        use crate::services::courier_obey::CourierOutcome;
+        use fixture::{AT_B, HEAD_B};
+
+        let pool = fixture::pool_with_row_at_a();
+        let verifier = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
+            Some(HEAD_B),
+            Some("sha256-bbbb"),
+            AT_B,
+        )));
+        let courier = fixture::courier(HEAD_B);
+        let bytes = fixture::bytes(true);
+        let memo = fixture::memo();
+        let (outcome, local) = tokio::time::timeout(
+            Duration::from_secs(1),
+            courier_before_local_probe(
+                async {
+                    Some(fixture::run(&verifier, &courier, &bytes, &memo, &pool, HEAD_B).await)
+                },
+                std::future::pending::<()>(),
+            ),
+        )
+        .await
+        .expect("valid signed evidence must not wait for the stalled local election");
+        assert_eq!(outcome, Some(CourierOutcome::Stamped));
+        assert_eq!(local, None);
+        assert_eq!(fixture::row(&pool).0.as_deref(), Some(HEAD_B));
+    }
+
+    #[tokio::test]
+    async fn absent_refused_or_pending_courier_preserves_safe_local_fallback() {
+        use crate::services::courier_obey::tests as fixture;
+        use crate::services::courier_obey::CourierOutcome;
+        use fixture::{AT_A, AT_B, HEAD_A, HEAD_B};
+
+        for missing in [true, false] {
+            let pool = fixture::pool_with_row_at_a();
+            let verifier = fixture::verifier(fixture::Verdict::Refuses(
+                "verify_carried_head_evidence: signature invalid",
+            ));
+            let courier = fixture::courier(HEAD_B);
+            let bytes = fixture::bytes(true);
+            let memo = fixture::memo();
+            let (outcome, local) = courier_before_local_probe(
+                async {
+                    if missing {
+                        None
+                    } else {
+                        Some(fixture::run(&verifier, &courier, &bytes, &memo, &pool, HEAD_B).await)
+                    }
+                },
+                async { Err::<(), _>("local election unavailable") },
+            )
+            .await;
+            assert_eq!(outcome, (!missing).then_some(CourierOutcome::Refused));
+            assert_eq!(local, Some(Err("local election unavailable")));
+            assert_eq!(fixture::row(&pool).0.as_deref(), Some(HEAD_A));
+            assert_eq!(fixture::row(&pool).2, Some(AT_A));
+        }
+
+        let pool = fixture::pool_with_row_at_a();
+        let verifier = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
+            Some(HEAD_B),
+            Some("sha256-bbbb"),
+            AT_B,
+        )));
+        let courier = fixture::courier(HEAD_B);
+        let bytes = fixture::bytes(false);
+        let memo = fixture::memo();
+        let (outcome, local) = courier_before_local_probe(
+            async { Some(fixture::run(&verifier, &courier, &bytes, &memo, &pool, HEAD_B).await) },
+            async { "own conductor still resolves" },
+        )
+        .await;
+        assert_eq!(outcome, Some(CourierOutcome::AwaitingBytes));
+        assert_eq!(local, Some("own conductor still resolves"));
+        assert_eq!(fixture::row(&pool).0.as_deref(), Some(HEAD_A));
+    }
+
+    #[tokio::test]
+    async fn a_courier_losing_to_a_newer_local_election_preserves_the_own_probe() {
+        use crate::services::courier_obey::tests as fixture;
+        use crate::services::courier_obey::CourierOutcome;
+        use fixture::{AT_A, AT_B, HEAD_A, HEAD_B};
+
+        let pool = fixture::pool_with_row_at_a();
+        // The unchanged native verifier merges valid carried B with local C.
+        // C wins, so its verdict carries C's election and no adoptable B head.
+        let mut evidence = fixture::evidence(None, None, AT_B + 1);
+        evidence.election.winner_target = "uhCkkC".into();
+        let verifier = fixture::verifier(fixture::Verdict::Proves(evidence));
+        let courier = fixture::courier(HEAD_B);
+        let bytes = fixture::bytes(true);
+        let memo = fixture::memo();
+        let (outcome, local) = courier_before_local_probe(
+            async { Some(fixture::run(&verifier, &courier, &bytes, &memo, &pool, HEAD_B).await) },
+            async { "own conductor elects C" },
+        )
+        .await;
+
+        assert_eq!(outcome, Some(CourierOutcome::Disagrees));
+        assert_eq!(local, Some("own conductor elects C"));
+        assert_eq!(
+            fixture::row(&pool),
+            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+        );
     }
 
     /// Exercise actual timer/queue handoff and SQL projection together. The

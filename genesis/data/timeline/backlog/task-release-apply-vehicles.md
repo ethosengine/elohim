@@ -187,3 +187,25 @@ archives them to `.failed-<timestamp>` and restores the known-good executable
 record, so `.next` cannot loop. Current state: GREEN by the real-process fixture
 `app/elohim-app/scripts/__tests__/hc-mesh-storage-slot.test.sh`. The full T4
 foreground apply/revert ceremony remains this atom's graduation receipt.
+
+### Missing station: the applied receipt names the process that actually serves
+
+Chain: staged executable → restart consumes the slot → **the new executable owns
+the peer's listener** → applied/soak receipt. Current state: OPEN, measured on
+2026-10-01 during the FCT peer-authoring shift. An archived slot runs with Linux
+`comm` equal to `elohim-storage.`; the restart arm's exact `elohim-storage` match
+missed all three live peers, restored captured commands without stopping them,
+and observed the old listeners as healthy. The existing slot-consumption fixture
+does not prove this intervening station. The shift recovered by verifying exact
+owned port/executable/environment identities, stopping those processes gracefully,
+then consuming the newly staged slots; no conductor or data identity was reset.
+
+Completion probe: a renamed applied-slot process is found through verified peer
+ownership, its current environment is captured, and the replacement's PID/start
+ticks, executable/inode and owned listener match the staged candidate before an
+applied receipt is archived. A candidate that fails to bind while an old listener
+is alive must fail adoption and preserve the known-good executable record. Keep
+this under the existing apply-vehicle/restart discipline; the current shift's
+campaign oracle and runtime helper remain frozen. Evidence: private
+`/tmp/fct-courier-dual-household-rollout-20261001.log` and per-peer archived release
+receipts under the owned household fixture.

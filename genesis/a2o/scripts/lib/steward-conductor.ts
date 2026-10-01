@@ -65,6 +65,29 @@ export interface Conductor {
   close(): Promise<void>;
 }
 
+/** The SDK waits for a future close event even when the socket is already closed.
+ * Bound cleanup so a disconnected transport cannot hide a call's original error. */
+export async function closeConductorSocket(client: unknown): Promise<void> {
+  const connection = client as {
+    socket?: { readyState: number };
+    close(): Promise<unknown>;
+  };
+  if (connection.socket?.readyState === 3) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      connection.close(),
+      new Promise<void>(resolve => {
+        timer = setTimeout(resolve, 2000);
+      }),
+    ]);
+  } catch {
+    // Cleanup is best-effort; the connection or call error remains authoritative.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * The Holochain client stores zome-call credentials in a process-global map
  * keyed only by cell id. Re-select this connection's existing credentials
@@ -251,16 +274,13 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
         );
       },
       async close() {
-        try {
-          await (connected.client as unknown as { close(): Promise<unknown> }).close();
-        } finally {
-          await admin.client.close();
-        }
+        await closeConductorSocket(connected.client);
+        await closeConductorSocket(admin.client);
       },
     };
   } catch (error) {
-    if (appWs) await (appWs.client as unknown as { close(): Promise<unknown> }).close();
-    await admin.client.close();
+    if (appWs) await closeConductorSocket(appWs.client);
+    await closeConductorSocket(admin.client);
     throw error;
   }
 }
@@ -304,7 +324,7 @@ async function connectHosted(o: ConductorOptions, dir: string): Promise<Conducto
     )
       throw new Error('Hosted conductor differs from enrolled app/cell');
   } catch (error) {
-    await (app.client as unknown as { close(): Promise<unknown> }).close();
+    await closeConductorSocket(app.client);
     throw error;
   }
   return {
@@ -323,7 +343,7 @@ async function connectHosted(o: ConductorOptions, dir: string): Promise<Conducto
       );
     },
     async close() {
-      await (app.client as unknown as { close(): Promise<unknown> }).close();
+      await closeConductorSocket(app.client);
     },
   };
 }
@@ -359,6 +379,6 @@ export async function readConductorAgent(
   } finally {
     clearTimeout(timer);
     read.catch(() => undefined);
-    await admin?.client.close().catch(() => undefined);
+    if (admin) await closeConductorSocket(admin.client);
   }
 }

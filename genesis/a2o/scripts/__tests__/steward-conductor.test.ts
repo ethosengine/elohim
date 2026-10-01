@@ -12,10 +12,40 @@ import {
   connectConductor,
   callZomeWithCredentials,
   conductorSocketOptions,
+  closeConductorSocket,
   loadSigningCredentials,
 } from '../lib/steward-conductor.js';
 
 import type { AppClientTransport, AppInfo, CellId, SigningCredentials } from '@holochain/client';
+
+it('finishes socket cleanup when already closed, rejected or missing a close event', async () => {
+  let calls = 0;
+  await closeConductorSocket({
+    socket: { readyState: 3 },
+    async close() {
+      calls += 1;
+      return new Promise(() => undefined);
+    },
+  });
+  assert.equal(calls, 0);
+  let normallyClosed = false;
+  await closeConductorSocket({
+    async close() {
+      await Promise.resolve();
+      normallyClosed = true;
+    },
+  });
+  assert.equal(normallyClosed, true);
+  await closeConductorSocket({
+    async close() {
+      await Promise.resolve();
+      throw new Error('remote socket failure');
+    },
+  });
+  const started = Date.now();
+  await closeConductorSocket({ close: async () => new Promise(() => undefined) });
+  assert.ok(Date.now() - started < 5000, 'missing close event must not stall cleanup');
+});
 
 function testSigningCredentials(seedHex: string, cell: CellId, capSecretByte: number) {
   const seed = Buffer.from(seedHex, 'hex');

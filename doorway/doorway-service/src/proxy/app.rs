@@ -4,9 +4,14 @@
 //! No message filtering needed - app interfaces handle their own auth.
 
 use futures_util::{SinkExt, StreamExt};
+use std::{io::ErrorKind, time::Duration};
 use tokio_tungstenite::{
     connect_async_with_config,
-    tungstenite::{http::Request, protocol::Message},
+    tungstenite::{
+        http::Request,
+        protocol::{frame::coding::CloseCode, CloseFrame, Message},
+        Error,
+    },
 };
 use tracing::{debug, error, info};
 
@@ -20,7 +25,7 @@ type HyperWebSocket =
 /// `conductor_host` is the hostname of the conductor (e.g. "elohim-edgenode-alpha")
 /// extracted from CONDUCTOR_URL. Falls back to "localhost" for local dev.
 pub async fn run_proxy(
-    client_ws: HyperWebSocket,
+    mut client_ws: HyperWebSocket,
     port: u16,
     origin: Option<String>,
     query: Option<String>,
@@ -57,9 +62,37 @@ pub async fn run_proxy(
         .body(())
         .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
-    let (conductor_ws, _) = connect_async_with_config(request, None, false)
-        .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to app interface: {e}")))?;
+    let (conductor_ws, _) = match connect_async_with_config(request, None, false).await {
+        Ok(connection) => connection,
+        Err(e) => {
+            // Only disclose a bounded transport classification, never the upstream
+            // URL, headers, response body or raw error. Native auth has not run.
+            let reason = match &e {
+                Error::Io(error) => match error.kind() {
+                    ErrorKind::ConnectionRefused => "upstream app connection refused".to_owned(),
+                    ErrorKind::TimedOut => "upstream app connection timed out".to_owned(),
+                    _ => "upstream app I/O failure".to_owned(),
+                },
+                Error::Http(response) => {
+                    format!("upstream app handshake HTTP {}", response.status().as_u16())
+                }
+                Error::Protocol(_) => "upstream app handshake protocol error".to_owned(),
+                Error::Tls(_) => "upstream app TLS failure".to_owned(),
+                _ => "upstream app connection failed".to_owned(),
+            };
+            let _ = tokio::time::timeout(
+                Duration::from_secs(1),
+                client_ws.send(Message::Close(Some(CloseFrame {
+                    code: CloseCode::Error,
+                    reason: reason.into(),
+                }))),
+            )
+            .await;
+            return Err(DoorwayError::Holochain(format!(
+                "Failed to connect to app interface: {e}"
+            )));
+        }
+    };
 
     info!("Connected to app interface on port {}", port);
 
@@ -150,4 +183,83 @@ pub async fn run_proxy(
 
     info!("App proxy connection closed (port {})", port);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hyper::{server::conn::http1, service::service_fn};
+    use hyper_util::rt::TokioIo;
+    use std::convert::Infallible;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    #[tokio::test]
+    async fn upstream_handshake_failure_reaches_client_as_safe_1011_close() {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let upstream_port = upstream.local_addr().unwrap().port();
+            let upstream_task = tokio::spawn(async move {
+                let (mut socket, _) = upstream.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 1024];
+                while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                    let count = socket.read(&mut buffer).await.unwrap();
+                    assert!(count > 0);
+                    request.extend_from_slice(&buffer[..count]);
+                }
+                socket
+                    .write_all(
+                        b"HTTP/1.1 403 Forbidden\r\nContent-Length: 21\r\nX-Private: private-token-fixture\r\n\r\nprivate-token-fixture",
+                    )
+                    .await
+                    .unwrap();
+            });
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let proxy_task = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                http1::Builder::new()
+                    .serve_connection(
+                        TokioIo::new(socket),
+                        service_fn(move |request| async move {
+                            let (response, websocket) =
+                                hyper_tungstenite::upgrade(request, None).unwrap();
+                            tokio::spawn(async move {
+                                let websocket = websocket.await.unwrap();
+                                let _ = run_proxy(
+                                    websocket,
+                                    upstream_port,
+                                    None,
+                                    None,
+                                    "127.0.0.1",
+                                )
+                                .await;
+                            });
+                            Ok::<_, Infallible>(response)
+                        }),
+                    )
+                    .with_upgrades()
+                    .await
+                    .unwrap();
+            });
+            let (mut client, _) = tokio_tungstenite::connect_async(format!("ws://{address}"))
+                .await
+                .unwrap();
+            let message = client.next().await.unwrap().unwrap();
+            let Message::Close(Some(frame)) = message else {
+                panic!("expected upstream failure to arrive as a websocket close frame");
+            };
+            assert_eq!(frame.code, CloseCode::Error);
+            assert_eq!(frame.reason, "upstream app handshake HTTP 403");
+            assert!(!frame.reason.contains("private-token-fixture"));
+            assert!(!frame.reason.contains("127.0.0.1"));
+            upstream_task.await.unwrap();
+            proxy_task.await.unwrap();
+        })
+        .await
+        .expect("real websocket failure propagation must remain bounded");
+    }
 }
