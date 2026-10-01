@@ -56,6 +56,32 @@ fn upstream_failure_reason(error: &Error) -> String {
     }
 }
 
+/// Build the conductor app interface URL from the conductor host (not hardcoded localhost).
+///
+/// Doorway-specific params (apiKey, token, conductor_id) are for doorway auth/routing only
+/// and are stripped. The real Holochain app auth token is sent by AppWebsocket in the WS
+/// handshake, not the URL. A surviving query is always preceded by `/`: tungstenite writes
+/// the URI's path-and-query verbatim into the request line, so `ws://host:port?x=y` goes out
+/// as `GET ?x=y HTTP/1.1`, which the conductor drops before answering the handshake.
+fn upstream_app_url(conductor_host: &str, port: u16, query: Option<&str>) -> String {
+    let base = format!("ws://{conductor_host}:{port}");
+    let filtered: Vec<&str> = query
+        .unwrap_or_default()
+        .split('&')
+        .filter(|param| {
+            !param.is_empty()
+                && !param.starts_with("apiKey=")
+                && !param.starts_with("token=")
+                && !param.starts_with("conductor_id=")
+        })
+        .collect();
+    if filtered.is_empty() {
+        base
+    } else {
+        format!("{base}/?{}", filtered.join("&"))
+    }
+}
+
 /// Run the app proxy between client and conductor app interface.
 ///
 /// `conductor_host` is the hostname of the conductor (e.g. "elohim-edgenode-alpha")
@@ -67,19 +93,7 @@ pub async fn run_proxy(
     query: Option<String>,
     conductor_host: &str,
 ) -> Result<()> {
-    // Build app interface URL using the conductor host (not hardcoded localhost)
-    // Strip Doorway-specific params (apiKey, token) — these are for doorway auth/routing only.
-    // The real Holochain app auth token is sent by AppWebsocket in the WS handshake, not the URL.
-    let mut app_url = format!("ws://{conductor_host}:{port}");
-    if let Some(q) = query {
-        let filtered: Vec<&str> = q
-            .split('&')
-            .filter(|param| !param.starts_with("apiKey=") && !param.starts_with("token="))
-            .collect();
-        if !filtered.is_empty() {
-            app_url = format!("{}?{}", app_url, filtered.join("&"));
-        }
-    }
+    let app_url = upstream_app_url(conductor_host, port, query.as_deref());
 
     info!("Creating app proxy to {} (origin: {:?})", app_url, origin);
 
@@ -241,6 +255,48 @@ mod tests {
             "upstream app handshake protocol error: accept key mismatch",
         )
         .await;
+    }
+
+    #[test]
+    fn upstream_url_strips_doorway_params_and_keeps_a_rooted_request_target() {
+        assert_eq!(upstream_app_url("c", 8445, None), "ws://c:8445");
+        assert_eq!(
+            upstream_app_url("c", 8445, Some("conductor_id=conductor-1")),
+            "ws://c:8445"
+        );
+        assert_eq!(
+            upstream_app_url("c", 8445, Some("token=t&apiKey=k&conductor_id=x")),
+            "ws://c:8445"
+        );
+        assert_eq!(
+            upstream_app_url("c", 8445, Some("conductor_id=x&keep=1")),
+            "ws://c:8445/?keep=1"
+        );
+    }
+
+    /// The request line the conductor receives must name a rooted target. A selector
+    /// query used to reach it as `GET ?conductor_id=… HTTP/1.1`.
+    #[test]
+    fn selector_query_reaches_upstream_with_a_rooted_request_line() {
+        use tokio_tungstenite::tungstenite::http::Uri;
+        // The defect: with no path, the query alone becomes the request target.
+        let unrooted: Uri = "ws://127.0.0.1:8445?conductor_id=conductor-1"
+            .parse()
+            .unwrap();
+        assert_eq!(
+            unrooted.path_and_query().unwrap().as_str(),
+            "?conductor_id=conductor-1"
+        );
+        for query in [
+            "conductor_id=conductor-1",
+            "conductor_id=conductor-1&keep=1",
+        ] {
+            let url = upstream_app_url("127.0.0.1", 8445, Some(query));
+            let uri: Uri = url.parse().unwrap();
+            let target = uri.path_and_query().unwrap().as_str();
+            assert!(target.starts_with('/'), "unrooted request target: {target}");
+            assert!(!target.contains("conductor_id"));
+        }
     }
 
     #[test]
