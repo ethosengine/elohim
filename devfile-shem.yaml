@@ -111,12 +111,18 @@ components:
       # Built via Jenkins (devspaces-udi-plus, devspaces-rust-nix-dev). Image name
       # rust-nix-dev:latest is historical — current source folder is rust-dev/.
       image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
-      # shem has 135G; the LAN devfile's 30Gi was the ethosengine ceiling. The fleet peers
-      # on shem share this node, so the request stays modest.
-      memoryLimit: 64Gi
+      # Memory is not shem's constraint (110Gi allocatable, ~5Gi requested, 2026-10-01);
+      # 40Gi clears the 30Gi ceiling the LAN workspace keeps hitting without reserving more.
+      memoryLimit: 40Gi
       memoryRequest: 8Gi
-      cpuLimit: '10'
-      cpuRequest: '6'
+      # CPU is. shem has 24 threads of 2013 Ivy Bridge and was already using ~9.4 of them
+      # (30 min average, same day) for the fleet peers it hosts. Under contention the kernel
+      # shares CPU in proportion to REQUESTS, and each fleet conductor requests 125m: the
+      # LAN devfile's request of 6 would outweigh a conductor 48:1 and starve the peers a
+      # build runs beside. So the request is small and the limit leaves the measured fleet
+      # load its headroom.
+      cpuLimit: '8'
+      cpuRequest: '2'
       mountSources: true
       sourceMapping: /projects
       env:
