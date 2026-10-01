@@ -1688,6 +1688,14 @@ pub async fn call_get_record_for_action(
     hc: &Arc<HcClient>,
     action_hash: &str,
 ) -> Result<Option<CarriedRecordWire>, StorageError> {
+    call_get_record_for_action_classed(hc, action_hash, AdmissionClass::Interactive).await
+}
+
+pub async fn call_get_record_for_action_classed(
+    hc: &Arc<HcClient>,
+    action_hash: &str,
+    class: AdmissionClass,
+) -> Result<Option<CarriedRecordWire>, StorageError> {
     let input = GetRecordForActionInput {
         action_hash: action_hash.to_string(),
     };
@@ -1696,8 +1704,8 @@ pub async fn call_get_record_for_action(
             "conductor_writes: encode GetRecordForActionInput: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "get_record_for_action", payload)
+    let (bytes, _) = hc
+        .call_zome_timed(ZOME_NAME, "get_record_for_action", payload, class)
         .await?;
     let out: Option<CarriedRecordWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(

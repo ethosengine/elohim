@@ -132,7 +132,10 @@ pub fn default_obs_severity() -> String {
 
 /// Freshness state bucket for cluster + topology + slice views.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FreshnessState {
     Live,
@@ -145,7 +148,10 @@ pub enum FreshnessState {
 
 /// Liveness/staleness indicator. `staleSinceMs` is populated when state ≠ live.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Freshness {
     pub state: FreshnessState,
@@ -162,7 +168,10 @@ pub struct Freshness {
 /// `agreements` / `economic_events` later. The inventory itself rides in the
 /// `ViewSlice.payload` as a [`ProjectionInventoryPayload`].
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ViewKind {
     Cluster,
@@ -171,6 +180,12 @@ pub enum ViewKind {
     /// names the projection (v1: `"rea_commitments"` only).
     ProjectionInventory {
         table: String,
+        // Optional discovery-only filter. A filtered caller requires this exact
+        // filter echoed in the response view kind; legacy unfiltered replies
+        // are unsupported, never evidence for the requested undertaking.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        filter: Option<ProjectionInventoryFilter>,
     },
     /// P2P twin of `GET /db/content/{id}/head-record`: ask the responder for
     /// the serialized DHT `Record` behind ITS declared head for `content_id`,
@@ -192,6 +207,21 @@ pub enum ViewKind {
     },
 }
 
+/// An exact undertaking filter on the existing inventory discovery surface.
+/// No authority travels here: candidates still require own-notary reconstruction.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectionInventoryFilter {
+    ProjectEpr {
+        #[serde(rename = "eprId")]
+        epr_id: String,
+    },
+}
+
 /// Response payload (carried in `ViewSlice.payload`) for a
 /// [`ViewKind::ContentHeadRecord`] request — the P2P twin of the
 /// `GET /db/content/{id}/head-record` response body.
@@ -205,7 +235,10 @@ pub enum ViewKind {
 /// every layer between the two conductors, re-verified in wasm by the
 /// receiving conductor before the declaration is honored.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentHeadRecordPayload {
     /// Echoes the requested content id.
@@ -300,7 +333,10 @@ pub struct ContentHeadRecordPayload {
 /// The reconciler diffs these against its own projection: missing id OR a
 /// different `dhtAnchorHash` ⇒ a convergence gap to heal from its OWN conductor.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectionInventoryEntry {
     pub id: String,
@@ -370,7 +406,10 @@ pub struct ProjectionInventoryEntry {
 /// reports the full row count so the requester can tell the inventory was
 /// truncated (v1 cap documented in `p2p::projection_reconcile`).
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectionInventoryPayload {
     /// The projection table this inventory is for (echoes the request's `table`).
@@ -435,7 +474,10 @@ pub struct ProjectionInventoryPayload {
 /// signed by the responding peer's agent key. The meta-shape that federates
 /// cluster + topology views across household peers.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewSlice {
     pub peer_id: String,
@@ -451,7 +493,10 @@ pub struct ViewSlice {
 /// F-T16: wire envelope only. The codec lands in F-T17 and the responder
 /// handler in F-T20.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewFederationRequest {
     pub view_kind: ViewKind,
@@ -516,7 +561,10 @@ pub struct ViewFederationRequest {
 /// PartialEq is intentionally NOT derived: `ViewSlice.payload` is `JsonVal`
 /// (`serde_json::Value`), which does not implement `PartialEq` cleanly.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewFederationResponse {
     pub view_kind: ViewKind,
@@ -601,6 +649,7 @@ mod inventory_offset_wire_compat_tests {
         // decode it at yesterday's behavior (offset 0), ignoring the extra key.
         let new = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -621,6 +670,7 @@ mod inventory_offset_wire_compat_tests {
         // decode it with the field defaulting to None (offset 0).
         let old = OldViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -637,6 +687,7 @@ mod inventory_offset_wire_compat_tests {
     fn offset_round_trips_when_present() {
         let req = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -989,6 +1040,7 @@ mod head_corpus_digest_wire_compat_tests {
     fn head_corpus_digest_round_trips_when_present() {
         let req = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -1032,6 +1084,7 @@ mod head_corpus_digest_wire_compat_tests {
         // head_corpus_digest key at all.
         let old = OldViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -1082,6 +1135,7 @@ mod head_corpus_digest_wire_compat_tests {
     fn none_head_corpus_digest_is_byte_identical_to_the_pre_field_encoding() {
         let new = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -1091,6 +1145,7 @@ mod head_corpus_digest_wire_compat_tests {
         };
         let old = OldViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: "content".into(),
             },
             agent_cid: "agent".into(),
@@ -1275,5 +1330,58 @@ mod head_set_snapshot_wire_compat_tests {
             .expect("old struct tolerates the unknown head_set_snapshot key");
         assert_eq!(old.entries, vec![entry()]);
         assert_eq!(old.total, 1);
+    }
+}
+
+#[cfg(test)]
+mod hosting_inventory_wire_tests {
+    use super::*;
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    enum LegacyKind {
+        ProjectionInventory { table: String },
+    }
+
+    #[test]
+    fn filtered_inventory_legacy_ignore_is_not_filter_support() {
+        let requested = ViewKind::ProjectionInventory {
+            table: "rea_commitments".into(),
+            filter: Some(ProjectionInventoryFilter::ProjectEpr {
+                epr_id: "exact-site".into(),
+            }),
+        };
+        let json = serde_json::to_value(&requested).unwrap();
+        assert_eq!(
+            json["projection_inventory"]["filter"],
+            serde_json::json!({"projectEpr":{"eprId":"exact-site"}})
+        );
+        let bytes = rmp_serde::to_vec_named(&requested).unwrap();
+        let old: LegacyKind = rmp_serde::from_slice(&bytes).unwrap();
+        let echoed: ViewKind =
+            rmp_serde::from_slice(&rmp_serde::to_vec_named(&old).unwrap()).unwrap();
+        assert_ne!(
+            echoed, requested,
+            "legacy unfiltered reply must be unsupported"
+        );
+        let new: ViewKind = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(
+            new, requested,
+            "supported exact filter survives wire round-trip"
+        );
+    }
+
+    #[test]
+    fn unfiltered_inventory_keeps_legacy_wire_bytes() {
+        let old = LegacyKind::ProjectionInventory {
+            table: "rea_commitments".into(),
+        };
+        let new = ViewKind::ProjectionInventory {
+            table: "rea_commitments".into(),
+            filter: None,
+        };
+        assert_eq!(
+            rmp_serde::to_vec_named(&old).unwrap(),
+            rmp_serde::to_vec_named(&new).unwrap()
+        );
     }
 }

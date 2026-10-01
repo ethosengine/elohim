@@ -3540,6 +3540,7 @@ async fn discover_rea(
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS.to_string(),
             },
             // Carries the local agent; the responder ignores ownership for
@@ -4642,6 +4643,7 @@ async fn discover_content(
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_CONTENT.to_string(),
             },
             agent_cid: p2p.agent_pubkey().to_string(),
@@ -6867,6 +6869,7 @@ async fn discover_collectives(
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_COLLECTIVES.to_string(),
             },
             agent_cid: p2p.agent_pubkey().to_string(),
@@ -7664,6 +7667,7 @@ pub async fn reconcile_shard_locations_from_peers(p2p: &dyn ReconcilePeers, pool
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS.to_string(),
             },
             agent_cid: p2p.agent_pubkey().to_string(),
@@ -8467,7 +8471,7 @@ mod tests {
         let t0 = std::time::Instant::now();
         // Two ids exhausted 30s apart, so `dormant` and `longest_dormancy` have
         // something to tell apart.
-        let mut exhaust = |ledger: &mut MissLedger, at, id| {
+        let exhaust = |ledger: &mut MissLedger, at, id| {
             for _ in 0..MAX_RETRIES {
                 ledger.admit_at(at, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false);
             }

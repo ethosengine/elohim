@@ -412,6 +412,66 @@ pub fn inventory_for_reconcile(
     Ok((entries, total.try_into().unwrap_or(usize::MAX)))
 }
 
+/// Discovery only: at most 64 project-epr scope candidates from this page.
+/// SQL narrows attention; the canonical parser makes the exact EPR decision.
+/// Wildcards in an EPR identifier are escaped, and prefix collisions never pass.
+/// Terminal rows remain discoverable so own-native reconstruction can withdraw.
+pub fn hosting_inventory(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    epr_id: &str,
+    offset: i64,
+) -> Result<(Vec<ReconcileInventoryRow>, usize), StorageError> {
+    if epr_id.is_empty() || epr_id.len() > 512 || epr_id.chars().any(char::is_control) {
+        return Err(StorageError::InvalidInput(
+            "invalid hosting inventory EPR".into(),
+        ));
+    }
+    let escaped = epr_id
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    let pattern = format!("%epr:{escaped}%");
+    let rows: Vec<ReaCommitment> = rea_commitments::table
+        .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+        .filter(rea_commitments::action.eq(PROJECT_EPR_ACTION))
+        .filter(rea_commitments::in_scope_of.like(pattern).escape('\\'))
+        .order(rea_commitments::created_at.desc())
+        .offset(offset.max(0))
+        .limit(64)
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("hosting inventory: {e}")))?;
+    let windowed = rows.len() == 64;
+    let entries: Vec<_> = rows
+        .into_iter()
+        .filter_map(|c| {
+            let (_, epr) = parse_projection_scope(c.in_scope_of.as_deref()?).ok()?;
+            if epr != epr_id {
+                return None;
+            }
+            let withdrawn = c.finished != 0
+                || matches!(c.state.as_str(), "cancelled" | "terminated" | "superseded");
+            let public = c
+                .metadata_json
+                .as_deref()
+                .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+                .is_some_and(|metadata| {
+                    matches!(
+                        metadata.get("reach").and_then(|v| v.as_str()),
+                        Some("commons" | "public")
+                    )
+                });
+            if !withdrawn && !public {
+                return None;
+            }
+            Some((c.id, c.dht_anchor_hash.unwrap_or_default(), c.state))
+        })
+        .collect();
+    // A full SQL page is partial, even when malformed near-matches were denied.
+    let total = entries.len() + usize::from(windowed);
+    Ok((entries, total))
+}
+
 /// Get commitments for an agent (as provider or receiver)
 pub fn get_commitments_for_agent(
     conn: &mut SqliteConnection,
@@ -1701,6 +1761,7 @@ pub fn find_active_projections(
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .filter(rea_commitments::action.eq(PROJECT_EPR_ACTION))
         .filter(rea_commitments::in_scope_of.like(&scope_filter))
+        .filter(rea_commitments::finished.eq(0))
         .filter(rea_commitments::state.ne("cancelled"))
         .filter(rea_commitments::state.ne("terminated"))
         // Re-grant supersession (spec §3.2/§3.3): a superseded predecessor is no
@@ -1911,7 +1972,19 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
 ///
 /// New writes are canonical bare pipe-strings; this tolerance exists so a
 /// legacy row degrades to a served projection instead of a parse error.
-fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError> {
+pub(crate) fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError> {
+    parse_projection_scope_at_depth(scope, 0)
+}
+
+fn parse_projection_scope_at_depth(
+    scope: &str,
+    depth: usize,
+) -> Result<(String, String), StorageError> {
+    if scope.len() > 4096 || depth > 8 {
+        return Err(StorageError::InvalidInput(
+            "projection scope codec budget exceeded".into(),
+        ));
+    }
     let trimmed = scope.trim();
     if trimmed.starts_with('[') {
         let items: Vec<String> = serde_json::from_str(trimmed).map_err(|e| {
@@ -1931,7 +2004,7 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
                 )))
             }
         };
-        return parse_projection_scope(&healed);
+        return parse_projection_scope_at_depth(&healed, depth + 1);
     }
 
     // `doorway:{id}|epr:{id}` names the projection. Exactly ONE additional ref
@@ -1970,6 +2043,11 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
         .strip_prefix("epr:")
         .ok_or_else(|| StorageError::Internal(format!("Scope missing 'epr:' prefix: {}", scope)))?
         .to_string();
+    if doorway_raw.is_empty() || epr_id.is_empty() || scope.chars().any(char::is_control) {
+        return Err(StorageError::InvalidInput(
+            "empty or invalid projection qualifier".into(),
+        ));
+    }
     Ok((format!("doorway:{}", doorway_raw), epr_id))
 }
 
@@ -3733,5 +3811,112 @@ mod reach_redeclaration_tests {
         anchor_advance(&mut conn, &ctx, &metadata("commons"));
 
         assert_eq!(served_reach(&mut conn, &ctx), "commons");
+    }
+}
+
+#[cfg(test)]
+mod hosting_inventory_tests {
+    use super::*;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    #[test]
+    fn exact_hosting_inventory_denies_scope_falsification_and_preserves_terminal_candidates() {
+        let mut conn = SqliteConnection::establish(":memory:").unwrap();
+        conn.run_pending_migrations(MIGRATIONS).unwrap();
+        let ctx = AppContext::default_lamad();
+        let target = "garden_%";
+        for (id, action, scope, reach) in [
+            (
+                "canonical",
+                "project-epr",
+                "doorway:a|epr:garden_%",
+                "commons",
+            ),
+            (
+                "known-legacy",
+                "project-epr",
+                r#"["doorway:b","epr:garden_%"]"#,
+                "commons",
+            ),
+            (
+                "near-prefix",
+                "project-epr",
+                "doorway:a|epr:garden_%other",
+                "commons",
+            ),
+            (
+                "wildcard-substitute",
+                "project-epr",
+                "doorway:a|epr:garden_xy",
+                "commons",
+            ),
+            (
+                "wrong-action",
+                "provide",
+                "doorway:a|epr:garden_%",
+                "commons",
+            ),
+            (
+                "bad-qualifier",
+                "project-epr",
+                "doorway:|epr:garden_%",
+                "commons",
+            ),
+            (
+                "bad-third-ref",
+                "project-epr",
+                "doorway:a|epr:garden_%|authority:all",
+                "commons",
+            ),
+            (
+                "private",
+                "project-epr",
+                "doorway:a|epr:garden_%",
+                "private",
+            ),
+        ] {
+            create_commitment(
+                &mut conn,
+                &ctx,
+                CreateReaCommitmentInput {
+                    id: Some(id.into()),
+                    action: action.into(),
+                    provider: "author".into(),
+                    receiver: "operator".into(),
+                    in_scope_of: Some(scope.into()),
+                    metadata_json: Some(serde_json::json!({"reach":reach}).to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        diesel::update(rea_commitments::table.filter(rea_commitments::id.eq("canonical")))
+            .set((
+                rea_commitments::state.eq("cancelled"),
+                rea_commitments::finished.eq(1),
+                rea_commitments::metadata_json.eq("{\"reach\":\"private\"}"),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+        let (rows, total) = hosting_inventory(&mut conn, &ctx, target, 0).unwrap();
+        assert_eq!(total, 2);
+        let ids: std::collections::HashSet<_> = rows.iter().map(|r| r.0.as_str()).collect();
+        assert_eq!(
+            ids,
+            std::collections::HashSet::from(["canonical", "known-legacy"])
+        );
+        assert!(rows
+            .iter()
+            .any(|r| r.0 == "canonical" && r.2 == "cancelled"));
+        assert!(hosting_inventory(&mut conn, &ctx, "", 0).is_err());
+        let mut nested = "doorway:a|epr:garden_%".to_string();
+        for _ in 0..9 {
+            nested = serde_json::to_string(&vec![nested]).unwrap();
+        }
+        assert!(
+            parse_projection_scope(&nested).is_err(),
+            "legacy nesting has a fixed codec budget"
+        );
     }
 }

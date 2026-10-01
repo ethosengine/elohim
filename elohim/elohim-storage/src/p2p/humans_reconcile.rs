@@ -196,6 +196,7 @@ pub async fn discover_humans(
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_HUMANS.to_string(),
             },
             agent_cid: p2p.agent_pubkey().to_string(),

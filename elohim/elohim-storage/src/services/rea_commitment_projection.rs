@@ -170,3 +170,155 @@ where
     }
     prepare_with_reader(id, &observed.action_hash.to_string(), expected, read).await
 }
+
+/// Same native prepare/CAS path as authenticated refresh, with exact hosting
+/// attention and Background admission. Candidates and their anchors are hints.
+/// bounded-work: four ID observations and 64 shared record reads per worker attempt.
+pub(crate) async fn refresh_hosting_by_id(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    epr_id: &str,
+    record_reads: &Arc<std::sync::atomic::AtomicUsize>,
+    events: Option<&crate::services::events::EventBus>,
+) -> Result<bool, StorageError> {
+    use crate::conductor_admission::AdmissionClass;
+    let expected = {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+        rea_commitment_lifecycle::snapshot(&mut conn, ctx, id)?
+    };
+    let prepared = prepare_hosting_refresh_with_reader(
+        id,
+        epr_id,
+        expected,
+        conductor_writes::get_rea_commitment_classed(hc, id, AdmissionClass::Background),
+        |hash| {
+            let hc = hc.clone();
+            let reads = record_reads.clone();
+            async move {
+                if !reserve_hosting_record(&reads) {
+                    return Err(StorageError::InvalidInput(
+                        "hosting record work budget pending".into(),
+                    ));
+                }
+                conductor_writes::call_get_record_for_action_classed(
+                    &hc,
+                    &hash,
+                    AdmissionClass::Background,
+                )
+                .await
+            }
+        },
+    )
+    .await?;
+    let Some(prepared) = prepared else {
+        // The observer authenticated a same/older record, not missing evidence.
+        // It deliberately returns no prepared scope to inspect here, so remain
+        // pending conservatively; the existing finite ladder bounds this cost.
+        return Ok(false);
+    };
+    let withdrawn = prepared.observation.commitment.finished
+        || matches!(
+            prepared.observation.commitment.state.as_str(),
+            "cancelled" | "terminated" | "superseded"
+        );
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Database(e.to_string()))?;
+    let outcome = apply_prepared(&mut conn, ctx, prepared)?;
+    if outcome == ApplyOutcome::Advanced {
+        if let Some(bus) = events {
+            bus.emit(if withdrawn {
+                crate::services::events::StorageEvent::ProjectionRevoked {
+                    commitment_id: id.into(),
+                }
+            } else {
+                crate::services::events::StorageEvent::ProjectionRegistered {
+                    commitment_id: id.into(),
+                }
+            });
+        }
+    }
+    Ok(outcome != ApplyOutcome::Deferred)
+}
+
+/// Validate the authenticated record, not a peer's projected scope or the
+/// unsigned fields accompanying a native ID observation. Reuse the same parser
+/// and CAS preparation as every other lifecycle observation.
+pub(crate) async fn prepare_hosting_refresh_with_reader<F, Fut, Lookup>(
+    id: &str,
+    epr_id: &str,
+    expected: Option<Snapshot>,
+    lookup: Lookup,
+    read: F,
+) -> Result<Option<Prepared>, StorageError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<
+        Output = Result<Option<conductor_writes::CarriedRecordWire>, StorageError>,
+    >,
+    Lookup: std::future::Future<
+        Output = Result<Option<shefa_types::ReaCommitmentOutput>, StorageError>,
+    >,
+{
+    let prepared = prepare_refresh(id, expected, lookup, read).await?;
+    if let Some(p) = &prepared {
+        let c = &p.observation.commitment;
+        let input = crate::rea_projection::project_typed_commitment(c);
+        let (_, exact_epr) = crate::db::rea_commitments::parse_projection_scope(
+            input.in_scope_of.as_deref().unwrap_or(""),
+        )?;
+        let withdrawn =
+            c.finished || matches!(c.state.as_str(), "cancelled" | "terminated" | "superseded");
+        let public = serde_json::from_str::<serde_json::Value>(&c.metadata_json)
+            .ok()
+            .is_some_and(|metadata| {
+                matches!(
+                    metadata.get("reach").and_then(|v| v.as_str()),
+                    Some("commons" | "public")
+                )
+            });
+        if c.action != "project-epr" || exact_epr != epr_id || (!withdrawn && !public) {
+            return Err(StorageError::InvalidInput(
+                "hosting record does not bind exact public EPR".into(),
+            ));
+        }
+    }
+    Ok(prepared)
+}
+
+fn reserve_hosting_record(reads: &std::sync::atomic::AtomicUsize) -> bool {
+    use std::sync::atomic::Ordering;
+    reads
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+            (n < 64).then_some(n + 1)
+        })
+        .is_ok()
+}
+
+#[cfg(test)]
+mod hosting_record_budget_tests {
+    use super::*;
+    #[test]
+    fn multiple_hosting_ids_share_one_record_budget() {
+        let reads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let workers = (0..4)
+            .map(|_| {
+                let reads = reads.clone();
+                std::thread::spawn(move || {
+                    (0..64).filter(|_| reserve_hosting_record(&reads)).count()
+                })
+            })
+            .collect::<Vec<_>>();
+        let admitted: usize = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .sum();
+        assert_eq!(admitted, 64);
+        assert!(!reserve_hosting_record(&reads));
+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), 64);
+    }
+}

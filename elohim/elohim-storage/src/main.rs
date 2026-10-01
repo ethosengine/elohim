@@ -5789,6 +5789,8 @@ async fn async_main(
             elohim_storage::services::courier_obey::register_node_byte_presence(bytes.clone());
             let _ = trigger_courier_slot.set(
                 elohim_storage::services::head_adoption_trigger::TriggerCourier {
+                    peers: peers.clone(),
+                    events: content_events_for_adoption.clone(),
                     fetcher: Arc::new(
                         elohim_storage::p2p::trigger_courier::OwnedPeerHeadRecordFetcher(peers),
                     ),

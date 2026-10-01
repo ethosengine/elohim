@@ -156,6 +156,7 @@ pub async fn discover_participations(
     for peer in &peers {
         let request = ViewFederationRequest {
             view_kind: ViewKind::ProjectionInventory {
+                filter: None,
                 table: PROJECTION_INVENTORY_TABLE_PARTICIPATIONS.to_string(),
             },
             agent_cid: p2p.agent_pubkey().to_string(),

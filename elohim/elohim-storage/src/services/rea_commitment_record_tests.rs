@@ -536,3 +536,182 @@ async fn explicit_refresh_wrong_id_refuses_before_record_read() {
     .await;
     assert!(matches!(result, Err(StorageError::InvalidInput(_))));
 }
+
+async fn reconstruct_hosting(
+    conn: &mut SqliteConnection,
+    r: &Record,
+    map: &HashMap<String, CarriedRecordWire>,
+    epr: &str,
+) -> Result<lifecycle::ApplyOutcome, StorageError> {
+    let ctx = AppContext::default_lamad();
+    let Some(Entry::App(entry)) = r.entry().as_option() else {
+        panic!("fixture entry missing");
+    };
+    let c: Commitment = rmp_serde::from_slice(entry.bytes()).unwrap();
+    let output = shefa_types::ReaCommitmentOutput {
+        action_hash: r.action_address().clone(),
+        entry_hash: r.action().entry_hash().unwrap().clone(),
+        commitment: c,
+    };
+    let prepared = projection::prepare_hosting_refresh_with_reader(
+        "own-provide",
+        epr,
+        lifecycle::snapshot(conn, &ctx, "own-provide")?,
+        std::future::ready(Ok(Some(output))),
+        |hash| std::future::ready(Ok(map.get(&hash).cloned())),
+    )
+    .await?;
+    match prepared {
+        Some(p) => projection::apply_prepared(conn, &ctx, p),
+        None => Ok(lifecycle::ApplyOutcome::Unchanged),
+    }
+}
+
+#[tokio::test]
+async fn native_hosting_reconstruction_mounts_exact_scope_and_withdraws_without_reauthoring() {
+    let live = record(project_epr_commitment("commons"), 1, None, 1);
+    let mut closed = project_epr_commitment("private");
+    closed.state = "cancelled".into();
+    closed.finished = true;
+    let closed = record(closed, 2, Some(&live), 1);
+    let map = records(&[&live, &closed]);
+    let mut conn = database();
+    let ctx = AppContext::default_lamad();
+    assert!(
+        rea_commitments::find_active_projections(&mut conn, &ctx, "alpha-elohim-host")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        reconstruct_hosting(&mut conn, &live, &map, "own-provide")
+            .await
+            .unwrap(),
+        lifecycle::ApplyOutcome::Advanced
+    );
+    let rows =
+        rea_commitments::find_active_projections(&mut conn, &ctx, "alpha-elohim-host").unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].epr_id, "own-provide");
+    assert_eq!(rows[0].url_path, "/garden");
+    assert!(
+        rea_commitments::find_active_projections(&mut conn, &ctx, "other-doorway")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        reconstruct_hosting(&mut conn, &closed, &map, "own-provide")
+            .await
+            .unwrap(),
+        lifecycle::ApplyOutcome::Advanced
+    );
+    assert!(
+        rea_commitments::find_active_projections(&mut conn, &ctx, "alpha-elohim-host")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        reconstruct_hosting(&mut conn, &live, &map, "own-provide")
+            .await
+            .unwrap(),
+        lifecycle::ApplyOutcome::Unchanged
+    );
+    assert!(
+        rea_commitments::find_active_projections(&mut conn, &ctx, "alpha-elohim-host")
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn hosting_reconstruction_refuses_misbound_or_unverifiable_native_record() {
+    let live = record(project_epr_commitment("commons"), 1, None, 1);
+    let map = records(&[&live]);
+    let mut conn = database();
+    assert!(
+        reconstruct_hosting(&mut conn, &live, &map, "own-provide-suffix")
+            .await
+            .is_err()
+    );
+    assert!(
+        reconstruct_hosting(&mut conn, &live, &HashMap::new(), "own-provide")
+            .await
+            .is_err()
+    );
+    let private = record(project_epr_commitment("private"), 1, None, 1);
+    let private_map = records(&[&private]);
+    assert!(
+        reconstruct_hosting(&mut conn, &private, &private_map, "own-provide")
+            .await
+            .is_err(),
+        "new active private record cannot mount"
+    );
+    let mut malformed = project_epr_commitment("commons");
+    malformed.in_scope_of_json = r#"["doorway:|epr:own-provide"]"#.into();
+    let malformed = record(malformed, 1, None, 1);
+    let malformed_map = records(&[&malformed]);
+    assert!(
+        reconstruct_hosting(&mut conn, &malformed, &malformed_map, "own-provide")
+            .await
+            .is_err()
+    );
+    assert!(rea_commitments::get_commitment(
+        &mut conn,
+        &AppContext::default_lamad(),
+        "own-provide"
+    )
+    .unwrap()
+    .is_none());
+}
+
+#[tokio::test]
+async fn native_hosting_lookup_absence_is_error_and_unchanged_record_is_verified() {
+    let live = record(project_epr_commitment("commons"), 1, None, 1);
+    let map = records(&[&live]);
+    let mut conn = database();
+    reconstruct_hosting(&mut conn, &live, &map, "own-provide")
+        .await
+        .unwrap();
+    let app = AppContext::default_lamad();
+    let expected = lifecycle::snapshot(&mut conn, &app, "own-provide").unwrap();
+    let reads = std::cell::Cell::new(0usize);
+    let missing = projection::prepare_hosting_refresh_with_reader(
+        "own-provide",
+        "own-provide",
+        expected.clone(),
+        std::future::ready(Ok(None)),
+        |hash| {
+            reads.set(reads.get() + 1);
+            std::future::ready(Ok(map.get(&hash).cloned()))
+        },
+    )
+    .await;
+    assert!(
+        matches!(missing, Err(StorageError::NotFound(_))),
+        "own lookup absence is pending error, never a settled record"
+    );
+    assert_eq!(reads.get(), 0);
+    let same = projection::prepare_hosting_refresh_with_reader(
+        "own-provide",
+        "own-provide",
+        expected,
+        std::future::ready(Ok(Some(shefa_types::ReaCommitmentOutput {
+            action_hash: live.action_address().clone(),
+            entry_hash: live.action().entry_hash().unwrap().clone(),
+            commitment: project_epr_commitment("commons"),
+        }))),
+        |hash| {
+            reads.set(reads.get() + 1);
+            std::future::ready(Ok(map.get(&hash).cloned()))
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        same.is_none(),
+        "None is the authenticated same-record observation"
+    );
+    assert!(
+        reads.get() > 0,
+        "equal SQL anchor never skips exact native record verification"
+    );
+}

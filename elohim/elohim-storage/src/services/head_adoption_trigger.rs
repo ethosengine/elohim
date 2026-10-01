@@ -280,6 +280,13 @@ pub fn retry_warranted(doc_hint: Option<&str>, local_declared: Option<&str>) -> 
     }
 }
 
+/// Private progress within one existing bounded claim, never a wire entity.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct HostingCursor {
+    pub page_offset: u32,
+    pub candidate_offset: usize,
+}
+
 /// One scheduled adoption probe.
 #[derive(Debug, Clone)]
 pub struct HeadAdoptionTrigger {
@@ -301,6 +308,7 @@ pub struct HeadAdoptionTrigger {
     /// FAULT (see [`SLOW_REPROBE_DELAY`]). A fault is not the not-yet-walkable
     /// race and must not consume the fast ladder.
     pub slow_retry_used: bool,
+    pub(crate) hosting_cursor: HostingCursor,
 }
 
 /// The single, slow re-probe granted after a conductor FAULT.
@@ -725,6 +733,7 @@ impl TriggerGate {
             raised_at: now,
             attempt: 0,
             slow_retry_used: false,
+            hosting_cursor: HostingCursor::default(),
         };
         match self.tx.try_send(trigger) {
             Ok(()) => EnqueueDecision::Enqueued,
@@ -833,6 +842,8 @@ impl ConductorSource for crate::hc_client_registry::HcClientRegistry {
 /// What the courier path needs from the node: a way to ask a peer for its head
 /// evidence, and byte presence. See [`crate::services::courier_obey`].
 pub struct TriggerCourier {
+    pub peers: Arc<dyn crate::p2p::reconcile_peers::ReconcilePeers>,
+    pub events: Option<Arc<crate::services::events::EventBus>>,
     pub fetcher: Arc<dyn HeadRecordFetcher>,
     pub bytes: Arc<dyn crate::services::courier_obey::BytePresence>,
 }
@@ -1051,7 +1062,11 @@ async fn process_trigger(
             action,
             TriggerAction::SkippedCurrent | TriggerAction::NoHintLeftToSweep
         ) {
-            gate.release(id);
+            if hosting_retry_needed(action, trigger.attempt) {
+                finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
+            } else {
+                gate.release(id);
+            }
         }
         if action == TriggerAction::NoLocalRow {
             tracing::debug!(
@@ -1086,7 +1101,7 @@ async fn process_trigger(
     )
     .await;
     let Some(probe) = probe else {
-        gate.release(id);
+        finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
         return;
     };
 
@@ -1212,7 +1227,7 @@ async fn process_trigger(
         AdoptOutcome::Adopted => {
             crate::metrics::inc_head_adoption_trigger("adopted");
             // The row now names the doc's head; the next change is a new event.
-            gate.release(id);
+            finish_hosting_or_retry(trigger, &hc, pool, ctx, gate, courier).await;
             // THE confirming line. Pair it with the `Applying changes from peer
             // … node:<slug>` line for the same id: the delta between them is the
             // measurement the 2026-09-17 analysis asked for, and it is now
@@ -1731,6 +1746,7 @@ mod tests {
             raised_at: raised,
             attempt: 0,
             slow_retry_used: false,
+            hosting_cursor: HostingCursor::default(),
         });
         assert_eq!(plan, RetryPlan::After(Duration::from_secs(1)));
         assert_eq!(gate.pending_retries(), 1, "the timer holds its slot");
@@ -2239,6 +2255,7 @@ mod tests {
             raised_at: Instant::now(),
             attempt: 0,
             slow_retry_used: false,
+            hosting_cursor: HostingCursor::default(),
         };
         assert!(gate.schedule_slow_retry(t.clone()), "first fault: granted");
         // The re-enqueued trigger carries `slow_retry_used`, and
@@ -2258,6 +2275,7 @@ mod tests {
             content_id: "beta".into(),
             peer: "peerA".into(),
             attempt: 0,
+            hosting_cursor: HostingCursor::default(),
         };
         assert!(!gate.schedule_slow_retry(late));
     }
@@ -2339,5 +2357,86 @@ mod tests {
             carried_record: None,
             peer_id: "peerA".into(),
         }));
+    }
+}
+
+/// Hosting has the same bounded queue/claim as its public bundle head. A partial
+/// native reconstruction schedules one existing rung even when the head itself
+/// is already current; exhausted work remains for the ordinary reconcile sweep.
+#[allow(clippy::too_many_arguments)]
+async fn finish_hosting_or_retry(
+    trigger: &HeadAdoptionTrigger,
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    gate: &Arc<TriggerGate>,
+    courier: &CourierSlot,
+) {
+    let Some(c) = courier.get() else {
+        gate.release(&trigger.content_id);
+        return;
+    };
+    let mut next = trigger.clone();
+    if crate::p2p::trigger_courier::reconstruct_bundle_hosting(
+        c.peers.as_ref(),
+        hc,
+        pool,
+        ctx,
+        c.events.as_deref(),
+        &trigger.content_id,
+        &trigger.peer,
+        &mut next.hosting_cursor,
+    )
+    .await
+    {
+        gate.release(&trigger.content_id);
+    } else {
+        let plan = gate.schedule_retry(next);
+        tracing::debug!(content_id = %trigger.content_id, ?plan, "hosting reconstruction pending on existing bounded retry ladder");
+    }
+}
+
+// Only an already-admitted pending retry may reconstruct an unchanged head.
+// Fresh current/no-hint notifications keep the original SQL-only cheap path.
+fn hosting_retry_needed(action: TriggerAction, attempt: u32) -> bool {
+    action == TriggerAction::SkippedCurrent && attempt > 0
+}
+
+#[cfg(test)]
+mod hosting_attention_tests {
+    use super::*;
+
+    #[test]
+    fn unchanged_notifications_do_not_restart_native_hosting_work() {
+        assert!(!hosting_retry_needed(TriggerAction::SkippedCurrent, 0));
+        assert!(!hosting_retry_needed(TriggerAction::NoHintLeftToSweep, 0));
+        assert!(!hosting_retry_needed(TriggerAction::NoHintLeftToSweep, 1));
+        assert!(hosting_retry_needed(TriggerAction::SkippedCurrent, 1));
+        // Exercise the real claim/queue and the worker's actual SQL decision:
+        // successful adoption releases the claim, then unrelated edits re-admit
+        // fresh attempt-zero work inside the same 60-second interval.
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        let now = Instant::now();
+        assert_eq!(
+            gate.claim_and_send("bundle", "peer", now),
+            EnqueueDecision::Enqueued
+        );
+        let _adopted = rx.try_recv().unwrap();
+        gate.release("bundle");
+        for second in 1..60 {
+            assert_eq!(
+                gate.claim_and_send("bundle", "peer", now + Duration::from_secs(second)),
+                EnqueueDecision::Enqueued
+            );
+            let next = rx.try_recv().unwrap();
+            for hint in [Some("head"), None] {
+                let action = decide(Some((Some("head"), false)), hint);
+                assert!(
+                    !hosting_retry_needed(action, next.attempt),
+                    "fresh settled notifications must spend no inventory/native hosting work"
+                );
+            }
+            gate.release("bundle");
+        }
     }
 }

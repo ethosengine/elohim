@@ -78,7 +78,7 @@ const _: () = assert!(
 );
 
 /// The REA-commitment projection table (v1 reconciliation stream). The
-/// `ViewKind::ProjectionInventory { table }` discriminator is the seam for
+/// `ViewKind::ProjectionInventory { table, filter }` discriminator is the seam for
 /// `agreements` / `economic_events` later; an unknown table yields an empty
 /// inventory (honest: "I hold nothing for a table I don't know").
 pub const PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS: &str = "rea_commitments";
@@ -378,8 +378,9 @@ pub async fn build_response_slice(
     ctx: SliceContext<'_>,
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
     // ProjectionInventory: not agent-scoped. Build from local SQL directly.
-    if let ViewKind::ProjectionInventory { table } = &view_kind {
-        let (payload, state) = build_inventory_payload(
+    if let ViewKind::ProjectionInventory { table, filter } = &view_kind {
+        let (payload, state) = build_filtered_inventory_payload(
+            filter.as_ref(),
             ctx.pool,
             table,
             ctx.inventory_offset.unwrap_or(0),
@@ -928,7 +929,18 @@ fn fit_inventory_to_budget(payload: &mut ProjectionInventoryPayload, budget: usi
 /// emits a frame its own codec's `write_response` would reject. `Live` when the
 /// pool is present (local SQL is present truth); `Offline` with an empty inventory
 /// when `pool` is `None` (test/conductor-less contexts) or the table is unknown.
+#[cfg(test)]
 fn build_inventory_payload(
+    pool: Option<&crate::db::DbPool>,
+    table: &str,
+    offset: u32,
+    requester_head_corpus_digest: Option<&str>,
+) -> (serde_json::Value, FreshnessState) {
+    build_filtered_inventory_payload(None, pool, table, offset, requester_head_corpus_digest)
+}
+
+fn build_filtered_inventory_payload(
+    filter: Option<&crate::views::ProjectionInventoryFilter>,
     pool: Option<&crate::db::DbPool>,
     table: &str,
     offset: u32,
@@ -965,6 +977,43 @@ fn build_inventory_payload(
         return empty();
     };
     let app_ctx = crate::db::AppContext::default_lamad();
+
+    if let Some(crate::views::ProjectionInventoryFilter::ProjectEpr { epr_id }) = filter {
+        if table != PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS {
+            return empty();
+        }
+        return match crate::db::rea_commitments::hosting_inventory(
+            &mut conn,
+            &app_ctx,
+            epr_id,
+            i64::from(offset),
+        ) {
+            Ok((rows, total)) => {
+                let mut payload = ProjectionInventoryPayload {
+                    table: table.to_string(),
+                    total,
+                    entries: rows
+                        .into_iter()
+                        .map(|(id, dht_anchor_hash, state)| ProjectionInventoryEntry {
+                            id,
+                            dht_anchor_hash,
+                            commitment_state: Some(state),
+                            declared_head_action_hash: None,
+                            declared_head_at: None,
+                        })
+                        .collect(),
+                    in_sync: None,
+                    head_set_snapshot: None,
+                };
+                fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+                (
+                    serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                    FreshnessState::Live,
+                )
+            }
+            Err(_) => empty(),
+        };
+    }
 
     // Content table (notary-authority Leg 4) — anchored, distribution-safe rows.
     if table == PROJECTION_INVENTORY_TABLE_CONTENT {
@@ -2499,5 +2548,75 @@ mod tests {
         let dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
         assert_eq!(dropped, 0, "a small payload under budget is never trimmed");
         assert_eq!(payload.entries.len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod hosting_filtered_responder_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn signed_filtered_inventory_echoes_scope_and_returns_only_exact_candidates() {
+        let pool = crate::test_util::test_pool();
+        let app = crate::db::AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            for (id, scope) in [
+                ("exact", "doorway:b|epr:garden"),
+                ("prefix", "doorway:b|epr:garden-extra"),
+            ] {
+                crate::db::rea_commitments::create_commitment(
+                    &mut conn,
+                    &app,
+                    crate::db::rea_commitments::CreateReaCommitmentInput {
+                        id: Some(id.into()),
+                        action: "project-epr".into(),
+                        provider: "author".into(),
+                        receiver: "operator".into(),
+                        in_scope_of: Some(scope.into()),
+                        metadata_json: Some(serde_json::json!({"reach":"commons"}).to_string()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            }
+        }
+        let kind = ViewKind::ProjectionInventory {
+            table: PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS.into(),
+            filter: Some(crate::views::ProjectionInventoryFilter::ProjectEpr {
+                epr_id: "garden".into(),
+            }),
+        };
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        let reply = build_response_slice(
+            kind.clone(),
+            SliceContext {
+                agent_cid: "requester".into(),
+                request_id: "bounded".into(),
+                local_agent_cid: "responder",
+                local_peer_id: keypair.public().to_peer_id().to_string(),
+                connected_peers: &[],
+                keypair: &keypair,
+                pool: Some(&pool),
+                inventory_offset: Some(0),
+                head_corpus_digest: None,
+                hc_registry: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(reply.view_kind, kind);
+        assert_eq!(reply.slice.view_kind, kind);
+        assert!(matches!(reply.slice.freshness.state, FreshnessState::Live));
+        let signature = base64::engine::general_purpose::STANDARD
+            .decode(&reply.slice.signature)
+            .unwrap();
+        assert!(keypair
+            .public()
+            .verify(&reply.slice.canonical_bytes_for_signing(), &signature));
+        let payload: ProjectionInventoryPayload =
+            serde_json::from_value(reply.slice.payload.0).unwrap();
+        assert_eq!(payload.entries.len(), 1);
+        assert_eq!(payload.entries[0].id, "exact");
     }
 }

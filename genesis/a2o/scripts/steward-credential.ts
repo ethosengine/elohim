@@ -27,7 +27,10 @@ import {
 import type { ConductorOptions } from './lib/steward-conductor.js';
 import type { InvocationMandate } from './lib/steward-credential.js';
 
-export async function main(argv: string[]): Promise<void> {
+export async function main(
+  argv: string[],
+  connect: typeof connectConductor = connectConductor
+): Promise<void> {
   if (argv.length === 4 && argv[0] === 'stage-head') {
     const descriptor = JSON.parse(readFileSync(argv[1], 'utf8')) as {
       connection: ConductorOptions;
@@ -45,7 +48,7 @@ export async function main(argv: string[]): Promise<void> {
       !descriptor.mandate.subjects.some(s => s.id === id && s.root === grant.rootActionHash)
     )
       throw new Error('credential does not authorize this exact provisional root approval');
-    const c = await connectConductor(descriptor.connection);
+    const c = await connect(descriptor.connection);
     try {
       const m = descriptor.mandate;
       if (c.agent !== m.issuer || c.dna !== m.dna || c.requester !== m.requester)
@@ -72,13 +75,22 @@ export async function main(argv: string[]): Promise<void> {
       await c.close();
     }
   }
-  if (argv.length === 2 && ['grant-heads', 'exercise-ceremony'].includes(argv[0])) {
+  if (
+    (argv[0] === 'grant-heads' && (argv.length === 2 || argv.length === 3)) ||
+    (argv[0] === 'exercise-ceremony' && argv.length === 2)
+  ) {
     const descriptor = JSON.parse(readFileSync(argv[1], 'utf8')) as {
       connection: ConductorOptions;
       mandate: InvocationMandate;
     };
     const m = descriptor.mandate;
-    const c = await connectConductor(descriptor.connection);
+    // Select execution only; the issued mandate and requester custody stay intact.
+    const selectedId = argv[0] === 'grant-heads' ? argv[2] : undefined;
+    const subjects =
+      selectedId === undefined ? m.subjects : m.subjects.filter(s => s.id === selectedId);
+    if (selectedId !== undefined && subjects.length !== 1)
+      throw new Error('selected subject must name one exact root in the issued mandate');
+    const c = await connect(descriptor.connection);
     try {
       if (c.agent !== m.issuer || c.dna !== m.dna || c.requester !== m.requester)
         throw new Error('ceremony connection differs from its exact credential');
@@ -105,7 +117,7 @@ export async function main(argv: string[]): Promise<void> {
         string,
         HeadDelegationDocument
       >;
-      for (const subject of m.subjects) {
+      for (const subject of subjects) {
         if (Object.hasOwn(grants, subject.id)) {
           const saved = grants[subject.id];
           if (
@@ -142,7 +154,7 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (argv.length !== 2 || argv[0] !== 'issue')
     throw new Error(
-      'usage: steward-credential.ts issue PLAN.json | grant-heads DESCRIPTOR.json | stage-head DESCRIPTOR.json ID HEAD | exercise-ceremony DESCRIPTOR.json | refresh-hosted CONNECTION.json'
+      'usage: steward-credential.ts issue PLAN.json | grant-heads DESCRIPTOR.json [ID] | stage-head DESCRIPTOR.json ID HEAD | exercise-ceremony DESCRIPTOR.json | refresh-hosted CONNECTION.json'
     );
   const issued = await issueCredential(readCredentialPlan(argv[1]));
   console.log(`credential issued: action=${issued.capabilityAction} profile=${issued.profile}`);
