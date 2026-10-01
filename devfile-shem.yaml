@@ -1,3 +1,6 @@
+# NOT LAUNCHABLE YET (2026-10-01): the image below is built on UBI 10 (x86-64-v3) and shem's
+# Sandy Bridge Xeons are x86-64-v2 — the first container dies with "CPU does not support
+# x86-64-v3". Plan: che-devworkspaces docs/2026-10-01-x86-64-v2-workspace-image-plan.md.
 schemaVersion: 2.2.0
 metadata:
   name: elohim-devspace-shem
