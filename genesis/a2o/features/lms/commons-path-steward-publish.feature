@@ -1,5 +1,25 @@
-@e2e @lamad @act:i @wip @concern:commons-path-steward-publish
+@e2e @lamad @act:i @concern:commons-path-steward-publish
 Feature: A steward publishes a commons learning path from his own peer, and seeding never overrides what he signed
+  The active scenario proves that a person can correct one commons learning item
+  from an authorized device without rebuilding or reseeding the course. Matthew's
+  publishing peer originally created that item and remains its root author. Che
+  is the original workspace peer, recognized as a device of Matthew's existing
+  Human identity. Che signs updates with its own key, distinct from Matthew's
+  publishing peer's key. Matthew's root-author peer accepts each exact update,
+  and Matthew's identity controller witnesses that device's exact exercise.
+
+  Adam is a separate peer with a different key on the same network. The test
+  reads Adam's own native election and ancestry, so Che's local copy cannot
+  stand in for another peer's acceptance. Alpha and apex are two public
+  doorways through which readers reach the peers. Both must serve the exact
+  updated head and body within 75 seconds of Che starting the update. The
+  same item is then changed a second time, under the same root and permission,
+  to show that ordinary editing continues after the first successful update.
+
+  The six scenarios tagged work in progress retain the wider course, seeding,
+  privacy and withdrawal requirements. They are not part of this reduced proof.
+  The course narrative below describes that wider intended behavior.
+
   Matthew is the steward of "Foundations for Christian Technology": the person
   who holds the authority to publish updates to it. Every piece of content
   declares its reach, how far it may travel, on a scale that runs from intimate
@@ -49,9 +69,9 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   Jessica's love map is a path at intimate reach: it is theirs, inside their home.
   The steward-publish command has no business touching it.
 
-  The doorway named in the background is the household's gateway: the address
-  through which a browser, or this test, reaches the peers. The feature is
-  tagged work in progress until its steps are wired to the running household.
+  The doorway named in the held scenarios is the household's gateway: the
+  address through which a browser, or this test, reaches the peers. Those wider
+  scenarios stay tagged work in progress until their steps are wired.
 
   Matthew can recognize an independently keyed workspace peer as another device
   of his existing identity. Matthew is that identity's controller: he can affirm
@@ -64,8 +84,8 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   device permission for that exact item and accept the exact updated version.
   A credential lists those original records, the device, the permitted actions
   and this network. Calling a function alone confers no wider permission.
-  The first four scenarios use Matthew's original publishing peer and its exact
-  agent key. The workspace scenarios use the workspace peer's different key;
+  The held original-publishing scenarios use Matthew's original publishing peer
+  and its exact agent key. The workspace scenarios use the workspace peer's different key;
   recognizing it as Matthew's device does not make those keys interchangeable.
   An acceptance records the version and the original time its author approved it.
 
@@ -74,31 +94,33 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   Peers verify the authors, predecessor hashes and ordering and inspect the records
   for withdrawal or a changed controller policy. A missing record or exhausted
   verification budget leaves the update pending; a discovery-link miss is no proof
-  that withdrawal never happened. The scenarios below remain work in progress
-  until those native witnesses and household checks are wired.
+  that withdrawal never happened. The broader withdrawal scenarios below remain
+  work in progress until their native witnesses and household checks are wired.
 
-  Background:
+  # Sprint 1.4 closes one exact item; the full course and lifecycle scenarios stay held.
+  Scenario: Che publishes two consecutive updates to Matthew's item without the pipeline
+    Given the original Che peer has verified credentials for one Matthew-authored commons item
+    When Che publishes two consecutive single-item updates with exact controller witnesses
+    Then Adam elects each Che update and alpha and apex serve its exact head and body within 75 seconds
+
+  @wip
+  Scenario: Seeding after the publish leaves the current course untouched
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And the learning path "foundations-christian-technology" is declared at commons reach
     And the learning path "love-map-matthew-jessica" is declared at intimate reach
     And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
-
-  Scenario: Matthew's update reaches another peer without the pipeline
-    Given Matthew has reworked "foundations-christian-technology" into five movements
-    When Matthew runs steward-publish for the reworked path and its items
-    Then Jessica's peer serves the path's head signed by Matthew's publishing peer's agent
-    And the path's movements on Jessica's peer are "Waking Up", "Turning", "Reordering Loves", "Rebuilding Common Life" and "Abundant Life & Sending"
-    And the lesson of "The Church Dilemma", the first module of "Waking Up", on Jessica's peer links to its anchor scripture, its story, its discussion and its practice
-    And the "evolution-of-trust" simulation is still on the path
-
-  Scenario: Seeding after the publish leaves the current course untouched
     Given Matthew has run steward-publish for the reworked path and its items
     And nobody has changed the course in the repository since
     When the peers are seeded from the repository
     Then seeding reports every item of the course as already current
     And every item of the course on Jessica's peer keeps the head Matthew's publishing peer's agent signed
 
+  @wip
   Scenario: A correction to a signed item is published by its steward, not by seeding
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And the learning path "foundations-christian-technology" is declared at commons reach
+    And the learning path "love-map-matthew-jessica" is declared at intimate reach
+    And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
     Given Matthew has run steward-publish for the reworked path and its items
     And a developer then corrects the text of the lesson of "The Church Dilemma" in the repository
     When the peers are seeded from the repository
@@ -107,14 +129,23 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     When Matthew runs steward-publish for that lesson
     Then Jessica's peer serves the corrected text under a new head signed by Matthew's publishing peer's agent
 
+  @wip
   Scenario: steward-publish refuses anything held at intimate reach
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And the learning path "foundations-christian-technology" is declared at commons reach
+    And the learning path "love-map-matthew-jessica" is declared at intimate reach
+    And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
     When Matthew runs steward-publish for "love-map-matthew-jessica"
     Then the command refuses before writing anything, naming the love map's intimate reach
     And the love map on every peer keeps its head and its intimate reach
 
   # Constraint: access to a function does not authorize every root the peer authored.
-  @regression
+  @wip @regression
   Scenario: Matthew's publishing credential cannot authorize another course
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And the learning path "foundations-christian-technology" is declared at commons reach
+    And the learning path "love-map-matthew-jessica" is declared at intimate reach
+    And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
     Given Matthew recognizes his workspace peer as a device of his existing identity
     And Matthew authorizes its signing key for the exact roots of "foundations-christian-technology"
     When the signing key asks the author peer to grant publishing authority for a different course
@@ -122,8 +153,12 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     And the other course keeps its head
 
   # Constraint: later withdrawal stops new exercise while preserving exact accepted history.
-  @regression
+  @wip @regression
   Scenario: An interrupted accepted update remains recoverable after device withdrawal
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And the learning path "foundations-christian-technology" is declared at commons reach
+    And the learning path "love-map-matthew-jessica" is declared at intimate reach
+    And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
     Given Matthew's workspace peer authored a course update
     And its root author accepted that exact version before the device was withdrawn
     And publication stopped before that version was declared
@@ -135,8 +170,12 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
     And Matthew's identity and his other devices retain their standing
 
   # Constraint: absent lifecycle links cannot prove that a withdrawal never happened.
-  @regression
+  @wip @regression
   Scenario: Missing withdrawal history does not become publishing permission
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And the learning path "foundations-christian-technology" is declared at commons reach
+    And the learning path "love-map-matthew-jessica" is declared at intimate reach
+    And the path "foundations-christian-technology" includes the "evolution-of-trust" simulation
     Given Matthew withdrew his workspace device before an update was accepted
     And another peer has the device binding but lacks its withdrawal discovery link
     And it cannot obtain a required signed record in the controller history
