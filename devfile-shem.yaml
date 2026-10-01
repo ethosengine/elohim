@@ -25,13 +25,18 @@ metadata:
 # strategic-merge-patched into the workspace pod by the DevWorkspace operator.
 #
 # SHEM VARIANT of devfile.yaml. Launch with ?devfilePath=devfile-shem.yaml. Differences
-# from the root devfile: the three placement attributes below and the memory limit.
-# Procedure and the operator-owned prerequisite: che-devworkspaces/README.md, "Choosing the
-# host for a new Elohim workspace".
+# from the root devfile: the name, the three placement attributes below, and the
+# memory/CPU settings.
 #   - storage: the `devworkspace-config-shem` DevWorkspaceOperatorConfig in `eclipse-che`
-#     must exist and set workspace.storageClassName: shem-zfs BEFORE the first start. The
-#     Che Dashboard injects its own config reference at creation; verify the created
-#     DevWorkspace still names devworkspace-config-shem, or the PVC lands on the LAN class.
+#     must exist BEFORE the first start: a copy of Che's `devworkspace-config` with
+#     workspace.storageClassName: shem-zfs. The dashboard adds its own config reference
+#     only when this attribute is absent (checked on 7.122.0, 2026-10-01); still confirm
+#     the created PVC's class, because a claim's storage class cannot be changed.
+#   - after the first start, on shem: exclude the new dataset from hourly snapshots. Every
+#     tank/k8s dataset is snapshotted hourly and the volume quota counts snapshots; build
+#     output would fill it. The dataset name exists only once the PVC is created.
+#   - `shem-zfs` is Retain: deleting the workspace leaves the PV, zfsvolume and dataset
+#     behind for manual removal.
 #   - node: a selector alone does not change the storage class, and the toleration is what
 #     lets the pod through shem's remote-wan taint.
 # A new workspace is a new device: it has its own conductor key and enrols as its own
