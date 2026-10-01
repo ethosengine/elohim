@@ -21,8 +21,8 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
-use crate::auth::{is_operation_allowed, PermissionLevel};
-use crate::proxy::holochain::{encode_error, parse_message};
+use crate::auth::{is_operation_allowed, AdminCaller, PermissionLevel};
+use crate::proxy::holochain::{encode_error, parse_message, ParsedMessage};
 use crate::types::{DoorwayError, Result};
 
 type HyperWebSocket =
@@ -34,6 +34,7 @@ pub async fn run_proxy(
     conductor_url: &str,
     _origin: Option<String>,
     permission_level: PermissionLevel,
+    caller: AdminCaller,
 ) -> Result<()> {
     info!(
         "Creating filtered admin proxy to {} (permission: {})",
@@ -83,7 +84,7 @@ pub async fn run_proxy(
             match msg {
                 Ok(Message::Binary(data)) => {
                     // Parse message and check permissions
-                    match filter_message(&data, permission_level) {
+                    match filter_message(&data, permission_level, &caller) {
                         FilterResult::Allow => {
                             let mut sink = conductor_sink_for_client.lock().await;
                             if let Err(e) = sink.send(Message::Binary(data)).await {
@@ -114,11 +115,16 @@ pub async fn run_proxy(
                         }
                     }
                 }
-                Ok(Message::Text(text)) => {
-                    // Forward text messages (shouldn't happen with Holochain, but handle it)
-                    let mut sink = conductor_sink_for_client.lock().await;
-                    if let Err(e) = sink.send(Message::Text(text)).await {
-                        error!("Failed to send text to conductor: {}", e);
+                Ok(Message::Text(_)) => {
+                    // Holochain admin speaks binary MessagePack only. A text frame
+                    // cannot be parsed into an operation, so it cannot be
+                    // authorized — never forwarded, same refusal as an
+                    // unparseable binary frame.
+                    warn!("Blocking text admin frame");
+                    let error_response = encode_error("Invalid message format");
+                    let mut sink = client_sink_for_client.lock().await;
+                    if let Err(e) = sink.send(Message::Binary(error_response)).await {
+                        error!("Failed to send error to client: {}", e);
                         break;
                     }
                 }
@@ -222,27 +228,377 @@ enum FilterResult {
     PassThrough,
 }
 
-/// Filter a message based on permission level
-fn filter_message(data: &[u8], permission_level: PermissionLevel) -> FilterResult {
+/// Filter a message based on permission level and the caller's own scope
+fn filter_message(
+    data: &[u8],
+    permission_level: PermissionLevel,
+    caller: &AdminCaller,
+) -> FilterResult {
     match parse_message(data) {
-        Ok(parsed) => {
-            let operation = &parsed.operation;
-
-            if is_operation_allowed(operation, permission_level) {
+        Ok(parsed) => match authorize_admin_request(&parsed, permission_level, caller) {
+            Ok(()) => {
                 debug!(
                     "Allowing operation '{}' for permission level {}",
-                    operation, permission_level
+                    parsed.operation, permission_level
                 );
                 FilterResult::Allow
-            } else {
-                FilterResult::Deny(format!(
-                    "Operation '{operation}' requires higher permission level (current: {permission_level})"
-                ))
             }
-        }
+            Err(reason) => FilterResult::Deny(reason),
+        },
         Err(e) => {
             debug!("Failed to parse message: {}", e);
             FilterResult::PassThrough
         }
+    }
+}
+
+/// Operations whose payload names a cell (`cell_id: [dna_hash, agent_pub_key]`).
+const CELL_BEARING_OPERATIONS: &[&str] = &[
+    "grant_zome_call_capability",
+    "revoke_zome_call_capability",
+    "dump_state",
+    "dump_full_state",
+    "dump_op_timings",
+];
+
+/// Operations whose payload names an installed app (`installed_app_id`).
+const APP_BEARING_OPERATIONS: &[&str] =
+    &["issue_app_authentication_token", "list_capability_grants"];
+
+/// Authorize one parsed admin request: the operation must be allowed at the
+/// caller's level (name check), and below `Admin` a cell- or app-bearing
+/// operation must target the caller's OWN cell/app. `Admin` is unchanged.
+///
+/// Fails closed: if the caller's identity is unknown or the cell/app cannot be
+/// read from the payload, the request is refused.
+pub(crate) fn authorize_admin_request(
+    parsed: &ParsedMessage,
+    permission_level: PermissionLevel,
+    caller: &AdminCaller,
+) -> std::result::Result<(), String> {
+    let operation = parsed.operation.as_str();
+    if !is_operation_allowed(operation, permission_level) {
+        return Err(format!(
+            "Operation '{operation}' requires higher permission level (current: {permission_level})"
+        ));
+    }
+    if permission_level >= PermissionLevel::Admin {
+        return Ok(());
+    }
+
+    if CELL_BEARING_OPERATIONS.contains(&operation) {
+        let Some(own_agent) = caller.agent.as_deref() else {
+            return Err(format!(
+                "Operation '{operation}' requires a caller bound to an agent key"
+            ));
+        };
+        return match cell_agent(&parsed.data) {
+            Some(agent) if agent == own_agent => Ok(()),
+            Some(_) => Err(format!(
+                "Operation '{operation}' may only target the caller's own cell"
+            )),
+            None => Err(format!(
+                "Operation '{operation}' refused: cell_id could not be determined"
+            )),
+        };
+    }
+
+    if APP_BEARING_OPERATIONS.contains(&operation) {
+        let Some(own_app) = caller.installed_app_id.as_deref() else {
+            return Err(format!(
+                "Operation '{operation}' requires a caller bound to an installed app"
+            ));
+        };
+        return match single_string_field(&parsed.data, "installed_app_id") {
+            Some(app) if app == own_app => Ok(()),
+            Some(_) => Err(format!(
+                "Operation '{operation}' may only target the caller's own app"
+            )),
+            None => Err(format!(
+                "Operation '{operation}' refused: installed_app_id could not be determined"
+            )),
+        };
+    }
+
+    Ok(())
+}
+
+/// The raw 39-byte agent key of the payload's `cell_id` (`[dna_hash, agent]`).
+/// `None` unless the payload has exactly one well-formed `cell_id`.
+fn cell_agent(data: &rmpv::Value) -> Option<Vec<u8>> {
+    let rmpv::Value::Map(map) = data else {
+        return None;
+    };
+    let mut found = map
+        .iter()
+        .filter(|(k, _)| k.as_str() == Some("cell_id"))
+        .map(|(_, v)| v);
+    let cell_id = found.next()?;
+    if found.next().is_some() {
+        return None;
+    }
+    let rmpv::Value::Array(parts) = cell_id else {
+        return None;
+    };
+    match parts.as_slice() {
+        [rmpv::Value::Binary(_dna), rmpv::Value::Binary(agent)] if agent.len() == 39 => {
+            Some(agent.clone())
+        }
+        _ => None,
+    }
+}
+
+/// A string field that appears exactly once in the payload map.
+fn single_string_field(data: &rmpv::Value, key: &str) -> Option<String> {
+    let rmpv::Value::Map(map) = data else {
+        return None;
+    };
+    let mut found = map
+        .iter()
+        .filter(|(k, _)| k.as_str() == Some(key))
+        .map(|(_, v)| v);
+    let value = found.next()?;
+    if found.next().is_some() {
+        return None;
+    }
+    value.as_str().map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rmpv::Value;
+
+    const OWN: [u8; 39] = [7; 39];
+    const OTHER: [u8; 39] = [9; 39];
+
+    fn s(v: &str) -> Value {
+        Value::String(v.into())
+    }
+
+    /// `{ type: "request", id, data: <msgpack { type: op, data }> }` — the
+    /// double-encoded shape @holochain/client sends.
+    fn frame(op: &str, data: Value) -> Vec<u8> {
+        let inner = Value::Map(vec![(s("type"), s(op)), (s("data"), data)]);
+        let mut inner_bytes = Vec::new();
+        rmpv::encode::write_value(&mut inner_bytes, &inner).unwrap();
+        let outer = Value::Map(vec![
+            (s("id"), Value::from(1)),
+            (s("type"), s("request")),
+            (s("data"), Value::Binary(inner_bytes)),
+        ]);
+        let mut out = Vec::new();
+        rmpv::encode::write_value(&mut out, &outer).unwrap();
+        out
+    }
+
+    fn cell_payload(agent: &[u8]) -> Value {
+        Value::Map(vec![(
+            s("cell_id"),
+            Value::Array(vec![
+                Value::Binary(vec![1; 39]),
+                Value::Binary(agent.to_vec()),
+            ]),
+        )])
+    }
+
+    fn caller() -> AdminCaller {
+        AdminCaller {
+            agent: Some(OWN.to_vec()),
+            installed_app_id: Some("elohim-alice".into()),
+        }
+    }
+
+    fn allowed(op: &str, data: Value, level: PermissionLevel, who: &AdminCaller) -> bool {
+        matches!(
+            filter_message(&frame(op, data), level, who),
+            FilterResult::Allow
+        )
+    }
+
+    #[test]
+    fn authenticated_cannot_grant_on_a_foreign_cell() {
+        let who = caller();
+        assert!(!allowed(
+            "grant_zome_call_capability",
+            cell_payload(&OTHER),
+            PermissionLevel::Authenticated,
+            &who
+        ));
+        assert!(allowed(
+            "grant_zome_call_capability",
+            cell_payload(&OWN),
+            PermissionLevel::Authenticated,
+            &who
+        ));
+    }
+
+    #[test]
+    fn authenticated_cannot_dump_full_state_of_a_foreign_cell() {
+        let who = caller();
+        for op in [
+            "dump_state",
+            "dump_full_state",
+            "revoke_zome_call_capability",
+        ] {
+            assert!(!allowed(
+                op,
+                cell_payload(&OTHER),
+                PermissionLevel::Authenticated,
+                &who
+            ));
+            assert!(allowed(
+                op,
+                cell_payload(&OWN),
+                PermissionLevel::Authenticated,
+                &who
+            ));
+        }
+    }
+
+    #[test]
+    fn admin_may_target_any_cell() {
+        let who = AdminCaller::default();
+        assert!(allowed(
+            "grant_zome_call_capability",
+            cell_payload(&OTHER),
+            PermissionLevel::Admin,
+            &who
+        ));
+        assert!(allowed(
+            "dump_full_state",
+            cell_payload(&OTHER),
+            PermissionLevel::Admin,
+            &who
+        ));
+    }
+
+    #[test]
+    fn undeterminable_cell_is_refused_at_authenticated() {
+        let who = caller();
+        let malformed = [
+            Value::Nil,
+            Value::Map(vec![]),
+            Value::Map(vec![(s("cell_id"), s("not-a-cell"))]),
+            // Agent half is the wrong length.
+            cell_payload(&[7; 32]),
+            // Two cell_id keys: parsers could disagree about which one wins.
+            Value::Map(vec![
+                (
+                    s("cell_id"),
+                    Value::Array(vec![
+                        Value::Binary(vec![1; 39]),
+                        Value::Binary(OWN.to_vec()),
+                    ]),
+                ),
+                (
+                    s("cell_id"),
+                    Value::Array(vec![
+                        Value::Binary(vec![1; 39]),
+                        Value::Binary(OTHER.to_vec()),
+                    ]),
+                ),
+            ]),
+        ];
+        for data in malformed {
+            assert!(!allowed(
+                "grant_zome_call_capability",
+                data,
+                PermissionLevel::Authenticated,
+                &who
+            ));
+        }
+    }
+
+    #[test]
+    fn caller_without_an_agent_fails_closed_on_cell_operations() {
+        // An API-key caller binds no agent.
+        let who = AdminCaller::default();
+        assert!(!allowed(
+            "dump_state",
+            cell_payload(&OWN),
+            PermissionLevel::Authenticated,
+            &who
+        ));
+    }
+
+    #[test]
+    fn app_bearing_operations_are_scoped_to_the_callers_app() {
+        let who = caller();
+        let app = |id: &str| Value::Map(vec![(s("installed_app_id"), s(id))]);
+        for op in ["issue_app_authentication_token", "list_capability_grants"] {
+            assert!(allowed(
+                op,
+                app("elohim-alice"),
+                PermissionLevel::Authenticated,
+                &who
+            ));
+            assert!(!allowed(
+                op,
+                app("elohim-bob"),
+                PermissionLevel::Authenticated,
+                &who
+            ));
+            assert!(!allowed(
+                op,
+                Value::Nil,
+                PermissionLevel::Authenticated,
+                &who
+            ));
+            assert!(!allowed(
+                op,
+                app("elohim-alice"),
+                PermissionLevel::Authenticated,
+                &AdminCaller::default()
+            ));
+            assert!(allowed(
+                op,
+                app("elohim-bob"),
+                PermissionLevel::Admin,
+                &AdminCaller::default()
+            ));
+        }
+    }
+
+    #[test]
+    fn name_check_still_applies_before_scope() {
+        let who = caller();
+        assert!(!allowed(
+            "install_app",
+            Value::Nil,
+            PermissionLevel::Authenticated,
+            &who
+        ));
+        assert!(!allowed(
+            "grant_zome_call_capability",
+            cell_payload(&OWN),
+            PermissionLevel::Public,
+            &who
+        ));
+    }
+
+    #[test]
+    fn unscoped_authenticated_operations_are_unchanged() {
+        let who = AdminCaller::default();
+        assert!(allowed(
+            "generate_agent_pub_key",
+            Value::Nil,
+            PermissionLevel::Authenticated,
+            &who
+        ));
+        assert!(allowed(
+            "list_apps",
+            Value::Nil,
+            PermissionLevel::Public,
+            &who
+        ));
+    }
+
+    #[test]
+    fn unparseable_frame_is_not_allowed() {
+        assert!(matches!(
+            filter_message(&[0xc1, 0x00], PermissionLevel::Admin, &caller()),
+            FilterResult::PassThrough
+        ));
     }
 }

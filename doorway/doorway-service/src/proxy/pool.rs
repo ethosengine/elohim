@@ -11,7 +11,8 @@ use std::sync::Arc;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use tracing::{error, info, warn};
 
-use crate::auth::{is_operation_allowed, PermissionLevel};
+use crate::auth::{AdminCaller, PermissionLevel};
+use crate::proxy::admin::authorize_admin_request;
 use crate::proxy::holochain::{encode_error, parse_message};
 use crate::types::Result;
 use crate::worker::WorkerPool;
@@ -25,6 +26,7 @@ pub async fn run_admin_proxy(
     pool: Arc<WorkerPool>,
     origin: Option<String>,
     permission_level: PermissionLevel,
+    caller: AdminCaller,
 ) -> Result<()> {
     info!(
         "Starting pool admin proxy (origin: {:?}, permission: {})",
@@ -41,15 +43,11 @@ pub async fn run_admin_proxy(
                 {
                     match parse_message(&data) {
                         Ok(parsed) => {
-                            if !is_operation_allowed(&parsed.operation, permission_level) {
-                                warn!(
-                                    "Blocked admin call '{}' due to insufficient permissions",
-                                    parsed.operation
-                                );
-                                let error_response = encode_error(&format!(
-                                    "Operation '{}' requires higher permission level (current: {})",
-                                    parsed.operation, permission_level
-                                ));
+                            if let Err(reason) =
+                                authorize_admin_request(&parsed, permission_level, &caller)
+                            {
+                                warn!("Blocked admin call '{}': {}", parsed.operation, reason);
+                                let error_response = encode_error(&reason);
                                 if let Err(e) =
                                     client_sink.send(Message::Binary(error_response)).await
                                 {
