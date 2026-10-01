@@ -46,6 +46,22 @@ where
         Output = Result<Option<conductor_writes::CarriedRecordWire>, StorageError>,
     >,
 {
+    prepare_with_reader_mode(id, action_hash, expected, read, false).await
+}
+
+async fn prepare_with_reader_mode<F, Fut>(
+    id: &str,
+    action_hash: &str,
+    expected: Option<Snapshot>,
+    read: F,
+    retain_current: bool,
+) -> Result<Option<Prepared>, StorageError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<
+        Output = Result<Option<conductor_writes::CarriedRecordWire>, StorageError>,
+    >,
+{
     if expected
         .as_ref()
         .is_some_and(|s| s.anchor.as_deref().is_none_or(str::is_empty))
@@ -54,13 +70,12 @@ where
             "REA lifecycle stored authority missing".into(),
         ));
     }
-    let observation = rea_commitment_record::observe(
-        id,
-        action_hash,
-        expected.as_ref().and_then(|s| s.anchor.as_deref()),
-        read,
-    )
-    .await?;
+    let stored = expected.as_ref().and_then(|s| s.anchor.as_deref());
+    let observation = if retain_current {
+        rea_commitment_record::observe_with_current(id, action_hash, stored, read, true).await?
+    } else {
+        rea_commitment_record::observe(id, action_hash, stored, read).await?
+    };
     Ok(observation.map(|observation| Prepared {
         expected,
         observation,
@@ -215,9 +230,7 @@ pub(crate) async fn refresh_hosting_by_id(
     )
     .await?;
     let Some(prepared) = prepared else {
-        // The observer authenticated a same/older record, not missing evidence.
-        // It deliberately returns no prepared scope to inspect here, so remain
-        // pending conservatively; the existing finite ladder bounds this cost.
+        // An authenticated older version cannot settle the current projection.
         return Ok(false);
     };
     let withdrawn = prepared.observation.commitment.finished
@@ -242,7 +255,10 @@ pub(crate) async fn refresh_hosting_by_id(
             });
         }
     }
-    Ok(outcome != ApplyOutcome::Deferred)
+    Ok(matches!(
+        outcome,
+        ApplyOutcome::Advanced | ApplyOutcome::Unchanged
+    ))
 }
 
 /// Validate the authenticated record, not a peer's projected scope or the
@@ -264,7 +280,17 @@ where
         Output = Result<Option<shefa_types::ReaCommitmentOutput>, StorageError>,
     >,
 {
-    let prepared = prepare_refresh(id, expected, lookup, read).await?;
+    let observed = lookup.await?.ok_or_else(|| {
+        StorageError::NotFound(format!("Commitment {id} not observed by own conductor"))
+    })?;
+    if observed.commitment.id != id {
+        return Err(StorageError::InvalidInput(
+            "REA refresh returned another undertaking".into(),
+        ));
+    }
+    let prepared =
+        prepare_with_reader_mode(id, &observed.action_hash.to_string(), expected, read, true)
+            .await?;
     if let Some(p) = &prepared {
         let c = &p.observation.commitment;
         let input = crate::rea_projection::project_typed_commitment(c);

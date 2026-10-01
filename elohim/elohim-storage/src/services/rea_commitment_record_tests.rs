@@ -706,12 +706,101 @@ async fn native_hosting_lookup_absence_is_error_and_unchanged_record_is_verified
     )
     .await
     .unwrap();
-    assert!(
-        same.is_none(),
-        "None is the authenticated same-record observation"
+    assert_eq!(
+        projection::apply_prepared(&mut conn, &app, same.expect("signed current retained"))
+            .unwrap(),
+        lifecycle::ApplyOutcome::Unchanged,
+        "signed exact-scope current observation completes through atomic CAS"
     );
     assert!(
         reads.get() > 0,
         "equal SQL anchor never skips exact native record verification"
+    );
+}
+
+#[tokio::test]
+async fn hosting_current_observation_still_denies_scope_private_older_and_raced_rows() {
+    let live = record(project_epr_commitment("commons"), 1, None, 1);
+    let mut terminal = project_epr_commitment("private");
+    terminal.state = "cancelled".into();
+    terminal.finished = true;
+    let terminal = record(terminal, 2, Some(&live), 1);
+    let private = record(project_epr_commitment("private"), 1, None, 1);
+    let map = records(&[&live, &terminal, &private]);
+    let app = AppContext::default_lamad();
+    let mut conn = database();
+    apply(&mut conn, &map, &live).await.unwrap();
+    let expected = lifecycle::snapshot(&mut conn, &app, "own-provide").unwrap();
+    let output = |r: &Record| {
+        let Some(Entry::App(entry)) = r.entry().as_option() else {
+            panic!("fixture entry missing");
+        };
+        shefa_types::ReaCommitmentOutput {
+            action_hash: r.action_address().clone(),
+            entry_hash: r.action().entry_hash().unwrap().clone(),
+            commitment: rmp_serde::from_slice(entry.bytes()).unwrap(),
+        }
+    };
+    assert!(
+        projection::prepare_hosting_refresh_with_reader(
+            "own-provide",
+            "another-epr",
+            expected.clone(),
+            std::future::ready(Ok(Some(output(&live)))),
+            |hash| std::future::ready(Ok(map.get(&hash).cloned())),
+        )
+        .await
+        .is_err(),
+        "same anchor must still validate signed exact scope"
+    );
+    let mut private_conn = database();
+    apply(&mut private_conn, &map, &private).await.unwrap();
+    assert!(
+        projection::prepare_hosting_refresh_with_reader(
+            "own-provide",
+            "own-provide",
+            lifecycle::snapshot(&mut private_conn, &app, "own-provide").unwrap(),
+            std::future::ready(Ok(Some(output(&private)))),
+            |hash| std::future::ready(Ok(map.get(&hash).cloned())),
+        )
+        .await
+        .is_err(),
+        "same active private record cannot complete hosting work"
+    );
+
+    let prepared = projection::prepare_hosting_refresh_with_reader(
+        "own-provide",
+        "own-provide",
+        expected,
+        std::future::ready(Ok(Some(output(&live)))),
+        |hash| std::future::ready(Ok(map.get(&hash).cloned())),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    // A real concurrent signed cancellation changes the projection after prepare.
+    reconstruct_hosting(&mut conn, &terminal, &map, "own-provide")
+        .await
+        .unwrap();
+    assert_eq!(
+        projection::apply_prepared(&mut conn, &app, prepared).unwrap(),
+        lifecycle::ApplyOutcome::Deferred,
+        "raced same-current observation stays pending"
+    );
+    let older = projection::prepare_hosting_refresh_with_reader(
+        "own-provide",
+        "own-provide",
+        lifecycle::snapshot(&mut conn, &app, "own-provide").unwrap(),
+        std::future::ready(Ok(Some(output(&live)))),
+        |hash| std::future::ready(Ok(map.get(&hash).cloned())),
+    )
+    .await
+    .unwrap();
+    assert!(older.is_none(), "authenticated older record stays pending");
+    assert!(
+        rea_commitments::find_active_projections(&mut conn, &app, "alpha-elohim-host")
+            .unwrap()
+            .is_empty(),
+        "same/older cannot resurrect the terminal mount"
     );
 }

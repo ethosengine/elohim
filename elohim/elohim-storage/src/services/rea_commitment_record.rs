@@ -133,7 +133,23 @@ pub(crate) async fn observe<F, Fut>(
     id: &str,
     incoming: &str,
     stored: Option<&str>,
+    read: F,
+) -> Result<Option<Observation>, StorageError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: Future<Output = Result<Option<CarriedRecordWire>, StorageError>>,
+{
+    observe_with_current(id, incoming, stored, read, false).await
+}
+
+/// Retain a verified same-anchor observation when a caller must inspect its
+/// signed scope before completing work. Older versions still return None.
+pub(crate) async fn observe_with_current<F, Fut>(
+    id: &str,
+    incoming: &str,
+    stored: Option<&str>,
     mut read: F,
+    retain_current: bool,
 ) -> Result<Option<Observation>, StorageError>
 where
     F: FnMut(String) -> Fut,
@@ -159,7 +175,9 @@ where
         {
             return Err(invalid("ambiguous signed sequence"));
         }
-        if next.record.action().action_seq() <= old.record.action().action_seq() {
+        if next.record.action().action_seq() < old.record.action().action_seq()
+            || (incoming_hash == old_hash && !retain_current)
+        {
             return Ok(None);
         }
         if next.record.action().timestamp() < old.record.action().timestamp() {

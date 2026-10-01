@@ -8,6 +8,7 @@ use std::{io::ErrorKind, time::Duration};
 use tokio_tungstenite::{
     connect_async_with_config,
     tungstenite::{
+        error::ProtocolError,
         http::Request,
         protocol::{frame::coding::CloseCode, CloseFrame, Message},
         Error,
@@ -19,6 +20,41 @@ use crate::types::{DoorwayError, Result};
 
 type HyperWebSocket =
     hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+
+// These client-visible labels must never interpolate upstream error details.
+fn upstream_failure_reason(error: &Error) -> String {
+    match error {
+        Error::Io(error) => match error.kind() {
+            ErrorKind::ConnectionRefused => "upstream app connection refused".to_owned(),
+            ErrorKind::TimedOut => "upstream app connection timed out".to_owned(),
+            _ => "upstream app I/O failure".to_owned(),
+        },
+        Error::Http(response) => {
+            format!("upstream app handshake HTTP {}", response.status().as_u16())
+        }
+        Error::Protocol(error) => {
+            let category = match error {
+                ProtocolError::HandshakeIncomplete => "incomplete",
+                ProtocolError::WrongHttpMethod => "wrong HTTP method",
+                ProtocolError::WrongHttpVersion => "wrong HTTP version",
+                ProtocolError::MissingConnectionUpgradeHeader => "missing connection upgrade",
+                ProtocolError::MissingUpgradeWebSocketHeader => "missing websocket upgrade",
+                ProtocolError::MissingSecWebSocketVersionHeader => "missing websocket version",
+                ProtocolError::MissingSecWebSocketKey => "missing websocket key",
+                ProtocolError::SecWebSocketAcceptKeyMismatch => "accept key mismatch",
+                ProtocolError::SecWebSocketSubProtocolError(_) => "subprotocol mismatch",
+                ProtocolError::InvalidHeader(_) => "invalid header",
+                ProtocolError::HttparseError(_) => "malformed HTTP",
+                ProtocolError::JunkAfterRequest => "junk after request",
+                ProtocolError::CustomResponseSuccessful => "unexpected successful response",
+                _ => "other",
+            };
+            format!("upstream app handshake protocol error: {category}")
+        }
+        Error::Tls(_) => "upstream app TLS failure".to_owned(),
+        _ => "upstream app connection failed".to_owned(),
+    }
+}
 
 /// Run the app proxy between client and conductor app interface.
 ///
@@ -67,19 +103,7 @@ pub async fn run_proxy(
         Err(e) => {
             // Only disclose a bounded transport classification, never the upstream
             // URL, headers, response body or raw error. Native auth has not run.
-            let reason = match &e {
-                Error::Io(error) => match error.kind() {
-                    ErrorKind::ConnectionRefused => "upstream app connection refused".to_owned(),
-                    ErrorKind::TimedOut => "upstream app connection timed out".to_owned(),
-                    _ => "upstream app I/O failure".to_owned(),
-                },
-                Error::Http(response) => {
-                    format!("upstream app handshake HTTP {}", response.status().as_u16())
-                }
-                Error::Protocol(_) => "upstream app handshake protocol error".to_owned(),
-                Error::Tls(_) => "upstream app TLS failure".to_owned(),
-                _ => "upstream app connection failed".to_owned(),
-            };
+            let reason = upstream_failure_reason(&e);
             let _ = tokio::time::timeout(
                 Duration::from_secs(1),
                 client_ws.send(Message::Close(Some(CloseFrame {
@@ -198,6 +222,39 @@ mod tests {
 
     #[tokio::test]
     async fn upstream_handshake_failure_reaches_client_as_safe_1011_close() {
+        assert_safe_upstream_close(
+            b"HTTP/1.1 403 Forbidden\r\nContent-Length: 21\r\nX-Private: private-token-fixture\r\n\r\nprivate-token-fixture",
+            "upstream app handshake HTTP 403",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn incomplete_upstream_handshake_reaches_client_as_safe_1011_close() {
+        assert_safe_upstream_close(b"", "upstream app handshake protocol error: incomplete").await;
+    }
+
+    #[tokio::test]
+    async fn upstream_accept_key_mismatch_reaches_client_as_safe_1011_close() {
+        assert_safe_upstream_close(
+            b"HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: private-token-fixture\r\n\r\n",
+            "upstream app handshake protocol error: accept key mismatch",
+        )
+        .await;
+    }
+
+    #[test]
+    fn invalid_header_diagnostic_does_not_disclose_attacker_controlled_name() {
+        let error = Error::Protocol(ProtocolError::InvalidHeader(
+            "private-token-fixture".parse().unwrap(),
+        ));
+        assert_eq!(
+            upstream_failure_reason(&error),
+            "upstream app handshake protocol error: invalid header"
+        );
+    }
+
+    async fn assert_safe_upstream_close(response: &'static [u8], expected_reason: &str) {
         tokio::time::timeout(Duration::from_secs(10), async {
             let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let upstream_port = upstream.local_addr().unwrap().port();
@@ -210,12 +267,7 @@ mod tests {
                     assert!(count > 0);
                     request.extend_from_slice(&buffer[..count]);
                 }
-                socket
-                    .write_all(
-                        b"HTTP/1.1 403 Forbidden\r\nContent-Length: 21\r\nX-Private: private-token-fixture\r\n\r\nprivate-token-fixture",
-                    )
-                    .await
-                    .unwrap();
+                socket.write_all(response).await.unwrap();
             });
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
@@ -229,14 +281,9 @@ mod tests {
                                 hyper_tungstenite::upgrade(request, None).unwrap();
                             tokio::spawn(async move {
                                 let websocket = websocket.await.unwrap();
-                                let _ = run_proxy(
-                                    websocket,
-                                    upstream_port,
-                                    None,
-                                    None,
-                                    "127.0.0.1",
-                                )
-                                .await;
+                                let _ =
+                                    run_proxy(websocket, upstream_port, None, None, "127.0.0.1")
+                                        .await;
                             });
                             Ok::<_, Infallible>(response)
                         }),
@@ -253,7 +300,7 @@ mod tests {
                 panic!("expected upstream failure to arrive as a websocket close frame");
             };
             assert_eq!(frame.code, CloseCode::Error);
-            assert_eq!(frame.reason, "upstream app handshake HTTP 403");
+            assert_eq!(frame.reason, expected_reason);
             assert!(!frame.reason.contains("private-token-fixture"));
             assert!(!frame.reason.contains("127.0.0.1"));
             upstream_task.await.unwrap();
