@@ -173,7 +173,9 @@ dive to confirm or refute, and both are our design choices, not the fork's.
   reached about 15,000 grants. A storage peer and its own conductor are one steward. Measure: grants
   minted per connect and per day on a household peer at the current pin.
 
-They compound: more grants and a longer chain make every call slower.
+They compound: more grants and a longer chain make every call slower. Their home, with three
+further observations, is `arch-dataplane-borrows-backlog.md` §"Plane-separation pass — design
+observations to check"; record what you find there, not here.
 
 ## How the two skills work together
 
