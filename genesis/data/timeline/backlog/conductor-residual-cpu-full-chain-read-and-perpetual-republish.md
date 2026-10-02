@@ -11,7 +11,7 @@ status: "open"
 priority: "high"
 severity: medium
 nodes: [alpha, household]
-tags: [conductor-fork, cpu, sqlite, publish, source-chain, dataplane-convergence, idle-is-free]
+tags: [conductor-fork, cpu, sqlite, publish, source-chain, dataplane-convergence, idle-is-free, performance, perf-cpu, perf-io, perf-scale, trustful-self, friction-verify, friction-mechanical, plane-notary, unit-history, phase-steady, lane-borrowed]
 cites:
   - genesis/a2o/reports/recovery/fleet-cpu-publish-livelock-2026-09-28.md
   - genesis/a2o/reports/recovery/k0-window-e0bfc6c7a-vs-25dd2d0be.md

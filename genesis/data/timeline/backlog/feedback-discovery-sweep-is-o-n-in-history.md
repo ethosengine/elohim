@@ -13,7 +13,7 @@ jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "habit:dataplane-convergence"
-tags: [accountable-correction, feedback-projector, discovery, scale, slice-2]
+tags: [accountable-correction, feedback-projector, discovery, scale, slice-2, performance, perf-scale, perf-convergence, trustful-self, friction-mechanical, friction-wait, plane-projection, fused-planes, unit-history, phase-growth, lane-background]
 ---
 
 **Evidence (household mesh, 2026-09-07 rounds 045232Z/051633Z/055414Z):** `feedback_projector.rs` visits `MAX_MEMBERS_PER_SWEEP = 8` members per `SWEEP_INTERVAL_SECS = 60` tick and `publish_generation` republishes only on a tick that ends with nothing unvisited and nothing pending. The subscription set is every content record and every discovered correction the peer has ever seen (no retirement, no cursor): 14 → 44 → 127 members over the day; measured acceptance→application lag 106.6 s, 212.5 s, 252.6 s, 332.8 s = `ceil(N/8)` sweeps. By round 4 a single act took >25 min at the product default. The a2o lane pins `ELOHIM_FEEDBACK_SWEEP_SECONDS=5` and derives budgets from the peer's live N; the product default is untouched.

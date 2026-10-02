@@ -9,7 +9,7 @@ written: "2026-07-28"
 author: "heads-converge-truthful-resilience shift"
 status: "open"
 priority: "high"
-tags: [canonical-head, declare, adam, admission, notary-authority, ch06]
+tags: [canonical-head, declare, adam, admission, notary-authority, ch06, performance, perf-queue, perf-convergence, trustful-self, friction-mechanical, friction-verify, plane-notary, fused-planes, unit-call, phase-transition, lane-interactive]
 cites:
   - genesis/data/timeline/backlog/content-divergence-unhealable-without-canonical-heads.md
   - genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md

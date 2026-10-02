@@ -9,7 +9,7 @@ written: "2026-08-04"
 author: "claude (research mint pass, operator-directed clustering)"
 status: "backlog"
 priority: "medium"
-tags: [architecture, dataplane, p2p, transport, replication, blobs, research-derived, cross-pollination]
+tags: [architecture, dataplane, p2p, transport, replication, blobs, research-derived, cross-pollination, performance, perf-queue, perf-latency, friction-mechanical, custody-subset, plane-custody]
 cites:
   - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
   - genesis/research/ssb-scuttlebutt-ancestor-retrospective-2026-08-03.md
@@ -50,6 +50,9 @@ before code. **Fold new survey-sourced dataplane borrows here — do not mint si
 | 15 | **Bi-temporal `as_of` on `EpistemicStanding` and graph edges — demotion with a timestamp, never deletion; DROP (revoke-reach-everywhere) lands as attested demotion across every fold that reaches** | Zep/Graphiti's temporal edge validity (MIT) and SuperLocalMemory's three-date model with `as_of` threaded through every surface, "point-in-time demotion, not snapshot deletion"; [research](epr:local-first-to-council-memory-search-seams-2026-09-12) §1.5, §3.5; [spec](epr:memory-search-scale-three-seams-design) §2, §7. The Living Memory epic's forgetting made mechanical. | Measure-family row 26; the digital-memory standing ontology spec. | rust-architect |
 | 16 | **Receiver-granted doorway→storage blob forwarding — no blind retry, bounded large-transfer concurrency** (Homa: receiver-driven grants, limited overcommitment, incast) | [story 3.3 design input](epr:admission-receiver-granted-lanes-design) §2, §5 change (2). **Incident 2026-09-23 (alpha):** one doorway re-sent the same 3–12 MB `PUT /blob` ~100× in 3 h. Storage's PUT awaited one advisory Node Registry zome call per shard (`elohim-storage/src/http.rs:3417-3445`) behind a conductor pinned at its CPU limit. **Why the sender kept sending:** the forward re-offers only on a *declared* shed (`doorway-service/src/routes/seed.rs:535-555`, clamped 1–5 s, 3 attempts), so a timeout is terminal and the caller (`stage-spa-blob.sh`) re-PUTs. Each re-PUT that hits the doorway cache re-forwards the whole payload (`seed.rs:259-264`), and nothing single-flights a forward of a hash already in flight. Storage admits a 12 MB body on the same 64-permit write pool as a small PATCH and holds the permit for the whole transfer (`http.rs:254-260`, `:1760-1790`). **Shape:** storage grants a bulk slot (a per-peer bulk lane of k=1–2 concurrent large bodies, apart from the write pool) *before* bytes move — `Expect: 100-continue` or a body-less reservation answered 503 + `Retry-After` + `X-Available-Permits`. The doorway single-flights each hash and treats a timeout as "unknown — ask" (`HEAD /blob/{hash}`), never "re-send". **Smallest next step:** doorway-only — single-flight per hash plus HEAD-before-resend on the cache-hit branch, proven on the household with a deliberately slowed storage PUT; the storage bulk lane follows. Sibling: [blob-forward-confirmation-status-only-no-body-check](epr:blob-forward-confirmation-status-only-no-body-check) (same forward, read-back leg). | Sequence after change (1), which moves shard registration into the Background admission lane (in flight on another branch). p2p-design-gate n/a: no entity; the blob stays content-addressed. | rust-architect shift (doorway first, then storage) |
 | 17 | **Conductor publish backpressure — surface publish rate + pending receipts, then receipt-aware republish backoff and per-peer outbound caps (holochain/kitsune2 fork)** (TCP: Jacobson's congestion avoidance; Homa: receiver-paced sending, ACKs never queued behind data) | [story 3.3 design input](epr:admission-receiver-granted-lanes-design) §1–2, §5 change (4). **Incident 2026-09-23 (alpha):** after repeated crashes matthew's conductor republished ~1.13 M DHT ops per 15 min in ~24 k-op rounds (~10× james/jessica, 18× adam). Every alpha conductor sat at its CPU limit, SQLite median was 1.5 s (max 210 s), and doorway zome calls timed out at 10 s (`doorway-service/src/services/zome_caller.rs:99`). Yet storage offered its conductor only ~0.2 calls/s per pod, so the load was conductor-internal and invisible to our telemetry. **Mechanism (fork code):** `get_ops_to_publish` selects every authored op that lacks `receipts_complete` and was last published before now − `min_publish_interval`, with no `LIMIT` (`holochain-conductor` `crates/holochain_data/src/dht/inner/chain_op_publish.rs:115-150`). The interval defaults to 300 s (`crates/holochain_conductor_api/src/config/conductor.rs:702-704`). Completion needs `required_validations`, or 5 receipts by default (`crates/holochain/src/core/workflow/publish_dht_ops_workflow.rs:28`, `crates/holochain/src/conductor/cell.rs:606-651`). kitsune2 queues outgoing publishes on a 16 384-slot channel and skips only peers already marked unresponsive, with no per-peer rate or back-off (`kitsune2` `crates/core/src/factories/core_publish.rs:215-217`, `:293-340`). **Working theory, unconfirmed:** receipts starve behind saturation, so ops stay incomplete and are republished every 5 min, which sustains the saturation. **Steps, in order:** (a) *telemetry first* — per cell, ops pending receipts and ops published per round, exported where storage's `/db/p2p/conductor-diagnostics` can read them; this confirms or refutes the theory; (b) receipt-aware backoff — a per-op exponential republish interval in place of the fixed 300 s; (c) a per-peer outbound publish cap in `core_publish`. **Smallest next step:** (a), read-only; nothing is tuned before it is measured. Raising `min_publish_interval` in conductor tuning is an available operator stopgap, but it is a limit raise — a design signal, not the cure. | Graduates [scale-risk](epr:arch-scale-risk-backlog) row 8 mitigation (1); sibling of [conductor-publish-livelock-fk787](epr:conductor-publish-livelock-fk787). The fork patch rides the conductor submodule pin (no DNA-hash move). p2p-design-gate n/a. | rust-architect (fork), telemetry slice first |
+| 19 | **Research pass: open-source exemplars of plane separation — what each keeps apart, and what we would borrow** | Operator request, 2026-10-02, after the gradient labelling pass named nine planes (CONVENTIONS.md §Plane) and marked 28 performance entries `fused-planes`. **The list below is recalled from general knowledge and is unverified**; the pass's first job is to check each claim against the project's own primary sources, then mint surviving takes as rows here. *Closest overall:* **AT Protocol** (signed, host-portable data repositories apart from DID identity, apart from the relay firehose, apart from AppViews that build derived views; "speech versus reach") — custody ≠ identity ≠ projection. **TUF / Sigstore** (root, targets, snapshot and timestamp roles with separate keys and k-of-n thresholds) — authority and freshness as their own planes, threshold as a dial apart from membership. **Git / OCI registries** (immutable content-addressed objects; small mutable refs and tags; signatures beside the bytes) — bytes ≠ head. *Strong on one separation:* **Kubernetes, Envoy/Istio** (control plane vs data plane, declared state reconciled) — the head-as-manifest model. **Ceph CRUSH** (placement across declared failure domains) — custody by independence, not headcount; reads onto [commons-holonic-stewardship](epr:commons-holonic-stewardship-backlog) row 30. **Tahoe-LAFS** (servers hold ciphertext; separate verify/read/write capabilities) — custody ≠ readability. **IPFS/IPLD + IPNS, iroh** (blocks, provider records, naming as distinct subsystems). **BitTorrent** (who-holds-it vs piece transfer vs metainfo). **Willow/Meadowcap, Keyhive** (capabilities gating sync at sub-document grain; already rows 12 and 9's neighbours). *For unlinkability:* **Privacy Pass, Oblivious HTTP** (unlinkable tokens, split-trust relays) — the count-and-payment leg of [confidentiality-plane](epr:arch-confidentiality-plane-backlog) row 12. **Questions for the pass:** for each project, which of our nine planes does it separate, what does the separation cost it, where did fusing planes hurt it and how was that found; which of our 28 fused entries has a direct precedent; is there any project that prices verification by relationship (none is known to — that may be the inversion). Suggested first three: AT Protocol, TUF, CRUSH. **Five design observations from the same session ride with this pass as brainstorm input:** [below](#plane-separation-pass--design-observations-to-check). | Research pass (survey under `genesis/research/`, closing with a mint pass), then brainstorm. No code; each borrow that survives is p2p-design-gated on its own row. Method: the `gradient-reading` skill. | brainstorm / research first |
+
+| 18 | **Holochain fork resource bounds and recovery** | Operator request, 2026-10-01, from the resilience/failover/reactive-streams campaign; six ranked priorities and acceptance criteria in [the item below](#holochain-fork-resource-bounds-and-recovery). Composes row 17 and scale-risk rows 7–8 rather than duplicating their implementation work. | Backlog; establish version-pinned baselines before implementation; data/identity design requires p2p-design-gate. | Holochain conductor/Kitsune2 fork, with upstream collaboration |
 
 **Below the line (dies honestly in the surveys unless resurfaced):** SSB vocabulary imports ("free
 listening", "near moderation") — adopt opportunistically in prose, no work item; Holepunch UDX
@@ -63,3 +66,144 @@ uses of automerge's own sync protocol (`generate_sync_message` / `receive_sync_m
 `automerge::sync::State` — no hits), so the DAG-in-memory cost sedimentree exists to fix is one we
 never paid. The Automerge 3.0 / Hexane memory win is a *document-representation* win and arrived
 with the 0.10.0 bump, unrelated to this. See [the L2 version-DAG record](epr:version-dag-lives-at-l2-not-in-crdt-doc).
+
+## Holochain fork resource bounds and recovery
+
+**Item:** 18 · **Recorded:** 2026-10-01 · **Status:** backlog · **Priority:** high.
+**Implementation home:** `elohim/holochain-conductor` and its pinned Kitsune2 dependencies.
+**Existing habits served:** `conductor-capacity-represented`, `dataplane-convergence`,
+and `doorway-failover`. This item does not change their status or create a new active commitment.
+
+Make the conductor remain responsive within a declared resource budget, expose why progress
+has stalled, and recover without amplifying background work. The user-visible outcome is that
+a household node can contribute within its means while people continue reading and authoring
+through catch-up, peer loss, and host recovery. This is the fork's prioritized engineering
+backlog and a reference for upstream discussions; it is not a claim that all six capabilities
+are absent from every upstream version.
+
+### Evidence and ownership
+
+- The [serving-edge campaign](../../../docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md)
+  couples failover, balancing and streaming. Its app retry loops, head-projection correctness,
+  and doorway streaming remain Elohim responsibilities; a conductor improvement alone does
+  not prove the complete campaign.
+- The [capability-grant investigation](conductor-cap-grant-scan-per-zome-call.md), September 29
+  delta, records SQL wall times of 19.21–41.88 seconds. These are threshold-selected slow
+  statements, not a CPU profile. Its isolated candidate passed a warm household convergence
+  run (15/15 steps, about 613 seconds waiting for convergence); the record does not establish
+  fleet recovery. Follow that item's current branch and deployment evidence when picking up
+  this work, rather than treating a tested patch as a deployed fix.
+- The [arc feasibility assessment](../../../docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md)
+  documents the effective zero/full control and lack of a runtime fractional-arc actuator on
+  the assessed line. Recheck the fork pin and dependencies before implementing a replacement.
+- [Scale-risk rows 7–8](arch-scale-risk-backlog.md) own the hosted-human memory and full-arc
+  CPU concerns. The [earlier memory attribution](conductor-memory-attribution-verdict.md)
+  instead identified allocator arena retention, resolved with jemalloc: that historical
+  runaway growth was arc-independent and is not evidence that sharding cures memory leaks.
+- Row 17 owns publish backpressure. The [validation dependency incident](alpha-conductor-sys-validation-spin-unfetchable-deps.md)
+  records sustained CPU pressure and repeatedly unfetched dependencies; its attempted local
+  reproductions did not establish the fleet mechanism. Preserve that uncertainty.
+
+### Ranked priorities and acceptance criteria
+
+1. **Bound background work and preserve interactive service.** Cover publishing, validation,
+   dependency fetches, authorization lookup, and database maintenance. Bound queues and
+   concurrency; back off when progress is impossible; report overload explicitly. Graduate
+   publish-specific changes through row 17 and grant changes through their existing item.
+   **Acceptance:** on a loaded store, sustained missing dependencies and restart catch-up stay
+   within declared CPU/RAM budgets and an agreed interactive p95/p99 latency target. Once
+   peers return, pending work drains without weakening validation or authorization. A client
+   timeout must not be treated as proof that a write was cancelled.
+
+2. **Support safe partial sharding and resource-aware arc adjustment.** Provide a supported
+   partial contribution posture, observable current/target arcs, and runtime adjustment with
+   coverage-preserving handoff. Test heterogeneous devices and multiple agents sharing a host.
+   **Acceptance:** a constrained node demonstrably holds and serves a partial arc; shrinking,
+   growing and losing a peer preserve the declared redundancy floor or explicitly report its
+   loss. Several agents on one machine must not be counted as independent physical failure
+   domains in the acceptance evidence. Configuration parsing alone is not proof of actuation.
+
+3. **Make multi-agent memory costs predictable.** Attribute costs to agents, cells, DNAs,
+   active calls, caches and runtime instance pools. Establish supported budgets and idle-cell
+   lifecycle/reclamation semantics, distinct from allocator-retained RSS.
+   **Acceptance:** long soaks across increasing hosted populations and repeated activation/
+   deactivation show a measured marginal cost and bounded retained memory; overload yields a
+   documented admission response rather than an OOM. Record baseline, peak and settled memory.
+
+4. **Expose progress and pressure through supported diagnostics.** Build on existing upstream
+   and fork instruments. Cover queue depth and oldest age, pending dependencies/receipts,
+   publish and integration progress, database contention, arcs and workflow pressure.
+   **Acceptance:** a bounded diagnostic read distinguishes progressing, waiting and stalled
+   cases in injected failures, with bounded label cardinality and measured collection cost.
+   Readiness must distinguish an open socket from a functioning authorized zome call; our
+   hosting layer remains responsible for consuming these signals.
+
+5. **Provide a resumable foundation for reactive projections.** Specify a supported feed or
+   reference implementation for relevant committed/integrated changes: cursor, replay,
+   bounded retention, gap detection, and snapshot-to-subscription handoff. State local versus
+   network scope and ordering explicitly. Existing send-and-forget signals remain useful
+   notifications, but are insufficient evidence of durable delivery.
+   **Acceptance:** disconnect/reconnect, process restart, duplicate events and retention expiry
+   either converge the projection without silent omissions or explicitly require a rebuild.
+   No global total-order or exactly-once promise is implied. Elohim owns projection semantics
+   and cross-doorway delivery; feed/API design requires the P2P design gate before implementation.
+
+6. **Make identity-preserving recovery operationally supported.** Evaluate existing restore
+   and migration work before adding fork machinery. Document backup/restore, host transfer,
+   private-state protection and prevention of concurrent source-chain writers. Serving a
+   replica of content is distinct from safely resuming an agent's authorship.
+   **Acceptance:** crash/transfer drills preserve identity and valid chain continuation,
+   refuse unsafe concurrent authorship, and explicitly identify unavailable private state or
+   insufficient DHT recovery evidence. Recovery must never silently mint a replacement identity.
+
+### Graduation and verification
+
+Start with priorities 1 and 2; instrument enough of priority 4 to attribute their results.
+Each implementation slice must name an existing owning item/habit, a runnable scenario, exact
+fork and dependency commits, and numeric resource/latency/recovery budgets before execution.
+The scenarios should cover loaded and fresh stores, hosted-agent count, unavailable dependencies,
+peer churn, restart catch-up and heterogeneous hardware. Set thresholds from measured baselines;
+this backlog deliberately does not invent performance guarantees.
+
+Keep fork patches isolated, retain security and differential regressions, run the owning gates,
+and obtain household evidence before changing the deployment pin. A successful build, a quiet
+fresh database, or a green unrelated scenario does not establish recovery under campaign load.
+Upstream collaboration should offer reproductions, profiles, isolated patches and this acceptance
+suite. Recheck upstream support against the exact target release when each priority is claimed.
+
+## Plane-separation pass — design observations to check
+
+**Item:** 19 · **Recorded:** 2026-10-02 · **Status:** brainstorm input, unverified.
+
+The operator asked, at the end of the gradient labelling session, whether any design issue stood
+out. These five did. They were read from backlog entries, habit deltas and the campaign 1.4 stop
+receipts, not from the code. Each is a hypothesis for the brainstorm to confirm or drop, with the
+source that prompted it. None is a finding and none authorizes a change.
+
+1. **Machine bookkeeping shares a source chain with human acts.** The household author chain was
+   past 45,000 actions, and a root approval failed with a head-moved error while background storage
+   wrote to the same chain (`genesis/docs/superpowers/sprints/2026-10-01-campaign-1.4-household-restart.md`).
+   A person's ceremony waits behind machine churn and grows with it. *To check:* which writers land
+   on an author's chain and at what rate; whether high-frequency machine writes can live on a
+   separate cell or off the chain. Tags: `plane-notary`, `unit-history`, `lane-borrowed`.
+2. **Authority is checked per call, not per relationship.** Storage authorises a new signing
+   credential on every connect, which is how one agent reached about 15,000 grants that each call
+   then scanned ([conductor-cap-grant-scan-per-zome-call](epr:conductor-cap-grant-scan-per-zome-call);
+   habit `zome-call-cost-bounded`, DELTA 2026-09-19). A storage peer and its own conductor are one
+   steward. *To check:* whether one long-lived credential per relationship, looked up by key, is
+   sufficient, and what rotation it needs. Tags: `trustful-self`, `friction-verify`, `plane-authority`.
+3. **The pricing signal was built last.** The dataplane trust handshake is a stub that classes
+   every edge `public` ([sync-edge-susan-timeouts-per-edge-observability](epr:sync-edge-susan-timeouts-per-edge-observability)),
+   so every path was built trust-blind and the gradient cannot be measured. *To check:* the smallest
+   verifiable identity-and-relationship claim the handshake could carry, and per-edge cost reporting.
+4. **The conductor ran without instruments.** Its telemetry instruments reach no exporter (habit
+   `zome-call-cost-bounded`, DELTA 2026-09-23); the grant scan and the publish livelock grew unseen
+   until every conductor was pinned. Row 17 step (a) and row 18 priority 4 already own this.
+5. **Restart was never a designed state.** 23 of the 65 phase-labelled performance entries are
+   transition costs: saturation after a restart, fleet-wide catch-up after a roll
+   ([performance-concern-index](epr:performance-concern-index)). Staggering and warm-up arrived as
+   incident cures. *To check:* a declared budget and mode for a node coming back.
+
+Observations 1 and 2 are our own design choices and compound: more grants and a longer chain make
+every call slower. A smaller sixth — the head moving separately from its content — is already being
+cured by campaign story 1.4.

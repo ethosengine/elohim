@@ -9,7 +9,7 @@ written: "2026-09-18"
 author: "doorway-overnight-20260914 shift (doorway-failover pickup)"
 status: "backlog"
 priority: "high"
-tags: [risk, conductor, holochain, kitsune2, gossip, household-mesh, scale, prologue]
+tags: [risk, conductor, holochain, kitsune2, gossip, household-mesh, scale, prologue, performance, perf-convergence, perf-scale, trustful-declared, friction-wait, friction-mechanical, custody-everyone, plane-notary, unit-item, phase-growth, lane-background]
 cites:
   - genesis/a2o/reports/recovery/doorway-pickup-20260917/final/household-gossip-wedge-notes.md
   - genesis/local-dev/preserved/pre-fresh-household-20260918T2235Z-lamad-gossip-wedge/

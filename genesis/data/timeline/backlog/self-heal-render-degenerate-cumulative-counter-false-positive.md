@@ -15,7 +15,7 @@ severity: medium
 fingerprints: [afc100835f7c, da8bb3bdd7e1]
 nodes: [alpha-b, alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, sensing-gap, cumulative-counter, rate-without-a-base, elevate-arm, runtime-harvest, false-positive, closure-by-disappearance, adam]
+tags: [self-heal, render-degenerate, sensing-gap, cumulative-counter, rate-without-a-base, elevate-arm, runtime-harvest, false-positive, closure-by-disappearance, adam, performance, perf-telemetry, friction-blind, phase-steady, lane-operator]
 cites:
   - https://elohim.host/admin/render-stats
   - https://elohim.host/admin/self-healing

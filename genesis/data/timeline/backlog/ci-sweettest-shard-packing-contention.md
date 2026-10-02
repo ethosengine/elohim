@@ -11,7 +11,7 @@ status: "wip"
 priority: "medium"
 ci_status: in-progress
 jobs: [elohim-holochain]
-tags: [ci, sweettest, flake, contention, scheduling]
+tags: [ci, sweettest, flake, contention, scheduling, performance, perf-cpu, perf-queue, friction-mechanical, unit-once, lane-operator]
 ---
 
 # Sweettest shard packing saturates one node and fails timing-sensitive tests

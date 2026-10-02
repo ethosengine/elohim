@@ -15,7 +15,7 @@ relatedNodeIds:
   - "backlog-p1-dht-authored-content-not-projected"
   - "backlog-iroh-lane-bootstrap-publish-dark"
   - "habit:dataplane-convergence"
-tags: [dataplane, sovereign-peer, kitsune2, storage-arc, iroh, bootstrap, T3, ratchet-lane-P]
+tags: [dataplane, sovereign-peer, kitsune2, storage-arc, iroh, bootstrap, T3, ratchet-lane-P, performance, perf-convergence, trustless, friction-wait, plane-custody, fused-planes, unit-peer, phase-transition, lane-interactive]
 ---
 
 ## Measured (T3 hybrid rung, workspace conductor = ethosengine fork holochain 0.6.3 on iroh, joined to alpha)

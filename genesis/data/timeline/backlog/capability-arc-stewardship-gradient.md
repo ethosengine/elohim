@@ -2,7 +2,7 @@
 title: "Capability arc — steward↔stewardee gradient, decline, death; unexpected death as separate intervention"
 created: 2026-06-04
 domain: "design"
-tags: [capability, decline, stewardship, guardianship, death, recovery, imagodei, mishpat]
+tags: [capability, decline, stewardship, guardianship, death, recovery, imagodei, mishpat, trustful-declared]
 cites:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md
   - genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md

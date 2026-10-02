@@ -17,7 +17,7 @@ relatedNodeIds:
 cites:
   - genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md
   - genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md
-tags: [dataplane, custody, placement, erasure-coding, bounded-code-fix, codex-claimable, agent-agnostic]
+tags: [dataplane, custody, placement, erasure-coding, bounded-code-fix, codex-claimable, agent-agnostic, custody-diverse]
 ---
 
 # Data-shard-first diversity placement

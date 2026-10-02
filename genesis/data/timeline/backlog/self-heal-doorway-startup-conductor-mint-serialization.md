@@ -14,7 +14,7 @@ severity: high
 fingerprints: []
 nodes: [doorway-alpha, intel-nuc]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, doorway, startup, conductor, liveness, crash-loop, intel-nuc, admission-shed]
+tags: [self-heal, render-degenerate, doorway, startup, conductor, liveness, crash-loop, intel-nuc, admission-shed, performance, perf-latency, trustful-self, friction-wait, friction-mechanical, plane-authority, unit-agent, phase-transition, lane-interactive]
 cites:
   - doorway/doorway-service/src/main.rs
   - doorway/doorway-service/src/worker/conductor.rs

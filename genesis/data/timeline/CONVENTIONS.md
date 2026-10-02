@@ -184,6 +184,130 @@ A useful ceremony checks whether a fresh reader can answer a concrete question f
 sources, and merges redundant labels encountered in flight while preserving historical meaning.
 No population-wide retagging is required before continuing useful work.
 
+## Performance — a view, not a kind (tag `performance`)
+
+A **performance concern** is an entry whose subject is the resource cost, elapsed time, throughput,
+capacity or scaling behaviour of a system we run or build with, or the inability to measure such a
+cost. A correctness bug that merely surfaced as a timeout is not one. The **performance view** is the
+query `tags contains performance`; the mechanism tags below narrow it. Each entry carries
+`performance` plus one to three mechanism tags, and keeps the layer tag its cluster already uses
+(`conductor`, `kitsune2`, `elohim-storage`, `doorway`, `ci`, `a2o`, …).
+
+| Tag | The entry is about |
+|---|---|
+| `perf-cpu` | CPU saturation, spin, throttling, repeated unnecessary compute |
+| `perf-memory` | Heap or RSS growth, leaks, OOM, per-agent memory cost |
+| `perf-io` | SQLite, disk or lock contention, WAL, store growth, pool saturation |
+| `perf-latency` | Per-call cost or wall-clock on a path someone waits on |
+| `perf-queue` | Admission, backpressure, starvation, retry storms, livelock — work that amplifies or blocks other work |
+| `perf-convergence` | Time for peers, heads or projections to converge; gossip rounds, quiesce, catch-up |
+| `perf-scale` | A growth law: cost ∝ chain length, peers, agents, corpus or history |
+| `perf-telemetry` | A cost we cannot observe or attribute; a missing or misleading metric, probe or profile |
+
+The prefix exists because the bare words were already taken (`memory` means the memory team here).
+The tags describe the mechanism an entry reports, not a verdict: they never mean measured, confirmed
+or cured. Read the entry's evidence for that. A `perf-scale` entry with a measurable trigger that has
+not fired also carries `risk`. Index and profiling bootstrap:
+`backlog/performance-concern-index.md`.
+
+## Trust context and friction — the gradient view
+
+Trust prices compute: verification is paid once, close to the human judgment, and cost should fall
+as trust rises (`trust-as-efficiency-signal`). Two more tag families make that readable against the
+performance view. Each answers one question about **the path an entry is about**.
+
+**Who stands at each end?** The relationship that already holds there — not the content's reach, and
+not whether the code honours it today.
+
+| Tag | The two ends are |
+|---|---|
+| `trustful-self` | One steward: a process and its own store or source chain, a storage peer and its own conductor, a doorway and the node that backs it, one human's own registered devices. Nothing is left to earn |
+| `trustful-declared` | Distinct parties in a standing declared relationship: household peers, the genesis pair, steward peers, fleet nodes that pre-agreed to replicate, a hosted human and their doorway |
+| `trustful-earned` | Parties whose standing was earned on the commons: attested stewards, earned reach, a delegate under a scoped grant |
+| `trustless` | Strangers: first contact, an unknown or newly joined peer, an anonymous browser, unwitnessed or contested content. Full ceremony belongs here |
+
+An entry whose path serves both kinds without separating them, or that has no relationship on it
+(build cost, tooling, hardware), carries none of these.
+
+**What kind of cost is being paid?**
+
+| Tag | The cost is |
+|---|---|
+| `friction-verify` | Re-deriving or re-checking a fact one end already holds or that was already verified: per-call authorization lookups, re-reading a whole chain, signature or witness verification, re-resolving instead of carrying a proof |
+| `friction-wait` | Waiting for agreement or readiness: a second convergence, a poll or retry ladder, quiesce, catch-up, a gossip round, a cold warm-up |
+| `friction-mechanical` | Plain resource engineering: leaks, lock or pool contention, livelock, backpressure storms, write amplification, OOM. It would cost the same between any two parties |
+| `friction-blind` | We cannot see or attribute the cost |
+
+**Reading the gradient.** A `trustful-*` entry paying `friction-verify` or `friction-wait` is a
+candidate for compression: a carried proof, one trust act per relationship instead of per item. The
+ceremony is compressed, never skipped — a proposal that goes fast by weakening a check is the wrong
+shape. `friction-mechanical` is owed unconditionally whatever the relationship, and is never deferred
+to trust. `trustless` with `friction-verify` is the ceremony standing where it belongs.
+
+The dataplane's trust handshake is a stub that classes every sync edge `public`
+(`sync-edge-susan-timeouts-per-edge-observability`), so every path is trust-blind today. These tags
+name the relationship that holds, which is what a priced path would read.
+
+### Custody shape — who carries it
+
+Sharing load is the other way cost falls. A third question, asked only where the answer drives the
+cost or the design: **how widely is the thing held, and is that breadth bought as headcount or as
+independence?** Custody is its own plane — it is neither reach (audience) nor head (version).
+
+| Tag | The entry is about |
+|---|---|
+| `custody-everyone` | A cost paid because every participant holds or validates all of it: full arc, flood gossip, a copy per hosted agent |
+| `custody-subset` | Holding by a chosen subset: an arc, a shard, a ring — as a lever tried or a design proposed |
+| `custody-diverse` | Choosing holders for independent failure domains instead of for number |
+
+A `custody-everyone` entry asks what the smallest holder set meeting the object's resilience need
+would be. An entry that records breadth was *not* the driver should say so in its body; that is as
+useful as the tag. The operator's statement of the principle is
+`backlog/commons-holonic-stewardship-backlog.md` row 30.
+
+### Plane — which part of the object is doing the work
+
+An object on the network is several planes, and each has its own natural price. Bytes are large and
+self-certifying, so they are cheap to verify even from a stranger. Meaning is small and takes the
+ceremony. Separating them lets each take its cheapest shape. The tag names **the plane whose work
+consumes the resource**.
+
+| Tag | The plane |
+|---|---|
+| `plane-bytes` | Content bytes: blobs, shards, transfer |
+| `plane-head` | Which version is current: declaration, election, adoption, anchors |
+| `plane-authority` | Who may act: capability grants, delegation, signatures, identity binding |
+| `plane-notary` | DHT ops: publish, validation, receipts, gossip, the source chain as machinery |
+| `plane-custody` | Who holds what: inventory, provider records, arcs, placement |
+| `plane-projection` | The derived local view: SQL projection, projector, reconcile, render |
+| `plane-reference` | Edges between objects: relationships, paths, links |
+| `plane-attention` | Views, feedback, private observation |
+| `plane-value` | Economic events, commitments, flows |
+
+`fused-planes` marks an entry where one plane's price is charged on another plane's path: an
+authority lookup paid on every data read, a head convergence delaying bytes that already arrived.
+It is the marker to read first, because the cure is usually to let the cheap plane stop waiting on
+the expensive one. The operator's worked example of separating custody from identity and meaning is
+`backlog/arch-confidentiality-plane-backlog.md` row 12.
+
+### Cost unit, phase and lane
+
+Three shorter questions complete the view.
+
+| Question | Tags |
+|---|---|
+| **What does the cost multiply by?** | `unit-once` (a boot, a deploy, a build) · `unit-call` (every call, request or sweep tick) · `unit-item` (per item, blob, shard, op or row) · `unit-peer` (per peer or edge) · `unit-agent` (per hosted agent or cell) · `unit-history` (grows with a chain, a log or accumulated history) |
+| **When is it paid?** | `phase-steady` (at rest or ordinary load) · `phase-transition` (restart, cold start, deploy, roll, a peer joining, catch-up) · `phase-growth` (appears only as corpus, chain, peers or agents grow) |
+| **Who is waiting?** | `lane-interactive` (a person or foreground caller) · `lane-background` (only sweeps, reconcile, gossip or heal are delayed) · `lane-borrowed` (background work consuming capacity a foreground path then waits on) · `lane-operator` (a developer, pipeline or gate) |
+
+The unit is where conversions show: per item to per peer, per call to once, per history to a bounded
+range. Phase matches the cure to the moment — steady cost is optimised, transition cost is staggered
+or warmed, growth cost needs a different algorithm. `lane-borrowed` is the lane to read first.
+
+The whole family — performance, trust context, friction, custody, plane, unit, phase, lane — is the
+**gradient view**. The `gradient-reading` skill holds the method for reading costs and for declaring
+an object at design time, and says how to brief a reader for a bulk labelling pass.
+
 ## Risks — a view, not a kind (tag `risk`)
 
 A **project risk** is a concern with a *measurable trigger that has not fired yet*. It is not a

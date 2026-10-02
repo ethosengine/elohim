@@ -13,7 +13,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 relatedNodeIds: []
 nodes: [matthew, doorway-alpha]
-tags: [doorway, alpha, conductor, reconnect-storm, app-ws-session-close, warm-stream, liveness-watchdog, restart-on-hang, upstream-operator-owned, needs-brainstorm, sqlite-read-pool-saturation, matthew-edge, ab-control-adam-healthy]
+tags: [doorway, alpha, conductor, reconnect-storm, app-ws-session-close, warm-stream, liveness-watchdog, restart-on-hang, upstream-operator-owned, needs-brainstorm, sqlite-read-pool-saturation, matthew-edge, ab-control-adam-healthy, performance, perf-queue, perf-cpu, trustful-self, friction-mechanical, plane-notary, fused-planes, unit-call, phase-steady, lane-interactive]
 cites:
   - genesis/orchestrator/manifests/doorway/alpha.yaml
   - doorway/doorway-service/src/projection/subscriber.rs

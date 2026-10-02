@@ -11,7 +11,7 @@ status: "triaged"
 priority: "low"
 jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
-tags: [metrics, observability, transport-selection, C8]
+tags: [metrics, observability, transport-selection, C8, performance, perf-telemetry, friction-blind, lane-operator]
 ---
 
 Measured 2026-08-29 06:4xZ after edge #1389 deployed 1.0.0-dev-71f310ce to 7/7 alpha pods: Prometheus lists the

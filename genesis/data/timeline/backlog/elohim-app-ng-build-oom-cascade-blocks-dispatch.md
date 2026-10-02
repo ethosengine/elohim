@@ -9,7 +9,7 @@ written: "2026-08-02"
 author: "pipeline-landing shift (integrator)"
 status: "backlog"
 priority: "high"
-tags: [ci, orchestrator, elohim-app, oom, pod-memory, cascade-abort, dispatch, infra]
+tags: [ci, orchestrator, elohim-app, oom, pod-memory, cascade-abort, dispatch, infra, performance, perf-memory, friction-mechanical, unit-once, lane-operator]
 cites:
   - Jenkinsfile
   - genesis/orchestrator/Jenkinsfile

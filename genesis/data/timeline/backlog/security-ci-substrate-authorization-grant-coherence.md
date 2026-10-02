@@ -11,7 +11,7 @@ status: "open"
 priority: "high"
 ci_status: none
 jobs: [elohim-genesis]
-tags: [security, authorization, delegates-compute, rea, doorway, conductor, netpol, bootstrap-debt, p2p-design-gate]
+tags: [security, authorization, delegates-compute, rea, doorway, conductor, netpol, bootstrap-debt, p2p-design-gate, trustful-earned, friction-verify]
 cites:
   - genesis/orchestrator/manifests/network-policies.yaml
   - genesis/data/timeline/backlog/ci-genesis-conductor-adminws-unreachable.md

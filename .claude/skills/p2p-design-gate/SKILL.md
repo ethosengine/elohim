@@ -173,6 +173,10 @@ Every new entity and decision predicate declares:
 
 ---
 
+### Step 1.6: Shape per plane (gradient reading)
+
+An object is several planes with different natural prices: its bytes, its head, the references to it, who holds it. When the entity's audience, holders and bytes differ — an intimate reference to commons bytes, keys backed by a holder set, a head that moves separately from content — load the `gradient-reading` skill and answer its *Declaring an object at design time* questions here: reach per plane, custody (resilience need, holder set, threshold), freshness and stakes, linkability, cost bearer. Record the answers in the gate output under Design Constraints Discovered. Vocabulary: `genesis/data/timeline/CONVENTIONS.md` §Trust context and friction through §Cost unit, phase and lane.
+
 ## Step 2: Content Address Strategy
 
 For each entity, declare which addressing strategy applies. There are exactly three options.

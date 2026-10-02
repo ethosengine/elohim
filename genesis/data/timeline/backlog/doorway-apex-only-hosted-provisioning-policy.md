@@ -10,7 +10,7 @@ author: "claude (integrator shift — surfaced by the hosted-agent cap lever rev
 status: "open"
 priority: "medium"
 jobs: [elohim-edge]
-tags: [doorway, provisioning, hosted-agents, household-nodes, capacity, pool-map, mishpat, delegates-compute]
+tags: [doorway, provisioning, hosted-agents, household-nodes, capacity, pool-map, mishpat, delegates-compute, trustful-declared]
 cites:
   - doorway/doorway-service/src/conductor/pool_map.rs
   - genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md

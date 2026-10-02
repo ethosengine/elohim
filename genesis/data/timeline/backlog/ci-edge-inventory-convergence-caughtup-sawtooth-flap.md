@@ -13,7 +13,7 @@ ci_status: blocked
 fingerprints: [7db3e674ea84, 591656751c2b]
 jobs: [elohim-edge]
 relatedNodeIds: []
-tags: [ci, elohim-edge, dataplane, a2o, caughtUp, projection-reconcile, quiesce, flake, measurement]
+tags: [ci, elohim-edge, dataplane, a2o, caughtUp, projection-reconcile, quiesce, flake, measurement, performance, perf-telemetry, perf-convergence, friction-blind, friction-wait, phase-steady, lane-operator]
 cites:
   - genesis/data/timeline/backlog/projection-reconcile-actionable-sawtooth.md
   - genesis/data/timeline/backlog/fleet-quiesce-pass-not-convergence.md

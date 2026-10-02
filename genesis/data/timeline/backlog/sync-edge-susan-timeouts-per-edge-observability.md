@@ -10,6 +10,7 @@ author: "shift 2026-08-28T03-25-shakeout-landing-perf-trust-hybrid"
 status: "open"
 priority: "high"
 jobs: [elohim-edge]
+tags: [performance, perf-latency, perf-telemetry, trustful-declared, friction-blind, friction-wait, plane-custody, unit-peer, phase-steady, lane-background]
 ---
 
 ## Measured (Loki, alpha, 6 h ending 2026-08-28T03:15Z)

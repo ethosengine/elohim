@@ -9,7 +9,7 @@ written: "2026-09-18"
 author: "doorway-overnight-20260914 shift (doorway-failover pickup)"
 status: "backlog"
 priority: "medium"
-tags: [elohim-storage, sqlite, backpressure, deterministic-floor, flake, household-mesh]
+tags: [elohim-storage, sqlite, backpressure, deterministic-floor, flake, household-mesh, performance, perf-io, trustful-self, friction-mechanical, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
 cites:
   - genesis/a2o/reports/recovery/doorway-pickup-20260917/final2/laneD-deliverability-receipt.log
   - genesis/data/timeline/backlog/household-mesh-harness-honest-readiness.md

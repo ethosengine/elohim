@@ -13,7 +13,7 @@ ci_status: in-progress
 fingerprints: [15133508b92b, 5fed1dca2f69, 7569d2b6e0c6, c7b21e0d88e4]
 jobs: [elohim/dev]
 relatedNodeIds: []
-tags: [ci, elohim-app, deploy, projected-head, served-vs-declared, ssr-bundle-head, doorway-reconcile-tick, eventual-consistency, convergence-race, probe-reads-converging-value, T4-2, T4-1, retry-ladder, in-flight-fix]
+tags: [ci, elohim-app, deploy, projected-head, served-vs-declared, ssr-bundle-head, doorway-reconcile-tick, eventual-consistency, convergence-race, probe-reads-converging-value, T4-2, T4-1, retry-ladder, in-flight-fix, performance, perf-convergence, perf-telemetry, friction-wait, friction-blind, plane-head, unit-once, phase-transition, lane-operator]
 cites:
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1628/
   - https://jenkins.ethosengine.com/job/elohim/job/dev/1629/

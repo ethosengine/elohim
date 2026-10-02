@@ -14,7 +14,7 @@ cites:
   - elohim/elohim-storage/src/reconcile/controller.rs
 relatedNodeIds:
   - backlog-bounds-validator-lexicographic-timestamp-compare
-tags: [ci, measurement, quiesce, reconcile, oscillation, dataplane]
+tags: [ci, measurement, quiesce, reconcile, oscillation, dataplane, performance, perf-telemetry, perf-convergence, friction-blind, friction-wait, phase-transition, lane-operator]
 shift_objective: |
   Make fleet measurement available while A-side reconcile oscillates. Evidence
   (2026-08-19 evening): edge #1367, #1368, #1369 (validate-only) ALL ended

@@ -14,7 +14,7 @@ cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "habit:dataplane-convergence"
   - "backlog-pull-leg-drains-before-iroh-book-warms"
-tags: [dataplane, inventory, gossip, dual-stack, sequence-gap, bounded-work, ratchet-lane-P]
+tags: [dataplane, inventory, gossip, dual-stack, sequence-gap, bounded-work, ratchet-lane-P, performance, perf-convergence, perf-queue, trustful-declared, friction-mechanical, friction-verify, plane-custody, unit-item, phase-steady, lane-background]
 ---
 
 ## Measured (dual household mesh, 2026-08-29, three peers, 3.4k-row corpus)

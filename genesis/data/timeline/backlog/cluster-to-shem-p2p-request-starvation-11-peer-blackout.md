@@ -15,7 +15,7 @@ themes: [dataplane, libp2p, shem, reachability, acquisition, observability]
 relatedNodeIds:
   - "genesis/manifests/habits.yaml"
   - "genesis/data/timeline/backlog/wan-nat-federation-dataplane-discovery-gap-2026-06-23.md"
-tags: [p2p, shem, blocked-by-env, habits:sync-scale-honesty]
+tags: [p2p, shem, blocked-by-env, habits:sync-scale-honesty, performance, perf-queue, perf-latency, trustful-declared, friction-mechanical, friction-wait, plane-custody, fused-planes, unit-peer, phase-steady, lane-background]
 ---
 
 # Cluster→shem P2P request starvation — the 11-peer blackout

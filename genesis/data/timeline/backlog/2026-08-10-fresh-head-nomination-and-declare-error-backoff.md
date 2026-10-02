@@ -9,7 +9,7 @@ written: "2026-08-10"
 author: "batch-3 integration session (follow-up from cascade trace)"
 status: "partially-resolved"
 priority: "medium"
-tags: [dataplane, head-adoption, contest, ghost-decay, design-capture, codex-claimable-partial]
+tags: [dataplane, head-adoption, contest, ghost-decay, design-capture, codex-claimable-partial, performance, perf-queue, perf-convergence, trustful-self, friction-wait, friction-mechanical, plane-head, unit-item, phase-steady, lane-background]
 cites:
   - genesis/data/timeline/backlog/2026-08-10-post-decay-adjudication-cascade-trace.md
 ---

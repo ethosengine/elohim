@@ -22,7 +22,7 @@ cites:
   - genesis/data/timeline/backlog/ci-alpha-cluster-degraded-substrate.md
   - genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md
   - genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
-tags: [substrate, adam, genesis-anchor, arc-factor, db-read-pool-saturation, conductor-unreachable, dht-non-convergence, host-green-not-ci-green, operator-domain, post-storm]
+tags: [substrate, adam, genesis-anchor, arc-factor, db-read-pool-saturation, conductor-unreachable, dht-non-convergence, host-green-not-ci-green, operator-domain, post-storm, performance, perf-io, perf-queue, trustful-declared, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, lane-interactive]
 ---
 
 # adam sustained saturation after the storm-pod deletion — no tree-fixable scale lever (genesis anchor can't arc-shrink)

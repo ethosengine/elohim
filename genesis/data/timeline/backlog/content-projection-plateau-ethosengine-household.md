@@ -19,7 +19,7 @@ relatedNodeIds:
   - "memory:project_alpha_topology_bootstrap_pair"
 cites:
   - genesis/data/timeline/backlog/ci-alpha-cluster-degraded-substrate.md
-tags: [dataplane, content-projection, convergence, divergent-anchor, household-nodes, ethosengine, node-locality, storm-independent]
+tags: [dataplane, content-projection, convergence, divergent-anchor, household-nodes, ethosengine, node-locality, storm-independent, performance, perf-convergence, trustful-declared, friction-wait, plane-projection, unit-item, phase-steady, lane-background]
 ---
 
 # Content-projection plateau on the ethosengine household — separate from the inventory-snapshot storm

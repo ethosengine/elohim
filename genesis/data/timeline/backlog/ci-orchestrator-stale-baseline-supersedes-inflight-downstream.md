@@ -13,7 +13,7 @@ jobs: [elohim-orchestrator, elohim]
 cluster: "ci-orchestrator-backlog"
 relatedNodeIds:
   - "habit:doorway-failover"
-tags: [ci, orchestrator, dispatch, baseline, timeout, wall-clock]
+tags: [ci, orchestrator, dispatch, baseline, timeout, wall-clock, performance, perf-queue, perf-latency, friction-mechanical, unit-once, lane-operator]
 ---
 
 **The fact.** Orchestrator #1894 (push c919bc8f1) ran DNA #1451 (44 min) then edge #1477

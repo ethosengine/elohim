@@ -9,7 +9,7 @@ written: "2026-07-27"
 author: "claude (freenet NOW slice Task 4 — sonnet measurement pass)"
 status: "open"
 priority: "medium"
-tags: [anti-entropy, sync, gossip, automerge, kitsune2, inventory-gossip, metrics, prometheus, egress, observability-gap]
+tags: [anti-entropy, sync, gossip, automerge, kitsune2, inventory-gossip, metrics, prometheus, egress, observability-gap, performance, perf-telemetry, perf-scale, trustful-declared, friction-blind, custody-everyone, plane-custody, unit-peer, phase-steady, lane-background]
 cites:
   - genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md
   - genesis/docs/superpowers/plans/2026-07-27-freenet-now-slice-plan.md
