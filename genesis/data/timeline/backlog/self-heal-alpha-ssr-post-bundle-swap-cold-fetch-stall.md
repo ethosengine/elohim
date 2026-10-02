@@ -3,10 +3,10 @@ id: "backlog-self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "alpha's SSR degenerate burst is REAL and deploy-coupled: for ~15min after a bundle-head swap, ONE fetch of the 29 in every cold `/` render exceeds the 1200ms soft budget, so every visitor in that window gets a degenerate HTTP 200 — and the stalling URL is unknowable from outside the process"
+title: "alpha's SSR renders stall at the 1200ms fetch soft budget in bursts: first seen as a ~15min window after a bundle-head swap, then (2026-10-02) sporadically for hours on a days-old head — the stalled fetches are named, storage never saw a slow request, so the time is lost before the request reaches storage"
 slug: "self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall"
 written: "2026-09-12"
-updated: "2026-09-28"
+updated: "2026-10-02"
 author: "runtime-triage"
 status: "wip"
 priority: "medium"
@@ -15,7 +15,7 @@ severity: medium
 fingerprints: [da8bb3bdd7e1]
 nodes: [alpha, doorway-alpha, elohim-matthew-alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, ssr, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha, performance, perf-latency, trustful-self, friction-wait, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
+tags: [self-heal, render-degenerate, ssr, pool-free-client, name-lookup, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha, performance, perf-latency, trustful-self, friction-wait, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
 cites:
   - https://doorway-alpha.elohim.host/admin/render-stats
   - https://doorway-alpha.elohim.host/admin/self-healing
@@ -35,6 +35,10 @@ cites:
   - .claude/scripts/_lib/runtime_harvest.py
   - genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md
   - genesis/data/timeline/backlog/self-heal-doorway-alpha-storage-breaker-matthew-rekey.md
+  - elohim/elohim-storage/src/metrics.rs
+  - elohim/elohim-storage/src/http.rs
+  - elohim/elohim-storage/src/services/live_earned.rs
+  - doorway/doorway-service/src/routes/storage_proxy.rs
 ---
 
 # The third firing is the first TRUE positive — and it is a deploy-coupled cold window, not saturation
@@ -378,3 +382,185 @@ doorway serves a 16-day-old app bundle. That is a head/blob coherence question o
 content-sync plane, not an SSR render question. It is named here because it was seen,
 not investigated, and not claimed to cause the stall (adam, the peer with the stale blob,
 is the one that does NOT stall).
+
+---
+
+# 2026-10-02: `da8bb3bdd7e1` fired a third time, and this time the head is days old
+
+## What is exhausted
+
+Ledger line (fp `da8bb3bdd7e1`, node **alpha**, filed poll 227, `2026-10-02T17:45:07+00:00`):
+
+```
+render degenerate 6/11 of NEW renders = 0.55 over 3 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+The stored window (`.claude/data/runtime-cursor.json`, poll 227) on alpha runs `total` 1 → 8 → 11 → 12
+and `stalled` 0 → 3 → 5 → 6. alpha-b over the same window: `total` 1 → 12, `stalled` 0.
+
+Re-fetch at triage, `GET https://doorway-alpha.elohim.host/admin/render-stats` (17:45:59Z, HTTP 200):
+
+```json
+{"total": 12, "rendered": 6, "renderedEmpty": 0, "stalled": 6, "timedOut": 0,
+ "errored": 0, "avgWallMs": 723, "maxWallMs": 1287, "degenerateRate": 0.5}
+```
+
+`/admin/self-healing` the same minute: `admission.shedTotal: 0`, upstream `circuit: closed`,
+`errorStreak: 0`, `warmup.completed: true`, `conductor.connectedWorkers: 4/4`,
+`projector.caughtUp: false` with `divergentAnchor: 27`, two of seven conductor peers `Degraded`.
+
+## The re-encounter rule, applied: this is NOT the cold window
+
+The rule above says to read the head first. `GET /db/content/elohim-host-landing/head` returned
+`updatedAt: 2026-09-30T09:39:10Z` and `blobHash: sha256-9a0bae8d…`, the blob alpha already served on
+2026-09-28. The head is **more than two days old**. `/health` reports `uptime: 27755` s, so the
+doorway process started about 10:04Z (image `5ffe985`, built 2026-10-02T09:32:53Z). The seven stalls
+are spread over the following **7.7 hours**. Neither a head swap nor a restart is within 15 minutes of
+most of them.
+
+So the "deploy-coupled ~15 min cold window" was one occasion of this condition, not its definition.
+The record keeps the fingerprint (same node, same terminal, same clamp at the soft budget) and the
+frame widens: **renders on alpha stall in sporadic bursts with no deploy nearby.**
+
+## The instrument from 2026-09-28 read out
+
+The `degenerate_fetches` warn landed with image `5ffe985`. Loki, `{namespace="elohim-alpha"} |= "degenerate_fetches"`,
+2026-10-02T09:00Z → 17:49Z: **7 lines, all from pod `elohim-doorway-alpha-bd68cb6fc-h2d2t`**, all
+`path: "/"`, `terminal: "stalled"`. The B-side doorway pods have none.
+
+| time (UTC) | `wall_ms` | fetches named, each `stalled 1200ms` |
+|---|---|---|
+| 11:45:44 | 1287 | resilience/policymakers, epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, +1 more |
+| 13:05:58 | 1257 | resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+| 13:06:08 | 1227 | epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+| 15:56:52 | 1239 | resilience/policymakers, epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, +1 more |
+| 15:57:38 | 1268 | resilience/communities, epr-head/manifesto |
+| 17:34:44 | 1271 | resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+| 17:46:18 | 1229 | epr-head/developers, resilience/developers, epr-head/communities, resilience/communities, epr-head/manifesto |
+
+(Full paths are `GET /epr-head/concept-path-forward-<x>`, `GET /api/v1/resilience/concept-path-forward-<x>`
+and `GET /epr-head/manifesto`. The logged host is `localhost:8090`: the trace records the URL the
+bundle asked for, and `ResolverFetcher` rewrites it onto `SSR_STORAGE_URL` before sending,
+`doorway/doorway-service/src/ssr.rs`.) The 17:46:18 line is one of this triage's own probes.
+
+Two corrections to what this record said before:
+
+- **It is not one fetch.** 2 to 6 fetches stall together. The 2026-09-12 arithmetic ("28 settle, exactly
+  one never settles") could not tell one from several, because concurrent fetches cut at the same
+  budget cost the same 1200 ms.
+- **It is always the tail.** The named fetches are a suffix of the same ordered sequence
+  (policymakers → developers → communities → manifesto). How far up the sequence the stall reaches
+  varies from 2 to 6. Everything issued before that point arrives.
+
+## Storage is ruled out, by its own histogram
+
+The same routes, fetched through the doorway's pooled proxy client at triage, 6 times each:
+`/epr-head/concept-path-forward-communities`, `/api/v1/resilience/concept-path-forward-communities`,
+`/api/v1/resilience/concept-path-forward-developers`, `/epr-head/manifesto`,
+`/epr-head/concept-path-forward-policymakers`. All 30 answered HTTP 200 in **14–25 ms**.
+
+Storage records one `elohim_http_request_duration_ms` observation per request at its single dispatch
+point, labelled by `route_class` (`elohim/elohim-storage/src/metrics.rs`). `/api/v1/resilience/*` is
+class `api`. Prometheus, pod `elohim-matthew-alpha-0`, 10:00Z → 17:50Z, 30 s scrape:
+
+- `api` / `2xx`: 1665 observations, **all in the ≤500 ms bucket**. `api` / `4xx`: 37, all ≤500 ms.
+- `api` / `5xx` (where a request dropped by the client before a status is recorded would land):
+  the count above 1000 ms last moved at 10:15Z and never after.
+- No step in `_count − _bucket{le="1000.0"}` for `api` or `content` within ±2 min of the six stalls
+  from 11:45 to 17:34.
+- `elohim_http_requests_in_flight` max over 8 h: 3.
+
+Fifteen `api`-class fetches are named as cut at 1200 ms by the doorway today. Storage never held an
+`api` request for even 500 ms. **The stalled requests were not slow inside storage.** The 1200 ms is
+spent before storage's dispatch wrapper starts its clock, or after it stops: in the name lookup, in the
+TCP connect, in transit, or on the render thread.
+
+(Storage logs no per-request lines, so Loki cannot show whether a stalled request arrived late or
+never. The histogram is the only storage-side witness.)
+
+## Root-cause inventory (this pass)
+
+1. **`doorway/doorway-service/src/server/http.rs`, `init_ssr_render_client`** — the SSR render client is
+   pool-free on purpose (`pool_max_idle_per_host(0)`, the containment for the 2026-08-21 parked-driver
+   incident documented on that function). The consequence: every render fetch opens a fresh TCP
+   connection and does a fresh name lookup of `elohim-matthew-alpha.elohim-alpha.svc.cluster.local`.
+   A `/` render does about 29 of each. The proxy client that answered the same routes in 17 ms keeps
+   pooled connections and does neither. That is the one structural difference between the path that
+   stalls and the path that does not.
+2. **`doorway/doorway-service/src/routes/storage_proxy.rs:48`** — `STORAGE_PROXY_CONNECT_TIMEOUT_SECS = 3`
+   is the render client's connect bound. It is above the 1200 ms soft budget, so a slow connect is cut
+   by the soft budget first and reads as `stalled`, never as `errored`. That matches `errored: 0` on
+   every firing of this fingerprint.
+3. **`elohim/elohim-render/src/traced_fetcher.rs`** — unchanged and still only the messenger.
+4. **Not established:** which of lookup, connect or the render thread loses the time. Candidates on the
+   record, none proven: a slow `getaddrinfo` (this doorway has a recorded history of DNS flaps, see the
+   doorway ops incidents memory); a dropped SYN (a 1 s retransmit lands near the budget, and earlier
+   records show alpha-b renders that completed near 1 s: `maxWallMs` 991 today, with no stall); the render thread's
+   `current_thread` runtime not polling the tail fetches. The doorway pod runs on node `intel-nuc` and
+   the storage pod on `ethosengine`, so every one of these connections crosses nodes.
+
+## Fix path
+
+1. **Time the name lookup (landed this pass).** `TimedDnsResolver` in `doorway/doorway-service/src/ssr.rs`
+   is now the SSR render client's resolver. It resolves exactly as before (`tokio::net::lookup_host`,
+   the same `getaddrinfo` on the blocking pool) and emits a `warn!` on target `doorway::ssr::dns` with
+   `host` and `elapsed_ms` when a lookup takes ≥ 250 ms or fails. On the next stall, one Loki query
+   settles the lookup question: a `doorway::ssr::dns` line beside the `degenerate_fetches` line means
+   the lookup is the cause; a stall with no such line rules it out.
+2. **Then the cure, chosen by that reading.**
+   - Lookup is slow: cache the resolved address on the render client for a short TTL, so a render does
+     one lookup and not 29, and a slow refresh serves the previous answer.
+   - Lookup is clean: the next split is connect vs render thread. That needs a connect-phase timing on
+     the render client, or the 2026-09-12 move 2 (a warm render) re-examined against the tail-suffix shape.
+3. Unchanged refusals: do not widen the soft budget, do not touch `_render_degenerate`, do not raise
+   `DEFAULT_SSR_RENDER_PERMITS`, and do not re-pool the render client (that reopens the 2026-08-21 wedge).
+
+## Current decision (supersedes 2026-09-28)
+
+**IN PROGRESS. Storage is exonerated; the second instrument is committed and the cure waits on its
+first reading.** `just gate doorway` (fmt-check, clippy `-D warnings`, test, `RUSTFLAGS=""`): EXIT=0, lib suite 1723 passed, 0 failed, 2 ignored, including the 3 new `ssr::tests` for the resolver.
+
+What the poller cites on re-encounter: this record. The condition is intermittent (1 stall in 14
+cold probes at triage) and is no longer tied to a deploy, so **expect this fingerprint to close by
+disappearance and re-file**. On the next firing, before anything else, run in Loki over the firing
+window: `{namespace="elohim-alpha"} |= "doorway::ssr::dns"` and `|= "degenerate_fetches"`, and compare
+timestamps. That reading is the whole triage. The instrument only reads after an edge deploy carries
+this commit; a firing on image `5ffe985` or older has no `doorway::ssr::dns` lines by construction.
+
+## Verification
+
+- 2026-10-02 17:45:59Z: `/admin/render-stats`, `/admin/self-healing`, `/health`, `/version` and the
+  landing head re-fetched on alpha (HTTP 200, quoted above). The cursor window was read from disk.
+- 17:46:17Z → 17:47:05Z: 14 cache-busted cold renders of `/` on alpha. 13 `rendered` at 35–67 ms,
+  **1 `stalled` at 1229 ms**. Two on elohim.host: `rendered`, 142 and 155 ms. The condition is live
+  and intermittent, not cleared.
+- 17:51:55Z: `/admin/render-stats` reads `total: 26, stalled: 7`.
+- Loki and Prometheus readings as quoted above.
+- Closure: left to the poller. The ledger line is `triaged` and is not manually deleted.
+
+### Instrument disclosure
+
+This triage added 14 renders and 1 stall to alpha's lifetime counters (`total` 12 → 26, `stalled`
+6 → 7) and 2 renders to alpha-b's. It also made 6 `/head` reads on alpha and 4 on alpha-b; each is a
+2 s conductor ask (below) and each lands in storage's `content` histogram above 1000 ms. The `content`
+step of +6 on matthew and +4 on adam at 17:47Z in Prometheus is this triage, not the stall.
+
+## Observation, not a claim (`/head` costs 2.0 s on both peers, every time)
+
+`GET /db/content/elohim-host-landing/head` took **2.02 s** on doorway-alpha (6 of 6, also for
+`lamad-spa`) and **2.02–2.08 s** on elohim.host (3 of 3), and returned `stagingCandidateState: "unavailable"`.
+Storage logs the reason each time: `head read: local election ask timed out — reporting unavailable`,
+`outcome: "deadline"`, `elapsed_ms: 2001`. That is `LIVE_ELECTION_BUDGET` (2 s,
+`elohim/elohim-storage/src/services/live_earned.rs:59`) expiring on the conductor's
+`resolve_canonical_election` call in `ask_local_election` (`elohim/elohim-storage/src/http.rs`). The
+local conductor does not answer that ask within 2 s on either peer. In the same hours storage logged
+`record_peer_status zome call failed … init() callback … blocking this zome call for longer than 30 seconds`
+(11:45:45Z) and the doorway logged `Zome call timed out after 10000ms (infrastructure/infrastructure/get_all_doorways)`
+against adam's and james's conductors.
+
+This is a conductor-responsiveness question, not an SSR one, and it is not claimed to cause the
+stall: the `/` render does not fetch `/head`, and the stalled routes are plain SQLite reads that
+storage answered fast. It is named because every consumer of `/head` (the doorway's bundle-heads
+reconciler, `doorway/doorway-service/src/render/bundle_heads.rs`, treats `unavailable` as "keep the
+last candidate") is currently paying 2 s for an answer of "unavailable". It has no backlog home yet.
+

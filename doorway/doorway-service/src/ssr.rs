@@ -339,6 +339,74 @@ fn strip_to_path(url: &str) -> &str {
 }
 
 // =============================================================================
+// TimedDnsResolver — names a slow name lookup on the SSR render client
+// =============================================================================
+
+/// A name lookup on the SSR render client slower than this is logged. It sits
+/// well under the render's per-fetch soft budget
+/// (`elohim_render::traced_fetcher::DEFAULT_SOFT_BUDGET_MS`, 1200 ms), so a
+/// lookup that is on its way to stalling a fetch is named before the cut.
+pub const SSR_DNS_SLOW_LOOKUP_MS: u128 = 250;
+
+/// Whether a lookup that took `elapsed_ms` is slow enough to log.
+fn ssr_dns_lookup_is_slow(elapsed_ms: u128) -> bool {
+    elapsed_ms >= SSR_DNS_SLOW_LOOKUP_MS
+}
+
+/// The SSR render client's DNS resolver: the system resolver, timed.
+///
+/// The render client is pool-free on purpose (`init_ssr_render_client`), so
+/// every render fetch opens a fresh connection and performs a fresh name
+/// lookup — a `/` render performs about 29. A fetch that stalls at the soft
+/// budget while storage's own request histogram shows no slow request spent
+/// that time before the request reached storage: in the lookup, in the
+/// connect, or waiting on the render thread. This resolver makes the lookup
+/// share of that readable: a slow or failed lookup is a `warn!` on target
+/// `doorway::ssr::dns` carrying the host and the elapsed time. A stalled
+/// render with no such line beside it rules the lookup out.
+///
+/// Resolution itself is unchanged in kind — `tokio::net::lookup_host` runs the
+/// same `getaddrinfo` reqwest's default resolver runs, on the blocking pool.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TimedDnsResolver;
+
+impl reqwest::dns::Resolve for TimedDnsResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        Box::pin(async move {
+            let host = name.as_str().to_string();
+            let started = Instant::now();
+            let looked_up = tokio::net::lookup_host((host.as_str(), 0)).await;
+            let elapsed_ms = started.elapsed().as_millis();
+            match looked_up {
+                Ok(addrs) => {
+                    let addrs: Vec<std::net::SocketAddr> = addrs.collect();
+                    if ssr_dns_lookup_is_slow(elapsed_ms) {
+                        tracing::warn!(
+                            target: "doorway::ssr::dns",
+                            host = %host,
+                            elapsed_ms = elapsed_ms as u64,
+                            addresses = addrs.len(),
+                            "SSR render fetch: slow name lookup"
+                        );
+                    }
+                    Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "doorway::ssr::dns",
+                        host = %host,
+                        elapsed_ms = elapsed_ms as u64,
+                        error = %e,
+                        "SSR render fetch: name lookup failed"
+                    );
+                    Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+                }
+            }
+        })
+    }
+}
+
+// =============================================================================
 // DoorwayBundleSource — blocking BundleSource over the storage HTTP API
 // =============================================================================
 
@@ -560,6 +628,62 @@ pub fn parse_server_blob_hash(body: &str) -> elohim_render::Result<String> {
 mod tests {
     use super::*;
     use elohim_render::BundleSource;
+
+    // ── TimedDnsResolver ────────────────────────────────────────────────────
+
+    #[test]
+    fn ssr_dns_slow_threshold_sits_under_the_fetch_soft_budget() {
+        assert!(!ssr_dns_lookup_is_slow(0));
+        assert!(!ssr_dns_lookup_is_slow(SSR_DNS_SLOW_LOOKUP_MS - 1));
+        assert!(ssr_dns_lookup_is_slow(SSR_DNS_SLOW_LOOKUP_MS));
+        // A lookup must be named before it can stall a fetch, never after.
+        assert!(SSR_DNS_SLOW_LOOKUP_MS < 1_200);
+    }
+
+    #[tokio::test]
+    async fn timed_dns_resolver_resolves_like_the_system_resolver() {
+        use reqwest::dns::Resolve;
+        use std::str::FromStr;
+
+        let name = reqwest::dns::Name::from_str("localhost").expect("valid name");
+        let addrs: Vec<std::net::SocketAddr> = TimedDnsResolver
+            .resolve(name)
+            .await
+            .expect("localhost resolves")
+            .collect();
+        assert!(!addrs.is_empty());
+        assert!(addrs.iter().all(|a| a.ip().is_loopback()));
+    }
+
+    #[tokio::test]
+    async fn ssr_render_client_still_fetches_through_the_timed_resolver() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = sock.read(&mut buf).await;
+            let _ = sock
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok")
+                .await;
+        });
+        // A HOSTNAME, so the request goes through the resolver (an IP literal
+        // would bypass it).
+        let client = crate::server::http::init_ssr_render_client();
+        let body = client
+            .get(format!("http://localhost:{port}/x"))
+            .send()
+            .await
+            .expect("send")
+            .text()
+            .await
+            .expect("body");
+        assert_eq!(body, "ok");
+    }
 
     // ── boot materialize budget (structural no-overwhelm) ───────────────────
     //
