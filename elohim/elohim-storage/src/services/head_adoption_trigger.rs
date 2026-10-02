@@ -956,6 +956,50 @@ enum WorkerExit {
     SenderClosed,
 }
 
+const RETAINED_HINT_PAGE: i64 = 64;
+
+/// A sync hint can outlive its initial retry ladder or a process restart.
+/// Revisit one bounded page of existing, distribution-safe anchored rows;
+/// hints only enqueue the existing verifier and never write head/body fields.
+/// The cursor is disposable local state, reconstructed from the inventory.
+async fn offer_retained_head_hints(
+    gate: &TriggerGate,
+    pool: &DbPool,
+    sync: &SyncManager,
+    ctx: &AppContext,
+    offset: i64,
+) -> Result<i64, crate::error::StorageError> {
+    let (rows, total) = {
+        let mut conn = pool
+            .get()
+            .map_err(|e| crate::error::StorageError::Internal(format!("Pool error: {e}")))?;
+        content_diesel::list_content_anchor_inventory(&mut conn, ctx, offset, RETAINED_HINT_PAGE)?
+    };
+    let next = offset.saturating_add(rows.len() as i64);
+    for row in rows {
+        let doc_id = crate::sync::projector::content_doc_id(&row.id);
+        let hint = sync
+            .get_doc_field(
+                crate::sync::projector::PROJECTION_NAMESPACE,
+                &doc_id,
+                "headActionHash",
+            )
+            .await
+            .ok()
+            .filter(|h| !h.trim().is_empty());
+        if should_probe(row.declared_head_action_hash.as_deref(), hint.as_deref()) {
+            // Retained documents have no current supplier to attribute. The
+            // worker uses its own conductor, not a fabricated transport peer.
+            if gate.offer(crate::sync::projector::PROJECTION_NAMESPACE, &doc_id, "")
+                == EnqueueDecision::Enqueued
+            {
+                tracing::info!(content_id = %row.id, "retained content-head hint queued for own-conductor verification");
+            }
+        }
+    }
+    Ok(if next < total { next } else { 0 })
+}
+
 /// The drain loop proper. Returns rather than exiting the task, so the
 /// supervisor above can tell an orderly end from a panic.
 #[allow(clippy::too_many_arguments)]
@@ -970,6 +1014,9 @@ async fn worker_loop(
     memo: &crate::services::courier_obey::RefusalMemo,
     shutdown: &mut tokio::sync::broadcast::Receiver<()>,
 ) -> WorkerExit {
+    let mut retained = tokio::time::interval(DEFAULT_TRIGGER_COOLDOWN);
+    retained.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut retained_offset = 0;
     loop {
         let trigger = tokio::select! {
             t = rx.recv() => match t {
@@ -977,6 +1024,13 @@ async fn worker_loop(
                 None => return WorkerExit::SenderClosed,
             },
             _ = shutdown.recv() => return WorkerExit::Shutdown,
+            _ = retained.tick() => {
+                match offer_retained_head_hints(gate, pool, sync, ctx, retained_offset).await {
+                    Ok(next) => retained_offset = next,
+                    Err(error) => tracing::warn!(%error, "retained content-head hint read deferred"),
+                }
+                continue;
+            },
         };
         process_trigger(&trigger, conductor, pool, sync, ctx, gate, courier, memo).await;
     }
@@ -1323,7 +1377,7 @@ async fn try_courier(
 ) -> Option<crate::services::courier_obey::CourierOutcome> {
     use crate::services::courier_obey::{courier_obey, ConductorVerifier, CourierOutcome};
 
-    if !crate::config::obey_carried_election_enabled() {
+    if trigger.peer.is_empty() || !crate::config::obey_carried_election_enabled() {
         return None;
     }
     let (c, hint) = (courier.get()?, doc_hint?);
@@ -1422,6 +1476,123 @@ fn schedule_slow_reprobe(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn retained_hint_fixture() -> (DbPool, SyncManager, tempfile::TempDir) {
+        let dir = tempfile::TempDir::new().unwrap();
+        let pool = crate::db::init_pool_from_dir(dir.path()).unwrap();
+        let store = Arc::new(
+            crate::sync::DocStore::new(crate::sync::DocStoreConfig {
+                db_path: dir.path().join("sync.sled"),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let sync = SyncManager::new(store, Arc::new(crate::sync::StreamTracker::new()));
+        (pool, sync, dir)
+    }
+
+    fn retained_row(pool: &DbPool, id: &str, reach: &str) {
+        use crate::db::diesel_schema::content::dsl as c;
+        use diesel::prelude::*;
+        let mut conn = pool.get().unwrap();
+        let input = serde_json::from_value(serde_json::json!({
+            "id": id, "title": id, "reach": reach,
+            "content_body": "old body", "dht_anchor_hash": "old head"
+        }))
+        .unwrap();
+        content_diesel::create_content(&mut conn, &AppContext::default_lamad(), input).unwrap();
+        diesel::update(c::content.filter(c::id.eq(id)))
+            .set((
+                c::declared_head_action_hash.eq(Some("old head")),
+                c::canonical_earned.eq(Some(1_i32)),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+    }
+
+    async fn retained_doc(sync: &SyncManager, id: &str, hint: &str) {
+        use automerge::transaction::Transactable;
+        let ns = crate::sync::projector::PROJECTION_NAMESPACE;
+        let id = crate::sync::projector::content_doc_id(id);
+        let mut doc = sync.get_or_create_doc(ns, &id).await.unwrap();
+        let mut tx = doc.transaction();
+        tx.put(automerge::ROOT, "headActionHash", hint).unwrap();
+        tx.commit();
+        sync.apply_changes(ns, &id, vec![doc.save()]).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn retained_hint_wakes_verification_without_stamping_or_touching_private_content() {
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        for (id, reach, hint) in [
+            ("pending", "commons", "new head"),
+            ("current", "commons", "old head"),
+            ("private", "intimate", "new head"),
+        ] {
+            retained_row(&pool, id, reach);
+            retained_doc(&sync, id, hint).await;
+        }
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        assert_eq!(
+            offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+                .await
+                .unwrap(),
+            0
+        );
+        let trigger = rx.try_recv().unwrap();
+        assert_eq!(trigger.content_id, "pending");
+        assert!(
+            trigger.peer.is_empty(),
+            "no transport supplier was invented"
+        );
+        assert!(
+            rx.try_recv().is_err(),
+            "matched and private rows must not wake the verifier"
+        );
+        offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+            .await
+            .unwrap();
+        assert!(
+            rx.try_recv().is_err(),
+            "the existing cooldown coalesces repeated replay"
+        );
+        let mut conn = pool.get().unwrap();
+        let row = content_diesel::get_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            "pending",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("old head"));
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("old head"));
+        assert_eq!(row.content_body.as_deref(), Some("old body"));
+    }
+
+    #[tokio::test]
+    async fn retained_hint_replay_visits_one_bounded_page_and_wraps() {
+        let (pool, sync, _dir) = retained_hint_fixture().await;
+        for i in 0..=RETAINED_HINT_PAGE {
+            retained_row(&pool, &format!("row-{i:03}"), "commons");
+        }
+        let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
+        let next = offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), 0)
+            .await
+            .unwrap();
+        assert_eq!(next, RETAINED_HINT_PAGE);
+        assert_eq!(
+            offer_retained_head_hints(&gate, &pool, &sync, &AppContext::default_lamad(), next)
+                .await
+                .unwrap(),
+            0
+        );
+        assert!(
+            rx.try_recv().is_err(),
+            "absent hints are not evidence warranting a probe"
+        );
+    }
 
     fn gate_with(cooldown: Duration) -> (Arc<TriggerGate>, mpsc::Receiver<HeadAdoptionTrigger>) {
         TriggerGate::new(cooldown)
