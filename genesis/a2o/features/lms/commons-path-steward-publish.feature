@@ -12,9 +12,16 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   reads Adam's own native election and ancestry, so Che's local copy cannot
   stand in for another peer's acceptance. Alpha and apex are two public
   doorways through which readers reach the peers. Both must serve the exact
-  updated head and body within 75 seconds of Che starting the update. The
-  same item is then changed a second time, under the same root and permission,
+  updated head and body within 75 seconds of Che starting that update. Only
+  after the first update reaches Adam and both doorways does the second begin,
+  with its own shared 75-second deadline starting when Che begins that update.
+  The same item is changed again under the same root and permission,
   to show that ordinary editing continues after the first successful update.
+  The fixture supplies two distinct replacement bodies for that item. For each
+  round, those exact submitted bytes are the expected correction: the receiving
+  peer and both doorways must serve them with the corresponding signed head.
+  This reduced proof checks the person's editing and delivery workflow; it does
+  not assess whether the supplied lesson text teaches well.
 
   The six scenarios tagged work in progress retain the wider course, seeding,
   privacy and withdrawal requirements. They are not part of this reduced proof.
@@ -100,8 +107,8 @@ Feature: A steward publishes a commons learning path from his own peer, and seed
   # Sprint 1.4 closes one exact item; the full course and lifecycle scenarios stay held.
   Scenario: Che publishes two consecutive updates to Matthew's item without the pipeline
     Given the original Che peer has verified credentials for one Matthew-authored commons item
-    When Che publishes two consecutive single-item updates with exact controller witnesses
-    Then Adam elects each Che update and alpha and apex serve its exact head and body within 75 seconds
+    When Che publishes an update with exact controller witnesses, waits for election and doorway delivery, then publishes a second update
+    Then Adam elects each Che update and alpha and apex serve its exact head and body within 75 seconds of that update starting
 
   @wip
   Scenario: Seeding after the publish leaves the current course untouched

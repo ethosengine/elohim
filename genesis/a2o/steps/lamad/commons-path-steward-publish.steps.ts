@@ -24,7 +24,7 @@ Given(
   }
 );
 When(
-  'Che publishes two consecutive single-item updates with exact controller witnesses',
+  'Che publishes an update with exact controller witnesses, waits for election and doorway delivery, then publishes a second update',
   { timeout: 180_000 },
   async function (this: E2EWorld) {
     const run = runs.get(this);
@@ -33,7 +33,7 @@ When(
   }
 );
 Then(
-  'Adam elects each Che update and alpha and apex serve its exact head and body within 75 seconds',
+  'Adam elects each Che update and alpha and apex serve its exact head and body within 75 seconds of that update starting',
   function (this: E2EWorld) {
     const heads = runs.get(this)?.heads;
     assert.equal(heads?.length, 2);
