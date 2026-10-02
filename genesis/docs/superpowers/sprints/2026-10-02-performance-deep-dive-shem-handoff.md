@@ -69,13 +69,32 @@ recorded in `2026-10-01-campaign-1.4-household-restart.md`. Short chains and lon
 therefore two points on one path, which is the two-point shape the boundaries ask for, but only
 once both are measured with the same binaries.
 
-**Conductor memory per hosted agent.** While the mesh prologue cast its hosted humans on that
-fresh mesh, the one conductor that hosts them grew from under 2 GB to 12.4 GB resident; the
-other two stayed under 2 GB with the same seeded content. The repository's standing figure is
-about 786 MB of conductor heap per hosted human, never released when a session closes. A
-read-only attribution of that growth was in progress when this section was written; its result
-is appended below when it lands. It is a `custody-everyone` cost by this page's labels (a copy
-per hosted agent) and belongs in your ranking.
+**Conductor memory scales with hosted agents, not with content.** Measured read-only on that
+fresh mesh at about 16:21Z, 35 minutes after start, after the prologue had registered 15 hosted
+humans through the first doorway:
+
+| Conductor | Apps / cells | Resident | Anonymous | Conductor directory on disk |
+|---|---|---|---|---|
+| matthew (hosts the cast) | 16 / 80 | 12,473,340 kB | 12,442,104 kB | 649 MB |
+| jessica | 1 / 5 | 1,917,280 kB | 1,887,104 kB | 582 MB |
+| james | 1 / 5 | 1,728,024 kB | 1,697,692 kB | 711 MB |
+
+Every hosted registration installs a full five-cell app on the doorway's conductor. All three
+conductors hold the same seeded content (about 3,500 items) and the same database files; 557 MB
+of each directory is `wasm.db`, written before any hosted human existed. The difference is 99.8%
+anonymous memory with no swap and about 10 MB file-backed, so it is heap, not storage. Taking
+jessica as the baseline it is about 704 MB per hosted agent, or about 137 MiB per added cell;
+matthew's own figure before the cast was not recorded. The repository's standing figure is about
+786 MB per hosted human (22.8 GB over 145 cells on 2026-09-11, a quotient, not a breakdown).
+
+Not established: what a cell's share is made of (compiled wasm or instances, per-cell SQLite
+pools and page caches, kitsune2 per-agent state, workflow queues, allocator retention), which
+allocator this fork binary uses, whether all 80 cells were running, and whether the memory is a
+one-time cost of install or grows with time. This is one snapshot. The measurement that would
+attribute it: `smaps_rollup` and the sizes of anonymous mappings before, during and after
+provisioning one more hosted agent on a disposable mesh, paired with the conductor's own
+`hc_*` metrics (`MESH_CONDUCTOR_LAUNCH=direct` exports them). It is a `custody-everyone` cost by
+this page's labels (a copy per hosted agent) and belongs in your ranking.
 
 **The bundle the household ran was assembled, not built.** It was an older preserved hApp with two
 coordinators swapped in. Its `content_store` coordinator matches a build of this ref
