@@ -179,6 +179,49 @@ What this shows:
   excluded by class, connection and taste. The protocol keeps the function (someone stakes
   standing on a work before it travels) and changes who may perform it.
 
+### Awards are attestations
+
+The operator, 2026-10-02: the awards too. An award is an attestation: a named body says, after the
+fact, that this work mattered. Three kinds, differing in who attests and what it costs to fake
+(from general knowledge; no source was looked up for this paragraph):
+
+- **Juried** — a small named panel stakes its own reputation. Slow, hard to buy, open to taste and
+  connection.
+- **Popular vote** — a count of readers. Cheap to read, open to campaigning.
+- **Pay-to-enter** — the entrant funds the award. The attestation is purchased, and the seal on
+  the cover looks the same as a juried one.
+
+The manifesto's "Meaningful Attestation" (Part IV-B) already draws the line: attestations come
+from humans, reference specific content, accumulate at the creator's presence, and cannot be sold.
+
+### The whole analogue (a mapping to test, not a design)
+
+| Book world | Elohim protocol | What changes |
+|---|---|---|
+| The text | the EPR's bytes | addressed by content, so a copy proves itself |
+| Table of contents | a path, or the author's composition | many paths may cross the same atoms |
+| Footnote and bibliography | cite edges inside the content | fingerprinted; a changed source is visible |
+| Index | a projection each peer derives | rebuilt at will, never the truth |
+| Edition | head | which version is current is a declared fact |
+| Catalogue record | the envelope and `.epr-meta` | read before the bytes are fetched |
+| Author | a presence, claimed or held in trust | the seat is held for the absent |
+| Editor | review at the gate | judges support once; the verdict is carried |
+| Publishing house | a steward or collective staking standing | anyone with standing may perform it |
+| Imprint | the signature on the carried proof | names who answers for the judgement |
+| Distributor | replication and custody | holders are declared; none need hold everything |
+| Bookstore front table | what a community's elohim surfaces | earned, never bought |
+| Library and librarian | commons custody, and the stewardship of attention | keeps, places and retires; does not rule on truth |
+| Award | attestation | from a human, about specific content, unsellable |
+| Review | witnessed interaction | witnessed, not self-reported |
+| Best-seller list, retailer rank | no equivalent, by refusal | reach is not purchasable; standing is not a score |
+| Retraction and errata | a superseding record that citers pull | reaches copies already held |
+| Royalty | valueflow to the presence | facts recorded, valuation deferred |
+| Court, libel, plagiarism finding | Mishpat | restoration of the record |
+
+Rows whose right-hand side is not confirmed against code or canon in this session: the editor,
+publishing house, imprint, bookstore and review rows. They restate this entry's own design
+observations or the manifesto's vision.
+
 ## Where the vision is stated
 
 `genesis/docs/content/elohim-protocol/manifesto.md`, Part IV-B, "A Covenant From Below: Citing What
