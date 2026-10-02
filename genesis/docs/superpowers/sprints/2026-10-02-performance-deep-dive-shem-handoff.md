@@ -14,21 +14,22 @@ Added 2026-10-02 (evening) by claude-fable-5-1 on the ethosengine workspace, at 
 direction. The rest of the page is unchanged and still applies, except where this section says
 otherwise.
 
-**The code under investigation is not on `dev`.** It is on a handoff ref, published without a
-deploy so that this work can start before the campaign's one push lands:
+**The code under investigation is on `dev`; this page is on a handoff ref.** The campaign's one
+push landed at about 17:44Z on 2026-10-02: `origin/dev` moved `5ffe98552` → `dd1b55ac2` (29
+commits) through the pre-push gates. This page, the concern index and the other pages it names
+are not on `dev` yet. They are on a handoff ref that contains `dd1b55ac2` plus those pages:
 
 ```bash
 git fetch origin refs/handoff/campaign-1.4:refs/remotes/origin/handoff/campaign-1.4
 git switch -c shem/performance-deep-dive origin/handoff/campaign-1.4
 ```
 
-The ref holds the campaign branch (`codex/fct-hosting-native-reconstruction` at `12721cb88`, 28
-commits past `origin/dev` `5ffe98552`) with this page and the pages it names merged in. Nothing on
-it has been deployed: the fleet still runs `5ffe98552`. On this ref the conductor gitlink
-(`elohim/holochain-conductor`) is `2b334df7973d`, the tip of the fork branch
-`codex/fct-native-query-prefilter`; `origin/dev` records `517d4c835`. That replaces the
+Whether the push's pipelines have deployed to the fleet was not confirmed when this was written;
+read the Jenkins state before assuming the fleet runs `dd1b55ac2`. On `dev` the conductor gitlink
+(`elohim/holochain-conductor`) is now `2b334df7973d`, the tip of the fork branch
+`codex/fct-native-query-prefilter`; before the push it was `517d4c835`. That replaces the
 `c8c17202c` and `7e553f9c3` figures under "Things to check on arrival". The campaign sprint pages
-listed under "What you do not have" are on this ref.
+listed under "What you do not have" are on `dev` and on this ref.
 
 **One of today's failures was a crash, not latency. Do not read it as a timing result.** Storage
 commit `03f107651` made every conductor-touching HTTP request future carry the conductor call by
@@ -63,11 +64,12 @@ them as the cost of that sharing so far. None of them measures or reduces the sh
 (`features/dataplane/epr-app-deliverability.feature`, five stations) passed on three-peer
 households on 2026-09-28 and 2026-09-30 in 613, 925 and 1,227 seconds of station time. On the
 four-peer long-chain household on 2026-10-02 it took 2,034 seconds and failed every station. A
-fresh three-peer mesh built from this ref was ready in 151 seconds. Its serving-story result on
-the fixed storage binary was not yet available when this section was written; it will be
-recorded in `2026-10-01-campaign-1.4-household-restart.md`. Short chains and long chains are
-therefore two points on one path, which is the two-point shape the boundaries ask for, but only
-once both are measured with the same binaries.
+fresh three-peer mesh built from this source was ready in 151 seconds, and on the fixed storage
+binary it passed all five stations in 4m53s (56, 37, 105, 81 and 14 seconds; run
+`household-20261002T164340Z-12721cb8`, recorded in
+`2026-10-01-campaign-1.4-household-restart.md`). Short chains and long chains are two points on
+one path, which is the two-point shape the boundaries ask for. They are not yet a controlled
+pair: the long-chain run used the pre-fix storage binary, an assembled hApp and four peers.
 
 **Conductor memory scales with hosted agents, not with content.** Measured read-only on that
 fresh mesh at about 16:21Z, 35 minutes after start, after the prologue had registered 15 hosted
