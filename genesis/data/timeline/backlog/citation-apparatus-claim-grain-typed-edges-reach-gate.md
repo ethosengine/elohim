@@ -140,6 +140,45 @@ What the arrangement shows about cost:
 
 The 268 stale edges recorded above are a librarian's job with no catalogue to do it from.
 
+### The reach system around the book, and the games played in it
+
+The operator, 2026-10-02: name the editor, the publishing house, the system of distribution, the
+bookstore and the libraries; the legacy gatekeepers and reach enablers; the best-seller list and
+the retailer ranking; and the games people play in that system.
+
+| Role | What it decides | Plane | Who pays, and what the signal costs to fake |
+|---|---|---|---|
+| Editor | whether the text is fit to release, and in what form | authority, before release | the house pays; hard to fake, slow |
+| Publishing house | whether to stake its name and money on the work | authority and value | the house; its imprint is the carried proof |
+| Distributor and wholesaler | which outlets can obtain the work | custody and reach | the trade; invisible to the reader |
+| Bookstore | what sits on the front table | attention | the store, or the publisher buying placement |
+| Library | what is kept and lent without charge | custody and attention | the public; a librarian's judgement |
+| Best-seller list | what "everyone is reading" | attention, derived from sales | cheap to fake relative to its effect |
+| Retailer ranking and reviews | what is shown first to a buyer | attention, derived from sales and reviews | cheap to fake, at volume |
+
+What this shows:
+
+- **The gatekeepers are reach gates.** Each stakes something of its own (name, money, shelf
+  space) on the work, and the reader trusts the stake. That is the carried proof, paid once.
+- **The games concentrate where a signal is derived from a count that money can buy.** A list
+  compiled from sales can be entered by purchasing the sales. The New York Times list has marked
+  bulk orders with a dagger since 1995, and firms have since placed orders so as not to trip it
+  ([Book Riot](https://bookriot.com/buying-books-onto-the-bestseller-list/)). Retailer reviews
+  are bought at volume; Amazon reports blocking more than 275 million suspected fake reviews in
+  2024, and the United States Federal Trade Commission issued a rule against fake reviews that
+  year ([Retail Dive](https://www.retaildive.com/news/amazon-fight-fake-reviews/736089),
+  [SPS Commerce](https://www.spscommerce.com/community/articles/ftc-fake-review-ban-key-prohibitions-and-implications)).
+  Both sources were found by web search on 2026-10-02 and not read in full.
+- **A cheap aggregate plane ends up steering an expensive one.** The count is easy to read, so
+  attention follows it, and the editor's and librarian's judgements are bypassed. In the plane
+  vocabulary this is the attention plane fused to a purchasable count.
+- **The design consequences already held in canon:** reach cannot be bought, and standing is not a
+  score (`succession.md` §10; `shefa.md` §5.3). A citation count read as rank would rebuild the
+  best-seller list.
+- **What the legacy gatekeepers got wrong is a separate matter from what they did.** They also
+  excluded by class, connection and taste. The protocol keeps the function (someone stakes
+  standing on a work before it travels) and changes who may perform it.
+
 ## Where the vision is stated
 
 `genesis/docs/content/elohim-protocol/manifesto.md`, Part IV-B, "A Covenant From Below: Citing What
