@@ -78,6 +78,27 @@ void test('refuses another DNA before any native read', async () => {
   );
   assert.equal(calls.length, 0);
 });
+void test('native verification may use thirty seconds but never extends the shared deadline', async () => {
+  for (const deadline of [75_000, 12_000]) {
+    const { c, timing } = fixture();
+    const original = c.call;
+    const timeouts: { name: string; timeout?: number }[] = [];
+    c.call = async (name, payload, timeout) => {
+      timeouts.push({ name, timeout });
+      return original(name, payload, timeout);
+    };
+    const proof = await awaitNativeReceiver(c, target, deadline, timing);
+    assert.equal(proof.accepted, true);
+    assert.equal(timeouts[0].timeout, Math.min(30_000, deadline));
+    assert.ok(timeouts.every(call => (call.timeout ?? Infinity) <= deadline));
+    assert.ok(
+      timeouts
+        .filter(call => call.name === 'get_content_lineage')
+        .every(call => call.timeout === 5000)
+    );
+    assert.equal(proof.deadlineMs, deadline);
+  }
+});
 void test('a v3 native grant proof carries both its issuance and acceptance actions', async () => {
   const { c, calls, timing } = fixture();
   const grantTarget = {

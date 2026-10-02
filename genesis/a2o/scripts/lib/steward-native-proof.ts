@@ -75,10 +75,10 @@ export async function awaitNativeReceiver(
   const headHash = decodeHashFromBase64(target.head);
   while (timing.now() < deadlineMs) {
     try {
-      const remaining = (): number => {
+      const remaining = (limit = 30_000): number => {
         const left = deadlineMs - timing.now();
         if (left <= 0) throw new Error('Shared publication deadline elapsed');
-        return Math.min(5000, left);
+        return Math.min(limit, left);
       };
       const head = await receiver.call<Head | null>(
         'resolve_content_head_local',
@@ -106,7 +106,7 @@ export async function awaitNativeReceiver(
       const lineage = await receiver.call<Lineage>(
         'get_content_lineage',
         { action_hash: headHash, local: true },
-        remaining()
+        remaining(5000)
       );
       const lineageMatches =
         lineage.content_id === target.id &&

@@ -49,6 +49,7 @@ function fixture() {
   let loseAcceptanceResponse = false;
   let patches = 0;
   let delayedAuthorHistory = false;
+  let deviceWitness = false;
   const profile = {
     adminWs: REMOTE,
     appWs: REMOTE,
@@ -123,6 +124,22 @@ function fixture() {
         if (name === 'resolve_content_head_local') return null as T;
         if (name === 'verify_device_binding' || name === 'verify_historical_device_binding')
           return { human_id: 'matthew', human_action_hash: bytes(10) } as T;
+        if (name === 'verify_device_publication') {
+          assert.deepEqual(payload, {
+            publication: {
+              device: {
+                binding: bytes(5),
+                expected_device: bytes(1),
+                expected_content_dna: bytes(2),
+              },
+              content_root: bytes(3),
+              content_head: bytes(6),
+              root_acceptance: bytes(8),
+            },
+            witness: bytes(11),
+          });
+          return { device: { human_id: 'matthew', human_action_hash: bytes(10) } } as T;
+        }
         if (name === 'get_accepted_delegated_head') return (nativeAcceptance ?? null) as T;
         if (name === 'accept_delegated_head') {
           assert.deepEqual(
@@ -138,6 +155,7 @@ function fixture() {
               witness_action_hash: bytes(8),
               accepted_at: Date.now() * 1000,
               signature: new Uint8Array(64),
+              ...(deviceWitness ? { device_witness_action_hash: bytes(11) } : {}),
             },
           };
           if (loseAcceptanceResponse)
@@ -203,6 +221,9 @@ function fixture() {
     connect,
     fetcher,
     calls,
+    withDeviceWitness: () => {
+      deviceWitness = true;
+    },
     dials,
     patches: () => patches,
     refuse: (name: string | undefined) => {
@@ -230,6 +251,19 @@ function fixture() {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
+void test('controller publication verification carries the exact native root acceptance', async t => {
+  const f = fixture();
+  t.after(f.cleanup);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  f.online();
+  f.withDeviceWitness();
+  f.loseAcceptanceResponse();
+  assert.equal(await runStewardPublish(f.argv, f.connect), 1);
+  assert.equal(await runStewardPublish(f.argv, f.connect), 0);
+  assert.ok(f.calls.includes('verify_device_publication'));
+  assert.equal(f.receipt().acceptedDelegation?.acceptance?.witnessActionHash, hash(8));
+  assert.ok(f.receipt().declaredAt);
+});
 void test('offline stage saves pending exact head and connected resume declares without rewriting', async t => {
   const f = fixture();
   t.after(f.cleanup);

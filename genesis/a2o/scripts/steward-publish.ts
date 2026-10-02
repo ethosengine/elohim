@@ -525,6 +525,7 @@ async function verifyBinding(
           device,
           content_root: decodeHashFromBase64(accepted.rootActionHash),
           content_head: decodeHashFromBase64(accepted.acceptance.headActionHash),
+          root_acceptance: decodeHashFromBase64(accepted.acceptance.witnessActionHash),
         },
         witness: decodeHashFromBase64(accepted.acceptance.deviceWitnessActionHash),
       });

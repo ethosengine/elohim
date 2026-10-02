@@ -376,11 +376,14 @@ pub(crate) fn verify_head_delegation(
     Ok(())
 }
 
-/// Reuse the native batch resolver's wall budget. A record cap alone cannot
+/// Acceptance has its own wall budget. A record cap alone cannot
 /// bound sequential network waits. Check before every host read and pass only
 /// the remaining allowance to network requests; one host/database operation can
 /// still overshoot because HDK host calls are synchronous and not cancellable.
 struct AcceptanceBudget(Timestamp);
+// Operator-approved after household record reads measured 9.3–10.9 seconds.
+// The separate shared publication deadline remains 75 seconds.
+const ACCEPTANCE_VERIFICATION_BUDGET_MS: u32 = 30_000;
 impl AcceptanceBudget {
     fn start() -> ExternResult<Self> {
         Ok(Self(sys_time()?))
@@ -418,7 +421,7 @@ impl AcceptanceBudget {
 }
 
 fn acceptance_remaining_ms(start: Timestamp, now: Timestamp) -> Option<u32> {
-    BATCH_BUDGET_DEFAULT_MS
+    ACCEPTANCE_VERIFICATION_BUDGET_MS
         .checked_sub(elapsed_ms_since(start, now))
         .filter(|remaining| *remaining > 0)
 }
@@ -1109,11 +1112,15 @@ mod tests {
         let start = Timestamp::from_micros(10_000_000);
         let at = |ms: i64| Timestamp::from_micros(10_000_000 + ms * 1000);
         let first = acceptance_get_options(start, at(0), GetStrategy::Network).unwrap();
-        assert_eq!(first.timeout_ms(), Some(u64::from(BATCH_BUDGET_DEFAULT_MS)));
-        let next = acceptance_get_options(start, at(3_999), GetStrategy::Network).unwrap();
+        assert_eq!(
+            first.timeout_ms(),
+            Some(u64::from(ACCEPTANCE_VERIFICATION_BUDGET_MS))
+        );
+        let limit = i64::from(ACCEPTANCE_VERIFICATION_BUDGET_MS);
+        let next = acceptance_get_options(start, at(limit - 1), GetStrategy::Network).unwrap();
         assert_eq!(next.timeout_ms(), Some(1));
         assert_eq!(next.strategy(), GetStrategy::Network);
-        assert!(acceptance_get_options(start, at(4_000), GetStrategy::Network).is_none());
+        assert!(acceptance_get_options(start, at(limit), GetStrategy::Network).is_none());
         assert!(acceptance_get_options(start, at(60_000), GetStrategy::Local).is_none());
         let local = acceptance_get_options(start, at(1), GetStrategy::Local).unwrap();
         assert_eq!(local.strategy(), GetStrategy::Local);
