@@ -158,6 +158,23 @@ chain, or head delivery to a doorway. Whether any of them explains the figures a
    chain of about 45,000 actions.
 4. **Report.** See "What to send back".
 
+## Two design hypotheses to test
+
+These came from reading the entries and receipts, not the code. They are hypotheses for the deep
+dive to confirm or refute, and both are our design choices, not the fork's.
+
+- **Machine bookkeeping shares a source chain with human acts.** The household author chain is past
+  45,000 actions, and the campaign's first approval failed with a source-chain-head-moved error
+  while background storage was writing to the same cell. If a person's ceremony grows with, and
+  waits behind, machine churn, the question is whether high-frequency machine writes belong on that
+  chain at all. Measure: what share of those 45,000 actions a person or a ceremony authored.
+- **Authority is paid per connection instead of per relationship.** `zome-call-cost-bounded`
+  records that storage authorises a new signing credential on every connect, which is how one agent
+  reached about 15,000 grants. A storage peer and its own conductor are one steward. Measure: grants
+  minted per connect and per day on a household peer at the current pin.
+
+They compound: more grants and a longer chain make every call slower.
+
 ## How the two skills work together
 
 `runtime-performance` answers where the time goes: process costs, sampled functions, call
