@@ -34,7 +34,9 @@
 //! * a READ ([`is_chain_write`] says no) goes straight through — no lock, no
 //!   metric, byte-identical to the pre-gate path;
 //! * a WRITE takes the per-chain async mutex, makes ONE conductor call while
-//!   holding it, and releases.
+//!   holding it, and releases when its native response finishes. If an outer
+//!   observer times out after the call is offered, that response keeps the
+//!   scheduling lease; uncancellable WASM must not race the next writer.
 //!
 //! The lock is held across nothing but the conductor call itself — not across a
 //! backoff sleep. A `HeadMoved` retry RE-QUEUES rather than camping on the lock.
@@ -103,6 +105,7 @@
 //!
 //! Not a timeout: nothing dispatched is ever abandoned here.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::future::Future;
@@ -113,6 +116,7 @@ use std::time::Duration;
 
 use holochain_client::CellId;
 use tokio::time::Instant;
+use tracing::Instrument;
 
 use crate::error::StorageError;
 
@@ -188,6 +192,45 @@ tokio::task_local! {
     /// [`witnessed`] so an OUTER timeout can ask whether the call it abandoned
     /// was merely parked or actually offered.
     static DISPATCH_FLAGS: (Arc<AtomicBool>, Arc<AtomicBool>);
+
+    /// Scheduling ownership before the call reaches the websocket. A cancelled
+    /// admission waiter drops it; an offered call transfers it to its response.
+    static WRITE_LEASE: RefCell<Option<WriteLease>>;
+}
+
+struct WriteLease {
+    _local: tokio::sync::OwnedMutexGuard<()>,
+    _external: Option<File>,
+}
+
+/// Await the offered native response. Called after local admission, so a
+/// cancelled queued request still never reaches the conductor.
+pub(crate) async fn finish_offered_call<Fut, T>(call: Fut) -> Result<T, StorageError>
+where
+    Fut: Future<Output = Result<T, StorageError>> + Send + 'static,
+    T: Send + 'static,
+{
+    let lease = WRITE_LEASE
+        .try_with(|slot| slot.borrow_mut().take())
+        .ok()
+        .flatten();
+    let Some(lease) = lease else {
+        // Reads retain their original cancellation behavior.
+        return call.await;
+    };
+    let response = tokio::spawn(
+        as_writer(current_writer_kind(), async move {
+            // Dropping the caller's JoinHandle detaches this one offered call.
+            // Its lock and capacity remain occupied until the native response;
+            // no retry is dispatched after the original caller disappears.
+            let _lease = lease;
+            call.await
+        })
+        .instrument(tracing::Span::current()),
+    );
+    response.await.map_err(|error| {
+        StorageError::Internal(format!("offered native chain write task failed: {error}"))
+    })?
 }
 
 /// Run `fut` labelled as `kind`.
@@ -648,9 +691,17 @@ where
     Fut: Future<Output = Result<T, StorageError>>,
 {
     let lock = gate().lock_for(&chain_key_of(cell_id));
-    let _guard = lock.lock().await;
-    let _external = external_writer_lock(&chain_key_of(cell_id)).await?;
-    grant().await
+    let guard = lock.lock_owned().await;
+    let external = external_writer_lock(&chain_key_of(cell_id)).await?;
+    WRITE_LEASE
+        .scope(
+            RefCell::new(Some(WriteLease {
+                _local: guard,
+                _external: external,
+            })),
+            grant(),
+        )
+        .await
 }
 
 /// THE choke point. Route one conductor call: reads straight through, writes
@@ -709,12 +760,10 @@ where
     mark_queued();
     let lock = gate().lock_for(chain_key);
 
-    // A FLAT budget, stated plainly. No caller in this crate owns a deadline
-    // around a write today (the ~2 s budgets in `http.rs` fence the candidate
-    // /election READ path, not the declare), so a "we never extend the caller's
-    // deadline" claim would be about nothing. If a write ever acquires a real
-    // budget, shorten to `min(caller_deadline, start + RETRY_BUDGET)` here — and
-    // only shorten.
+    // This is the retry budget, not a native execution timeout. A caller may
+    // bound its observation independently (projection reconciliation does).
+    // Once offered, that one native call retains its lease until its response;
+    // abandoning the observer neither releases the chain nor starts a retry.
     let started = Instant::now();
     let budget_end = started + RETRY_BUDGET;
 
@@ -723,7 +772,7 @@ where
 
     for attempt in 1..=MAX_ATTEMPTS {
         let queue_started = Instant::now();
-        let guard = lock.lock().await;
+        let guard = lock.clone().lock_owned().await;
         let external = external_writer_lock(chain_key).await?;
         let waited = queue_started.elapsed();
         queued_total += waited;
@@ -733,12 +782,18 @@ where
         // permit and crosses the websocket, so an outer timeout can no longer
         // claim nothing happened.
         mark_dispatched();
-        let outcome = call().await;
+        let outcome = WRITE_LEASE
+            .scope(
+                RefCell::new(Some(WriteLease {
+                    _local: guard,
+                    _external: external,
+                })),
+                call(),
+            )
+            .await;
         let rtt = dispatched_at.elapsed();
-        drop(external);
-        // The lock models exclusive access to the chain HEAD, which the
-        // conductor has finished contending for the instant the call returns.
-        drop(guard);
+        // The native response owns the lease once offered. A normal return has
+        // released it; an abandoned observer leaves it with that response.
 
         match outcome {
             Ok(value) => {
@@ -1478,6 +1533,121 @@ mod tests {
             "interactive waited {waited:?} — that is batch-shaped, not call-shaped"
         );
         batch.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_caller_timeout_keeps_an_offered_native_write_exclusive_until_its_reply() {
+        let key = "chain:offered-cancellation";
+        let started = Arc::new(tokio::sync::Notify::new());
+        let finish = Arc::new(tokio::sync::Notify::new());
+        let first_started = started.clone();
+        let first_finish = finish.clone();
+        let first = tokio::spawn(async move {
+            tokio::time::timeout(
+                Duration::from_millis(50),
+                write_serialized(key, "create_content", || {
+                    let started = first_started.clone();
+                    let finish = first_finish.clone();
+                    async move {
+                        let (reply, response) = tokio::sync::oneshot::channel();
+                        // Like conductor WASM, this operation survives the HTTP
+                        // caller abandoning its response future.
+                        tokio::spawn(async move {
+                            started.notify_one();
+                            finish.notified().await;
+                            let _ = reply.send(());
+                        });
+                        finish_offered_call(async move {
+                            response
+                                .await
+                                .map_err(|error| StorageError::Internal(error.to_string()))
+                        })
+                        .await
+                    }
+                }),
+            )
+            .await
+        });
+        started.notified().await;
+        assert!(
+            first.await.unwrap().is_err(),
+            "caller deadline was extended"
+        );
+
+        let second = tokio::spawn(async move {
+            write_serialized(key, "update_content", || async {
+                Ok::<_, StorageError>(())
+            })
+            .await
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let raced = second.is_finished();
+        finish.notify_one();
+        second.await.unwrap().unwrap();
+        assert!(
+            !raced,
+            "a later writer entered while the offered native call was still running"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_admission_waiter_never_offers_a_call_or_leaks_its_chain_lock() {
+        let key = "chain:cancelled-admission";
+        let admission = Arc::new(tokio::sync::Notify::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let timed_out = tokio::time::timeout(
+            Duration::from_millis(20),
+            write_serialized(key, "create_content", || {
+                let admission = admission.clone();
+                let calls = calls.clone();
+                async move {
+                    admission.notified().await;
+                    calls.fetch_add(1, AtomicOrdering::SeqCst);
+                    finish_offered_call(async { Ok::<_, StorageError>(()) }).await
+                }
+            }),
+        )
+        .await;
+        assert!(timed_out.is_err());
+        admission.notify_one();
+        tokio::time::timeout(
+            Duration::from_millis(100),
+            write_serialized(key, "update_content", || async {
+                Ok::<_, StorageError>(())
+            }),
+        )
+        .await
+        .expect("cancelled admission retained the chain lock")
+        .unwrap();
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn an_abandoned_offered_refusal_is_not_retried() {
+        let key = "chain:abandoned-refusal";
+        let calls = Arc::new(AtomicUsize::new(0));
+        let timed_out = tokio::time::timeout(
+            Duration::from_millis(20),
+            write_serialized(key, "create_content", || {
+                let calls = calls.clone();
+                async move {
+                    calls.fetch_add(1, AtomicOrdering::SeqCst);
+                    finish_offered_call(async {
+                        tokio::time::sleep(Duration::from_millis(60)).await;
+                        Err::<(), _>(head_moved())
+                    })
+                    .await
+                }
+            }),
+        )
+        .await;
+        assert!(timed_out.is_err());
+        write_serialized(key, "update_content", || async {
+            Ok::<_, StorageError>(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
     }
 
     #[tokio::test(start_paused = true)]

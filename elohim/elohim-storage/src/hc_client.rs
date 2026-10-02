@@ -177,26 +177,31 @@ async fn authorize_signing_credentials_fenced(
     // per-cell lock every zome write takes — otherwise a mint during a running
     // sweep moves the head under a gated writer, which then reports an external
     // co-author it does not have. See `chain_write_gate::grant_capability_serialized`.
-    crate::chain_write_gate::grant_capability_serialized(cell_id, || async {
-        match crate::closed_chain_fence::fence() {
-            Some(fence) => fence
-                .authorize(admin_ws, cell_id, label)
-                .await
-                .map_err(|e| StorageError::Connection(e.to_string())),
-            None => admin_ws
-                .authorize_signing_credentials(
-                    holochain_client::AuthorizeSigningCredentialsPayload {
-                        cell_id: cell_id.clone(),
-                        functions: None,
-                    },
-                )
-                .await
-                .map_err(|e| {
-                    StorageError::Connection(format!(
-                        "authorize_signing_credentials ({label}) failed: {e}"
-                    ))
-                }),
-        }
+    crate::chain_write_gate::grant_capability_serialized(cell_id, || {
+        let admin_ws = admin_ws.clone();
+        let cell_id = cell_id.clone();
+        let label = label.to_owned();
+        crate::chain_write_gate::finish_offered_call(async move {
+            match crate::closed_chain_fence::fence() {
+                Some(fence) => fence
+                    .authorize(&admin_ws, &cell_id, &label)
+                    .await
+                    .map_err(|e| StorageError::Connection(e.to_string())),
+                None => admin_ws
+                    .authorize_signing_credentials(
+                        holochain_client::AuthorizeSigningCredentialsPayload {
+                            cell_id: cell_id.clone(),
+                            functions: None,
+                        },
+                    )
+                    .await
+                    .map_err(|e| {
+                        StorageError::Connection(format!(
+                            "authorize_signing_credentials ({label}) failed: {e}"
+                        ))
+                    }),
+            }
+        })
     })
     .await
 }
@@ -959,25 +964,35 @@ impl HcClient {
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
                     let conn = self.connection();
-                    observe_conductor_attempt(
-                        zome_name,
-                        fn_name,
-                        AdmissionClass::Interactive.label(),
-                        conn.app_ws.call_zome(
-                            ZomeCallTarget::CellId(target),
-                            zome_name.into(),
-                            fn_name.into(),
-                            ExternIO::from(payload),
-                        ),
-                    )
-                    .await
-                    .inspect(|_| {
-                        crate::hc_client_registry::note_transport_ok(
-                            self.role_key(),
-                            conn.generation,
+                    let offered_connection = conn.clone();
+                    let offered_zome = zome_name.to_owned();
+                    let offered_fn = fn_name.to_owned();
+                    let result = crate::chain_write_gate::finish_offered_call(async move {
+                        let conn = offered_connection;
+                        let result = observe_conductor_attempt(
+                            &offered_zome,
+                            &offered_fn,
+                            AdmissionClass::Interactive.label(),
+                            conn.app_ws.call_zome(
+                                ZomeCallTarget::CellId(target),
+                                offered_zome.clone().into(),
+                                offered_fn.clone().into(),
+                                ExternIO::from(payload),
+                            ),
                         )
+                        .await;
+                        drop(_permit);
+                        Ok(result)
                     })
-                    .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
+                    .await?;
+                    result
+                        .inspect(|_| {
+                            crate::hc_client_registry::note_transport_ok(
+                                self.role_key(),
+                                conn.generation,
+                            )
+                        })
+                        .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
                 }
             })
             .await?;
@@ -1033,25 +1048,35 @@ impl HcClient {
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
                     let conn = self.connection();
-                    observe_conductor_attempt(
-                        zome_name,
-                        fn_name,
-                        AdmissionClass::Interactive.label(),
-                        conn.app_ws.call_zome(
-                            ZomeCallTarget::CellId(target),
-                            zome_name.into(),
-                            fn_name.into(),
-                            ExternIO::from(payload),
-                        ),
-                    )
-                    .await
-                    .inspect(|_| {
-                        crate::hc_client_registry::note_transport_ok(
-                            self.role_key(),
-                            conn.generation,
+                    let offered_connection = conn.clone();
+                    let offered_zome = zome_name.to_owned();
+                    let offered_fn = fn_name.to_owned();
+                    let result = crate::chain_write_gate::finish_offered_call(async move {
+                        let conn = offered_connection;
+                        let result = observe_conductor_attempt(
+                            &offered_zome,
+                            &offered_fn,
+                            AdmissionClass::Interactive.label(),
+                            conn.app_ws.call_zome(
+                                ZomeCallTarget::CellId(target),
+                                offered_zome.clone().into(),
+                                offered_fn.clone().into(),
+                                ExternIO::from(payload),
+                            ),
                         )
+                        .await;
+                        drop(_permit);
+                        Ok(result)
                     })
-                    .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
+                    .await?;
+                    result
+                        .inspect(|_| {
+                            crate::hc_client_registry::note_transport_ok(
+                                self.role_key(),
+                                conn.generation,
+                            )
+                        })
+                        .map_err(|e| self.zome_call_failed_on(&heal_cell, conn.generation, e))
                 }
             })
             .await?;
@@ -1154,28 +1179,33 @@ impl HcClient {
                     );
                 }
                 let conn = self.connection();
-                let result = observe_conductor_attempt(
-                    zome_name,
-                    fn_name,
-                    class.label(),
-                    conn.app_ws.call_zome(
-                        ZomeCallTarget::CellId(target),
-                        zome_name.into(),
-                        fn_name.into(),
-                        ExternIO::from(payload),
-                    ),
-                )
-                .await;
+                let offered_connection = conn.clone();
+                let offered_zome = zome_name.to_owned();
+                let offered_fn = fn_name.to_owned();
+                let result = crate::chain_write_gate::finish_offered_call(async move {
+                    let conn = offered_connection;
+                    let result = observe_conductor_attempt(
+                        &offered_zome,
+                        &offered_fn,
+                        class.label(),
+                        conn.app_ws.call_zome(
+                            ZomeCallTarget::CellId(target),
+                            offered_zome.clone().into(),
+                            offered_fn.clone().into(),
+                            ExternIO::from(payload),
+                        ),
+                    )
+                    .await;
+                    // The offered response owns capacity until it finishes,
+                    // even if the caller abandons its observation.
+                    drop(permit);
+                    Ok(result)
+                })
+                .await?;
                 if result.is_ok() {
                     crate::hc_client_registry::note_transport_ok(self.role_key(), conn.generation);
                 }
                 let result = result.map_err(|e| self.zome_call_failed(conn.generation, e));
-                // Held across the whole call on purpose: the permit models
-                // capacity the conductor is still spending, and releasing it
-                // early would understate occupancy by exactly the interval that
-                // matters most. It is released HERE — before any backoff sleep
-                // and before this writer re-queues on the chain lock.
-                drop(permit);
                 result.map(|bytes| (bytes, admission_wait))
             }
         })
