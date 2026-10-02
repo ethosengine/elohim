@@ -8,6 +8,85 @@ habits: [zome-call-cost-bounded, runtime-performance, idle-is-free, dataplane-co
 
 # Performance deep dive on shem: reconcile the labelled concerns, then profile
 
+## Read this first: where the code is, and what changed after this page was written
+
+Added 2026-10-02 (evening) by claude-fable-5-1 on the ethosengine workspace, at the operator's
+direction. The rest of the page is unchanged and still applies, except where this section says
+otherwise.
+
+**The code under investigation is not on `dev`.** It is on a handoff ref, published without a
+deploy so that this work can start before the campaign's one push lands:
+
+```bash
+git fetch origin refs/handoff/campaign-1.4:refs/remotes/origin/handoff/campaign-1.4
+git switch -c shem/performance-deep-dive origin/handoff/campaign-1.4
+```
+
+The ref holds the campaign branch (`codex/fct-hosting-native-reconstruction` at `12721cb88`, 28
+commits past `origin/dev` `5ffe98552`) with this page and the pages it names merged in. Nothing on
+it has been deployed: the fleet still runs `5ffe98552`. On this ref the conductor gitlink
+(`elohim/holochain-conductor`) is `2b334df7973d`, the tip of the fork branch
+`codex/fct-native-query-prefilter`; `origin/dev` records `517d4c835`. That replaces the
+`c8c17202c` and `7e553f9c3` figures under "Things to check on arrival". The campaign sprint pages
+listed under "What you do not have" are on this ref.
+
+**One of today's failures was a crash, not latency. Do not read it as a timing result.** Storage
+commit `03f107651` made every conductor-touching HTTP request future carry the conductor call by
+value (46,072 bytes). In an unoptimized build the deepest request path then needed about 2.2 MB
+of the 2 MiB `http-server` worker stack, and storage aborted with `thread 'http-server' has
+overflowed its stack`. It happened twice: on the long-chain household (matthew, 14:32:34Z, during
+serving run `household-campaign14-serving-20261002T135944Z-run-scoped`) and on a fresh three-peer
+mesh (jessica, 15:48:25Z, during bulk content seeding). A call-graph search found no recursion.
+`12721cb88` boxes the call (request future 12,960 bytes, worst path about 1.08 MB) and carries
+three regressions. How much stack a release build used was not measured. Any run between those
+two commits in which a storage process died is crash evidence only.
+
+**The verification budget on this ref is 30,000 ms, not 4,000 ms.** The operator authorized the
+raise on 2026-10-02 (`ba0703dee`) to let the functional path proceed. The 75-second publication
+deadline did not move. For this diagnosis the four-second figure remains the reference the stop
+assessment names; the boundary below about not raising budgets still binds your work.
+
+**Later functional figures, same household, all actors test fixtures.** After the raise, three
+receiving conductors each elected the earned head for two successive versions. Head reads took
+11.7–36.0 s and election reads 12.3–29.6 s. Both local doorways served the second head and the
+same body at 05:53:30Z, minutes after the receivers adopted it. That is eventual delivery; there
+is still no pass inside 75 seconds.
+
+**Bearing on the first design hypothesis.** Three storage commits on this ref are successive
+patches for foreground authoring and the background writer sharing one source chain: a per-cell
+write lock (`f66f1f4b0`), ownership of an offered write through caller cancellation
+(`03f107651`), and the stack fix for the future that the second one enlarged (`12721cb88`). Read
+them as the cost of that sharing so far. None of them measures or reduces the share of the
+45,000 actions that machine writes account for.
+
+**A comparison point for the specimen question.** The serving story
+(`features/dataplane/epr-app-deliverability.feature`, five stations) passed on three-peer
+households on 2026-09-28 and 2026-09-30 in 613, 925 and 1,227 seconds of station time. On the
+four-peer long-chain household on 2026-10-02 it took 2,034 seconds and failed every station. A
+fresh three-peer mesh built from this ref was ready in 151 seconds. Its serving-story result on
+the fixed storage binary was not yet available when this section was written; it will be
+recorded in `2026-10-01-campaign-1.4-household-restart.md`. Short chains and long chains are
+therefore two points on one path, which is the two-point shape the boundaries ask for, but only
+once both are measured with the same binaries.
+
+**Conductor memory per hosted agent.** While the mesh prologue cast its hosted humans on that
+fresh mesh, the one conductor that hosts them grew from under 2 GB to 12.4 GB resident; the
+other two stayed under 2 GB with the same seeded content. The repository's standing figure is
+about 786 MB of conductor heap per hosted human, never released when a session closes. A
+read-only attribution of that growth was in progress when this section was written; its result
+is appended below when it lands. It is a `custody-everyone` cost by this page's labels (a copy
+per hosted agent) and belongs in your ranking.
+
+**The bundle the household ran was assembled, not built.** It was an older preserved hApp with two
+coordinators swapped in. Its `content_store` coordinator matches a build of this ref
+(`66bc7660…`); its `mishpat` coordinator (`30066df3…`) does not (`1e9a09f2…` from this ref), and
+the cause of that difference is not established. Build your household's hApp from this ref and
+record the coordinator hashes with each finding.
+
+**State you cannot see from git.** The ethosengine household is stopped with its identities
+intact. The workspace conductor that is the real device in the campaign stopped abruptly at
+15:08:26Z for a reason not yet established; nothing has been published to the fleet from it.
+
 ## Operator direction
 
 The operator, 2026-10-02: campaign 1.4 has not closed because convergence takes longer than the
