@@ -302,12 +302,14 @@ interface RootCommitmentRow {
 async function assertRootCommitmentIsUnclaimed(
   storageUrl: string,
   peerName: string,
-  doorwayId: string
+  doorwayId: string,
+  deadline: number
 ): Promise<void> {
   for (let page = 0; page < MAX_COMMITMENT_PAGES; page += 1) {
     const offset = page * COMMITMENT_PAGE_SIZE;
     const response = await fetch(
-      `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}`
+      `${storageUrl}/api/v1/commitments?action=project-epr&limit=${COMMITMENT_PAGE_SIZE}&offset=${offset}`,
+      { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) }
     );
     if (!response.ok) {
       assert.fail(
@@ -433,10 +435,11 @@ When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
  */
 async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   const record = app(world);
-  // One observer budget inside this step's existing 180s ceiling. Native
-  // writes are uncancellable; a short per-request observer must not interrupt
-  // setup while the conductor is still committing the requested owned mount.
-  const setupDeadline = Date.now() + 170_000;
+  // Share one authoring observer across the whole mount phase. The outer
+  // fixture step also needs 2 * 80s for guarded doorway restarts and 2 * 60s
+  // for their readiness checks: a 180s outer ceiling could abandon a valid
+  // mount during those subsequent operations.
+  const setupDeadline = Date.now() + 360_000;
   const storageUrl = resolveStorageUrl('alpha-A');
   assert.ok(
     storageUrl,
@@ -444,6 +447,7 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   );
   const response = await fetch(`${storageUrl}/db/content/bulk`, {
     method: 'POST',
+    signal: AbortSignal.timeout(Math.max(1, setupDeadline - Date.now())),
     headers: { 'content-type': 'application/json', 'x-schema-version': '1' },
     body: JSON.stringify([
       {
@@ -465,19 +469,28 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   // These are hosting commitments, not extra writes of the app's head.
   for (const peerName of DOORWAYS) {
     const base = resolvePeerUrl(peerName);
-    const coherenceResponse = await fetch(`${base}/api/v1/federation/coherence`);
+    const coherenceResponse = await fetch(`${base}/api/v1/federation/coherence`, {
+      signal: AbortSignal.timeout(Math.max(1, setupDeadline - Date.now())),
+    });
     const coherence = (await coherenceResponse.json()) as {
       doorwayId: string;
     };
     assert.ok(coherence.doorwayId, `${peerName} exposes no doorway identity`);
     if (record.mountPath === '/') {
-      const routes = await fetch(`${base}/api/v1/federation/coherence`);
+      const routes = await fetch(`${base}/api/v1/federation/coherence`, {
+        signal: AbortSignal.timeout(Math.max(1, setupDeadline - Date.now())),
+      });
       const projected = (await routes.json()) as { heads: { urlPath: string }[] };
       assert.ok(
         !projected.heads.some(head => head.urlPath === '/'),
         `${peerName}: root is already claimed; cannot borrow it for this fixture`
       );
-      await assertRootCommitmentIsUnclaimed(storageUrl, peerName, coherence.doorwayId);
+      await assertRootCommitmentIsUnclaimed(
+        storageUrl,
+        peerName,
+        coherence.doorwayId,
+        setupDeadline
+      );
       record.rootCommitments ??= [];
       record.rootCommitments.push(`${record.slug}-${coherence.doorwayId}`);
     }
@@ -568,13 +581,20 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   }
 }
 
-Given('an EPR record this run owns for it', { timeout: 180_000 }, async function (this: E2EWorld) {
-  await authorOwnedEprRecord(this);
-});
+// 360s mount observation + 160s guarded restarts + 120s readiness + 80s headroom.
+const OWNED_FIXTURE_SETUP_TIMEOUT_MS = 720_000;
+
+Given(
+  'an EPR record this run owns for it',
+  { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
+  async function (this: E2EWorld) {
+    await authorOwnedEprRecord(this);
+  }
+);
 
 Given(
   'Matthew has registered PUBLIC_NAME for published releases and CANDIDATE_NAME for staged releases of a fresh empty app',
-  { timeout: 180_000 },
+  { timeout: OWNED_FIXTURE_SETUP_TIMEOUT_MS },
   async function (this: E2EWorld) {
     const record = app(this);
     record.publicHostname = `public-${record.slug}.elohim.local`;
@@ -1954,7 +1974,7 @@ Then(
 
 // This After hook must fail the scenario if restoration fails; world's generic
 // cleanup callbacks are best-effort and cannot attest ownership restoration.
-After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (this: E2EWorld) {
+After({ tags: '@deliverability-browser', timeout: 450_000 }, async function (this: E2EWorld) {
   const record = publishedApps.get(this);
   if (!record?.rootCommitments?.length) return;
   // Every root commitment here was minted through ONE storage endpoint: "an
@@ -1968,9 +1988,11 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
   // observed lifecycle" — that is expected behavior, not a fault to route
   // around. Cancel through the author peer (alpha-A / matthew) only.
   const authorStorageUrl = resolveStorageUrl('alpha-A');
-  // Reserve 75s for projection convergence and 5s of hook headroom after the
-  // native cancellations. All cancellation requests share this observer bound.
-  const cancellationDeadline = Date.now() + 100_000;
+  // Both native cancellations use the same author cell. A 100s observer
+  // completed only one on the preserved household, leaving its queued sibling
+  // live. Allow the pair two setup-sized 180s windows, then reserve the
+  // unchanged 75s projection check and 15s of hook headroom.
+  const cancellationDeadline = Date.now() + 360_000;
   assert.ok(
     authorStorageUrl,
     'no direct storage URL for peer "alpha-A" (the root commitment author) — set E2E_STORAGE_URL'
