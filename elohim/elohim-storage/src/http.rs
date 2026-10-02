@@ -19624,6 +19624,42 @@ mod blob_backend_wiring_tests {
 // when no `p2p_handle`/`db_pool` is wired, which is exactly what these tests
 // drive.
 // =============================================================================
+/// The per-request future every `http-server` worker polls.
+///
+/// An unoptimized build copies each awaited child future onto its parent's poll
+/// frame, so the bytes this future carries are paid again on the stack by every
+/// frame between the hyper dispatcher and the deepest await (about fifteen of
+/// them on a conductor-touching route). On 2026-10-02 the offered conductor call
+/// was carried inline, this future measured 46,072 bytes (12,960 once boxed), and
+/// the debug build's deepest request path needed ~2.2 MB of a 2 MiB worker stack:
+/// matthew's storage aborted with "thread 'http-server' has overflowed its stack".
+#[cfg(test)]
+mod request_future_size_tests {
+    use super::*;
+
+    fn returned_future_size<A, Fut: std::future::Future>(_: &impl Fn(A) -> Fut) -> usize {
+        std::mem::size_of::<Fut>()
+    }
+
+    #[tokio::test]
+    async fn the_request_future_does_not_carry_the_conductor_call_inline() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        let size = returned_future_size(&|req: Request<Incoming>| server.handle_request(req));
+        assert!(
+            size <= REQUEST_FUTURE_BUDGET,
+            "HttpServer::handle_request future is {size} bytes (budget {REQUEST_FUTURE_BUDGET}); \
+             something on the request path now carries a large future by value"
+        );
+    }
+
+    const REQUEST_FUTURE_BUDGET: usize = 32 * 1024;
+}
+
 #[cfg(test)]
 mod apps_resolver_heal_tests {
     use super::*;

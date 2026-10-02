@@ -110,6 +110,7 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -203,34 +204,56 @@ struct WriteLease {
     _external: Option<File>,
 }
 
+/// A conductor call that has passed local admission, boxed. See
+/// [`finish_offered_call`] for why it is never carried by value.
+type OfferedCall<T> = Pin<Box<dyn Future<Output = Result<T, StorageError>> + Send>>;
+
 /// Await the offered native response. Called after local admission, so a
 /// cancelled queued request still never reaches the conductor.
-pub(crate) async fn finish_offered_call<Fut, T>(call: Fut) -> Result<T, StorageError>
+///
+/// # The call is boxed before any future captures it
+///
+/// Every HTTP request that reaches the conductor awaits this future inline, so
+/// whatever it holds by value is held again by every ancestor future up to
+/// `HttpServer::handle_request`, and an unoptimized build copies each ancestor's
+/// child future onto that ancestor's poll frame. As an `async fn` taking the call
+/// by value, this future stored the call twice, the `handle_request` future
+/// measured 46,072 bytes (12,960 with the call boxed), and the debug build's
+/// deepest request path needed ~2.2 MB of a 2 MiB worker stack: matthew's
+/// storage aborted with "thread 'http-server' has overflowed its stack"
+/// (2026-10-02). This is a plain `fn` so the box is taken at the call site,
+/// before the returned future exists.
+pub(crate) fn finish_offered_call<Fut, T>(
+    call: Fut,
+) -> impl Future<Output = Result<T, StorageError>> + Send + 'static
 where
     Fut: Future<Output = Result<T, StorageError>> + Send + 'static,
     T: Send + 'static,
 {
-    let lease = WRITE_LEASE
-        .try_with(|slot| slot.borrow_mut().take())
-        .ok()
-        .flatten();
-    let Some(lease) = lease else {
-        // Reads retain their original cancellation behavior.
-        return call.await;
-    };
-    let response = tokio::spawn(
-        as_writer(current_writer_kind(), async move {
-            // Dropping the caller's JoinHandle detaches this one offered call.
-            // Its lock and capacity remain occupied until the native response;
-            // no retry is dispatched after the original caller disappears.
-            let _lease = lease;
-            call.await
-        })
-        .instrument(tracing::Span::current()),
-    );
-    response.await.map_err(|error| {
-        StorageError::Internal(format!("offered native chain write task failed: {error}"))
-    })?
+    let call: OfferedCall<T> = Box::pin(call);
+    async move {
+        let lease = WRITE_LEASE
+            .try_with(|slot| slot.borrow_mut().take())
+            .ok()
+            .flatten();
+        let Some(lease) = lease else {
+            // Reads retain their original cancellation behavior.
+            return call.await;
+        };
+        let response = tokio::spawn(
+            as_writer(current_writer_kind(), async move {
+                // Dropping the caller's JoinHandle detaches this one offered call.
+                // Its lock and capacity remain occupied until the native response;
+                // no retry is dispatched after the original caller disappears.
+                let _lease = lease;
+                call.await
+            })
+            .instrument(tracing::Span::current()),
+        );
+        response.await.map_err(|error| {
+            StorageError::Internal(format!("offered native chain write task failed: {error}"))
+        })?
+    }
 }
 
 /// Run `fut` labelled as `kind`.
@@ -1648,6 +1671,92 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    /// Size of the conductor-call future the ballast tests offer. Far larger
+    /// than a real `call_zome` future, so the by-value cost is unmistakable.
+    const BALLAST: usize = 128 * 1024;
+
+    async fn ballast_call() -> Result<usize, StorageError> {
+        // Held across an await, so it lives in the future's state.
+        let ballast = [7u8; BALLAST];
+        tokio::task::yield_now().await;
+        Ok(ballast.iter().map(|byte| usize::from(*byte)).sum())
+    }
+
+    /// The offered call is boxed before any future in the gate captures it.
+    ///
+    /// Every HTTP write that reaches the conductor awaits this future inline,
+    /// so whatever it carries by value is carried by every ancestor future up
+    /// to `HttpServer::handle_request` — and an unoptimized build copies each
+    /// ancestor's child future onto that ancestor's poll frame. Carrying the
+    /// call by value is what took `matthew`'s 2 MiB `http-server` worker over
+    /// its stack on 2026-10-02.
+    #[test]
+    fn the_offered_call_is_boxed_not_carried_by_value() {
+        let call = ballast_call();
+        assert!(std::mem::size_of_val(&call) >= BALLAST);
+        let offered = finish_offered_call(call);
+        let size = std::mem::size_of_val(&offered);
+        assert!(
+            size < 1024,
+            "finish_offered_call carries its {BALLAST}-byte call inline ({size} bytes); \
+             every ancestor future up to the HTTP dispatcher grows by that much"
+        );
+    }
+
+    /// The spawn path of an offered write, run on a thread with tokio's default
+    /// 2 MiB worker stack. Before the call was boxed, a large call future was
+    /// moved by value through the write gate and `tokio::spawn`'s generic
+    /// frames, each holding a full copy in an unoptimized build, and this thread
+    /// aborted with "has overflowed its stack" — the production failure class.
+    /// Runs in a child process because a stack overflow aborts the process.
+    #[test]
+    fn an_offered_write_spawns_within_the_default_worker_stack() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "chain_write_gate::tests::offered_write_stack_probe_child",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("ELOHIM_OFFERED_WRITE_STACK_PROBE", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            output.status.success() && stdout.contains("offered-write-stack-probe: ok"),
+            "offered write did not complete on a 2 MiB stack ({}):\n{stderr}",
+            output.status
+        );
+    }
+
+    /// Child half of the probe above; inert unless that test launches it.
+    #[test]
+    fn offered_write_stack_probe_child() {
+        if std::env::var_os("ELOHIM_OFFERED_WRITE_STACK_PROBE").is_none() {
+            return;
+        }
+        let worker = std::thread::Builder::new()
+            .name("http-server".into())
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        write_serialized("chain:offered-stack-probe", "create_content", || {
+                            finish_offered_call(ballast_call())
+                        })
+                        .await
+                    })
+            })
+            .unwrap();
+        let (total, _) = worker.join().unwrap().unwrap();
+        assert_eq!(total, 7 * BALLAST);
+        println!("offered-write-stack-probe: ok");
     }
 
     #[tokio::test(start_paused = true)]
