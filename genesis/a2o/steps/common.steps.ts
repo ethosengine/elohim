@@ -953,7 +953,10 @@ async function captureAllFailureArtifacts(
 /**
  * Capture artifacts on failure, assert console cleanliness on pass, then run cleanup.
  */
-After(async function (this: E2EWorld, scenario) {
+// Required fixture teardown can spend 2 * 15s deregistering and 3 * 20s
+// stopping guarded children. Keep its observer above that existing 90s
+// bound, with 30s for evidence capture; product step deadlines are unchanged.
+After({ timeout: 120_000 }, async function (this: E2EWorld, scenario) {
   const featureSlug = this.featureSlug ?? 'unknown-feature';
   const scenarioSlug = this.scenarioSlug ?? 'unknown-scenario';
 

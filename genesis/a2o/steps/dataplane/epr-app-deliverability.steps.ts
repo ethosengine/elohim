@@ -433,6 +433,10 @@ When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
  */
 async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
   const record = app(world);
+  // One observer budget inside this step's existing 180s ceiling. Native
+  // writes are uncancellable; a short per-request observer must not interrupt
+  // setup while the conductor is still committing the requested owned mount.
+  const setupDeadline = Date.now() + 170_000;
   const storageUrl = resolveStorageUrl('alpha-A');
   assert.ok(
     storageUrl,
@@ -497,15 +501,18 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
       metadataJson: JSON.stringify(metadata),
       metadata,
     };
-    const setupDeadline = Date.now() + 60_000;
-    const mounted = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+    const mounted = await postFixtureCommitment(
+      `${storageUrl}/api/v1/commitments`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+        },
+        body: JSON.stringify(commitmentInput),
       },
-      body: JSON.stringify(commitmentInput),
-    });
+      setupDeadline
+    );
     await resolveOwnedCommitmentCreate(
       mounted,
       commitmentInput,
@@ -526,22 +533,26 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
       };
       const candidateId = `${record.slug}-${coherence.doorwayId}-candidate`;
       record.rootCommitments?.push(candidateId);
-      const candidate = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+      const candidate = await postFixtureCommitment(
+        `${storageUrl}/api/v1/commitments`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+          },
+          body: JSON.stringify({
+            id: candidateId,
+            action: 'project-epr',
+            provider: ROOT_AUTHOR,
+            receiver: ROOT_AUTHOR,
+            inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
+            metadataJson: JSON.stringify(candidateMetadata),
+            metadata: candidateMetadata,
+          }),
         },
-        body: JSON.stringify({
-          id: candidateId,
-          action: 'project-epr',
-          provider: ROOT_AUTHOR,
-          receiver: ROOT_AUTHOR,
-          inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
-          metadataJson: JSON.stringify(candidateMetadata),
-          metadata: candidateMetadata,
-        }),
-      });
+        setupDeadline
+      );
       assert.ok(candidate.ok, `candidate mount ${peerName}: ${candidate.status} ${candidate.text}`);
     }
   }
@@ -657,7 +668,13 @@ async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Pr
   const record = app(this);
   const bundle = requireBundle(this);
   const doorwayUrl = resolvePeerUrl(peerName);
-  const outcome = await stageBundle({ bundle, slug: record.slug, doorwayUrl, declare: true });
+  const outcome = await stageBundle({
+    bundle,
+    slug: record.slug,
+    doorwayUrl,
+    declare: true,
+    stepTimeoutMs: 300_000,
+  });
   assert.strictEqual(
     outcome.code,
     0,
@@ -1085,6 +1102,7 @@ When(
       doorwayUrl,
       declare: true,
       kind: 'server',
+      stepTimeoutMs: 300_000,
     });
     assert.strictEqual(
       outcome.code,
@@ -1950,6 +1968,9 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
   // observed lifecycle" — that is expected behavior, not a fault to route
   // around. Cancel through the author peer (alpha-A / matthew) only.
   const authorStorageUrl = resolveStorageUrl('alpha-A');
+  // Reserve 75s for projection convergence and 5s of hook headroom after the
+  // native cancellations. All cancellation requests share this observer bound.
+  const cancellationDeadline = Date.now() + 100_000;
   assert.ok(
     authorStorageUrl,
     'no direct storage URL for peer "alpha-A" (the root commitment author) — set E2E_STORAGE_URL'
@@ -1959,16 +1980,22 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
       const response = await cancelOwnedCommitmentWithReadback(
         id,
         async () =>
-          await postFixtureCommitment(`${authorStorageUrl}/api/v1/commitments/${id}`, {
-            method: 'PATCH',
-            headers: {
-              'content-type': 'application/json',
-              'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+          await postFixtureCommitment(
+            `${authorStorageUrl}/api/v1/commitments/${id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'content-type': 'application/json',
+                'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+              },
+              body: JSON.stringify({ state: 'cancelled', finished: true }),
             },
-            body: JSON.stringify({ state: 'cancelled', finished: true }),
-          }),
+            cancellationDeadline
+          ),
         async () => {
-          const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`);
+          const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`, {
+            signal: AbortSignal.timeout(Math.max(1, cancellationDeadline - Date.now())),
+          });
           return readback.status === 200
             ? ((await readback.json()) as { id?: string; state?: string; finished?: boolean })
             : undefined;
@@ -1979,7 +2006,9 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
         `alpha-A/matthew (root author): could not cancel owned root mount ${id}: ${response.status} ${response.text}`
       );
       if (response.ok) {
-        const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`);
+        const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`, {
+          signal: AbortSignal.timeout(Math.max(1, cancellationDeadline - Date.now())),
+        });
         assert.equal(
           ((await readback.json()) as { state: string }).state,
           'cancelled',

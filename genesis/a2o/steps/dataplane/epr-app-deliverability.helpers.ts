@@ -170,6 +170,7 @@ export async function stageBundle(opts: {
   doorwayUrl: string;
   declare: boolean;
   kind?: 'browser' | 'server';
+  stepTimeoutMs?: number;
 }): Promise<StageOutcome> {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -177,6 +178,15 @@ export async function stageBundle(opts: {
     // Use the publisher's bounded retry policy. Canonical concurrent writers
     // can conflict after the deliberately induced peer restart; verdict2 stays terminal.
   };
+  if (opts.stepTimeoutMs !== undefined) {
+    // The shell timeout grants 30s for process-group shutdown. Leave another
+    // 20s to return its diagnostic before Cucumber abandons the step.
+    const hardSecs = Math.max(1, Math.floor((opts.stepTimeoutMs - 50_000) / 1000));
+    const configured = Number(env['STAGE_HARD_TIMEOUT_SECS']);
+    env['STAGE_HARD_TIMEOUT_SECS'] = String(
+      Number.isFinite(configured) && configured > 0 ? Math.min(configured, hardSecs) : hardSecs
+    );
+  }
   let code = 0;
   let output = '';
   try {
@@ -784,8 +794,11 @@ export function doorwayRestartLog(name: string, world?: E2EWorld): string {
 }
 
 /** Fixture authoring retries only the conductor's explicit optimistic-write conflict. */
-export async function postFixtureCommitment(url: string, init: RequestInit) {
-  const deadline = Date.now() + 60_000;
+export async function postFixtureCommitment(
+  url: string,
+  init: RequestInit,
+  deadline = Date.now() + 60_000
+) {
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(url, {
       ...init,
