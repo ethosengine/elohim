@@ -213,10 +213,28 @@ from humans, reference specific content, accumulate at the creator's presence, a
 | Library and librarian | commons custody, and the stewardship of attention | keeps, places and retires; does not rule on truth |
 | Award | attestation | from a human, about specific content, unsellable |
 | Review | witnessed interaction | witnessed, not self-reported |
-| Best-seller list, retailer rank | no equivalent, by refusal | reach is not purchasable; standing is not a score |
+| Best-seller list, retailer rank | plural aggregates, each chosen and published for its reach utility | governed by the elohim council and the constitution, as a commons; see the correction below |
 | Retraction and errata | a superseding record that citers pull | reaches copies already held |
 | Royalty | valueflow to the presence | facts recorded, valuation deferred |
 | Court, libel, plagiarism finding | Mishpat | restoration of the record |
+
+**Correction by the operator (2026-10-02).** An earlier draft of this table said the best-seller
+list has no equivalent, by refusal. That was wrong. The protocol does have a version of it:
+aggregates, plural, however they are chosen, are chosen and published according to their reach
+utility, subject to the elohim council and the constitution. They are a true commons.
+
+What separates such an aggregate from the legacy list is therefore not that it is absent. Read
+against the games recorded above, the differences to design for are:
+
+- **Plural.** No single list stands as "what everyone is reading"; a community may publish its own.
+- **Chosen and published.** The method and its purpose are declared, so an aggregate can be
+  contested and replaced.
+- **Governed as a commons.** No private party owns the list or sells a place on it.
+- **Fed by inputs that cannot be bought.** Witnessed attestation and earned reach, where the
+  legacy list is fed by a purchasable count.
+
+The earlier sentence "a citation count read as rank would rebuild the best-seller list" stands
+only in the narrow sense: one ungoverned count, privately published and purchasable, would.
 
 Rows whose right-hand side is not confirmed against code or canon in this session: the editor,
 publishing house, imprint, bookstore and review rows. They restate this entry's own design
