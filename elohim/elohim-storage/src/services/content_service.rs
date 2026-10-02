@@ -14,6 +14,27 @@ use crate::services::conductor_writes;
 
 use super::events::{EventBus, StorageEvent};
 
+/// A missing projection anchor does not establish native absence. If the
+/// conductor confirms that this ID already exists, apply the requested patch
+/// through its normal update/authority checks. Every other failure propagates;
+/// this recovery spends at most one create and one update. Heal callers retain
+/// their existing readback recovery and never mint a replacement version here.
+async fn create_or_update_existing_content(
+    election: content_diesel::HeadElection,
+    create: impl std::future::Future<Output = Result<Vec<u8>, StorageError>>,
+    update: impl std::future::Future<Output = Result<Vec<u8>, StorageError>>,
+) -> Result<Vec<u8>, StorageError> {
+    match create.await {
+        Err(error)
+            if matches!(election, content_diesel::HeadElection::Declare)
+                && super::reanchor_backfill::is_already_anchored_error(&error) =>
+        {
+            update.await
+        }
+        result => result,
+    }
+}
+
 /// Content service for business logic
 pub struct ContentService {
     pool: DbPool,
@@ -505,8 +526,19 @@ impl ContentService {
             }
         };
 
+        let patch = anchored_update_input(
+            id,
+            &view,
+            new_blob_cid.clone(),
+            merged_metadata_json.clone(),
+        );
         let output_bytes = if existing.content.dht_anchor_hash.is_none() {
-            conductor_writes::call_create_content(hc, &bootstrap).await?
+            create_or_update_existing_content(
+                election,
+                conductor_writes::call_create_content(hc, &bootstrap),
+                conductor_writes::call_update_content(hc, &patch),
+            )
+            .await?
         } else {
             // Standard update: only patched fields cross the wire.
             // REACH (reach-floor Task 6, landed 2026-08-30): `reach` IS threaded through
@@ -515,12 +547,6 @@ impl ContentService {
             // live-anchored entry is a real substrate move (the projection then stamps
             // the committed grade). `reach_patch_refusal` (called above) only refuses
             // when the conductor bridge cannot carry the change; on this arm it can.
-            let patch = anchored_update_input(
-                id,
-                &view,
-                new_blob_cid.clone(),
-                merged_metadata_json.clone(),
-            );
             match conductor_writes::call_update_content(hc, &patch).await {
                 Ok(bytes) => bytes,
                 // STALE-ANCHOR HEAL (2026-06-10): the SQL row carries a
@@ -538,7 +564,12 @@ impl ContentService {
                         id = %id,
                         "update_via_conductor: stale dht_anchor_hash (no DHT entry behind it) — healing via create_content re-publish"
                     );
-                    conductor_writes::call_create_content(hc, &bootstrap).await?
+                    create_or_update_existing_content(
+                        election,
+                        conductor_writes::call_create_content(hc, &bootstrap),
+                        conductor_writes::call_update_content(hc, &patch),
+                    )
+                    .await?
                 }
                 Err(e) => return Err(e),
             }
@@ -1013,6 +1044,98 @@ pub(crate) fn committed_projection_patch(oc: &lamad_types::Content) -> ContentPr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn duplicate_native_root_updates_once_and_returns_the_committed_update() {
+        let calls = std::cell::RefCell::new(Vec::new());
+        let result = create_or_update_existing_content(
+            content_diesel::HeadElection::Declare,
+            async {
+                calls.borrow_mut().push("create");
+                Err(StorageError::Conductor(
+                    "Content with id 'owned-app' already exists. Use update_content to modify existing entries.".into(),
+                ))
+            },
+            async {
+                calls.borrow_mut().push("update");
+                Ok(b"committed-update-with-new-bundle".to_vec())
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(&*calls.borrow(), &["create", "update"]);
+        assert_eq!(result, b"committed-update-with-new-bundle");
+    }
+
+    #[tokio::test]
+    async fn native_create_success_never_authors_an_extra_update() {
+        let result = create_or_update_existing_content(
+            content_diesel::HeadElection::Declare,
+            async { Ok(vec![7]) },
+            async { panic!("successful creation must not spend another native write") },
+        )
+        .await
+        .unwrap();
+        assert_eq!(result, vec![7]);
+    }
+
+    #[tokio::test]
+    async fn native_create_fault_never_falls_back_to_an_update() {
+        for message in [
+            "admission deadline",
+            "unauthorized",
+            "unrelated entry already exists",
+        ] {
+            let result = create_or_update_existing_content(
+                content_diesel::HeadElection::Declare,
+                async { Err(StorageError::Conductor(message.into())) },
+                async {
+                    panic!("only the existing native duplicate-root refusal licenses recovery")
+                },
+            )
+            .await;
+            assert!(result.unwrap_err().to_string().contains(message));
+        }
+    }
+
+    #[tokio::test]
+    async fn duplicate_root_recovery_preserves_native_update_refusal() {
+        let result = create_or_update_existing_content(
+            content_diesel::HeadElection::Declare,
+            async {
+                Err(StorageError::Conductor(
+                    "Content already exists. Use update_content".into(),
+                ))
+            },
+            async {
+                Err(StorageError::Conductor(
+                    "root author authorization refused".into(),
+                ))
+            },
+        )
+        .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("root author authorization refused"));
+    }
+
+    #[tokio::test]
+    async fn heal_duplicate_root_remains_a_readback_recovery_without_an_update() {
+        let result = create_or_update_existing_content(
+            content_diesel::HeadElection::PreserveExistingDeclaration,
+            async {
+                Err(StorageError::Conductor(
+                    "Content already exists. Use update_content".into(),
+                ))
+            },
+            async { panic!("a heal must not mint a replacement version") },
+        )
+        .await;
+        assert!(super::super::reanchor_backfill::is_already_anchored_error(
+            &result.unwrap_err()
+        ));
+    }
 
     // Note: Tests would require setting up a test database
     // For now, just test validation logic
