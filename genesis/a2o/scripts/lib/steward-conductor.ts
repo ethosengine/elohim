@@ -5,8 +5,9 @@
  * Existing per-cell signing credentials are reused. Connecting never creates a
  * capability grant; missing credentials require an explicit device ceremony.
  */
+import { spawn } from 'node:child_process';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -52,6 +53,69 @@ export interface ConductorOptions {
   /** Refuse accidental connection to a different device or DNA. */
   expectedAgent?: string;
   expectedDna?: string;
+  /** Local storage and ceremony processes must use the same directory. */
+  chainWriteLockDir?: string;
+}
+
+/** Only these source-verified reads bypass local write coordination. */
+const CEREMONY_READS = new Set([
+  'get_content_lineage',
+  'resolve_content_head_local',
+  'resolve_canonical_election',
+  'get_my_human',
+  'get_human_root_evidence',
+  'verify_device_binding',
+  'verify_device_affirmation',
+]);
+
+/** Same kernel lock as storage's per-cell write gate; never a grant of authority. */
+export async function withCellWriteLock<T>(
+  directory: string | undefined,
+  cell: CellId,
+  call: (remainingMs: number) => Promise<T>,
+  timeoutMs = 180_000
+): Promise<T> {
+  if (!directory) return call(timeoutMs);
+  const deadline = Date.now() + timeoutMs;
+  await mkdir(directory, { recursive: true });
+  const key = cell.map(hash => encodeHashToBase64(hash)).join(':');
+  const lock = spawn(
+    '/usr/bin/flock',
+    [
+      '--exclusive',
+      '--',
+      join(directory, `${key}.lock`),
+      '/bin/sh',
+      '-c',
+      String.raw`printf "locked\n"; while IFS= read -r line; do :; done`,
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'] }
+  );
+  const closed = new Promise<void>(resolve => lock.once('close', () => resolve()));
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error('cell write lock deadline elapsed')),
+        timeoutMs
+      );
+      const done = (error?: Error) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve();
+      };
+      lock.once('error', () => done(new Error('local cell write lock unavailable')));
+      lock.once('close', () => done(new Error('local cell write lock closed before acquisition')));
+      lock.stdout.once('data', () => done());
+    });
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) throw new Error('cell write lock deadline elapsed');
+    return await call(remainingMs);
+  } finally {
+    lock.stdin.end();
+    // A queued flock has not started its stdin reader yet.
+    lock.kill('SIGTERM');
+    await closed;
+  }
 }
 
 export interface Conductor {
@@ -235,6 +299,11 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
       'existing signing credentials required: set STEWARD_SIGNING_CREDENTIALS_DIR or --signing-credentials-dir'
     );
   }
+  if (
+    o.chainWriteLockDir &&
+    (o.hosted || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(o.adminWs).hostname))
+  )
+    throw new Error('local cell write coordination cannot be used for a remote hosted conductor');
   if (o.hosted) return connectHosted(o, dir);
   const admin = await AdminWebsocket.connect({
     url: new URL(o.adminWs),
@@ -263,13 +332,19 @@ export async function connectConductor(o: ConductorOptions): Promise<Conductor> 
       dna,
       requester: encodeHashToBase64(signingCredentials.signingKey),
       async call<T>(fnName: string, payload: unknown, timeoutMs?: number): Promise<T> {
-        return callZomeWithCredentials<T>(
-          connected,
+        return withCellWriteLock(
+          CEREMONY_READS.has(fnName) ? undefined : o.chainWriteLockDir,
           cell,
-          signingCredentials,
-          o.zome ?? 'content_store',
-          fnName,
-          payload,
+          async remainingMs =>
+            callZomeWithCredentials<T>(
+              connected,
+              cell,
+              signingCredentials,
+              o.zome ?? 'content_store',
+              fnName,
+              payload,
+              remainingMs
+            ),
           timeoutMs
         );
       },

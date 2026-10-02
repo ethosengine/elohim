@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { encodeHashToBase64 } from '@holochain/client';
 
 import {
   scopedCapability,
+  writeCustodyJson,
   MANDATE_TAG,
   type InvocationMandate,
 } from '../lib/steward-credential.js';
+import { main } from '../steward-credential.js';
+
+import type { connectConductor } from '../lib/steward-conductor.js';
 
 const hash = (prefix: number, value: number) =>
   encodeHashToBase64(new Uint8Array([132, prefix, 36, ...new Uint8Array(36).fill(value)]));
@@ -84,4 +91,44 @@ void test('identity signing requires an exact payload and never inherits content
     scopedCapability({ ...identity, exact_payload_json: null }, 'mishpat', new Uint8Array(64), 99)
   );
   assert.throws(() => scopedCapability(identity, 'content_store', new Uint8Array(64), 99));
+});
+
+void test('the ceremony CLI persists Buffer hashes as complete native byte arrays', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'ceremony-output-'));
+  const descriptor = join(directory, 'descriptor.json');
+  const bytes = new Uint8Array([132, 41, 36, ...new Uint8Array(36).fill(9)]);
+  let closed = false;
+  writeCustodyJson(descriptor, {
+    connection: {},
+    mandate: { ...mandate(), operations: ['witness_device_publication'], exact_payload_json: '{}' },
+  });
+  const connect = (async () => {
+    await Promise.resolve();
+    return {
+      agent: owner,
+      dna,
+      requester,
+      call: async () => {
+        await Promise.resolve();
+        return { action_hash: Buffer.from(bytes), entry_hash: bytes };
+      },
+      close: async () => {
+        await Promise.resolve();
+        closed = true;
+      },
+    };
+  }) as typeof connectConductor;
+  try {
+    await main(['exercise-ceremony', descriptor], connect);
+    const result = JSON.parse(readFileSync(join(directory, 'ceremony-result.json'), 'utf8')) as {
+      action_hash: number[];
+      entry_hash: number[];
+    };
+    assert.deepEqual(result.action_hash, Array.from(bytes));
+    assert.deepEqual(result.entry_hash, Array.from(bytes));
+    assert.equal(encodeHashToBase64(new Uint8Array(result.action_hash)), encodeHashToBase64(bytes));
+    assert.equal(closed, true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

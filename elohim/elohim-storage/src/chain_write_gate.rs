@@ -104,7 +104,9 @@
 //! Not a timeout: nothing dispatched is ever abandoned here.
 
 use std::collections::HashMap;
+use std::fs::{File, OpenOptions, TryLockError};
 use std::future::Future;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -580,6 +582,45 @@ pub fn chain_key_of(cell_id: &CellId) -> String {
     format!("{}:{}", cell_id.dna_hash(), cell_id.agent_pubkey())
 }
 
+/// Optional local coordination with an independently signed ceremony process.
+/// The kernel releases this lock when its owning file/process closes. It is
+/// scheduling only: every conductor call still exercises its native capability.
+async fn external_writer_lock(chain_key: &str) -> Result<Option<File>, StorageError> {
+    let Some(directory) = std::env::var_os("ELOHIM_CHAIN_WRITE_LOCK_DIR") else {
+        return Ok(None);
+    };
+    Ok(Some(lock_file(Path::new(&directory), chain_key).await?))
+}
+
+async fn lock_file(directory: &Path, chain_key: &str) -> Result<File, StorageError> {
+    // Keys are the conductor's public DNA/agent addresses, never caller paths.
+    if chain_key.is_empty()
+        || !chain_key
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b':' | b'-' | b'_'))
+    {
+        return Err(StorageError::Conductor(
+            "invalid chain write lock key".into(),
+        ));
+    }
+    std::fs::create_dir_all(directory)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(directory.join(format!("{chain_key}.lock")))?;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(TryLockError::WouldBlock) => {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Err(TryLockError::Error(error)) => return Err(error.into()),
+        }
+    }
+}
+
 // =============================================================================
 // The choke point
 // =============================================================================
@@ -598,13 +639,17 @@ pub fn chain_key_of(cell_id: &CellId) -> String {
 /// connect time, where the reconnect path already owns the recovery, and
 /// replaying a keypair mint is not the same kind of safe as replaying an
 /// encoded zome payload.
-pub async fn grant_capability_serialized<F, Fut, T, E>(cell_id: &CellId, grant: F) -> Result<T, E>
+pub async fn grant_capability_serialized<F, Fut, T>(
+    cell_id: &CellId,
+    grant: F,
+) -> Result<T, StorageError>
 where
     F: FnOnce() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
+    Fut: Future<Output = Result<T, StorageError>>,
 {
     let lock = gate().lock_for(&chain_key_of(cell_id));
     let _guard = lock.lock().await;
+    let _external = external_writer_lock(&chain_key_of(cell_id)).await?;
     grant().await
 }
 
@@ -679,6 +724,7 @@ where
     for attempt in 1..=MAX_ATTEMPTS {
         let queue_started = Instant::now();
         let guard = lock.lock().await;
+        let external = external_writer_lock(chain_key).await?;
         let waited = queue_started.elapsed();
         queued_total += waited;
 
@@ -689,6 +735,7 @@ where
         mark_dispatched();
         let outcome = call().await;
         let rtt = dispatched_at.elapsed();
+        drop(external);
         // The lock models exclusive access to the chain HEAD, which the
         // conductor has finished contending for the instant the call returns.
         drop(guard);
@@ -741,6 +788,51 @@ where
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_ceremony_lock_blocks_only_its_cell_and_releases_on_process_exit() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("same-cell.lock");
+        let mut external = std::process::Command::new("flock")
+            .args(["--exclusive", "--"])
+            .arg(&path)
+            .args(["sh", "-c", "printf 'locked\\n'; read release"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        use std::io::BufRead;
+        let mut ready = String::new();
+        std::io::BufReader::new(external.stdout.take().unwrap())
+            .read_line(&mut ready)
+            .unwrap();
+        assert_eq!(ready, "locked\n");
+        assert!(tokio::time::timeout(
+            Duration::from_millis(50),
+            lock_file(directory.path(), "same-cell")
+        )
+        .await
+        .is_err());
+        let other = tokio::time::timeout(
+            Duration::from_secs(1),
+            lock_file(directory.path(), "other-cell"),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        drop(other);
+        drop(external.stdin.take());
+        external.wait().unwrap();
+        let acquired = tokio::time::timeout(
+            Duration::from_secs(1),
+            lock_file(directory.path(), "same-cell"),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        drop(acquired);
+    }
 
     fn head_moved() -> StorageError {
         StorageError::Conductor("Zome call failed: SourceChainError::HeadMoved".into())

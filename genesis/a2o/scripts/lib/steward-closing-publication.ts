@@ -118,7 +118,11 @@ export async function runClosingPublication(f: ClosingPublicationFixture): Promi
   assert.equal((che.connection ?? che).expectedAgent, f.che);
   assert.equal((che.connection ?? che).expectedDna, f.dna);
   const receivers = json<Record<string, ConductorOptions>>(f.nativeReceivers);
-  assert.deepEqual(Object.keys(receivers), ['adam']);
+  assert.ok(receivers.adam, 'one designated independent receiver is required');
+  for (const receiver of Object.values(receivers)) {
+    assert.equal(receiver.expectedDna, f.dna);
+    assert.notEqual(receiver.expectedAgent, f.che);
+  }
   assert.equal(receivers.adam.expectedAgent, f.adam);
   assert.equal(receivers.adam.expectedDna, f.dna);
   const owner = json<{

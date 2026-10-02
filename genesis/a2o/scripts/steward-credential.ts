@@ -13,6 +13,7 @@ import { decodeHashFromBase64, encodeHashToBase64 } from '@holochain/client';
 import { connectConductor } from './lib/steward-conductor.js';
 import {
   issueCredential,
+  ceremonyResultDocument,
   readCredentialPlan,
   refreshHostedCredential,
   writeCustodyJson,
@@ -100,11 +101,7 @@ export async function main(
         const result = await c.call(m.operations[0], JSON.parse(m.exact_payload_json));
         writeCustodyJson(
           join(dirname(argv[1]), 'ceremony-result.json'),
-          JSON.parse(
-            JSON.stringify(result, (_key, v: unknown) =>
-              v instanceof Uint8Array ? Array.from(v) : v
-            )
-          ),
+          ceremonyResultDocument(result),
           true
         );
         console.log('native identity ceremony recorded');

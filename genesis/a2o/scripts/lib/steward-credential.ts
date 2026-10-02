@@ -16,6 +16,7 @@ import { AdminWebsocket, decodeHashFromBase64, encodeHashToBase64 } from '@holoc
 import {
   conductorSocketOptions,
   loadSigningCredentials,
+  withCellWriteLock,
   type ConductorOptions,
   HostedConductorReceipt,
 } from './steward-conductor.js';
@@ -187,7 +188,9 @@ export async function issueCredential(
       )
     )
       throw new Error('ceremony owner app/cell differs from plan');
-    const action = await admin.grantZomeCallCapability({ cell_id: cell, cap_grant: grant });
+    const action = await withCellWriteLock(o.chainWriteLockDir, cell, async remainingMs =>
+      admin.grantZomeCallCapability({ cell_id: cell, cap_grant: grant }, remainingMs)
+    );
     const capabilityAction = encodeHashToBase64(action);
     writeCustodyJson(
       join(plan.outputDir, 'descriptor.json'),
@@ -275,6 +278,17 @@ export async function refreshHostedCredential(o: ConductorOptions): Promise<void
     doorway: doorway.origin,
     expiresAt: Math.min(auth.expiresAt * 1000, Date.now() + 3_600_000),
   });
+}
+
+/** Preserve native hash/signature bytes before Buffer.toJSON changes their shape. */
+export function ceremonyResultDocument(value: unknown): unknown {
+  if (value instanceof Uint8Array) return Array.from(value);
+  if (Array.isArray(value)) return value.map(ceremonyResultDocument);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, ceremonyResultDocument(item)])
+    );
+  return value;
 }
 
 /** Durable private custody. Exclusive issuance reserves the path before any

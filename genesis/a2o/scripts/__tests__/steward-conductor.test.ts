@@ -14,9 +14,57 @@ import {
   conductorSocketOptions,
   closeConductorSocket,
   loadSigningCredentials,
+  withCellWriteLock,
 } from '../lib/steward-conductor.js';
 
 import type { AppClientTransport, AppInfo, CellId, SigningCredentials } from '@holochain/client';
+
+it('serializes independent local ceremony processes and refuses an expired lock wait', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cell-writer-'));
+  const cell: CellId = [new Uint8Array(39).fill(1), new Uint8Array(39).fill(2)];
+  let release!: () => void;
+  let acquired!: () => void;
+  const ready = new Promise<void>(resolve => (acquired = resolve));
+  const held = new Promise<void>(resolve => (release = resolve));
+  const first = withCellWriteLock(directory, cell, async () => {
+    acquired();
+    await held;
+  });
+  try {
+    await ready;
+    let entered = false;
+    await assert.rejects(
+      withCellWriteLock(
+        directory,
+        cell,
+        async () => {
+          await Promise.resolve();
+          entered = true;
+        },
+        50
+      ),
+      /cell write lock deadline elapsed/
+    );
+    assert.equal(entered, false, 'an expired waiter must not invoke the conductor');
+    release();
+    await first;
+    await withCellWriteLock(
+      directory,
+      cell,
+      async remainingMs => {
+        await Promise.resolve();
+        assert.ok(remainingMs > 0 && remainingMs <= 1000);
+        entered = true;
+      },
+      1000
+    );
+    assert.equal(entered, true);
+  } finally {
+    release();
+    await first;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 it('finishes socket cleanup when already closed, rejected or missing a close event', async () => {
   let calls = 0;

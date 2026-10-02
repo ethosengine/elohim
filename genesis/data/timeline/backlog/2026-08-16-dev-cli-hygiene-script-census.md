@@ -202,3 +202,5 @@ script. Coupled context synced: root `CLAUDE.md` Build & Test (via the `elohim-r
 `hc-dev-orchestrator` skill (via its package), where a stale storage-binary path was also corrected to the parked
 `mesh-bin` copy. The same pass made the preflight judge each zome wasm against its own crate, so a coordinator-only
 change no longer falsely refuses the integrity wasm.
+
+- 2026-10-01 campaign 1.4: the mesh lane wrapper generates an invalid Bash variable for the maintained hyphenated late joiner `matthew-device-campaign14`; use the same scoped Cucumber profile and sprint-report builder directly for this proof. Fix is deferred to this CLI home; see `2026-10-01-campaign-1.4-household-restart.md`.
