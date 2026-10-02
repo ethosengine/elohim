@@ -158,6 +158,28 @@ chain, or head delivery to a doorway. Whether any of them explains the figures a
    chain of about 45,000 actions.
 4. **Report.** See "What to send back".
 
+## How the two skills work together
+
+`runtime-performance` answers where the time goes: process costs, sampled functions, call
+durations, SQL, with a coverage check that refuses to call thin evidence a pass. `gradient-reading`
+answers whether that cost should exist on that path: who stands at each end, what kind of cost it
+is, which plane is paying. Neither replaces the other. A loop, per path:
+
+1. **Choose the path with the gradient.** Take the labelled entries where a trustful path
+   re-verifies or waits, where a cost grows with history, or where planes are fused. Write down the
+   one question a measurement should settle, before capturing anything.
+2. **Measure with `runtime-performance`.** Capture and report for that path only. Its report says
+   what was measured and what is missing.
+3. **Read the result with the gradient.** State the two ends, the fact being re-derived or the
+   plane being waited on, and the compression the measurement justifies. If the cost turns out to be
+   mechanical, say so and rank it by its measured cost alone.
+4. **Record** the finding in the entry it belongs to, with the commits and the evidence path.
+
+One known gap bears on step 2. The `runtime-performance` habit is red because caller, workflow and
+SQL attribution are incomplete: an earlier capture resolved leaf functions (SHA-512 at 45% of one
+conductor's sampled CPU) without the callers that would say why. The gradient question narrows
+which caller to look for; it does not supply the missing attribution.
+
 ## What you do not have
 
 - **The evidence directories.** `genesis/a2o/reports/` and `genesis/local-dev/` are gitignored, so

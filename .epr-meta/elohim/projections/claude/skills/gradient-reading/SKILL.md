@@ -88,6 +88,12 @@ You have profiled or ranked costs and want to know which to pursue.
 
 Acceptance stays with the habit's own check. Copy figures from the source; never derive one.
 
+The `runtime-performance` skill is the measuring half. It answers where the time goes; this skill
+answers whether that cost should exist on that path. Use them as a loop: choose the path and write
+the question here, capture and report there, then read the result here. When its report shows a
+hot leaf function with no caller attribution, the gradient question says which caller to look for;
+it does not replace the missing evidence.
+
 ### Declaring an object at design time
 
 Run this beside the `p2p-design-gate` skill, which owns entity classification. For the object, state
