@@ -729,14 +729,15 @@ where
         >,
     >,
 {
-    tokio::time::timeout(
-        crate::p2p::projection_reconcile::HEAL_ATTEMPT_TIMEOUT,
-        call,
-    )
+    // A single admitted head can need the native 30s acceptance-history check
+    // plus its surrounding reads. The heal lane's 25s attempt limit discarded
+    // verified declarations measured at 32–36s. Keep the in-WASM batch budget
+    // unchanged, and use the conductor's existing 60s request bound here.
+    tokio::time::timeout(std::time::Duration::from_secs(60), call)
     .await
     .map_err(|_| {
         StorageError::Conductor(
-            "ordered head payload read exceeded the existing heal attempt timeout; already-running WASM work may continue"
+            "ordered head payload read exceeded the conductor request bound; already-running WASM work may continue"
                 .into(),
         )
     })?
@@ -1441,6 +1442,58 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn verified_ordered_head_can_project_after_the_heal_attempt_limit() {
+        use crate::services::conductor_writes::{
+            BatchAttempt, BatchCall, BatchOutcome, BatchResolveOutput, BATCH_RESOLVE_SCHEMA_VERSION,
+        };
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "slow-verified-head";
+        seed_content(&pool, id, "blob-a");
+        let ordering = content_diesel::CanonicalOrdering::new(100, true);
+        let response = bounded_ordered_head_call(async {
+            tokio::time::sleep(std::time::Duration::from_secs(36)).await;
+            Ok(BatchCall {
+                out: BatchResolveOutput {
+                    schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+                    attempted: vec![BatchAttempt {
+                        id: id.into(),
+                        outcome: BatchOutcome::Resolved(Some(ordered_head(
+                            id, "head-b", "blob-b", ordering,
+                        ))),
+                    }],
+                    unattempted: Vec::new(),
+                    stop_reason: None,
+                    elapsed_ms: 36_000,
+                },
+                timing: crate::hc_client::ZomeCallTiming {
+                    admission_wait: std::time::Duration::ZERO,
+                    rtt: std::time::Duration::from_secs(36),
+                },
+            })
+        })
+        .await
+        .expect("a verified response inside the conductor bound must survive");
+        let head = ordered_head_from_batch(id, response.out).expect("complete head");
+        apply_ordered_content_head(
+            id,
+            &HoloHashB64("head-b".into()),
+            ordering,
+            head,
+            &pool,
+            &ctx,
+        )
+        .expect("project the exact authenticated declaration");
+        let mut conn = pool.get().expect("connection");
+        let row =
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .expect("read")
+                .expect("row");
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("head-b"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-b"));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn timed_out_ordered_head_read_leaves_the_projection_untouched() {
         let pool = content_signal_test_pool();
         let ctx = AppContext::default_lamad();
@@ -1456,8 +1509,8 @@ mod tests {
             >,
         >())
         .await
-        .expect_err("the existing heal attempt timeout must bound the worker");
-        assert!(error.to_string().contains("heal attempt timeout"));
+        .expect_err("the conductor request bound must bound the worker");
+        assert!(error.to_string().contains("conductor request bound"));
 
         let mut conn = pool.get().expect("connection");
         let row =
