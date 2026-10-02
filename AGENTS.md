@@ -303,6 +303,11 @@ The app runs in four modes with different content loading paths:
 
 ## Development Workflow
 
+### Persistent workspace work
+
+Che workspace restarts erase `/tmp`. Keep work in progress, helper scripts, checkpoints, and resumable campaign state under `genesis/local-dev/<campaign>/`, never `/tmp`. Keep Git worktrees under `/projects/elohim/.worktrees/`. Store required durable proof receipts under `genesis/a2o/reports/recovery/` and operator runbooks under `genesis/docs/superpowers/sprints/`. `/tmp` is only for disposable scratch that can be regenerated; never make it the only copy of uncommitted work or evidence. After a restart, resume existing conductor databases and keystores in place; do not reset or recast identities.
+
+
 ### Story-First Default
 
 Before implementing a feature, find or write the a2o scenario that describes the learner's experience. The scenario is your specification. Implementation is done when the scenario passes.
