@@ -11,7 +11,7 @@ metadata:
   originSessionId: 2437c985-9e3a-4918-af90-61da254d98d6
   modified: 2026-07-24T17:21:46.291Z
 cites:
-  - "values-forward | values-forward | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "values-forward | values-forward | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "glossary | glossary | sha256:faeef215b3a16143 | path: genesis/docs/content/elohim-protocol/glossary.md"
 ---
 
