@@ -236,6 +236,18 @@ against the games recorded above, the differences to design for are:
 The earlier sentence "a citation count read as rank would rebuild the best-seller list" stands
 only in the narrow sense: one ungoverned count, privately published and purchasable, would.
 
+**The goal, in the operator's words (2026-10-02, lightly paraphrased).** REA holds meaning and
+value settlement, with aggregation left open to re-interpretation, so the commons can say what is
+really valuable in relationship and hold a new floor for care value.
+
+The mechanism that makes this possible is the rule already in canon: record the facts, defer the
+valuation. The events are recorded once; any number of aggregates can be computed over them later,
+and a community can choose one that counts care the market never priced. Two constraints follow.
+The cost shape is one record per event and many derived readings, which belongs to the scale
+question above. And `succession.md` warns that a witnessed-care record the cared-for cannot
+contest is a conferred identity, so an aggregate that values care depends on records the cared-for
+can answer.
+
 Rows whose right-hand side is not confirmed against code or canon in this session: the editor,
 publishing house, imprint, bookstore and review rows. They restate this entry's own design
 observations or the manifesto's vision.
