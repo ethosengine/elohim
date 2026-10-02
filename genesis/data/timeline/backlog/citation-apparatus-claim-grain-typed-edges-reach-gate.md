@@ -111,6 +111,35 @@ The costs to size before designing, in the vocabulary of CONVENTIONS.md §Cost u
 This entry is not tagged `performance`: nothing here is a measured cost yet. The `gradient-reading`
 skill's design-time use is the method for the pass that sizes it.
 
+## The book and the library as planes (for the return to the performance story)
+
+The operator, 2026-10-02: the book has its own planes (table of contents, content, index,
+bibliography) and librarians. Read against CONVENTIONS.md §Plane; a mapping to test, not a design:
+
+| Part | Plane | Made by, and when |
+|---|---|---|
+| Content | bytes | the author, once |
+| Table of contents | projection, shipped with the work | the author; the intended order of reading |
+| Footnote marker and bibliography | reference | the author, per claim and per source |
+| Index | projection, reversed | an indexer, after the text is fixed |
+| Edition and printing | head | the publisher, per revision |
+| Title page, imprint, peer review | authority and notary | the publisher and reviewers, before release |
+| Catalogue record | the envelope, held outside the work | a cataloguer; lets a reader judge the book without holding it |
+| Shelves, and loans between libraries | custody | each library holds a subset; the shared catalogue says who holds what |
+| The librarian | attention | decides what to acquire, where it belongs, what to retire, and which question goes to which shelf |
+
+What the arrangement shows about cost:
+
+- Each plane is made by a different role at a different time and is read without the others. No
+  one opens the book to use the catalogue.
+- The catalogue is small against the shelves, and no library holds everything.
+- The librarian does not judge whether a book is true. The librarian judges where it belongs and
+  whether to keep it. That is a cheaper judgement than review and it is what keeps the rest usable.
+- Two things the print world never solved: a correction does not reach the copies already held,
+  and "who cites this?" needed a separate institution (the citation index) built long after.
+
+The 268 stale edges recorded above are a librarian's job with no catalogue to do it from.
+
 ## Where the vision is stated
 
 `genesis/docs/content/elohim-protocol/manifesto.md`, Part IV-B, "A Covenant From Below: Citing What
