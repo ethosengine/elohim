@@ -9,7 +9,7 @@ written: "2026-09-19"
 author: "pipeline-shakeout shift pickup (2026-09-19)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, projection-reconcile, quiesce, alpha-fleet, measurement]
+tags: [dataplane, projection-reconcile, quiesce, alpha-fleet, measurement, performance, perf-convergence, trustful-declared, friction-wait, plane-projection, fused-planes, unit-item, phase-steady, lane-background]
 jobs: [elohim-edge]
 cites:
   - scripts/ci/fleet-quiesce-gate.sh

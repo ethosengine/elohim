@@ -26,7 +26,7 @@ cites:
   - genesis/docs/content/elohim-protocol/architecture/2026-07-16-alpha-test-bench-compute-envelope.md
   - genesis/data/rakia/compute-capacity.schema.json
   - elohim/rakia/docs/plans/stage-2-canopy.md
-tags: [rea, compute-commitment, delegates-compute, mesh, virtual-peer, cgroup, resource-envelope, shefa, rakia, a2o, p2p-gated, agent-agnostic]
+tags: [rea, compute-commitment, delegates-compute, mesh, virtual-peer, cgroup, resource-envelope, shefa, rakia, a2o, p2p-gated, agent-agnostic, performance, perf-memory, trustful-declared, friction-mechanical, unit-once, phase-transition, lane-operator]
 shift_objective: |
   Rung (a) only. Make `app/elohim-app/scripts/hc-mesh.sh` place each mesh peer's processes
   (conductor + storage + doorway) into a named cgroup-v2 sub-tree `<pod>/mesh/<peer>` with

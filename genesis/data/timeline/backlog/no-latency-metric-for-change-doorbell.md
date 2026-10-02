@@ -13,7 +13,7 @@ jobs: [elohim]
 cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "habit:dataplane-convergence"
-tags: [dataplane, iroh, libp2p, observability, streaming, doorbell]
+tags: [dataplane, iroh, libp2p, observability, streaming, doorbell, performance, perf-telemetry, perf-convergence, trustful-declared, friction-blind]
 ---
 
 **The fact.** In `TransportBackend::Dual` mode, the iroh announce bridge is deliberately not spawned:

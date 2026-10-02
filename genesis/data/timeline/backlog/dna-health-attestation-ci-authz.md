@@ -10,7 +10,7 @@ author: "agentic-developer (EPR durability shift, live-seeding Grafana read)"
 status: "backlog"
 priority: "high"
 jobs: [elohim-genesis]
-tags: [dna, infrastructure-zome, authorization, ci-seeding, delegates-compute]
+tags: [dna, infrastructure-zome, authorization, ci-seeding, delegates-compute, trustful-earned]
 cites:
   - genesis/data/timeline/backlog/security-ci-substrate-authorization-grant-coherence.md
 ---

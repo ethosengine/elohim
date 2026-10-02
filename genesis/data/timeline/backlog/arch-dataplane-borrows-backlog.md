@@ -9,7 +9,7 @@ written: "2026-08-04"
 author: "claude (research mint pass, operator-directed clustering)"
 status: "backlog"
 priority: "medium"
-tags: [architecture, dataplane, p2p, transport, replication, blobs, research-derived, cross-pollination]
+tags: [architecture, dataplane, p2p, transport, replication, blobs, research-derived, cross-pollination, performance, perf-queue, perf-latency, friction-mechanical, custody-subset, plane-custody]
 cites:
   - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
   - genesis/research/ssb-scuttlebutt-ancestor-retrospective-2026-08-03.md

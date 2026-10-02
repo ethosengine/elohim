@@ -5,6 +5,7 @@ status: open
 class: self-heal-exhaustion
 habit: dataplane-convergence
 requires_env: alpha-cluster-6peer
+tags: [performance, perf-queue, perf-cpu, trustful-self, friction-mechanical, plane-notary, fused-planes, unit-call, phase-steady, lane-borrowed]
 ---
 
 Post edge #1378 (00:45Z, commit 9acddc279) matthew's `projectionReconcile` leg cannot drain:

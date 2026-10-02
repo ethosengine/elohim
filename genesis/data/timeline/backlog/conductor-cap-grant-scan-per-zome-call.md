@@ -9,7 +9,7 @@ written: "2026-09-19"
 author: "pipeline-shakeout shift pickup (2026-09-19)"
 status: "backlog"
 priority: "critical"
-tags: [conductor, capability-grants, zome-call-cost, trust, alpha-fleet, holochain-fork]
+tags: [conductor, capability-grants, zome-call-cost, trust, alpha-fleet, holochain-fork, performance, perf-cpu, perf-latency, perf-scale, trustful-self, friction-verify, friction-mechanical, plane-authority, fused-planes, unit-call, phase-steady, lane-interactive]
 jobs: [elohim-edge, elohim]
 cites:
   - genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md

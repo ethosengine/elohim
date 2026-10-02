@@ -11,7 +11,7 @@ status: "wip"
 priority: "high"
 area: "deploy"
 domain: "design"
-tags: [edge-deploy, conductor, arc-catchup, availability, design-domain, needs-brainstorm]
+tags: [edge-deploy, conductor, arc-catchup, availability, design-domain, needs-brainstorm, performance, perf-convergence, perf-queue, trustful-declared, friction-wait, custody-everyone, plane-notary, fused-planes, unit-peer, phase-transition, lane-interactive]
 ---
 
 # Staggered conductor fleet restarts

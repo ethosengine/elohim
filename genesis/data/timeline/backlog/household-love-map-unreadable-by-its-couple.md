@@ -15,7 +15,7 @@ jobs: [elohim-genesis]
 relatedNodeIds:
   - "habit:reach-enforced-everywhere"
   - "backlog-security-content-head-route-bypasses-reach-gate"
-tags: [reach, intimate-reach, love-map, household, fixtures]
+tags: [reach, intimate-reach, love-map, household, fixtures, trustful-declared]
 ---
 ## Observed (household mesh, 2026-09-27)
 `love-map-matthew-jessica` is seeded at intimate reach with `created_by = NULL`. After the read

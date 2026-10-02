@@ -9,7 +9,7 @@ written: "2026-09-19"
 author: "pipeline-shakeout shift pickup (2026-09-19)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, conductor-admission, restart, app-delivery, alpha-fleet]
+tags: [dataplane, conductor-admission, restart, app-delivery, alpha-fleet, performance, perf-queue, perf-convergence, trustful-self, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, lane-interactive]
 jobs: [elohim, elohim-edge]
 cites:
   - elohim/elohim-storage/src/conductor_admission.rs

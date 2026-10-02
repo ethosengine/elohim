@@ -15,7 +15,7 @@ relatedNodeIds:
   - "memory:project_alpha_substrate_probe_rails"
   - "memory:project_doorway_ops_incidents"
   - "memory:feedback_reach_head_replication_distinct_planes"
-tags: [doorway, breaker, dataplane, availability, resiliency-saga, doorway-failover, extraction-cache, observability]
+tags: [doorway, breaker, dataplane, availability, resiliency-saga, doorway-failover, extraction-cache, observability, performance, perf-queue, trustful-self, friction-mechanical, plane-bytes, unit-call, phase-steady, lane-interactive]
 cites:
   - doorway/doorway-service/src/routes/upstream_health.rs
   - doorway/doorway-service/src/routes/storage_proxy.rs

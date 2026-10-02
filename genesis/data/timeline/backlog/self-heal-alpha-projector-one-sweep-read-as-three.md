@@ -14,7 +14,7 @@ severity: low
 fingerprints: [6cdded115d74]
 nodes: [alpha]
 relatedNodeIds: []
-tags: [self-heal, projector-reconcile, sensing-gap, elevate-arm, runtime-harvest, false-positive, post-restart, poll-is-not-a-sweep, matthew]
+tags: [self-heal, projector-reconcile, sensing-gap, elevate-arm, runtime-harvest, false-positive, post-restart, poll-is-not-a-sweep, matthew, performance, perf-telemetry, perf-convergence, friction-blind, phase-steady, lane-operator]
 cites:
   - https://doorway-alpha.elohim.host/p2p/status
   - https://doorway-alpha.elohim.host/admin/self-healing

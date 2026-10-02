@@ -10,6 +10,7 @@ author: "quiescence-gated-saga-recording shift (post-#1285 fleet observation)"
 status: "backlog"
 priority: "high"
 jobs: [elohim-edge]
+tags: [performance, perf-convergence, trustful-declared, friction-wait, friction-mechanical, plane-projection, fused-planes, unit-item, phase-growth, lane-background]
 ---
 
 # Fleet-wide content-gap limit cycle blocks convergence

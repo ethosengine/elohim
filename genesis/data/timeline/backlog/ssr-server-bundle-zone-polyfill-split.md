@@ -9,7 +9,7 @@ written: "2026-07-30"
 author: "angular22-campaign"
 status: "backlog"
 priority: "low"
-tags: [angular, ssr, zone.js, zoneless, bundle-size, elohim-render, performance]
+tags: [angular, ssr, zone.js, zoneless, bundle-size, elohim-render, performance, perf-cpu, perf-latency, friction-mechanical, plane-projection, unit-once, phase-transition, lane-interactive]
 cites:
   - app/elohim-app/angular.json
   - app/lamad/angular.json

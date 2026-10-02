@@ -9,7 +9,7 @@ written: "2026-08-03"
 author: "pipeline-landing shift (integrator; diagnosis corrected same shift by code-disproof)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, holochain, conductor, db-pool-saturation, backpressure, obey-path, convergence, concern-c11, concern-c8, misdiagnosis-corrected]
+tags: [dataplane, holochain, conductor, db-pool-saturation, backpressure, obey-path, convergence, concern-c11, concern-c8, misdiagnosis-corrected, performance, perf-queue, perf-io, trustful-self, friction-mechanical, plane-notary, fused-planes, unit-call, phase-steady, lane-interactive]
 cites:
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - elohim/elohim-storage/src/services/head_adoption.rs

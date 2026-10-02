@@ -17,7 +17,7 @@ relatedNodeIds:
   - "spec:runtime-artifacts-elected-content"
   - "backlog-task-release-manifest-schema-packager"
   - "backlog-task-runtime-upgrade-a2o-receipt"
-tags: [upgrade-propagation, rung5, ceremony, canonical-head, election, delegable]
+tags: [upgrade-propagation, rung5, ceremony, canonical-head, election, delegable, trustful-earned]
 ---
 
 **Claimable by any implementation agent. Depends on T1

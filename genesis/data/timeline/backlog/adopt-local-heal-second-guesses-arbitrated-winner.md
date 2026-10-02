@@ -12,7 +12,7 @@ priority: "medium"
 area: "substrate/content-versioning-authority"
 domain: "elohim-storage"
 jobs: [elohim, elohim-edge]
-tags: [heal, adopt-before-author, canonical-head, refused_declared, head_adoption, projection-reconcile, saga-06]
+tags: [heal, adopt-before-author, canonical-head, refused_declared, head_adoption, projection-reconcile, saga-06, performance, perf-convergence, trustful-self, friction-verify, friction-wait, plane-head, unit-item, phase-steady, lane-background]
 cites:
   - elohim/elohim-storage/src/services/head_adoption.rs
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs

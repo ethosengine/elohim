@@ -18,7 +18,7 @@ relatedNodeIds:
 cites:
   - "doorway-federated-continuity-roadmap | Doorway-federated continuity | sha256:4c661dbbb6927763 | path: genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
-tags: [dataplane, blob-swarm, inventory, gossip, bounded-feature, codex-claimable, agent-agnostic]
+tags: [dataplane, blob-swarm, inventory, gossip, bounded-feature, codex-claimable, agent-agnostic, performance, perf-scale, perf-io, trustful-declared, friction-mechanical, custody-everyone, plane-custody, fused-planes, unit-item, phase-growth, lane-background]
 ---
 
 # Shard-level inventory gossip

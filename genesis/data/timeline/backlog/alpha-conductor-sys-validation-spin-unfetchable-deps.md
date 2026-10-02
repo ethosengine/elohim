@@ -16,7 +16,7 @@ relatedNodeIds:
   - "memory:project_full_arc_authority_disables_network_get"
   - "memory:project_ghost_declaration_deadlock_batch3"
   - "memory:feedback_mesh_is_the_proving_ground"
-tags: [conductor, holochain, sys-validation, cpu, spin-loop, full-arc, observability, loki, alpha]
+tags: [conductor, holochain, sys-validation, cpu, spin-loop, full-arc, observability, loki, alpha, performance, perf-cpu, trustful-declared, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-item, phase-steady, lane-borrowed]
 cites:
   - elohim/elohim-storage/src/conductor_admission.rs
   - genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml

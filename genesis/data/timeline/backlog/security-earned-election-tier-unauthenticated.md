@@ -19,7 +19,7 @@ cites:
   - genesis/data/timeline/backlog/security-declare-carries-record-carried-evidence-bounds.md
   - genesis/data/timeline/backlog/security-storage-direct-caller-unauthenticated.md
   - genesis/data/timeline/backlog/lamad-teacher-authoring-backlog.md
-tags: [security, election, earned-head, reach, coordinator, integrity]
+tags: [security, election, earned-head, reach, coordinator, integrity, trustless, friction-verify]
 ---
 
 # The earned tier is not authenticated

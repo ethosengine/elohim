@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure, unmeasured-sweep, measured-term, peer-set-variance]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure, unmeasured-sweep, measured-term, peer-set-variance, performance, perf-convergence, perf-queue, trustful-declared, friction-wait, friction-mechanical, custody-everyone, plane-notary, fused-planes, unit-call, phase-transition, lane-background]
 cites:
   - "resiliency-saga-valueflow | the saga plan whose sprint-3 delivery found this ch06 runtime blocker | sha256:1ffcaefb3212d80b | path: genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md"
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs

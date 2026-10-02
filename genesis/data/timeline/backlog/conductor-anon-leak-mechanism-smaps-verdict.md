@@ -2,7 +2,7 @@
 title: Conductor anon leak is mmap-count accumulation (many discrete large mappings) — H1 falsified, H4 not-the-slope, H3 leading
 kind: backlog
 status: confirmed
-tags: [decision-record, runtime-memory, conductor, kitsune2, validation-receipt, self-heal, design-decision-toolkit]
+tags: [decision-record, runtime-memory, conductor, kitsune2, validation-receipt, self-heal, design-decision-toolkit, performance, perf-memory, trustful-self, friction-mechanical, unit-history, phase-growth]
 occurred_at: 2026-06-17
 ---
 

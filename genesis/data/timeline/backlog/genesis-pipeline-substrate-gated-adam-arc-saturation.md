@@ -13,6 +13,7 @@ needs: P0 receive-side idempotency IMPLEMENTED (awaiting edge deploy + drain-ver
 cites:
   - inventory-gossip-amplifier-three-layer-idempotency
   - genesis-scenario-code-leads-seeder-upsert-and-authz
+tags: [performance, perf-cpu, perf-queue, trustful-declared, friction-mechanical, plane-custody, fused-planes, unit-item, phase-steady, lane-borrowed]
 ---
 
 ## ⚠️ CORRECTION — the overnight conclusion in the first draft of this file was WRONG

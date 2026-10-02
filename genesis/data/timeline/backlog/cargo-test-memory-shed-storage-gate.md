@@ -13,7 +13,7 @@ jobs: [elohim-edge]
 cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "habit:dataplane-convergence"
-tags: [gate, cargo, ram-guard, orchestrator, build-manifest, velocity]
+tags: [gate, cargo, ram-guard, orchestrator, build-manifest, velocity, performance, perf-memory, friction-mechanical, unit-once, lane-operator]
 ---
 
 **Concern.** `just gate elohim-storage` — the gate the `dataplane-convergence` habit's checks

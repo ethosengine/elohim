@@ -17,7 +17,7 @@ domain: "code"
 relatedNodeIds:
   - "memory:project_storage_as_pod_operator_sets_virtual_limits"
   - "memory:project_ci_storage_topology"
-tags: [ssr, doorway, k8s, memory, oom, startupprobe, code-domain]
+tags: [ssr, doorway, k8s, memory, oom, startupprobe, code-domain, performance, perf-memory, friction-mechanical, unit-once, phase-transition, lane-operator]
 shift_objective: |
   The doorway SSR runtime embeds V8 (deno_core), whose cold-start wall-time and resident
   memory are far higher than a CSR-only doorway — but the SSR staging.yaml and prod.yaml

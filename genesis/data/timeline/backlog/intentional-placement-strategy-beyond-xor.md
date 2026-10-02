@@ -10,7 +10,7 @@ author: "claude (blob-custody Phase-3 brainstorm — operator-directed: XOR is M
 status: "open"
 priority: "medium"
 domain: D5
-tags: [blob, custody, placement, placement-strategy, diversity, household-resilience, affinity, rea-standing, governance, byte-mobility]
+tags: [blob, custody, placement, placement-strategy, diversity, household-resilience, affinity, rea-standing, governance, byte-mobility, custody-diverse]
 cites:
   - genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-02-blob-custody-reconciliation-design.md

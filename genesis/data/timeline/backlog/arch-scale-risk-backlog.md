@@ -19,7 +19,7 @@ relatedNodeIds:
 cites:
   - "holochain-evolution-epic | Holochain Evolution Epic | sha256:ac9f29f9ae06b776 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - genesis/data/timeline/backlog/dht-scale-envelope-and-web2-projection-at-planetary-scale.md
-tags: [risk, scale, architecture, head-plane, lineage, node-registry, elohim-storage, p2p-design-gate]
+tags: [risk, scale, architecture, head-plane, lineage, node-registry, elohim-storage, p2p-design-gate, performance, perf-scale, friction-mechanical, custody-everyone, plane-notary, unit-history, phase-growth]
 ---
 
 # Scale-risk cluster

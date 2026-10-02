@@ -15,7 +15,7 @@ severity: medium
 fingerprints: [da8bb3bdd7e1]
 nodes: [alpha, doorway-alpha, elohim-matthew-alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, ssr, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha]
+tags: [self-heal, render-degenerate, ssr, soft-budget, bundle-head-swap, cold-window, elohim-render, doorway, observability-gap, true-positive, recurrence, matthew, alpha, performance, perf-latency, trustful-self, friction-wait, plane-projection, fused-planes, unit-call, phase-transition, lane-interactive]
 cites:
   - https://doorway-alpha.elohim.host/admin/render-stats
   - https://doorway-alpha.elohim.host/admin/self-healing

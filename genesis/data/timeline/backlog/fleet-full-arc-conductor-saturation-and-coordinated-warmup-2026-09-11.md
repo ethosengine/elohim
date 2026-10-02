@@ -10,7 +10,7 @@ author: "shift 2026-09-11T09-00-land-batch-2c338124a (integrator) — operator q
 status: "open"
 priority: "high"
 needs_brainstorm: true
-tags: [conductor, kitsune2, backpressure, arc, gossip, publish, warm-up, edge-pipeline, D8, risk]
+tags: [conductor, kitsune2, backpressure, arc, gossip, publish, warm-up, edge-pipeline, D8, risk, performance, perf-cpu, perf-queue, trustful-declared, friction-mechanical, friction-wait, custody-everyone, plane-notary, fused-planes, unit-peer, phase-transition, lane-borrowed]
 relatedNodeIds: []
 cites:
   - elohim/elohim-storage/src/services/arc_actuator.rs

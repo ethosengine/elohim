@@ -9,7 +9,7 @@ written: "2026-06-11"
 author: "lamad island recompose (avodah authorship pass)"
 status: "backlog"
 priority: "medium"
-tags: [lamad, path-service, performance, n-plus-one, projection, mastery]
+tags: [lamad, path-service, performance, n-plus-one, projection, mastery, perf-scale, perf-latency, trustful-self, friction-mechanical, plane-reference, unit-item, phase-steady, lane-interactive]
 cites:
   - app/lamad/src/app/services/path.service.ts
   - app/lamad/src/app/interfaces/agent.interface.ts

@@ -17,7 +17,7 @@ domain: "operator"
 relatedNodeIds:
   - "memory:project_ci_storage_topology"
   - "memory:project_seed_whoever_is_ready"
-tags: [ci, edge, rollout, timeout, operator-domain]
+tags: [ci, edge, rollout, timeout, operator-domain, performance, perf-latency, friction-wait, friction-mechanical, unit-once, phase-transition, lane-operator]
 shift_objective: |
   The edge pipeline hits a 1-hour wall-timeout on cold-start statefulset rollout — observed
   ~43% flake (3 of 7 builds) on 2026-05-16. The three sequential statefulset rollouts plus

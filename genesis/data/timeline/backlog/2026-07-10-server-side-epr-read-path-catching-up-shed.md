@@ -7,7 +7,7 @@ status: IN-PROGRESS
 domain: D-dataplane
 source: genesis #1272 E2E evidence + doorway-client catching-up seeder fix (ec5f0f522) — the read-path twin
 severity: high
-tags: [projector, admission-control, backpressure, p2p-dataplane, catching-up]
+tags: [projector, admission-control, backpressure, p2p-dataplane, catching-up, performance, perf-queue, trustful-self, friction-wait, friction-mechanical, plane-projection, fused-planes, unit-call, phase-steady, lane-interactive]
 ---
 
 **Context.** genesis #1272 (UNSTABLE) fails in two families. The *write* family —

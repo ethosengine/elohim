@@ -19,6 +19,7 @@ requires_env: alpha-cluster-6peer  # final root needs live gossipsub mesh intros
 needs: brainstorm (publish-side suppression + gossip message-id) — receive-side idempotency LANDED
 cites:
   - genesis-pipeline-substrate-gated-adam-arc-saturation  # the storm this amplifies into
+tags: [performance, perf-queue, perf-cpu, perf-io, trustful-declared, friction-mechanical, friction-verify, custody-everyone, plane-custody, unit-peer, phase-steady, lane-borrowed]
 ---
 
 ## What this is

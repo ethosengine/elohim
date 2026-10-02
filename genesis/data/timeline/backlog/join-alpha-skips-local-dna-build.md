@@ -4,6 +4,7 @@ created: 2026-06-10
 domain: process-meta (build-and-test; dev stack)
 source: arc plan Task 2.2 in-flight simplification sweep (2026-06-10)
 severity: low
+tags: [performance, perf-latency, friction-mechanical, unit-once, lane-operator]
 ---
 
 `hc-start.sh` Step 1 builds all 5 WASM DNAs when `HAPP_PATH` is missing even

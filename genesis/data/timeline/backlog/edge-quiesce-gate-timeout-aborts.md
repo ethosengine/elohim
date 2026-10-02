@@ -13,7 +13,7 @@ jobs: [elohim-edge, elohim-holochain]
 cluster: "arch-dataplane-refactor-backlog"
 relatedNodeIds:
   - "backlog-upgrade-propagation-p2p-design-arc"
-tags: [ci, quiesce, cycle-time]
+tags: [ci, quiesce, cycle-time, performance, perf-latency, perf-convergence, friction-wait, unit-once, phase-transition, lane-operator]
 ---
 
 Observed 2026-09-01: edge #1406/#1407/#1408 all completed their DEPLOY

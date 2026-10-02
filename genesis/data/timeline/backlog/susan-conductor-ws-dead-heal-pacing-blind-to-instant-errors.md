@@ -9,7 +9,7 @@ written: "2026-07-31"
 author: "claude (Prometheus + Loki + code RCA)"
 status: "open"
 priority: "high"
-tags: [self-heal, projection-reconcile, heal-outcomes, websocket, conductor, shem, susan, heal-circuit, pacing, dataplane, lesson]
+tags: [self-heal, projection-reconcile, heal-outcomes, websocket, conductor, shem, susan, heal-circuit, pacing, dataplane, lesson, performance, perf-queue, trustful-self, friction-mechanical, friction-blind, plane-projection, unit-call, phase-steady, lane-background]
 cites:
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md

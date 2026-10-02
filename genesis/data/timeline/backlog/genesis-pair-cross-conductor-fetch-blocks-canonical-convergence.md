@@ -19,7 +19,7 @@ cites:
   - genesis/data/timeline/backlog/view-federation-request-flakiness-mesh-wide.md
   - peer-discovery-fractal-federation | Peer Discovery as Fractal Federation | sha256:42ae0e67f9e9d4bc | path: genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md
   - genesis/a2o/features/dataplane/notary-authority.feature
-tags: [substrate, kitsune2, tx5, dht-fetch, genesis-pair, notary-authority, f-t19, signal-bus, canonical-head, rea-commitments, recurrence]
+tags: [substrate, kitsune2, tx5, dht-fetch, genesis-pair, notary-authority, f-t19, signal-bus, canonical-head, rea-commitments, recurrence, performance, perf-latency, trustful-declared, friction-wait, plane-notary, fused-planes, unit-once, phase-transition, lane-operator]
 ---
 
 # Genesis-pair cross-conductor DHT fetch regression

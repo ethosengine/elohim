@@ -11,7 +11,7 @@ status: "open"
 priority: "critical"
 ceiling: "operator"
 relatedNodeIds: []
-tags: [escalation, alpha, conductor, crash-loop, sqlite-read-pool, out-of-threads, process-manager, readiness-window, doorway, headless-dns, projection-reconcile, canonical-head, dna-hash-moved, integrity-wasm, mixed-version, north-star]
+tags: [escalation, alpha, conductor, crash-loop, sqlite-read-pool, out-of-threads, process-manager, readiness-window, doorway, headless-dns, projection-reconcile, canonical-head, dna-hash-moved, integrity-wasm, mixed-version, north-star, performance, perf-io, perf-queue, trustful-self, friction-mechanical, plane-notary, fused-planes, phase-transition, lane-interactive]
 cites:
   - elohim/elohim-storage/src/conductor/process_manager.rs
   - elohim/elohim-storage/src/happ_manager.rs

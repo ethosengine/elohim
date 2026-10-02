@@ -9,7 +9,7 @@ written: "2026-08-10"
 author: "batch-3 ghost-declaration diagnosis session"
 status: "backlog"
 priority: "high"
-tags: [dataplane, projector, pull-loop, catching-up-shed, adam, doorway-b, self-heal-exhaustion, saga]
+tags: [dataplane, projector, pull-loop, catching-up-shed, adam, doorway-b, self-heal-exhaustion, saga, performance, perf-convergence, trustful-self, friction-wait, friction-mechanical, plane-projection, fused-planes, phase-transition, lane-interactive]
 cites:
   - genesis/data/timeline/backlog/2026-07-10-server-side-epr-read-path-catching-up-shed.md
   - genesis/data/timeline/backlog/adopt-before-author-evidence-starvation.md

@@ -9,7 +9,7 @@ written: "2026-08-18"
 author: "integrator-session"
 status: "backlog"
 priority: "medium"
-tags: [fleet-quiesce, probes, unmeasured-vs-zero, gospel-drift, dataplane, gate-semantics]
+tags: [fleet-quiesce, probes, unmeasured-vs-zero, gospel-drift, dataplane, gate-semantics, performance, perf-telemetry, perf-convergence, friction-blind, lane-operator]
 relatedNodeIds:
   - "backlog-fleet-quiesce-pass-not-convergence"
   - "backlog-resilience-unmeasured-vs-zero-honest-denominators"

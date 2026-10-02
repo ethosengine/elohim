@@ -9,7 +9,7 @@ written: "2026-09-18"
 author: "doorway-overnight-20260914 shift (doorway-failover pickup)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, head-adoption, trust-gradient, sync, elohim-storage, holochain]
+tags: [dataplane, head-adoption, trust-gradient, sync, elohim-storage, holochain, performance, perf-convergence, friction-verify, friction-wait, plane-authority, fused-planes, unit-item, phase-steady, lane-background]
 cites:
   - elohim/elohim-storage/src/services/head_adoption_trigger.rs
   - elohim/elohim-storage/src/chain_write_gate.rs

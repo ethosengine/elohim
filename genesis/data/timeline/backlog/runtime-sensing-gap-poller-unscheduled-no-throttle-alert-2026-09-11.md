@@ -9,7 +9,7 @@ written: "2026-09-11"
 author: "shift 2026-09-11T09-00-land-batch-2c338124a (integrator)"
 status: "open"
 priority: "high"
-tags: [runtime-harvest, findings-sentinel, alerting, prometheus, conductor, sensing, D8]
+tags: [runtime-harvest, findings-sentinel, alerting, prometheus, conductor, sensing, D8, performance, perf-telemetry, perf-cpu, friction-blind, phase-steady, lane-operator]
 relatedNodeIds: []
 cites:
   - .claude/scripts/runtime-harvest.py

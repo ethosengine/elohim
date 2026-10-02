@@ -9,7 +9,7 @@ written: "2026-06-18"
 status: "open"
 priority: "high"
 ci_status: blocked
-tags: [genesis, seed-database, conductor-leak, ci-timeout, stampProvenance, circuit-open, leak-aware-preflight]
+tags: [genesis, seed-database, conductor-leak, ci-timeout, stampProvenance, circuit-open, leak-aware-preflight, performance, perf-latency, perf-queue, trustful-self, friction-mechanical, friction-wait, plane-notary, unit-call, phase-transition, lane-operator]
 cites:
   - genesis/scripts/ci/verify-doorway-readiness.sh
   - genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md

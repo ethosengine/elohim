@@ -9,7 +9,7 @@ written: "2026-09-26"
 author: "agent:orchestrator@claude-opus-5-5 (operator-directed, human:matthew)"
 status: "backlog"
 priority: "high"
-tags: [governance, consent, qahal, stewardship, permissions, capture, ergonomics]
+tags: [governance, consent, qahal, stewardship, permissions, capture, ergonomics, trustful-declared, friction-verify]
 relatedNodeIds: [feedback_consent_fatigue_route_by_stakes, feedback-decide-clear-calls-not-over-ask, feedback_legacy_consumers_governed_gifts, feedback_human_loop_not_terminal_authority]
 cites:
   - bridges/CLAUDE.md

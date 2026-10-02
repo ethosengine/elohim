@@ -9,7 +9,7 @@ written: "2026-07-30"
 author: "angular22-campaign"
 status: "backlog"
 priority: "low"
-tags: [elohim-render, ssr, hydration, angular, low-power-devices, performance]
+tags: [elohim-render, ssr, hydration, angular, low-power-devices, performance, perf-latency, perf-cpu, friction-mechanical, plane-projection, fused-planes, unit-call, phase-steady, lane-interactive]
 cites:
   - app/elohim-app/src/app/app.config.server.ts
   - app/lamad/src/app/app.config.server.ts

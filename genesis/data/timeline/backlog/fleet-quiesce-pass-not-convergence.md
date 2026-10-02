@@ -9,7 +9,7 @@ written: "2026-08-09"
 author: "integrator-session"
 status: "backlog"
 priority: "high"
-tags: [edge-pipeline, fleet-quiesce, probes, dataplane-validation, gate-semantics]
+tags: [edge-pipeline, fleet-quiesce, probes, dataplane-validation, gate-semantics, performance, perf-telemetry, perf-convergence, friction-blind, friction-wait, phase-transition, lane-operator]
 
 relatedNodeIds:
   - "backlog-edge-deploy-ready-gate-liveness-only"

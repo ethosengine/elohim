@@ -9,7 +9,7 @@ written: "2026-09-17"
 author: "doorway-overnight-20260914 shift, from the publish-storm RCA (genesis/a2o/reports/recovery/doorway-pickup-20260917/)"
 status: "backlog"
 priority: "high"
-tags: [risk, incident, conductor, holochain, upstream, sqlite, publish-queue, livelock, fleet-risk, 0.7.0]
+tags: [risk, incident, conductor, holochain, upstream, sqlite, publish-queue, livelock, fleet-risk, 0.7.0, performance, perf-queue, perf-cpu, trustful-self, friction-mechanical, plane-notary, unit-item, phase-steady, lane-borrowed]
 cites:
   - genesis/a2o/reports/recovery/doorway-pickup-20260917/publish-storm-rca.md
   - genesis/a2o/reports/recovery/doorway-pickup-20260917/cell-debug-notes.md

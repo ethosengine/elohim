@@ -18,7 +18,7 @@ relatedNodeIds:
   - "memory:project_ci_storage_topology"
   - "memory:project_household_horizontal_scaling"
   - "memory:feedback_multi_agent_pvc_pacing"
-tags: [recovery, cluster, pressure, nodeaffinity, operator-domain]
+tags: [recovery, cluster, pressure, nodeaffinity, operator-domain, performance, perf-cpu, perf-memory, friction-mechanical, phase-steady, lane-operator]
 shift_objective: |
   The alpha cluster runs hot: the intel-nuc node reported ~135% CPU and the jessica edgenode
   is OOM-flapping, which trips evictions and rollout instability elsewhere (observed

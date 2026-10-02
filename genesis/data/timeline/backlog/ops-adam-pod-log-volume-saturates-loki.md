@@ -9,7 +9,7 @@ written: "2026-06-11"
 author: "agentic-developer (EPR durability arc, Phase 0)"
 status: "backlog"
 priority: "high"
-tags: [ops, observability, loki, elohim-alpha, adam, log-volume]
+tags: [ops, observability, loki, elohim-alpha, adam, log-volume, performance, perf-io, perf-telemetry, friction-mechanical, friction-blind, phase-steady, lane-operator]
 cites:
   - genesis/manifests/humans/
 ---

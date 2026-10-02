@@ -10,7 +10,7 @@ author: "claude (saga-final-chapters shift)"
 status: "open"
 priority: "high"
 jobs: [elohim-edge]
-tags: [dataplane, projector, alpha, doorway, reconcile, shem, hairpin, resiliency-saga]
+tags: [dataplane, projector, alpha, doorway, reconcile, shem, hairpin, resiliency-saga, performance, perf-convergence, trustful-self, friction-wait, plane-projection, unit-item, phase-steady, lane-interactive]
 cites:
   - genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature
   - genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md

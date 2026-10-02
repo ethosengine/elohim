@@ -12,7 +12,7 @@ priority: "medium"
 relatedNodeIds:
   - "elohim/eprfs/epr-cli/src/flow/walk.rs"
   - ".eprfs/status/flows.jsonl"
-tags: [eprfs, epr-rea, performance, dx]
+tags: [eprfs, epr-rea, performance, dx, perf-latency, perf-scale, friction-mechanical, unit-history, phase-steady, lane-operator]
 ---
 
 Measured directly (T6, 2026-07-25): `cargo run --manifest-path elohim/eprfs/Cargo.toml -q -p

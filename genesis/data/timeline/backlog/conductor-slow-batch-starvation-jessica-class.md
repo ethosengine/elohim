@@ -10,7 +10,7 @@ author: "claude (shift 2026-08-15T00-54-verify-spin-discharge-live, iteration 4b
 status: "open"
 ci_status: "open"
 priority: "medium"
-tags: [dataplane, conductor, circuit-breaker, heal-pacing, starvation, saga-06-heads-converge, jessica]
+tags: [dataplane, conductor, circuit-breaker, heal-pacing, starvation, saga-06-heads-converge, jessica, performance, perf-queue, perf-convergence, trustful-self, friction-mechanical, friction-wait, plane-projection, fused-planes, unit-item, phase-steady, lane-background]
 cites:
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - genesis/data/timeline/backlog/susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors.md
