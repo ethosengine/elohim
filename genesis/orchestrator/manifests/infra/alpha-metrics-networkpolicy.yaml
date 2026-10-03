@@ -28,7 +28,7 @@
 #    2026-06-17), the apply-path for infra/*.yaml is the separate gap to close.
 #
 # Scope rationale: observability is trusted shared infra (same reasoning as the
-#   jenkins carve-out already in default-deny-cross-env), scoped to exactly the two
+#   jenkins carve-out already in default-deny-cross-env), scoped to exactly the three
 #   /metrics ports — not a blanket open.
 #
 # Lineage:
@@ -59,3 +59,5 @@ spec:
           port: 8090 # elohim-storage storage-http /metrics (edgenode PodMonitor)
         - protocol: TCP
           port: 8080 # doorway gateway-ws /metrics (doorway PodMonitor)
+        - protocol: TCP
+          port: 9464 # conductor hc-metrics /metrics (edgenode PodMonitor; fork pin with the Prometheus exporter)
