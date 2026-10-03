@@ -119,10 +119,12 @@ pub async fn call_seal_close(
 ) -> Result<SealReceipt, String> {
     let payload =
         rmp_serde::to_vec_named(v1_cell).map_err(|e| format!("encode seal_close v1_cell: {e}"))?;
-    let bytes = client
-        .call_zome(SEAL_ZOME, SEAL_FN, payload)
-        .await
-        .map_err(|e| e.to_string())?;
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::ReleaseAdoption,
+        client.call_zome(SEAL_ZOME, SEAL_FN, payload),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     rmp_serde::from_slice(&bytes).map_err(|e| format!("decode SealReceipt: {e}"))
 }
 

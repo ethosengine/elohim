@@ -467,7 +467,12 @@ async fn author_or_recover_evidence(
         content_size_bytes: None,
         content_hash: None,
     };
-    match crate::services::conductor_writes::call_create_content(hc, &input).await {
+    match crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::HttpAuthor,
+        crate::services::conductor_writes::call_create_content(hc, &input),
+    )
+    .await
+    {
         Ok(bytes) => {
             let out: lamad_types::ContentOutput = rmp_serde::from_slice(&bytes)
                 .map_err(|e| StorageError::Serialization(format!("decode ContentOutput: {e}")))?;
@@ -492,7 +497,12 @@ async fn resolve_evidence_action(
     let content_id = pinned.evidence_content_id();
     let payload = rmp_serde::to_vec_named(&serde_json::json!({ "id": content_id }))
         .map_err(|e| StorageError::Serialization(e.to_string()))?;
-    let bytes = match hc.call_zome(ZOME, "get_content_by_id", payload).await {
+    let bytes = match crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::HttpAuthor,
+        hc.call_zome(ZOME, "get_content_by_id", payload),
+    )
+    .await
+    {
         Ok(b) => b,
         Err(_) => return Ok(None),
     };
@@ -548,9 +558,11 @@ async fn file_feedback(
         "standing_impact": pinned.standing_impact,
     }))
     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-    let bytes = hc
-        .call_zome(ZOME, "create_feedback_signal", payload)
-        .await?;
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::HttpAuthor,
+        hc.call_zome(ZOME, "create_feedback_signal", payload),
+    )
+    .await?;
     let action_hash: holochain_types::prelude::ActionHash = rmp_serde::from_slice(&bytes)
         .map_err(|e| StorageError::Serialization(format!("decode ActionHash: {e}")))?;
     Ok(action_hash.to_string())

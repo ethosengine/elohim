@@ -81,10 +81,11 @@ impl QahalService {
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Internal(format!("encode CreateCollectiveInput: {e}")))?;
 
-        let result = self
-            .hc
-            .call_zome(self.zome, "create_collective", payload)
-            .await?;
+        let result = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            self.hc.call_zome(self.zome, "create_collective", payload),
+        )
+        .await?;
 
         let action_bytes: Vec<u8> = rmp_serde::from_slice(&result).map_err(|e| {
             StorageError::Internal(format!("decode ActionHash from create_collective: {e}"))
@@ -142,10 +143,12 @@ impl QahalService {
             StorageError::Internal(format!("encode CreateCollabAgreementInput: {e}"))
         })?;
 
-        let result = self
-            .hc
-            .call_zome(self.zome, "create_collab_agreement", payload)
-            .await?;
+        let result = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            self.hc
+                .call_zome(self.zome, "create_collab_agreement", payload),
+        )
+        .await?;
 
         let action_bytes: Vec<u8> = rmp_serde::from_slice(&result).map_err(|e| {
             StorageError::Internal(format!(
@@ -199,9 +202,12 @@ impl QahalService {
         })?;
 
         // Returns () — we ignore the response bytes
-        self.hc
-            .call_zome(self.zome, "attest_collab_agreement", payload)
-            .await?;
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            self.hc
+                .call_zome(self.zome, "attest_collab_agreement", payload),
+        )
+        .await?;
 
         // Refresh from DHT now that attestation has been recorded
         self.fetch_agreement_by_action_bytes(&agreement_action_bytes_from_cid(
@@ -234,9 +240,12 @@ impl QahalService {
             .map_err(|e| StorageError::Internal(format!("encode WithdrawMembershipInput: {e}")))?;
 
         // Returns () — coordinator mutates the Membership entry
-        self.hc
-            .call_zome(self.zome, "withdraw_membership_clean", payload)
-            .await?;
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            self.hc
+                .call_zome(self.zome, "withdraw_membership_clean", payload),
+        )
+        .await?;
 
         // Fetch the updated Membership record
         self.fetch_membership_by_action(membership_action_bytes)

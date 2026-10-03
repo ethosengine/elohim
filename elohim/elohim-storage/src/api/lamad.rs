@@ -157,13 +157,15 @@ async fn handle_emit_event(
         let zome_input = ZomeLamadEventIntentInput::from(&intent);
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Conductor(format!("encode intent: {e}")))?;
-        match hc
-            .call_zome(
+        match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            hc.call_zome(
                 "content_store",
                 "create_rea_economic_event_from_intent",
                 payload,
-            )
-            .await
+            ),
+        )
+        .await
         {
             Ok(resp_bytes) => {
                 // Decode the ReaEconomicEventOutput from the zome.

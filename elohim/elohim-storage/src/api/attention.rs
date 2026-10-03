@@ -231,9 +231,11 @@ async fn handle_post_tending(
         let payload = rmp_serde::to_vec_named(&zome_input)
             .map_err(|e| StorageError::Conductor(format!("encode attention tending: {e}")))?;
 
-        match hc
-            .call_zome("content_store", "create_attention_tending", payload)
-            .await
+        match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            hc.call_zome("content_store", "create_attention_tending", payload),
+        )
+        .await
         {
             Ok(resp_bytes) => {
                 // The coordinator returns an ActionHash (serialized as bytes).

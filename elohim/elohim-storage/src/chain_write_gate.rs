@@ -99,11 +99,52 @@
 //!   constructs today (it survives as a `&mut` parameter in `blob_store.rs`).
 //!   Its three infrastructure writes would bypass this gate if it were ever
 //!   wired up; route it through [`dispatch`] on that day.
+//! * **`import_handler::ImportHandler`** — LIVE (started from `main` unless
+//!   `--no-import`). It answers an `ImportBatchQueued` signal by sending
+//!   `process_import_chunk` over its OWN app websocket, hand-encoded, so those
+//!   chain writes take neither this cell's lock nor the plane guard. (The HTTP
+//!   import path, `import_api`, does go through [`dispatch`].)
+//! * **Two credential mints outside the lock.** `signing::ConductorSigningClient`
+//!   and `reconcile::holochain_app_signal::HolochainAppSignalStream` each call
+//!   `authorize_signing_credentials` through the closed-chain fence but not
+//!   through [`grant_capability_serialized`]. The fence reuses persisted
+//!   credentials, so a mint is rare — but when one happens it is a `CapGrant`
+//!   committed with no lock held and no plane declared.
 //! * **Cross-process races.** Two storage processes on one cell (which the
 //!   protocol does not do) still race, and land in the bounded retry exactly as
 //!   an external writer does.
 //!
 //! Not a timeout: nothing dispatched is ever abandoned here.
+//!
+//! ## The plane rule — who is speaking, and why now
+//!
+//! Storage signs as the steward's own agent, so every chain write from this
+//! crate is a permanent statement in the PERSON's voice. The lock above answers
+//! "one at a time"; it never asked "who is speaking, and why now?", and the
+//! answer cost the fleet about 50 hours of conductor call time a day
+//! (`record_peer_status`, a machine write on a 60 s timer) and an idle
+//! three-peer mesh 72 actions an hour on each lamad chain.
+//!
+//! So every write that reaches [`dispatch`] declares a [`Voice`] and a
+//! [`Trigger`], derived in ONE place from the writer's identity
+//! ([`WriterKind::plane`]). Before the call is queued, let alone offered:
+//!
+//! * `Machine` + `Timer` is refused with [`StorageError::PlaneViolation`];
+//! * an undeclared writer ([`WriterKind::Other`]) is refused in debug and test
+//!   builds — a new write site cannot ship unnamed — and counted and logged
+//!   once per `(zome, fn)` in release, where a label must never take a running
+//!   node down;
+//! * a machine-timer writer that predates the rule is carried as DECLARED DEBT
+//!   in [`PLANE_DEBT`], counted on every write, each entry naming the spec
+//!   section that retires it.
+//!
+//! The gate takes a writer's declaration on trust. A `Transition` writer that
+//! re-authors unchanged state on every sweep is a timer wearing a transition's
+//! name, and nothing here can see that — the per-plane counter
+//! (`elohim_chain_writes_by_plane_total`) read on an idle node is what does.
+//!
+//! Ruling: `genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md`
+//! §1 (the rule), §12 row 1 (this guard).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -126,40 +167,84 @@ use crate::error::StorageError;
 // =============================================================================
 
 /// The CLOSED vocabulary of in-process chain writers, used as the single metric
-/// label on this module's series.
+/// label on this module's series and as the ONE identity a write's voice and
+/// trigger are derived from ([`WriterKind::plane`]).
 ///
 /// Closed on purpose: a metric label that can take a content id (or any
 /// unbounded value) is a cardinality bomb in a Prometheus scrape. A writer with
-/// no entry here reports as [`WriterKind::Other`] — which is a legible answer,
-/// not a gap.
+/// no entry here reports as [`WriterKind::Other`] — which is a GAP, not an
+/// answer: `Other` declares neither voice nor trigger, so the plane guard
+/// refuses its chain writes outside release builds.
+///
+/// Adding a variant: name it here, add it to [`WriterKind::ALL`], give it a
+/// label, and declare its plane in [`WriterKind::plane`]. If that plane is
+/// machine + timer the write is refused unless it is added to [`PLANE_DEBT`],
+/// which a test pins — so new debt is a reviewed act, never a side effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WriterKind {
     /// The reconcile sweep's adopt-before-author declare leg.
     SweepAdopt,
+    /// The reconcile sweep re-publishing a row whose anchor its own conductor
+    /// cannot resolve (the ghost-witness heal), and the declare that completes
+    /// its author-then-adopt.
+    SweepReauthor,
     /// The sync-triggered head-adoption worker
     /// ([`crate::services::head_adoption_trigger`]).
     TriggerAdopt,
     /// [`crate::services::reanchor_backfill`] re-authoring a dead/NULL anchor.
     Reanchor,
-    /// Provide-reconcile's commons author.
+    /// Provide-reconcile's commons author and its stranded-row revoke.
     Provide,
     /// The REA ledger / ordered-signal author path.
     ReaSignal,
     /// An operator-driven HTTP write (PATCH /db/content → declare, and friends).
     HttpAuthor,
+    /// An operator-submitted bulk import: the batch entry and its chunks.
+    Import,
+    /// The node-local compute facing acting under a verified performer's
+    /// capability: a delegated grant, its consent and its activation.
+    ComputeDelegate,
+    /// The lifecycle heartbeat (`infrastructure::record_peer_status`), every
+    /// 60 s whether or not anything changed. Machine + timer: [`PLANE_DEBT`].
+    Heartbeat,
+    /// A release's soak attestation, authored once when its soak window closes.
+    ReleaseSoak,
+    /// Release adoption's own chain work: carrying, re-adopting and sealing
+    /// across a DNA cutover, and the read that heals a missing id link.
+    ReleaseAdoption,
+    /// A `custody-blob` placement intent authored when this node selects itself
+    /// as a holder (salvage, and the custody-spool expansion).
+    CustodyIntent,
+    /// The background shard-assignment registration with the node registry.
+    ShardRegistration,
+    /// Minting this node's agent↔transport binding.
+    BindingMint,
+    /// The signing-credential `CapGrant`, committed over the admin socket when
+    /// a cell connects without persisted credentials.
+    CapGrant,
     /// Anything that did not name itself.
     Other,
 }
 
 impl WriterKind {
     /// Every variant, for metric pre-touch.
-    pub const ALL: [WriterKind; 7] = [
+    pub const ALL: [WriterKind; 17] = [
         WriterKind::SweepAdopt,
+        WriterKind::SweepReauthor,
         WriterKind::TriggerAdopt,
         WriterKind::Reanchor,
         WriterKind::Provide,
         WriterKind::ReaSignal,
         WriterKind::HttpAuthor,
+        WriterKind::Import,
+        WriterKind::ComputeDelegate,
+        WriterKind::Heartbeat,
+        WriterKind::ReleaseSoak,
+        WriterKind::ReleaseAdoption,
+        WriterKind::CustodyIntent,
+        WriterKind::ShardRegistration,
+        WriterKind::BindingMint,
+        WriterKind::CapGrant,
         WriterKind::Other,
     ];
 
@@ -168,13 +253,357 @@ impl WriterKind {
     pub fn label(self) -> &'static str {
         match self {
             WriterKind::SweepAdopt => "sweep_adopt",
+            WriterKind::SweepReauthor => "sweep_reauthor",
             WriterKind::TriggerAdopt => "trigger_adopt",
             WriterKind::Reanchor => "reanchor",
             WriterKind::Provide => "provide",
             WriterKind::ReaSignal => "rea_signal",
             WriterKind::HttpAuthor => "http_author",
+            WriterKind::Import => "import",
+            WriterKind::ComputeDelegate => "compute_delegate",
+            WriterKind::Heartbeat => "heartbeat",
+            WriterKind::ReleaseSoak => "release_soak",
+            WriterKind::ReleaseAdoption => "release_adoption",
+            WriterKind::CustodyIntent => "custody_intent",
+            WriterKind::ShardRegistration => "shard_registration",
+            WriterKind::BindingMint => "binding_mint",
+            WriterKind::CapGrant => "cap_grant",
             WriterKind::Other => "other",
         }
+    }
+
+    /// THE one place a writer's voice and trigger are derived.
+    ///
+    /// `None` is the undeclared writer. Every other answer is a claim the
+    /// writer makes about itself; see the module doc for what the gate can and
+    /// cannot check about it.
+    pub const fn plane(self) -> Option<Plane> {
+        use Trigger::{Act, PeriodClose, Timer, Transition};
+        use Voice::{Delegate, Machine, Person};
+        let (voice, trigger) = match self {
+            // A person did something, at an HTTP door they were authenticated at.
+            WriterKind::HttpAuthor | WriterKind::Import => (Person, Act),
+            // A performer acting under a capability the person scoped.
+            WriterKind::ComputeDelegate => (Delegate, Act),
+            // The node, because something it tracks changed state: a head
+            // diverged or was elected, an anchor was found dead, a pin gained or
+            // lost its offer, a commitment moved, a holder was selected, a
+            // shard was placed, a binding or a credential was found missing.
+            WriterKind::SweepAdopt
+            | WriterKind::SweepReauthor
+            | WriterKind::TriggerAdopt
+            | WriterKind::Reanchor
+            | WriterKind::Provide
+            | WriterKind::ReaSignal
+            | WriterKind::ReleaseAdoption
+            | WriterKind::CustodyIntent
+            | WriterKind::ShardRegistration
+            | WriterKind::BindingMint
+            | WriterKind::CapGrant => (Machine, Transition),
+            // The node, because a declared period ended.
+            WriterKind::ReleaseSoak => (Machine, PeriodClose),
+            // The node, because a clock fired and nothing changed.
+            WriterKind::Heartbeat => (Machine, Timer),
+            WriterKind::Other => return None,
+        };
+        Some(Plane { voice, trigger })
+    }
+}
+
+// =============================================================================
+// The plane rule
+// =============================================================================
+
+/// Whose statement a chain write is. Closed vocabulary — see [`WriterKind`] for
+/// why every label on this module's series is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Voice {
+    /// A human act: the steward or an operator did this, deliberately.
+    Person,
+    /// Acting under a person's scoped grant.
+    Delegate,
+    /// The node observing, repairing, obeying or nominating on its own account.
+    Machine,
+}
+
+impl Voice {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Voice::Person => "person",
+            Voice::Delegate => "delegate",
+            Voice::Machine => "machine",
+        }
+    }
+}
+
+/// Why a chain write is happening NOW. Closed vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trigger {
+    /// Someone did something.
+    Act,
+    /// A state changed.
+    Transition,
+    /// A declared period ended.
+    PeriodClose,
+    /// A clock fired and nothing changed.
+    Timer,
+}
+
+impl Trigger {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Trigger::Act => "act",
+            Trigger::Transition => "transition",
+            Trigger::PeriodClose => "period_close",
+            Trigger::Timer => "timer",
+        }
+    }
+}
+
+/// A chain write's declaration: who is speaking, and why now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Plane {
+    pub voice: Voice,
+    pub trigger: Trigger,
+}
+
+impl Plane {
+    /// The anti-pattern the guard exists for: a machine writing on a timer.
+    pub const fn is_machine_timer(self) -> bool {
+        matches!((self.voice, self.trigger), (Voice::Machine, Trigger::Timer))
+    }
+}
+
+/// Label used for the voice and the trigger of a writer that declared neither.
+pub const UNDECLARED: &str = "undeclared";
+
+/// One machine-timer writer the gate tolerates, and what retires it.
+#[derive(Debug, Clone, Copy)]
+pub struct PlaneDebt {
+    pub writer: WriterKind,
+    /// The spec section whose landing removes this entry.
+    pub retired_by: &'static str,
+}
+
+/// DECLARED DEBT: machine-timer writers that predate the plane rule.
+///
+/// Each is let through and counted on every write
+/// (`elohim_chain_write_plane_violation_tolerated_total{writer}`), so the debt
+/// is a number on a scrape rather than a sentence in a document. An entry
+/// leaves when the ruling it names lands; `the_plane_debt_allowlist_is_pinned`
+/// fails if one is added without that test being edited.
+pub const PLANE_DEBT: &[PlaneDebt] = &[
+    // `infrastructure::record_peer_status`, every 60 s (`heartbeat.rs`). It IS
+    // the anti-pattern, and it cannot be refused yet: shard placement
+    // (`services/peer_selection.rs`), the resilience card
+    // (`services/household_resilience.rs`, `api/resilience.rs`) and network
+    // posture (`api/network_posture.rs`) all read its timestamp as liveness
+    // through `services/peer_status_fanout.rs`. Plane-separation §5.5 rules the
+    // order: arm substrate liveness on iroh, move those three readers, and only
+    // then change the writer — refusing it first puts every healthy peer out of
+    // placement after 900 s. §11 retires the timer as a liveness carrier.
+    PlaneDebt {
+        writer: WriterKind::Heartbeat,
+        retired_by: "plane-separation §5.5 (the heartbeat splits: posture on change, liveness \
+                     on substrate presence, consumers moved first); retired per §11",
+    },
+];
+
+/// What the gate does with a chain write from a writer that never named itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndeclaredPosture {
+    /// Debug and test builds: refuse, so a new write site cannot ship unnamed.
+    Refuse,
+    /// Release builds: count and log, and let the write through — a missing
+    /// label must never break a running node.
+    Count,
+}
+
+impl UndeclaredPosture {
+    /// The posture a build defaults to: [`Self::Refuse`] with debug assertions,
+    /// [`Self::Count`] without.
+    pub const fn for_build() -> Self {
+        if cfg!(debug_assertions) {
+            UndeclaredPosture::Refuse
+        } else {
+            UndeclaredPosture::Count
+        }
+    }
+
+    /// `ELOHIM_PLANE_UNDECLARED_WRITER=refuse|count`, else the build default.
+    /// Anything else is ignored rather than guessed at.
+    fn from_override(value: Option<&str>) -> Self {
+        match value.map(str::trim) {
+            Some("refuse") => UndeclaredPosture::Refuse,
+            Some("count") => UndeclaredPosture::Count,
+            _ => Self::for_build(),
+        }
+    }
+}
+
+/// The rule as data, so the decision can be exercised without building release.
+#[derive(Debug, Clone, Copy)]
+pub struct PlanePolicy {
+    pub debt: &'static [PlaneDebt],
+    pub undeclared: UndeclaredPosture,
+}
+
+impl PlanePolicy {
+    /// The policy this process runs: [`PLANE_DEBT`], and the undeclared posture
+    /// resolved ONCE (an operator override must not be re-read per write, and a
+    /// test must not be able to flip it under a running one).
+    pub fn current() -> Self {
+        static UNDECLARED_POSTURE: OnceLock<UndeclaredPosture> = OnceLock::new();
+        let undeclared = *UNDECLARED_POSTURE.get_or_init(|| {
+            UndeclaredPosture::from_override(
+                std::env::var("ELOHIM_PLANE_UNDECLARED_WRITER")
+                    .ok()
+                    .as_deref(),
+            )
+        });
+        PlanePolicy {
+            debt: PLANE_DEBT,
+            undeclared,
+        }
+    }
+}
+
+/// The gate's answer for one chain write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlaneVerdict {
+    /// Declared, and not a machine on a timer.
+    Pass(Plane),
+    /// A machine on a timer that [`PLANE_DEBT`] names: let through, counted.
+    ToleratedDebt(Plane),
+    /// A machine on a timer nobody declared as debt: refused.
+    RefusedMachineTimer(Plane),
+    /// Undeclared, release posture: let through, counted, logged once.
+    UndeclaredCounted,
+    /// Undeclared, debug/test posture: refused.
+    UndeclaredRefused,
+}
+
+impl PlaneVerdict {
+    /// Is this write kept from the conductor?
+    pub const fn is_refused(self) -> bool {
+        matches!(
+            self,
+            PlaneVerdict::RefusedMachineTimer(_) | PlaneVerdict::UndeclaredRefused
+        )
+    }
+}
+
+/// THE decision. Pure: no metric, no log, no environment.
+pub fn plane_verdict(writer: WriterKind, policy: &PlanePolicy) -> PlaneVerdict {
+    let Some(plane) = writer.plane() else {
+        return match policy.undeclared {
+            UndeclaredPosture::Refuse => PlaneVerdict::UndeclaredRefused,
+            UndeclaredPosture::Count => PlaneVerdict::UndeclaredCounted,
+        };
+    };
+    if !plane.is_machine_timer() {
+        return PlaneVerdict::Pass(plane);
+    }
+    if policy.debt.iter().any(|debt| debt.writer == writer) {
+        PlaneVerdict::ToleratedDebt(plane)
+    } else {
+        PlaneVerdict::RefusedMachineTimer(plane)
+    }
+}
+
+fn plane_violation(
+    writer: WriterKind,
+    plane: Option<Plane>,
+    zome: &str,
+    fn_name: &str,
+) -> StorageError {
+    StorageError::PlaneViolation {
+        writer: writer.label().to_string(),
+        voice: plane.map_or(UNDECLARED, |p| p.voice.label()).to_string(),
+        trigger: plane.map_or(UNDECLARED, |p| p.trigger.label()).to_string(),
+        zome: zome.to_string(),
+        fn_name: fn_name.to_string(),
+    }
+}
+
+/// Enact [`plane_verdict`] for one chain write by `writer`: count it, log what
+/// needs logging, and refuse what the rule refuses. Called BEFORE the write is
+/// queued, so a refusal never holds the chain lock and never reaches the
+/// conductor.
+fn enforce_plane(
+    writer: WriterKind,
+    zome: &str,
+    fn_name: &str,
+    policy: &PlanePolicy,
+) -> Result<(), StorageError> {
+    match plane_verdict(writer, policy) {
+        PlaneVerdict::Pass(plane) => {
+            crate::metrics::inc_chain_write_by_plane(
+                writer.label(),
+                plane.voice.label(),
+                plane.trigger.label(),
+            );
+            Ok(())
+        }
+        PlaneVerdict::ToleratedDebt(plane) => {
+            crate::metrics::inc_chain_write_by_plane(
+                writer.label(),
+                plane.voice.label(),
+                plane.trigger.label(),
+            );
+            crate::metrics::inc_plane_violation_tolerated(writer.label());
+            Ok(())
+        }
+        PlaneVerdict::RefusedMachineTimer(plane) => {
+            crate::metrics::inc_plane_violation_refused(writer.label());
+            tracing::error!(
+                writer = writer.label(),
+                voice = plane.voice.label(),
+                trigger = plane.trigger.label(),
+                zome = %zome,
+                fn_name = %fn_name,
+                "chain_write_gate: PLANE VIOLATION — a machine write on a timer was refused \
+                 before it reached the conductor (plane-separation §1, §12)"
+            );
+            Err(plane_violation(writer, Some(plane), zome, fn_name))
+        }
+        PlaneVerdict::UndeclaredCounted => {
+            crate::metrics::inc_chain_write_by_plane(writer.label(), UNDECLARED, UNDECLARED);
+            crate::metrics::inc_chain_write_undeclared_writer(zome, fn_name);
+            warn_undeclared_writer(zome, fn_name);
+            Ok(())
+        }
+        PlaneVerdict::UndeclaredRefused => {
+            crate::metrics::inc_chain_write_undeclared_writer(zome, fn_name);
+            tracing::error!(
+                zome = %zome,
+                fn_name = %fn_name,
+                "chain_write_gate: PLANE VIOLATION — an undeclared writer's chain write was \
+                 refused. Wrap the write site in `chain_write_gate::as_writer(WriterKind::…)` \
+                 so its voice and trigger are declared (plane-separation §12)"
+            );
+            Err(plane_violation(writer, None, zome, fn_name))
+        }
+    }
+}
+
+/// WARN once per process per `(zome, fn)` an undeclared writer reached. Bounded
+/// by the number of distinct externs the binary can name.
+fn warn_undeclared_writer(zome: &str, fn_name: &str) {
+    static SEEN: OnceLock<Mutex<std::collections::BTreeSet<(String, String)>>> = OnceLock::new();
+    let seen = SEEN.get_or_init(|| Mutex::new(std::collections::BTreeSet::new()));
+    let mut guard = match seen.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    if guard.insert((zome.to_string(), fn_name.to_string())) {
+        tracing::warn!(
+            zome = %zome,
+            fn_name = %fn_name,
+            "chain_write_gate: an UNDECLARED writer committed to a person's source chain. Wrap \
+             the write site in `chain_write_gate::as_writer(WriterKind::…)` — debug and test \
+             builds refuse this write (plane-separation §12)"
+        );
     }
 }
 
@@ -185,8 +614,9 @@ tokio::task_local! {
     /// a label through a dozen `conductor_writes` helpers and their callers — a
     /// crate-wide signature change for an observability field. It does NOT cross
     /// `tokio::spawn`, so a writer that spawns must set it inside the spawned
-    /// future; the default is [`WriterKind::Other`], so forgetting mislabels but
-    /// never breaks.
+    /// future. The default is [`WriterKind::Other`], which declares neither
+    /// voice nor trigger: forgetting is refused by the plane guard in debug and
+    /// test builds, and counted in release.
     static WRITER_KIND: WriterKind;
 
     /// `(reached the gate's queue, offered to the conductor)` — set by
@@ -713,19 +1143,36 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = Result<T, StorageError>>,
 {
+    // The grant is one writer by construction, so it names itself here rather
+    // than at each connect site: a `CapGrant` is committed because a cell was
+    // found without usable credentials (machine, transition). It is still put
+    // to the plane guard, so it is counted with every other chain write.
+    enforce_plane(
+        WriterKind::CapGrant,
+        ADMIN_GRANT_ZOME,
+        ADMIN_GRANT_FN,
+        &PlanePolicy::current(),
+    )?;
     let lock = gate().lock_for(&chain_key_of(cell_id));
     let guard = lock.lock_owned().await;
     let external = external_writer_lock(&chain_key_of(cell_id)).await?;
-    WRITE_LEASE
-        .scope(
+    as_writer(
+        WriterKind::CapGrant,
+        WRITE_LEASE.scope(
             RefCell::new(Some(WriteLease {
                 _local: guard,
                 _external: external,
             })),
             grant(),
-        )
-        .await
+        ),
+    )
+    .await
 }
+
+/// The admin-socket grant is not a zome call; these name it on the plane
+/// guard's error and series.
+const ADMIN_GRANT_ZOME: &str = "admin";
+const ADMIN_GRANT_FN: &str = "authorize_signing_credentials";
 
 /// THE choke point. Route one conductor call: reads straight through, writes
 /// through the per-chain lock with a bounded `HeadMoved` retry.
@@ -757,6 +1204,23 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, StorageError>>,
 {
+    dispatch_under(&PlanePolicy::current(), chain_key, zome, fn_name, call).await
+}
+
+/// [`dispatch`] with the plane policy as an argument, so the rule can be
+/// exercised against a policy this build does not run (an empty debt list, the
+/// release posture) without building release.
+async fn dispatch_under<F, Fut, T>(
+    policy: &PlanePolicy,
+    chain_key: &str,
+    zome: &str,
+    fn_name: &str,
+    call: F,
+) -> Result<(T, Duration), StorageError>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, StorageError>>,
+{
     if !is_chain_write(zome, fn_name) {
         let mut call = call;
         let started = Instant::now();
@@ -764,12 +1228,20 @@ where
         let value = call().await?;
         return Ok((value, started.elapsed()));
     }
+    // WHO IS SPEAKING, AND WHY NOW — asked before the write is queued. A refusal
+    // takes no lock, marks no witness and never invokes `call`, so nothing is
+    // offered to the conductor.
+    enforce_plane(current_writer_kind(), zome, fn_name, policy)?;
     write_serialized(chain_key, fn_name, call).await
 }
 
-/// The write arm of [`dispatch`], exposed for callers that have already
-/// classified (and for tests).
-pub async fn write_serialized<F, Fut, T>(
+/// The write arm of [`dispatch`]: the serializer and the `HeadMoved` retry, and
+/// nothing else.
+///
+/// Crate-private on purpose. The plane guard runs in [`dispatch`], before this
+/// is reached, so a caller that came straight here would commit without ever
+/// declaring who is speaking. Go through [`dispatch`].
+pub(crate) async fn write_serialized<F, Fut, T>(
     chain_key: &str,
     fn_name: &str,
     mut call: F,
@@ -839,6 +1311,8 @@ where
                     crate::metrics::inc_head_moved_exhausted(writer.label());
                     tracing::info!(
                         writer = writer.label(),
+                        voice = writer.plane().map_or(UNDECLARED, |p| p.voice.label()),
+                        trigger = writer.plane().map_or(UNDECLARED, |p| p.trigger.label()),
                         fn_name = %fn_name,
                         attempts = attempt,
                         reason = if out_of_attempts { "attempts" } else { "budget" },
@@ -1757,6 +2231,447 @@ mod tests {
         let (total, _) = worker.join().unwrap().unwrap();
         assert_eq!(total, 7 * BALLAST);
         println!("offered-write-stack-probe: ok");
+    }
+
+    // =========================================================================
+    // The plane rule
+    // =========================================================================
+
+    /// The policy this build runs by default, minus the operator override, so
+    /// these tests do not depend on the environment they are launched from.
+    fn build_policy() -> PlanePolicy {
+        PlanePolicy {
+            debt: PLANE_DEBT,
+            undeclared: UndeclaredPosture::for_build(),
+        }
+    }
+
+    /// The same rule with NO declared debt: what the gate does to a
+    /// machine-timer writer nobody allowlisted.
+    fn policy_without_debt() -> PlanePolicy {
+        PlanePolicy {
+            debt: &[],
+            undeclared: UndeclaredPosture::Refuse,
+        }
+    }
+
+    /// A stubbed conductor: counts the calls that were actually offered.
+    async fn offer(
+        policy: &PlanePolicy,
+        zome: &str,
+        fn_name: &str,
+        calls: &AtomicUsize,
+    ) -> Result<(), StorageError> {
+        dispatch_under(policy, "chain:plane", zome, fn_name, || {
+            calls.fetch_add(1, AtomicOrdering::SeqCst);
+            async { Ok::<_, StorageError>(()) }
+        })
+        .await
+        .map(|_| ())
+    }
+
+    fn tolerated(writer: WriterKind) -> u64 {
+        crate::metrics::CHAIN_WRITE_PLANE_VIOLATION_TOLERATED
+            .with_label_values(&[writer.label()])
+            .get()
+    }
+
+    fn refused(writer: WriterKind) -> u64 {
+        crate::metrics::CHAIN_WRITE_PLANE_VIOLATION_REFUSED
+            .with_label_values(&[writer.label()])
+            .get()
+    }
+
+    fn undeclared(zome: &str, fn_name: &str) -> u64 {
+        crate::metrics::CHAIN_WRITE_UNDECLARED_WRITER
+            .with_label_values(&[zome, fn_name])
+            .get()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_machine_timer_write_outside_the_debt_list_is_refused_before_the_conductor() {
+        let calls = AtomicUsize::new(0);
+        let before = refused(WriterKind::Heartbeat);
+        let witness = DispatchWitness::new();
+
+        // The heartbeat is the one machine-timer writer the vocabulary holds;
+        // with the debt list emptied it is exactly "a non-allowlisted writer".
+        let error = as_writer(
+            WriterKind::Heartbeat,
+            witnessed(&witness, async {
+                offer(
+                    &policy_without_debt(),
+                    "infrastructure",
+                    "record_peer_status",
+                    &calls,
+                )
+                .await
+            }),
+        )
+        .await
+        .unwrap_err();
+
+        match &error {
+            StorageError::PlaneViolation {
+                writer,
+                voice,
+                trigger,
+                zome,
+                fn_name,
+            } => {
+                assert_eq!(writer, "heartbeat");
+                assert_eq!(voice, "machine");
+                assert_eq!(trigger, "timer");
+                assert_eq!(zome, "infrastructure");
+                assert_eq!(fn_name, "record_peer_status");
+            }
+            other => panic!("expected the typed plane refusal, got {other:?}"),
+        }
+        let message = error.to_string();
+        assert!(
+            message.contains("a machine write on a timer is refused"),
+            "the error must state the rule: {message}"
+        );
+        assert!(
+            message
+                .contains("genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md"),
+            "the error must point at the spec: {message}"
+        );
+        assert_eq!(
+            calls.load(AtomicOrdering::SeqCst),
+            0,
+            "a refused write was offered to the conductor"
+        );
+        assert!(
+            !witness.dispatched() && !witness.parked_without_dispatch(),
+            "a refused write must neither queue nor dispatch"
+        );
+        assert!(refused(WriterKind::Heartbeat) > before);
+        // A refusal is a verdict, not a race: it is not the HeadMoved class.
+        assert!(!is_source_chain_head_moved(&error));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn declared_writers_that_are_not_a_machine_on_a_timer_pass() {
+        for (writer, voice, trigger) in [
+            (WriterKind::HttpAuthor, Voice::Person, Trigger::Act),
+            (WriterKind::ComputeDelegate, Voice::Delegate, Trigger::Act),
+            (WriterKind::SweepAdopt, Voice::Machine, Trigger::Transition),
+            (
+                WriterKind::ReleaseSoak,
+                Voice::Machine,
+                Trigger::PeriodClose,
+            ),
+        ] {
+            assert_eq!(
+                writer.plane(),
+                Some(Plane { voice, trigger }),
+                "{writer:?} no longer declares the plane this test pins"
+            );
+            let calls = AtomicUsize::new(0);
+            // Refused-if-undeclared AND no tolerated debt: the strictest policy.
+            as_writer(
+                writer,
+                offer(
+                    &policy_without_debt(),
+                    "content_store",
+                    "create_content",
+                    &calls,
+                ),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{writer:?} ({voice:?}, {trigger:?}) was refused: {e}"));
+            assert_eq!(calls.load(AtomicOrdering::SeqCst), 1, "{writer:?}");
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_undeclared_writers_chain_write_is_refused_in_debug_and_test_builds() {
+        // The posture is a property of the BUILD: tests compile with debug
+        // assertions, so this is the arm a new unnamed write site hits here and
+        // on a debug mesh binary.
+        assert_eq!(
+            UndeclaredPosture::for_build(),
+            if cfg!(debug_assertions) {
+                UndeclaredPosture::Refuse
+            } else {
+                UndeclaredPosture::Count
+            }
+        );
+        let policy = PlanePolicy {
+            debt: PLANE_DEBT,
+            undeclared: UndeclaredPosture::Refuse,
+        };
+        assert_eq!(
+            plane_verdict(WriterKind::Other, &policy),
+            PlaneVerdict::UndeclaredRefused
+        );
+
+        let calls = AtomicUsize::new(0);
+        let before = undeclared("content_store", "plane_test_refused_extern");
+        // No `as_writer`: the task-local default is `Other`.
+        let error = offer(
+            &policy,
+            "content_store",
+            "plane_test_refused_extern",
+            &calls,
+        )
+        .await
+        .unwrap_err();
+
+        match &error {
+            StorageError::PlaneViolation {
+                writer,
+                voice,
+                trigger,
+                ..
+            } => {
+                assert_eq!(writer, "other");
+                assert_eq!(voice, UNDECLARED);
+                assert_eq!(trigger, UNDECLARED);
+            }
+            other => panic!("expected the typed plane refusal, got {other:?}"),
+        }
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(
+            undeclared("content_store", "plane_test_refused_extern"),
+            before + 1,
+            "a refused undeclared write must still be counted"
+        );
+    }
+
+    /// The release arm, exercised through the function that decides rather than
+    /// by building release: an unnamed writer is counted and let through.
+    #[tokio::test(start_paused = true)]
+    async fn an_undeclared_writers_chain_write_is_counted_and_let_through_under_the_release_posture(
+    ) {
+        let policy = PlanePolicy {
+            debt: PLANE_DEBT,
+            undeclared: UndeclaredPosture::Count,
+        };
+        assert_eq!(
+            plane_verdict(WriterKind::Other, &policy),
+            PlaneVerdict::UndeclaredCounted
+        );
+        assert!(!plane_verdict(WriterKind::Other, &policy).is_refused());
+
+        let calls = AtomicUsize::new(0);
+        let before = undeclared("content_store", "plane_test_counted_extern");
+        for _ in 0..3 {
+            offer(
+                &policy,
+                "content_store",
+                "plane_test_counted_extern",
+                &calls,
+            )
+            .await
+            .expect("release must not break a running node on a label");
+        }
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 3);
+        assert_eq!(
+            undeclared("content_store", "plane_test_counted_extern"),
+            before + 3,
+            "every undeclared write is counted, even though it is logged once"
+        );
+    }
+
+    #[test]
+    fn the_undeclared_posture_override_accepts_only_its_two_words() {
+        assert_eq!(
+            UndeclaredPosture::from_override(Some("refuse")),
+            UndeclaredPosture::Refuse
+        );
+        assert_eq!(
+            UndeclaredPosture::from_override(Some(" count ")),
+            UndeclaredPosture::Count
+        );
+        for ignored in [None, Some(""), Some("off"), Some("REFUSE")] {
+            assert_eq!(
+                UndeclaredPosture::from_override(ignored),
+                UndeclaredPosture::for_build(),
+                "{ignored:?}"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_allowlisted_heartbeat_passes_and_is_counted_as_tolerated_debt() {
+        let calls = AtomicUsize::new(0);
+        let before = tolerated(WriterKind::Heartbeat);
+        let refused_before = refused(WriterKind::Heartbeat);
+
+        as_writer(
+            WriterKind::Heartbeat,
+            offer(
+                &build_policy(),
+                "infrastructure",
+                "record_peer_status",
+                &calls,
+            ),
+        )
+        .await
+        .expect("the live heartbeat must not be refused before its readers move (§5.5)");
+
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+        assert!(
+            tolerated(WriterKind::Heartbeat) > before,
+            "tolerated debt must be counted on every write"
+        );
+        assert_eq!(
+            plane_verdict(WriterKind::Heartbeat, &build_policy()),
+            PlaneVerdict::ToleratedDebt(Plane {
+                voice: Voice::Machine,
+                trigger: Trigger::Timer,
+            })
+        );
+        // This test offered nothing the gate refuses. (Another test refuses the
+        // heartbeat under an EMPTY debt list, so only a lower bound is stable.)
+        assert!(refused(WriterKind::Heartbeat) >= refused_before);
+    }
+
+    /// THE PIN. New debt is a deliberate, reviewed act: adding an entry to
+    /// [`PLANE_DEBT`] fails here until this list is edited to match.
+    ///
+    /// Before you edit it: a machine write on a timer is the anti-pattern
+    /// plane-separation §1 rules out. The answer is almost always to change the
+    /// TRIGGER (write on transition, or close a period) or to move the fact off
+    /// the chain (observation substrate, substrate presence) — not to add a row
+    /// here. Removing a row when its ruling lands is the edit this test wants.
+    #[test]
+    fn the_plane_debt_allowlist_is_pinned() {
+        let pinned: [&str; 1] = ["heartbeat"];
+
+        let actual: Vec<&str> = PLANE_DEBT.iter().map(|d| d.writer.label()).collect();
+        assert_eq!(
+            actual, pinned,
+            "PLANE_DEBT changed. Tolerated machine-timer debt may only grow by a reviewed edit \
+             to this test (plane-separation §12)."
+        );
+        for debt in PLANE_DEBT {
+            assert!(
+                debt.writer.plane().is_some_and(Plane::is_machine_timer),
+                "{:?} is listed as debt but is not a machine on a timer — the entry is dead",
+                debt.writer
+            );
+            assert!(
+                debt.retired_by.contains('§'),
+                "{:?}: every debt entry names the spec section that retires it",
+                debt.writer
+            );
+        }
+        // And the converse: nothing in the vocabulary is a machine on a timer
+        // except what is pinned above, so no such writer rides in unlisted and
+        // merely refused-at-runtime.
+        let machine_timers: Vec<&str> = WriterKind::ALL
+            .iter()
+            .filter(|w| w.plane().is_some_and(Plane::is_machine_timer))
+            .map(|w| w.label())
+            .collect();
+        assert_eq!(machine_timers, pinned);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn reads_are_unaffected_by_the_plane_guard() {
+        // Undeclared, under the strictest policy: a read never asks who speaks.
+        let calls = AtomicUsize::new(0);
+        let before = undeclared("content_store", "get_content");
+        offer(
+            &policy_without_debt(),
+            "content_store",
+            "get_content",
+            &calls,
+        )
+        .await
+        .expect("an undeclared READ must pass");
+        // Even the refused plane reads freely — the rule is about writes.
+        as_writer(
+            WriterKind::Heartbeat,
+            offer(
+                &policy_without_debt(),
+                "infrastructure",
+                "get_latest_peer_status_for_agent",
+                &calls,
+            ),
+        )
+        .await
+        .expect("a machine-timer READ must pass");
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 2);
+        assert_eq!(
+            undeclared("content_store", "get_content"),
+            before,
+            "a read must not be counted as an undeclared write"
+        );
+    }
+
+    #[test]
+    fn every_writer_but_other_declares_a_plane_and_the_vocabulary_is_closed() {
+        let mut labels: Vec<&str> = WriterKind::ALL.iter().map(|w| w.label()).collect();
+        labels.sort_unstable();
+        let before = labels.len();
+        labels.dedup();
+        assert_eq!(labels.len(), before, "two writers share a metric label");
+
+        for writer in WriterKind::ALL {
+            match writer.plane() {
+                None => assert_eq!(writer, WriterKind::Other, "{writer:?} declares no plane"),
+                Some(plane) => {
+                    assert_ne!(writer, WriterKind::Other);
+                    assert!(["person", "delegate", "machine"].contains(&plane.voice.label()));
+                    assert!(["act", "transition", "period_close", "timer"]
+                        .contains(&plane.trigger.label()));
+                }
+            }
+        }
+        // Only a machine may write on a timer or a period close; only a person
+        // or a delegate acts.
+        for writer in WriterKind::ALL {
+            let Some(plane) = writer.plane() else {
+                continue;
+            };
+            let acts = plane.trigger == Trigger::Act;
+            let machine = plane.voice == Voice::Machine;
+            assert_ne!(acts, machine, "{writer:?} pairs {plane:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_capability_grant_names_itself_and_is_counted() {
+        use holochain_types::prelude::{AgentPubKey, DnaHash};
+        let cell = CellId::new(
+            DnaHash::from_raw_36(vec![0xC1; 36]),
+            AgentPubKey::from_raw_36(vec![0xC2; 36]),
+        );
+        let seen = grant_capability_serialized(&cell, || async {
+            Ok::<_, StorageError>(current_writer_kind())
+        })
+        .await
+        .expect("a credential grant is a machine transition, never refused");
+        assert_eq!(seen, WriterKind::CapGrant);
+        assert_eq!(
+            plane_verdict(WriterKind::CapGrant, &build_policy()),
+            PlaneVerdict::Pass(Plane {
+                voice: Voice::Machine,
+                trigger: Trigger::Transition,
+            })
+        );
+    }
+
+    #[test]
+    fn the_plane_series_are_on_the_scrape_before_the_first_write() {
+        crate::metrics::register_all();
+        let text = crate::metrics::gather_text();
+        assert!(
+            text.contains(
+                "elohim_chain_write_plane_violation_tolerated_total{writer=\"heartbeat\"}"
+            ),
+            "declared debt must be visible on a scrape from boot:\n{text}"
+        );
+        assert!(
+            text.contains(
+                "elohim_chain_writes_by_plane_total{trigger=\"timer\",voice=\"machine\",writer=\"heartbeat\"}"
+            ),
+            "the per-plane series must be pre-touched per declared writer"
+        );
     }
 
     #[tokio::test(start_paused = true)]

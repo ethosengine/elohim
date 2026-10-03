@@ -1884,9 +1884,13 @@ async fn async_main(
                                     event_hash: pending.event_hash.clone(),
                                     signed_at: pending.signed_at.clone(),
                                 };
-                                    if let Err(e) = elohim_storage::services::conductor_writes::call_create_commitment_state_link(
+                                    // The node speaks because a commitment moved
+                                    // state (proposed → active on a provide event).
+                                    if let Err(e) = elohim_storage::chain_write_gate::as_writer(
+                                        elohim_storage::chain_write_gate::WriterKind::ReaSignal,
+                                        elohim_storage::services::conductor_writes::call_create_commitment_state_link(
                                     &hc_link, input,
-                                )
+                                ))
                                 .await
                                 {
                                     // Best-effort: the SQL cache flip already stands.

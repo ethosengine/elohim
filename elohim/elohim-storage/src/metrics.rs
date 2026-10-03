@@ -2520,6 +2520,62 @@ lazy_static! {
         &["writer"],
     )
     .unwrap();
+
+    /// Chain writes the plane guard let through, by who is speaking and why now
+    /// (`crate::chain_write_gate::WriterKind::plane`).
+    ///
+    /// Read it on an IDLE node: any series other than `trigger="act"` that keeps
+    /// climbing with nobody acting is a machine writing on a person's chain on
+    /// its own account. `voice`/`trigger` are functions of `writer`, so the
+    /// label set is bounded by the closed writer vocabulary; an undeclared
+    /// writer that release lets through reads `voice="undeclared"`.
+    pub static ref CHAIN_WRITES_BY_PLANE: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_writes_by_plane_total",
+            "Chain writes admitted by the plane guard, by writer, voice and trigger.",
+        ),
+        &["writer", "voice", "trigger"],
+    )
+    .unwrap();
+
+    /// DECLARED DEBT, counted: machine-on-a-timer chain writes the plane guard
+    /// tolerates because `chain_write_gate::PLANE_DEBT` names them. Every
+    /// increment is one statement in the person's voice that the person never
+    /// made; the series reaches a flat line when the ruling that retires the
+    /// writer lands (plane-separation §5.5, §11).
+    pub static ref CHAIN_WRITE_PLANE_VIOLATION_TOLERATED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_write_plane_violation_tolerated_total",
+            "Machine-timer chain writes tolerated as declared debt, by writer.",
+        ),
+        &["writer"],
+    )
+    .unwrap();
+
+    /// Machine-on-a-timer chain writes REFUSED before they reached the
+    /// conductor. Anything above zero is a write site that needs its trigger
+    /// changed, not a limit that needs raising.
+    pub static ref CHAIN_WRITE_PLANE_VIOLATION_REFUSED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_write_plane_violation_refused_total",
+            "Machine-timer chain writes refused by the plane guard, by writer.",
+        ),
+        &["writer"],
+    )
+    .unwrap();
+
+    /// Chain writes by a writer that never named itself. Release lets them
+    /// through and counts them here; debug and test builds refuse them (and
+    /// count the refusal here too). `fn` is bounded by the externs the binary
+    /// can name, exactly as `elohim_conductor_calls_total` is.
+    pub static ref CHAIN_WRITE_UNDECLARED_WRITER: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_write_undeclared_writer_total",
+            "Chain writes reaching the write gate from an undeclared writer, by zome and fn.",
+        ),
+        &["zome", "fn"],
+    )
+    .unwrap();
 }
 
 // Q3/Q4 (minutes-quiesce W1.2/W1.3): blob-swarm shard-manifest propagation +
@@ -3382,6 +3438,29 @@ pub fn register_all() {
                 .with_label_values(&[writer.label()])
                 .inc_by(0);
         }
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITES_BY_PLANE.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_PLANE_VIOLATION_TOLERATED.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_PLANE_VIOLATION_REFUSED.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_UNDECLARED_WRITER.clone()));
+        // Pre-touch the plane series for the same reason: an idle node must
+        // read a MEASURED zero per declared writer, and the debt must be on the
+        // scrape before its first write rather than after it.
+        for writer in crate::chain_write_gate::WriterKind::ALL {
+            if let Some(plane) = writer.plane() {
+                CHAIN_WRITES_BY_PLANE
+                    .with_label_values(&[
+                        writer.label(),
+                        plane.voice.label(),
+                        plane.trigger.label(),
+                    ])
+                    .inc_by(0);
+            }
+        }
+        for debt in crate::chain_write_gate::PLANE_DEBT {
+            CHAIN_WRITE_PLANE_VIOLATION_TOLERATED
+                .with_label_values(&[debt.writer.label()])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_SIZE.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_FALLBACK.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_MANIFESTS_RECEIVED.clone()));
@@ -3628,6 +3707,34 @@ pub fn inc_head_moved_retried(writer: &str) {
 pub fn inc_head_moved_exhausted(writer: &str) {
     CHAIN_WRITE_HEAD_MOVED_EXHAUSTED
         .with_label_values(&[writer])
+        .inc();
+}
+
+/// Count one chain write the plane guard admitted, by who spoke and why.
+pub fn inc_chain_write_by_plane(writer: &str, voice: &str, trigger: &str) {
+    CHAIN_WRITES_BY_PLANE
+        .with_label_values(&[writer, voice, trigger])
+        .inc();
+}
+
+/// Count one machine-timer chain write tolerated as declared debt.
+pub fn inc_plane_violation_tolerated(writer: &str) {
+    CHAIN_WRITE_PLANE_VIOLATION_TOLERATED
+        .with_label_values(&[writer])
+        .inc();
+}
+
+/// Count one machine-timer chain write refused before the conductor saw it.
+pub fn inc_plane_violation_refused(writer: &str) {
+    CHAIN_WRITE_PLANE_VIOLATION_REFUSED
+        .with_label_values(&[writer])
+        .inc();
+}
+
+/// Count one chain write that reached the gate from an undeclared writer.
+pub fn inc_chain_write_undeclared_writer(zome: &str, fn_name: &str) {
+    CHAIN_WRITE_UNDECLARED_WRITER
+        .with_label_values(&[zome, fn_name])
         .inc();
 }
 

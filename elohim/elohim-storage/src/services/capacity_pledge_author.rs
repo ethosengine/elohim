@@ -169,13 +169,17 @@ pub async fn author_capacity_pledge(
         .and_utc()
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
-    let bytes = conductor_writes::call_create_commitment(
-        hc,
-        CreateMishpatCommitmentInput {
-            action: "replicates-commons".to_string(),
-            payload_json: payload_json.clone(),
-            signed_at,
-        },
+    // A steward's explicit pledge, made at the HTTP door: a person's act.
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::HttpAuthor,
+        conductor_writes::call_create_commitment(
+            hc,
+            CreateMishpatCommitmentInput {
+                action: "replicates-commons".to_string(),
+                payload_json: payload_json.clone(),
+                signed_at,
+            },
+        ),
     )
     .await?;
     let output: CreateCommitmentOutput = rmp_serde::from_slice(&bytes).map_err(|e| {

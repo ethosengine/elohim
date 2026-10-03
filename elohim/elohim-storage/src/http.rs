@@ -10341,20 +10341,21 @@ impl HttpServer {
 
                 let update_result = match (needs_conductor, lamad_hc) {
                     (true, Some(hc)) => {
-                        services
-                            .content
+                        crate::chain_write_gate::as_writer(
+                            crate::chain_write_gate::WriterKind::HttpAuthor,
                             // DECLARE: this is a request-borne re-notarization —
                             // a deploy PATCHing {blobHash, reach} IS the
                             // head-declaration act, and it must keep moving the
                             // head deliberately. The heal-class re-author sweeps
                             // preserve instead; see `HeadElection`.
-                            .update_via_conductor(
+                            services.content.update_via_conductor(
                                 &hc,
                                 content_id,
                                 view,
                                 db::content_diesel::HeadElection::Declare,
-                            )
-                            .await
+                            ),
+                        )
+                        .await
                     }
                     (true, None) => {
                         // A notarized change (blob_hash/reach) needs the
@@ -15608,8 +15609,11 @@ impl HttpServer {
                 payload_json,
                 signed_at,
             };
-            if let Err(e) =
-                crate::services::conductor_writes::call_create_commitment(&hc, input).await
+            if let Err(e) = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::HttpAuthor,
+                crate::services::conductor_writes::call_create_commitment(&hc, input),
+            )
+            .await
             {
                 tracing::warn!(
                     target: "elohim_storage::provide",

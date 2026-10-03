@@ -278,7 +278,11 @@ pub async fn issue(
     let action_hash = match native::get_commitment(hc, &cid).await? {
         Some(existing) => existing.action_hash,
         None => {
-            let bytes = native::call_create_commitment(hc, grant.clone()).await?;
+            let bytes = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::ComputeDelegate,
+                native::call_create_commitment(hc, grant.clone()),
+            )
+            .await?;
             let created: native::CreateCommitmentOutput =
                 rmp_serde::from_slice(&bytes).map_err(|e| invalid(&e.to_string()))?;
             if created.entry_hash != entry_hash {
@@ -337,7 +341,11 @@ pub async fn issue(
     let consent = match existing {
         Some(event) => event,
         None => rmp_serde::from_slice(
-            &native::call_create_rea_economic_event(hc, &consent_input).await?,
+            &crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::ComputeDelegate,
+                native::call_create_rea_economic_event(hc, &consent_input),
+            )
+            .await?,
         )
         .map_err(|e| invalid(&e.to_string()))?,
     };
@@ -351,14 +359,17 @@ pub async fn issue(
         .iter()
         .any(|s| s.author == provider && s.state == "active" && s.event_hash == event_hash)
     {
-        native::call_create_commitment_state_link(
-            hc,
-            native::CreateCommitmentStateLinkInput {
-                commitment_cid: cid.clone(),
-                state: "active".into(),
-                event_hash: event_hash.clone(),
-                signed_at: grant.signed_at.clone(),
-            },
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::ComputeDelegate,
+            native::call_create_commitment_state_link(
+                hc,
+                native::CreateCommitmentStateLinkInput {
+                    commitment_cid: cid.clone(),
+                    state: "active".into(),
+                    event_hash: event_hash.clone(),
+                    signed_at: grant.signed_at.clone(),
+                },
+            ),
         )
         .await?;
     }
@@ -428,17 +439,20 @@ pub async fn revoke(
         RevokeVerdict::AlreadyWithdrawn { at } => at.clone(),
         RevokeVerdict::Withdraw => {
             let signed_at = Utc::now().to_rfc3339();
-            native::call_create_commitment_state_link(
-                hc,
-                native::CreateCommitmentStateLinkInput {
-                    commitment_cid: cid.clone(),
-                    state: "revoked".into(),
-                    // A withdrawal spends no economic event — it RETRACTS the
-                    // authority the grant conferred — so the transition points
-                    // at the grant's own notarizing action.
-                    event_hash: held.action_hash.to_string(),
-                    signed_at: signed_at.clone(),
-                },
+            crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::ComputeDelegate,
+                native::call_create_commitment_state_link(
+                    hc,
+                    native::CreateCommitmentStateLinkInput {
+                        commitment_cid: cid.clone(),
+                        state: "revoked".into(),
+                        // A withdrawal spends no economic event — it RETRACTS the
+                        // authority the grant conferred — so the transition points
+                        // at the grant's own notarizing action.
+                        event_hash: held.action_hash.to_string(),
+                        signed_at: signed_at.clone(),
+                    },
+                ),
             )
             .await?;
             let confirmed = native::get_commitment_authority_links(hc, &cid).await?;

@@ -470,18 +470,20 @@ pub async fn run_once(
             server_blob_hash: None,
             p2p_published_at: None,
         };
-        let reauthor = content_service
+        let reauthor = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Reanchor,
             // PRESERVE: re-authoring is a heal, not a declaration. Before this,
             // every boot's sweep crowned its own fresh root and silently
             // un-adopted whatever canonical head this peer had converged on.
-            .update_via_conductor(
+            content_service.update_via_conductor(
                 hc,
                 id,
                 empty_patch,
                 crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
-            )
-            .await
-            .map(|_| ());
+            ),
+        )
+        .await
+        .map(|_| ());
 
         // IDEMPOTENCY FIX (adam alpha Cache-DB saturation, 2026-07-05): when the
         // re-author is refused because the entry is ALREADY committed to the
@@ -494,13 +496,15 @@ pub async fn run_once(
         // and retry next boot.
         let recovery = if matches!(&reauthor, Err(e) if is_already_anchored_error(e)) {
             Some(
-                content_service
-                    .project_existing_anchor(
+                crate::chain_write_gate::as_writer(
+                    crate::chain_write_gate::WriterKind::Reanchor,
+                    content_service.project_existing_anchor(
                         hc,
                         id,
                         crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
-                    )
-                    .await,
+                    ),
+                )
+                .await,
             )
         } else {
             None
@@ -531,14 +535,17 @@ pub async fn run_once(
         // which the next sweep's pre-flight picks straight back up.
         if let Some((head_action_hash, carried_record, peer_id)) = pending_adopt {
             if outcome != RowOutcome::Failed {
-                let finished = crate::services::head_adoption::finish_author_then_adopt(
-                    hc,
-                    pool,
-                    &app_ctx,
-                    id,
-                    &head_action_hash,
-                    carried_record,
-                    &peer_id,
+                let finished = crate::chain_write_gate::as_writer(
+                    crate::chain_write_gate::WriterKind::Reanchor,
+                    crate::services::head_adoption::finish_author_then_adopt(
+                        hc,
+                        pool,
+                        &app_ctx,
+                        id,
+                        &head_action_hash,
+                        carried_record,
+                        &peer_id,
+                    ),
                 )
                 .await;
                 if finished == AdoptOutcome::Adopted {

@@ -501,9 +501,11 @@ async fn commit_binding(
             "binding mint: encode CreateAgentPeerBindingInput: {e}"
         )))
     })?;
-    let bytes = hc
-        .call_zome_imagodei(IMAGODEI_ZOME, CREATE_BINDING_FN, payload)
-        .await?;
+    let bytes = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::BindingMint,
+        hc.call_zome_imagodei(IMAGODEI_ZOME, CREATE_BINDING_FN, payload),
+    )
+    .await?;
     let out: CreateAgentPeerBindingOutput = rmp_serde::from_slice(&bytes).map_err(|e| {
         MintError::Storage(StorageError::Serialization(format!(
             "binding mint: decode CreateAgentPeerBindingOutput: {e}"

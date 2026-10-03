@@ -607,9 +607,10 @@ impl CommitmentAuthor for SpoolCustodyAuthor {
         })?;
         let hc = self.hc.clone();
         tokio::task::block_in_place(|| {
-            handle.block_on(async move {
-                conductor_writes::call_create_rea_commitment(&hc, &input).await
-            })
+            handle.block_on(crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::CustodyIntent,
+                async move { conductor_writes::call_create_rea_commitment(&hc, &input).await },
+            ))
         })
         .map(|_bytes| ())
     }
