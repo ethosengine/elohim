@@ -247,8 +247,9 @@ most machine declares are by non-authors, the writer to remove is "obey", not "r
   Retry stays as a capped backstop that yields to a person's write. `ChainTopOrdering::Relaxed` is
   stock and unused here; it fits machine writes that never use their own action hash and cannot
   apply to the head declare.
-- **Publish only new ops between sweeps** (option E, built). The eve reading is the shape it
-  removes. It pins after the grant lookup, so the two are measured apart.
+- **Publish only new ops between sweeps** (option E). Pinned as fork `901b02607` by `95a0eb298`
+  on 2026-10-03, ahead of the grant lookup. The eve reading is the shape it removes; read that pass
+  again once the roll settles, and before the grant-lookup pin, so the two are measured apart.
 - **The conductor's histograms use the SDK's default boundaries on second-valued data**, so every
   quantile is unusable until a second-scale view is added in the fork. Read means until then. Two
   series named in repo comments do not exist at this pin.
@@ -288,10 +289,10 @@ down while the exporter logs that it is listening.
 
 ## 10. Order
 
-1. Fork: secret-keyed grant lookup (§3.1). It removes the largest per-call cost and clears the
-   ground for every later measurement.
-2. Doorway, stop the damage: single-cell mint, sent/unsent fault typing, no second key (§4.2–3).
-3. Pin option E and read the publish pass again (§7).
+1. Read the publish pass again on the option E roll (§7), already pinned.
+2. Fork: secret-keyed grant lookup (§3.1), written as `33722d5a1` and rebased onto the option E
+   pin. It pins only after an independent review and a household mesh proof.
+3. Doorway, stop the damage: single-cell mint, sent/unsent fault typing, no second key (§4.2–3).
 4. Fork: idempotent grant and second-scale histogram boundaries; doorway: derived credential and
    listed functions (§3.2–4).
 5. Coordinator, one hot-swap: bounded latest-status read, election-keyed declare guard, closed
