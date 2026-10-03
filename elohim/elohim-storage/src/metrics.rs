@@ -2552,28 +2552,46 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Machine-on-a-timer chain writes REFUSED before they reached the
-    /// conductor. Anything above zero is a write site that needs its trigger
-    /// changed, not a limit that needs raising.
+    /// Chain writes REFUSED by the plane guard before they reached the
+    /// conductor, by writer and by `reason` — a closed pair:
+    /// `machine_timer` (a clock-driven writer showed no change and is not
+    /// declared debt) and `undeclared` (a writer that never named itself, on a
+    /// build that refuses those; `writer="other"`). Anything above zero is a
+    /// write site to fix, not a limit to raise.
     pub static ref CHAIN_WRITE_PLANE_VIOLATION_REFUSED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_chain_write_plane_violation_refused_total",
-            "Machine-timer chain writes refused by the plane guard, by writer.",
+            "Chain writes refused by the plane guard, by writer and reason.",
         ),
-        &["writer"],
+        &["writer", "reason"],
     )
     .unwrap();
 
-    /// Chain writes by a writer that never named itself. Release lets them
-    /// through and counts them here; debug and test builds refuse them (and
-    /// count the refusal here too). `fn` is bounded by the externs the binary
-    /// can name, exactly as `elohim_conductor_calls_total` is.
+    /// Chain writes by a writer that never named itself that were LET THROUGH
+    /// (the release posture). A refused one is counted on
+    /// `elohim_chain_write_plane_violation_refused_total{reason="undeclared"}`
+    /// instead, so the two outcomes never share a series. `fn` is the closed
+    /// table of externs this crate writes (`chain_write_gate::CRATE_WRITE_FNS`),
+    /// pre-touched; an extern outside that table still counts under its own
+    /// name, bounded by the names the binary can pass.
     pub static ref CHAIN_WRITE_UNDECLARED_WRITER: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_chain_write_undeclared_writer_total",
-            "Chain writes reaching the write gate from an undeclared writer, by zome and fn.",
+            "Chain writes let through from an undeclared writer, by extern.",
         ),
-        &["zome", "fn"],
+        &["fn"],
+    )
+    .unwrap();
+
+    /// Which undeclared-writer posture this process runs: exactly one of
+    /// `posture="refuse"` / `posture="count"` reads 1. Set once, when the plane
+    /// policy resolves at boot (`chain_write_gate::PlanePolicy::current`).
+    pub static ref CHAIN_WRITE_UNDECLARED_POSTURE: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_chain_write_undeclared_posture",
+            "The plane guard's posture toward an undeclared writer (1 = in force).",
+        ),
+        &["posture"],
     )
     .unwrap();
 }
@@ -3442,11 +3460,21 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_PLANE_VIOLATION_TOLERATED.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_PLANE_VIOLATION_REFUSED.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_UNDECLARED_WRITER.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_UNDECLARED_POSTURE.clone()));
         // Pre-touch the plane series for the same reason: an idle node must
         // read a MEASURED zero per declared writer, and the debt must be on the
         // scrape before its first write rather than after it.
-        for writer in crate::chain_write_gate::WriterKind::ALL {
-            if let Some(plane) = writer.plane() {
+        {
+            use crate::chain_write_gate::{
+                Drive, WriterKind, CRATE_WRITE_FNS, REFUSED_MACHINE_TIMER, REFUSED_UNDECLARED,
+            };
+            for writer in WriterKind::ALL {
+                let Some(plane) = writer.plane() else {
+                    CHAIN_WRITE_PLANE_VIOLATION_REFUSED
+                        .with_label_values(&[writer.label(), REFUSED_UNDECLARED])
+                        .inc_by(0);
+                    continue;
+                };
                 CHAIN_WRITES_BY_PLANE
                     .with_label_values(&[
                         writer.label(),
@@ -3454,8 +3482,27 @@ pub fn register_all() {
                         plane.trigger.label(),
                     ])
                     .inc_by(0);
+                if matches!(writer.standing(), Some((_, Drive::Clock))) {
+                    // A clock-driven writer has two planes: the timer it is
+                    // without a witness (touched above) and the transition it
+                    // is with one.
+                    CHAIN_WRITES_BY_PLANE
+                        .with_label_values(&[writer.label(), plane.voice.label(), "transition"])
+                        .inc_by(0);
+                    CHAIN_WRITE_PLANE_VIOLATION_REFUSED
+                        .with_label_values(&[writer.label(), REFUSED_MACHINE_TIMER])
+                        .inc_by(0);
+                }
+            }
+            for fn_name in CRATE_WRITE_FNS {
+                CHAIN_WRITE_UNDECLARED_WRITER
+                    .with_label_values(&[fn_name])
+                    .inc_by(0);
             }
         }
+        // Resolve the plane policy now, at boot: this logs the posture once and
+        // sets the posture gauge (see `PlanePolicy::current`).
+        let _ = crate::chain_write_gate::PlanePolicy::current();
         for debt in crate::chain_write_gate::PLANE_DEBT {
             CHAIN_WRITE_PLANE_VIOLATION_TOLERATED
                 .with_label_values(&[debt.writer.label()])
@@ -3724,18 +3771,29 @@ pub fn inc_plane_violation_tolerated(writer: &str) {
         .inc();
 }
 
-/// Count one machine-timer chain write refused before the conductor saw it.
-pub fn inc_plane_violation_refused(writer: &str) {
+/// Count one chain write refused before the conductor saw it. `reason` is
+/// `chain_write_gate::REFUSED_MACHINE_TIMER` or `REFUSED_UNDECLARED`.
+pub fn inc_plane_violation_refused(writer: &str, reason: &str) {
     CHAIN_WRITE_PLANE_VIOLATION_REFUSED
-        .with_label_values(&[writer])
+        .with_label_values(&[writer, reason])
         .inc();
 }
 
-/// Count one chain write that reached the gate from an undeclared writer.
-pub fn inc_chain_write_undeclared_writer(zome: &str, fn_name: &str) {
+/// Count one chain write LET THROUGH from an undeclared writer.
+pub fn inc_chain_write_undeclared_writer(fn_name: &str) {
     CHAIN_WRITE_UNDECLARED_WRITER
-        .with_label_values(&[zome, fn_name])
+        .with_label_values(&[fn_name])
         .inc();
+}
+
+/// Publish the undeclared-writer posture in force: the named posture reads 1,
+/// the other 0.
+pub fn set_chain_write_undeclared_posture(in_force: &str) {
+    for posture in ["refuse", "count"] {
+        CHAIN_WRITE_UNDECLARED_POSTURE
+            .with_label_values(&[posture])
+            .set(i64::from(posture == in_force));
+    }
 }
 
 /// Count one conductor call at the moment it is dispatched — after the gate

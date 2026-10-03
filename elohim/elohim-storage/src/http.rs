@@ -19654,6 +19654,9 @@ mod request_future_size_tests {
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         let size = returned_future_size(&|req: Request<Incoming>| server.handle_request(req));
+        // Printed so a change on the request path can report its cost as a number
+        // (`-- --nocapture`), not only as pass/fail against the budget.
+        println!("handle_request future: {size} bytes (budget {REQUEST_FUTURE_BUDGET})");
         assert!(
             size <= REQUEST_FUTURE_BUDGET,
             "HttpServer::handle_request future is {size} bytes (budget {REQUEST_FUTURE_BUDGET}); \

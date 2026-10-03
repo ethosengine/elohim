@@ -254,6 +254,12 @@ pub(crate) fn decide_outcome(
 /// only the local-DHT arm can fire; the sweep-driven caller
 /// (`p2p::projection_reconcile::witness_bootstrap`) passes the hints its
 /// inventory diff just collected.
+/// What the never-authored arm observed about a candidate (the evidence
+/// name its re-author's [`crate::chain_write_gate::ChangeWitness`] carries).
+const OBSERVED_NO_ANCHOR: &str = "content row has no anchor";
+/// What the dead-anchor arm observed about a candidate.
+const OBSERVED_DEAD_ANCHOR: &str = "content row's anchor is dead";
+
 pub async fn run_once(
     pool: &DbPool,
     content_service: &ContentService,
@@ -333,7 +339,14 @@ pub async fn run_once(
         "reanchor_backfill: re-authoring NULL-anchor and DEAD-anchor content via conductor"
     );
 
-    for (id, reach, content_type) in &candidates {
+    // The never-authored arm comes first in the chained list (see above).
+    let never_authored = report.candidates;
+    for (position, (id, reach, content_type)) in candidates.iter().enumerate() {
+        let observed_anchor = if position < never_authored {
+            OBSERVED_NO_ANCHOR
+        } else {
+            OBSERVED_DEAD_ANCHOR
+        };
         // HELD BACKOFF — ahead of every conductor round-trip, and ahead of the
         // vocabulary guards because it is strictly cheaper than both. A previous
         // sweep's pre-flight already HELD this candidate against this same
@@ -470,16 +483,29 @@ pub async fn run_once(
             server_blob_hash: None,
             p2p_published_at: None,
         };
+        // WHY NOW. This loop runs on a clock, and a row stays a candidate until
+        // the stamp that records its repair lands — so "the anchor is NULL/dead"
+        // is true again on the next sweep whenever that stamp failed, and the
+        // loop re-authors what it already authored (`idle-is-free`: the same 46
+        // rows, six times over). The FIRST re-author against an observed
+        // NULL/dead anchor answers a change and carries a witness; a repeat
+        // against the unchanged observation carries none, reaches the gate as a
+        // machine on a timer, and is counted as declared debt.
+        let first_reauthor =
+            crate::chain_write_gate::ChangeWitness::first_observation(observed_anchor, id);
         let reauthor = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::Reanchor,
-            // PRESERVE: re-authoring is a heal, not a declaration. Before this,
-            // every boot's sweep crowned its own fresh root and silently
-            // un-adopted whatever canonical head this peer had converged on.
-            content_service.update_via_conductor(
-                hc,
-                id,
-                empty_patch,
-                crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+            crate::chain_write_gate::with_change(
+                first_reauthor,
+                // PRESERVE: re-authoring is a heal, not a declaration. Before this,
+                // every boot's sweep crowned its own fresh root and silently
+                // un-adopted whatever canonical head this peer had converged on.
+                content_service.update_via_conductor(
+                    hc,
+                    id,
+                    empty_patch,
+                    crate::db::content_diesel::HeadElection::PreserveExistingDeclaration,
+                ),
             ),
         )
         .await
@@ -518,6 +544,10 @@ pub async fn run_once(
         // it so the next reconcile sweep contests instead of waiting out the
         // window (see `services::contest_backoff`).
         if outcome != RowOutcome::Failed {
+            // The repair is RECORDED (the row is stamped and leaves the
+            // candidate set), so the observation is settled: if this id ever
+            // turns up unanchored or dead again, that is a new change.
+            crate::chain_write_gate::ChangeWitness::settle_observation(observed_anchor, id);
             crate::services::contest_backoff::note_local_chain_arrived(id);
             // Same fact, the heal leg's ledger: a chain landing falsifies any
             // cached conductor-missing verdict, so the next heal sweep must

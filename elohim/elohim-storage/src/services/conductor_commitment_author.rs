@@ -392,14 +392,17 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
         // failure so the reconciler rolls the latch back and retries next tick.
         // The commitment IS notarised regardless — the next tick finds it live
         // in the projection and does NOT re-author (logical-key dedup).
-        economic_event_emit_service::emit(&emit_input, &self.hc, &fetcher, &rate)
-            .await
-            .map_err(|e| {
-                StorageError::Internal(format!(
-                    "ProvideAnnounce emit failed for {} (commitment {} notarised): {e}",
-                    req.head_ref, new_cid
-                ))
-            })?;
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Provide,
+            economic_event_emit_service::emit(&emit_input, &self.hc, &fetcher, &rate),
+        )
+        .await
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "ProvideAnnounce emit failed for {} (commitment {} notarised): {e}",
+                req.head_ref, new_cid
+            ))
+        })?;
 
         Ok(new_cid)
     }

@@ -132,13 +132,13 @@ pub enum StorageError {
     /// `"undeclared"`). Nothing was committed, and re-offering the same call
     /// will be refused again: this is a defect in the write site, not a
     /// transient failure, so it maps to no retryable status.
+    ///
+    /// The text is deliberately short and stable — it can reach an HTTP
+    /// response body. The rule in full, and where it is ruled, is logged by the
+    /// gate at the refusal.
     #[error(
-        "Plane violation: writer `{writer}` (voice={voice}, trigger={trigger}) was refused \
-         `{zome}::{fn_name}` before it reached the conductor. A person's source chain speaks in \
-         the person's voice: a machine write on a timer is refused, and every chain write must \
-         name its writer so its voice (person, delegate, machine) and trigger (act, transition, \
-         period close, timer) are declared. See \
-         genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md §1 and §12."
+        "plane_violation: chain write `{zome}::{fn_name}` refused before the conductor \
+         (writer={writer}, voice={voice}, trigger={trigger})"
     )]
     PlaneViolation {
         writer: String,

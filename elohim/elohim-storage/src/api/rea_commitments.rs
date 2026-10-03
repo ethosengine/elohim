@@ -194,7 +194,11 @@ async fn handle_create(
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_create_result(
-        ReaCommitmentService::create(&mut conn, ctx, input, events, hc_lamad).await,
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            ReaCommitmentService::create(&mut conn, ctx, input, events, hc_lamad),
+        )
+        .await,
     ))
 }
 
@@ -379,7 +383,11 @@ async fn handle_update_state(
     let mut conn = get_conn(pool)?;
     let events = services.as_ref().map(|s| s.events.as_ref());
     Ok(from_result(
-        ReaCommitmentService::update_state(&mut conn, ctx, id, &update, events, hc_lamad).await,
+        crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            ReaCommitmentService::update_state(&mut conn, ctx, id, &update, events, hc_lamad),
+        )
+        .await,
     ))
 }
 

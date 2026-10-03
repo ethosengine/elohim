@@ -3153,7 +3153,9 @@ async fn contest_peer(
     //
     // `Held` is what every other suppression in this function returns, so no
     // caller sees a new outcome.
-    if !claim_peer_head_candidacy(id, &peer_head, crate::config::contest_remint_window()) {
+    let peer_head_claimed =
+        claim_peer_head_candidacy(id, &peer_head, crate::config::contest_remint_window());
+    if !peer_head_claimed {
         crate::metrics::inc_contest_remint_suppressed();
         tracing::debug!(
             target: "elohim_storage::head_adoption",
@@ -3170,13 +3172,21 @@ async fn contest_peer(
     // ARM 1 — PEER-HEAD CANDIDACY. `adopt_before_author: false` — this is the
     // classic attempt, and it must stay the classic attempt: the bypass may only
     // ever run AFTER the no-chain gate has actually refused, never instead of it.
-    match conductor_writes::call_declare_canonical_content_head_classed(
-        hc,
-        id,
-        peer_head.clone(),
-        carried_record,
-        false,
-        SWEEP_DECLARE_CLASS,
+    // The change this declare answers: the ledger above accepted
+    // `(id, peer_head)` for the first time in its window.
+    match crate::chain_write_gate::with_change(
+        crate::chain_write_gate::ChangeWitness::newly_claimed(
+            "first nomination of a peer's head for this id",
+            peer_head_claimed,
+        ),
+        conductor_writes::call_declare_canonical_content_head_classed(
+            hc,
+            id,
+            peer_head.clone(),
+            carried_record,
+            false,
+            SWEEP_DECLARE_CLASS,
+        ),
     )
     .await
     {
@@ -3333,7 +3343,8 @@ async fn contest_peer(
 
     // QUIESCENCE, second shape: we already nominated this exact head. Re-minting
     // would add an identical candidate every sweep until the election projects.
-    if !claim_candidacy(id, own_head) {
+    let own_head_claimed = claim_candidacy(id, own_head);
+    if !own_head_claimed {
         tracing::debug!(
             content_id = %id,
             "adopt-before-author: contest gate — this node already nominated its own head for \
@@ -3346,13 +3357,19 @@ async fn contest_peer(
     // AFTER the chain gate has already PASSED (the zome answers `is not
     // retrievable` only downstream of it), so there is no no-chain gate here to
     // bypass — and it carries no record to license one with either.
-    match conductor_writes::call_declare_canonical_content_head_classed(
-        hc,
-        id,
-        own_head.to_string(),
-        None,
-        false,
-        SWEEP_DECLARE_CLASS,
+    match crate::chain_write_gate::with_change(
+        crate::chain_write_gate::ChangeWitness::newly_claimed(
+            "first nomination of this node's head for this id",
+            own_head_claimed,
+        ),
+        conductor_writes::call_declare_canonical_content_head_classed(
+            hc,
+            id,
+            own_head.to_string(),
+            None,
+            false,
+            SWEEP_DECLARE_CLASS,
+        ),
     )
     .await
     {
@@ -3482,7 +3499,8 @@ async fn contest_divergent(
     // IDEMPOTENCE — the row is NOT stamped by a contest, so without the claim
     // this arm would re-mint the identical link every sweep for the whole
     // window between minting and the election projecting back.
-    if !claim_candidacy(id, target) {
+    let target_claimed = claim_candidacy(id, target);
+    if !target_claimed {
         tracing::debug!(
             content_id = %id,
             "spin-discharge: this node already nominated its own head for this id; \
@@ -3491,13 +3509,19 @@ async fn contest_divergent(
         return AdoptOutcome::Held;
     }
 
-    match conductor_writes::call_declare_canonical_content_head_classed(
-        hc,
-        id,
-        target.to_string(),
-        None,
-        false,
-        SWEEP_DECLARE_CLASS,
+    match crate::chain_write_gate::with_change(
+        crate::chain_write_gate::ChangeWitness::newly_claimed(
+            "first nomination of this node's head for this id",
+            target_claimed,
+        ),
+        conductor_writes::call_declare_canonical_content_head_classed(
+            hc,
+            id,
+            target.to_string(),
+            None,
+            false,
+            SWEEP_DECLARE_CLASS,
+        ),
     )
     .await
     {
@@ -3609,7 +3633,8 @@ async fn try_adopt_before_author(
     // reach this arm concurrently for one id) and handed back on failure, which
     // is the C3 repair that keeps a failed attempt from retiring the pair for
     // the life of the process.
-    if !claim_candidacy(id, peer_head) {
+    let bypass_claimed = claim_candidacy(id, peer_head);
+    if !bypass_claimed {
         tracing::debug!(
             content_id = %id,
             "adopt-before-author: bypass gate — this node already nominated this target for \
@@ -3618,13 +3643,19 @@ async fn try_adopt_before_author(
         return None;
     }
 
-    match conductor_writes::call_declare_canonical_content_head_classed(
-        hc,
-        id,
-        peer_head.to_string(),
-        Some(bytes),
-        true,
-        SWEEP_DECLARE_CLASS,
+    match crate::chain_write_gate::with_change(
+        crate::chain_write_gate::ChangeWitness::newly_claimed(
+            "first nomination of a peer's head for this id",
+            bypass_claimed,
+        ),
+        conductor_writes::call_declare_canonical_content_head_classed(
+            hc,
+            id,
+            peer_head.to_string(),
+            Some(bytes),
+            true,
+            SWEEP_DECLARE_CLASS,
+        ),
     )
     .await
     {
@@ -3785,9 +3816,18 @@ async fn declare_peer_head(
     carried_record: Option<Vec<u8>>,
     hint: &PeerHeadHint,
 ) -> AdoptOutcome {
+    // The change this declare answers, built ONLY from a declared head that was
+    // actually read: it differs from the head about to be declared. When the
+    // read is unavailable (below) there is no observation and so no witness —
+    // the gate then sees a clock-driven sweep's declare as what it is.
+    let mut head_moves: Option<crate::chain_write_gate::ChangeWitness> = None;
     if let Ok(mut conn) = pool.get() {
+        let mut declared_head_was_read = false;
         let current = match content_diesel::declared_head_for(&mut conn, ctx, id) {
-            Ok(v) => v,
+            Ok(v) => {
+                declared_head_was_read = true;
+                v
+            }
             Err(e) => {
                 // A DB error here silently opened the declare-storm gate (the
                 // old `.unwrap_or(None)` read it identically to "undeclared").
@@ -3808,6 +3848,13 @@ async fn declare_peer_head(
                 "adopt-before-author: declare-storm gate — already declaring this head, skipping"
             );
             return AdoptOutcome::Held;
+        }
+        if declared_head_was_read {
+            head_moves = crate::chain_write_gate::ChangeWitness::value_moves(
+                "the row's declared head differs from the head being declared",
+                current.as_deref(),
+                head_action_hash,
+            );
         }
     } else {
         // Same silent-open: no connection means the declare-storm gate is
@@ -3835,13 +3882,16 @@ async fn declare_peer_head(
     // the evidence retry), and exactly one while the flag is off. Not a retry
     // ladder — the second call is a DIFFERENT request (evidence-backed) made
     // once, only after the first was refused for the one reason it can answer.
-    let attempted = conductor_writes::call_declare_canonical_content_head_classed(
-        hc,
-        id,
-        head_action_hash.to_string(),
-        carried_record.clone(),
-        false,
-        SWEEP_DECLARE_CLASS,
+    let attempted = crate::chain_write_gate::with_change(
+        head_moves,
+        conductor_writes::call_declare_canonical_content_head_classed(
+            hc,
+            id,
+            head_action_hash.to_string(),
+            carried_record.clone(),
+            false,
+            SWEEP_DECLARE_CLASS,
+        ),
     )
     .await;
     let attempted = match attempted {
@@ -3851,13 +3901,16 @@ async fn declare_peer_head(
             match adopt_retry.filter(|_| refused_for_no_chain) {
                 None => Err(first),
                 Some(bytes) => {
-                    match conductor_writes::call_declare_canonical_content_head_classed(
-                        hc,
-                        id,
-                        head_action_hash.to_string(),
-                        Some(bytes),
-                        true,
-                        SWEEP_DECLARE_CLASS,
+                    match crate::chain_write_gate::with_change(
+                        head_moves,
+                        conductor_writes::call_declare_canonical_content_head_classed(
+                            hc,
+                            id,
+                            head_action_hash.to_string(),
+                            Some(bytes),
+                            true,
+                            SWEEP_DECLARE_CLASS,
+                        ),
                     )
                     .await
                     {

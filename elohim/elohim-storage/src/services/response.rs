@@ -259,6 +259,13 @@ pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
         // Conductor unavailable (e.g. lamad bridge not yet connected) is a transient
         // readiness failure, not a hard error — 503 so seeders/clients can retry.
         StorageError::Conductor(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
+        // A write site that broke the plane rule is this node's defect, not the
+        // caller's and not transient: 500, with a stable code and nothing about
+        // which writer or extern (the gate logged that).
+        StorageError::PlaneViolation { .. } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "plane_violation: chain write refused by this node".to_string(),
+        ),
         _ => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
 

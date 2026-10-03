@@ -333,8 +333,18 @@ impl ReaCommitmentService {
         let outcome = if existing.as_ref().is_some_and(|row| row.state == "active") {
             EnsureCustodyOutcome::AlreadyActive
         } else {
+            // WHO IS SPEAKING, AND WHY NOW: the node, pledging custody of
+            // bytes it just verified it holds. Each write shows the change it
+            // answers — the commitment was looked for and is absent; its state
+            // is not yet `active`.
+            use crate::chain_write_gate::{as_writer, with_change, ChangeWitness, WriterKind};
             if created {
-                Self::create(conn, ctx, input, None, Some(hc_lamad)).await?;
+                let absent = ChangeWitness::absent("self-custody commitment", existing.as_ref());
+                as_writer(
+                    WriterKind::CustodyIntent,
+                    with_change(absent, Self::create(conn, ctx, input, None, Some(hc_lamad))),
+                )
+                .await?;
             }
 
             let update = UpdateReaCommitmentState {
@@ -342,7 +352,19 @@ impl ReaCommitmentService {
                 finished: None,
                 metadata_json: None,
             };
-            Self::update_state(conn, ctx, &id, &update, None, Some(hc_lamad)).await?;
+            let activates = ChangeWitness::value_moves(
+                "self-custody commitment state",
+                existing.as_ref().map(|row| row.state.as_str()),
+                "active",
+            );
+            as_writer(
+                WriterKind::CustodyIntent,
+                with_change(
+                    activates,
+                    Self::update_state(conn, ctx, &id, &update, None, Some(hc_lamad)),
+                ),
+            )
+            .await?;
 
             if created {
                 EnsureCustodyOutcome::CreatedAndActivated
@@ -391,7 +413,19 @@ impl ReaCommitmentService {
                     finished: None,
                     metadata_json: None,
                 };
-                Self::update_state(conn, ctx, &row.id, &cancel, None, Some(hc_lamad)).await?;
+                let cancels = crate::chain_write_gate::ChangeWitness::value_moves(
+                    "stale self-custody pledge state",
+                    Some(row.state.as_str()),
+                    "cancelled",
+                );
+                crate::chain_write_gate::as_writer(
+                    crate::chain_write_gate::WriterKind::CustodyIntent,
+                    crate::chain_write_gate::with_change(
+                        cancels,
+                        Self::update_state(conn, ctx, &row.id, &cancel, None, Some(hc_lamad)),
+                    ),
+                )
+                .await?;
             }
         }
 
@@ -577,11 +611,11 @@ impl ReaCommitmentService {
         //    emits ProjectionSignal::ReaCommitmentCommitted, which the
         //    in-process signal subscriber routes to
         //    rea_projection::project_signal — upsert with dht_anchor_hash.
-        let output_bytes = crate::chain_write_gate::as_writer(
-            crate::chain_write_gate::WriterKind::ReaSignal,
-            conductor_writes::call_create_rea_commitment(hc, &shefa_input),
-        )
-        .await?;
+        // No writer label here. This commitment speaks in the voice of whoever
+        // called `create`: a person's POST, the custody rotation tick, the
+        // node's own self-custody. Naming it at this depth made a person's
+        // write read as a machine's.
+        let output_bytes = conductor_writes::call_create_rea_commitment(hc, &shefa_input).await?;
 
         // The acknowledged action is a hint for the same authenticated
         // prepare/CAS path used by signals and reconciliation.
@@ -835,11 +869,9 @@ impl ReaCommitmentService {
                 .flatten(),
         };
 
-        let output_bytes = crate::chain_write_gate::as_writer(
-            crate::chain_write_gate::WriterKind::ReaSignal,
-            conductor_writes::call_update_rea_commitment_state(hc, &zome_input),
-        )
-        .await?;
+        // No writer label here, for the reason `create` carries none.
+        let output_bytes =
+            conductor_writes::call_update_rea_commitment_state(hc, &zome_input).await?;
 
         // Never split lifecycle and anchor writes: a delayed HTTP response
         // must not overwrite a newer signal/reconciliation observation.
