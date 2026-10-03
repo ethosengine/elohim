@@ -3,7 +3,7 @@ id: "backlog-dependabot-triage"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Triage Dependabot backlog — 191 vulnerabilities (1 critical, 113 high) on the default branch, untriaged"
+title: "Dependabot alert surface — 302 open on the default branch (135 high) as of 2026-10-03; index of the concern entries that own them"
 slug: "dependabot-triage"
 written: "2026-06-02"
 author: "cartographer"
@@ -14,9 +14,9 @@ recurrence: 2
 source_shifts:
   - "2026-05-17"
 domain: "operator"
-deprecation_status: triaged
+deprecation_status: in-progress
 severity: security
-fingerprints: [c4bc9714e080]
+fingerprints: [c4bc9714e080, c81302c029ff]
 relatedNodeIds:
   - "memory:feedback_cargo_resolution_vs_compilation"
   - "memory:feedback_subagent_dep_conflict_supervision"
@@ -106,7 +106,53 @@ cargo traps:
 4. **Vendored subrepos** (`rust-ipfs`/`brit`/`rakia`) — decide whether their advisories are
    in-scope (we build them) or should be excluded from the top-level surface.
 
-## Current decision (2026-07-29 — IN FLIGHT, campaign underway)
+## Current decision (2026-10-03 — every open alert has an owning entry; nothing landed this pass)
+
+> remote: GitHub found 302 vulnerabilities on ethosengine/elohim's default branch
+> (135 high, 140 moderate, 27 low).
+
+Ledger fingerprint `c81302c029ff` (push to `dev`, 2026-10-03). The default branch is `dev`, so
+the banner describes the current tree. The count is 302 against 191 in June and 304 at the
+July decomposition: the two campaigns closed alerts by fix and wrote the rest as repo-side
+dispositions (NOT-REACHABLE, MIRROR-RETRY, NEEDS-OPERATOR) that were never recorded as
+dismissals on GitHub, and 124 new alerts (#786 to #915: 117 npm, 7 cargo) have been raised
+since.
+
+**The alert list is now readable from the dev environment.**
+`gh api --paginate '/repos/ethosengine/elohim/dependabot/alerts?state=open&per_page=100'`
+returns all 302 (the `gh` CLI is installed and authenticated as EthosengineBot). Every
+statement below that the list is an operator-token read is superseded.
+
+**The mirror constraint is retired on both sides.** `.npmrc` and `.cargo/config.toml` now
+resolve public packages straight from npmjs and crates.io (registry split, 2026-07-30). Every
+`MIRROR-RETRY` disposition in the campaign record is therefore unblocked and should be re-run,
+not re-probed.
+
+Ownership of the 302, by upgrade unit:
+
+| Alerts | Unit | Owning entry | State |
+|---|---|---|---|
+| 226 npm | same-major transitive overrides (50 entries) | `security-npm-transitive-override-refresh` | open, resolution proven, ready to run |
+| 6 npm | Angular 22.1.0 to 22.2.x, whole family | `security-angular-22-patch-line-coordinated-bump` | open, queued |
+| 5 npm | vitest 3 to 4 in three SDK packages | `security-sdk-vitest-3-to-4-bump` | blocked on dependency major, plan written |
+| 4 npm | sharp 0.34 to 0.35 in `steward/device` | `security-steward-device-sharp-0-35-bump` | blocked on breaking bump, plan written |
+| 16 npm | dev-tooling transitives with no same-major fix | `security-dev-tooling-transitives-without-same-major-fix` | blocked on parent majors or dismissal |
+| 45 cargo | four service locks plus bitswap | `security-cargo-vulnerability-campaign-retry-queue` | operator decision sheet; 2026-10-03 addendum there |
+
+By manifest: `pnpm-lock.yaml` 252, `elohim/elohim-storage/Cargo.lock` 16, `steward/node/Cargo.lock`
+14, `doorway/doorway-service/Cargo.lock` 10, `elohim/holochain/tests/sweettest/Cargo.lock` 4,
+`steward/device/package.json` 2, one each on `elohim/sdk/storage-client-ts/package.json`,
+`elohim/sdk/epr-ts/package.json`, `elohim/elohim-agent/elohim-agent-sdk/package.json` and
+`elohim/elohim-bitswap/Cargo.lock`.
+
+Nothing was fixed in this pass. Every npm closure needs `pnpm install` in the shared working
+tree plus the JS gates, and every cargo closure needs `cargo test`; the dispatching session
+had an alpha fleet roll in flight in that tree and ruled out worktrees and heavy cargo. The
+first move when the tree is quiet is the override refresh: one `package.json` edit, 226 alerts.
+
+Still undone from the June plan sketch: a top-level grouped `.github/dependabot.yml` (item 3).
+
+## Prior decision (2026-07-29 — campaign underway; superseded where the section above says so)
 
 **The operator-initiated sprint this entry called for has started.** The alert surface is now
 decomposed into eleven write-disjoint cluster files at repo root,
