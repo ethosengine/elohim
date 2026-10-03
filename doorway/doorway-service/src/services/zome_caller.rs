@@ -79,6 +79,7 @@ use holochain_client::{
 };
 use holochain_types::prelude::ExternIO;
 
+use crate::conductor::typed_admin::{classify_request_error, FaultClass};
 use crate::services::signing_credentials::{
     cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, CredentialDecision,
     SigningCredentialCache,
@@ -1007,11 +1008,159 @@ impl RoleCredentials {
 struct Connection {
     app_ws: AppWebsocket,
     /// The admin socket the connect ran over, kept so the first call to a role
-    /// can mint that role's credential without a second handshake. If it has
-    /// died by then the mint fails as `Unavailable`, the whole connection is
-    /// dropped, and the next call reconnects with a fresh one.
-    admin_ws: AdminWebsocket,
+    /// can mint that role's credential without a second handshake.
+    ///
+    /// On a long-lived caller it can be dead by the time a NEW role is first
+    /// called. If the mint reports the request was never written (the socket
+    /// was already torn down), [`mint_role_credential`] dials a fresh admin
+    /// socket, leaves it here, and mints over that — the call does not fail.
+    admin_ws: std::sync::Mutex<AdminWebsocket>,
+    /// Where to dial a replacement admin socket.
+    admin_addr: String,
     roles: RoleCredentials,
+}
+
+impl Connection {
+    fn admin(&self) -> AdminWebsocket {
+        self.admin_ws
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+}
+
+/// Why minting one role's credential failed.
+#[derive(Debug)]
+enum MintFailure {
+    /// The admin client returned an error — typed, so it can be classed.
+    Conductor(ConductorApiError),
+    /// The authorize outran the per-call deadline.
+    TimedOut,
+    /// A replacement admin socket could not be dialled.
+    Redial(String),
+}
+
+/// Did this mint fail WITHOUT its request ever being written?
+///
+/// The typed test hosted provisioning uses ([`FaultClass::NotSent`]):
+/// `holochain_websocket` answers `Close("No connection")` when the socket was
+/// already torn down before the write — exactly what a kept-but-idle admin
+/// socket looks like once its peer has closed it.
+fn mint_never_written(failure: &MintFailure) -> bool {
+    matches!(
+        failure,
+        MintFailure::Conductor(error) if classify_request_error(error) == FaultClass::NotSent
+    )
+}
+
+/// Run `first`; if it failed without its request ever being written, run
+/// `redial_and_retry` ONCE instead of surfacing the failure.
+///
+/// Nothing reached the conductor in that case, so the retry cannot author a
+/// second `CapGrant`. Any other failure — a request that was written and then
+/// lost, a timeout, a refusal — is returned unchanged and never retried: its
+/// grant may exist.
+async fn retry_if_never_written<T, E, First, Retry, RetryFut>(
+    first: First,
+    never_written: impl Fn(&E) -> bool,
+    redial_and_retry: Retry,
+) -> Result<T, E>
+where
+    First: Future<Output = Result<T, E>>,
+    Retry: FnOnce() -> RetryFut,
+    RetryFut: Future<Output = Result<T, E>>,
+{
+    match first.await {
+        Err(failure) if never_written(&failure) => redial_and_retry().await,
+        outcome => outcome,
+    }
+}
+
+/// One `authorize_signing_credentials`, bounded by `deadline`.
+async fn authorize_once(
+    admin: &AdminWebsocket,
+    cell_id: CellId,
+    deadline: Duration,
+) -> Result<SigningCredentials, MintFailure> {
+    match tokio::time::timeout(
+        deadline,
+        admin.authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+            cell_id,
+            functions: None,
+        }),
+    )
+    .await
+    {
+        Err(_elapsed) => Err(MintFailure::TimedOut),
+        Ok(Err(error)) => Err(MintFailure::Conductor(error)),
+        Ok(Ok(credentials)) => Ok(credentials),
+    }
+}
+
+/// Mint ONE role's signing credential over the connection's admin socket,
+/// replacing that socket first if it turns out to be dead.
+///
+/// Each conductor step is bounded by `deadline`, the same per-call deadline as
+/// everywhere else in this module; none is extended.
+async fn mint_role_credential(
+    connection: &Connection,
+    role_name: &str,
+    cell_id: CellId,
+    deadline: Duration,
+) -> Result<SigningCredentials, String> {
+    let kept = connection.admin();
+    let minted = retry_if_never_written(
+        authorize_once(&kept, cell_id.clone(), deadline),
+        mint_never_written,
+        || async {
+            warn!(
+                conductor = %connection.admin_addr,
+                role = %role_name,
+                "Kept admin socket is dead — redialling it to mint this role's credential"
+            );
+            let fresh = redial_admin(&connection.admin_addr, deadline)
+                .await
+                .map_err(MintFailure::Redial)?;
+            *connection
+                .admin_ws
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = fresh.clone();
+            authorize_once(&fresh, cell_id.clone(), deadline).await
+        },
+    )
+    .await;
+
+    match minted {
+        Ok(credentials) => {
+            info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
+            Ok(credentials)
+        }
+        Err(MintFailure::TimedOut) => Err(format!(
+            "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
+            deadline.as_millis()
+        )),
+        Err(MintFailure::Conductor(e)) => Err(format!(
+            "authorize_signing_credentials failed for role '{role_name}': {e}"
+        )),
+        Err(MintFailure::Redial(e)) => Err(e),
+    }
+}
+
+/// Dial a fresh admin socket for an existing connection.
+async fn redial_admin(admin_addr: &str, deadline: Duration) -> Result<AdminWebsocket, String> {
+    let admin_socket = crate::conductor::resolve_host_port(admin_addr).await?;
+    tokio::time::timeout(
+        deadline,
+        AdminWebsocket::connect(admin_socket, Some(String::from("doorway-zome-caller"))),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "Admin connect timed out after {}ms ({admin_addr})",
+            deadline.as_millis()
+        )
+    })?
+    .map_err(|e| format!("Admin connect failed: {e}"))
 }
 
 /// Connect to ONE conductor and return a signing-capable connection.
@@ -1144,7 +1293,8 @@ async fn connect_endpoint(
 
     Ok(Connection {
         app_ws,
-        admin_ws,
+        admin_ws: std::sync::Mutex::new(admin_ws),
+        admin_addr: endpoint.admin_addr.clone(),
         roles,
     })
 }
@@ -1183,35 +1333,11 @@ async fn call_on_connection(
     payload: Vec<u8>,
     deadline: Duration,
 ) -> Result<Vec<u8>, CallError> {
-    let admin_ws = &connection.admin_ws;
     connection
         .roles
-        .ensure(
-            credential_cache(),
-            role_name,
-            deadline,
-            |cell_id| async move {
-                let credentials = tokio::time::timeout(
-                    deadline,
-                    admin_ws.authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                        cell_id,
-                        functions: None,
-                    }),
-                )
-                .await
-                .map_err(|_| {
-                    format!(
-                        "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
-                        deadline.as_millis()
-                    )
-                })?
-                .map_err(|e| {
-                    format!("authorize_signing_credentials failed for role '{role_name}': {e}")
-                })?;
-                info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
-                Ok(credentials)
-            },
-        )
+        .ensure(credential_cache(), role_name, deadline, |cell_id| {
+            mint_role_credential(connection, role_name, cell_id, deadline)
+        })
         .await
         .map_err(CallError::unavailable)?;
 
@@ -2253,5 +2379,107 @@ mod tests {
             2,
             "…and the mark is consumed"
         );
+    }
+
+    // ── the kept admin socket (lazy mints on a long-lived caller) ───────────
+
+    fn never_written() -> MintFailure {
+        MintFailure::Conductor(ConductorApiError::WebsocketError(
+            holochain_websocket::WebsocketError::Close("No connection".to_string()),
+        ))
+    }
+
+    /// A long-lived caller's first use of a new role finds its kept admin
+    /// socket already torn down. Nothing was written, so the admin socket is
+    /// redialled and the mint goes ahead — the call does not fail.
+    #[tokio::test]
+    async fn a_dead_kept_admin_socket_is_redialled_instead_of_failing_the_call() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Err::<u8, _>(never_written()) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Ok(7u8)
+            },
+        )
+        .await;
+
+        assert_eq!(outcome.expect("the retry over a fresh socket succeeds"), 7);
+        assert_eq!(redials.load(Ordering::SeqCst), 1);
+    }
+
+    /// A mint whose request WAS written is never retried: the grant may exist,
+    /// and a second authorize would author a second one.
+    #[tokio::test]
+    async fn a_mint_that_was_written_is_never_retried() {
+        use std::io::{Error as IoError, ErrorKind};
+        for written in [
+            MintFailure::Conductor(ConductorApiError::WebsocketError(
+                holochain_websocket::WebsocketError::Close("ConnectionClosed".to_string()),
+            )),
+            MintFailure::Conductor(ConductorApiError::IoError(IoError::new(
+                ErrorKind::BrokenPipe,
+                "broken pipe",
+            ))),
+            MintFailure::Conductor(ConductorApiError::ExternalApiWireError(
+                holochain_conductor_api::ExternalApiWireError::InternalError(
+                    "source chain head has moved".to_string(),
+                ),
+            )),
+            MintFailure::TimedOut,
+            MintFailure::Redial("Admin connect failed".to_string()),
+        ] {
+            let redials = AtomicU32::new(0);
+            let rendered = format!("{written:?}");
+            let outcome = retry_if_never_written(
+                async { Err::<u8, _>(written) },
+                mint_never_written,
+                || async {
+                    redials.fetch_add(1, Ordering::SeqCst);
+                    Ok(7u8)
+                },
+            )
+            .await;
+
+            assert!(outcome.is_err(), "must surface unchanged: {rendered}");
+            assert_eq!(redials.load(Ordering::SeqCst), 0, "{rendered}");
+        }
+    }
+
+    /// The common case: a live socket mints and nothing is redialled.
+    #[tokio::test]
+    async fn a_live_admin_socket_is_not_redialled() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Ok::<u8, MintFailure>(1) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Ok(2u8)
+            },
+        )
+        .await;
+
+        assert_eq!(outcome.unwrap(), 1);
+        assert_eq!(redials.load(Ordering::SeqCst), 0);
+    }
+
+    /// One redial, not a loop: if the fresh socket also fails, that surfaces.
+    #[tokio::test]
+    async fn the_redial_is_attempted_once() {
+        let redials = AtomicU32::new(0);
+        let outcome = retry_if_never_written(
+            async { Err::<u8, _>(never_written()) },
+            mint_never_written,
+            || async {
+                redials.fetch_add(1, Ordering::SeqCst);
+                Err(never_written())
+            },
+        )
+        .await;
+
+        assert!(outcome.is_err());
+        assert_eq!(redials.load(Ordering::SeqCst), 1);
     }
 }

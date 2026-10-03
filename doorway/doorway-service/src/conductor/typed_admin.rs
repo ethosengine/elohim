@@ -128,7 +128,7 @@ impl From<AdminFault> for String {
 /// Matching is case-insensitive. A marker added here widens
 /// `SentOutcomeUnknown` at the expense of `Refused`, which is the safe
 /// direction: it costs a same-conductor lookup, never a second identity.
-fn classify_request_error(error: &ConductorApiError) -> FaultClass {
+pub(crate) fn classify_request_error(error: &ConductorApiError) -> FaultClass {
     /// How a conductor's rendered answer spells "a transport of mine dropped".
     const DROPPED_TRANSPORT_MARKERS: [&str; 12] = [
         "brokenpipe",
@@ -181,17 +181,23 @@ fn classify_request_error(error: &ConductorApiError) -> FaultClass {
     }
 }
 
+/// How long an admin request is waited for before the client gives up.
+///
+/// Read from the library that enforces it, not restated: every admin socket
+/// here is opened with `AdminWebsocket::connect`, which uses
+/// `WebsocketConfig::CLIENT_DEFAULT`, and `holochain_websocket` fails a request
+/// with `WebsocketError::Timeout` once `default_request_timeout` has passed.
+/// The conductor does NOT stop working on a request when this fires.
+pub fn admin_request_timeout() -> Duration {
+    holochain_websocket::WebsocketConfig::CLIENT_DEFAULT.default_request_timeout
+}
+
 /// The admin operations hosted provisioning performs on ONE conductor, with
 /// their failures typed.
 ///
 /// A trait so the provisioner's decisions — re-offer, resolve in place, or
 /// stop — can be driven by a scripted conductor in tests. [`TypedAdminClient`]
 /// is the only production implementation.
-// `clippy::double_must_use`: `#[async_trait]` (0.1.89) marks each generated
-// method `#[must_use]`, and from clippy 1.99 the boxed future it returns is
-// already must-use. Every `#[async_trait]` trait in this crate trips it; the
-// crate-wide cure (an async-trait bump or one crate-level allow) retires this.
-#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait ProvisionAdmin: Send + Sync {
     /// Generate a new agent key. Returns the raw 39 bytes.
@@ -219,7 +225,6 @@ pub trait ProvisionAdmin: Send + Sync {
 
 /// Opens an admin connection to a conductor. A failure here is `NotSent` by
 /// construction: no admin request exists yet.
-#[allow(clippy::double_must_use)] // see `ProvisionAdmin`
 #[async_trait]
 pub trait AdminConnector: Send + Sync {
     async fn connect(&self, admin_url: &str) -> Result<Box<dyn ProvisionAdmin>, AdminFault>;

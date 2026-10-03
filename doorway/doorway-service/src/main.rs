@@ -462,7 +462,29 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             .database(m.db_name())
             .collection::<bson::Document>("conductor_registry")
     });
-    let registry = ConductorRegistry::new(registry_collection).await;
+    let mut registry = ConductorRegistry::new(registry_collection).await;
+
+    // The provisioning intent log lives beside the mappings, in the same
+    // database. If the collection (or its unique index) cannot be opened the
+    // log stays in process memory: provisioning still works and is still
+    // serialized within this process, but an attempt is not remembered across
+    // a restart — said loudly, because that is the property the log exists for.
+    if let Some(mongo) = state.mongo.as_ref() {
+        match doorway::conductor::MongoIntentStore::open(mongo.inner(), mongo.db_name()).await {
+            Ok(store) => {
+                registry = registry.with_intent_store(Arc::new(store));
+                info!(
+                    db = %mongo.db_name(),
+                    "Provisioning intent log: durable (Mongo `provisioning_intents`)"
+                );
+            }
+            Err(e) => warn!(
+                error = %e,
+                "Provisioning intent log could NOT be opened in Mongo — falling back to \
+                 process memory; in-flight provisioning will not survive a restart"
+            ),
+        }
+    }
 
     // Hosted-agent ceiling, read ONCE at startup and threaded into BOTH capacity
     // gates below (registry `capacity_max` = the provisioning gate; ConductorPoolMap

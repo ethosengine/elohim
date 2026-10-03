@@ -20,8 +20,11 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use super::agent_key::{is_agent_key_form, normalize_agent_key};
+use super::provision_intent::{IntentStore, MemoryIntentStore};
+use crate::keyed_lock::KeyedLock;
 use tracing::{info, warn};
 
 /// Count DISTINCT hosted agents per conductor from `(conductor_id, agent_key)` rows.
@@ -78,6 +81,15 @@ pub struct ConductorRegistry {
     conductors: DashMap<String, ConductorInfo>,
     /// MongoDB collection for persistent backing (None = memory-only)
     db: Option<mongodb::Collection<bson::Document>>,
+    /// The provisioning intent log — what this doorway asked a conductor to do
+    /// for each person. Lives beside the mappings above (same database when
+    /// Mongo is configured, process memory otherwise). See
+    /// [`super::provision_intent`].
+    intents: Arc<dyn IntentStore>,
+    /// One provisioning call at a time per identifier, in this process. The
+    /// intent log's compare-and-set is what is correct across processes; this
+    /// only spares a second in-process call a wasted key generation.
+    provision_locks: KeyedLock,
 }
 
 /// An agent's assignment to a conductor
@@ -115,6 +127,8 @@ impl ConductorRegistry {
             agents: DashMap::new(),
             conductors: DashMap::new(),
             db,
+            intents: Arc::new(MemoryIntentStore::new()),
+            provision_locks: KeyedLock::new(),
         };
 
         // Load persisted agent mappings if MongoDB is available
@@ -125,6 +139,31 @@ impl ConductorRegistry {
         }
 
         registry
+    }
+
+    /// Back the provisioning intent log with `store` instead of process memory.
+    pub fn with_intent_store(mut self, store: Arc<dyn IntentStore>) -> Self {
+        self.intents = store;
+        self
+    }
+
+    /// The provisioning intent log.
+    pub fn intents(&self) -> &Arc<dyn IntentStore> {
+        &self.intents
+    }
+
+    /// Per-identifier provisioning serialization for this process.
+    pub fn provision_locks(&self) -> &KeyedLock {
+        &self.provision_locks
+    }
+
+    /// The agent mapped to `app_id` on `conductor_id`, if this doorway holds
+    /// one. A lookup in the doorway's own records — it asks no conductor.
+    pub fn find_agent_by_app(&self, conductor_id: &str, app_id: &str) -> Option<String> {
+        self.agents
+            .iter()
+            .find(|e| e.value().conductor_id == conductor_id && e.value().app_id == app_id)
+            .map(|e| e.key().clone())
     }
 
     /// Load agent→conductor mappings from MongoDB

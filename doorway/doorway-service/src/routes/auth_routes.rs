@@ -992,6 +992,22 @@ fn password_too_weak(password: &str) -> bool {
     password.len() < MIN_PASSWORD_LEN
 }
 
+/// Note in the provisioning intent log how far a registration got AFTER
+/// provisioning. Best-effort and forward-only; a person this doorway never
+/// provisioned has no record and gets none. Nothing is decided on these marks —
+/// whether a human exists is the DHT's to say, not this log's.
+async fn mark_provisioning_progress(
+    state: &AppState,
+    identifier: &str,
+    progress: crate::conductor::IntentState,
+) {
+    if let Some(registry) = &state.conductor_registry {
+        AgentProvisioner::new(Arc::clone(registry))
+            .record_progress(identifier, progress)
+            .await;
+    }
+}
+
 /// Whether a hosted registrant gets their own provisioned cell.
 ///
 /// WHY NOT `dev_mode`: that flag is `"true"` on every deployed manifest
@@ -1520,6 +1536,12 @@ async fn handle_register(
 
             match zome_result {
                 Ok(human_output) => {
+                    mark_provisioning_progress(
+                        &state,
+                        &body.identifier,
+                        crate::conductor::IntentState::HumanCreated,
+                    )
+                    .await;
                     // Prefer the provisioned agent key; fall back to zome config
                     let agent_key = if let Some(ref p) = provisioner_result {
                         p.agent_pub_key.clone()
@@ -1989,6 +2011,12 @@ async fn handle_register(
         "Registered new user: {} with custodial key",
         body.identifier
     );
+    mark_provisioning_progress(
+        &state,
+        &body.identifier,
+        crate::conductor::IntentState::AccountRecorded,
+    )
+    .await;
 
     // The JOIN. A registrant who NAMED a canonical human (`humanId` on the
     // request body — the household prologue passes `human-james-son`) has just

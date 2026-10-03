@@ -8,6 +8,7 @@ pub mod agent_key;
 pub mod chaperone;
 pub mod grant_memory;
 pub mod pool_map;
+pub mod provision_intent;
 pub mod provisioner;
 pub mod registry;
 pub mod router;
@@ -24,7 +25,10 @@ pub use pool_map::{
     max_agents_per_conductor_from_env, ConductorPoolMap, ConductorPoolStatus,
     DEFAULT_MAX_AGENTS_PER_CONDUCTOR, MAX_AGENTS_PER_CONDUCTOR_ENV,
 };
-pub use provisioner::{AgentProvisioner, ProvisionError, ProvisionedAgent};
+pub use provision_intent::{
+    IntentState, IntentStore, MemoryIntentStore, MongoIntentStore, ProvisionIntent,
+};
+pub use provisioner::{AgentProvisioner, Existence, ProvisionError, ProvisionedAgent};
 pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};
 pub use router::ConductorRouter;
 pub use typed_admin::{AdminFault, FaultClass, TypedAdminClient};

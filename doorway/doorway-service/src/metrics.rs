@@ -29,8 +29,8 @@ use std::time::Instant;
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts,
-    Registry, TextEncoder,
+    Encoder, Histogram, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 // ── Reconnect-reason label values (M2). The close *cause*, a non-overlapping
@@ -288,6 +288,30 @@ lazy_static! {
     pub static ref ADMISSION_SHED_TOTAL: IntCounter = IntCounter::new(
         "doorway_admission_shed_total",
         "Inbound requests shed by the global admission gate (at ceiling).",
+    )
+    .unwrap();
+
+    // ── Provisioning intent log — the saga's visible debt ────────────────────
+
+    /// Records in the provisioning intent log, by state. `abandoned` is the
+    /// count of attempts that ended leaving nothing behind; nothing reaps
+    /// them, so this is where that debt shows. Refreshed after each
+    /// provisioning call (event-driven, like every other series here).
+    pub static ref PROVISION_INTENTS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provision_intents",
+            "Provisioning intent log records, by state.",
+        ),
+        &["state"],
+    )
+    .unwrap();
+
+    /// Live intent records that never reached `enabled` and have not moved for
+    /// longer than the in-flight bound: attempts nobody finished. The work a
+    /// reaper would have, were there one.
+    pub static ref PROVISION_INTENTS_STALE: IntGauge = IntGauge::new(
+        "doorway_provision_intents_stale",
+        "Live provisioning intents not yet enabled and unchanged past the in-flight bound.",
     )
     .unwrap();
 
@@ -742,6 +766,8 @@ pub fn register_all() {
             BLOB_PANTRY_TOTAL.with_label_values(&[outcome]).inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(BLOB_TARGET_FAILOVER_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS_STALE.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
@@ -964,6 +990,18 @@ pub fn inc_breaker_open() {
 /// M4: upstream backpressure (429/503) was honored by shedding to the client.
 pub fn inc_backpressure_honored() {
     UPSTREAM_BACKPRESSURE_HONORED_TOTAL.inc();
+}
+
+/// Provisioning intent log: how many records are in `state`.
+pub fn set_provision_intents(state: &str, count: u64) {
+    PROVISION_INTENTS
+        .with_label_values(&[state])
+        .set(i64::try_from(count).unwrap_or(i64::MAX));
+}
+
+/// Provisioning intent log: live records unfinished past the in-flight bound.
+pub fn set_provision_intents_stale(count: u64) {
+    PROVISION_INTENTS_STALE.set(i64::try_from(count).unwrap_or(i64::MAX));
 }
 
 /// M4: an inbound request was shed by the global admission gate.
