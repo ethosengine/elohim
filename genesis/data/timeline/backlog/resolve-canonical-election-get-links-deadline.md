@@ -9,7 +9,7 @@ written: "2026-08-03"
 author: "pipeline-landing shift (integrator; diagnosis corrected same shift by code-disproof)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, holochain, conductor, db-pool-saturation, backpressure, obey-path, convergence, concern-c11, concern-c8, misdiagnosis-corrected, performance, perf-queue, perf-io, trustful-self, friction-mechanical, plane-notary, fused-planes, unit-call, phase-steady, lane-interactive]
+tags: [dataplane, holochain, conductor, db-pool-saturation, backpressure, obey-path, convergence, concern-c11, concern-c8, misdiagnosis-corrected, performance, perf-queue, perf-io, trustful-self, friction-mechanical, plane-notary, plane-head, fused-planes, unit-call, phase-steady, lane-interactive]
 cites:
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - elohim/elohim-storage/src/services/head_adoption.rs
@@ -73,3 +73,5 @@ seam-registry C6a answered-with-accurate-reasoning) are legibility-only and
 ride the next coordinator swap — they do not move the obey rate.
 
 Status: open, unowned. First action: read the probe histogram post-deploy.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly. The cited 10 s semaphore is gone at the 0.7 pin; reads use a sqlx pool with a 30 s acquire timeout (`holochain_data/src/lib.rs:262-271`). A batched election answer exists (`head_adoption.rs:962-1000`); a failed read still drops the row until next sweep (`:2575-2594`). Same mechanism as: adam-genesis-anchor-sustained-saturation (read-pool starvation). Confirming measurement: `elohim_content_election_obey_probe_total{outcome}` split on a household storage peer.

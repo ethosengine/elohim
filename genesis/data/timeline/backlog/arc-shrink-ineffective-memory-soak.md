@@ -48,3 +48,5 @@ length/restarts against it. No RCA attempted this shift; capturing the measureme
 - Soak evidence + judgment: shift journal `.claude/shifts/2026-06-16T0357-alpha-conductor-oom-arc-leecher.journal.md` (iteration 2)
 - RCA: `genesis/docs/content/elohim-protocol/history/2026-06-15-matthew-edge-resiliency-rca-fanout-synthesis.md` (§4 instrumentation, §5 staged experiments)
 - Falsified spec: `genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md`
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): arc is still zero-or-full; the shem mesh binary carries jemalloc, so the 2026-09-04 update no longer describes shem. `kitsune2_gossip-0.5.0/src/storage_arc.rs:99-103`; `genesis/local-dev/perf-deep-dive/build-fork-fp.sh:12`; `hc-mesh.sh:2103-2116` accepts any binary without checking features. Same mechanism as: conductor-memory-attribution-verdict. Confirming measurement: `RssAnon` slope of three jemalloc conductors over 4 idle hours, fixed cells.

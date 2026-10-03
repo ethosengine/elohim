@@ -120,3 +120,5 @@ recording whether it passed through `select_canonical_winner`/
 Open. Not blocking — `b19f12014` (Leg A) already keeps this class out of the
 fleet-wide convergence gauge, so this is a latent slower-convergence gap to
 close on its own schedule, not a red blocking the saga today.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly cured; adopt_local still stamps HealCanonical but the guard now compares the carried DHT election ordering; un-elected or not-newer answers still refuse. `elohim-storage/src/services/head_adoption.rs:2082,2204-2206`; `services/conductor_writes.rs:577-587`; `db/content_diesel.rs:2132-2153`; commits 496a4aba8, da8975176. Same mechanism as: content-gap-limit-cycle-blocks-convergence (RCA v3 consumption wall). Confirming measurement: household two-peer declare scenario, `elohim_projection_refused_stale{reason}` on the gossip-only peer.

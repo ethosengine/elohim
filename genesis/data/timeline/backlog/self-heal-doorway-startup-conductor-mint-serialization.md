@@ -146,3 +146,5 @@ being too tight).
   startup probe `connection refused` on :8080 co-occurring with
   `Failed to connect to conductor ... Name or service not known`. Until the
   rebuilt image is deployed, this entry stays `wip` / `in-progress`.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): cured in code, no deployed verification recorded. The per-conductor pool no longer mints before the HTTP bind (doorway-service/src/main.rs:551-575); one bounded synchronous mint remains for the default app pool (main.rs:325, retries at 2063-2076, about 12.5 s worst case) and server::run is still last (main.rs:1878). Same mechanism as: none. Confirming measurement: time from doorway start to first /health 200 on the household with CONDUCTOR_URLS naming one unreachable conductor.

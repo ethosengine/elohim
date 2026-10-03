@@ -94,3 +94,5 @@ storm regression.
    Check per-peer blob counts (per `project_inventory_exchange_not_byte_replication`: metadata
    count ≠ bytes) before concluding.
 3. Dedup against any existing content-replication / diversity-placement backlog before deep work.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): not determinable from code; an untested observation whose figures match the gap floor a later entry attributes to a classifier conflation, now cured in code. `elohim-storage/src/p2p/projection_reconcile.rs:4486-4499`; `db/content_diesel.rs:2854-2882`. Same mechanism as: content-gap-limit-cycle-blocks-convergence (probable earlier sighting; ids never sampled). Confirming measurement: household `content sweep complete` log fields `divergent_anchor` and `conductor_missing` over four sweeps beside `elohim_projection_reconcile_reach_scoped`.

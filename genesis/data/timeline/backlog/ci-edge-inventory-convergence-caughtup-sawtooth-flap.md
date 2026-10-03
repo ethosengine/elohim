@@ -162,3 +162,5 @@ load-bearing and must survive any de-duplication.
 - `elohim-edge/dev` #1467 — same scenario green, no relevant changeset.
 - ci-investigator run 2026-09-19 (this triage) — build table 1440..1467.
 - `.claude/data/ci-findings.jsonl` fps `7db3e674ea84`, `591656751c2b`.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PRESENT, measurement leg only. The scenario still asserts one instant sample with a message carrying only the caughtUp value (genesis/a2o/steps/dataplane.steps.ts:483-496; inventory-convergence.feature:42-45). The gate and the scenario read different surfaces: storage /p2p/status pull.caughtUp (scripts/ci/fleet-quiesce-gate.sh:50,194) versus a peer's /health p2p.caughtUp, so "same field" overstates. Same mechanism as: fleet-quiesce-pass-not-convergence. Confirming measurement: both fields polled every 5 s across two sweeps on the household.

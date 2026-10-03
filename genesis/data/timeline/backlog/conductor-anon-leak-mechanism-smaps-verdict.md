@@ -2,7 +2,7 @@
 title: Conductor anon leak is mmap-count accumulation (many discrete large mappings) — H1 falsified, H4 not-the-slope, H3 leading
 kind: backlog
 status: confirmed
-tags: [decision-record, runtime-memory, conductor, kitsune2, validation-receipt, self-heal, design-decision-toolkit, performance, perf-memory, trustful-self, friction-mechanical, unit-history, phase-growth]
+tags: [decision-record, runtime-memory, conductor, kitsune2, validation-receipt, self-heal, design-decision-toolkit, performance, perf-memory, trustful-self, friction-mechanical, unit-history, phase-steady]
 occurred_at: 2026-06-17
 ---
 
@@ -152,3 +152,5 @@ Derived facts:
 - the upstream-research record (body retired; lesson in `genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md` §Dead paths) (upstream search: transport elimination tx5≠iroh, #5664/#5718/#5719/#408 analysis, source-read of `validation_receipt_workflow.rs:87`)
 - Instrument source: `elohim/elohim-storage/src/services/system_metrics.rs:443-500` (`parse_smaps_anon`,
   `classify_mapping`), `elohim/elohim-storage/src/metrics.rs` (gauge surface, currently unscraped)
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): allocator cure and the H2 trigger fix are both in the pin; neither has a recorded runtime check on the 0.7 line. `holochain/src/bin/holochain/main.rs:26-28`; `validation_receipt_workflow.rs:73-90`. The "wasmer linear memory" reading of the fixed mapping is unverified. Same mechanism as: conductor-memory-attribution-verdict, arc-shrink-ineffective-memory-soak. Confirming measurement: anonymous mappings split by `r-x` and `rw-` over a 4 h idle soak on the local mesh.

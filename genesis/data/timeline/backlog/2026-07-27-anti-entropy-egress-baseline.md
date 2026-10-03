@@ -152,3 +152,5 @@ optimization is inert; that check is future work, not this baseline.
   it against `elohim_sync_rounds_total` to compute the digest-shortcut hit
   rate — this is the number Phase 3 (capability-relative budget/eviction, per
   the parent slice plan) is blocked on.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly cured; inventory gossip now has message counters, no byte counters; kitsune2 gossip still unmeasured. `elohim-storage/src/metrics.rs:1653,1682,1706,1937`; `p2p/gossip_dispatch.rs:376-626`; `p2p/mod.rs:4161,8574`; `p2p/conductor_agent_info_gossip.rs` has no metrics call. Same mechanism as: no-latency-metric-for-change-doorbell, sync-edge-susan-timeouts-per-edge-observability. Confirming measurement: household, ten-minute delta of `elohim_inventory_pages_published_total{outcome="sent"}` and `elohim_sync_rounds_total` per peer; bytes remain unreadable.

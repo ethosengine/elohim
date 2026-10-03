@@ -110,3 +110,5 @@ and never need `PUBLISHER_RESTART_GAP` (kept as the fallback for pre-epoch publi
 field added. Unit-tested (`an_epoch_carrying_restart_needs_no_gap_heuristic`); live: the mesh logs
 `epoch`/`counter` on every snapshot apply. Stations 2–5 (per-publisher `SyncStreamState` on `/p2p/status`,
 `docsBehind`, `pull.epoch`, a real `SnapshotRequest`) are in the spec.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): CURED-IN-CODE for reorder, pacing, failed-page hold and restart re-base (household numbers already in this entry); SnapshotRequest is still a placeholder. elohim-storage/src/p2p/gossip_dispatch.rs:581-621; p2p/mod.rs:4139,5151-5158; db/peer_blob_inventory.rs:86-95. Same mechanism as: inventory-gossip-amplifier-three-layer-idempotency; its locked page is storage-sqlite-locked-surfaces-as-500-despite-busy-timeout. Confirming measurement: elohim_inventory_pages_total{kind="delta",outcome="overflow"} stays 0 and receiver row count equals publisher count within two refreshes.

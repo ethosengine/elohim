@@ -243,3 +243,5 @@ correction): a dedicated bounded render pool / per-render budget for the ACTUAL 
 Tonight's fix closes the shell-fetch half of "first `/` is slow"; the cold-render-parks-the-shared-runtime
 half (2026-08-21 20:30 correction) is unchanged.
 
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY. Trial theft, extraction herd, warm-shell dead code and the missing storage histogram are cured in code with no deployed verification. doorway-service/src/routes/upstream_health.rs:277,298 (would_shed; raw gate test-only), elohim-storage/src/http.rs:302,11043-11081, doorway-service/src/server/http.rs:1382. Hop histogram still Off below 3 cores (metrics.rs:525-539) and no per-render budget (server/http.rs:6576-6583). Same mechanism as: none. Confirming measurement: first-/ latency after a doorway restart plus doorway_upstream_breaker_open_total on the household.

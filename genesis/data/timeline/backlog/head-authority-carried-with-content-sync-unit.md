@@ -9,7 +9,7 @@ written: "2026-09-18"
 author: "doorway-overnight-20260914 shift (doorway-failover pickup)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, head-adoption, trust-gradient, sync, elohim-storage, holochain, performance, perf-convergence, friction-verify, friction-wait, plane-authority, fused-planes, unit-item, phase-steady, lane-background]
+tags: [dataplane, head-adoption, trust-gradient, sync, elohim-storage, holochain, performance, perf-convergence, friction-verify, friction-wait, plane-head, fused-planes, unit-item, phase-steady, lane-background, dataplane-convergence]
 cites:
   - elohim/elohim-storage/src/services/head_adoption_trigger.rs
   - elohim/elohim-storage/src/chain_write_gate.rs
@@ -218,3 +218,52 @@ work; item 8 is a ready-to-review draft that shortens the eventual carried-recor
   three iroh apply sites offer through the shared `reverse_project`, and a pure-iroh node requests missing bytes
   over the iroh fetch leg.
 - Items 2 and 4–8 are untouched by this sprint and stay open.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY — item 7 cured in code by aa55b2e71 (held candidates back off 900 s), unrecorded here; item 2 present (no Relaxed ordering in the zomes); item 6 not verified; item 8 still a parked branch. elohim-storage/src/services/reanchor_backfill.rs:337-361; services/head_adoption_trigger.rs:240. Same mechanism as: items 6-7 pay conductor-cap-grant-scan-per-zome-call on every failing declare. Confirming measurement: timeToAdoptMs (doorway-sibling-adoption-measure/v1); elohim_content_reanchor_skipped_total{reason="held_backoff"}.
+
+**2026-10-03: silent adopt-before-author trigger on one peer; the fallback cannot meet the 75 s
+deadline** (shem household mesh, all actors test fixtures; logs read and code traced, nothing
+changed). In the `epr-app-deliverability` scenario "the doorway in front of the peers renders the
+server version every peer agreed on", the second browser declaration of one slug (02:19:55.8Z, via
+doorway A / matthew) was adopted by james's trigger in 4.8 s (attempt 1), but jessica's trigger
+logged nothing at INFO for that slug. Jessica caught up only through the projection-reconcile heal
+sweep at 02:21:17.2Z, about 81 s after the declaration. The step's last poll was at 76.95 s, so the
+scenario failed; doorway B (backed by jessica) hot-swapped at 02:21:22.5Z. The fallback's worst case
+is structural: on this mesh the content inventory is windowed (2,000 rows a page of 5,081), the sweep
+runs every 30 s, and offsets rotate 0 → 2000 → 4000, so a given slug's page recurs about every 90 s,
+plus a tick. That is above the 75 s publication deadline, so any peer whose trigger stays silent
+misses the deadline at random, depending on sweep phase. The earlier declaration of the same slug
+healed in 25 s only because offset 0 came round next. The unpatched conductor control (2b334df7)
+failed the same way one step earlier, so this is independent of the conductor per-call fixes; every
+conductor call on the path took 33–58 ms. Why the trigger was silent is not established. The leading
+candidates are a probe exit that logs only at debug (not yet walkable, courier refused, conductor
+fault), or the per-id claim from the declaration 35 s earlier deduplicating the second offer: the
+claim is keyed on content id alone with a 60 s cooldown (`services/head_adoption_trigger.rs:758-770`),
+and retry rungs stop at `elapsed + delay >= cooldown` (`:596-604`), so the 30 s rung never fires. The
+next measurement is a debug rerun on jessica with
+`RUST_LOG=info,elohim_storage::head_adoption_trigger=debug,elohim_storage::services::head_adoption_trigger=debug`.
+Proposed change, not made: key the claim on (content id, hint), add a trailing re-check at cooldown
+expiry, and promote the silent exits to rate-limited INFO. The deadline is not to be raised. This
+extends item 5 (cooldown and ladder are compile-time consts) and is the gap item 1 (carried-record
+adoption) would close. Detail on shem: `genesis/local-dev/perf-deep-dive/serving-elohim-host-miss.md`,
+`adoption-trigger-silent.md`.
+
+**2026-10-03 (later): the debug rerun narrows the silent trigger** (shem, same mesh, two passing runs
+of the same scenario with both trigger log targets at debug, 03:04–03:18Z). On jessica, each run's
+first declaration exits "no local content row — terminal" (the slug is new) and is healed by the
+sweep; the second declaration is then ADOPTED by the trigger on attempt 0 in 338 ms and 425 ms, one
+of them 41 s after the first, inside the 60 s cooldown. So the per-id claim does not suppress a
+second declaration, and the earlier "deduplicated by the claim" candidate is ruled out. What the
+debug window does show is load: 724 of 730 "cannot yet walk the head" / "re-probe ladder spent"
+lines were for 404 distinct `device-health` attestation documents written to matthew's chain by a
+measurement probe. The retained-hint pass re-offers them through the same gate and the same
+256-deep serial queue as sync-apply offers (`services/head_adoption_trigger.rs:960-996`, queue at
+`:180`), at about 60 offers a minute. A full queue drops an offer with no log line (`DroppedFull`,
+`:738-743`). Leading cause for the failed run is now a human-content offer dropped or delayed behind
+that machine-written backlog. Not proven: the failed run had debug off and its log was replaced at
+the restart. Next measurement: `elohim_head_adoption_trigger_total{outcome="dropped_full"}` scraped
+on jessica during a station-3 run with the backlog present. Design input: machine-written
+attestations should not share the adoption fast path's queue with a person's publication (see
+`arch-dataplane-borrows-backlog.md`, plane-separation observation 1). A priority lane, or excluding
+attestation kinds from the retained-hint pass, would be the narrow fix. Detail on shem:
+`genesis/local-dev/perf-deep-dive/serving-elohim-host-miss.md`.

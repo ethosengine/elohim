@@ -10,7 +10,7 @@ author: "shift 2026-09-11T09-00-land-batch-2c338124a (integrator) — operator q
 status: "open"
 priority: "high"
 needs_brainstorm: true
-tags: [conductor, kitsune2, backpressure, arc, gossip, publish, warm-up, edge-pipeline, D8, risk, performance, perf-cpu, perf-queue, trustful-declared, friction-mechanical, friction-wait, custody-everyone, plane-notary, fused-planes, unit-peer, phase-transition, lane-borrowed]
+tags: [conductor, kitsune2, backpressure, arc, gossip, publish, warm-up, edge-pipeline, D8, risk, performance, perf-cpu, perf-queue, trustful-declared, friction-mechanical, friction-wait, custody-everyone, plane-notary, fused-planes, unit-peer, phase-transition, phase-steady, lane-borrowed]
 relatedNodeIds: []
 cites:
   - elohim/elohim-storage/src/services/arc_actuator.rs
@@ -113,3 +113,5 @@ an object-label change. CHANGED is now the live pod template before vs after app
 (`scripts/ci/pod-inputs-fingerprint.sh`), and an identical-DNA hApp rebuild no longer moves that
 template (`conductor-happ-stamp.sh`). A deploy that restarts no conductor therefore pays no soak
 and no gate. Not yet proven on the fleet; the saturation itself is untouched.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly. Publish has no sender back-off (crates.io `kitsune2_core` 0.5.0 `core_publish.rs:348-379`) and the receive throttle is not at this pin. Two gossip knobs are now templated (`_edgenode-conductor.template.yaml:134-139`). Conductor roll is sequenced (`elohim/holochain/Jenkinsfile:989-1010`). Same mechanism as: staggered-conductor-fleet-restarts (roll), conductor-residual-cpu (republish). Confirming measurement: fleet — conductor CFS throttle ratio and adam's `error in recv_data` rate.

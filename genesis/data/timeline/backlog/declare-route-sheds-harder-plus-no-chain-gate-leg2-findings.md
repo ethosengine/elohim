@@ -53,3 +53,5 @@ Status: OPEN. Items 2 and 3 are code-shaped candidates (admission class of the
 declare route; whether declare-with-carried-record should be exempt from the
 no-chain gate since the record IS the verifiable content); item 1 is the
 standing operator ceiling.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly; shared write pool and Interactive declare class still present; no extra shed on the declare route found; no-chain gate now has a default-off carried-record exit. `elohim-storage/src/http.rs:279-284,325-331`; `services/conductor_writes.rs:59`; `content_store/src/lib.rs:2832-2846,5891`. Same mechanism as: conductor-slow-batch-starvation-jessica-class, self-heal-adam-projection-catchup-exhaustion-full-arc (slow conductor calls upstream). Confirming measurement: household paired declare and PATCH under load, `elohim_conductor_admission_shed_total` by zome.

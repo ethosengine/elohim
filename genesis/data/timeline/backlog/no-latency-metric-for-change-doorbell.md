@@ -81,3 +81,5 @@ The dual-mode announce guard remains in place; story 4.3's delivery change
 remains open. The next refinement is one projection followed by fan-out to both
 announcers, preserving the guard's protection against competing projection
 writers, then repeating the same mixed measurement.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY — the staleness histogram is committed and observed on both planes; it measures apply staleness, not notification transit; the dual-mode announce guard is unchanged, so story 4.3's delivery change is still open. elohim-storage/src/metrics.rs:1507-1524; p2p/mod.rs:8689; p2p_iroh/sync_backend.rs:195,344; main.rs:4754-4777. Same mechanism as: none. Confirming measurement: elohim_sync_projected_apply_staleness_seconds{plane} on a mixed mesh, enough samples to be a distribution.

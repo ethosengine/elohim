@@ -63,3 +63,5 @@ Reads (GET/HEAD) draw the larger pool; writes keep the tighter one (a shed write
 backpressure — the seeder retries per `ec5f0f522`). Local verification green (cargo check + unit
 tests both crates). Stays open until a deployed genesis run confirms the E2E `/epr/*` 503 count → 0
 (needs the dev merge/deploy — operator integration call).
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): cured in code for the pool-ceiling shed, no deployed verification recorded. Reads draw 256 permits against 64 for writes in storage (elohim-storage/src/http.rs:284,292,1988-2010) and 512 in the doorway (doorway-service/src/server/http.rs:557,7836-7850). An upstream-circuit shed (server/http.rs:3428) was not traced for /epr reads. Same mechanism as: doorway-breaker-trial-theft-fleet-verification (Upstream arm only). Confirming measurement: 200 versus 503 counts on GET /epr/<projected slug> during a seed burst above 64 concurrent writes.

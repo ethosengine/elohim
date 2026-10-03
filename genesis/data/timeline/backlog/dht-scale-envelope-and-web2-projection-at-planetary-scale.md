@@ -98,3 +98,5 @@ sizing, and the REA read-path economics — folded into the seam-map atlas
 sequence with the dht-unity plan's T5 (federation-level transport
 commons): T5 fixes today's two-doorway membrane; this item designs the
 10^9 version of the same seam.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): the build still has only a zero or a full arc; the sharded branch is compiled out. `kitsune2_gossip-0.5.0/src/storage_arc.rs:99-103`, `initiate.rs:59-66`; `holochain/Cargo.toml:263`. Everything else here is design, not code. Same mechanism as: arch-scale-risk-backlog rows 7–8 (the per-node costs of full custody). Confirming measurement: none on a three-peer mesh; needs a sharded build or the fleet.

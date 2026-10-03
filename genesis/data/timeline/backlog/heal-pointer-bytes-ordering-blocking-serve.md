@@ -52,3 +52,5 @@ propagation check tripped on (jessica curl-000 while healthy, genesis #1232).
 concerns cover the END state; a new scenario should pin the TRANSITION state:
 "pointer healed, bytes lagging → root answers ≤5s with syncing status, then
 converges to 200."
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): CURED-IN-CODE, both gaps, on 2026-07-02 (e1f4329ef eager byte fetch at pointer heal; dfe10c583 5 s in-request budget then syncing 503); no runtime verification recorded in this entry. elohim-storage/src/p2p/mod.rs:8643-8701; http.rs:1362,5132-5151,4599. Same mechanism as: none. Confirming measurement: GET /blob/<hash> for bytes the peer lacks answers 503 + Retry-After within ~5 s, with the log line "in-request budget expired".

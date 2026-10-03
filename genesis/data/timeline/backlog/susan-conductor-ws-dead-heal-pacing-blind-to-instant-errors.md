@@ -432,3 +432,5 @@ attribution: storage's own P2P path is a major part of what fills the cgroup. Th
 lived only in the message of commit `c93d772a9`. It was harvested on 2026-09-22 from the retired
 sprint-result `2026-08-14T02-42-saga-leg2-drain-regressions-profiler-eyes`, archived in
 `/projects/.claude-config/archive/shifts-stale-2026-09-22.tar.gz`.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY — the pacing gap is cured in code by f76378b2e (closed sockets count as never-answered and trip the circuit), with no fleet reading after it; susan's socket and the host-placement cause are not determinable from code. elohim-storage/src/p2p/projection_reconcile.rs:1087-1131,1151-1153,1252-1276. Same mechanism as: conductor-slow-batch-starvation-jessica-class; the missed per-attempt deadline is downstream of conductor per-call cost. Confirming measurement: "OPENED the unresponsive-conductor circuit" within three attempts with one conductor stopped.

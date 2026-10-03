@@ -43,3 +43,5 @@ flatness claims about it are unverifiable until instrumented; and
 elohim_head_batch_queue_wait_ms splits by node class (shem peers flat
 ~0.5/0.9ms p50/p90; household matthew/james/jessica elevated, matthew p90
 peaking 900ms during validation traffic).
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): the annotation fix is in code, the scope is unchanged. B-caughtUp is printed but does not gate (scripts/ci/fleet-quiesce-gate.sh:380-384) and the pass banner states the gate is not fleet convergence (:408). The PTxnGuard metric claim: symbol not found in elohim/ or doorway/. Same mechanism as: ci-edge-inventory-convergence-caughtup-sawtooth-flap, quiesce-gate-measurement-availability. Confirming measurement: fleet only for the B-False-at-PASS reading; on the household, compare storage pull.caughtUp with /health p2p.caughtUp.

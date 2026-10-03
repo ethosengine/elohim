@@ -55,3 +55,5 @@ until the mitigation lands.
 - **At planning:** the `risk` tag is the query; `/converge` ranks this cluster by `priority: high`; the p2p-design-gate's head-plane question cites row 3 for any lineage entity.
 - **At session start:** rows 1–4 sit in the `guard:` of the `happ-lineage-migration` habit atom, rendered by `just status habits --full`.
 - **Every measured run:** the Station 3 / 5 / 8 receipts carry the trigger numbers (elapsed, counts, RSS) — the first live measure of these rows is the next lamad-scale run, not node_registry.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): rows 2, 3, 6, 7, 8, 9, 10 present; row 1's "no pushdown" is stale (fork `2b334df79`); row 7's double-count is fixed (`conductor/registry.rs:266-278`); row 8's kitsune2 paths are now `kitsune2_core-0.5.0/src/factories/core_publish.rs:258-271,348-360`. Same mechanism as: row 7 = borrows row 18 priority 3; row 8 = borrows row 17. Confirming measurement: row 7, anonymous mappings split `r-x`/`rw-` around one hosted registration; row 8 needs the fleet.

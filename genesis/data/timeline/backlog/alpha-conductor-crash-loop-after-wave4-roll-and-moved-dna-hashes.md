@@ -11,7 +11,7 @@ status: "open"
 priority: "critical"
 ceiling: "operator"
 relatedNodeIds: []
-tags: [escalation, alpha, conductor, crash-loop, sqlite-read-pool, out-of-threads, process-manager, readiness-window, doorway, headless-dns, projection-reconcile, canonical-head, dna-hash-moved, integrity-wasm, mixed-version, north-star, performance, perf-io, perf-queue, trustful-self, friction-mechanical, plane-notary, fused-planes, phase-transition, lane-interactive]
+tags: [escalation, alpha, conductor, crash-loop, sqlite-read-pool, out-of-threads, process-manager, readiness-window, doorway, headless-dns, projection-reconcile, canonical-head, dna-hash-moved, integrity-wasm, mixed-version, north-star, performance, perf-io, perf-queue, trustful-self, friction-mechanical, plane-notary, fused-planes, unit-once, phase-transition, lane-interactive]
 cites:
   - elohim/elohim-storage/src/conductor/process_manager.rs
   - elohim/elohim-storage/src/happ_manager.rs
@@ -321,3 +321,5 @@ All seven conductor pods Ready with 0 restarts over 2 h; both doorways resolve t
 conductor; `projectionReconcile.caughtUp true`; a `[build:app]` run reports `✓ canonical head
 propagated` for elohim-host-landing and lamad-spa on both doorways and alpha's index assets
 return 200; and the integrity-hash question in §4 has an answer recorded on this atom.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): cured in code for the torn-uninstall mechanism. `elohim-storage/src/happ_manager.rs:31-33,604-641` (migration intent required; refuses uninstall on a saturated DB), `conductor/process_manager.rs:613,647,730` (dead child detected), `_edgenode-conductor.template.yaml:335-338` (flag false). Same mechanism as: none; the post-restart read storm is only its trigger. Confirming measurement: needs the fleet or a disposable canary; no safe household reproduction.

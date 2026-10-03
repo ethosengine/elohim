@@ -43,3 +43,5 @@ The findings-sentinel pattern (flag → agent → canon → stasis) is only as g
 
 - `runtime-cursor.json` windows are non-empty on every poll for a week; the harvester files a finding within one poll of a synthetic stuck state on the household mesh.
 - A throttle alert fires in Alertmanager against the live fleet state as measured today.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): fixes 1 and 2 are in the repo; fix 3 (a Prometheus-fed throttle class in the harvester) is absent; no recorded Alertmanager firing. `.claude/settings.json:50`; `alpha-doorway-alerts.yaml:130,160`. The conductor's own exporter is not in this pin, so throttle remains the only conductor-side signal. Same mechanism as: senses arch-scale-risk-backlog row 8. Confirming measurement: fleet only — the alert's state in Alertmanager against live throttle.

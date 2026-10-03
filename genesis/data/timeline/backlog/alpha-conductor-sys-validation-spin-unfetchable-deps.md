@@ -169,3 +169,5 @@ integrator's move, and it dispatches a conductor image build).
 4. Not reproduced on the local mesh. The `@requires:owned-substrate` chaos scenario named above
    (author on one peer, re-key that peer, assert retry budget and log rate) is still unwritten and
    is what would make this Act I-provable.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): spin cured in code; the unfetchable set is data, not determinable here. `sys_validation_workflow/missing_dep_backoff.rs:44-62`, `sys_validation_workflow.rs:615,817` (fork c08a851a7, not b9c7458ae). The saturation counter and throttled log line named above are not at this pin. Same mechanism as: none. Confirming measurement: conductor log `Sys validation sleeping … (K of T tracked dependencies are unfetchable and on a slow sweep)`; needs the fleet or the v3 staging to be non-trivial.

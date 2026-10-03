@@ -47,3 +47,5 @@ check throttle BEFORE assuming identity/DHT cause); (b) heal-leg batch-size/time
 so a single batch fits under the 25s conductor-call ceiling (a real code cure, but speculative
 while the conductor itself reports 247s receipt latency — likely treats a symptom); (c) a
 deeper conductor-performance investigation (why is a 6-peer alpha conductor 247s-laggy).
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): not determinable from code; a fleet condition with no established cause in this entry. Heal constants unchanged (`elohim-storage/src/p2p/projection_reconcile.rs:785,799,4190`). The sys-validation and FK-787 candidates have code cures at the pin; the grant lookup is still measured costly there. Same mechanism as: probably conductor-admission-saturated / cap-grant scan (inference). Confirming measurement: fleet — matthew `healedTotal` slope and circuit-open count per sweep after the pin moves.

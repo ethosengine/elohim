@@ -96,3 +96,5 @@ template (+ ConfigMap data for storage) before vs after apply
 live object (`storage-workload-image.sh`; `[storage-roll]` forces). Proof owed: the first edge
 build after landing logs `⏭️` for unchanged peers, and Deploy Alpha on a doorway-only commit
 drops back toward the 08-25 7.8 m baseline.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): cured in code for conductors, present for storage, unproven on the fleet. Sequenced plan and per-peer gate at `elohim/holochain/Jenkinsfile:989-1040,1138-1161`; content-keyed restart at `:1299-1326,1744`; storage still `parallel(branches)` at `:987`. Same mechanism as: fleet-full-arc-conductor-saturation (slice 4). Confirming measurement: fleet — an edge build console with skip lines for unchanged peers and `roll gate: <peer> settled` per rolled conductor.

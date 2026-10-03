@@ -10,7 +10,7 @@ author: "quiescence-gated-saga-recording shift (post-#1285 fleet observation)"
 status: "backlog"
 priority: "high"
 jobs: [elohim-edge]
-tags: [performance, perf-convergence, trustful-declared, friction-wait, friction-mechanical, plane-projection, fused-planes, unit-item, phase-growth, lane-background]
+tags: [elohim-storage, performance, perf-convergence, perf-telemetry, trustful-declared, friction-wait, friction-mechanical, plane-projection, fused-planes, unit-item, phase-steady, lane-background]
 ---
 
 # Fleet-wide content-gap limit cycle blocks convergence
@@ -653,3 +653,5 @@ reach` on matthew would settle it outright, operator-side.
   (7 peers vs 4489 EPRs; discovery is O(corpus x peers) per sweep with a
   3-sweep/15-min rotating-window latency floor before a divergence is even
   visible).
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly cured; the reach-scoped classifier cure and heal-leg levers are in the tree, the falsifier gauge has no recorded read, and OFFSET paging over `updated_at` (RC-3) is still present. `elohim-storage/src/p2p/projection_reconcile.rs:811,4463,4486-4499`; `db/content_diesel.rs:2880-2882,3214`; `metrics.rs:1021,1207`. Same mechanism as: content-projection-plateau-ethosengine-household, projection-reconcile-actionable-sawtooth. Confirming measurement: household `elohim_projection_reconcile_reach_scoped{stream="content"}` against `known_gaps` after a seeded prologue.

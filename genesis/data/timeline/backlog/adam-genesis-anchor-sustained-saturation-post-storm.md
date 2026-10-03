@@ -22,7 +22,7 @@ cites:
   - genesis/data/timeline/backlog/ci-alpha-cluster-degraded-substrate.md
   - genesis/data/timeline/backlog/ci-rbac-jenkins-deployer.md
   - genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md
-tags: [substrate, adam, genesis-anchor, arc-factor, db-read-pool-saturation, conductor-unreachable, dht-non-convergence, host-green-not-ci-green, operator-domain, post-storm, performance, perf-io, perf-queue, trustful-declared, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, lane-interactive]
+tags: [substrate, adam, genesis-anchor, arc-factor, db-read-pool-saturation, conductor-unreachable, dht-non-convergence, host-green-not-ci-green, operator-domain, post-storm, performance, perf-io, perf-queue, trustful-declared, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, phase-steady, lane-interactive]
 ---
 
 # adam sustained saturation after the storm-pod deletion — no tree-fixable scale lever (genesis anchor can't arc-shrink)
@@ -119,3 +119,5 @@ escalated; the operator then identified the CPU/db-pool provisioning drift (see 
 repo fix — now landed + pushed. **Falsifier:** post-apply, adam's `max_readers` metric →16, DB-read
 saturation drains, EPR router serves from adam again (`primary_state` not "empty") → then a fresh
 `[build:app,genesis]` should show the `elohim.host`/adam legs green.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): not determinable from code. The recorded 8000m resolution is not what the tree holds: adam's storage and conductor containers are both at 4000m (`adam-firstman.yaml:343`, `adam-firstman-conductor.yaml:386`); pool size 20 remains (`:274-275`). The saturation log line it measured no longer exists at this pin. Same mechanism as: resolve-canonical-election-get-links-deadline (read-pool starvation). Confirming measurement: fleet — sqlx pool-acquire warnings and EPR router `primary_state` on adam.

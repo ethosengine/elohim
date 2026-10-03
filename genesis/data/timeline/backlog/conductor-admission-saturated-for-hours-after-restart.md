@@ -9,7 +9,7 @@ written: "2026-09-19"
 author: "pipeline-shakeout shift pickup (2026-09-19)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, conductor-admission, restart, app-delivery, alpha-fleet, performance, perf-queue, perf-convergence, trustful-self, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, lane-interactive]
+tags: [dataplane, conductor-admission, restart, app-delivery, alpha-fleet, performance, perf-queue, perf-convergence, perf-latency, trustful-self, friction-mechanical, friction-wait, plane-notary, fused-planes, unit-call, phase-transition, phase-steady, lane-interactive]
 jobs: [elohim, elohim-edge]
 cites:
   - elohim/elohim-storage/src/conductor_admission.rs
@@ -198,3 +198,5 @@ deadline for conductor-bearing writes, or a storage-side detached notarize (spaw
 client-side timeout doesn't abandon the zome call), are code follow-ups that only help once the
 conductor answers inside 12-60 s — neither helps while the 5 s admission shed dominates. Raising
 `ELOHIM_CONDUCTOR_PERMITS` is not recommended, per this file's design-decision note above.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly. One shared pool with no reserved capacity remains (`elohim-storage/src/conductor_admission.rs:315,222-227`); heartbeat still calls as interactive (`heartbeat.rs:302`). The grant lookup it names as cause is still measured costly at this pin; blob PUT no longer awaits registration (`http.rs:3655-3661`). Same mechanism as: conductor-cap-grant-scan-per-zome-call. Confirming measurement: `elohim_conductor_admission_in_flight` and mean hold by zome on a household peer across a storage restart; hours-long saturation needs the fleet.

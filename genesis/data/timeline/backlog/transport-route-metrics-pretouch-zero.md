@@ -36,3 +36,5 @@ After `storage-restart` onto the rebuilt binary all three peers scrape the full 
 `elohim_acquisition_dispatch_total{transport="iroh|libp2p"} 0` — before any decision exists; after the warm recovery
 jessica's rows populated (`best_rtt` iroh 27 / libp2p 3, `explore` 2, `explore_unknown` 2). Absence and "not yet
 decided" are now two readings. Fleet read on the next edge deploy is the confirm.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): CURED-IN-CODE with the household measurement already recorded here; the fleet read is still pending; the path_rtt_ms family named in the title was not checked. elohim-storage/src/p2p/transport_paths.rs:183; metrics.rs:3321-3327. Same mechanism as: none. Confirming measurement: a /metrics scrape straight after storage-restart shows elohim_transport_route_total series at 0; fleet confirm is one series listing after the next edge deploy.

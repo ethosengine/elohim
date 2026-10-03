@@ -134,3 +134,5 @@ op: the poison is never sent, all three publish times persist, the next loop sel
 holochain_data 148 + 8, holochain_state 196 (two pre-existing test-wasm fixture failures need
 `build_wasms`, unrelated), publish workflow 9 — `EXIT=0` each. Not verified: the household or fleet
 FK-787 rate; upstream report still to file (their defect, commit `e52fa68ac`).
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): livelock cured in code; receive throttle absent at this pin. `holochain_data/src/dht/inner/chain_op_publish.rs:98-109` (inner join, locally_validated), `holochain_state/src/dht_store.rs:80,937` (256-op chunks), fork cb7cefa80; `patches/kitsune2_transport_iroh/src/connection_context.rs:638` still logs per refusal. Same mechanism as: conductor-residual-cpu (republish selector). Confirming measurement: household conductor logs, count of SQLite 787 lines over ten minutes, expected zero.

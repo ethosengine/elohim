@@ -9,7 +9,7 @@ written: "2026-08-10"
 author: "batch-3 ghost-declaration diagnosis session"
 status: "backlog"
 priority: "high"
-tags: [dataplane, projector, pull-loop, catching-up-shed, adam, doorway-b, self-heal-exhaustion, saga, performance, perf-convergence, trustful-self, friction-wait, friction-mechanical, plane-projection, fused-planes, phase-transition, lane-interactive]
+tags: [dataplane, projector, pull-loop, catching-up-shed, adam, doorway-b, self-heal-exhaustion, saga, performance, perf-convergence, perf-telemetry, trustful-self, friction-wait, friction-mechanical, friction-blind, plane-projection, phase-transition, lane-interactive]
 cites:
   - genesis/data/timeline/backlog/2026-07-10-server-side-epr-read-path-catching-up-shed.md
   - genesis/data/timeline/backlog/adopt-before-author-evidence-starvation.md
@@ -252,3 +252,5 @@ The first live scrape after deployment can now settle the remaining Adam
 question without inference: `initialized=1, active_pins=0` is a genuinely empty
 desired set; `initialized=0` plus the reconcile outcome series identifies the
 exact pre-census stop.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): no wedge mechanism in code; the status-honesty follow-up is cured in code, with no fleet scrape recorded. `elohim-storage/src/p2p/acquisition.rs:383,487,505-507`; `p2p/mod.rs:10232`; `metrics.rs:1848,1859,1867`. Same mechanism as: residue belongs to content-gap-limit-cycle-blocks-convergence and alpha-a-projector-chronic-catchup-flap. Confirming measurement: household `GET /p2p/status` reads `pull: null` before the first reconcile and `elohim_acquisition_reconcile_initialized 1` after; adam's pin count needs the fleet.

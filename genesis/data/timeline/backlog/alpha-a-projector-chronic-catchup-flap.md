@@ -10,7 +10,7 @@ author: "claude (saga-final-chapters shift)"
 status: "open"
 priority: "high"
 jobs: [elohim-edge]
-tags: [dataplane, projector, alpha, doorway, reconcile, shem, hairpin, resiliency-saga, performance, perf-convergence, trustful-self, friction-wait, plane-projection, unit-item, phase-steady, lane-interactive]
+tags: [dataplane, projector, alpha, doorway, reconcile, shem, hairpin, resiliency-saga, performance, perf-queue, perf-telemetry, trustful-self, friction-wait, friction-blind, plane-projection, unit-call, phase-steady, lane-interactive]
 cites:
   - genesis/a2o/features/dataplane/resiliency-saga/06-heads-converge.feature
   - genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md
@@ -120,3 +120,5 @@ that is an instrument outage, not an absence of errors. The B-side doorway pod
 also has no Prometheus target (`up{pod=~"elohim-doorway-alpha-b-.*"}` empty),
 so half the pair has no breaker telemetry at all. Fixing that scrape gap is
 probably the cheapest next step toward naming the trigger.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): breaker shape present; what opens it is not determinable from code. `doorway-service/src/routes/storage_proxy.rs:48-50,235-255` (timeout or 5xx only), `routes/upstream_health.rs:21,39,41` (3 in 20 s, 30 s cooldown); `elohim-storage/src/conductor_admission.rs:156`. Same mechanism as: doorway-breaker-trial-theft-fleet-verification, 2026-07-10-server-side-epr-read-path-catching-up-shed. Confirming measurement: household doorway log "storage forward failed (connect/timeout)" by route beside `doorway_upstream_breaker_open_total` during a mesh lane.

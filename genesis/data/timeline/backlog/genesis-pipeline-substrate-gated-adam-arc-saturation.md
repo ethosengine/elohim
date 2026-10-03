@@ -106,3 +106,5 @@ while fix #1 ships. Do NOT bump CPU (feeds the storm).
 - Companion pipeline-robustness candidate stands: genesis "Verify Target Health" couples the
   seed-readiness gate to the app SPA host (TARGET_HOST) rather than storage/doorway — a 503
   on the SPA hard-fails seeding for an orthogonal reason.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY — receive-side dedup is in code, but any delta clears the fingerprint, so a multi-page refresh re-applies the whole set each tick (runtime effect inferred); drain-verify never recorded. elohim-storage/src/db/peer_blob_inventory.rs:99-142,273-277; p2p/gossip_dispatch.rs:438-459. Same mechanism as: inventory-gossip-amplifier-three-layer-idempotency. Confirming measurement: elohim_inventory_pages_total{kind="snapshot",outcome="applied"} vs "deduplicated" on a seeded mesh at rest.

@@ -83,3 +83,5 @@ Surfaced by the overnight shift `2026-06-15T03-46-doorway-crashloop-stabilize-th
 (Phase 1 gate: deploy did not stabilize the matthew edge → Phase 2 seeder shakeout NOT
 started, held per the hard gate). Evidence: Prometheus restart/ready trends + Loki
 session-close counts, 2026-06-15 ~04:35Z.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY. No re-replay cooldown exists: the warm stream is single-flight but re-fires after each completion (doorway-service/src/projection/subscriber.rs:437-451). Since 2026-08-21 the reconnect ladder is stability-gated (subscriber.rs:478-512), which in my reading bounds a short-session storm to about one reconnect a minute. The upstream conductor saturation cannot be checked at this pin. Same mechanism as: none on the doorway side; the trigger is slow conductor calls. Confirming measurement: doorway_conductor_close_code_total rate and warm-up triggers per minute on the household.

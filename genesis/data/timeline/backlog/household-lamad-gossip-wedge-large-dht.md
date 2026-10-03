@@ -93,3 +93,5 @@ comparison against a fresh household's lamad gossip behavior at low ops count.
 `conductor-publish-livelock-fk787.md` (same household, same night, different mechanism — ruled
 out as the cause here by a zero FK-787 grep). A fresh household sidesteps the amplitude (low ops
 count) without curing the scale ceiling; the fleet-risk probe in §3 is the smallest next step.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY. The round deadline is a whole-round wall clock (kitsune2_gossip-0.5.0 state.rs:50,71; timeout.rs:58,93; mesh sets 60 s, hc-mesh.sh:2560) and the time-slice read fetches every row (holochain_data/src/dht/inner/sync_queries.rs:95-165); that SQL saturation is the cause at 120k ops is not determinable from code. Same mechanism as: sovereign-peer-network-read-no-authorities. Confirming measurement: per-DNA completed_rounds versus peer_timeouts at about 1k, 10k and 100k lamad ops on the household.

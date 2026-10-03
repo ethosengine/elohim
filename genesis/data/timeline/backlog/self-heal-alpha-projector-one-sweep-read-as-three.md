@@ -151,3 +151,5 @@ this fix has regressed.
 - `python3 .claude/scripts/_lib/__tests__/runtime_harvest_test.py`: 69 assertions passed,
   exit 0.
 - No cargo, mesh, cluster action or push in this pass.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): cured poller-side in code; tests not re-run. `_distinct_sweeps` collapses repeated reads of one sweep and the measured arm applies it before the LAG_POLLS window (.claude/scripts/_lib/runtime_harvest.py:244-273,350-358). The wedge-duration signal is still absent: no startedAt or uptime in projection_reconcile.rs or metrics.rs. Same mechanism as: self-heal-adam-projection-catchup-exhaustion-full-arc (sensing, not cost). Confirming measurement: replay the poller over three identical sweeps reads and over three distinct unconverged sweeps.

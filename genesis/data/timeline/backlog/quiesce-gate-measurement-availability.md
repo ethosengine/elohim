@@ -44,3 +44,5 @@ reconcile plateau's quiet windows during validate-only runs #1367-#1369
 (2026-08-19 16:00-19:10Z), while deploy-run #1366 measured minutes after its
 restart. Measurement availability should not depend on winning a race against
 a non-converging sweep.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY cured. A tolerance leg is in code: validation exports QUIESCE_ACTIONABLE_TOLERANCE=2 (scripts/ci/run-dataplane-validation.sh:85-86; gate :32-47,332-343). No measure-under-churn mode exists: deadline still ends DID NOT MEASURE (run-dataplane-validation.sh:97-100). The plateau substrate cause is not determinable from this code. Same mechanism as: ci-edge-inventory-convergence-caughtup-sawtooth-flap. Confirming measurement: fleet only; locally, seconds to sustained PASS from run-mesh-quiesce-stage.sh.

@@ -18,7 +18,7 @@ relatedNodeIds:
 cites:
   - "doorway-federated-continuity-roadmap | Doorway-federated continuity | sha256:4c661dbbb6927763 | path: genesis/docs/superpowers/plans/2026-08-23-doorway-federated-continuity-roadmap.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
-tags: [dataplane, blob-swarm, inventory, gossip, bounded-feature, codex-claimable, agent-agnostic, performance, perf-scale, perf-io, trustful-declared, friction-mechanical, custody-everyone, plane-custody, fused-planes, unit-item, phase-growth, lane-background]
+tags: [dataplane, blob-swarm, inventory, gossip, bounded-feature, codex-claimable, agent-agnostic, performance, perf-scale, perf-io, trustful-declared, friction-mechanical, custody-subset, plane-custody, fused-planes, unit-item, phase-growth, lane-background]
 ---
 
 # Shard-level inventory gossip
@@ -91,3 +91,5 @@ artifact ingests and serves whole) and `features/dataplane/doorway-failover.feat
 one RS blob with 1/2/3 holders and assert wall-clock falls) and a parity-shard-missing
 heal through the doorway; those are the evidence that flips blob-durability, so this
 row moves to `wip`-verified, not `done`.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): flat per-shard advertising still present; frame-limit leg cured by paging; the bitfield wire shape is not in the tree. `elohim-storage/src/p2p/inventory_gossip.rs:87-101` (no `shards_held`), `p2p/inventory_broadcaster.rs:39,275-279`, `p2p/blob_swarm.rs:181-193`; `4009362f0` added no bitfield. Same mechanism as: inventory-refresh-pages-dropped-as-gaps, inventory-gossip-amplifier-three-layer-idempotency. Confirming measurement: household, one 64 MiB blob, count its shard rows in `peer_blob_inventory` and pages sent per refresh.

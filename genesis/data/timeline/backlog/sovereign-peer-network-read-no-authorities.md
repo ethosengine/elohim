@@ -102,3 +102,5 @@ timeout (gather_content_chain(Network) on a cold/saturated arc). Cure lives in t
 storage-arc + gossip path (make a fresh joiner an authority whose ops the fleet fetches) = the
 dataplane-convergence habit. "Declare from the root author's conductor" masks this; the real bar is
 any validly-elected head converging across the plane with every doorway projecting it, no key.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY. `storageArc: null` is the pre-promotion state, not an encoding defect: arc starts Empty (holochain_p2p/src/local_agent.rs:70), serializes as null (kitsune2_api-0.5.0 arc.rs:13), is filtered out of gets (actor.rs:811), and promotes only after a sector-clean round (kitsune2_gossip-0.5.0 storage_arc.rs:99-103). Whether fleet arcs ever promote is not determinable from code. Same mechanism as: household-lamad-gossip-wedge-large-dht. Confirming measurement: storageArc per peer via conductor-diagnostics at 1, 5, 15 minutes after a join on the household.

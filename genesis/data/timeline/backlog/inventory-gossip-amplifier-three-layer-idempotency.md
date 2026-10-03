@@ -97,3 +97,5 @@ restart-safe floor and is DONE; the other two cut upstream waste.
 Layers 2–3 need a drained alpha for a trustworthy before/after (the storm confounds any
 measurement). Sequence: land P0 → confirm the apply-rate collapses on Loki → then brainstorm
 + implement layers 2–3 with live mesh introspection.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PARTLY — layer 1 in code (weakened for multi-page inventories); layer 2 not built (every tick publishes a full refresh, no last-published fingerprint); layer 3 not built (no message_id_fn); the 500x origin is not determinable from code. elohim-storage/src/p2p/mod.rs:4201-4334; p2p/behaviour.rs:524-528. Same mechanism as: genesis-pipeline-substrate-gated-adam-arc-saturation. Confirming measurement: elohim_inventory_pages_published_total{outcome="sent"} rate per peer against page_count per cadence; relay fan-in needs the fleet.

@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure, unmeasured-sweep, measured-term, peer-set-variance, performance, perf-convergence, perf-queue, trustful-declared, friction-wait, friction-mechanical, custody-everyone, plane-notary, fused-planes, unit-call, phase-transition, lane-background]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier, post-deploy-catch-up, genuine-closure, unmeasured-sweep, measured-term, peer-set-variance, performance, perf-convergence, perf-queue, trustful-declared, friction-wait, friction-mechanical, custody-everyone, plane-notary, fused-planes, unit-call, unit-agent, phase-transition, lane-background]
 cites:
   - "resiliency-saga-valueflow | the saga plan whose sprint-3 delivery found this ch06 runtime blocker | sha256:1ffcaefb3212d80b | path: genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md"
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
@@ -1137,3 +1137,5 @@ history here.
   datasource was reachable from this pass; the pod restart cause; and whether the residue
   ids are the rekeyed-peer anchors. No cargo, mesh, cluster action, commit or push was
   run in this pass.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): the July chain is present at kitsune2 0.5.0 — arc resets to Empty on join and the space waits on fetch drain while any agent is below target. `kitsune2_core-0.5.0/src/factories/core_space.rs:469`; `kitsune2_gossip-0.5.0/src/initiate.rs:66-109`; `holochain_p2p/src/spawn/actor.rs:2620`. The 0.3.2 line numbers above are stale. Same mechanism as: arch-scale-risk-backlog rows 7–8 (hosted agents per conductor). Confirming measurement: seconds from conductor start to the last `Updating storage arc to full` line at 1 versus 16 hosted apps on the local mesh.

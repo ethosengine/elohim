@@ -9,7 +9,7 @@ written: "2026-09-19"
 author: "pipeline-shakeout shift pickup (2026-09-19)"
 status: "backlog"
 priority: "high"
-tags: [dataplane, projection-reconcile, quiesce, alpha-fleet, measurement, performance, perf-convergence, trustful-declared, friction-wait, plane-projection, fused-planes, unit-item, phase-steady, lane-background]
+tags: [dataplane, projection-reconcile, quiesce, alpha-fleet, measurement, performance, perf-convergence, trustful-declared, friction-wait, plane-projection, fused-planes, unit-item, phase-steady, lane-operator]
 jobs: [elohim-edge]
 cites:
   - scripts/ci/fleet-quiesce-gate.sh
@@ -75,3 +75,5 @@ in elohim-edge 1444, 1449, 1456, 1457 (peer `elohim.host`) and 1466 (peer
 deliberately declines to add a settle window (a 20-30 minute cycle means a
 bounded poll either does not help or masks the sawtooth). When the reconcile
 cure lands, that scenario is its free confirmation probe.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): NOT-DETERMINABLE-FROM-CODE — cause still unknown. Actionable is divergent minus refused, and refused includes miss-ledger-parked ids, so a park/re-admit cycle is a candidate (inference); the dormancy rule changed 2026-09-20 (ef18d08a4) with no fleet reading since. elohim-storage/src/p2p/projection_reconcile.rs:1867,1903-1907,3797. Same mechanism as: possibly content-gap-limit-cycle-blocks-convergence; if the leg sheds, conductor per-call cost. Confirming measurement: divergent_actionable against elohim_projection_reconcile_exhausted and converged_blocked_by{term}; needs the fleet.

@@ -517,3 +517,5 @@ The moment cross-conductor fetch works, convergence is AUTOMATIC on the
 next app deploy (no code change): the propagation declare succeeds on the
 second peer, its row eager-stamps, and notary-authority scenario 2 flips
 green. Everything above the substrate is waiting on this single link.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): first-call warm-up is a Cranelift compile per conductor and wasm hash, not per cell, cached in `wasm.db`; modules are also evicted after every app install and after 1 h idle. `real_ribosome/module_cache.rs:61-62,88-95,179-209`; `real_ribosome.rs:726-749`. The oracle now warms (`rea_commitment_replication.rs:266-272`). Same mechanism as: arch-scale-risk-backlog row 7 (module reload path). Confirming measurement: time the first and second `export_schema_version` on a fresh conductor directory, then again after a restart.

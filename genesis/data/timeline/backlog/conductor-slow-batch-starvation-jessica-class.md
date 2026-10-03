@@ -232,3 +232,5 @@ bash scripts/ci/stage-spa-blob.sh - "$ID" "$TARGET" browser
 
 Reverse `SOURCE`/`TARGET` only when the other doorway is the one proven to hold
 the matching servable record. Do not run both directions speculatively.
+
+**RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): partly cured; sweep declares moved to the Background class and one failed batch no longer sheds the leg; the shared ceiling remains and the circuit still has no counter. `elohim-storage/src/conductor_admission.rs:150-164,248-259`; `services/head_adoption.rs:788,802`; `p2p/projection_reconcile.rs:5223-5241,5764-5772`. Same mechanism as: conductor-cap-grant-scan-per-zome-call (per-call chain-length cost upstream), declare-route-sheds-harder leg 1. Confirming measurement: household `elohim_conductor_admission_hold_ms` versus `elohim_conductor_admission_shed_total` per peer over one sweep.
