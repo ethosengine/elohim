@@ -53,7 +53,43 @@ Labelling only, 2026-10-02. Nothing was investigated, re-measured or re-ranked.
 - **Figures are copied from the entries**, not re-derived. Open the entry before quoting one.
 
 
-Indexed: 74 entries — 71 tagged at the source, 3 by reference (†). By mechanism: `perf-convergence` 25, `perf-queue` 24, `perf-latency` 17, `perf-telemetry` 15, `perf-cpu` 14, `perf-scale` 10, `perf-memory` 9, `perf-io` 8. By stated evidence: measured 49, theory 8, design 6, cured-unverified 6, cured 5.
+Indexed: 74 entries — 71 tagged at the source, 3 by reference (†). By mechanism: `perf-queue` 25, `perf-convergence` 24, `perf-latency` 19, `perf-telemetry` 18, `perf-cpu` 14, `perf-scale` 10, `perf-memory` 9, `perf-io` 8. By stated evidence: measured 49, theory 8, design 6, cured-unverified 6, cured 5. (Mechanism counts updated 2026-10-02 after the reconciliation's tag corrections; the evidence column is the first pass's and is superseded where an entry carries a `RECONCILED 2026-10-02` line — see the next section.)
+
+## Reconciliation, 2026-10-02 (shem)
+
+The deep dive's first step. 53 of the 74 entries now end in a dated `RECONCILED 2026-10-02` line,
+settled by reading code at superproject `4a80267f3` and conductor fork `2b334df7973d`; the conductor
+pair also carries measurements from a disposable three-peer mesh (all actors test fixtures). Layers
+done: conductor (20), kitsune2 / gossip (2), elohim-storage (22), doorway (4), harness and gates (5).
+Not reconciled: app and SSR, CI and builds, devspace tooling, cluster and nodes (21), held as off the
+critical path. Working notes (gitignored, on shem): `genesis/local-dev/perf-deep-dive/reconcile-*.md`.
+
+What changed the reading of the whole index:
+
+- **The pin is not on the lineage many conductor entries cite.** Cure commits from fork branch
+  `int/2026-09-23-diagnostics-throttle-perf` (`61565f320`, `cb61633c2`, `0f26f6703`, …) are not
+  ancestors of `2b334df7973d`. Four cures were re-derived on the pin's own line (single-query grant
+  lookup, range-bounded chain read, FK-787 livelock, sys-validation back-off). The receive throttle
+  and the Prometheus exporter were not: the pinned conductor exports no `hc_*` series.
+- **A zome call's fixed cost grows with the caller's chain (measured).** No-op p50 went from 7 ms at
+  about 120 actions to 469 ms at about 18,300; a second agent with a short chain in the same
+  conductor answered in about 15 ms. The grant lookup and the init check each walk the author's whole
+  Action index; the publish selector re-reads the author's op set. Homes:
+  [conductor-cap-grant-scan-per-zome-call](epr:conductor-cap-grant-scan-per-zome-call),
+  [conductor-residual-cpu-full-chain-read-and-perpetual-republish](epr:conductor-residual-cpu-full-chain-read-and-perpetual-republish).
+  Several storage and doorway entries are probably downstream of this cost; each says so where it
+  applies, as inference.
+- **Machine writes share the person's chain.** On an idle mesh the doorway peer-health attestation
+  writes 72 lamad actions an hour per peer and caused the head-moved collisions; see
+  [arch-dataplane-borrows-backlog](epr:arch-dataplane-borrows-backlog) §Plane-separation pass.
+- **Cures present in code but unrecorded in their entries:** `feedback-discovery-sweep-is-o-n-in-history`,
+  `heal-pointer-bytes-ordering-blocking-serve`, `head-authority-carried-with-content-sync-unit`
+  item 7, `susan-conductor-ws-dead-heal-pacing-blind-to-instant-errors` pacing leg. None has a fleet
+  reading after the cure.
+- **Tag corrections applied** where an entry's own text contradicted a tag, on 14 entries; the tables
+  below reflect them. Arguable cases were left and are listed in the working notes.
+
+A `RECONCILED` line is a reading against code, not a re-measurement, unless it says otherwise.
 
 
 ## The trust gradient
@@ -66,12 +102,16 @@ edge `public`.
 
 | Trust context | verify | wait | mechanical | blind |
 |---|---|---|---|---|
-| **trustful-self** — one steward on both ends | 3 | 7 | 17 | · |
-| **trustful-declared** — household, genesis pair, fleet peers | · | 7 | 9 | 3 |
+| **trustful-self** — one steward on both ends | 5 | 12 | 22 | 3 |
+| **trustful-declared** — household, genesis pair, fleet peers | 2 | 12 | 12 | 3 |
 | **trustful-earned** — earned standing, scoped delegation | · | · | · | · |
 | **trustless** — strangers, first contact | · | 1 | · | · |
-| mixed — not separated in the entry | 1 | · | 3 | · |
-| no relationship on the path | · | 3 | 12 | 8 |
+| no trust tag (no relationship on the path, or mixed) | 1 | 7 | 14 | 10 |
+
+Recomputed from the tags on 2026-10-02 (`genesis/local-dev/perf-deep-dive/index-tally.py` on shem):
+a cell counts every tagged entry carrying both labels, so an entry with two friction kinds counts
+twice, and the three † entries are not counted. The first pass's table counted one primary friction
+per entry and split a "mixed" row by hand, which is why its cells were smaller.
 
 No performance entry sits in a trustful-earned context yet. Ten further entries that are *about* a
 trustful context without reporting a cost carry the trust tag alone; `grep -lE '^tags:.*\btrustful-' genesis/data/timeline/backlog/*.md` lists them all.
@@ -118,7 +158,9 @@ would be.
 - [self-heal-adam-projection-catchup-exhaustion-full-arc](epr:self-heal-adam-projection-catchup-exhaustion-full-arc)
 - [staggered-conductor-fleet-restarts](epr:staggered-conductor-fleet-restarts)
 - [inventory-gossip-amplifier-three-layer-idempotency](epr:inventory-gossip-amplifier-three-layer-idempotency)
-- `2026-08-23-shard-level-inventory-gossip.md`, `2026-07-27-anti-entropy-egress-baseline.md`
+- `2026-07-27-anti-entropy-egress-baseline.md`
+- (`2026-08-23-shard-level-inventory-gossip.md` was re-tagged `custody-subset` on 2026-10-02: its
+  remedy is finding the peer that holds just one shard, a subset shape.)
 - [dht-scale-envelope-and-web2-projection-at-planetary-scale](epr:dht-scale-envelope-and-web2-projection-at-planetary-scale)
 - [arch-scale-risk-backlog](epr:arch-scale-risk-backlog) rows 7–8 (hosted-human heap; full-arc CPU)
 
@@ -144,17 +186,18 @@ Each entry names the plane whose work consumes the resource (CONVENTIONS.md §Pl
 marks the entries where that price is charged on another plane's path. These are the ones to read
 first: the cure is usually to let the cheap plane stop waiting on the expensive one.
 
-By paying plane: no plane (build, tooling, gates) 25, notary 18, projection 13, custody 9, head 4, authority 3, bytes 1, reference 1.
+By paying plane: no plane (build, tooling, gates) 25, notary 18, projection 13, custody 9, head 5, authority 2, bytes 1, reference 1.
 
 | Paying plane → path it is charged on | Entries |
 |---|---|
-| projection → head (5) | `2026-08-10-adam-pull-loop-wedged-at-boot`; `conductor-slow-batch-starvation-jessica-class`; `content-gap-limit-cycle-blocks-convergence`; `projection-reconcile-actionable-sawtooth`; `storage-sqlite-locked-surfaces-as-500-despite-busy-timeout` |
+| projection → head (4) | `conductor-slow-batch-starvation-jessica-class`; `content-gap-limit-cycle-blocks-convergence`; `projection-reconcile-actionable-sawtooth`; `storage-sqlite-locked-surfaces-as-500-despite-busy-timeout` |
 | notary → head (5) | `adam-genesis-anchor-sustained-saturation-post-storm`; `conductor-admission-saturated-for-hours-after-restart`; `declare-route-sheds-harder-plus-no-chain-gate-leg2-findings`; `genesis-pair-cross-conductor-fetch-blocks-canonical-convergence`; `resolve-canonical-election-get-links-deadline` |
 | custody → bytes (3) | `2026-08-23-shard-level-inventory-gossip`; `cluster-to-shem-p2p-request-starvation-11-peer-blackout`; `sovereign-peer-network-read-no-authorities` |
 | notary → projection (3) | `2026-08-24-matthew-conductor-saturation-heal-leg-loop`; `self-heal-adam-projection-catchup-exhaustion-full-arc`; `staggered-conductor-fleet-restarts` |
 | notary → bytes (3) | `alpha-conductor-crash-loop-after-wave4-roll-and-moved-dna-hashes`; `alpha-conductor-sys-validation-spin-unfetchable-deps`; `doorway-conductor-reconnect-storm-matthew-edge` |
 | projection → attention (3) | `elohim-render-incremental-hydration`; `feedback-discovery-sweep-is-o-n-in-history`; `self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall` |
-| authority → head (2) | `conductor-cap-grant-scan-per-zome-call`; `head-authority-carried-with-content-sync-unit` |
+| authority → head (1) | `conductor-cap-grant-scan-per-zome-call` |
+| head → (charged path not re-read) (1) | `head-authority-carried-with-content-sync-unit` (re-planed from authority to head, 2026-10-02) |
 | projection → bytes (1) | `2026-07-10-server-side-epr-read-path-catching-up-shed` |
 | custody → projection (1) | `genesis-pipeline-substrate-gated-adam-arc-saturation` |
 | head → bytes (1) | `heal-pointer-bytes-ordering-blocking-serve` |
@@ -168,20 +211,23 @@ shallowest of the label passes; treat the pairing as a prompt for the question, 
 Three more questions (CONVENTIONS.md §Cost unit, phase and lane): what the cost multiplies by, when it
 is paid, and who is waiting.
 
-By unit: item 16, unlabelled 15, call 15, once 12, peer 8, history 7, agent 1.
+Recomputed from the tags on 2026-10-02 (72 tagged entries; † entries not counted; an entry may carry
+two labels of one kind):
 
-By phase: steady 33, transition 23, growth 9, unlabelled 9.
+By unit: call 16, item 15, unlabelled 14, once 13, peer 8, history 5, agent 2.
 
-By lane: operator 23, interactive 21, background 16, borrowed 7, unlabelled 7.
+By phase: steady 36, transition 23, growth 6, unlabelled 10.
+
+By lane: operator 24, interactive 21, background 15, borrowed 8, unlabelled 6.
 
 | Unit | steady | transition | growth |
 |---|---|---|---|
-| history | 2 | · | 5 |
-| agent | · | 1 | · |
-| peer | 4 | 3 | 1 |
-| item | 12 | 1 | 3 |
-| call | 8 | 7 | · |
-| once | · | 7 | · |
+| history | 2 | · | 3 |
+| agent | · | 2 | · |
+| peer | 5 | 3 | 1 |
+| item | 12 | 1 | 2 |
+| call | 11 | 7 | · |
+| once | · | 8 | · |
 
 Two reading orders:
 
@@ -202,12 +248,12 @@ incident text.
 | [arc-shrink-ineffective-memory-soak](epr:arc-shrink-ineffective-memory-soak) † | memory, telemetry | self | mechanical | cured | target_arc_factor=0 does not bound conductor memory (leecher soak); real driver hidden by the fused cgroup, later found as glibc arena retention and cured by jemalloc. | — |
 | [arch-dataplane-borrows-backlog](epr:arch-dataplane-borrows-backlog) (rows 3, 13, 16, 17, 18) | queue, latency | mixed | mechanical | design | Flow-control and tail-latency borrows; row 17 conductor publish backpressure, row 18 fork resource bounds and recovery (six ranked priorities). | row 17: ~1.13 M DHT ops republished per 15 min on matthew; SQLite median 1.5 s (max 210 s) |
 | [arch-scale-risk-backlog](epr:arch-scale-risk-backlog) (rows all (risk rows 1–10)) | scale | mixed | mechanical | design | Risk rows: landed-code shapes that grow badly with chain length, peer count or migration count, each with a measurable trigger. | — |
-| [conductor-admission-saturated-for-hours-after-restart](epr:conductor-admission-saturated-for-hours-after-restart) | queue, convergence | self | mechanical, wait | measured | After a storage restart the conductor-admission gate stays full for hours, so no head can be authored and sheds spread across every storage caller. | admission capacity 5, in_flight 5 for ~4h (03:00-07:00Z) vs ~20 min runbook; shed after 5000ms |
+| [conductor-admission-saturated-for-hours-after-restart](epr:conductor-admission-saturated-for-hours-after-restart) | queue, convergence, latency | self | mechanical, wait | measured | After a storage restart the conductor-admission gate stays full for hours, so no head can be authored and sheds spread across every storage caller. | admission capacity 5, in_flight 5 for ~4h (03:00-07:00Z) vs ~20 min runbook; shed after 5000ms |
 | [conductor-anon-leak-mechanism-smaps-verdict](epr:conductor-anon-leak-mechanism-smaps-verdict) | memory | self | mechanical | cured | Conductor anon-memory leak mechanism via smaps; hypothesis ranking superseded, real cause glibc arena retention cured by jemalloc. | jemalloc flat ~2.1-2.9 GB past old ~5h OOM cadence; Go heap flat ~52 MB |
 | [conductor-cap-grant-scan-per-zome-call](epr:conductor-cap-grant-scan-per-zome-call) | cpu, latency, scale | self | verify, mechanical | measured | Every zome call re-reads all capability grants (storage minted them), so each call costs tens of thousands of SQL queries and pegs conductor CPU and admission. | ~47,000 SQL queries/call; CapGrant read 11,619-18,516 rows in 4.3-8.7 s; ~15,000 grants |
 | [conductor-memory-attribution-verdict](epr:conductor-memory-attribution-verdict) † | memory, telemetry | self | mechanical | cured | Conductor OOM climb is anonymous heap, not page cache or corpus, arc-independent; attributed to the conductor child and later cured by jemalloc. | anon share 94-98.3% (james 6.53 GB, matthew 5.39 GB, jessica 3.79 GB mid-climb) |
 | [conductor-publish-livelock-fk787](epr:conductor-publish-livelock-fk787) | queue, cpu | self | mechanical | measured | Upstream Holochain 0.7.0 publish queue livelocks (SQLite FK 787): get_ops_to_publish LEFT JOIN plus batch-voiding record_published_op_hashes; confirmed locally. | — |
-| [conductor-residual-cpu-full-chain-read-and-perpetual-republish](epr:conductor-residual-cpu-full-chain-read-and-perpetual-republish) | cpu, io, scale | self | verify, mechanical | measured | After the FK-787 cure alpha conductors stay near CPU limit: full source-chain read per call, bulk Entry fetch, CapGrant read and a republish that never completes receipts. | full-chain read rows_returned=33608, ~8 s; ranked by slow-statement seconds over 20 min |
+| [conductor-residual-cpu-full-chain-read-and-perpetual-republish](epr:conductor-residual-cpu-full-chain-read-and-perpetual-republish) | cpu, io, scale, latency | self | verify, mechanical | measured | After the FK-787 cure alpha conductors stay near CPU limit: full source-chain read per call, bulk Entry fetch, CapGrant read and a republish that never completes receipts. | full-chain read rows_returned=33608, ~8 s; ranked by slow-statement seconds over 20 min |
 | [dht-scale-envelope-and-web2-projection-at-planetary-scale](epr:dht-scale-envelope-and-web2-projection-at-planetary-scale) | scale | mixed | mechanical | design | Design question whether one DHT space and per-EPR replication scale to billions of users and hot content, and how trust projects to web2. | — |
 | [fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11](epr:fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11) | cpu, queue | declared | mechanical, wait | measured | Every full-arc alpha conductor is CPU-pegged and throttled; kitsune2 publish has no sender back-off, gossip knobs are default, and the fleet rolls all peers at once. | adam 4.00 of 4 CPU 100% throttled ~24h; gertrude/susan/eve 1.50 of 1.5 for 7 days; matthew 55% throttled |
 | [genesis-pair-cross-conductor-fetch-blocks-canonical-convergence](epr:genesis-pair-cross-conductor-fetch-blocks-canonical-convergence) | latency | declared | wait | measured | Sweettest red read as REA fetch regression; DELTA shows the 60s budget is spent on cold-cell first-call warm-up, the retrieval itself is fast. | first call 100.97 s; warmup export_schema_version 94.37 s; B retrieves commitment in 12 ms |
@@ -228,13 +274,13 @@ incident text.
 | Entry | Mechanism | Trust | Friction | Evidence | What costs what | Figures in the entry |
 |---|---|---|---|---|---|---|
 | [2026-07-27-anti-entropy-egress-baseline](2026-07-27-anti-entropy-egress-baseline.md) | telemetry, scale | declared | blind | theory | Three concurrent unbudgeted anti-entropy loops; two have zero counters so egress cannot be priced. | kitsune2 gossip 120-300s, inventory gossip 60s, Automerge 60s; Freenet single loop 53.7% of egress |
-| [2026-08-10-adam-pull-loop-wedged-at-boot](2026-08-10-adam-pull-loop-wedged-at-boot.md) | convergence | self | wait, mechanical | measured | adam's projector pull loop never completes its first pass for hours, so doorway B sheds catching-up on every head-record read. | pull total=0 fetched=0 caughtUp=false for hours |
+| [2026-08-10-adam-pull-loop-wedged-at-boot](2026-08-10-adam-pull-loop-wedged-at-boot.md) | convergence, telemetry | self | wait, mechanical, blind | measured | adam's projector pull loop never completes its first pass for hours, so doorway B sheds catching-up on every head-record read. | pull total=0 fetched=0 caughtUp=false for hours |
 | [2026-08-10-fresh-head-nomination-and-declare-error-backoff](2026-08-10-fresh-head-nomination-and-declare-error-backoff.md) | queue, convergence | self | wait, mechanical | cured-unverified | Phantom-candidate loop stalls canonical convergence and declare_error lacked per-id backoff (retry amplification); backoff fix recorded as landed. | — |
 | [2026-08-23-shard-level-inventory-gossip](2026-08-23-shard-level-inventory-gossip.md) | scale, io | declared | mechanical | design | Inventory gossip advertises N flat shard addresses per blob (64 for a 64 MiB blob); oversized snapshots hit the frame limit and stop advertising. Bitfield per composite proposed. | 64 addresses per 64 MiB chunked blob; 3.5 KB page budget; MessageTooLarge on household mesh |
 | [adopt-local-heal-second-guesses-arbitrated-winner](epr:adopt-local-heal-second-guesses-arbitrated-winner) | convergence | self | verify, wait | theory | adopt_local re-derives forward-ordering proof the conductor already settled, so gossip-only peers converge slower than Declare-receiving peers. | — |
-| [alpha-a-projector-chronic-catchup-flap](epr:alpha-a-projector-chronic-catchup-flap) | convergence | self | wait | measured | alpha-A projector oscillates catching-up and serving and never durably catches up, answering 503 to doorway reads. | p2p.divergentAnchor 1456 -> 2031 between runs ~90 min apart; retryAfter 30 |
+| [alpha-a-projector-chronic-catchup-flap](epr:alpha-a-projector-chronic-catchup-flap) | queue, telemetry | self | wait, blind | measured | alpha-A projector oscillates catching-up and serving and never durably catches up, answering 503 to doorway reads. | p2p.divergentAnchor 1456 -> 2031 between runs ~90 min apart; retryAfter 30 |
 | [conductor-slow-batch-starvation-jessica-class](epr:conductor-slow-batch-starvation-jessica-class) | queue, convergence | self | mechanical, wait | measured | Circuit breaker sheds the content heal leg before per-item classification on jessica, starving every adopt/contest arm so divergence never drains. | known_divergent{content} flat at 13 for 3+ h while matthew 13->2, james 14->1 |
-| [content-gap-limit-cycle-blocks-convergence](epr:content-gap-limit-cycle-blocks-convergence) | convergence | declared | wait, mechanical | measured | Fleet-wide content-gap limit cycle: discovered-never-fetched ids oscillate with zero decay so the fleet never converges after a restart. | ~2.8k gaps/pod; ~30-min identical waveform 3h+ zero decay; divergent ~1245-3055 on adam |
+| [content-gap-limit-cycle-blocks-convergence](epr:content-gap-limit-cycle-blocks-convergence) | convergence, telemetry | declared | wait, mechanical | measured | Fleet-wide content-gap limit cycle: discovered-never-fetched ids oscillate with zero decay so the fleet never converges after a restart. | ~2.8k gaps/pod; ~30-min identical waveform 3h+ zero decay; divergent ~1245-3055 on adam |
 | [content-projection-plateau-ethosengine-household](epr:content-projection-plateau-ethosengine-household) | convergence | declared | wait | measured | Content-projection divergent_anchor plateaus on the ethosengine household, independent of the inventory-snapshot storm and not touched by storage deploy. | — |
 | [declare-route-sheds-harder-plus-no-chain-gate-leg2-findings](epr:declare-route-sheds-harder-plus-no-chain-gate-leg2-findings) | queue, convergence | self | mechanical, verify | measured | adam write-admission pool starves then oscillates, shedding 503 catching-up for hours so canonical-head declare route sheds harder than PATCH. | ~7h paced attempts; pool oscillates open every ~2-6 min |
 | [feedback-discovery-sweep-is-o-n-in-history](epr:feedback-discovery-sweep-is-o-n-in-history) | scale, convergence | self | mechanical, wait | measured | Feedback projector visits 8 members per 60s sweep with no cursor, so correction convergence grows with whole mesh history rather than subscribed set. | convergence 107s to 333s across a day; 8 members per 60s sweep |
