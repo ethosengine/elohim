@@ -142,3 +142,57 @@ repositories under the temp root; inside the work tree their upward walks (git d
 Items 1 and 2 are the highest-leverage: both are the same shape (process-liveness mistaken for
 serving-readiness) and both directly caused lost work during the 2026-09-17/18 incidents this
 cluster's sibling entries describe. Owner: next a2o-harness shift.
+
+## 2026-10-02 additions from the shem performance deep dive (observed, not yet fixed)
+
+Three more places where the harness reports ready or capable and is not. Observed by the measuring
+session on a fresh three-peer mesh at superproject `4a80267f3`, fork `2b334df7973d`.
+
+8. **`just mesh preflight` passes with no packed `elohim.happ` and no in-tree wasm.** The failure
+   surfaces later, in sandbox generation. Preflight should refuse and name `just build` in the DNA
+   directory.
+9. **`MESH_CONDUCTOR_LAUNCH=direct` takes effect on `conductors-restart`, not on the first
+   `mesh start`.** A session that asked for one conductor process per peer does not get it until it
+   restarts the conductors.
+10. **Direct launch exports `HOLOCHAIN_PROMETHEUS_LISTEN`, and the pinned conductor has no
+    Prometheus exporter.** Exporter commit `0f26f6703` is not an ancestor of `2b334df7973d`; the
+    only exporter in source is Influx line protocol (`holochain_metrics/src/lib.rs:19-41`). The root
+    `CLAUDE.md` line promising `hc_*` series on `:9464`, the `zome-call-cost-bounded` DELTA of
+    2026-09-23b and the `conductor-capacity-represented` DELTA of 2026-09-23 all describe a lineage
+    the dev pin is not on. Preflight should check the binary for the exporter before the launcher
+    advertises the port. The live socket was not probed.
+11. **`just test mesh` launches browser scenarios without Chromium installed** (observed
+    2026-10-03 on shem, serving receipt for fork `ab31ecf2c`). Two of five scenarios passed; all
+    three failures were Playwright's `browserType.launch: Executable doesn't exist`, mid-lane, after
+    the prologue and the earlier stations had already spent their time. The lane already refuses
+    before launch when the hosted-human roster is missing (`justfile` ~:132-142); it should refuse
+    the same way when the Playwright Chromium executable is absent and name `pnpm a2o:setup`
+    (`genesis/a2o/package.json:30`, `playwright install chromium`). CI installs it explicitly for
+    the same reason (`scripts/ci/run-dataplane-validation.sh:118-122`).
+12. **The prologue's FATAL names a build that fails on a fresh box.** `hc-mesh-prologue.sh` says
+    "build the apps first (cd app/elohim-app && pnpm build; cd app/lamad && pnpm build)". On shem
+    that failed three ways: the sophia bundle in `src/assets/sophia-plugin/` was an ES module, not
+    UMD, so `check-sophia.sh`'s widget check refused; `elohim-core`/`elohim-imagodei` were unbuilt
+    (TS2307 in elohim-app, `elohim-core/register` unresolved in lamad); and `prebuild`'s
+    `build-wasm.sh` needs `wasm-pack`, which is absent. The order that works is CI's (root
+    `Jenkinsfile` `buildSophiaPlugin()`, "Build Elohim Core", "Build App", "Build Lamad Bundle"):
+    fetch `@ethosengine/sophia-element` from Nexus, build the three element libraries, then
+    `ng build` directly; shem's script is `genesis/local-dev/perf-deep-dive/build-apps-ci-order.sh`.
+    The FATAL should name that order, or a `just` recipe that runs it.
+13. **Root `CLAUDE.md`'s sophia recipe names a script that does not exist.** "Run: `cd sophia &&
+    pnpm install && pnpm build && pnpm build:umd`": there is no `build:umd` at the sophia root (the
+    UMD build lives in the element package), and CI does not build it at all; it fetches the
+    published bundle. A replacement line is proposed for the operator, not applied.
+14. **`RUST_LOG` in the environment makes `just mesh start` refuse a matching toolchain**
+    (observed 2026-10-03 on shem). With `RUST_LOG=info` exported, `hc --version` prints a log line
+    before its version string. The version probes merge stderr and take the first line's last
+    word: `hc_version() { hc --version 2>&1 | head -1 | awk '{print $NF}'; }`
+    (`app/elohim-app/scripts/hc-mesh.sh:2206`), and the conductor probe the same way (`:2208-2209`).
+    So the hc version reads as "Log", and `assert_toolchain_parity` (`:2229`, refusal text at
+    `:2237`, called from `:1159` and `:3578`) refuses to start, reporting that the conductor and the
+    hc CLI are different builds when they are not. The probes should not inherit the caller's log
+    settings and should pick the version line itself, e.g.
+    `RUST_LOG= hc --version 2>/dev/null | grep -m1 -E '^hc'`. The descriptive lines at `:2831`,
+    `:2843-2850` and `:3670-3672` parse the same way. Workaround: leave `RUST_LOG` unset for
+    `mesh start` and pass log settings per process with `MESH_RESTART_ENV_OVERLAY` on
+    `storage-restart`.
