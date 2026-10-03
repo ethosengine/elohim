@@ -1,20 +1,25 @@
 //! Agent Provisioner — orchestrates Holochain agent provisioning
 //!
 //! When a user registers, the provisioner:
-//! 1. Finds the least loaded conductor
-//! 2. Generates a new agent key on that conductor
-//! 3. Installs the app with that agent key
-//! 4. Enables the app
-//! 5. Registers the agent→conductor mapping
+//! 1. Establishes that the user has no app on ANY conductor of the pool
+//! 2. Finds the least loaded conductor
+//! 3. Generates a new agent key on that conductor
+//! 4. Installs the app with that agent key
+//! 5. Enables the app
+//! 6. Registers the agent→conductor mapping
 //!
-//! Provisioning failure is non-fatal — registration falls back to local key generation.
+//! Every failure of an admin call arrives typed
+//! ([`FaultClass`](super::typed_admin::FaultClass)), and what happens next is
+//! decided on that type alone: an attempt whose install was never sent may be
+//! offered to another conductor; one whose install was sent is settled on the
+//! conductor it was sent to. See [`AgentProvisioner::provision_agent`].
 
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use super::agent_key::{canonical_agent_key, lookup_forms};
-use super::registry::ConductorRegistry;
-use super::typed_admin::TypedAdminClient;
+use super::registry::{ConductorInfo, ConductorRegistry};
+use super::typed_admin::{AdminConnector, FaultClass, LiveAdminConnector, ProvisionAdmin};
 
 /// The EXACT string a freshly provisioned agent is known by — the one value
 /// that becomes [`ProvisionedAgent::agent_pub_key`], and from there the JWT
@@ -37,8 +42,8 @@ const DEFAULT_APP_ID: &str = "elohim";
 /// Default bundle path for the Holochain app.
 const DEFAULT_BUNDLE_PATH: &str = "/app/elohim.happ";
 
-/// How many conductors a single provisioning call may be re-offered to when the
-/// admin socket drops mid-call.
+/// How many conductors a single provisioning call may be re-offered to when an
+/// attempt fails before its install was sent.
 ///
 /// Bounded deliberately: a registration is an interactive request behind a
 /// hosted human's sign-up, so the budget is "ask a couple of siblings", never
@@ -47,36 +52,9 @@ const DEFAULT_BUNDLE_PATH: &str = "/app/elohim.happ";
 /// the same sick one.
 const PROVISION_TRANSPORT_ATTEMPTS: u32 = 3;
 
-/// Is this provisioning error a TRANSPORT fault rather than a verdict?
-///
-/// A transport fault means the admin websocket died before the conductor
-/// answered — the work was never performed *or* its outcome was never reported,
-/// and in both cases nothing is established about whether it can succeed
-/// elsewhere. A verdict (at capacity, cell genesis timed out, the conductor
-/// refused) is a real answer and must not be retried into a second side effect.
-///
-/// Matched on the rendered error string because that is the only shape the
-/// `holochain_client` admin errors reach this layer in: they arrive as
-/// `External API wire error: InternalError("… Other({\"error\":\"BrokenPipe\"})")`,
-/// with the discriminant already flattened into text upstream. Widening this
-/// set is safe in one direction only — a false POSITIVE costs one extra
-/// provisioning attempt on a different conductor, a false NEGATIVE costs a human
-/// their registration.
-fn is_transport_fault(error: &str) -> bool {
-    const TRANSPORT_MARKERS: [&str; 8] = [
-        "BrokenPipe",
-        "ConnectionAborted",
-        "ConnectionReset",
-        "ConnectionRefused",
-        "connection closed",
-        "Connection closed",
-        "websocket closed",
-        "Failed to connect to admin",
-    ];
-    TRANSPORT_MARKERS
-        .iter()
-        .any(|marker| error.contains(marker))
-}
+/// How long a freshly enabled app is given to finish cell genesis.
+const GENESIS_MAX_POLLS: u32 = 30;
+const GENESIS_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Result of successful agent provisioning.
 #[derive(Debug, Clone)]
@@ -97,11 +75,114 @@ pub struct ProvisionedAgent {
     pub installed_app_id: String,
 }
 
+/// Why provisioning did not produce an agent.
+///
+/// Two outcomes a caller must be able to tell apart, because they ask
+/// different things of the person waiting:
+///
+/// - [`ProvisionError::Failed`] — nothing was left behind. Trying again is a
+///   fresh start.
+/// - [`ProvisionError::Unresolved`] — this person may ALREADY have an app on
+///   the named conductor(s) and the doorway could not find out. Provisioning
+///   them anywhere else would risk a second agent key for one person, so the
+///   doorway refuses instead. Trying again later resolves it, once the
+///   conductor answers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProvisionError {
+    /// An install may have landed — or an earlier one may exist — on
+    /// `conductors`, and that could not be resolved there.
+    Unresolved {
+        conductors: Vec<String>,
+        detail: String,
+    },
+    /// Provisioning failed and established that nothing was installed.
+    Failed(String),
+}
+
+impl ProvisionError {
+    /// The machine-readable code a route puts in front of a client.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Unresolved { .. } => "PROVISIONING_UNRESOLVED",
+            Self::Failed(_) => "PROVISIONING_FAILED",
+        }
+    }
+
+    fn unresolved(conductor_id: &str, detail: impl Into<String>) -> Self {
+        Self::Unresolved {
+            conductors: vec![conductor_id.to_string()],
+            detail: detail.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for ProvisionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unresolved { conductors, detail } => write!(
+                f,
+                "provisioning is unresolved on {}: {detail}",
+                conductors.join(", ")
+            ),
+            Self::Failed(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for ProvisionError {}
+
+/// One failed attempt on one conductor, classed by what it establishes about
+/// THE INSTALL — the only step that gives a person an identity.
+///
+/// `install` is not always the class of the admin call that failed. A key
+/// generation whose socket dropped is `SentOutcomeUnknown` as an admin call,
+/// but the install was never written, so for the install it is `NotSent`: an
+/// orphaned key on a conductor is not an identity. See [`before_install`].
+struct AttemptFault {
+    install: FaultClass,
+    message: String,
+}
+
+impl AttemptFault {
+    /// The doorway's or the conductor's own answer. Never re-offered.
+    fn verdict(message: String) -> Self {
+        Self {
+            install: FaultClass::Refused,
+            message,
+        }
+    }
+}
+
+/// What a fault in a step that runs BEFORE `install_app` establishes about the
+/// install: a refusal is still a verdict; any transport fault means the install
+/// was never written.
+fn before_install(class: FaultClass) -> FaultClass {
+    match class {
+        FaultClass::Refused => FaultClass::Refused,
+        FaultClass::NotSent | FaultClass::SentOutcomeUnknown => FaultClass::NotSent,
+    }
+}
+
+/// What the search for an existing app established.
+enum Existence {
+    /// The person already has an app; this is it.
+    Found(ProvisionedAgent),
+    /// EVERY conductor answered, and none has the app.
+    NotInstalled,
+    /// No reachable conductor has the app, but these could not be asked.
+    /// "Not found" is not a conclusion that is available here.
+    Unresolved {
+        conductors: Vec<String>,
+        detail: String,
+    },
+}
+
 /// Orchestrates agent provisioning on a conductor.
 pub struct AgentProvisioner {
     registry: Arc<ConductorRegistry>,
     app_id: String,
     bundle_path: String,
+    connector: Arc<dyn AdminConnector>,
 }
 
 impl AgentProvisioner {
@@ -111,6 +192,7 @@ impl AgentProvisioner {
             registry,
             app_id: DEFAULT_APP_ID.to_string(),
             bundle_path: DEFAULT_BUNDLE_PATH.to_string(),
+            connector: Arc::new(LiveAdminConnector),
         }
     }
 
@@ -126,6 +208,13 @@ impl AgentProvisioner {
         self
     }
 
+    /// Drive the provisioner against a scripted conductor pool.
+    #[cfg(test)]
+    fn with_connector(mut self, connector: Arc<dyn AdminConnector>) -> Self {
+        self.connector = connector;
+        self
+    }
+
     /// Provision an agent for the given user (idempotent).
     ///
     /// Searches ALL conductors for an existing app before installing a new one.
@@ -134,98 +223,141 @@ impl AgentProvisioner {
     /// re-login case where `find_least_loaded()` returns a different conductor
     /// than the one the app was originally installed on.
     ///
-    /// Flow, per attempt:
-    /// 1. Search all conductors for existing app (idempotency)
-    /// 2. If not found, pick the least loaded conductor not already excluded
+    /// Flow:
+    /// 1. Search all conductors for an existing app (idempotency). If any could
+    ///    not be asked, stop: see below.
+    /// 2. Pick the least loaded conductor not already excluded
     /// 3. Generate agent key, install, enable, register
     ///
-    /// ## A dropped admin socket is not a provisioning verdict
+    /// ## One person, one agent key
+    ///
+    /// Each attempt generates a FRESH agent key, and the app id embeds the
+    /// conductor id. So "try the next conductor" is only safe when the previous
+    /// attempt cannot have installed anything — otherwise one person ends up
+    /// with two agent keys on two conductors, and nothing reconciles them.
+    ///
+    /// The rule, decided on the typed [`FaultClass`] of the INSTALL:
+    ///
+    /// - `NotSent` — the install was never written (the connect failed, or key
+    ///   generation dropped). Re-offer to another conductor, bounded at
+    ///   [`PROVISION_TRANSPORT_ATTEMPTS`], excluding the one that dropped.
+    /// - `SentOutcomeUnknown` — the install was written and its outcome is not
+    ///   known. Resolve it on the SAME conductor: if the app is there, finish
+    ///   it and use it; if it is not, or the conductor cannot be asked, fail
+    ///   with [`ProvisionError::Unresolved`]. Never a second key elsewhere.
+    /// - `Refused` — the conductor (or the doorway's own capacity check)
+    ///   answered. Returned unchanged; a verdict is not retried into a second
+    ///   side effect.
+    ///
+    /// The same reasoning binds the search in step 1: a conductor that cannot
+    /// be reached might hold this person's app, so "found nothing" is only a
+    /// conclusion when every conductor answered.
+    ///
+    /// ## History: a dropped admin socket is not a provisioning verdict
     ///
     /// `elohim-genesis/dev` #1576 refused two hosted registrations on a
     /// seven-peer-healthy alpha with
     /// `Failed to generate agent key on conductor-3: … Other: {"error":"BrokenPipe"}`
     /// and
     /// `Failed to install app on conductor-3: … Other({"error":"ConnectionAborted"})`,
-    /// each surfacing to the human as `503 PROVISIONING_FAILED`. Both are
-    /// TRANSPORT faults on the admin websocket: the conductor never answered,
-    /// so neither establishes anything about the work — exactly the class the
-    /// substrate trust contract says must be re-offered rather than verdicted
-    /// (the same lesson `conductor_admission`'s shed carries in elohim-storage,
-    /// and the same lesson the seed-blob forward learned on 2026-09-02).
-    ///
-    /// Only `conductor-3` appeared anywhere in that build's log: the pool held
-    /// other members and none was ever asked. The re-offer is bounded at
-    /// [`PROVISION_TRANSPORT_ATTEMPTS`] and EXCLUDES the conductor that dropped,
-    /// so a single sick pool member cannot absorb every attempt — and the
-    /// idempotency search re-runs at the top of each attempt, because an
-    /// `install_app` whose socket died may have landed before it died.
-    ///
-    /// A non-transport error (at capacity, cell genesis timed out, a real
-    /// conductor refusal) is returned immediately and unchanged: those ARE
-    /// verdicts.
-    pub async fn provision_agent(&self, user_identifier: &str) -> Result<ProvisionedAgent, String> {
+    /// each surfacing to the human as `503 PROVISIONING_FAILED`. The first is
+    /// still re-offered (no install was sent). The second no longer is: an
+    /// install that was sent is resolved where it was sent.
+    pub async fn provision_agent(
+        &self,
+        user_identifier: &str,
+    ) -> Result<ProvisionedAgent, ProvisionError> {
+        // 1. Search ALL conductors for an existing app for this user — ONCE.
+        // Not per attempt: the only thing a later attempt could newly find is
+        // an install this call sent, and that is resolved on its own conductor
+        // below rather than rediscovered by a pool walk.
+        match self.find_existing_app(user_identifier).await {
+            Existence::Found(agent) => return Ok(agent),
+            Existence::Unresolved { conductors, detail } => {
+                warn!(
+                    user = %user_identifier,
+                    unreachable = ?conductors,
+                    "Cannot establish whether this user already has an app — refusing to \
+                     provision a second one elsewhere"
+                );
+                return Err(ProvisionError::Unresolved { conductors, detail });
+            }
+            Existence::NotInstalled => {}
+        }
+
         let mut excluded: Vec<String> = Vec::new();
-        let mut last_transport_error: Option<String> = None;
+        let mut last_not_sent: Option<String> = None;
 
         for attempt in 1..=PROVISION_TRANSPORT_ATTEMPTS {
-            // 1. Search ALL conductors for an existing app for this user.
-            // Re-run per attempt, not once: a previous attempt's aborted
-            // install may have completed on the conductor that stopped talking.
-            if let Some(result) = self.find_existing_app(user_identifier).await {
-                return Ok(result);
-            }
-
-            // 2. No existing app found — provision on the least loaded
-            // conductor that has not already dropped on us in this call.
+            // 2. Provision on the least loaded conductor that has not already
+            // dropped on us in this call.
             let Some(conductor) = self.registry.find_least_loaded_excluding(&excluded) else {
                 break;
             };
 
-            match self.provision_on(&conductor, user_identifier).await {
+            let fault = match self.provision_on(&conductor, user_identifier).await {
                 Ok(agent) => return Ok(agent),
-                Err(e) if is_transport_fault(&e) => {
+                Err(fault) => fault,
+            };
+
+            match fault.install {
+                FaultClass::NotSent => {
                     warn!(
                         conductor = %conductor.conductor_id,
                         attempt,
                         max_attempts = PROVISION_TRANSPORT_ATTEMPTS,
-                        error = %e,
-                        "conductor admin socket dropped mid-provision — re-offering to \
-                         another conductor; a dropped socket says nothing about the work"
+                        error = %fault.message,
+                        "provisioning attempt failed before its install was sent — \
+                         re-offering to another conductor"
                     );
                     excluded.push(conductor.conductor_id.clone());
-                    last_transport_error = Some(e);
+                    last_not_sent = Some(fault.message);
                 }
-                Err(e) => return Err(e),
+                FaultClass::SentOutcomeUnknown => {
+                    warn!(
+                        conductor = %conductor.conductor_id,
+                        error = %fault.message,
+                        "install was sent and its outcome is unknown — resolving on the \
+                         SAME conductor; it will not be re-offered"
+                    );
+                    return self
+                        .resolve_sent_install(&conductor, user_identifier, &fault.message)
+                        .await;
+                }
+                FaultClass::Refused => return Err(ProvisionError::Failed(fault.message)),
             }
         }
 
-        Err(last_transport_error
-            .unwrap_or_else(|| "No conductors available for provisioning".to_string()))
+        Err(ProvisionError::Failed(last_not_sent.unwrap_or_else(|| {
+            "No conductors available for provisioning".to_string()
+        })))
     }
 
     /// One provisioning attempt against ONE named conductor.
     async fn provision_on(
         &self,
-        conductor: &super::registry::ConductorInfo,
+        conductor: &ConductorInfo,
         user_identifier: &str,
-    ) -> Result<ProvisionedAgent, String> {
-        let conductor = conductor.clone();
+    ) -> Result<ProvisionedAgent, AttemptFault> {
         if conductor.capacity_used >= conductor.capacity_max {
-            return Err(format!(
+            return Err(AttemptFault::verdict(format!(
                 "Conductor {} at capacity ({}/{})",
                 conductor.conductor_id, conductor.capacity_used, conductor.capacity_max
-            ));
+            )));
         }
 
         let installed_app_id =
             generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
-        let admin = TypedAdminClient::connect(&conductor.admin_url)
+        let admin = self
+            .connector
+            .connect(&conductor.admin_url)
             .await
-            .map_err(|e| {
-                format!(
+            .map_err(|fault| AttemptFault {
+                install: before_install(fault.class),
+                message: format!(
                     "Failed to connect to admin on {}: {}",
-                    conductor.conductor_id, e
-                )
+                    conductor.conductor_id, fault
+                ),
             })?;
 
         info!(
@@ -236,104 +368,83 @@ impl AgentProvisioner {
             "Provisioning new agent on conductor"
         );
 
-        // 3. Generate agent key
-        let agent_key = admin.generate_agent_pub_key().await.map_err(|e| {
-            format!(
-                "Failed to generate agent key on {}: {}",
-                conductor.conductor_id, e
-            )
-        })?;
+        // 3. Generate agent key. Nothing identity-bearing exists until the
+        // install below, so a transport fault here leaves the install unsent.
+        let agent_key = admin
+            .generate_agent_pub_key()
+            .await
+            .map_err(|fault| AttemptFault {
+                install: before_install(fault.class),
+                message: format!(
+                    "Failed to generate agent key on {}: {}",
+                    conductor.conductor_id, fault
+                ),
+            })?;
 
-        let agent_pub_key_b64 = provisioned_agent_key(&agent_key);
-
-        // 4. Install app
-        if let Err(e) = admin
+        // 4. Install app. From the moment this is written, the person may have
+        // an identity on THIS conductor — the fault's own class is the answer.
+        if let Err(fault) = admin
             .install_app(&installed_app_id, &agent_key, &self.bundle_path)
             .await
         {
-            return Err(format!(
-                "Failed to install app on {}: {}",
-                conductor.conductor_id, e
-            ));
+            return Err(AttemptFault {
+                install: fault.class,
+                message: format!(
+                    "Failed to install app on {}: {}",
+                    conductor.conductor_id, fault
+                ),
+            });
         }
 
-        // 5. Enable app
-        if let Err(e) = admin.enable_app(&installed_app_id).await {
-            warn!(
-                "Enable failed, attempting uninstall cleanup for {}: {}",
-                installed_app_id, e
-            );
-            if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
-                warn!("Cleanup uninstall also failed: {}", cleanup_err);
-            }
-            return Err(format!(
+        // 5. Enable app. The app IS installed here now.
+        if let Err(fault) = admin.enable_app(&installed_app_id).await {
+            let message = format!(
                 "Failed to enable app on {}: {}",
-                conductor.conductor_id, e
-            ));
+                conductor.conductor_id, fault
+            );
+            return Err(match fault.class {
+                // The conductor answered: clean up what we just installed.
+                FaultClass::Refused => {
+                    warn!(
+                        "Enable failed, attempting uninstall cleanup for {}: {}",
+                        installed_app_id, fault
+                    );
+                    if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
+                        warn!("Cleanup uninstall also failed: {}", cleanup_err);
+                    }
+                    AttemptFault::verdict(message)
+                }
+                // The socket went: an installed app in an unknown state. No
+                // cleanup over a dead socket, and above all no second install.
+                FaultClass::NotSent | FaultClass::SentOutcomeUnknown => AttemptFault {
+                    install: FaultClass::SentOutcomeUnknown,
+                    message,
+                },
+            });
         }
 
         // 6. Verify cells are ready before returning (cell genesis can take seconds)
+        if !self
+            .await_cells(&*admin, conductor, &installed_app_id)
+            .await
         {
-            let max_polls = 30;
-            let poll_interval = std::time::Duration::from_millis(500);
-            let mut cells_ready = false;
-
-            for attempt in 1..=max_polls {
-                match admin.get_app_info(&installed_app_id).await {
-                    Ok(info) if !info.cell_ids.is_empty() => {
-                        let role_names: Vec<&str> =
-                            info.cell_ids.iter().map(|(r, _)| r.as_str()).collect();
-                        info!(
-                            conductor = %conductor.conductor_id,
-                            app_id = %installed_app_id,
-                            cell_count = info.cell_ids.len(),
-                            roles = ?role_names,
-                            polls = attempt,
-                            "Cell genesis complete — cells ready"
-                        );
-                        cells_ready = true;
-                        break;
-                    }
-                    Ok(_) => {
-                        debug!(
-                            app_id = %installed_app_id,
-                            attempt,
-                            max_polls,
-                            "Waiting for cell genesis..."
-                        );
-                    }
-                    Err(e) => {
-                        debug!(
-                            app_id = %installed_app_id,
-                            attempt,
-                            error = %e,
-                            "get_app_info not ready yet during genesis poll"
-                        );
-                    }
-                }
-                tokio::time::sleep(poll_interval).await;
-            }
-
-            if !cells_ready {
+            let waited = f64::from(GENESIS_MAX_POLLS) * GENESIS_POLL_INTERVAL.as_secs_f64();
+            warn!(
+                conductor = %conductor.conductor_id,
+                app_id = %installed_app_id,
+                "Cell genesis timed out after {}s — cleaning up",
+                waited
+            );
+            if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
                 warn!(
-                    conductor = %conductor.conductor_id,
-                    app_id = %installed_app_id,
-                    "Cell genesis timed out after {}s — cleaning up",
-                    max_polls as f64 * poll_interval.as_secs_f64()
+                    "Cleanup uninstall after genesis timeout failed: {}",
+                    cleanup_err
                 );
-                if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
-                    warn!(
-                        "Cleanup uninstall after genesis timeout failed: {}",
-                        cleanup_err
-                    );
-                }
-                return Err(format!(
-                    "Cell genesis timed out on {} for app '{}' after {}s",
-                    conductor.conductor_id,
-                    installed_app_id,
-                    max_polls as f64 * poll_interval.as_secs_f64()
-                ));
             }
+            return Err(AttemptFault::verdict(format!(
+                "Cell genesis timed out on {} for app '{}' after {}s",
+                conductor.conductor_id, installed_app_id, waited
+            )));
         }
 
         // 7. Register agent→conductor mapping under EVERY string form a reader
@@ -357,7 +468,9 @@ impl AgentProvisioner {
             if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
                 warn!("Cleanup uninstall also failed: {}", cleanup_err);
             }
-            return Err(format!("Failed to register agent mapping: {e}"));
+            return Err(AttemptFault::verdict(format!(
+                "Failed to register agent mapping: {e}"
+            )));
         }
 
         for alias in alias_forms {
@@ -367,6 +480,7 @@ impl AgentProvisioner {
                 .await;
         }
 
+        let agent_pub_key_b64 = provisioned_agent_key(&agent_key);
         info!(
             conductor = %conductor.conductor_id,
             agent = %agent_pub_key_b64,
@@ -376,69 +490,279 @@ impl AgentProvisioner {
 
         Ok(ProvisionedAgent {
             agent_pub_key: agent_pub_key_b64,
-            conductor_id: conductor.conductor_id,
-            conductor_url: conductor.conductor_url,
-            admin_url: conductor.admin_url,
+            conductor_id: conductor.conductor_id.clone(),
+            conductor_url: conductor.conductor_url.clone(),
+            admin_url: conductor.admin_url.clone(),
             installed_app_id,
         })
+    }
+
+    /// Poll until the app reports at least one provisioned cell, or the genesis
+    /// budget runs out. `true` = cells ready.
+    async fn await_cells(
+        &self,
+        admin: &dyn ProvisionAdmin,
+        conductor: &ConductorInfo,
+        installed_app_id: &str,
+    ) -> bool {
+        for attempt in 1..=GENESIS_MAX_POLLS {
+            match admin.find_app(installed_app_id).await {
+                Ok(Some(info)) if !info.cell_ids.is_empty() => {
+                    let role_names: Vec<&str> =
+                        info.cell_ids.iter().map(|(r, _)| r.as_str()).collect();
+                    info!(
+                        conductor = %conductor.conductor_id,
+                        app_id = %installed_app_id,
+                        cell_count = info.cell_ids.len(),
+                        roles = ?role_names,
+                        polls = attempt,
+                        "Cell genesis complete — cells ready"
+                    );
+                    return true;
+                }
+                Ok(_) => {
+                    debug!(
+                        app_id = %installed_app_id,
+                        attempt,
+                        max_polls = GENESIS_MAX_POLLS,
+                        "Waiting for cell genesis..."
+                    );
+                }
+                Err(e) => {
+                    debug!(
+                        app_id = %installed_app_id,
+                        attempt,
+                        error = %e,
+                        "get_app_info not ready yet during genesis poll"
+                    );
+                }
+            }
+            tokio::time::sleep(GENESIS_POLL_INTERVAL).await;
+        }
+        false
+    }
+
+    /// An install was written to `conductor` and its outcome is unknown.
+    /// Settle it THERE.
+    ///
+    /// Three things can be true, and only one of them yields an agent:
+    ///
+    /// - the app is installed → finish it (enable if needed, wait for cells)
+    ///   and use it, with the agent key the CONDUCTOR reports for it;
+    /// - the conductor answers that it has no such app → still unresolved. A
+    ///   conductor does not cancel an install because its client went away, so
+    ///   "not there yet" is not "never will be"; a retry finds it once it lands;
+    /// - the conductor cannot be asked → unresolved.
+    ///
+    /// Never uninstalls: by the time anyone looks again, `create_human` may
+    /// have run on this app.
+    async fn resolve_sent_install(
+        &self,
+        conductor: &ConductorInfo,
+        user_identifier: &str,
+        sent_fault: &str,
+    ) -> Result<ProvisionedAgent, ProvisionError> {
+        let conductor_id = conductor.conductor_id.as_str();
+        let installed_app_id = generate_app_id(&self.app_id, conductor_id, user_identifier);
+
+        let admin = self
+            .connector
+            .connect(&conductor.admin_url)
+            .await
+            .map_err(|fault| {
+                ProvisionError::unresolved(
+                    conductor_id,
+                    format!(
+                        "{sent_fault}; the install of '{installed_app_id}' may have landed and \
+                         {conductor_id} could not be reached to find out ({fault})"
+                    ),
+                )
+            })?;
+
+        let existing = match admin.find_app(&installed_app_id).await {
+            Ok(Some(existing)) => existing,
+            Ok(None) => {
+                return Err(ProvisionError::unresolved(
+                    conductor_id,
+                    format!(
+                        "{sent_fault}; '{installed_app_id}' is not installed on {conductor_id} \
+                         yet, but the install was sent and may still land"
+                    ),
+                ));
+            }
+            Err(fault) => {
+                return Err(ProvisionError::unresolved(
+                    conductor_id,
+                    format!(
+                        "{sent_fault}; the install of '{installed_app_id}' may have landed and \
+                         {conductor_id} did not answer the lookup ({fault})"
+                    ),
+                ));
+            }
+        };
+
+        info!(
+            conductor = %conductor_id,
+            app_id = %installed_app_id,
+            status = ?existing.status,
+            "The install whose outcome was unknown DID land — finishing it in place"
+        );
+
+        // Installed is not ready. Check what state it is in.
+        match existing.status.as_deref() {
+            Some("running") => {}
+            Some("disabled") => {
+                admin.enable_app(&installed_app_id).await.map_err(|fault| {
+                    ProvisionError::unresolved(
+                        conductor_id,
+                        format!(
+                            "'{installed_app_id}' is installed on {conductor_id} but disabled, \
+                             and could not be enabled ({fault})"
+                        ),
+                    )
+                })?;
+            }
+            other => {
+                return Err(ProvisionError::unresolved(
+                    conductor_id,
+                    format!(
+                        "'{installed_app_id}' is installed on {conductor_id} in state {} and \
+                         cannot be used as it stands",
+                        other.unwrap_or("unknown")
+                    ),
+                ));
+            }
+        }
+
+        if existing.cell_ids.is_empty()
+            && !self
+                .await_cells(&*admin, conductor, &installed_app_id)
+                .await
+        {
+            return Err(ProvisionError::unresolved(
+                conductor_id,
+                format!(
+                    "'{installed_app_id}' is installed on {conductor_id} but its cells did not \
+                     become ready"
+                ),
+            ));
+        }
+
+        Ok(self
+            .adopt_existing(conductor, installed_app_id, &existing.agent_pub_key)
+            .await)
+    }
+
+    /// Hand back an app that already exists on `conductor`, registering its
+    /// agent under every lookup form.
+    async fn adopt_existing(
+        &self,
+        conductor: &ConductorInfo,
+        installed_app_id: String,
+        raw_agent_key: &[u8],
+    ) -> ProvisionedAgent {
+        // SAME form as the fresh-provision path — an idempotent re-provision
+        // must hand back a key the grant surface accepts, or a returning
+        // human's promise leg fails where a newcomer's succeeds.
+        let agent_pub_key_b64 = provisioned_agent_key(raw_agent_key);
+
+        // Re-register in case the registry lost the mapping, under every lookup
+        // form (aliases for ONE agent — capacity is counted by distinct
+        // install, never by form count).
+        for form in lookup_forms(raw_agent_key) {
+            let _ = self
+                .registry
+                .register_agent(&form, &conductor.conductor_id, &installed_app_id)
+                .await;
+        }
+
+        ProvisionedAgent {
+            agent_pub_key: agent_pub_key_b64,
+            conductor_id: conductor.conductor_id.clone(),
+            conductor_url: conductor.conductor_url.clone(),
+            admin_url: conductor.admin_url.clone(),
+            installed_app_id,
+        }
     }
 
     /// Search all conductors for an existing app for this user.
     ///
     /// Since `generate_app_id` includes the conductor_id, we check each conductor
     /// with its own deterministic app ID. Returns the first match found.
-    async fn find_existing_app(&self, user_identifier: &str) -> Option<ProvisionedAgent> {
-        let conductors = self.registry.list_conductors();
-        if conductors.is_empty() {
-            return None;
-        }
+    ///
+    /// A conductor that cannot be reached, or does not answer the lookup, is
+    /// NOT a conductor without the app. It used to be skipped, which let "no
+    /// existing app" be concluded from a pool that had not all been asked —
+    /// and a person whose app sat on the silent conductor was then given a
+    /// second one. Now it is reported: [`Existence::Unresolved`].
+    async fn find_existing_app(&self, user_identifier: &str) -> Existence {
+        let mut unreachable: Vec<String> = Vec::new();
+        let mut reasons: Vec<String> = Vec::new();
 
-        for conductor in &conductors {
+        for conductor in &self.registry.list_conductors() {
             let app_id = generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
-            let admin = match TypedAdminClient::connect(&conductor.admin_url).await {
-                Ok(a) => a,
-                Err(_) => continue,
+
+            let lookup = match self.connector.connect(&conductor.admin_url).await {
+                Ok(admin) => admin.find_app(&app_id).await.map(|found| (admin, found)),
+                Err(fault) => Err(fault),
             };
 
-            match admin.get_app_info(&app_id).await {
-                Ok(existing) => {
-                    // SAME form as the fresh-provision path above — an
-                    // idempotent re-provision must hand back a key the grant
-                    // surface accepts, or a returning human's promise leg fails
-                    // where a newcomer's succeeds.
-                    let agent_pub_key_b64 = provisioned_agent_key(&existing.agent_pub_key);
-
+            match lookup {
+                Ok((admin, Some(existing))) => {
                     info!(
                         conductor = %conductor.conductor_id,
-                        agent = %agent_pub_key_b64,
                         app_id = %app_id,
                         user = %user_identifier,
+                        status = ?existing.status,
                         "Reusing existing app installation (idempotent provision)"
                     );
 
-                    // Re-register in case the registry lost the mapping, under
-                    // every lookup form (aliases for ONE agent — capacity is
-                    // counted by distinct install, never by form count).
-                    for form in lookup_forms(&existing.agent_pub_key) {
-                        let _ = self
-                            .registry
-                            .register_agent(&form, &conductor.conductor_id, &app_id)
-                            .await;
+                    // An app left disabled is usually an install whose enable
+                    // never arrived. Enable it rather than hand back an app no
+                    // zome call can reach. Best-effort: on failure it is handed
+                    // back as it always was, and the caller's own readiness
+                    // handling (the chaperone re-enables and polls) still runs.
+                    if existing.status.as_deref() == Some("disabled") {
+                        if let Err(fault) = admin.enable_app(&app_id).await {
+                            warn!(
+                                conductor = %conductor.conductor_id,
+                                app_id = %app_id,
+                                error = %fault,
+                                "Existing app is disabled and could not be enabled"
+                            );
+                        }
                     }
 
-                    return Some(ProvisionedAgent {
-                        agent_pub_key: agent_pub_key_b64,
-                        conductor_id: conductor.conductor_id.clone(),
-                        conductor_url: conductor.conductor_url.clone(),
-                        admin_url: conductor.admin_url.clone(),
-                        installed_app_id: app_id,
-                    });
+                    return Existence::Found(
+                        self.adopt_existing(conductor, app_id, &existing.agent_pub_key)
+                            .await,
+                    );
                 }
-                Err(_) => continue,
+                Ok((_, None)) => {}
+                Err(fault) => {
+                    warn!(
+                        conductor = %conductor.conductor_id,
+                        error = %fault,
+                        "Could not ask this conductor whether the user already has an app"
+                    );
+                    reasons.push(format!("{}: {}", conductor.conductor_id, fault));
+                    unreachable.push(conductor.conductor_id.clone());
+                }
             }
         }
 
-        None
+        if unreachable.is_empty() {
+            Existence::NotInstalled
+        } else {
+            unreachable.sort();
+            Existence::Unresolved {
+                conductors: unreachable,
+                detail: format!(
+                    "could not establish whether this user already has an app there ({})",
+                    reasons.join("; ")
+                ),
+            }
+        }
     }
 
     /// Deprovision an agent — uninstall the app from its conductor.
@@ -463,7 +787,9 @@ impl AgentProvisioner {
             "Deprovisioning agent"
         );
 
-        let admin = TypedAdminClient::connect(&conductor.admin_url)
+        let admin = self
+            .connector
+            .connect(&conductor.admin_url)
             .await
             .map_err(|e| {
                 format!(
@@ -508,44 +834,758 @@ fn generate_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conductor::typed_admin::{AdminFault, AppInfoDetailed};
+    use async_trait::async_trait;
+    use std::collections::{HashMap, VecDeque};
+    use std::sync::Mutex;
 
-    /// The two error strings `elohim-genesis/dev` #1576 put in front of a human
-    /// as `503 PROVISIONING_FAILED`, verbatim from the build log. Both must
-    /// classify as transport faults — the conductor never answered.
-    #[test]
-    fn the_two_build_1576_refusals_are_transport_faults_not_verdicts() {
-        let generate_key = "Failed to generate agent key on conductor-3: Admin error \
-             (generate_agent_pub_key): External API wire error: \
-             InternalError(\"Other: {\\\"error\\\":\\\"BrokenPipe\\\"}\")";
-        let install = "Failed to install app on conductor-3: Admin error (install_app): \
-             External API wire error: InternalError(\"Conductor returned an error while \
-             using a ConductorApi: Other({\\\"error\\\":\\\"ConnectionAborted\\\"})\")";
+    // ── a scripted conductor pool ───────────────────────────────────────────
+    //
+    // Stands in for the admin websockets of a pool, behind the same
+    // `AdminConnector` / `ProvisionAdmin` seam the live client implements. Each
+    // conductor counts what reached it, so a test can assert not only what the
+    // provisioner returned but what it DID — above all, how many agent keys it
+    // generated and where it sent an install.
 
-        assert!(
-            is_transport_fault(generate_key),
-            "a BrokenPipe on the admin socket says nothing about the work"
-        );
-        assert!(
-            is_transport_fault(install),
-            "a ConnectionAborted on the admin socket says nothing about the work"
-        );
+    const USER: &str = "jane@example.com";
+
+    /// What a conductor does with an `install_app`.
+    #[derive(Clone)]
+    enum Install {
+        /// Installs (disabled, until enabled) and answers.
+        Succeeds,
+        /// Answers with an error; nothing is installed.
+        Refuses(&'static str),
+        /// The request is written, then the socket drops. `lands` is the state
+        /// the app is in afterwards on the conductor — `None` if it has not
+        /// (yet) been installed.
+        SentThenDropped { lands: Option<&'static str> },
     }
+
+    struct FakeApp {
+        agent_key: Vec<u8>,
+        status: &'static str,
+        cells_ready: bool,
+    }
+
+    struct FakeConductor {
+        /// Scripted connect outcomes (`true` = accepted), consumed in order.
+        /// Once exhausted, connects succeed unless `dark`.
+        connects: VecDeque<bool>,
+        /// Refuses every connect.
+        dark: bool,
+        /// Goes dark the moment an install is written to it.
+        dark_after_install: bool,
+        keygen_fault: Option<AdminFault>,
+        install: Install,
+        /// Returned by the NEXT `enable_app`, once.
+        enable_fault: Option<AdminFault>,
+        /// Returned by every `find_app`.
+        lookup_fault: Option<AdminFault>,
+        apps: HashMap<String, FakeApp>,
+        keys_generated: u32,
+        installs_received: u32,
+        enables_received: u32,
+        uninstalls_received: u32,
+    }
+
+    impl FakeConductor {
+        fn healthy() -> Self {
+            Self {
+                connects: VecDeque::new(),
+                dark: false,
+                dark_after_install: false,
+                keygen_fault: None,
+                install: Install::Succeeds,
+                enable_fault: None,
+                lookup_fault: None,
+                apps: HashMap::new(),
+                keys_generated: 0,
+                installs_received: 0,
+                enables_received: 0,
+                uninstalls_received: 0,
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct FakePool {
+        conductors: Mutex<HashMap<String, FakeConductor>>,
+        keys_minted: Mutex<u8>,
+    }
+
+    impl FakePool {
+        fn with<R>(&self, conductor_id: &str, f: impl FnOnce(&mut FakeConductor) -> R) -> R {
+            let mut conductors = self.conductors.lock().unwrap();
+            f(conductors
+                .get_mut(&admin_url(conductor_id))
+                .expect("a conductor of this pool"))
+        }
+
+        fn total_keys_generated(&self) -> u32 {
+            self.conductors
+                .lock()
+                .unwrap()
+                .values()
+                .map(|c| c.keys_generated)
+                .sum()
+        }
+
+        fn total_installs_received(&self) -> u32 {
+            self.conductors
+                .lock()
+                .unwrap()
+                .values()
+                .map(|c| c.installs_received)
+                .sum()
+        }
+    }
+
+    fn admin_url(conductor_id: &str) -> String {
+        format!("ws://{conductor_id}:4444")
+    }
+
+    fn raw_agent_key(seed: u8) -> Vec<u8> {
+        holochain_client::AgentPubKey::from_raw_36(vec![seed; 36])
+            .get_raw_39()
+            .to_vec()
+    }
+
+    struct FakeConnector(Arc<FakePool>);
+
+    struct FakeAdmin {
+        pool: Arc<FakePool>,
+        admin_url: String,
+    }
+
+    impl FakeAdmin {
+        fn with<R>(&self, f: impl FnOnce(&mut FakeConductor) -> R) -> R {
+            let mut conductors = self.pool.conductors.lock().unwrap();
+            f(conductors
+                .get_mut(&self.admin_url)
+                .expect("a conductor of this pool"))
+        }
+    }
+
+    #[async_trait]
+    impl AdminConnector for FakeConnector {
+        async fn connect(&self, admin_url: &str) -> Result<Box<dyn ProvisionAdmin>, AdminFault> {
+            let accepted = {
+                let mut conductors = self.0.conductors.lock().unwrap();
+                let conductor = conductors
+                    .get_mut(admin_url)
+                    .expect("a conductor of this pool");
+                !conductor.dark && conductor.connects.pop_front().unwrap_or(true)
+            };
+            if !accepted {
+                return Err(AdminFault::not_sent(format!(
+                    "Admin WebSocket connect to {admin_url} failed: IO error: Connection \
+                     refused (os error 111)"
+                )));
+            }
+            Ok(Box::new(FakeAdmin {
+                pool: Arc::clone(&self.0),
+                admin_url: admin_url.to_string(),
+            }))
+        }
+    }
+
+    #[async_trait]
+    impl ProvisionAdmin for FakeAdmin {
+        async fn generate_agent_pub_key(&self) -> Result<Vec<u8>, AdminFault> {
+            if let Some(fault) = self.with(|c| c.keygen_fault.clone()) {
+                return Err(fault);
+            }
+            let seed = {
+                let mut minted = self.pool.keys_minted.lock().unwrap();
+                *minted += 1;
+                *minted
+            };
+            self.with(|c| c.keys_generated += 1);
+            Ok(raw_agent_key(seed))
+        }
+
+        async fn install_app(
+            &self,
+            installed_app_id: &str,
+            agent_key: &[u8],
+            _bundle_path: &str,
+        ) -> Result<(), AdminFault> {
+            self.with(|c| {
+                c.installs_received += 1;
+                let land = |status: &'static str, c: &mut FakeConductor| {
+                    c.apps.insert(
+                        installed_app_id.to_string(),
+                        FakeApp {
+                            agent_key: agent_key.to_vec(),
+                            status,
+                            cells_ready: status == "running",
+                        },
+                    );
+                };
+                match c.install.clone() {
+                    Install::Succeeds => {
+                        land("disabled", c);
+                        Ok(())
+                    }
+                    Install::Refuses(why) => Err(AdminFault::refused(format!(
+                        "Admin error (install_app): External API wire error: \
+                         InternalError(\"{why}\")"
+                    ))),
+                    Install::SentThenDropped { lands } => {
+                        if let Some(status) = lands {
+                            land(status, c);
+                        }
+                        if c.dark_after_install {
+                            c.dark = true;
+                        }
+                        Err(AdminFault::sent_outcome_unknown(
+                            "Admin error (install_app): Websocket error: Websocket closed: \
+                             ConnectionClosed",
+                        ))
+                    }
+                }
+            })
+        }
+
+        async fn enable_app(&self, installed_app_id: &str) -> Result<(), AdminFault> {
+            self.with(|c| {
+                c.enables_received += 1;
+                if let Some(fault) = c.enable_fault.take() {
+                    return Err(fault);
+                }
+                match c.apps.get_mut(installed_app_id) {
+                    Some(app) => {
+                        app.status = "running";
+                        app.cells_ready = true;
+                        Ok(())
+                    }
+                    None => Err(AdminFault::refused(
+                        "Admin error (enable_app): External API wire error: AppNotFound",
+                    )),
+                }
+            })
+        }
+
+        async fn find_app(
+            &self,
+            installed_app_id: &str,
+        ) -> Result<Option<AppInfoDetailed>, AdminFault> {
+            self.with(|c| {
+                if let Some(fault) = c.lookup_fault.clone() {
+                    return Err(fault);
+                }
+                Ok(c.apps.get(installed_app_id).map(|app| AppInfoDetailed {
+                    installed_app_id: installed_app_id.to_string(),
+                    agent_pub_key: app.agent_key.clone(),
+                    cell_ids: if app.cells_ready {
+                        vec![(
+                            "imagodei".to_string(),
+                            (vec![0u8; 39], app.agent_key.clone()),
+                        )]
+                    } else {
+                        Vec::new()
+                    },
+                    status: Some(app.status.to_string()),
+                    unrecoverable_cell_id: None,
+                    unrecoverable_reason: None,
+                }))
+            })
+        }
+
+        async fn uninstall_app(&self, installed_app_id: &str) -> Result<(), AdminFault> {
+            self.with(|c| {
+                c.uninstalls_received += 1;
+                c.apps.remove(installed_app_id);
+                Ok(())
+            })
+        }
+    }
+
+    /// A two-conductor pool where `conductor-a` is the least loaded — so it is
+    /// always the first offer — and `conductor-b` is the sibling a wrongly
+    /// re-offered install would land on.
+    async fn two_conductor_pool() -> (AgentProvisioner, Arc<FakePool>) {
+        let registry = Arc::new(ConductorRegistry::new(None).await);
+        let pool = Arc::new(FakePool::default());
+        for (id, used) in [("conductor-a", 0), ("conductor-b", 5)] {
+            registry.register_conductor(ConductorInfo {
+                conductor_id: id.to_string(),
+                conductor_url: format!("ws://{id}:8888"),
+                admin_url: admin_url(id),
+                capacity_used: used,
+                capacity_max: 10,
+            });
+            pool.conductors
+                .lock()
+                .unwrap()
+                .insert(admin_url(id), FakeConductor::healthy());
+        }
+        let provisioner = AgentProvisioner::new(registry)
+            .with_connector(Arc::new(FakeConnector(Arc::clone(&pool))));
+        (provisioner, pool)
+    }
+
+    fn app_on(conductor_id: &str) -> String {
+        generate_app_id(DEFAULT_APP_ID, conductor_id, USER)
+    }
+
+    fn assert_untouched(pool: &FakePool, conductor_id: &str) {
+        pool.with(conductor_id, |c| {
+            assert_eq!(
+                c.keys_generated, 0,
+                "{conductor_id} must not have been asked for an agent key"
+            );
+            assert_eq!(
+                c.installs_received, 0,
+                "{conductor_id} must not have been sent an install"
+            );
+            assert!(c.apps.is_empty());
+        });
+    }
+
+    fn unresolved_on(error: &ProvisionError) -> Vec<String> {
+        match error {
+            ProvisionError::Unresolved { conductors, .. } => conductors.clone(),
+            ProvisionError::Failed(message) => {
+                panic!("expected an unresolved result, got a plain failure: {message}")
+            }
+        }
+    }
+
+    // ── the happy path, through the seam ────────────────────────────────────
+
+    #[tokio::test]
+    async fn a_healthy_pool_provisions_once_on_the_least_loaded_conductor() {
+        let (provisioner, pool) = two_conductor_pool().await;
+
+        let agent = provisioner.provision_agent(USER).await.expect("provisions");
+
+        assert_eq!(agent.conductor_id, "conductor-a");
+        assert_eq!(agent.installed_app_id, app_on("conductor-a"));
+        assert_eq!(pool.total_keys_generated(), 1);
+        assert_untouched(&pool, "conductor-b");
+
+        // …and asking again finds it instead of installing a second.
+        let again = provisioner.provision_agent(USER).await.expect("idempotent");
+        assert_eq!(again.agent_pub_key, agent.agent_pub_key);
+        assert_eq!(pool.total_keys_generated(), 1);
+        assert_eq!(pool.total_installs_received(), 1);
+    }
+
+    // ── never a second identity for one person ──────────────────────────────
+
+    /// THE CASE. The install is written to conductor-a and the socket drops.
+    /// It landed. The provisioner must finish THAT install — one agent key in
+    /// the whole pool, nothing sent to the sibling — and hand back the key the
+    /// conductor holds for it.
+    #[tokio::test]
+    async fn an_install_sent_then_dropped_is_finished_on_the_same_conductor() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::SentThenDropped {
+                lands: Some("disabled"),
+            }
+        });
+
+        let agent = provisioner
+            .provision_agent(USER)
+            .await
+            .expect("an install that landed must be used, not abandoned");
+
+        assert_eq!(agent.conductor_id, "conductor-a");
+        assert_eq!(
+            pool.total_keys_generated(),
+            1,
+            "no second generate_agent_pub_key — one person, one agent key"
+        );
+        assert_untouched(&pool, "conductor-b");
+        pool.with("conductor-a", |c| {
+            let app = &c.apps[&app_on("conductor-a")];
+            assert_eq!(
+                agent.agent_pub_key,
+                provisioned_agent_key(&app.agent_key),
+                "the agent handed back must be the one the conductor installed"
+            );
+            assert_eq!(app.status, "running", "a disabled app is not ready");
+            assert_eq!(c.enables_received, 1);
+            assert_eq!(c.installs_received, 1);
+            assert_eq!(c.uninstalls_received, 0);
+        });
+    }
+
+    /// Same drop, but the install is not visible on the conductor when we look.
+    /// A conductor does not cancel an install because its client went away, so
+    /// this is NOT "nothing happened": the answer is an honest unresolved, and
+    /// still no second key and no install anywhere else.
+    #[tokio::test]
+    async fn an_install_sent_then_dropped_that_is_not_visible_is_unresolved_not_reoffered() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::SentThenDropped { lands: None }
+        });
+
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("an install of unknown outcome must not be papered over");
+
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(pool.total_keys_generated(), 1);
+        assert_eq!(pool.total_installs_received(), 1);
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    /// The install is written, lands, and the conductor then stops answering
+    /// entirely. It cannot be resolved there — so registration fails saying
+    /// exactly that, rather than quietly minting a second identity next door.
+    #[tokio::test]
+    async fn an_install_sent_to_a_conductor_that_then_goes_dark_is_unresolved_not_reoffered() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::SentThenDropped {
+                lands: Some("running"),
+            };
+            c.dark_after_install = true;
+        });
+
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("an unreachable conductor cannot resolve its own install");
+
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        assert!(
+            error.to_string().contains("conductor-a"),
+            "the error must name the conductor the identity may be on: {error}"
+        );
+        assert_eq!(pool.total_keys_generated(), 1);
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    /// The install answers OK and the socket drops on the ENABLE. The app is
+    /// installed there: finish it in place. No uninstall over a dead socket,
+    /// no second install.
+    #[tokio::test]
+    async fn an_enable_whose_socket_drops_is_finished_in_place() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.enable_fault = Some(AdminFault::sent_outcome_unknown(
+                "Admin error (enable_app): Websocket error: Websocket closed: ConnectionClosed",
+            ))
+        });
+
+        let agent = provisioner
+            .provision_agent(USER)
+            .await
+            .expect("an installed app must be finished, not re-provisioned");
+
+        assert_eq!(agent.conductor_id, "conductor-a");
+        assert_eq!(pool.total_keys_generated(), 1);
+        assert_untouched(&pool, "conductor-b");
+        pool.with("conductor-a", |c| {
+            assert_eq!(
+                c.enables_received, 2,
+                "the dropped enable, then the real one"
+            );
+            assert_eq!(c.uninstalls_received, 0);
+        });
+    }
+
+    /// A landed install that is not usable is REPORTED — never treated as
+    /// ready, never uninstalled (create_human may already have run on it by
+    /// the time anyone looks), never replaced elsewhere.
+    #[tokio::test]
+    async fn a_landed_install_in_an_unusable_state_is_reported_not_used() {
+        for state in ["unrecoverable", "paused"] {
+            let (provisioner, pool) = two_conductor_pool().await;
+            pool.with("conductor-a", |c| {
+                c.install = Install::SentThenDropped { lands: Some(state) }
+            });
+
+            let error = provisioner.provision_agent(USER).await.expect_err(state);
+
+            assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+            assert!(error.to_string().contains(state), "{error}");
+            pool.with("conductor-a", |c| assert_eq!(c.uninstalls_received, 0));
+            assert_untouched(&pool, "conductor-b");
+        }
+
+        // Disabled, and the enable is refused: reported, not used.
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::SentThenDropped {
+                lands: Some("disabled"),
+            };
+            c.enable_fault = Some(AdminFault::refused(
+                "Admin error (enable_app): External API wire error: InternalError(\"CellDisabled\")",
+            ));
+        });
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("a disabled app that cannot be enabled is not ready");
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        pool.with("conductor-a", |c| assert_eq!(c.uninstalls_received, 0));
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    // ── what MAY be re-offered ──────────────────────────────────────────────
+
+    /// The connect is refused before anything is written. Nothing reached
+    /// conductor-a, so the sibling is asked — the re-offer still happens.
+    #[tokio::test]
+    async fn a_connect_refused_before_anything_is_sent_is_reoffered() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        // Answers the existence check, then refuses the provisioning connect.
+        pool.with("conductor-a", |c| {
+            c.connects = VecDeque::from([true, false])
+        });
+
+        let agent = provisioner
+            .provision_agent(USER)
+            .await
+            .expect("a connect that never sent anything must be re-offered");
+
+        assert_eq!(agent.conductor_id, "conductor-b");
+        assert_untouched(&pool, "conductor-a");
+        assert_eq!(pool.total_keys_generated(), 1);
+    }
+
+    /// `elohim-genesis/dev` #1576: key generation fails with a dropped pipe.
+    /// As an admin call its outcome is unknown — but no install was written, so
+    /// for the install it is `NotSent`, and the sibling is asked.
+    #[tokio::test]
+    async fn a_key_generation_that_drops_is_reoffered_because_no_install_was_sent() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.keygen_fault = Some(AdminFault::sent_outcome_unknown(
+                "Admin error (generate_agent_pub_key): External API wire error: \
+                 InternalError(\"Other: {\\\"error\\\":\\\"BrokenPipe\\\"}\")",
+            ))
+        });
+
+        let agent = provisioner
+            .provision_agent(USER)
+            .await
+            .expect("a dropped key generation says nothing about the work");
+
+        assert_eq!(agent.conductor_id, "conductor-b");
+        pool.with("conductor-a", |c| assert_eq!(c.installs_received, 0));
+        assert_eq!(pool.total_installs_received(), 1);
+    }
+
+    #[test]
+    fn a_fault_before_the_install_never_makes_the_install_unknown() {
+        assert_eq!(before_install(FaultClass::NotSent), FaultClass::NotSent);
+        assert_eq!(
+            before_install(FaultClass::SentOutcomeUnknown),
+            FaultClass::NotSent
+        );
+        assert_eq!(before_install(FaultClass::Refused), FaultClass::Refused);
+    }
+
+    // ── verdicts ────────────────────────────────────────────────────────────
 
     /// The other half of the contract: a real answer must never be retried into
     /// a second side effect.
-    #[test]
-    fn a_conductor_verdict_is_never_reoffered() {
-        for verdict in [
-            "Conductor conductor-1 at capacity (50/50)",
-            "Cell genesis timed out on conductor-2 for app 'elohim-conductor-2-ab12cd' after 15s",
-            "Failed to enable app on conductor-0: AppNotFound",
-            "Failed to register agent mapping: mongo write failed",
-        ] {
-            assert!(
-                !is_transport_fault(verdict),
-                "a verdict must be returned unchanged, got a retry for: {verdict}"
-            );
+    #[tokio::test]
+    async fn a_refused_install_is_a_verdict_and_is_not_reoffered() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::Refuses("bundle not found at /app/elohim.happ")
+        });
+
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("a refusal is an answer");
+
+        assert_eq!(error.code(), "PROVISIONING_FAILED");
+        assert!(
+            error
+                .to_string()
+                .starts_with("Failed to install app on conductor-a: "),
+            "{error}"
+        );
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    /// A refused key generation is a verdict too — class decides, not stage.
+    #[tokio::test]
+    async fn a_refused_key_generation_is_a_verdict_and_is_not_reoffered() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.keygen_fault = Some(AdminFault::refused(
+                "Admin error (generate_agent_pub_key): External API wire error: \
+                 InternalError(\"keystore locked\")",
+            ))
+        });
+
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("verdict");
+
+        assert!(matches!(error, ProvisionError::Failed(_)), "{error}");
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    /// The doorway's own capacity check is a verdict as well.
+    #[tokio::test]
+    async fn a_full_pool_is_a_verdict() {
+        let registry = Arc::new(ConductorRegistry::new(None).await);
+        let pool = Arc::new(FakePool::default());
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-a".to_string(),
+            conductor_url: "ws://conductor-a:8888".to_string(),
+            admin_url: admin_url("conductor-a"),
+            capacity_used: 10,
+            capacity_max: 10,
+        });
+        pool.conductors
+            .lock()
+            .unwrap()
+            .insert(admin_url("conductor-a"), FakeConductor::healthy());
+        let provisioner = AgentProvisioner::new(registry)
+            .with_connector(Arc::new(FakeConnector(Arc::clone(&pool))));
+
+        let error = provisioner.provision_agent(USER).await.expect_err("full");
+
+        assert_eq!(
+            error,
+            ProvisionError::Failed("Conductor conductor-a at capacity (10/10)".to_string())
+        );
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    // ── the existence check ─────────────────────────────────────────────────
+
+    /// A conductor that cannot be reached is not a conductor without the app.
+    /// The search says so explicitly, and provisioning stops: no key, no
+    /// install, anywhere.
+    #[tokio::test]
+    async fn an_unreachable_conductor_during_the_existence_check_is_unresolved_not_absent() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-b", |c| c.dark = true);
+
+        match provisioner.find_existing_app(USER).await {
+            Existence::Unresolved { conductors, .. } => {
+                assert_eq!(conductors, vec!["conductor-b".to_string()]);
+            }
+            Existence::NotInstalled => panic!(
+                "\"no existing app\" must not be concluded from a pool that was not all asked"
+            ),
+            Existence::Found(agent) => panic!("nothing is installed, found {agent:?}"),
         }
+
+        let error = provisioner
+            .provision_agent(USER)
+            .await
+            .expect_err("the user may already have an app on the silent conductor");
+
+        assert_eq!(unresolved_on(&error), vec!["conductor-b".to_string()]);
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(pool.total_keys_generated(), 0);
+        assert_eq!(pool.total_installs_received(), 0);
+    }
+
+    /// Reaching a conductor is not enough — it has to ANSWER the lookup.
+    #[tokio::test]
+    async fn a_conductor_that_does_not_answer_the_lookup_is_unresolved_not_absent() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.lookup_fault = Some(AdminFault::sent_outcome_unknown(
+                "Admin error (list_apps for get_app_info): Websocket error: Timeout",
+            ))
+        });
+
+        assert!(matches!(
+            provisioner.find_existing_app(USER).await,
+            Existence::Unresolved { conductors, .. } if conductors == vec!["conductor-a".to_string()]
+        ));
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    /// Only a pool in which EVERY conductor answered "no" is "not installed".
+    #[tokio::test]
+    async fn every_conductor_answering_no_is_the_only_not_installed() {
+        let (provisioner, _pool) = two_conductor_pool().await;
+        assert!(matches!(
+            provisioner.find_existing_app(USER).await,
+            Existence::NotInstalled
+        ));
+    }
+
+    /// An app that IS found settles the question, whatever else is dark: the
+    /// person has an identity and it is on a conductor that answered.
+    #[tokio::test]
+    async fn an_app_found_on_a_reachable_conductor_is_used_even_if_another_is_dark() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        let key = raw_agent_key(200);
+        pool.with("conductor-a", |c| c.dark = true);
+        pool.with("conductor-b", |c| {
+            c.apps.insert(
+                app_on("conductor-b"),
+                FakeApp {
+                    agent_key: key.clone(),
+                    status: "running",
+                    cells_ready: true,
+                },
+            );
+        });
+
+        let agent = provisioner
+            .provision_agent(USER)
+            .await
+            .expect("an existing app is the answer");
+
+        assert_eq!(agent.conductor_id, "conductor-b");
+        assert_eq!(agent.agent_pub_key, provisioned_agent_key(&key));
+        assert_eq!(pool.total_keys_generated(), 0);
+        assert_eq!(pool.total_installs_received(), 0);
+    }
+
+    /// An existing app left disabled — typically an install whose enable never
+    /// arrived — is enabled when it is found, not handed back as if ready.
+    #[tokio::test]
+    async fn an_existing_disabled_app_is_enabled_when_found() {
+        let (provisioner, pool) = two_conductor_pool().await;
+        pool.with("conductor-a", |c| {
+            c.apps.insert(
+                app_on("conductor-a"),
+                FakeApp {
+                    agent_key: raw_agent_key(201),
+                    status: "disabled",
+                    cells_ready: false,
+                },
+            );
+        });
+
+        provisioner.provision_agent(USER).await.expect("found");
+
+        pool.with("conductor-a", |c| {
+            assert_eq!(c.apps[&app_on("conductor-a")].status, "running");
+            assert_eq!(c.enables_received, 1);
+        });
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    // ── the error a route reports ───────────────────────────────────────────
+
+    #[test]
+    fn an_unresolved_provision_has_its_own_code_and_names_the_conductor() {
+        let error = ProvisionError::unresolved("conductor-3", "the install may have landed");
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(
+            error.to_string(),
+            "provisioning is unresolved on conductor-3: the install may have landed"
+        );
+        assert_eq!(
+            ProvisionError::Failed("x".into()).code(),
+            "PROVISIONING_FAILED"
+        );
     }
 
     /// The exclusion is what makes the re-offer meaningful: without it, the
@@ -553,8 +1593,6 @@ mod tests {
     /// budget is spent on the one conductor already known to be dropping.
     #[tokio::test]
     async fn a_dropped_conductor_is_excluded_from_the_next_offer() {
-        use crate::conductor::registry::ConductorInfo;
-
         let registry = Arc::new(ConductorRegistry::new(None).await);
         for id in ["conductor-3", "conductor-4"] {
             registry.register_conductor(ConductorInfo {
@@ -620,8 +1658,10 @@ mod tests {
         let provisioner = AgentProvisioner::new(Arc::clone(&registry));
 
         let result = provisioner.provision_agent("test@example.com").await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("No conductors available"));
+        assert_eq!(
+            result.unwrap_err(),
+            ProvisionError::Failed("No conductors available for provisioning".to_string())
+        );
     }
 
     #[tokio::test]

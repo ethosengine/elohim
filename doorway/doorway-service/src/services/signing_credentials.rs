@@ -18,6 +18,22 @@
 //! doorway mints at most **one grant per cell per process**, plus at most one
 //! bounded heal.
 //!
+//! # Mint for the cell being called, not for the app (2026-10-03)
+//!
+//! Reuse bounded the count per process, but a first connect still authored a
+//! grant on EVERY role cell — five on the elohim hApp — to make a call on one.
+//! Each mint is a zome init plus two write transactions on the conductor, the
+//! conductor does not cancel them when the doorway gives up, and the connect
+//! aborted on the first one that outran the per-call deadline. A hosted
+//! registration calls `create_human` on `imagodei` alone and paid for all five.
+//!
+//! So the connect no longer mints anything. [`SigningCredentialCache::ensure`]
+//! is called on the call path for the ONE role the call targets; every other
+//! role is minted on its own first use through the same decide / lease / cache
+//! path. The ceiling is unchanged — at most one grant per (conductor, app,
+//! role) per process — and the floor drops from "every role" to "the roles
+//! actually called".
+//!
 //! # The discipline, ported from `elohim-storage`'s closed-chain fence
 //!
 //! `elohim-storage/src/closed_chain_fence.rs` solved the same problem for the
@@ -31,10 +47,10 @@
 //! # Concurrency: the mint is serialized PER CELL
 //!
 //! `decide` and `add_credentials` straddle the `authorize_signing_credentials`
-//! round trip. Two `connect_endpoint` runs for one endpoint overlap in
-//! practice — a primary connect racing a half-open re-probe, startup fan-out,
-//! or two provisions of the same hosted app — and without serialization both
-//! would observe `Mint` and both would author a `CapGrant`.
+//! round trip. Two first calls to one role of one endpoint overlap in
+//! practice — a primary call racing a half-open re-probe, startup fan-out,
+//! or two temporary callers for the same hosted app — and without
+//! serialization both would observe `Mint` and both would author a `CapGrant`.
 //!
 //! [`SigningCredentialCache::lease`] takes a per-(conductor, app, role) async
 //! lock ([`crate::keyed_lock`]) that the caller holds across `decide` → mint →
@@ -56,8 +72,9 @@
 //! unbounded heal would be the per-connect minting we are removing, wearing a
 //! different hat.
 
-use holochain_client::{AgentSigner, CellId, ClientAgentSigner};
+use holochain_client::{AgentSigner, CellId, ClientAgentSigner, SigningCredentials};
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -103,6 +120,17 @@ pub enum CredentialDecision {
     /// No cached credential for this cell, or a heal discarded it.
     /// Authorize ONCE, then cache.
     Mint,
+}
+
+/// What [`SigningCredentialCache::ensure`] did for one cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnsuredCredential {
+    /// `Reuse` authored nothing; `Mint` authored exactly one `CapGrant`.
+    pub decision: CredentialDecision,
+    /// Whether the per-cell lease was held across decide → mint → cache.
+    /// `false` means the previous holder outlived the deadline and this run
+    /// proceeded unserialized (the pre-lease behaviour).
+    pub serialized: bool,
 }
 
 /// The whole policy, as a pure function of two facts.
@@ -249,6 +277,56 @@ impl SigningCredentialCache {
             .unwrap_or_else(|e| e.into_inner())
             .remove(&role_key(endpoint_key, role_name));
         decide_credential(signer.get_provenance(cell).is_some(), marked)
+    }
+
+    /// Make sure ONE cell has a signing credential: lease → decide → mint →
+    /// cache, as one unit.
+    ///
+    /// This is the only place a credential is minted. It runs on the call path
+    /// for the role a zome call actually targets, never for a whole app, so a
+    /// call on one role of a five-role app authors one grant, not five.
+    ///
+    /// `mint` is the conductor round trip (`authorize_signing_credentials`). It
+    /// is invoked AT MOST once, and only when the decision is `Mint`; on
+    /// `Reuse` it is never polled and nothing is authored. A failed mint caches
+    /// nothing and returns the error, so the next caller decides `Mint` again —
+    /// the lease must never convert a failure into a permanent skip.
+    ///
+    /// Passing the mint as a closure is what lets every test drive THIS
+    /// function with a counting stub instead of a conductor.
+    pub async fn ensure<F, Fut>(
+        &self,
+        signer: &ClientAgentSigner,
+        endpoint_key: &str,
+        role_name: &str,
+        cell: &CellId,
+        deadline: Duration,
+        mint: F,
+    ) -> Result<EnsuredCredential, String>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<SigningCredentials, String>>,
+    {
+        // SERIALIZE THIS CELL'S MINT. `decide` … authorize … `add_credentials`
+        // straddles a conductor round trip, and two first calls to one role
+        // genuinely overlap. The lease makes the trio atomic per cell; the
+        // second caller waits, re-decides, and sees `Reuse`. Distinct cells and
+        // conductors never contend. `None` = the holder outlived the deadline,
+        // so we behave exactly as before the lease existed.
+        let lease = self.lease(endpoint_key, role_name, deadline).await;
+        let serialized = lease.is_some();
+
+        let decision = self.decide(signer, endpoint_key, role_name, cell);
+        if decision == CredentialDecision::Mint {
+            let credentials = mint().await?;
+            signer.add_credentials(cell.clone(), credentials);
+        }
+        drop(lease);
+
+        Ok(EnsuredCredential {
+            decision,
+            serialized,
+        })
     }
 
     /// A zome call on `role_name` was refused in a way that says the conductor
@@ -514,8 +592,9 @@ mod tests {
         serialized: bool,
     }
 
-    /// One cell of one `connect_endpoint` run, in the exact order the real loop
-    /// uses: lease → decide → authorize → add_credentials.
+    /// One first call to one cell, through the PRODUCTION
+    /// [`SigningCredentialCache::ensure`] — lease → decide → authorize →
+    /// add_credentials — with the stub standing in for the conductor.
     async fn connect_cell(
         cache: Arc<SigningCredentialCache>,
         signer: Arc<ClientAgentSigner>,
@@ -525,21 +604,27 @@ mod tests {
         deadline: Duration,
         stub: MintStub,
     ) -> CellRun {
-        let lease = cache.lease(&ep_key, &role, deadline).await;
-        let serialized = lease.is_some();
-        let decision = cache.decide(&signer, &ep_key, &role, &cell);
-        let mut minted = false;
-        if decision == CredentialDecision::Mint {
-            if let Some(credentials) = stub.authorize().await {
-                signer.add_credentials(cell.clone(), credentials);
-                minted = true;
-            }
-        }
-        drop(lease);
-        CellRun {
-            decision,
-            minted,
-            serialized,
+        let ensured = cache
+            .ensure(&signer, &ep_key, &role, &cell, deadline, || async {
+                stub.authorize()
+                    .await
+                    .ok_or_else(|| "stub mint failed".to_string())
+            })
+            .await;
+        match ensured {
+            Ok(done) => CellRun {
+                decision: done.decision,
+                minted: done.decision == CredentialDecision::Mint,
+                serialized: done.serialized,
+            },
+            // Only a `Mint` decision can fail: `Reuse` never polls the mint.
+            // `serialized` is not reported on the error path and no test reads
+            // it there.
+            Err(_) => CellRun {
+                decision: CredentialDecision::Mint,
+                minted: false,
+                serialized: false,
+            },
         }
     }
 

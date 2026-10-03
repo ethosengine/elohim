@@ -1435,7 +1435,15 @@ async fn handle_register(
                             Some(p)
                         }
                         Err(e) => {
+                            // `e.code()` separates two different things to
+                            // tell a person: PROVISIONING_FAILED (nothing was
+                            // left behind) and PROVISIONING_UNRESOLVED (an app
+                            // for them may already exist on the named
+                            // conductor and could not be confirmed — the
+                            // doorway refuses to mint a second identity
+                            // elsewhere; retrying later resolves it).
                             error!(
+                                code = e.code(),
                                 "Hosted: agent provisioning failed — cannot complete registration: {}",
                                 e
                             );
@@ -1443,7 +1451,7 @@ async fn handle_register(
                                 StatusCode::SERVICE_UNAVAILABLE,
                                 &ErrorResponse {
                                     error: format!("Agent provisioning failed: {e}"),
-                                    code: Some("PROVISIONING_FAILED".into()),
+                                    code: Some(e.code().into()),
                                 },
                             );
                         }
