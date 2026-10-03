@@ -306,6 +306,43 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Live intent records the doorway cannot finish on its own, by reason
+    /// (`key_mismatch`, `app_conflict`, `conductor_not_in_pool`, `app_unusable`,
+    /// `cells_not_ready`, `no_usable_key`). Each is an operator's to resolve.
+    pub static ref PROVISION_INTENTS_STUCK: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provision_intents_stuck",
+            "Live provisioning intents that need an operator, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// 1 when hosted provisioning can run: the intent store answers and no
+    /// recovery is outstanding. 0 refuses new hosted registrations.
+    pub static ref PROVISIONING_READY: IntGauge = IntGauge::new(
+        "doorway_provisioning_ready",
+        "1 when hosted provisioning can run (intent store available, no recovery outstanding).",
+    )
+    .unwrap();
+
+    /// 1 when this doorway's records were empty at startup while its conductors
+    /// already host apps, and an operator has not yet run recovery.
+    pub static ref PROVISIONING_RECOVERY_REQUIRED: IntGauge = IntGauge::new(
+        "doorway_provisioning_recovery_required",
+        "1 when the doorway's provisioning records were empty at boot while conductors host apps.",
+    )
+    .unwrap();
+
+    /// Credential mints the doorway stopped waiting for. The conductor does not
+    /// cancel them, so each may have authored a `CapGrant` the doorway holds no
+    /// credential for. The durable cure is an idempotent grant (fork work).
+    pub static ref SIGNING_MINTS_ABANDONED_TOTAL: IntCounter = IntCounter::new(
+        "doorway_signing_mints_abandoned_total",
+        "Credential mints whose outcome is unknown (timed out or dropped after being sent).",
+    )
+    .unwrap();
+
     /// Live intent records that never reached `enabled` and have not moved for
     /// longer than the in-flight bound: attempts nobody finished. The work a
     /// reaper would have, were there one.
@@ -768,6 +805,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(BLOB_TARGET_FAILOVER_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(PROVISION_INTENTS.clone()));
         let _ = REGISTRY.register(Box::new(PROVISION_INTENTS_STALE.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISION_INTENTS_STUCK.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_READY.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_RECOVERY_REQUIRED.clone()));
+        let _ = REGISTRY.register(Box::new(SIGNING_MINTS_ABANDONED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
@@ -997,6 +1038,24 @@ pub fn set_provision_intents(state: &str, count: u64) {
     PROVISION_INTENTS
         .with_label_values(&[state])
         .set(i64::try_from(count).unwrap_or(i64::MAX));
+}
+
+/// Provisioning intent log: live records stuck for `reason`.
+pub fn set_provision_intents_stuck(reason: &str, count: u64) {
+    PROVISION_INTENTS_STUCK
+        .with_label_values(&[reason])
+        .set(i64::try_from(count).unwrap_or(i64::MAX));
+}
+
+/// Whether hosted provisioning can run, and whether recovery is outstanding.
+pub fn set_provisioning_readiness(ready: bool, recovery_required: bool) {
+    PROVISIONING_READY.set(i64::from(ready));
+    PROVISIONING_RECOVERY_REQUIRED.set(i64::from(recovery_required));
+}
+
+/// A credential mint was given up on with its outcome unknown.
+pub fn inc_signing_mint_abandoned() {
+    SIGNING_MINTS_ABANDONED_TOTAL.inc();
 }
 
 /// Provisioning intent log: live records unfinished past the in-flight bound.

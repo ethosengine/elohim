@@ -937,7 +937,12 @@ async fn auto_provision(
         .with_app_id(state.args.installed_app_id.clone())
         .with_bundle_path(state.args.happ_bundle_path.clone());
 
-    let provisioned = match provisioner.provision_agent(&claims.identifier).await {
+    // The token was minted by THIS doorway (checked above) from the account row
+    // for exactly this identifier, so its agent key is that account's own.
+    let provisioned = match provisioner
+        .provision_agent_for_account(&claims.identifier, Some(&claims.agent_pub_key))
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             error!("Chaperone auto-provision failed: {}", e);

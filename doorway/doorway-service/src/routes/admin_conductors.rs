@@ -829,6 +829,169 @@ pub async fn handle_force_graduation(
     )
 }
 
+// =============================================================================
+// Provisioning recovery (operator)
+// =============================================================================
+
+/// Body of `POST /admin/provisioning/recover`. Empty is valid.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProvisioningRecoverRequest {
+    /// Identifiers whose STUCK record the operator has looked at and decided
+    /// to give up. The doorway never abandons a record while something may be
+    /// on a conductor; this is the operator doing so on purpose.
+    pub abandon: Vec<String>,
+}
+
+/// Is this caller THIS doorway's admin?
+///
+/// The existing admin credential, in either of its two existing carriers and
+/// nothing else: an Admin session token ([`require_admin`]), or `X-API-Key`
+/// equal to `API_KEY_ADMIN`. The second carrier matters here specifically: the
+/// route exists for a doorway whose database was wiped, where no admin ACCOUNT
+/// exists to mint a token from.
+///
+/// By the auth-posture questions: (1) "is this caller MY admin?" — the
+/// operator credential, not the seed credential; (2) no stage makes it
+/// cheaper, and the pre-coordination loopback affordance is deliberately NOT
+/// accepted; (3) fail-closed — an unset or empty `API_KEY_ADMIN` matches
+/// nothing; (4) it needs Admin: it rewrites which agent an identifier resolves
+/// to; (5) no expiry — it is an operator action, not a scaffold; (6) the p2p
+/// plane cannot answer it: the records being rebuilt are doorway-local; (7)
+/// all developer modes alike; (8) the operator acts on OTHER people's records,
+/// which is why it only rebuilds what an account row's own agent key proves.
+// `Response<Full<Bytes>>` is the crate-wide HTTP-error-as-Err convention.
+#[allow(clippy::result_large_err)]
+async fn require_admin_credential<B>(
+    req: &Request<B>,
+    state: &AppState,
+) -> Result<(), Response<Full<Bytes>>> {
+    let api_key = req.headers().get("x-api-key").and_then(|v| v.to_str().ok());
+    if api_key.is_some() {
+        let validator = crate::auth::ApiKeyValidator::new(None, state.args.api_key_admin.clone());
+        if validator.validate(api_key) == Some(crate::auth::PermissionLevel::Admin) {
+            return Ok(());
+        }
+    }
+    require_admin(req, state).await.map(|_| ())
+}
+
+/// Handle `GET /admin/provisioning/recover` — the intent log's state: what is
+/// stuck and why, what is stale, whether recovery is outstanding. Walks no
+/// conductor and changes nothing.
+pub async fn handle_provisioning_status<B>(
+    req: &Request<B>,
+    state: Arc<AppState>,
+) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin_credential(req, &state).await {
+        return resp;
+    }
+    let Some(ref registry) = state.conductor_registry else {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "Conductor registry not available"}),
+        );
+    };
+    let provisioner = AgentProvisioner::new(Arc::clone(registry))
+        .with_app_id(state.args.installed_app_id.clone());
+    json_response(StatusCode::OK, provisioner.recovery_status().await)
+}
+
+/// Handle `POST /admin/provisioning/recover` — rebuild this doorway's
+/// provisioning records from its conductors.
+///
+/// For a doorway whose database was wiped or restored while its conductors
+/// kept their hosted apps. It lists every conductor's apps, rebuilds the
+/// agent→conductor mappings from them, and rebuilds an identifier's record only
+/// where an account row this doorway holds carries an agent key a conductor
+/// confirms. An app no account claims is reported and given to nobody. The
+/// report also lists every stuck record with its reason.
+///
+/// A walk that reaches every conductor clears the startup `recovery_required`
+/// refusal; a partial walk does not, and says which conductor was not asked.
+pub async fn handle_provisioning_recover(
+    req: Request<Incoming>,
+    state: Arc<AppState>,
+) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin_credential(&req, &state).await {
+        return resp;
+    }
+    let Some(ref registry) = state.conductor_registry else {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "Conductor registry not available"}),
+        );
+    };
+
+    let body = match req.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                serde_json::json!({"error": format!("Failed to read body: {}", e)}),
+            );
+        }
+    };
+    let request: ProvisioningRecoverRequest = if body.is_empty() {
+        ProvisioningRecoverRequest::default()
+    } else {
+        match serde_json::from_slice(&body) {
+            Ok(r) => r,
+            Err(e) => {
+                return json_response(
+                    StatusCode::BAD_REQUEST,
+                    serde_json::json!({"error": format!("Invalid JSON: {}", e)}),
+                );
+            }
+        }
+    };
+
+    // The account rows are the only evidence of whose app is whose.
+    let accounts: Vec<(String, String)> = match &state.mongo {
+        Some(mongo) => {
+            let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+                Ok(c) => c,
+                Err(e) => {
+                    return json_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        serde_json::json!({"error": format!("Database error: {}", e)}),
+                    );
+                }
+            };
+            match collection.find_many(doc! { "is_active": true }).await {
+                Ok(users) => users
+                    .into_iter()
+                    .filter(|u| !u.agent_pub_key.is_empty())
+                    .map(|u| (u.identifier, u.agent_pub_key))
+                    .collect(),
+                Err(e) => {
+                    return json_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        serde_json::json!({"error": format!("Failed to read users: {}", e)}),
+                    );
+                }
+            }
+        }
+        None => Vec::new(),
+    };
+
+    let provisioner = AgentProvisioner::new(Arc::clone(registry))
+        .with_app_id(state.args.installed_app_id.clone());
+    let operator_abandoned = provisioner.operator_abandon(&request.abandon).await;
+    let mut report = provisioner.rebuild_from_conductors(&accounts).await;
+    report.operator_abandoned = operator_abandoned;
+    crate::conductor::provisioner::publish_intent_counts(registry).await;
+
+    info!(
+        complete = report.complete,
+        records_rebuilt = report.records_rebuilt.len(),
+        apps_without_an_account = report.apps_without_an_account.len(),
+        stuck = report.stuck.len(),
+        "Operator provisioning recovery ran"
+    );
+    json_response(StatusCode::OK, report)
+}
+
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(&body) {
         Ok(json) => Response::builder()

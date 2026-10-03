@@ -74,9 +74,52 @@ pub struct HealthResponse {
     /// Whether zome discovery has completed (zome_configs populated)
     #[serde(rename = "discoveryComplete")]
     pub discovery_complete: bool,
+    /// Whether this doorway can provision a hosted person right now. Reported
+    /// here and on `doorway_provisioning_ready`; it does NOT change the probe's
+    /// HTTP status — a doorway that cannot provision still serves everyone it
+    /// already hosts, and failing readiness would take those people down too.
+    pub provisioning: ProvisioningHealth,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+/// Hosted-provisioning readiness.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProvisioningHealth {
+    /// `intent_store_available && !recovery_required`.
+    pub ready: bool,
+    /// The provisioning intent log can be read and written. `false` refuses
+    /// hosted provisioning (`PROVISIONING_NOT_READY`).
+    pub intent_store_available: bool,
+    /// This doorway's records were empty at startup while its conductors
+    /// already host apps; a person with no record is answered
+    /// `PROVISIONING_UNRESOLVED` until an operator runs
+    /// `POST /admin/provisioning/recover`.
+    pub recovery_required: bool,
+}
+
+impl ProvisioningHealth {
+    pub fn of(state: &AppState) -> Self {
+        match &state.conductor_registry {
+            Some(registry) => {
+                let intent_store_available = registry.intents().available();
+                let recovery_required = registry.recovery_required();
+                Self {
+                    ready: intent_store_available && !recovery_required,
+                    intent_store_available,
+                    recovery_required,
+                }
+            }
+            // No conductor pool: nothing is provisioned, nothing is refused.
+            None => Self {
+                ready: true,
+                intent_store_available: true,
+                recovery_required: false,
+            },
+        }
+    }
 }
 
 /// P2P network health from elohim-storage sidecar
@@ -758,6 +801,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             status
         },
         registration_open,
+        provisioning: ProvisioningHealth::of(state),
         version: env!("CARGO_PKG_VERSION"),
         uptime,
         cache_enabled,

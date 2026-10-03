@@ -13,6 +13,21 @@
 //! says so, a human exists if the DHT says so, and the log only remembers what
 //! this doorway asked for.
 //!
+//! # An app id is not a person
+//!
+//! Nothing here treats "an app exists under this id" as "this is that person's
+//! app". The id is a string anyone can compute from an identifier, and an
+//! identifier is whatever an unauthenticated registration typed. An existing
+//! app is this person's only when the conductor's agent key for it equals a key
+//! this doorway holds for exactly that identifier: the key in their intent
+//! record, or the key on their own account row. Otherwise an app found under
+//! the id is a CONFLICT, answered `PROVISIONING_UNRESOLVED` and left for an
+//! operator.
+//!
+//! Apps installed under the old six-hex id are not migrated; they are
+//! recognised only by `AgentProvisioner::resolve_account_mapping`, which
+//! retires at the recast (plane-separation §11).
+//!
 //! Every failure of an admin call arrives typed
 //! ([`FaultClass`](super::typed_admin::FaultClass)), and what happens next is
 //! decided on that type alone: an attempt whose install was never sent may be
@@ -23,7 +38,7 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use super::agent_key::{canonical_agent_key, lookup_forms};
-use super::provision_intent::{IntentState, ProvisionIntent};
+use super::provision_intent::{IntentState, ProvisionIntent, StuckReason, ABANDONED_RECORD_TTL};
 use super::registry::{ConductorInfo, ConductorRegistry};
 use super::typed_admin::{
     AdminConnector, AppInfoDetailed, FaultClass, LiveAdminConnector, ProvisionAdmin,
@@ -105,6 +120,10 @@ pub enum ProvisionError {
     },
     /// Provisioning failed and established that nothing was installed.
     Failed(String),
+    /// The doorway cannot provision anyone right now: its intent log cannot be
+    /// read or written, so an attempt could not be remembered. Nothing was
+    /// asked of any conductor.
+    NotReady(String),
 }
 
 impl ProvisionError {
@@ -113,6 +132,7 @@ impl ProvisionError {
         match self {
             Self::Unresolved { .. } => "PROVISIONING_UNRESOLVED",
             Self::Failed(_) => "PROVISIONING_FAILED",
+            Self::NotReady(_) => "PROVISIONING_NOT_READY",
         }
     }
 
@@ -132,7 +152,7 @@ impl std::fmt::Display for ProvisionError {
                 "provisioning is unresolved on {}: {detail}",
                 conductors.join(", ")
             ),
-            Self::Failed(message) => f.write_str(message),
+            Self::Failed(message) | Self::NotReady(message) => f.write_str(message),
         }
     }
 }
@@ -202,10 +222,12 @@ const CLAIM_ROUNDS: u32 = 3;
 
 /// The intent log could not be read or written, at a point where nothing had
 /// been sent to any conductor. Provisioning blind would be provisioning
-/// without the one thing that prevents a second identity, so it stops.
+/// without the one thing that prevents a second identity, so it stops — and
+/// says the doorway is not ready, which is a different thing from a failure.
 fn log_unavailable(error: String) -> ProvisionError {
-    ProvisionError::Failed(format!(
-        "provisioning intent log unavailable — nothing was sent to any conductor: {error}"
+    ProvisionError::NotReady(format!(
+        "the provisioning intent log is not available, so no attempt can be recorded and \
+         nothing was sent to any conductor: {error}"
     ))
 }
 
@@ -343,6 +365,24 @@ impl AgentProvisioner {
         &self,
         user_identifier: &str,
     ) -> Result<ProvisionedAgent, ProvisionError> {
+        self.provision_agent_for_account(user_identifier, None)
+            .await
+    }
+
+    /// [`Self::provision_agent`], for a caller that already holds an ACCOUNT
+    /// for this identifier.
+    ///
+    /// `account_agent_key` is the agent key on the doorway's own account row
+    /// for EXACTLY this identifier (or in a session token this doorway minted
+    /// from that row). It is the one piece of evidence, besides an intent
+    /// record, that an existing app belongs to this person — see
+    /// [`Self::resolve_account_mapping`]. Pass `None` for a registration: a
+    /// person with no account has no such evidence.
+    pub async fn provision_agent_for_account(
+        &self,
+        user_identifier: &str,
+        account_agent_key: Option<&str>,
+    ) -> Result<ProvisionedAgent, ProvisionError> {
         // One call per person at a time in this process. The log's
         // compare-and-set is what holds across processes; this only spares a
         // second in-process call a wasted key generation. The wait is bounded by
@@ -354,14 +394,14 @@ impl AgentProvisioner {
             .acquire_within(user_identifier, install_in_flight_bound())
             .await;
 
-        let result = self.provision_from_record(user_identifier).await;
-        self.publish_intent_counts().await;
-        result
+        self.provision_from_record(user_identifier, account_agent_key)
+            .await
     }
 
     async fn provision_from_record(
         &self,
         user_identifier: &str,
+        account_agent_key: Option<&str>,
     ) -> Result<ProvisionedAgent, ProvisionError> {
         for _ in 0..CLAIM_ROUNDS {
             let recorded = self
@@ -396,12 +436,35 @@ impl AgentProvisioner {
                 // Abandoned: the last attempt left nothing behind. Start over
                 // on top of the record.
                 Some(abandoned) => self.offer(user_identifier, Some(abandoned)).await,
-                // No record. A person provisioned before the log existed still
-                // has an agent mapping; failing that, they were never attempted.
-                None => match self.resolve_legacy_mapping(user_identifier).await {
-                    Some(step) => step,
-                    None => self.offer(user_identifier, None).await,
-                },
+                // No record.
+                None => {
+                    // An account row's own agent key may name an app from
+                    // before the log existed.
+                    let from_account = match account_agent_key {
+                        Some(key) => self.resolve_account_mapping(user_identifier, key).await,
+                        None => None,
+                    };
+                    match from_account {
+                        Some(step) => step,
+                        // This doorway's records were empty at boot while its
+                        // conductors host people. "No record" then means "I do
+                        // not know", not "new" — and guessing "new" mints a
+                        // second identity for everyone who comes back.
+                        None if self.registry.recovery_required() => {
+                            Step::Done(Err(ProvisionError::Unresolved {
+                                conductors: self.pool_conductor_ids(),
+                                detail: "this doorway's provisioning records were empty at \
+                                         startup while its conductors already host apps, so it \
+                                         cannot tell whether this person is new; an operator \
+                                         must run POST /admin/provisioning/recover"
+                                    .to_string(),
+                            }))
+                        }
+                        // By this doorway's records the person was never
+                        // attempted.
+                        None => self.offer(user_identifier, None).await,
+                    }
+                }
             };
 
             match step {
@@ -421,6 +484,17 @@ impl AgentProvisioner {
             detail: "another provisioning attempt for this person kept changing the record"
                 .to_string(),
         })
+    }
+
+    fn pool_conductor_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .registry
+            .list_conductors()
+            .into_iter()
+            .map(|c| c.conductor_id)
+            .collect();
+        ids.sort();
+        ids
     }
 
     /// Record the intent, then provision — on the least-loaded conductor, and
@@ -576,7 +650,7 @@ impl AgentProvisioner {
         // writing it. If the doorway dies on the next line, the record already
         // says an install may be on this conductor, and with which key.
         intent.agent_pub_key = Some(provisioned_agent_key(&agent_key));
-        intent.install_sent_at = Some(chrono::Utc::now());
+        intent.install_sent_at = Some(intent_now());
         match self.save(intent).await {
             Ok(true) => {}
             Ok(false) => return Err(AttemptError::LostClaim),
@@ -609,23 +683,50 @@ impl AgentProvisioner {
                 FaultClass::SentOutcomeUnknown => {
                     return Err(AttemptFault::new(FaultClass::SentOutcomeUnknown, message).into());
                 }
-                // The conductor answered. One refusal is not a failure: "an app
-                // with this id is already installed" — the deterministic id is
-                // this person's, so that app is theirs (a record this doorway
-                // lost). Use it, with the key the CONDUCTOR holds for it.
+                // The conductor answered. What is on it now decides the rest,
+                // and only the conductor can say.
                 FaultClass::Refused => {
-                    if let Ok(Some(existing)) = admin.find_app(&installed_app_id).await {
-                        info!(
-                            conductor = %conductor.conductor_id,
-                            app_id = %installed_app_id,
-                            "Install refused because the app already exists — adopting it"
-                        );
-                        return self
-                            .finish_forward(&*admin, conductor, intent, existing)
-                            .await
-                            .map_err(AttemptError::Final);
-                    }
-                    return Err(AttemptFault::verdict(message).into());
+                    return Err(match admin.find_app(&installed_app_id).await {
+                        // Nothing there: a definite refusal that left nothing.
+                        Ok(None) => AttemptFault::verdict(message).into(),
+                        // An app already exists under this id. THIS attempt did
+                        // not install it (the conductor refused), and an id is
+                        // not a person: unless the conductor's key for it is the
+                        // key recorded for this attempt, the doorway has no
+                        // evidence it is this person's. A conflict — never an
+                        // adoption.
+                        Ok(Some(existing)) => {
+                            if intent.agent_pub_key.as_deref()
+                                == Some(provisioned_agent_key(&existing.agent_pub_key).as_str())
+                            {
+                                return self
+                                    .finish_forward(&*admin, conductor, intent, existing)
+                                    .await
+                                    .map_err(AttemptError::Final);
+                            }
+                            self.mark_stuck(intent, StuckReason::AppConflict).await;
+                            AttemptError::Final(ProvisionError::unresolved(
+                                &conductor.conductor_id,
+                                format!(
+                                    "an app already exists on {} under '{installed_app_id}' and \
+                                     this doorway has no record that it belongs to this person \
+                                     (its agent key is not one this doorway generated for them); \
+                                     an operator must resolve it",
+                                    conductor.conductor_id
+                                ),
+                            ))
+                        }
+                        // The lookup itself failed: nothing is known about what
+                        // is on the conductor. Never abandon on an unknown.
+                        Err(lookup) => AttemptError::Final(ProvisionError::unresolved(
+                            &conductor.conductor_id,
+                            format!(
+                                "{message}; and {} did not answer whether '{installed_app_id}' \
+                                 exists ({lookup})",
+                                conductor.conductor_id
+                            ),
+                        )),
+                    });
                 }
             }
         }
@@ -950,6 +1051,14 @@ impl AgentProvisioner {
     /// own admin request is ever waited for — to the SAME conductor, under the
     /// SAME app id, with the SAME recorded key. Never a new key: a new key
     /// would be a second identity if the original lands after all.
+    ///
+    /// This is also where a record that can never be finished ENDS. Each time a
+    /// reachable conductor answers "that app is not here" after a re-send it
+    /// refused (or that could not be made, for want of a key), the record
+    /// counts one verified absence. The checks are at least one in-flight bound
+    /// apart by construction. At [`ABSENT_CHECKS_BEFORE_ABANDON`] the record is
+    /// abandoned: nothing landed. A re-send whose own outcome is unknown, or a
+    /// conductor that does not answer, never counts.
     async fn resend_install(
         &self,
         admin: &dyn ProvisionAdmin,
@@ -960,18 +1069,14 @@ impl AgentProvisioner {
         let installed_app_id = intent.installed_app_id.clone();
         let unresolved = |detail: String| ProvisionError::unresolved(conductor_id, detail);
 
-        let Some(agent_key) = intent
+        let agent_key = intent
             .agent_pub_key
             .as_deref()
-            .and_then(super::agent_key::decode_key_bytes)
-        else {
-            return Err(unresolved(format!(
-                "an install of '{installed_app_id}' was sent to {conductor_id} but the record \
-                 holds no usable agent key to re-send it with"
-            )));
-        };
+            .and_then(super::agent_key::decode_key_bytes);
 
-        intent.install_sent_at = Some(chrono::Utc::now());
+        // Stamp the attempt first, as on the first send. This is also what
+        // spaces the absence checks one bound apart.
+        intent.install_sent_at = Some(intent_now());
         match self.save(intent).await {
             Ok(true) => {}
             Ok(false) => {
@@ -983,14 +1088,40 @@ impl AgentProvisioner {
             Err(e) => return Err(log_unavailable(e)),
         }
 
-        warn!(
-            conductor = %conductor_id,
-            app_id = %installed_app_id,
-            "Re-sending an install that never appeared — same conductor, same app id, same key"
-        );
-        let resent = admin
-            .install_app(&installed_app_id, &agent_key, &self.bundle_path)
-            .await;
+        // `Some(Err(refused))` only for a DEFINITE refusal; an unknown outcome
+        // is `None`, as is "no key, nothing was sent".
+        let refused: Option<String> = match &agent_key {
+            Some(agent_key) => {
+                warn!(
+                    conductor = %conductor_id,
+                    app_id = %installed_app_id,
+                    "Re-sending an install that never appeared — same conductor, same app \
+                     id, same key"
+                );
+                match admin
+                    .install_app(&installed_app_id, agent_key, &self.bundle_path)
+                    .await
+                {
+                    Ok(()) => None,
+                    Err(fault) if fault.class == FaultClass::Refused => Some(fault.message),
+                    Err(fault) => {
+                        // Sent, outcome unknown — or never written. Either way
+                        // not a verified absence; look, and report.
+                        return match admin.find_app(&installed_app_id).await {
+                            Ok(Some(existing)) => {
+                                self.finish_forward(admin, conductor, intent, existing)
+                                    .await
+                            }
+                            _ => Err(unresolved(format!(
+                                "the re-sent install of '{installed_app_id}' on {conductor_id} \
+                                 has an unknown outcome ({fault})"
+                            ))),
+                        };
+                    }
+                }
+            }
+            None => Some("the record holds no agent key to re-send it with".to_string()),
+        };
 
         // Whatever the re-send answered, the conductor's app list is the
         // truth. A refusal here most often means the ORIGINAL landed.
@@ -999,16 +1130,39 @@ impl AgentProvisioner {
                 self.finish_forward(admin, conductor, intent, existing)
                     .await
             }
-            Ok(None) => Err(unresolved(match resent {
-                Ok(()) => format!(
+            Ok(None) => match refused {
+                // Accepted but not listed yet: wait for it.
+                None => Err(unresolved(format!(
                     "the re-sent install of '{installed_app_id}' was accepted by {conductor_id} \
                      but the app is not listed yet"
-                ),
-                Err(fault) => format!(
-                    "the re-sent install of '{installed_app_id}' on {conductor_id} failed \
-                     ({fault}) and the app is not there"
-                ),
-            })),
+                ))),
+                // Refused (or unsendable), and the conductor confirms nothing
+                // is there: one verified absence.
+                Some(reason) => {
+                    intent.absent_past_bound += 1;
+                    if agent_key.is_none() {
+                        intent.stuck = Some(StuckReason::NoUsableKey);
+                    }
+                    if intent.absent_past_bound >= ABSENT_CHECKS_BEFORE_ABANDON {
+                        let ended = format!(
+                            "'{installed_app_id}' was verifiably absent on {conductor_id} at \
+                             {} checks, each at least {}s apart, and could not be installed \
+                             ({reason}); nothing landed",
+                            intent.absent_past_bound,
+                            install_in_flight_bound().as_secs()
+                        );
+                        self.abandon_if_live(Some(intent), &ended).await;
+                        return Err(ProvisionError::Failed(ended));
+                    }
+                    self.note(intent).await;
+                    Err(unresolved(format!(
+                        "the install of '{installed_app_id}' is not on {conductor_id} and could \
+                         not be made there ({reason}); verified absent {} of {} times before \
+                         this record is given up",
+                        intent.absent_past_bound, ABSENT_CHECKS_BEFORE_ABANDON
+                    )))
+                }
+            },
             Err(fault) => Err(unresolved(format!(
                 "the install of '{installed_app_id}' was re-sent to {conductor_id}, which did \
                  not answer the lookup ({fault})"
@@ -1016,11 +1170,18 @@ impl AgentProvisioner {
         }
     }
 
-    /// An app exists on `conductor` for this record. Bring it to ready and hand
-    /// it back — with the agent key the CONDUCTOR reports for it.
+    /// An app exists on `conductor` under this record's id. Prove it is this
+    /// person's, bring it to ready, and hand it back.
     ///
-    /// Installed is not ready: a disabled app is enabled, an app in any other
-    /// non-running state is reported, and cells are waited for. Never
+    /// PROOF FIRST. The app is this person's only if the conductor's agent key
+    /// for it EQUALS the key this doorway recorded for them. The app id proves
+    /// nothing on its own — an id is a string anyone can compute, and it used
+    /// to be 24 bits wide. On a mismatch the record is left exactly as it is
+    /// (the recorded key is never overwritten with the conductor's) and marked
+    /// stuck.
+    ///
+    /// Then: installed is not ready. A disabled app is enabled, an app in any
+    /// other non-running state is reported, and cells are waited for. Never
     /// uninstalls — `create_human` may already have run on this app.
     async fn finish_forward(
         &self,
@@ -1032,20 +1193,52 @@ impl AgentProvisioner {
         let conductor_id = conductor.conductor_id.as_str();
         let installed_app_id = intent.installed_app_id.clone();
 
+        let Some(recorded_key) = intent.agent_pub_key.clone() else {
+            self.mark_stuck(intent, StuckReason::NoUsableKey).await;
+            return Err(ProvisionError::unresolved(
+                conductor_id,
+                format!(
+                    "'{installed_app_id}' exists on {conductor_id} but this doorway recorded no \
+                     agent key for this person's install, so it cannot be shown to be theirs"
+                ),
+            ));
+        };
+        if provisioned_agent_key(&existing.agent_pub_key) != recorded_key {
+            // Keep the more specific name if this record is already known to be
+            // a first-send conflict.
+            if intent.stuck != Some(StuckReason::AppConflict) {
+                self.mark_stuck(intent, StuckReason::KeyMismatch).await;
+            }
+            return Err(ProvisionError::unresolved(
+                conductor_id,
+                format!(
+                    "'{installed_app_id}' exists on {conductor_id} with an agent key that is \
+                     not the agent key this doorway recorded for this person; it is not \
+                     treated as theirs"
+                ),
+            ));
+        }
+
         match existing.status.as_deref() {
             Some("running") => {}
             Some("disabled") => {
-                admin.enable_app(&installed_app_id).await.map_err(|fault| {
-                    ProvisionError::unresolved(
+                if let Err(fault) = admin.enable_app(&installed_app_id).await {
+                    // Only a refusal is a property of the app; a dropped socket
+                    // says nothing about it.
+                    if fault.class == FaultClass::Refused {
+                        self.mark_stuck(intent, StuckReason::AppUnusable).await;
+                    }
+                    return Err(ProvisionError::unresolved(
                         conductor_id,
                         format!(
                             "'{installed_app_id}' is installed on {conductor_id} but disabled, \
                              and could not be enabled ({fault})"
                         ),
-                    )
-                })?;
+                    ));
+                }
             }
             other => {
+                self.mark_stuck(intent, StuckReason::AppUnusable).await;
                 return Err(ProvisionError::unresolved(
                     conductor_id,
                     format!(
@@ -1060,6 +1253,7 @@ impl AgentProvisioner {
         if existing.cell_ids.is_empty()
             && !self.await_cells(admin, conductor, &installed_app_id).await
         {
+            self.mark_stuck(intent, StuckReason::CellsNotReady).await;
             return Err(ProvisionError::unresolved(
                 conductor_id,
                 format!(
@@ -1073,7 +1267,8 @@ impl AgentProvisioner {
             .adopt_existing(conductor, installed_app_id, &existing.agent_pub_key)
             .await;
 
-        intent.agent_pub_key = Some(agent.agent_pub_key.clone());
+        intent.stuck = None;
+        intent.absent_past_bound = 0;
         if intent.state < IntentState::Enabled {
             intent.state = IntentState::Enabled;
         }
@@ -1113,37 +1308,59 @@ impl AgentProvisioner {
         }
     }
 
-    /// A person provisioned before the intent log existed: no record, but this
-    /// doorway holds an agent mapping for their deterministic app id on some
-    /// conductor. That mapping names the conductor to resolve on.
+    /// THE ONE LEGACY LOOKUP — retires at the recast (plane-separation §11).
+    ///
+    /// A person provisioned before the intent log existed has no record, and
+    /// their app may sit under an OLD short app id (six hex digits of the
+    /// identifier's hash — 24 bits, shared by unrelated identifiers). That id is
+    /// never recomputed and never matched on. The only way such an app is
+    /// recognised is through a mapping that already names the person exactly:
+    ///
+    /// - `account_agent_key` — the agent key on the doorway's own account row
+    ///   for EXACTLY this identifier (the caller supplies it from that row);
+    /// - the doorway's persisted agent→conductor mapping for THAT key, which
+    ///   gives the conductor and the app id as they were installed;
+    /// - and the conductor confirming that the app's agent key IS that key.
     ///
     /// A lookup in the doorway's OWN records — no conductor is dialled to find
-    /// the mapping, and only the mapped conductor is dialled to resolve it.
-    /// `None` = no mapping (or a stale one the conductor disowned): the person
-    /// was never attempted, as far as this doorway knows.
-    async fn resolve_legacy_mapping(&self, user_identifier: &str) -> Option<Step> {
-        let (conductor, installed_app_id) =
-            self.registry.list_conductors().into_iter().find_map(|c| {
-                let app_id = generate_app_id(&self.app_id, &c.conductor_id, user_identifier);
-                self.registry
-                    .find_agent_by_app(&c.conductor_id, &app_id)
-                    .map(|_| (c, app_id))
-            })?;
-        let conductor_id = conductor.conductor_id.as_str();
-        let unresolved = |detail: String| {
+    /// the mapping, and only the mapped conductor is dialled to confirm it.
+    /// `None` = no mapping for that key (or a stale one the conductor
+    /// disowned): by this doorway's records the person was never attempted.
+    async fn resolve_account_mapping(
+        &self,
+        user_identifier: &str,
+        account_agent_key: &str,
+    ) -> Option<Step> {
+        let entry = self.registry.get_conductor_for_agent(account_agent_key)?;
+        let installed_app_id = entry.app_id.clone();
+        let unresolved = |conductor_id: &str, detail: String| {
             Some(Step::Done(Err(ProvisionError::unresolved(
                 conductor_id,
                 detail,
             ))))
         };
+        let Some(conductor) = self.registry.get_conductor_info(&entry.conductor_id) else {
+            return unresolved(
+                &entry.conductor_id,
+                format!(
+                    "this person's account is mapped to '{installed_app_id}' on {}, which is \
+                     not in this doorway's pool",
+                    entry.conductor_id
+                ),
+            );
+        };
+        let conductor_id = conductor.conductor_id.as_str();
 
         let admin = match self.connector.connect(&conductor.admin_url).await {
             Ok(admin) => admin,
             Err(fault) => {
-                return unresolved(format!(
-                    "this person is mapped to '{installed_app_id}' on {conductor_id}, which \
-                     could not be reached ({fault})"
-                ));
+                return unresolved(
+                    conductor_id,
+                    format!(
+                        "this person's account is mapped to '{installed_app_id}' on \
+                         {conductor_id}, which could not be reached ({fault})"
+                    ),
+                );
             }
         };
         let existing = match admin.find_app(&installed_app_id).await {
@@ -1158,19 +1375,34 @@ impl AgentProvisioner {
                 return None;
             }
             Err(fault) => {
-                return unresolved(format!(
-                    "this person is mapped to '{installed_app_id}' on {conductor_id}, which \
-                     did not answer the lookup ({fault})"
-                ));
+                return unresolved(
+                    conductor_id,
+                    format!(
+                        "this person's account is mapped to '{installed_app_id}' on \
+                         {conductor_id}, which did not answer the lookup ({fault})"
+                    ),
+                );
             }
         };
+
+        let account_key = super::agent_key::normalize_agent_key(account_agent_key);
+        if provisioned_agent_key(&existing.agent_pub_key) != account_key {
+            return unresolved(
+                conductor_id,
+                format!(
+                    "this person's account is mapped to '{installed_app_id}' on {conductor_id}, \
+                     but that app's agent key is not the account's agent key; it is not \
+                     treated as theirs"
+                ),
+            );
+        }
 
         info!(
             conductor = %conductor_id,
             app_id = %installed_app_id,
             user = %user_identifier,
             status = ?existing.status,
-            "Reusing existing app installation (agent mapping, no intent record) — backfilling"
+            "Reusing existing app installation (account mapping, no intent record) — backfilling"
         );
 
         // An app left disabled is enabled rather than handed back unusable.
@@ -1214,8 +1446,11 @@ impl AgentProvisioner {
     }
 
     /// A record whose conductor is not in this doorway's pool cannot be
-    /// resolved "on that conductor". This is the lost-record case, and the one
-    /// place the request path uses the recovery scan.
+    /// resolved "on that conductor". The pool is scanned for an app that
+    /// carries the RECORDED key; if none does, the record is stuck by name.
+    ///
+    /// It is not abandoned: the conductor it names cannot be asked, so whether
+    /// anything landed there is unverified.
     async fn recover_unplaceable_record(
         &self,
         mut intent: ProvisionIntent,
@@ -1223,30 +1458,38 @@ impl AgentProvisioner {
         warn!(
             user = %intent.identifier,
             recorded_conductor = %intent.conductor_id,
-            "Provisioning record names a conductor that is not in the pool — running the \
-             recovery scan"
+            "Provisioning record names a conductor that is not in the pool"
         );
-        match self.recover_by_pool_scan(&intent.identifier).await {
+        let named = intent.conductor_id.clone();
+        let found = match intent.agent_pub_key.clone() {
+            Some(recorded_key) => {
+                self.recover_by_pool_scan(&intent.identifier, &recorded_key)
+                    .await
+            }
+            None => Existence::NotInstalled,
+        };
+        match found {
             Existence::Found(agent) => {
                 intent.conductor_id = agent.conductor_id.clone();
                 intent.installed_app_id = agent.installed_app_id.clone();
-                intent.agent_pub_key = Some(agent.agent_pub_key.clone());
+                intent.stuck = None;
                 if intent.state < IntentState::Enabled {
                     intent.state = IntentState::Enabled;
                 }
                 self.note(&mut intent).await;
                 Ok(agent)
             }
-            Existence::NotInstalled => Err(ProvisionError::unresolved(
-                &intent.conductor_id,
-                format!(
-                    "this person's provisioning is recorded on {}, which is not in this \
-                     doorway's pool, and no conductor in the pool has their app",
-                    intent.conductor_id
-                ),
-            )),
-            Existence::Unresolved { conductors, detail } => {
-                Err(ProvisionError::Unresolved { conductors, detail })
+            Existence::NotInstalled | Existence::Unresolved { .. } => {
+                self.mark_stuck(&mut intent, StuckReason::ConductorNotInPool)
+                    .await;
+                Err(ProvisionError::unresolved(
+                    &named,
+                    format!(
+                        "this person's provisioning is recorded on {named}, which is not in \
+                         this doorway's pool, and no conductor in the pool holds an app with \
+                         the agent key recorded for them; an operator must resolve it"
+                    ),
+                ))
             }
         }
     }
@@ -1256,14 +1499,17 @@ impl AgentProvisioner {
     ///
     /// This is how the doorway used to answer "does this person already have an
     /// app?" on every registration, which made every registration depend on
-    /// every conductor. It is kept for the case the intent log cannot answer: a
-    /// record that was lost, or that names a conductor no longer in the pool.
-    /// It is for an operator or an admin tool to invoke; the only caller on the
-    /// request path is [`Self::recover_unplaceable_record`].
+    /// every conductor. It is kept for a record that names a conductor no
+    /// longer in the pool ([`Self::recover_unplaceable_record`], its only
+    /// caller on the request path).
+    ///
+    /// `proof_key` is the agent key recorded for this person. An app found
+    /// under the person's id is adopted ONLY if the conductor's key for it
+    /// equals `proof_key` — the scan never adopts on an id alone.
     ///
     /// A conductor that cannot be reached, or does not answer the lookup, is
     /// NOT a conductor without the app: [`Existence::Unresolved`] names it.
-    pub async fn recover_by_pool_scan(&self, user_identifier: &str) -> Existence {
+    pub async fn recover_by_pool_scan(&self, user_identifier: &str, proof_key: &str) -> Existence {
         let mut unreachable: Vec<String> = Vec::new();
         let mut reasons: Vec<String> = Vec::new();
 
@@ -1277,12 +1523,21 @@ impl AgentProvisioner {
 
             match lookup {
                 Ok((admin, Some(existing))) => {
+                    if provisioned_agent_key(&existing.agent_pub_key) != proof_key {
+                        warn!(
+                            conductor = %conductor.conductor_id,
+                            app_id = %app_id,
+                            "Recovery scan found an app under this id whose agent key is not \
+                             the recorded key — not adopted"
+                        );
+                        continue;
+                    }
                     info!(
                         conductor = %conductor.conductor_id,
                         app_id = %app_id,
                         user = %user_identifier,
                         status = ?existing.status,
-                        "Recovery scan found an existing app installation"
+                        "Recovery scan found this person's app (agent key confirmed)"
                     );
 
                     if existing.status.as_deref() == Some("disabled") {
@@ -1328,6 +1583,209 @@ impl AgentProvisioner {
         }
     }
 
+    /// OPERATOR RECOVERY — rebuild this doorway's records from the conductors.
+    ///
+    /// For a doorway whose database was wiped or restored while its conductors
+    /// kept their apps. Invoked by `POST /admin/provisioning/recover`, never by
+    /// a registration.
+    ///
+    /// - **Mappings** (agent key → conductor, app) are rebuilt from what each
+    ///   conductor reports. Those are facts about the conductor and need no
+    ///   proof.
+    /// - **Records** (identifier → app) are rebuilt ONLY where an account row
+    ///   this doorway holds carries an agent key a conductor confirms.
+    ///   `accounts` is `(identifier, agent key)` from the doorway's own account
+    ///   rows. An account whose key no conductor holds gets no record; an app
+    ///   no account claims is reported and assigned to nobody — the doorway has
+    ///   no evidence whose it is.
+    ///
+    /// The walk clears `recovery_required` only if EVERY conductor answered.
+    pub async fn rebuild_from_conductors(&self, accounts: &[(String, String)]) -> RecoveryReport {
+        let mut report = RecoveryReport::default();
+        // canonical agent key → (conductor, app id)
+        let mut seen: std::collections::HashMap<String, (String, String)> =
+            std::collections::HashMap::new();
+
+        let mut conductors = self.registry.list_conductors();
+        conductors.sort_by(|a, b| a.conductor_id.cmp(&b.conductor_id));
+        for conductor in &conductors {
+            let listed = match self.connector.connect(&conductor.admin_url).await {
+                Ok(admin) => admin.list_apps().await,
+                Err(fault) => Err(fault),
+            };
+            let apps = match listed {
+                Ok(apps) => apps,
+                Err(fault) => {
+                    warn!(
+                        conductor = %conductor.conductor_id,
+                        error = %fault,
+                        "Recovery could not list this conductor's apps"
+                    );
+                    report
+                        .conductors_unreachable
+                        .push(conductor.conductor_id.clone());
+                    continue;
+                }
+            };
+            report
+                .conductors_walked
+                .push(conductor.conductor_id.clone());
+            for app in apps {
+                // The doorway's own app is not a hosted person's.
+                if app.installed_app_id == self.app_id {
+                    continue;
+                }
+                report.apps_seen += 1;
+                for form in lookup_forms(&app.agent_pub_key) {
+                    if self
+                        .registry
+                        .register_agent(&form, &conductor.conductor_id, &app.installed_app_id)
+                        .await
+                        .is_ok()
+                    {
+                        report.mappings_written += 1;
+                    }
+                }
+                seen.insert(
+                    provisioned_agent_key(&app.agent_pub_key),
+                    (conductor.conductor_id.clone(), app.installed_app_id),
+                );
+            }
+        }
+
+        let mut claimed: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for (identifier, account_key) in accounts {
+            let key = super::agent_key::normalize_agent_key(account_key);
+            let Some((conductor_id, installed_app_id)) = seen.get(&key) else {
+                report.accounts_without_an_app.push(identifier.clone());
+                continue;
+            };
+            claimed.insert(key.clone());
+
+            let mut rebuilt = ProvisionIntent::intended(identifier, conductor_id, installed_app_id);
+            rebuilt.agent_pub_key = Some(key.clone());
+            rebuilt.state = IntentState::AccountRecorded;
+            let store = self.registry.intents();
+            let written = match store.get(identifier).await {
+                Ok(None) => store.insert_new(&rebuilt).await,
+                // Already the same proven fact: leave it.
+                Ok(Some(existing))
+                    if existing.is_live()
+                        && existing.stuck.is_none()
+                        && existing.agent_pub_key.as_deref() == Some(key.as_str())
+                        && existing.installed_app_id == *installed_app_id =>
+                {
+                    Ok(true)
+                }
+                // Abandoned, stuck, or pointing elsewhere: the conductor-
+                // confirmed account key wins.
+                Ok(Some(existing)) => {
+                    rebuilt.version = existing.version + 1;
+                    rebuilt.created_at = existing.created_at;
+                    store.replace(existing.version, &rebuilt).await
+                }
+                Err(e) => Err(e),
+            };
+            match written {
+                Ok(true) => report.records_rebuilt.push(identifier.clone()),
+                Ok(false) => report.records_not_written.push(format!(
+                    "{identifier}: the record changed while it was being rebuilt"
+                )),
+                Err(e) => report
+                    .records_not_written
+                    .push(format!("{identifier}: {e}")),
+            }
+        }
+
+        let mut unclaimed: Vec<String> = seen
+            .iter()
+            .filter(|(key, _)| !claimed.contains(*key))
+            .map(|(_, (conductor_id, app_id))| format!("{conductor_id}/{app_id}"))
+            .collect();
+        unclaimed.sort();
+        report.apps_without_an_account = unclaimed;
+
+        report.complete = report.conductors_unreachable.is_empty();
+        if report.complete {
+            self.registry.set_recovery_required(false);
+        }
+        report.recovery_required = self.registry.recovery_required();
+        self.fill_log_state(&mut report).await;
+        info!(
+            complete = report.complete,
+            apps_seen = report.apps_seen,
+            records_rebuilt = report.records_rebuilt.len(),
+            unreachable = ?report.conductors_unreachable,
+            "Operator recovery walked the conductor pool"
+        );
+        report
+    }
+
+    /// The operator's explicit decision that a stuck record is to be given up.
+    ///
+    /// The doorway never abandons a record while something may be on a
+    /// conductor; an operator who has looked may. Returns the identifiers
+    /// actually abandoned.
+    pub async fn operator_abandon(&self, identifiers: &[String]) -> Vec<String> {
+        let mut abandoned = Vec::new();
+        for identifier in identifiers {
+            if let Ok(Some(mut intent)) = self.registry.intents().get(identifier).await {
+                if intent.is_live() {
+                    self.abandon_if_live(Some(&mut intent), "abandoned by an operator")
+                        .await;
+                    if !intent.is_live() {
+                        abandoned.push(identifier.clone());
+                    }
+                }
+            }
+        }
+        abandoned
+    }
+
+    /// Add the log's own state to a recovery report: what is stuck, and why.
+    async fn fill_log_state(&self, report: &mut RecoveryReport) {
+        let store = self.registry.intents();
+        report.intent_store_available = store.available();
+        match store.stuck_records().await {
+            Ok(stuck) => {
+                report.stuck = stuck
+                    .into_iter()
+                    .map(|intent| StuckRecord {
+                        identifier: intent.identifier,
+                        conductor_id: intent.conductor_id,
+                        installed_app_id: intent.installed_app_id,
+                        reason: intent.stuck.map(StuckReason::as_str).unwrap_or("unknown"),
+                        state: intent.state.as_str(),
+                        absent_past_bound: intent.absent_past_bound,
+                    })
+                    .collect();
+            }
+            Err(e) => report.log_errors.push(e),
+        }
+        match store.counts(intent_now() - in_flight_bound_chrono()).await {
+            Ok(counts) => {
+                report.stale = counts.stale;
+                report.abandoned = counts
+                    .by_state
+                    .iter()
+                    .find(|(state, _)| *state == IntentState::Abandoned)
+                    .map(|(_, n)| *n)
+                    .unwrap_or(0);
+            }
+            Err(e) => report.log_errors.push(e),
+        }
+    }
+
+    /// The log's state without walking any conductor.
+    pub async fn recovery_status(&self) -> RecoveryReport {
+        let mut report = RecoveryReport {
+            recovery_required: self.registry.recovery_required(),
+            ..RecoveryReport::default()
+        };
+        self.fill_log_state(&mut report).await;
+        report
+    }
+
     // ── the log ─────────────────────────────────────────────────────────────
 
     /// Write `intent` against the version it was read at. `Ok(false)` = another
@@ -1336,7 +1794,7 @@ impl AgentProvisioner {
         let expected = intent.version;
         let mut next = intent.clone();
         next.version = expected + 1;
-        next.updated_at = chrono::Utc::now();
+        next.updated_at = intent_now();
         let written = self.registry.intents().replace(expected, &next).await?;
         if written {
             *intent = next;
@@ -1364,7 +1822,8 @@ impl AgentProvisioner {
         }
     }
 
-    /// End an attempt that left nothing behind.
+    /// End an attempt that left nothing behind. The record stays, countable,
+    /// until it expires.
     async fn abandon_if_live(&self, intent: Option<&mut ProvisionIntent>, reason: &str) {
         let Some(intent) = intent else { return };
         if !intent.is_live() {
@@ -1374,6 +1833,21 @@ impl AgentProvisioner {
         intent.abandoned_reason = Some(reason.to_string());
         intent.install_sent_at = None;
         intent.agent_pub_key = None;
+        intent.stuck = None;
+        intent.expire_at = chrono::Duration::from_std(ABANDONED_RECORD_TTL)
+            .ok()
+            .map(|ttl| intent_now() + ttl);
+        self.note(intent).await;
+    }
+
+    /// Name why a live record cannot be finished without an operator. Written
+    /// only when it changes, so a record that stays stuck is not rewritten on
+    /// every call.
+    async fn mark_stuck(&self, intent: &mut ProvisionIntent, reason: StuckReason) {
+        if intent.stuck == Some(reason) {
+            return;
+        }
+        intent.stuck = Some(reason);
         self.note(intent).await;
     }
 
@@ -1394,27 +1868,33 @@ impl AgentProvisioner {
         }
         intent.state = state;
         self.note(&mut intent).await;
-        self.publish_intent_counts().await;
     }
 
-    /// Publish the log's counts so abandoned and stale records are visible
-    /// debt. Nothing reaps them.
-    async fn publish_intent_counts(&self) {
-        let bound = chrono::Duration::from_std(install_in_flight_bound())
-            .unwrap_or_else(|_| chrono::Duration::zero());
-        match self
-            .registry
-            .intents()
-            .counts(chrono::Utc::now() - bound)
-            .await
-        {
-            Ok(counts) => {
-                for (state, n) in &counts.by_state {
-                    crate::metrics::set_provision_intents(state.as_str(), *n);
-                }
-                crate::metrics::set_provision_intents_stale(counts.stale);
+    /// Did THIS doorway provision `agent` for EXACTLY `user_identifier`?
+    ///
+    /// True only when a live record for that identifier names the same
+    /// conductor, the same app id and the same agent key. This is the evidence
+    /// a route needs before it attaches something that already exists on that
+    /// agent — an existing Human — to a registration. The app id alone, or an
+    /// agent some other identifier was provisioned, is not evidence.
+    pub async fn provisioned_for(&self, user_identifier: &str, agent: &ProvisionedAgent) -> bool {
+        match self.registry.intents().get(user_identifier).await {
+            Ok(Some(intent)) => {
+                intent.is_live()
+                    && intent.conductor_id == agent.conductor_id
+                    && intent.installed_app_id == agent.installed_app_id
+                    && intent.agent_pub_key.as_deref() == Some(agent.agent_pub_key.as_str())
             }
-            Err(e) => debug!(error = %e, "Provisioning intent counts unavailable"),
+            _ => false,
+        }
+    }
+
+    /// Forget this person's record — their account was closed. Best-effort: a
+    /// record that could not be deleted is logged, and expires or is found
+    /// stale; it holds an identifier, not an identity.
+    pub async fn forget(&self, user_identifier: &str) {
+        if let Err(e) = self.registry.intents().delete(user_identifier).await {
+            warn!(user = %user_identifier, error = %e, "Could not delete the provisioning record");
         }
     }
 
@@ -1460,6 +1940,13 @@ impl AgentProvisioner {
         // Remove from registry
         self.registry.unregister_agent(agent_pub_key);
 
+        // …and from the intent log: the app is gone, and the record holds the
+        // person's identifier.
+        let canonical = super::agent_key::normalize_agent_key(agent_pub_key);
+        if let Err(e) = self.registry.intents().delete_by_agent(&canonical).await {
+            warn!(agent = %agent_pub_key, error = %e, "Could not delete the provisioning record");
+        }
+
         info!(
             conductor = %entry.conductor_id,
             agent = %agent_pub_key,
@@ -1488,18 +1975,139 @@ fn install_in_flight_bound() -> std::time::Duration {
     super::typed_admin::admin_request_timeout()
 }
 
+/// What the operator's recovery found and did.
+#[derive(Debug, Default, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryReport {
+    /// Every conductor in the pool answered. Only then is recovery complete.
+    pub complete: bool,
+    /// Whether registration of people without a record is still refused.
+    pub recovery_required: bool,
+    pub intent_store_available: bool,
+    pub conductors_walked: Vec<String>,
+    pub conductors_unreachable: Vec<String>,
+    /// Hosted apps the conductors reported (the doorway's own app excluded).
+    pub apps_seen: usize,
+    pub mappings_written: usize,
+    /// Identifiers whose record was rebuilt from an account row whose agent
+    /// key a conductor confirmed.
+    pub records_rebuilt: Vec<String>,
+    pub records_not_written: Vec<String>,
+    /// Accounts whose agent key no conductor reported.
+    pub accounts_without_an_app: Vec<String>,
+    /// `conductor/app id` of hosted apps no account row claims. Assigned to
+    /// nobody: the doorway has no evidence whose they are.
+    pub apps_without_an_account: Vec<String>,
+    /// Live records the doorway cannot finish on its own, with the reason.
+    pub stuck: Vec<StuckRecord>,
+    /// Live records not yet enabled and unchanged past the in-flight bound.
+    pub stale: u64,
+    pub abandoned: u64,
+    pub operator_abandoned: Vec<String>,
+    pub log_errors: Vec<String>,
+}
+
+/// One stuck record, as an operator sees it.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StuckRecord {
+    pub identifier: String,
+    pub conductor_id: String,
+    pub installed_app_id: String,
+    pub reason: &'static str,
+    pub state: &'static str,
+    pub absent_past_bound: u32,
+}
+
+/// How many verified absences, each at least one in-flight bound apart, end a
+/// record whose install can never be made.
+///
+/// Three is the same budget a single call spends re-offering
+/// ([`PROVISION_TRANSPORT_ATTEMPTS`]) — "ask a few times, then stop" — spread
+/// over at least three in-flight bounds. It bounds how long a person is held
+/// by an attempt that left nothing; it is not a safety margin, because every
+/// check is the conductor itself answering that the app is not there.
+const ABSENT_CHECKS_BEFORE_ABANDON: u32 = PROVISION_TRANSPORT_ATTEMPTS;
+
+/// How often the intent log's counts are published. One in-flight bound: the
+/// stale count's own resolution.
+pub const INTENT_COUNTS_PERIOD: std::time::Duration =
+    holochain_websocket::WebsocketConfig::CLIENT_DEFAULT.default_request_timeout;
+
+fn intent_now() -> chrono::DateTime<chrono::Utc> {
+    super::provision_intent::now()
+}
+
+fn in_flight_bound_chrono() -> chrono::Duration {
+    chrono::Duration::from_std(install_in_flight_bound())
+        .unwrap_or_else(|_| chrono::Duration::zero())
+}
+
+/// Publish the intent log's counts and the doorway's provisioning readiness,
+/// and drop abandoned records whose time has come.
+///
+/// Runs on a timer ([`INTENT_COUNTS_PERIOD`]), never on a request: it is
+/// several counts over the collection and must not sit on a registration.
+pub async fn publish_intent_counts(registry: &ConductorRegistry) {
+    let store = registry.intents();
+    if let Err(e) = store.purge_expired(intent_now()).await {
+        debug!(error = %e, "Expired provisioning intents could not be purged");
+    }
+    match store.counts(intent_now() - in_flight_bound_chrono()).await {
+        Ok(counts) => {
+            for (state, n) in &counts.by_state {
+                crate::metrics::set_provision_intents(state.as_str(), *n);
+            }
+            for (reason, n) in &counts.stuck {
+                crate::metrics::set_provision_intents_stuck(reason.as_str(), *n);
+            }
+            crate::metrics::set_provision_intents_stale(counts.stale);
+        }
+        Err(e) => debug!(error = %e, "Provisioning intent counts unavailable"),
+    }
+    let recovery_required = registry.recovery_required();
+    crate::metrics::set_provisioning_readiness(
+        store.available() && !recovery_required,
+        recovery_required,
+    );
+}
+
+/// The OLD app id: six hex digits of the identifier's hash. Test-only — the
+/// production code never recomputes it (see `resolve_account_mapping`).
+#[cfg(test)]
+fn legacy_short_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(user_identifier.as_bytes());
+    format!("{app_id}-{conductor_id}-{}", hex::encode(&hash[..3]))
+}
+
+/// Domain separation for [`generate_app_id`]'s preimage.
+const APP_ID_DOMAIN: &[u8] = b"elohim/doorway/hosted-app-id/v1\0";
+
 /// Generate the installed app ID for a user on a conductor.
 ///
-/// Format: `{app_id}-{conductor_id}-{hash(user_identifier)[0:6]}`
+/// Format: `{app_id}-{conductor_id}-{hex(sha256(DOMAIN || identifier))}` — the
+/// WHOLE digest, 256 bits.
+///
+/// The id used to carry three bytes of the hash. Twenty-four bits do not name
+/// a person: unrelated identifiers shared an id, and code that read "an app
+/// with this id exists" as "this person's app" could hand one person another's
+/// agent. The full digest of a domain-separated preimage removes the
+/// collision. It does not, by itself, make an id proof of anything — the proof
+/// is the recorded agent key (`AgentProvisioner::finish_forward`).
+///
+/// Apps installed under the old short id are not migrated (the dataplane is
+/// replaceable at the recast, plane-separation §11) and are reachable only
+/// through `AgentProvisioner::resolve_account_mapping`.
 fn generate_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> String {
     use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
+    hasher.update(APP_ID_DOMAIN);
     hasher.update(user_identifier.as_bytes());
-    let hash = hasher.finalize();
-    let short_hash = hex::encode(&hash[..3]); // 6 hex chars from 3 bytes
+    let digest = hex::encode(hasher.finalize());
 
-    format!("{app_id}-{conductor_id}-{short_hash}")
+    format!("{app_id}-{conductor_id}-{digest}")
 }
 
 #[cfg(test)]
@@ -1815,6 +2423,28 @@ mod tests {
                 Ok(())
             })
         }
+
+        async fn list_apps(
+            &self,
+        ) -> Result<Vec<crate::conductor::typed_admin::InstalledAppInfo>, AdminFault> {
+            self.with(|c| {
+                if let Some(fault) = c.lookup_fault.clone() {
+                    return Err(fault);
+                }
+                let mut apps: Vec<_> = c
+                    .apps
+                    .iter()
+                    .map(
+                        |(id, app)| crate::conductor::typed_admin::InstalledAppInfo {
+                            installed_app_id: id.clone(),
+                            agent_pub_key: app.agent_key.clone(),
+                        },
+                    )
+                    .collect();
+                apps.sort_by(|a, b| a.installed_app_id.cmp(&b.installed_app_id));
+                Ok(apps)
+            })
+        }
     }
 
     /// A two-conductor pool where `conductor-a` is the least loaded — so it is
@@ -1862,7 +2492,7 @@ mod tests {
     fn unresolved_on(error: &ProvisionError) -> Vec<String> {
         match error {
             ProvisionError::Unresolved { conductors, .. } => conductors.clone(),
-            ProvisionError::Failed(message) => {
+            ProvisionError::Failed(message) | ProvisionError::NotReady(message) => {
                 panic!("expected an unresolved result, got a plain failure: {message}")
             }
         }
@@ -2183,7 +2813,10 @@ mod tests {
         let (provisioner, pool) = two_conductor_pool().await;
         pool.with("conductor-b", |c| c.dark = true);
 
-        match provisioner.recover_by_pool_scan(USER).await {
+        match provisioner
+            .recover_by_pool_scan(USER, &provisioned_agent_key(&raw_agent_key(200)))
+            .await
+        {
             Existence::Unresolved { conductors, .. } => {
                 assert_eq!(conductors, vec!["conductor-b".to_string()]);
             }
@@ -2208,7 +2841,9 @@ mod tests {
         });
 
         assert!(matches!(
-            provisioner.recover_by_pool_scan(USER).await,
+            provisioner
+            .recover_by_pool_scan(USER, &provisioned_agent_key(&raw_agent_key(200)))
+            .await,
             Existence::Unresolved { conductors, .. } if conductors == vec!["conductor-a".to_string()]
         ));
         assert_eq!(pool.total_keys_generated(), 0);
@@ -2219,7 +2854,9 @@ mod tests {
     async fn every_conductor_answering_no_is_the_only_not_installed() {
         let (provisioner, _pool) = two_conductor_pool().await;
         assert!(matches!(
-            provisioner.recover_by_pool_scan(USER).await,
+            provisioner
+                .recover_by_pool_scan(USER, &provisioned_agent_key(&raw_agent_key(200)))
+                .await,
             Existence::NotInstalled
         ));
     }
@@ -2242,7 +2879,10 @@ mod tests {
             );
         });
 
-        match provisioner.recover_by_pool_scan(USER).await {
+        match provisioner
+            .recover_by_pool_scan(USER, &provisioned_agent_key(&raw_agent_key(200)))
+            .await
+        {
             Existence::Found(agent) => {
                 assert_eq!(agent.conductor_id, "conductor-b");
                 assert_eq!(agent.agent_pub_key, provisioned_agent_key(&key));
@@ -2318,7 +2958,7 @@ mod tests {
     fn test_generate_app_id() {
         let id = generate_app_id("elohim", "conductor-0", "test@example.com");
         assert!(id.starts_with("elohim-conductor-0-"));
-        assert_eq!(id.len(), "elohim-conductor-0-".len() + 6); // 6 hex chars
+        assert_eq!(id.len(), "elohim-conductor-0-".len() + 64); // a whole SHA-256
 
         // Deterministic
         let id2 = generate_app_id("elohim", "conductor-0", "test@example.com");
@@ -2414,7 +3054,8 @@ mod tests {
     async fn age_install(store: &MemoryIntentStore, who: &str, ago: std::time::Duration) {
         let mut intent = intent_of(store, who).await;
         let expected = intent.version;
-        let then = chrono::Utc::now() - chrono::Duration::from_std(ago).unwrap();
+        let then =
+            crate::conductor::provision_intent::now() - chrono::Duration::from_std(ago).unwrap();
         intent.install_sent_at = Some(then);
         intent.updated_at = then;
         intent.version += 1;
@@ -2692,7 +3333,10 @@ mod tests {
                 .contains("bundle not found"),
             "{abandoned:?}"
         );
-        let counts = store.counts(chrono::Utc::now()).await.unwrap();
+        let counts = store
+            .counts(crate::conductor::provision_intent::now())
+            .await
+            .unwrap();
         assert!(counts.by_state.contains(&(IntentState::Abandoned, 1)));
 
         pool.with("conductor-a", |c| c.install = Install::Succeeds);
@@ -2729,9 +3373,9 @@ mod tests {
         assert_eq!(agent.conductor_id, "conductor-b");
     }
 
-    /// A person provisioned before the log existed has a mapping and no intent.
-    /// They resolve on the MAPPED conductor — nobody else is asked — and the log
-    /// is backfilled.
+    /// A person provisioned before the log existed has an account, a mapping
+    /// for the account's agent key, and no intent. They resolve on the MAPPED
+    /// conductor — nobody else is asked — and the log is backfilled.
     #[tokio::test]
     async fn a_legacy_mapping_with_no_intent_resolves_on_the_mapped_conductor() {
         let pool = Arc::new(FakePool::default());
@@ -2760,9 +3404,9 @@ mod tests {
         pool.with("conductor-a", |c| c.dark = true);
 
         let agent = doorway
-            .provision_agent(USER)
+            .provision_agent_for_account(USER, Some(&provisioned_agent_key(&key)))
             .await
-            .expect("the mapping says where this person lives");
+            .expect("the account's own agent key says where this person lives");
 
         assert_eq!(agent.conductor_id, "conductor-b");
         assert_eq!(agent.agent_pub_key, provisioned_agent_key(&key));
@@ -2796,7 +3440,10 @@ mod tests {
             .unwrap();
         pool.with("conductor-b", |c| c.dark = true);
 
-        let error = doorway.provision_agent(USER).await.expect_err("b is dark");
+        let error = doorway
+            .provision_agent_for_account(USER, Some(&provisioned_agent_key(&raw_agent_key(211))))
+            .await
+            .expect_err("b is dark");
 
         assert_eq!(unresolved_on(&error), vec!["conductor-b".to_string()]);
         assert_eq!(pool.total_keys_generated(), 0);
@@ -2884,43 +3531,6 @@ mod tests {
         });
     }
 
-    /// The doorway's record was lost (no intent, no mapping) but the person's
-    /// app is on the conductor a fresh attempt is offered to: the conductor
-    /// refuses the duplicate app id, and the existing app is adopted — with ITS
-    /// key — rather than reported as a failure.
-    #[tokio::test]
-    async fn a_lost_record_whose_app_is_on_the_offered_conductor_is_adopted() {
-        let pool = Arc::new(FakePool::default());
-        let store = Arc::new(MemoryIntentStore::new());
-        let doorway = doorway_over(&pool, &store, A_FIRST).await;
-        let key = raw_agent_key(212);
-        pool.with("conductor-a", |c| {
-            c.apps.insert(
-                app_on("conductor-a"),
-                FakeApp {
-                    agent_key: key.clone(),
-                    status: "disabled",
-                    cells_ready: false,
-                },
-            );
-        });
-
-        let agent = doorway.provision_agent(USER).await.expect("adopted");
-
-        assert_eq!(agent.agent_pub_key, provisioned_agent_key(&key));
-        pool.with("conductor-a", |c| {
-            assert_eq!(c.apps[&app_on("conductor-a")].status, "running");
-            assert_eq!(c.uninstalls_received, 0);
-        });
-        let intent = intent_of(&store, USER).await;
-        assert_eq!(intent.state, IntentState::Enabled);
-        assert_eq!(
-            intent.agent_pub_key.as_deref(),
-            Some(agent.agent_pub_key.as_str())
-        );
-        assert_untouched(&pool, "conductor-b");
-    }
-
     /// The route's progress marks only ever move the record forward.
     #[tokio::test]
     async fn progress_marks_move_the_intent_forward_only() {
@@ -2950,16 +3560,17 @@ mod tests {
     /// A record naming a conductor that is no longer in the pool cannot be
     /// resolved "on that conductor". This — a record that names no usable
     /// conductor — is the one place the request path falls back to the named
-    /// recovery scan.
+    /// recovery scan, and the scan adopts only an app carrying the RECORDED key.
     #[tokio::test]
     async fn an_intent_naming_a_conductor_outside_the_pool_uses_the_recovery_scan() {
         let pool = Arc::new(FakePool::default());
         let store = Arc::new(MemoryIntentStore::new());
         let doorway = doorway_over(&pool, &store, A_FIRST).await;
-        let mut intent = ProvisionIntent::intended(USER, "conductor-9", "elohim-conductor-9-xx");
-        intent.install_sent_at = Some(chrono::Utc::now());
-        store.insert_new(&intent).await.unwrap();
         let key = raw_agent_key(213);
+        let mut intent = ProvisionIntent::intended(USER, "conductor-9", "elohim-conductor-9-xx");
+        intent.install_sent_at = Some(crate::conductor::provision_intent::now());
+        intent.agent_pub_key = Some(provisioned_agent_key(&key));
+        store.insert_new(&intent).await.unwrap();
         pool.with("conductor-b", |c| {
             c.apps.insert(
                 app_on("conductor-b"),
@@ -2976,5 +3587,771 @@ mod tests {
         assert_eq!(agent.conductor_id, "conductor-b");
         assert_eq!(pool.total_keys_generated(), 0);
         assert_eq!(intent_of(&store, USER).await.conductor_id, "conductor-b");
+    }
+
+    // ── an app id is not a person ───────────────────────────────────────────
+    //
+    // The app id used to carry 24 bits of the identifier's hash, and several
+    // paths read "an app exists under this id" as "this is that person's app".
+    // Two identifiers that share the old short hash stand in for the whole
+    // class here: on no path may one of them be handed the other's agent.
+    //
+    // The proof the doorway accepts is the agent key IT recorded for the
+    // identifier (or the key on that identifier's own account row). Never the
+    // id alone.
+
+    use crate::conductor::provision_intent::StuckReason;
+
+    /// Two identifiers whose SHA-256 share their first three bytes (`f791bc`):
+    /// under the old id scheme they named the SAME app on any conductor.
+    const ALICE: &str = "person963@alpha.elohim.host";
+    const MALLORY: &str = "person2087@alpha.elohim.host";
+
+    fn app_for(conductor_id: &str, who: &str) -> String {
+        generate_app_id(DEFAULT_APP_ID, conductor_id, who)
+    }
+
+    fn place_app(
+        pool: &FakePool,
+        conductor_id: &str,
+        app_id: &str,
+        key: &[u8],
+        status: &'static str,
+    ) {
+        pool.with(conductor_id, |c| {
+            c.apps.insert(
+                app_id.to_string(),
+                FakeApp {
+                    agent_key: key.to_vec(),
+                    status,
+                    cells_ready: status == "running",
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn the_two_test_identifiers_shared_one_app_id_under_the_old_scheme() {
+        assert_eq!(
+            legacy_short_app_id(DEFAULT_APP_ID, "conductor-a", ALICE),
+            legacy_short_app_id(DEFAULT_APP_ID, "conductor-a", MALLORY),
+        );
+        assert_ne!(ALICE, MALLORY);
+    }
+
+    /// NEW IDS ARE FULL-WIDTH. The id carries the whole digest of a
+    /// domain-separated preimage, so two identifiers cannot share one.
+    #[test]
+    fn new_app_ids_carry_the_full_identity() {
+        let alice = app_for("conductor-a", ALICE);
+        let mallory = app_for("conductor-a", MALLORY);
+
+        assert_ne!(alice, mallory, "the old collision must not survive");
+        let digest = alice
+            .strip_prefix("elohim-conductor-a-")
+            .expect("the id still names the app and the conductor");
+        assert_eq!(digest.len(), 64, "a whole SHA-256, in hex: {alice}");
+        assert!(digest.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert_eq!(alice, app_for("conductor-a", ALICE), "deterministic");
+        assert_ne!(alice, app_for("conductor-b", ALICE));
+        assert_ne!(
+            digest,
+            {
+                use sha2::{Digest, Sha256};
+                hex::encode(Sha256::digest(ALICE.as_bytes()))
+            },
+            "the preimage is domain-separated, not the bare identifier"
+        );
+    }
+
+    /// LEGACY MAPPING. Alice was provisioned under the old short id and the
+    /// doorway holds her agent mapping. Mallory, whose identifier shares that
+    /// short hash, registers. She must get an app of her own — never Alice's.
+    #[tokio::test]
+    async fn a_short_hash_twin_never_resolves_to_the_others_app_through_an_agent_mapping() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let alice_key = raw_agent_key(220);
+        let legacy_id = legacy_short_app_id(DEFAULT_APP_ID, "conductor-a", ALICE);
+        place_app(&pool, "conductor-a", &legacy_id, &alice_key, "running");
+        doorway
+            .registry
+            .register_agent(
+                &provisioned_agent_key(&alice_key),
+                "conductor-a",
+                &legacy_id,
+            )
+            .await
+            .unwrap();
+
+        let mallory = doorway
+            .provision_agent(MALLORY)
+            .await
+            .expect("mallory is a new person and is provisioned as one");
+
+        assert_ne!(
+            mallory.agent_pub_key,
+            provisioned_agent_key(&alice_key),
+            "mallory was handed alice's agent"
+        );
+        assert_ne!(mallory.installed_app_id, legacy_id);
+        pool.with("conductor-a", |c| {
+            assert_eq!(
+                c.apps[&legacy_id].agent_key, alice_key,
+                "alice's app untouched"
+            );
+        });
+    }
+
+    /// THE ONE LEGACY LOOKUP. A person provisioned under an old short id is
+    /// found only through the agent key on THEIR OWN account row — never by
+    /// recomputing the short hash.
+    #[tokio::test]
+    async fn a_legacy_app_is_found_only_through_the_account_rows_own_agent_key() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let alice_key = raw_agent_key(221);
+        let alice_account_key = provisioned_agent_key(&alice_key);
+        let legacy_id = legacy_short_app_id(DEFAULT_APP_ID, "conductor-b", ALICE);
+        place_app(&pool, "conductor-b", &legacy_id, &alice_key, "running");
+        doorway
+            .registry
+            .register_agent(&alice_account_key, "conductor-b", &legacy_id)
+            .await
+            .unwrap();
+
+        // Alice, with the key her account row holds: her own app, no new key.
+        let alice = doorway
+            .provision_agent_for_account(ALICE, Some(&alice_account_key))
+            .await
+            .expect("alice's account row names her agent");
+        assert_eq!(alice.agent_pub_key, alice_account_key);
+        assert_eq!(alice.installed_app_id, legacy_id);
+        assert_eq!(pool.total_keys_generated(), 0);
+        let backfilled = intent_of(&store, ALICE).await;
+        assert_eq!(
+            backfilled.agent_pub_key.as_deref(),
+            Some(alice_account_key.as_str())
+        );
+        assert_eq!(backfilled.installed_app_id, legacy_id);
+
+        // Mallory, with HER account's key (which maps to nothing): a new app.
+        let mallory_account_key = provisioned_agent_key(&raw_agent_key(222));
+        let mallory = doorway
+            .provision_agent_for_account(MALLORY, Some(&mallory_account_key))
+            .await
+            .expect("mallory is provisioned fresh");
+        assert_ne!(mallory.agent_pub_key, alice_account_key);
+        assert_ne!(mallory.installed_app_id, legacy_id);
+    }
+
+    /// …and a key that maps to an app whose conductor reports a DIFFERENT key
+    /// is not proof either.
+    #[tokio::test]
+    async fn an_account_key_the_conductor_does_not_confirm_is_unresolved() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let mapped_key = provisioned_agent_key(&raw_agent_key(223));
+        let legacy_id = legacy_short_app_id(DEFAULT_APP_ID, "conductor-a", ALICE);
+        place_app(
+            &pool,
+            "conductor-a",
+            &legacy_id,
+            &raw_agent_key(224),
+            "running",
+        );
+        doorway
+            .registry
+            .register_agent(&mapped_key, "conductor-a", &legacy_id)
+            .await
+            .unwrap();
+
+        let error = doorway
+            .provision_agent_for_account(ALICE, Some(&mapped_key))
+            .await
+            .expect_err("the conductor's key for that app is not the account's");
+
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        assert_eq!(pool.total_keys_generated(), 0);
+        assert!(
+            store.is_empty(),
+            "nothing is recorded on an unproven adoption"
+        );
+    }
+
+    /// REFUSED INSTALL. An app already exists under the id this registration
+    /// would install. With no record and no account mapping the doorway has no
+    /// evidence it is this person's: a conflict, never an adoption.
+    #[tokio::test]
+    async fn an_app_already_under_the_id_is_a_conflict_not_this_persons_app() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let someone_elses_key = raw_agent_key(225);
+        let id = app_for("conductor-a", MALLORY);
+        place_app(&pool, "conductor-a", &id, &someone_elses_key, "disabled");
+
+        let error = doorway
+            .provision_agent(MALLORY)
+            .await
+            .expect_err("an existing app under the id is not hers to take");
+
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        pool.with("conductor-a", |c| {
+            assert_eq!(c.apps[&id].agent_key, someone_elses_key);
+            assert_eq!(c.apps[&id].status, "disabled", "not even enabled");
+            assert_eq!(c.uninstalls_received, 0);
+        });
+        let record = intent_of(&store, MALLORY).await;
+        assert!(
+            record.is_live(),
+            "a conflict is not abandoned: something is there"
+        );
+        assert_eq!(record.stuck, Some(StuckReason::AppConflict));
+        assert_ne!(
+            record.agent_pub_key.as_deref(),
+            Some(provisioned_agent_key(&someone_elses_key).as_str())
+        );
+        assert_untouched(&pool, "conductor-b");
+
+        // Asking again stays a conflict and generates no further keys.
+        let keys = pool.total_keys_generated();
+        let again = doorway.provision_agent(MALLORY).await.expect_err("still");
+        assert_eq!(again.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(pool.total_keys_generated(), keys);
+    }
+
+    /// RESEND and RESOLVE. The record holds the key this doorway generated. An
+    /// app under the id whose conductor key DIFFERS is not this person's: the
+    /// answer is Unresolved, and the record is left exactly as it was.
+    #[tokio::test]
+    async fn a_recorded_key_that_differs_from_the_conductors_is_unresolved_and_unchanged() {
+        for aged_past_the_bound in [false, true] {
+            let pool = Arc::new(FakePool::default());
+            let store = Arc::new(MemoryIntentStore::new());
+            an_install_in_flight_on_conductor_a(&pool, &store).await;
+            let recorded = intent_of(&store, USER).await;
+            let recorded_key = recorded
+                .agent_pub_key
+                .clone()
+                .expect("recorded before sending");
+            if aged_past_the_bound {
+                age_install(
+                    &store,
+                    USER,
+                    install_in_flight_bound() + std::time::Duration::from_secs(1),
+                )
+                .await;
+            }
+            // An app appears under the id — with somebody else's key.
+            let other = raw_agent_key(226);
+            place_app(
+                &pool,
+                "conductor-a",
+                &recorded.installed_app_id,
+                &other,
+                "disabled",
+            );
+
+            let doorway = doorway_over(&pool, &store, A_FIRST).await;
+            let error = doorway
+                .provision_agent(USER)
+                .await
+                .expect_err("the app under the id carries a different key");
+
+            assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+            assert!(
+                error.to_string().contains("agent key"),
+                "the reason must be distinct: {error}"
+            );
+            let after = intent_of(&store, USER).await;
+            assert_eq!(
+                after.agent_pub_key.as_deref(),
+                Some(recorded_key.as_str()),
+                "the recorded key must never be overwritten with the conductor's"
+            );
+            assert_eq!(after.stuck, Some(StuckReason::KeyMismatch));
+            assert!(after.is_live());
+            pool.with("conductor-a", |c| {
+                assert_eq!(c.apps[&recorded.installed_app_id].status, "disabled");
+                assert_eq!(c.installs_received, 1, "no re-send onto someone else's app");
+            });
+        }
+    }
+
+    /// POOL-SCAN RECOVERY. The scan adopts only an app whose conductor key is
+    /// the recorded key.
+    #[tokio::test]
+    async fn the_recovery_scan_never_adopts_an_app_on_its_id_alone() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let recorded_key = provisioned_agent_key(&raw_agent_key(227));
+        let mut intent =
+            ProvisionIntent::intended(MALLORY, "conductor-9", "elohim-conductor-9-gone");
+        intent.install_sent_at = Some(crate::conductor::provision_intent::now());
+        intent.agent_pub_key = Some(recorded_key.clone());
+        store.insert_new(&intent).await.unwrap();
+        let other = raw_agent_key(228);
+        place_app(
+            &pool,
+            "conductor-b",
+            &app_for("conductor-b", MALLORY),
+            &other,
+            "running",
+        );
+
+        let error = doorway
+            .provision_agent(MALLORY)
+            .await
+            .expect_err("the app found carries a key this doorway never recorded");
+
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        let after = intent_of(&store, MALLORY).await;
+        assert_eq!(
+            after.conductor_id, "conductor-9",
+            "the record is not rewritten"
+        );
+        assert_eq!(after.agent_pub_key.as_deref(), Some(recorded_key.as_str()));
+        assert_eq!(after.stuck, Some(StuckReason::ConductorNotInPool));
+        assert!(
+            after.is_live(),
+            "never abandoned while absence is unverified"
+        );
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    /// ALREADY-HAS-A-HUMAN. The route may recover an existing Human for a
+    /// registration only on an app this doorway recorded for EXACTLY that
+    /// identifier, with that agent key.
+    #[tokio::test]
+    async fn only_an_app_recorded_for_exactly_this_identifier_may_recover_its_existing_human() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let alice = doorway.provision_agent(ALICE).await.expect("alice");
+
+        assert!(doorway.provisioned_for(ALICE, &alice).await);
+        assert!(
+            !doorway.provisioned_for(MALLORY, &alice).await,
+            "another identifier presenting alice's agent is not alice"
+        );
+        let mut forged = alice.clone();
+        forged.agent_pub_key = provisioned_agent_key(&raw_agent_key(229));
+        assert!(!doorway.provisioned_for(ALICE, &forged).await);
+        let mut elsewhere = alice.clone();
+        elsewhere.installed_app_id = app_for("conductor-a", MALLORY);
+        assert!(!doorway.provisioned_for(ALICE, &elsewhere).await);
+    }
+
+    // ── never abandon on an unknown; every stuck record has a name ──────────
+
+    /// A refused install whose follow-up lookup FAILS establishes nothing about
+    /// what is on the conductor. Unresolved — the record and its key stay.
+    #[tokio::test]
+    async fn a_refused_install_whose_lookup_fails_is_unresolved_and_never_abandoned() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::Refuses("AppAlreadyInstalled");
+            c.lookup_fault = Some(AdminFault::sent_outcome_unknown(
+                "Admin error (list_apps for get_app_info): Websocket error: Timeout",
+            ));
+        });
+
+        let error = doorway.provision_agent(USER).await.expect_err("unknown");
+
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(unresolved_on(&error), vec!["conductor-a".to_string()]);
+        let record = intent_of(&store, USER).await;
+        assert!(record.is_live(), "never abandon on an unknown");
+        assert!(record.agent_pub_key.is_some(), "the key is kept");
+        assert!(record.install_sent_at.is_some());
+        assert_untouched(&pool, "conductor-b");
+    }
+
+    /// 4a. A re-send the conductor keeps refusing, with the app verifiably
+    /// absent on a reachable conductor each time, ends: after the bound the
+    /// record is abandoned (nothing landed) and the person can start again.
+    #[tokio::test]
+    async fn a_resend_refused_with_the_app_verifiably_absent_is_abandoned_after_a_bound() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        an_install_in_flight_on_conductor_a(&pool, &store).await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::Refuses("bundle not found at /app/elohim.happ")
+        });
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let past = install_in_flight_bound() + std::time::Duration::from_secs(1);
+
+        for round in 1..ABSENT_CHECKS_BEFORE_ABANDON {
+            age_install(&store, USER, past).await;
+            let error = doorway.provision_agent(USER).await.expect_err("refused");
+            assert_eq!(error.code(), "PROVISIONING_UNRESOLVED", "round {round}");
+            let record = intent_of(&store, USER).await;
+            assert!(record.is_live(), "round {round}: not yet");
+            assert_eq!(record.absent_past_bound, round);
+        }
+
+        age_install(&store, USER, past).await;
+        let error = doorway.provision_agent(USER).await.expect_err("the last");
+        assert_eq!(error.code(), "PROVISIONING_FAILED");
+        let record = intent_of(&store, USER).await;
+        assert_eq!(record.state, IntentState::Abandoned);
+        assert!(
+            record
+                .abandoned_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("verifiably absent"),
+            "{record:?}"
+        );
+        assert!(record.expire_at.is_some(), "an abandoned record expires");
+        assert_eq!(
+            pool.total_keys_generated(),
+            1,
+            "every re-send used the one key"
+        );
+
+        pool.with("conductor-a", |c| c.install = Install::Succeeds);
+        doorway
+            .provision_agent(USER)
+            .await
+            .expect("an abandoned record does not hold the person");
+    }
+
+    /// …but a re-send whose outcome is UNKNOWN is not a verified absence and
+    /// never counts toward abandonment.
+    #[tokio::test]
+    async fn a_resend_of_unknown_outcome_never_counts_toward_abandonment() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        an_install_in_flight_on_conductor_a(&pool, &store).await;
+        pool.with("conductor-a", |c| {
+            c.install = Install::SentThenDropped { lands: None }
+        });
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let past = install_in_flight_bound() + std::time::Duration::from_secs(1);
+
+        for _ in 0..(ABSENT_CHECKS_BEFORE_ABANDON + 2) {
+            age_install(&store, USER, past).await;
+            let error = doorway.provision_agent(USER).await.expect_err("unknown");
+            assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        }
+        let record = intent_of(&store, USER).await;
+        assert!(record.is_live());
+        assert_eq!(record.absent_past_bound, 0);
+    }
+
+    /// 4b. A record naming a conductor that is not in the pool, with nothing in
+    /// the pool to prove: stuck BY NAME, visible, and not abandoned — the named
+    /// conductor cannot be asked, so absence is unverified.
+    #[tokio::test]
+    async fn a_record_naming_a_conductor_outside_the_pool_is_stuck_by_name_not_abandoned() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let mut intent = ProvisionIntent::intended(USER, "conductor-9", "elohim-conductor-9-xx");
+        intent.install_sent_at = Some(crate::conductor::provision_intent::now());
+        intent.agent_pub_key = Some(provisioned_agent_key(&raw_agent_key(230)));
+        store.insert_new(&intent).await.unwrap();
+
+        let error = doorway.provision_agent(USER).await.expect_err("stuck");
+
+        assert_eq!(unresolved_on(&error), vec!["conductor-9".to_string()]);
+        let record = intent_of(&store, USER).await;
+        assert!(record.is_live());
+        assert_eq!(record.stuck, Some(StuckReason::ConductorNotInPool));
+        let counts = store
+            .counts(crate::conductor::provision_intent::now())
+            .await
+            .unwrap();
+        assert!(counts.stuck.contains(&(StuckReason::ConductorNotInPool, 1)));
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    /// 4c. An installed app the doorway cannot bring to ready is stuck by name.
+    #[tokio::test]
+    async fn an_installed_app_that_cannot_be_made_ready_is_stuck_by_name() {
+        for state in ["unrecoverable", "paused"] {
+            let pool = Arc::new(FakePool::default());
+            let store = Arc::new(MemoryIntentStore::new());
+            let doorway = doorway_over(&pool, &store, A_FIRST).await;
+            pool.with("conductor-a", |c| {
+                c.install = Install::SentThenDropped { lands: Some(state) }
+            });
+
+            let error = doorway.provision_agent(USER).await.expect_err(state);
+
+            assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+            let record = intent_of(&store, USER).await;
+            assert!(record.is_live(), "{state}: the app is THERE");
+            assert_eq!(record.stuck, Some(StuckReason::AppUnusable), "{state}");
+            pool.with("conductor-a", |c| assert_eq!(c.uninstalls_received, 0));
+        }
+    }
+
+    /// 4d. "Install sent" with no usable key cannot be proven or re-sent. If an
+    /// app is there it is stuck by name; if a reachable conductor keeps
+    /// answering that nothing is there, it ends like 4a.
+    #[tokio::test]
+    async fn a_sent_install_with_no_usable_key_is_stuck_or_ends_but_never_adopts() {
+        let past = install_in_flight_bound() + std::time::Duration::from_secs(1);
+
+        // An app IS there: not provable, not adopted, stuck.
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let mut intent = ProvisionIntent::intended(USER, "conductor-a", &app_on("conductor-a"));
+        intent.install_sent_at = Some(crate::conductor::provision_intent::now());
+        store.insert_new(&intent).await.unwrap();
+        place_app(
+            &pool,
+            "conductor-a",
+            &app_on("conductor-a"),
+            &raw_agent_key(231),
+            "running",
+        );
+        let error = doorway.provision_agent(USER).await.expect_err("unprovable");
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert_eq!(
+            intent_of(&store, USER).await.stuck,
+            Some(StuckReason::NoUsableKey)
+        );
+        assert_eq!(pool.total_keys_generated(), 0);
+
+        // Nothing is there, verified repeatedly past the bound: it ends.
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let mut intent = ProvisionIntent::intended(USER, "conductor-a", &app_on("conductor-a"));
+        intent.install_sent_at = Some(crate::conductor::provision_intent::now());
+        store.insert_new(&intent).await.unwrap();
+        for _ in 1..ABSENT_CHECKS_BEFORE_ABANDON {
+            age_install(&store, USER, past).await;
+            let error = doorway.provision_agent(USER).await.expect_err("absent");
+            assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        }
+        age_install(&store, USER, past).await;
+        let error = doorway.provision_agent(USER).await.expect_err("ended");
+        assert_eq!(error.code(), "PROVISIONING_FAILED");
+        assert_eq!(intent_of(&store, USER).await.state, IntentState::Abandoned);
+        assert_eq!(pool.total_installs_received(), 0, "nothing to re-send with");
+    }
+
+    // ── refusing to guess ───────────────────────────────────────────────────
+
+    /// A doorway whose records were empty at boot while its conductors host
+    /// apps cannot tell a returning person from a new one. Until an operator
+    /// has run recovery, a person with no record is Unresolved — not "new".
+    #[tokio::test]
+    async fn a_wiped_doorway_does_not_treat_everyone_as_new() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        doorway.registry.set_recovery_required(true);
+
+        let error = doorway
+            .provision_agent(USER)
+            .await
+            .expect_err("cannot know");
+
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert!(error.to_string().contains("recover"), "{error}");
+        assert_eq!(pool.total_keys_generated(), 0);
+        assert!(store.is_empty());
+
+        doorway.registry.set_recovery_required(false);
+        doorway.provision_agent(USER).await.expect("after recovery");
+    }
+
+    /// …while a person the doorway DOES hold a record for is unaffected.
+    #[tokio::test]
+    async fn recovery_required_does_not_block_a_person_with_a_record() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let first = doorway.provision_agent(USER).await.expect("provisioned");
+        doorway.registry.set_recovery_required(true);
+
+        let again = doorway.provision_agent(USER).await.expect("has a record");
+        assert_eq!(again.agent_pub_key, first.agent_pub_key);
+    }
+
+    /// The operator's recovery: rebuild mappings from what the conductors
+    /// report, and records from the account rows whose agent key a conductor
+    /// confirms. An account whose key no conductor holds gets no record; an app
+    /// no account claims is reported, not assigned.
+    #[tokio::test]
+    async fn recovery_rebuilds_records_only_where_an_account_key_matches_a_conductor() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        doorway.registry.set_recovery_required(true);
+        let alice_key = raw_agent_key(232);
+        let orphan_key = raw_agent_key(233);
+        let alice_app = legacy_short_app_id(DEFAULT_APP_ID, "conductor-b", ALICE);
+        place_app(&pool, "conductor-b", &alice_app, &alice_key, "running");
+        place_app(
+            &pool,
+            "conductor-a",
+            "elohim-conductor-a-orphan",
+            &orphan_key,
+            "running",
+        );
+
+        let report = doorway
+            .rebuild_from_conductors(&[
+                (ALICE.to_string(), provisioned_agent_key(&alice_key)),
+                (
+                    MALLORY.to_string(),
+                    provisioned_agent_key(&raw_agent_key(234)),
+                ),
+            ])
+            .await;
+
+        assert!(report.complete, "{report:?}");
+        assert_eq!(report.apps_seen, 2);
+        assert_eq!(report.records_rebuilt, vec![ALICE.to_string()]);
+        assert_eq!(report.accounts_without_an_app, vec![MALLORY.to_string()]);
+        assert_eq!(report.apps_without_an_account.len(), 1);
+        assert!(
+            !doorway.registry.recovery_required(),
+            "a complete walk clears it"
+        );
+
+        let alice = intent_of(&store, ALICE).await;
+        assert_eq!(alice.conductor_id, "conductor-b");
+        assert_eq!(alice.installed_app_id, alice_app);
+        assert_eq!(alice.state, IntentState::AccountRecorded);
+        assert!(store.get(MALLORY).await.unwrap().is_none());
+        assert!(doorway
+            .registry
+            .get_conductor_for_agent(&provisioned_agent_key(&orphan_key))
+            .is_some());
+
+        // And now alice resolves to HER app without a new key.
+        let found = doorway.provision_agent(ALICE).await.expect("recovered");
+        assert_eq!(found.agent_pub_key, provisioned_agent_key(&alice_key));
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    /// A walk that could not reach every conductor is not a recovery: the flag
+    /// stays, and the report says which conductor was not asked.
+    #[tokio::test]
+    async fn an_incomplete_recovery_walk_does_not_clear_the_flag() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        doorway.registry.set_recovery_required(true);
+        pool.with("conductor-b", |c| c.dark = true);
+
+        let report = doorway.rebuild_from_conductors(&[]).await;
+
+        assert!(!report.complete);
+        assert_eq!(
+            report.conductors_unreachable,
+            vec!["conductor-b".to_string()]
+        );
+        assert!(doorway.registry.recovery_required());
+    }
+
+    /// The intent store being unavailable refuses provisioning; it is never
+    /// replaced by memory.
+    #[tokio::test]
+    async fn an_unavailable_intent_store_refuses_provisioning() {
+        struct Down;
+        #[async_trait]
+        impl IntentStore for Down {
+            async fn get(&self, _: &str) -> Result<Option<ProvisionIntent>, String> {
+                Err("connection refused".into())
+            }
+            async fn insert_new(&self, _: &ProvisionIntent) -> Result<bool, String> {
+                Err("connection refused".into())
+            }
+            async fn replace(&self, _: i64, _: &ProvisionIntent) -> Result<bool, String> {
+                Err("connection refused".into())
+            }
+            async fn delete(&self, _: &str) -> Result<(), String> {
+                Err("connection refused".into())
+            }
+            async fn delete_by_agent(&self, _: &str) -> Result<u64, String> {
+                Err("connection refused".into())
+            }
+            async fn purge_expired(&self, _: chrono::DateTime<chrono::Utc>) -> Result<u64, String> {
+                Err("connection refused".into())
+            }
+            async fn stuck_records(&self) -> Result<Vec<ProvisionIntent>, String> {
+                Err("connection refused".into())
+            }
+            async fn total(&self) -> Result<u64, String> {
+                Err("connection refused".into())
+            }
+            async fn counts(
+                &self,
+                _: chrono::DateTime<chrono::Utc>,
+            ) -> Result<crate::conductor::provision_intent::IntentCounts, String> {
+                Err("connection refused".into())
+            }
+            fn available(&self) -> bool {
+                false
+            }
+        }
+
+        let pool = Arc::new(FakePool::default());
+        let registry = ConductorRegistry::new(None)
+            .await
+            .with_intent_store(Arc::new(Down));
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-a".to_string(),
+            conductor_url: "ws://conductor-a:8888".to_string(),
+            admin_url: admin_url("conductor-a"),
+            capacity_used: 0,
+            capacity_max: 10,
+        });
+        pool.conductors
+            .lock()
+            .unwrap()
+            .insert(admin_url("conductor-a"), FakeConductor::healthy());
+        let doorway = AgentProvisioner::new(Arc::new(registry))
+            .with_connector(Arc::new(FakeConnector(Arc::clone(&pool))));
+
+        let error = doorway.provision_agent(USER).await.expect_err("no store");
+
+        assert_eq!(error.code(), "PROVISIONING_NOT_READY");
+        assert!(error.to_string().contains("connection refused"), "{error}");
+        assert_eq!(
+            pool.total_keys_generated(),
+            0,
+            "nothing is asked of a conductor"
+        );
+        assert_eq!(pool.with("conductor-a", |c| c.connects_received), 0);
+    }
+
+    /// Deprovisioning forgets the person's record.
+    #[tokio::test]
+    async fn deprovisioning_deletes_the_record() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        let agent = doorway.provision_agent(USER).await.unwrap();
+        assert_eq!(store.len(), 1);
+
+        doorway
+            .deprovision_agent(&agent.agent_pub_key)
+            .await
+            .expect("deprovisioned");
+
+        assert!(
+            store.is_empty(),
+            "the identifier is not kept after deprovision"
+        );
+        doorway.forget(USER).await;
+        assert!(store.is_empty());
     }
 }

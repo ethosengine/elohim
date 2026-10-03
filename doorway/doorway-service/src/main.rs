@@ -465,25 +465,40 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     let mut registry = ConductorRegistry::new(registry_collection).await;
 
     // The provisioning intent log lives beside the mappings, in the same
-    // database. If the collection (or its unique index) cannot be opened the
-    // log stays in process memory: provisioning still works and is still
-    // serialized within this process, but an attempt is not remembered across
-    // a restart — said loudly, because that is the property the log exists for.
-    if let Some(mongo) = state.mongo.as_ref() {
-        match doorway::conductor::MongoIntentStore::open(mongo.inner(), mongo.db_name()).await {
-            Ok(store) => {
-                registry = registry.with_intent_store(Arc::new(store));
-                info!(
+    // database.
+    //
+    // THREE POSTURES, and the middle one is a refusal:
+    //   - Mongo configured and answering → the durable log.
+    //   - Mongo configured, log not usable → STILL the Mongo log: its every
+    //     operation fails, so hosted provisioning is refused honestly and heals
+    //     when Mongo returns. Never a quiet fall back to memory — an attempt
+    //     forgotten at the next restart is the second identity the log prevents.
+    //   - No Mongo configured at all (`state.mongo` is `None` only in that case;
+    //     a configured-but-unreachable Mongo fails startup above) → process
+    //     memory, on purpose: a local-first developer's box persists nothing.
+    match state.mongo.as_ref() {
+        Some(mongo) => {
+            let store = Arc::new(doorway::conductor::MongoIntentStore::new(
+                mongo.inner(),
+                mongo.db_name(),
+            ));
+            match store.ensure_indexes().await {
+                Ok(()) => info!(
                     db = %mongo.db_name(),
                     "Provisioning intent log: durable (Mongo `provisioning_intents`)"
-                );
+                ),
+                Err(e) => error!(
+                    error = %e,
+                    "Provisioning intent log is NOT usable — hosted provisioning is refused \
+                     until it is (it is not kept in memory instead)"
+                ),
             }
-            Err(e) => warn!(
-                error = %e,
-                "Provisioning intent log could NOT be opened in Mongo — falling back to \
-                 process memory; in-flight provisioning will not survive a restart"
-            ),
+            registry = registry.with_intent_store(store);
         }
+        None => warn!(
+            "Provisioning intent log: PROCESS MEMORY (no MongoDB configured) — local-first \
+             developer mode; provisioning attempts are not remembered across a restart"
+        ),
     }
 
     // Hosted-agent ceiling, read ONCE at startup and threaded into BOTH capacity
@@ -539,12 +554,66 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // Discover existing agents on each conductor (populate registry for affinity routing)
     // Without this, agents provisioned before the registry existed would have no
     // conductor affinity → requests load-balance via ClusterIP → CellMissing on wrong conductor
-    if conductor_urls.len() > 1 {
-        discover_existing_agents(&registry, &conductor_urls).await;
+    //
+    // The walk also answers a second question: do the conductors already host
+    // people this doorway has no record of? A database wiped or restored empty
+    // while the conductors kept their apps makes every returning person look
+    // new, and provisioning them "fresh" would mint each a second identity. The
+    // walk runs on every pool size for that reason; it REGISTERS mappings only
+    // for a multi-conductor pool, as before.
+    let hosted_apps_on_conductors = discover_existing_agents(
+        &registry,
+        &conductor_urls,
+        &args.installed_app_id,
+        conductor_urls.len() > 1,
+    )
+    .await;
+    if state.mongo.is_some() {
+        match registry.intents().total().await {
+            Ok(intent_records) => {
+                if doorway::conductor::store_looks_wiped(
+                    registry.persisted_mappings_at_boot(),
+                    intent_records,
+                    hosted_apps_on_conductors,
+                ) {
+                    registry.set_recovery_required(true);
+                    error!(
+                        hosted_apps_on_conductors,
+                        "This doorway's provisioning records are EMPTY but its conductors already \
+                         host apps — a wiped or restored database. Registration of anyone without \
+                         a record answers PROVISIONING_UNRESOLVED until an operator runs \
+                         POST /admin/provisioning/recover"
+                    );
+                }
+            }
+            Err(e) => warn!(error = %e, "Could not read the provisioning intent log at startup"),
+        }
     }
 
     let registry = Arc::new(registry);
     state.conductor_registry = Some(Arc::clone(&registry));
+
+    // Publish the intent log's counts and readiness OFF the request path: a
+    // periodic task, each pass bounded by its own period.
+    {
+        let registry = Arc::clone(&registry);
+        tokio::spawn(async move {
+            let period = doorway::conductor::provisioner::INTENT_COUNTS_PERIOD;
+            let mut tick = tokio::time::interval(period);
+            loop {
+                tick.tick().await;
+                if tokio::time::timeout(
+                    period,
+                    doorway::conductor::provisioner::publish_intent_counts(&registry),
+                )
+                .await
+                .is_err()
+                {
+                    warn!("Provisioning intent counts did not finish within their period");
+                }
+            }
+        });
+    }
     info!(
         "Conductor registry initialized: {} conductor(s), {} agent mapping(s)",
         registry.conductor_count(),
@@ -2165,7 +2234,12 @@ async fn mint_app_auth_token(
 /// Stores each agent key under both base64-standard and base64-url-safe
 /// encodings so the registry lookup matches regardless of which format
 /// the JWT agent_pub_key uses.
-async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: &[String]) {
+async fn discover_existing_agents(
+    registry: &ConductorRegistry,
+    conductor_urls: &[String],
+    base_app_id: &str,
+    register_mappings: bool,
+) -> usize {
     use base64::Engine;
     use std::time::Duration;
 
@@ -2175,6 +2249,8 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
     );
 
     let mut total_discovered = 0usize;
+    // Apps installed FOR a hosted person — every app but the doorway's own.
+    let mut hosted_apps = 0usize;
 
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
@@ -2231,6 +2307,13 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
         match list_apps_result {
             Ok(apps) => {
                 let mut conductor_agents = 0usize;
+                hosted_apps += apps
+                    .iter()
+                    .filter(|app| app.installed_app_id != base_app_id)
+                    .count();
+                if !register_mappings {
+                    continue;
+                }
                 for app in &apps {
                     // Encode in both formats to match any JWT key encoding
                     let key_std =
@@ -2288,6 +2371,7 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
     } else {
         info!("Agent discovery complete: no new agents found (registry may already be populated)");
     }
+    hosted_apps
 }
 
 /// Derive app WebSocket URL from conductor admin URL.

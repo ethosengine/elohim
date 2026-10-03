@@ -20,6 +20,7 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use super::agent_key::{is_agent_key_form, normalize_agent_key};
@@ -90,6 +91,30 @@ pub struct ConductorRegistry {
     /// intent log's compare-and-set is what is correct across processes; this
     /// only spares a second in-process call a wasted key generation.
     provision_locks: KeyedLock,
+    /// How many agent mappings were loaded from Mongo at construction. Zero on
+    /// a doorway whose database was empty at boot.
+    persisted_mappings_at_boot: usize,
+    /// Set at startup when this doorway's records were empty while its
+    /// conductors already host apps: the doorway cannot tell a returning
+    /// person from a new one until an operator has run recovery. See
+    /// [`store_looks_wiped`].
+    recovery_required: AtomicBool,
+}
+
+/// Does this boot look like a doorway whose database was wiped or restored
+/// empty while its conductors kept their hosted apps?
+///
+/// Three counted facts, all taken at startup: mappings loaded from the
+/// database, intent records in the log, and hosted apps the conductors report.
+/// A brand-new deployment has none of the three; a healthy restart has
+/// records. Only "no records at all, yet the conductors host people" is the
+/// wiped shape — and in that shape every returning person would look new.
+pub fn store_looks_wiped(
+    persisted_mappings: usize,
+    intent_records: u64,
+    hosted_apps_on_conductors: usize,
+) -> bool {
+    persisted_mappings == 0 && intent_records == 0 && hosted_apps_on_conductors > 0
 }
 
 /// An agent's assignment to a conductor
@@ -123,12 +148,14 @@ pub struct ConductorInfo {
 impl ConductorRegistry {
     /// Create a new registry with optional MongoDB backing
     pub async fn new(db: Option<mongodb::Collection<bson::Document>>) -> Self {
-        let registry = Self {
+        let mut registry = Self {
             agents: DashMap::new(),
             conductors: DashMap::new(),
             db,
             intents: Arc::new(MemoryIntentStore::new()),
             provision_locks: KeyedLock::new(),
+            persisted_mappings_at_boot: 0,
+            recovery_required: AtomicBool::new(false),
         };
 
         // Load persisted agent mappings if MongoDB is available
@@ -137,6 +164,7 @@ impl ConductorRegistry {
                 warn!("Failed to load conductor registry from MongoDB: {}", e);
             }
         }
+        registry.persisted_mappings_at_boot = registry.agents.len();
 
         registry
     }
@@ -157,13 +185,19 @@ impl ConductorRegistry {
         &self.provision_locks
     }
 
-    /// The agent mapped to `app_id` on `conductor_id`, if this doorway holds
-    /// one. A lookup in the doorway's own records — it asks no conductor.
-    pub fn find_agent_by_app(&self, conductor_id: &str, app_id: &str) -> Option<String> {
-        self.agents
-            .iter()
-            .find(|e| e.value().conductor_id == conductor_id && e.value().app_id == app_id)
-            .map(|e| e.key().clone())
+    /// Agent mappings loaded from the database when this registry was built.
+    pub fn persisted_mappings_at_boot(&self) -> usize {
+        self.persisted_mappings_at_boot
+    }
+
+    /// Whether an operator must run recovery before this doorway may treat a
+    /// person it has no record of as new.
+    pub fn recovery_required(&self) -> bool {
+        self.recovery_required.load(Ordering::Relaxed)
+    }
+
+    pub fn set_recovery_required(&self, required: bool) {
+        self.recovery_required.store(required, Ordering::Relaxed);
     }
 
     /// Load agent→conductor mappings from MongoDB
@@ -953,6 +987,23 @@ mod tests {
         assert!(
             info.capacity_used >= info.capacity_max,
             "a cap at the seeded population must gate further provisioning"
+        );
+    }
+
+    /// "No records at all, yet the conductors host people" is the wiped shape —
+    /// and the only one. A brand-new deployment (nothing anywhere) and a
+    /// healthy restart (records present) are not it.
+    #[test]
+    fn only_an_empty_store_over_populated_conductors_looks_wiped() {
+        assert!(store_looks_wiped(0, 0, 1));
+        assert!(store_looks_wiped(0, 0, 40));
+
+        assert!(!store_looks_wiped(0, 0, 0), "a brand-new deployment");
+        assert!(!store_looks_wiped(12, 0, 12), "mappings survived");
+        assert!(!store_looks_wiped(0, 3, 12), "intent records survived");
+        assert!(
+            !store_looks_wiped(12, 9, 0),
+            "records and no apps is not this fault"
         );
     }
 }

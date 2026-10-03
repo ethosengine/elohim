@@ -221,6 +221,10 @@ pub trait ProvisionAdmin: Send + Sync {
 
     /// Uninstall an app (cleanup).
     async fn uninstall_app(&self, installed_app_id: &str) -> Result<(), AdminFault>;
+
+    /// Every app installed on the conductor, with its agent key. Used only by
+    /// the operator's recovery walk.
+    async fn list_apps(&self) -> Result<Vec<InstalledAppInfo>, AdminFault>;
 }
 
 /// Opens an admin connection to a conductor. A failure here is `NotSent` by
@@ -375,19 +379,7 @@ impl TypedAdminClient {
     ///
     /// Returns the installed_app_id and raw 39-byte agent public key for each app.
     pub async fn list_apps(&self) -> Result<Vec<InstalledAppInfo>, String> {
-        let apps = self
-            .admin_ws
-            .list_apps(None)
-            .await
-            .map_err(|e| format!("Admin error (list_apps): {e}"))?;
-
-        Ok(apps
-            .into_iter()
-            .map(|app| InstalledAppInfo {
-                installed_app_id: app.installed_app_id.clone(),
-                agent_pub_key: app.agent_pub_key.get_raw_39().to_vec(),
-            })
-            .collect())
+        ProvisionAdmin::list_apps(self).await.map_err(String::from)
     }
 
     /// Get detailed app info including cell IDs for each role.
@@ -652,6 +644,22 @@ impl ProvisionAdmin for TypedAdminClient {
             .await
             .map_err(|e| AdminFault::request("uninstall_app", &e))?;
         Ok(())
+    }
+
+    async fn list_apps(&self) -> Result<Vec<InstalledAppInfo>, AdminFault> {
+        let apps = self
+            .admin_ws
+            .list_apps(None)
+            .await
+            .map_err(|e| AdminFault::request("list_apps", &e))?;
+
+        Ok(apps
+            .into_iter()
+            .map(|app| InstalledAppInfo {
+                installed_app_id: app.installed_app_id.clone(),
+                agent_pub_key: app.agent_pub_key.get_raw_39().to_vec(),
+            })
+            .collect())
     }
 }
 

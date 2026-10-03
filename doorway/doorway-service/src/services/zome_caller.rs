@@ -81,8 +81,8 @@ use holochain_types::prelude::ExternIO;
 
 use crate::conductor::typed_admin::{classify_request_error, FaultClass};
 use crate::services::signing_credentials::{
-    cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, CredentialDecision,
-    SigningCredentialCache,
+    cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, mint_cooldown,
+    CredentialDecision, MintError, SigningCredentialCache,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -301,7 +301,7 @@ pub struct ZomeCaller {
     fallbacks: Vec<ConductorEndpoint>,
     installed_app_id: String,
     /// The live connection to [`Self::primary`] (lazily initialized)
-    app_ws: RwLock<Option<Connection>>,
+    app_ws: RwLock<Option<Arc<Connection>>>,
     /// Lock to prevent concurrent connection attempts
     connecting: Mutex<()>,
     /// Lazily-established fallback connection, tagged with WHICH fallback it is.
@@ -310,7 +310,7 @@ pub struct ZomeCaller {
     /// re-issue `authorize_signing_credentials` — a conductor-side cap-grant
     /// write — on every federation poll for the whole duration of a primary
     /// outage, converting one sick peer into load on a healthy one.
-    fallback_ws: RwLock<Option<(usize, Connection)>>,
+    fallback_ws: RwLock<Option<(usize, Arc<Connection>)>>,
     /// Lock to prevent concurrent fallback connection attempts
     fallback_connecting: Mutex<()>,
     /// Which fallback to try first (round-robins away from a failing one).
@@ -436,7 +436,7 @@ impl ZomeCaller {
         };
 
         let mut ws = self.app_ws.write().await;
-        *ws = Some(connected);
+        *ws = Some(Arc::new(connected));
         Ok(())
     }
 
@@ -501,7 +501,7 @@ impl ZomeCaller {
         };
 
         let mut ws = self.fallback_ws.write().await;
-        *ws = Some((idx, connected));
+        *ws = Some((idx, Arc::new(connected)));
         Ok(())
     }
 
@@ -556,13 +556,26 @@ impl ZomeCaller {
         // The zome call is hard-bounded: a conductor that accepts the connection
         // but never answers (the `record_heartbeat` hang seen in the live freeze)
         // must surface as a timeout Err, not park the calling task forever.
-        let result = {
-            let ws = self.app_ws.read().await;
-            let connection = ws
-                .as_ref()
-                .ok_or_else(|| CallError::unavailable("Not connected"))?;
-            call_on_connection(connection, role_name, zome_name, fn_name, payload, deadline).await
-        };
+        //
+        // The read guard is held only long enough to CLONE the connection's
+        // `Arc`. A credential mint and the call both run without it: tokio's
+        // RwLock is write-preferring, so a writer queued behind a read guard
+        // held for the length of a mint would stall every later reader too.
+        let connection = self
+            .app_ws
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| CallError::unavailable("Not connected"))?;
+        let result = call_on_connection(
+            &connection,
+            role_name,
+            zome_name,
+            fn_name,
+            payload,
+            deadline,
+        )
+        .await;
 
         match result {
             Ok(bytes) => Ok(bytes),
@@ -578,14 +591,12 @@ impl ZomeCaller {
                         fn_name = %fn_name,
                         "Zome call unavailable, clearing connection: {}", e.message
                     );
-                    let mut ws = self.app_ws.write().await;
-                    *ws = None;
+                    self.clear_primary_if_current(&connection).await;
                 } else if self.heal_if_cap_grant_rejected(&self.primary, role_name, &e.message) {
                     // The one sanctioned clear on an application error — see
                     // `heal_if_cap_grant_rejected`. Bounded to once per
                     // (conductor, role) per process, so it cannot churn.
-                    let mut ws = self.app_ws.write().await;
-                    *ws = None;
+                    self.clear_primary_if_current(&connection).await;
                 } else {
                     warn!(
                         role_name = %role_name,
@@ -700,24 +711,26 @@ impl ZomeCaller {
                 continue;
             }
 
-            let result = {
-                let ws = self.fallback_ws.read().await;
-                match ws.as_ref() {
-                    Some((i, connection)) if *i == idx => {
-                        call_on_connection(
-                            connection,
-                            role_name,
-                            zome_name,
-                            fn_name,
-                            payload.clone(),
-                            deadline,
-                        )
-                        .await
-                    }
-                    // A concurrent caller rotated the slot out from under us.
-                    // Treat as unavailable and try the next endpoint.
-                    _ => Err(CallError::unavailable("fallback connection was replaced")),
+            // As on the primary: clone the `Arc` under the guard, call without it.
+            let fallback = match self.fallback_ws.read().await.as_ref() {
+                Some((i, connection)) if *i == idx => Some(Arc::clone(connection)),
+                _ => None,
+            };
+            let result = match fallback {
+                Some(connection) => {
+                    call_on_connection(
+                        &connection,
+                        role_name,
+                        zome_name,
+                        fn_name,
+                        payload.clone(),
+                        deadline,
+                    )
+                    .await
                 }
+                // A concurrent caller rotated the slot out from under us.
+                // Treat as unavailable and try the next endpoint.
+                None => Err(CallError::unavailable("fallback connection was replaced")),
             };
 
             match result {
@@ -762,6 +775,19 @@ impl ZomeCaller {
         }
 
         Err(last.unwrap_or_else(|| CallError::unavailable("no fallback conductors configured")))
+    }
+
+    /// Drop the primary connection — but only if it is still the one this call
+    /// used. With the read guard no longer held across the call, another caller
+    /// may already have replaced it with a healthy connection.
+    async fn clear_primary_if_current(&self, used: &Arc<Connection>) {
+        let mut ws = self.app_ws.write().await;
+        if ws
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, used))
+        {
+            *ws = None;
+        }
     }
 
     fn advance_fallback(&self, idx: usize, count: usize) {
@@ -962,7 +988,7 @@ impl RoleCredentials {
     ) -> Result<(), String>
     where
         F: FnOnce(CellId) -> Fut,
-        Fut: Future<Output = Result<SigningCredentials, String>>,
+        Fut: Future<Output = Result<SigningCredentials, MintError>>,
     {
         let Some(cell_id) = self.cells.get(role_name) else {
             return Ok(());
@@ -977,7 +1003,8 @@ impl RoleCredentials {
                 &self.ep_key,
                 role_name,
                 cell_id,
-                deadline,
+                worst_case_mint(deadline),
+                mint_cooldown(),
                 || mint(cell_id.clone()),
             )
             .await?;
@@ -1002,6 +1029,18 @@ impl RoleCredentials {
         );
         Ok(())
     }
+}
+
+/// The longest one credential mint can take: an authorize over the kept admin
+/// socket, then — if that socket was dead — a redial (one DNS resolve and one
+/// connect) and a second authorize, each bounded by `deadline`.
+///
+/// This is what a lease WAITER is given. It used to be given `deadline` alone,
+/// which is shorter than the mint it was waiting on, so waiters fell through
+/// the lease and minted in parallel with the holder. No deadline is changed:
+/// the same per-step bound, added up.
+fn worst_case_mint(deadline: Duration) -> Duration {
+    deadline * 3 + crate::conductor::dns_resolve_timeout()
 }
 
 /// One established connection to ONE conductor.
@@ -1102,12 +1141,16 @@ async fn authorize_once(
 ///
 /// Each conductor step is bounded by `deadline`, the same per-call deadline as
 /// everywhere else in this module; none is extended.
+///
+/// The error says whether a grant may have been authored anyway
+/// ([`MintError::outcome_unknown`]): a timeout, or a request written to a
+/// socket that then dropped. The conductor does not cancel either.
 async fn mint_role_credential(
     connection: &Connection,
     role_name: &str,
     cell_id: CellId,
     deadline: Duration,
-) -> Result<SigningCredentials, String> {
+) -> Result<SigningCredentials, MintError> {
     let kept = connection.admin();
     let minted = retry_if_never_written(
         authorize_once(&kept, cell_id.clone(), deadline),
@@ -1135,14 +1178,27 @@ async fn mint_role_credential(
             info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
             Ok(credentials)
         }
-        Err(MintFailure::TimedOut) => Err(format!(
+        Err(failure) => Err(mint_error(role_name, deadline, failure)),
+    }
+}
+
+/// Render a mint failure, and say whether a grant may exist regardless.
+fn mint_error(role_name: &str, deadline: Duration, failure: MintFailure) -> MintError {
+    match failure {
+        MintFailure::TimedOut => MintError::abandoned(format!(
             "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
             deadline.as_millis()
         )),
-        Err(MintFailure::Conductor(e)) => Err(format!(
-            "authorize_signing_credentials failed for role '{role_name}': {e}"
-        )),
-        Err(MintFailure::Redial(e)) => Err(e),
+        MintFailure::Conductor(e) => {
+            let message =
+                format!("authorize_signing_credentials failed for role '{role_name}': {e}");
+            match classify_request_error(&e) {
+                FaultClass::SentOutcomeUnknown => MintError::abandoned(message),
+                FaultClass::NotSent | FaultClass::Refused => MintError::refused(message),
+            }
+        }
+        // The replacement socket could not be dialled: nothing was sent on it.
+        MintFailure::Redial(e) => MintError::refused(e),
     }
 }
 
@@ -2100,7 +2156,7 @@ mod tests {
 
     /// Stands in for `authorize_signing_credentials`: every invocation is one
     /// `CapGrant` authored on the conductor.
-    async fn counted_mint(grants: &AtomicU32) -> Result<SigningCredentials, String> {
+    async fn counted_mint(grants: &AtomicU32) -> Result<SigningCredentials, MintError> {
         grants.fetch_add(1, Ordering::SeqCst);
         Ok(fake_credentials(7))
     }
@@ -2297,10 +2353,9 @@ mod tests {
 
         let refused = connection
             .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
-                Err(
-                    "authorize_signing_credentials timed out after 10000ms for role 'imagodei'"
-                        .to_string(),
-                )
+                Err(MintError::refused(
+                    "authorize_signing_credentials failed for role 'imagodei': refused",
+                ))
             })
             .await;
         assert!(refused.is_err());
@@ -2481,5 +2536,94 @@ mod tests {
 
         assert!(outcome.is_err());
         assert_eq!(redials.load(Ordering::SeqCst), 1);
+    }
+
+    // ── a mint the doorway stopped waiting for (bounded, not cured) ─────────
+
+    /// A lease waiter must still be waiting when the slowest possible mint
+    /// finishes: authorize, redial (resolve + connect), authorize again.
+    #[test]
+    fn the_lease_wait_covers_the_worst_case_mint() {
+        let deadline = Duration::from_millis(DEFAULT_ZOME_CALL_TIMEOUT_MS);
+        let wait = worst_case_mint(deadline);
+        assert_eq!(
+            wait,
+            deadline + crate::conductor::dns_resolve_timeout() + deadline + deadline
+        );
+        assert!(
+            wait > deadline,
+            "a waiter given only one deadline falls through and mints beside the holder"
+        );
+    }
+
+    /// Which mint failures may have authored a grant anyway.
+    #[test]
+    fn a_timed_out_or_dropped_mint_is_abandoned_and_a_refused_one_is_not() {
+        let deadline = Duration::from_secs(10);
+        assert!(mint_error("imagodei", deadline, MintFailure::TimedOut).outcome_unknown);
+        assert!(
+            mint_error(
+                "imagodei",
+                deadline,
+                MintFailure::Conductor(ConductorApiError::WebsocketError(
+                    holochain_websocket::WebsocketError::Close("ConnectionClosed".to_string()),
+                )),
+            )
+            .outcome_unknown
+        );
+        for nothing_authored in [
+            never_written(),
+            MintFailure::Redial("Admin connect failed".to_string()),
+            MintFailure::Conductor(ConductorApiError::ExternalApiWireError(
+                holochain_conductor_api::ExternalApiWireError::InternalError(
+                    "source chain head has moved".to_string(),
+                ),
+            )),
+        ] {
+            let rendered = format!("{nothing_authored:?}");
+            assert!(
+                !mint_error("imagodei", deadline, nothing_authored).outcome_unknown,
+                "{rendered}"
+            );
+        }
+        assert_eq!(
+            mint_error("imagodei", deadline, MintFailure::TimedOut).message,
+            "authorize_signing_credentials timed out after 10000ms for role 'imagodei'"
+        );
+    }
+
+    /// End to end at the call path: a mint that times out is counted, and the
+    /// next call to that role fails honestly instead of authoring a second
+    /// grant.
+    #[tokio::test(start_paused = true)]
+    async fn a_timed_out_mint_is_not_repeated_by_the_next_call() {
+        let cache = Cache::new();
+        let connection = five_role_connection(&cache, "abandoned-mint-test:4444");
+        let grants = AtomicU32::new(0);
+
+        let first = connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| async {
+                grants.fetch_add(1, Ordering::SeqCst);
+                Err(MintError::abandoned("timed out"))
+            })
+            .await;
+        assert!(first.is_err());
+
+        let second = connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await;
+        assert!(second.unwrap_err().contains("cooling down"));
+        assert_eq!(grants.load(Ordering::SeqCst), 1);
+
+        tokio::time::advance(mint_cooldown() + Duration::from_secs(1)).await;
+        connection
+            .ensure(&cache, "imagodei", NO_WAIT_EXPECTED, |_| {
+                counted_mint(&grants)
+            })
+            .await
+            .expect("after the cool-down, one mint");
+        assert_eq!(grants.load(Ordering::SeqCst), 2);
     }
 }

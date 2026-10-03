@@ -992,6 +992,83 @@ fn password_too_weak(password: &str) -> bool {
     password.len() < MIN_PASSWORD_LEN
 }
 
+/// May this registration be handed the Human that ALREADY EXISTS on the
+/// doorway's own conductor agent?
+///
+/// # What this closes
+///
+/// `agencyPhase: "doorway"` (and `hosted` with no conductor pool) authors the
+/// Human on the doorway's SINGLETON agent — the operator's. Once that Human
+/// exists, `create_human` answers "Agent already has a Human profile" to every
+/// later registration on that path, and the recovery branch used to answer by
+/// attaching the existing Human to the new account. The agency phase comes from
+/// the unauthenticated request body, so any caller could be given an account
+/// row and a session token whose `human_id` is the operator's Human.
+///
+/// # The gate, by the auth-posture questions
+///
+/// 1. *Whose question?* "Is this caller MY admin?" — the Human on this
+///    doorway's own agent is the operator's, so the operator credential
+///    (`API_KEY_ADMIN`, supplied as `adminBootstrapKey`) is the one that
+///    answers it. Not the seed credential, not a permission level.
+/// 2. *Stage?* None: it is never cheaper at a lower stage.
+/// 3. *Fail closed?* Yes — no configured key, an empty key, or no supplied key
+///    is a refusal.
+/// 4. *Narrower than Admin?* It grants nothing but this one recovery.
+/// 5. *Expires?* It applies only while a Human already exists on the agent.
+/// 6. *Could the p2p plane answer?* Not today: the doorway holds no proof of
+///    control of the operator's key from the caller.
+/// 7. *Which developer mode?* All of them, identically.
+/// 8. *Whose account?* The caller is claiming the OPERATOR's Human — someone
+///    else's unless they are the operator. That is exactly why it is gated.
+pub(crate) fn operator_identity_recovery_authorized(
+    supplied_admin_key: Option<&str>,
+    configured_admin_key: Option<&str>,
+) -> bool {
+    match (supplied_admin_key, configured_admin_key) {
+        (Some(supplied), Some(configured)) => !configured.is_empty() && supplied == configured,
+        _ => false,
+    }
+}
+
+/// May a HOSTED registration be handed the Human that already exists on the
+/// agent provisioned for it?
+///
+/// Only when this doorway provisioned that agent for EXACTLY this identifier —
+/// a live intent record naming the same conductor, app and agent key
+/// (`AgentProvisioner::provisioned_for`). That is the honest case: an earlier
+/// attempt by this person whose `create_human` landed and whose answer was
+/// lost. An app reached any other way is not evidence, and its Human is not
+/// attached. Question 8: the caller is acting on their own account only if
+/// that record says so.
+async fn hosted_identity_recovery_authorized(
+    state: &AppState,
+    identifier: &str,
+    provisioned: &ProvisionedAgent,
+) -> bool {
+    match &state.conductor_registry {
+        Some(registry) => {
+            AgentProvisioner::new(Arc::clone(registry))
+                .provisioned_for(identifier, provisioned)
+                .await
+        }
+        None => false,
+    }
+}
+
+/// The refusal both recovery branches answer with.
+fn identity_recovery_refused() -> Response<BoxBody> {
+    json_response(
+        StatusCode::CONFLICT,
+        &ErrorResponse {
+            error: "An identity already exists on the agent this registration would use, and \
+                    this doorway has no evidence that it belongs to this registrant"
+                .into(),
+            code: Some("IDENTITY_RECOVERY_REFUSED".into()),
+        },
+    )
+}
+
 /// Note in the provisioning intent log how far a registration got AFTER
 /// provisioning. Best-effort and forward-only; a person this doorway never
 /// provisioned has no record and gets none. Nothing is decided on these marks —
@@ -1335,7 +1412,20 @@ async fn handle_register(
                 Err(e) => {
                     let err_str = e.to_string();
                     if err_str.contains("Agent already has a Human profile") {
-                        // Conductor not reset but DB was cleared — recover.
+                        // Conductor not reset but DB was cleared — recover. The
+                        // Human that exists is the one on the doorway's OWN
+                        // agent: only the operator may be handed it.
+                        if !operator_identity_recovery_authorized(
+                            body.admin_bootstrap_key.as_deref(),
+                            state.args.api_key_admin.as_deref(),
+                        ) {
+                            warn!(
+                                identifier = %body.identifier,
+                                "Doorway: refusing to attach the doorway agent's existing Human \
+                                 to a registration that did not present the operator credential"
+                            );
+                            return identity_recovery_refused();
+                        }
                         warn!(
                             identifier = %body.identifier,
                             "Doorway: agent already has Human profile in DHT — recovering for DB re-registration"
@@ -1584,7 +1674,30 @@ async fn handle_register(
                 Err(e) => {
                     let err_str = e.to_string();
                     if err_str.contains("Agent already has a Human profile") {
-                        // Recover existing identity — conductor wasn't reset but DB was cleared.
+                        // Recover existing identity — but only with evidence
+                        // that it is THIS registrant's. On a provisioned app:
+                        // this doorway's own record that it provisioned that
+                        // agent for exactly this identifier. On the singleton
+                        // fallback: the operator credential.
+                        let recovery_authorized = match provisioner_result.as_ref() {
+                            Some(p) => {
+                                hosted_identity_recovery_authorized(&state, &body.identifier, p)
+                                    .await
+                            }
+                            None => operator_identity_recovery_authorized(
+                                body.admin_bootstrap_key.as_deref(),
+                                state.args.api_key_admin.as_deref(),
+                            ),
+                        };
+                        if !recovery_authorized {
+                            warn!(
+                                identifier = %body.identifier,
+                                "Hosted: refusing to attach an existing Human to a registration \
+                                 with no evidence that it is this registrant's"
+                            );
+                            return identity_recovery_refused();
+                        }
+                        // Conductor wasn't reset but DB was cleared.
                         warn!(
                             identifier = %body.identifier,
                             "Hosted: agent already has Human profile in DHT — recovering for DB re-registration"
@@ -2395,7 +2508,10 @@ async fn handle_login(
                 let provisioner = AgentProvisioner::new(Arc::clone(registry))
                     .with_app_id(state.args.installed_app_id.clone())
                     .with_bundle_path(state.args.happ_bundle_path.clone());
-                match provisioner.provision_agent(&body.identifier).await {
+                match provisioner
+                    .provision_agent_for_account(&body.identifier, Some(&user.agent_pub_key))
+                    .await
+                {
                     Ok(p) => {
                         info!(
                             "Auto-provisioned {} on {} (app: {})",
@@ -3110,6 +3226,16 @@ async fn handle_close_account(
         } else {
             warnings.push("No conductor pool is configured; the cell was not uninstalled".into());
         }
+    }
+    // The provisioning record holds this person's identifier and the agent key
+    // generated for them. Closing means the doorway keeps nothing that would
+    // host them — and a record left behind would hand the closed account's app
+    // to whoever registers the released identifier next. Forget it, whether or
+    // not the cell could be uninstalled.
+    if let Some(registry) = &state.conductor_registry {
+        AgentProvisioner::new(Arc::clone(registry))
+            .forget(&session_identifier)
+            .await;
     }
 
     // ── (3) End the row ────────────────────────────────────────────────────
@@ -3878,6 +4004,7 @@ async fn handle_confirm_stewardship(
                 );
             }
         }
+        provisioner.forget(&user.identifier).await;
     }
 
     // Deactivate ALL cached signing keys for this user
@@ -5966,6 +6093,49 @@ mod tests {
         assert!(!password_too_weak("12345678"), "exactly the minimum");
         assert!(!password_too_weak("a longer passphrase"));
         assert_eq!(MIN_PASSWORD_LEN, 8, "WEAK_PASSWORD message quotes this");
+    }
+
+    /// THE CLASS: a registration that names `agencyPhase: "doorway"` (or lands
+    /// on the singleton fallback) is answered "Agent already has a Human
+    /// profile" once the operator's Human exists. Attaching that Human to the
+    /// new account is refused unless the caller presents the operator
+    /// credential — and refused when none is configured.
+    #[test]
+    fn a_registration_cannot_recover_the_operators_human_without_the_operator_credential() {
+        let configured = Some("the-admin-key");
+        assert!(operator_identity_recovery_authorized(
+            Some("the-admin-key"),
+            configured
+        ));
+        assert!(
+            !operator_identity_recovery_authorized(None, configured),
+            "an ordinary registration presents no credential"
+        );
+        assert!(!operator_identity_recovery_authorized(
+            Some("a-guess"),
+            configured
+        ));
+        // Fail closed: an unconfigured or empty key authorizes nobody, and an
+        // empty supplied key never matches an empty configured one.
+        assert!(!operator_identity_recovery_authorized(
+            Some("the-admin-key"),
+            None
+        ));
+        assert!(!operator_identity_recovery_authorized(Some(""), Some("")));
+        assert!(!operator_identity_recovery_authorized(Some(""), None));
+        assert!(!operator_identity_recovery_authorized(None, None));
+    }
+
+    /// The refusal is its own code, so a client (and an operator reading logs)
+    /// can tell it from a conductor failure.
+    #[tokio::test]
+    async fn an_identity_recovery_refusal_is_a_distinct_conflict() {
+        use http_body_util::BodyExt;
+        let response = identity_recovery_refused();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], "IDENTITY_RECOVERY_REFUSED");
     }
 
     #[test]
