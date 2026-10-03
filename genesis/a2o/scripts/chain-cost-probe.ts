@@ -23,6 +23,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -49,7 +50,11 @@ async function authorizeOnce(admin: AdminWebsocket, cellId: any, key: string) {
     const c = JSON.parse(readFileSync(file, 'utf8'));
     setSigningCredentials(cellId, {
       capSecret: unb64(c.capSecret),
-      keyPair: { ...c.keyPair, publicKey: unb64(c.keyPair.publicKey), privateKey: unb64(c.keyPair.privateKey) },
+      keyPair: {
+        ...c.keyPair,
+        publicKey: unb64(c.keyPair.publicKey),
+        privateKey: unb64(c.keyPair.privateKey),
+      },
       signingKey: unb64(c.signingKey),
     } as any);
     return;
@@ -61,7 +66,11 @@ async function authorizeOnce(admin: AdminWebsocket, cellId: any, key: string) {
     file,
     JSON.stringify({
       capSecret: b64(c.capSecret),
-      keyPair: { ...c.keyPair, publicKey: b64(c.keyPair.publicKey), privateKey: b64(c.keyPair.privateKey) },
+      keyPair: {
+        ...c.keyPair,
+        publicKey: b64(c.keyPair.publicKey),
+        privateKey: b64(c.keyPair.privateKey),
+      },
       signingKey: b64(c.signingKey),
     }),
     { mode: 0o600 }
@@ -102,7 +111,7 @@ async function connect(spec: string, appId = APP_ID) {
     wsClientOptions: wsOpts,
     defaultTimeout: 120_000,
   });
-  const call = (role: string, zome_name: string, fn_name: string, payload: any) =>
+  const call = async (role: string, zome_name: string, fn_name: string, payload: any) =>
     appWs.callZome({ cell_id: cells.get(role), zome_name, fn_name, payload }, 120_000);
   return { name, call, cells, agent: encodeHashToBase64(lamad[1]) };
 }
@@ -117,7 +126,7 @@ function stats(ms: number[]) {
     min: s[0],
     p50: q(0.5),
     p90: q(0.9),
-    max: s[s.length - 1],
+    max: s.at(-1),
     mean: Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 100) / 100,
   };
 }
@@ -196,7 +205,13 @@ async function main() {
       agent_key,
     } as any);
     await admin.enableApp({ installed_app_id: appId });
-    console.log(JSON.stringify({ installed: appId, agent: encodeHashToBase64(agent_key), roles: Object.keys(info.cell_info) }));
+    console.log(
+      JSON.stringify({
+        installed: appId,
+        agent: encodeHashToBase64(agent_key),
+        roles: Object.keys(info.cell_info),
+      })
+    );
     process.exit(0);
   }
 
@@ -215,7 +230,13 @@ async function main() {
       controlZome && controlFn && c.cells.has(controlRole)
         ? await timeCalls(c, controlRole, controlZome, controlFn, calls)
         : null;
-    emit({ kind: 'checkpoint', writesDone, actionsAdded: writesDone * 3, noopMs: noop, controlMs: control });
+    emit({
+      kind: 'checkpoint',
+      writesDone,
+      actionsAdded: writesDone * 3,
+      noopMs: noop,
+      controlMs: control,
+    });
   };
 
   if (mode === 'time') {
@@ -237,13 +258,20 @@ async function main() {
           await c.call('lamad', 'content_store', 'issue_attestation', attestation(c.agent, i, run));
           break;
         } catch (e: any) {
-          if (attempt >= 5 || !String(e?.message ?? e).includes('source chain head has moved')) throw e;
+          if (attempt >= 5 || !String(e?.message ?? e).includes('source chain head has moved'))
+            throw e;
           headMoved++;
         }
       }
       window.push(Math.round((performance.now() - t) * 100) / 100);
       if (i % every === 0 || i === writes) {
-        emit({ kind: 'writes', writesDone: i, actionsAdded: i * 3, writeMs: stats(window), headMoved });
+        emit({
+          kind: 'writes',
+          writesDone: i,
+          actionsAdded: i * 3,
+          writeMs: stats(window),
+          headMoved,
+        });
         headMoved = 0;
         window = [];
         await checkpoint(i);
