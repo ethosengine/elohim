@@ -266,6 +266,18 @@ export async function refreshHostedCredential(o: ConductorOptions): Promise<void
   if (!response.ok)
     throw new Error(`hosted credential transport refresh refused (${response.status})`);
   const result = (await response.json()) as Omit<HostedConductorReceipt, 'doorway' | 'expiresAt'>;
+  // The chaperone's transport hashes are STANDARD base64 bytes, not Holochain
+  // multibase strings (doorway chaperone.rs ConnectResponse); canonicalize them
+  // before comparing and before persisting, as device-ceremony.ts already does.
+  const chaperoneHash = (value: string): string => {
+    if (/^u[A-Za-z0-9_-]{52}$/.test(value)) return value;
+    const raw = new Uint8Array(Buffer.from(value, 'base64'));
+    if (raw.length !== 39) throw new Error('hosted ceremony returned an invalid cell hash');
+    return encodeHashToBase64(raw);
+  };
+  result.agentPubKey = chaperoneHash(result.agentPubKey);
+  for (const [role, pair] of Object.entries(result.cellIds ?? {}))
+    result.cellIds[role] = [chaperoneHash(pair[0]), chaperoneHash(pair[1])];
   if (
     result.agentPubKey !== o.expectedAgent ||
     result.installedAppId !== o.appId ||

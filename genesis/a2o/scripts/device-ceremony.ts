@@ -125,6 +125,31 @@ async function optionalReceipt(path: string): Promise<ScopedReceipt | undefined>
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return Buffer.from(a).equals(Buffer.from(b));
 }
+/** Read a listed grant's access in either wire shape. The upstream client types
+ * `{type:'assigned', value:{secret, assignees}}`; the fork conductor's
+ * `list_capability_grants` serializes `{access_type:'assigned', assignees}` and
+ * omits the secret (observed on alpha conductor-0, 2026-10-03). A missing secret
+ * is "not disclosed", not "different". */
+function listedAccess(cap: CapGrantInfo['cap_grant']): {
+  assigned: boolean;
+  assignees: Uint8Array[];
+  secret?: Uint8Array;
+} {
+  const access = cap.access as unknown as Record<string, unknown> | undefined;
+  if (!access) return { assigned: false, assignees: [] };
+  if (access.type === 'assigned') {
+    const value = (access.value ?? {}) as { assignees?: Uint8Array[]; secret?: Uint8Array };
+    return { assigned: true, assignees: value.assignees ?? [], secret: value.secret };
+  }
+  if (access.access_type === 'assigned') {
+    return {
+      assigned: true,
+      assignees: (access.assignees as Uint8Array[] | undefined) ?? [],
+      secret: access.secret as Uint8Array | undefined,
+    };
+  }
+  return { assigned: false, assignees: [] };
+}
 function matchingCap(
   receipt: ScopedReceipt,
   cell: CellId,
@@ -135,12 +160,13 @@ function matchingCap(
     .flatMap(([id, values]) =>
       sameBytes(id[0], cell[0]) && sameBytes(id[1], cell[1]) ? values : []
     )
-    .filter(
-      ({ cap_grant: cap }) =>
+    .filter(({ cap_grant: cap }) => {
+      const access = listedAccess(cap);
+      return (
         cap.tag === receipt.tag ||
-        (cap.access.type === 'assigned' &&
-          cap.access.value.assignees.some(a => sameBytes(a, signer)))
-    );
+        (access.assigned && access.assignees.some(a => sameBytes(a, signer)))
+      );
+    });
   if (!candidates.length) return undefined;
   if (candidates.length !== 1)
     throw new Error('Ambiguous native signing grants; refusing replacement');
@@ -151,13 +177,15 @@ function matchingCap(
     cap.functions.type === 'listed'
       ? [...cap.functions.value].sort((a, b) => a[1].localeCompare(b[1]))
       : null;
+  const access = listedAccess(cap);
   if (
     (candidate.revoked_at ?? undefined) !== undefined ||
     cap.tag !== receipt.tag ||
-    cap.access.type !== 'assigned' ||
-    cap.access.value.assignees.length !== 1 ||
-    !sameBytes(cap.access.value.assignees[0], signer) ||
-    !sameBytes(cap.access.value.secret, Buffer.from(receipt.capSecret, 'hex')) ||
+    !access.assigned ||
+    access.assignees.length !== 1 ||
+    !sameBytes(access.assignees[0], signer) ||
+    (access.secret !== undefined &&
+      !sameBytes(access.secret, Buffer.from(receipt.capSecret, 'hex'))) ||
     JSON.stringify(actual) !== JSON.stringify(expected) ||
     (receipt.capActionHash && receipt.capActionHash !== encoded(candidate.action_hash))
   ) {
