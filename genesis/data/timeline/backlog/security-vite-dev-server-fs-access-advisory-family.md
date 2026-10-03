@@ -149,6 +149,14 @@ root lockfile work.
 
 ## Current decision
 
+**2026-10-03 update — the Nexus blocker below is gone for the root lockfile.** `.npmrc` now
+resolves public packages from `registry.npmjs.org` (registry split, 2026-07-30). The root
+legs of this family (`vite` 6.4.1 and 7.3.1, 9 open Dependabot alerts) are included in the
+override set in `security-npm-transitive-override-refresh`, which resolved `vite` to 6.4.3
+and 7.3.6 in an isolated `pnpm install --lockfile-only` run. This entry stays `blocked` only
+for the sophia 5.x leg, which is a separate lockfile and was not re-probed. The text below
+is the 2026-07-30 record.
+
 **Blocked — on artifact availability in the Nexus npm proxy, not on code.** The
 remediation above is complete, correct, and proven to resolve; it cannot be
 *installed*. `pnpm install` fails at fetch time:

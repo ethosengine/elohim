@@ -7,8 +7,9 @@ purpose: >
   habit atoms declared here — six of the register's twelve, which is not an accident of placement
   but a measurement: convergence, blob custody, cross-signed attribution, the operator's runtime
   verbs, sync cost, and conductor capacity are all promises this crate keeps or breaks. It
-  carries one author-time rule — the scale-risk pointer on the lineage bridge sweep, a measured
-  shape (fan-out ∝ peers × records) rather than lived drift; every other gate that holds this tree
+  carries two author-time rules — the scale-risk pointer on the lineage bridge sweep, a measured
+  shape (fan-out ∝ peers × records), and the plane rule for chain writes, born from the 2026-10-03
+  fleet reading; every other gate that holds this tree
   is structural (the schema contract harness, `just gate elohim-storage`, and the cargo-pool
   CARGO_TARGET_DIR rail), and a rule with no lived drift or measured risk behind it is furniture.
 rules:
@@ -28,6 +29,27 @@ rules:
       at least that long. Three peers on node_registry hides it. Prefer changes that elect a
       courier or compact what is carried over changes that only tune the page size, and put the
       catch-up minutes on the receipt. Advisory only.
+  - id: chain-speaks-in-the-persons-voice
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["record_peer_status", "issue_attestation", "WriterKind::", "write_serialized", "PEER_STATUS_STALENESS_SECS", "authorize_signing_credentials"]
+    dedupe-of: genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md
+    retire-when: >
+      when the write gate refuses a machine write on a timer by type (voice and trigger declared on
+      every chain write), substrate liveness is armed on iroh, and an idle household reads zero
+      chain actions per hour on every cell.
+    why: >
+      A PERSON'S CHAIN SPEAKS IN THE PERSON'S VOICE — plane-separation §1, §5, §6. Storage signs as
+      the steward's own agent, so every chain write from this crate is a statement the person makes
+      and can never unmake. Before adding or moving one, name its voice (person, delegate, machine)
+      and its trigger (act, transition, period close, timer): a machine write on a timer is the
+      anti-pattern (`record_peer_status` cost about 50 h of conductor call time per day on alpha).
+      Liveness is not a notary fact — a killed peer never writes that it left — so do not read
+      freshness from a DHT timestamp; read substrate presence, and change the consumers BEFORE the
+      writer (transition-only heartbeats drop every healthy peer out of placement after 900 s). An
+      attestation is immutable and has no head: it must never enter head adoption or be re-authored.
+      Name your `WriterKind`; `Other` is a gap. Advisory only.
 cites:
   - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
 ---

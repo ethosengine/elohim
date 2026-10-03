@@ -358,6 +358,14 @@ spec:
             # The k8s-native lever for this concern is resources/PriorityClass.
             - name: ELOHIM_CONDUCTOR_NICE
               value: "0"
+            # --- Conductor metrics ---
+            # Same as _edgenode-conductor.template.yaml: the fork's pull
+            # exposition serves the conductor's instruments at :9464/metrics and
+            # the edgenode PodMonitor scrapes the `hc-metrics` port by name.
+            # This file had neither, so adam was the one alpha conductor with no
+            # scrape target (2026-10-03).
+            - name: HOLOCHAIN_PROMETHEUS_LISTEN
+              value: "0.0.0.0:9464"
             # --- Storage features: ALL OFF ---
             # These are clap bool flags (main.rs Args) with ValueParser::bool(),
             # so "false" is parsed as false and an unparseable value hard-errors
@@ -376,6 +384,10 @@ spec:
             # elohim-storage HTTP — probe surface only, no Service port.
             - name: storage-http
               containerPort: 8090
+              protocol: TCP
+            # Conductor Prometheus exposition; scraped by name, no Service.
+            - name: hc-metrics
+              containerPort: 9464
               protocol: TCP
           resources:
             requests:
