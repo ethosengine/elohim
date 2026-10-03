@@ -355,3 +355,32 @@ superproject pin change or fleet rollout has occurred. No further fresh signer-a
 retries are planned: a client timeout does not cancel or disprove a committed CapGrant.
 
 **RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3; measured on a disposable three-peer mesh, all actors test fixtures): measured present, and the driver is chain length, not grant count. The 3N+ statement shape is gone (`db2f5bf37`, one joined statement per access class), but that statement's plan on matthew's stopped store is `SEARCH a USING INDEX elohim_Action_author_seq_idx (author=?)` then `SEARCH cg USING PRIMARY KEY`: it walks every action the author wrote and probes CapGrant once per action. Store census: 19,081 actions by that author, 9 CapGrant rows, 0 UpdatedRecord, 0 DeletedRecord, so the revocation subqueries are not the cost. Offline it takes 249–270 ms per execution for each access class, including the two that return no rows (about 13 µs per chain action). Live with statement logging at the same chain length, 20 no-op calls spent 56.3% of statement time here (44 executions, 109 ms mean). The caller-is-author shortcut does not apply to a signing credential, which is how storage, doorway and the probe call. Statement: `holochain_data/src/dht/inner/cap_grant.rs:133-171`; call chain `holochain/src/core/ribosome.rs:397-402` → `holochain_state/src/source_chain.rs:815-834`. Same mechanism as: the init check (same author-index walk; see conductor-residual-cpu-full-chain-read-and-perpetual-republish) and the named cause of conductor-admission-saturated-for-hours-after-restart. The habit's passing check seeds 600 grants on a fresh chain and never exercises few grants on a long chain. Not proved: the figure at 45,000 actions (growth stopped a little above 19,100); the fleet ranking at real chain lengths. Evidence (gitignored, on shem): `genesis/a2o/reports/recovery/shem-perf-deep-dive-20261002/offline-matthew-seq18k.json`, `sqlwin-noop.json`, `FINDINGS.md`.
+
+## Delta 2026-10-03 — the fleet reading: grant count is still the driver on alpha, and the pile is history
+
+The 2026-10-02 reconcile ("the driver is chain length, not grant count") is true of the shem store it
+measured, which held 9 grants on a 19,081-action chain. It is not true of alpha. Read from Loki on
+2026-10-03 with every conductor on `ab31ecf2c`: the lookup still logs as a slow statement thousands of
+times per 3 h per conductor, `rows_returned` 9,316 (eve), 11,216 (gertrude), 11,776 (adam), 14,162
+(susan), 20,298 (matthew), about 2.8 s typical and 68.7 s at worst. `ab31ecf2c` pins `CapGrant` as the
+outer loop; the read is then linear in live grants, and because `CapGrant` carries no author column
+and its only index is on the access class, linear in every agent's grants on that DNA database.
+
+**The pile is not growing.** Row counts moved by 2 in 15 h. Doorway logs give about 145–190 mints a day
+fleet-wide, about five per new hosted registration, with `reused` 40–100 times `minted`. Remedy 3 held.
+
+**Corrections to this entry.** `hc_client.rs:451-469` no longer mints (those lines are unrelated code);
+all storage mint sites go through the closed-chain fence, armed unconditionally at `main.rs:904`.
+"Remedy 1 — storage signs as the agent it is" is **rejected**: the DNA's invocation gates
+(`content_store/src/invocation.rs`, `mishpat/src/invocation.rs`) separate the chain author from a
+process under an assigned, function-listed grant, and the author path would pass every one silently.
+
+**What is left of the mint path.** A mint is wrapped in a 10 s timeout while the conductor waits 15 s
+for the database writer and does not cancel an in-flight admin request; the keypair and secret are
+generated per call, so an abandoned mint leaves an unusable grant and the retry authors another.
+Observed once on eve in genesis #1608 (two ops published for the agent 4 s after the timeout).
+
+**Ruled** (plane-separation §3): the lookup is keyed by author and a hash of the secret (fork branch
+`perf/cap-grant-secret-key`, in progress); the conductor's grant becomes idempotent by entry hash; the
+doorway derives its credential instead of re-rolling it; first-party grants become assigned and
+function-listed; nothing is deleted in place and the piles are retired at the development recast.

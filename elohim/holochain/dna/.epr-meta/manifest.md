@@ -34,6 +34,25 @@ rules:
       design — `epr:validator-dna-hash-neutrality` is registered machinery with NO concern-canon
       row, because the ceremony tested DNA-hash-neutrality as a class and declined it ("no runtime
       predicate… it becomes the third registered validator, not a class").
+  - id: read-cost-bounded-by-what-is-asked
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["links.sort_by", "sort_by_key(|l| l.timestamp)", "ChainQueryFilter::new()", "get_latest_peer_status_for_agent", "create_canonical_head_link"]
+    dedupe-of: genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md
+    retire-when: >
+      when a sweettest holds each history-shaped coordinator read to the same cost at two history
+      sizes and the conductor's per-call cost metric is read against a declared ceiling on every
+      peer (the `zome-call-cost-bounded` retire-when).
+    why: >
+      A COORDINATOR CALL MUST NOT COST THE AGENT'S HISTORY — plane-separation §2, §5.6, §6.4. Two
+      shapes did this on alpha: `get_links` on a base that grows forever followed by a sort to take
+      the newest (`get_latest_peer_status_for_agent` reads every status link the agent ever wrote,
+      1,440 new ones a day), and a whole-chain `query` filtered afterwards. Ask for what you want:
+      a bounded link query, a sequence range, or a base that holds one link. And before you write a
+      link or entry from a machine-driven path, check it is idempotent in MEANING, not only in
+      bytes: the staging head tier is newest-wins, so re-declaring an unchanged head refreshes its
+      clock and can pull peers back to a stale head. Advisory only.
   - id: scale-risk-lineage-carry
     class: inject
     when:
