@@ -354,3 +354,50 @@ register.
 The authoring signals are advisory in the gate's present version: they inject the rule and its reason
 at the moment a matching line is written, and do not block. The typed refusals and the tests are the
 enforcing half.
+
+## 13. Footprint — the notary must be small next to what it describes
+
+The operator's test: the genesis source set is about 40 MB on disk, so a highly available copy at
+5× replication is about 200 MB in total, and the DHT carries only heads — small manifests that
+describe what the blob store holds. Any peer footprint in gigabytes means something is wrong.
+
+A read-only byte census of the three-peer specimen (`genesis/local-dev/footprint-census/`,
+2026-10-03; a probe mesh, so its growth rates are not the fleet's, but its per-record costs and its
+fixed costs carry over) shows the heads are there and are minute, and names what surrounds them.
+One peer's conductor databases, 905 MB:
+
+| Share | Bytes | What |
+|---|---|---|
+| 54% | 490 MB | compiled wasm module cache: 10 modules, about 9.6× their 55 MB source |
+| 18% | 159 MB | lamad attestation writes with their framing; 99% of Content entries are device-health attestations |
+| 12% | 112 MB | write-ahead logs not checkpointed down; five near-empty peer-meta stores carry 4 MB each |
+| 6% | 55 MB | source wasm |
+| 3% | 30 MB | heartbeat records, 6.6 KB on disk per 207-byte entry |
+| 0.2% | 2 MB | capability grants |
+| 0.01% | 122 KB | human-authored content entries |
+
+Content entries are manifest-shaped: 29 of 8,738 carry an inline body, 30.7 KB in total, and no
+entry exceeds 12.6 KB. The cost is framing. An action fans out into three ops, each indexed, with
+1.37 validation receipts per op; receipts and ops are 62% of the DHT bytes; a 1.5 KB attestation
+costs about 18 KB on disk; entries over about 1,000 bytes spill to overflow pages (27 MB of slack).
+Every peer holds every action (30,254 lamad actions on all three). A manifest-only notary for the
+specimen's 7,094 content ids would be about 1.8 MB; the DHT databases are 115–130× that.
+
+**Rulings.**
+
+1. **Zome wasm is built for size.** Only the node-registry workspace sets a size profile; lamad,
+   imagodei, infrastructure and mishpat build with Cargo's defaults, and nothing runs `wasm-opt`.
+   Coordinator wasm is optimised and hot-swapped now. Integrity wasm changes the DNA hash, so it
+   joins the recast batch in §11. Whether the compiled cache is also the bulk of the conductor's
+   1.1–1.3 GiB resident memory is the first thing §8's heap measurement must answer.
+2. **Logs are checkpointed down on small and idle stores.** Owed mechanically, fork.
+3. **The non-head writers leave** (§5, §6): after them, what remains on a chain is what a person
+   or a delegate stands behind, and the framing cost is paid only for that.
+4. **Framing and custody are the open design question.** Receipts, op fan-out and every-peer
+   custody are not reached by the recast. Smallest holder set that meets the resilience need, and
+   what a receipt is for once trust is declared, need their own hypothesis and challenge before
+   anything is built.
+
+**The check.** After the recast, a peer's conductor footprint, with wasm excluded and reported
+separately, is a small multiple of the manifest bytes it holds. The census is the baseline.
+
