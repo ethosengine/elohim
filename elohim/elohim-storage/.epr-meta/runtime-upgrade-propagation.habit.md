@@ -269,3 +269,12 @@ only the peer's own app (`primaryAppId`) stops the roll; a hosted app's errors a
 drift left after apply must not exceed the roles the apply named as failed, and the run ends rc 5 / `COORDSWAP: UNHEALED` so it is
 not read as clean. `scripts/ci/fleet-coordswap.test.sh` covers both JSON engines. Owed: the second driver run reaching the last
 three peers; why that app's cells are missing (not investigated); a storage-side skip row for an app the conductor is not running.
+DELTA 2026-10-04b (fleet, second all-apps driver run, DNA #1483 on 616768fb0; green NOT re-earned): the roll reached all seven
+peers (`ROLLOUT REACHED EVERY PEER, HOSTED APPS UNHEALED`, `COORDSWAP: UNHEALED`). adam, matthew, jessica: drift 0. james: applied 0,
+5 roles left (`elohim-conductor-3-f3f0cc`). gertrude (conductor-4): applied 30, 31 roles left across 11 hosted apps. susan: applied
+27, 21 left across 7 apps. eve: applied 14, 50 left across 13 apps. Every one of the 107 unhealed roles is `update_coordinators
+failed ... CellMissing`; 32 hosted apps in all, most with exactly three roles missing. The operator's hosted app
+`elohim-conductor-4-927dff` is NOT among gertrude's unhealed rows, so it was swapped or already current; the log does not say
+which, and campaign 1.4 leg 2 (a delegation the current zome accepts) is the acceptance. Owed: why list_apps reports provisioned
+cells the conductor does not hold on 32 apps (genesis/data/timeline/backlog/hosted-app-coordinator-coverage-gaps.md); a per-app
+`applied` row in the driver's output so a named app's outcome is readable from the log.

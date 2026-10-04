@@ -54,6 +54,25 @@ Fix shape: `InstalledReality` carries every lineage-matching app on the conducto
 runs target" means all of them do. Not urgent while the fleet does not deliver coordinators through
 a followed channel.
 
+## 3. Hosted apps whose cells the conductor does not hold
+
+Fleet, 2026-10-04, DNA #1482 and #1483: `update_coordinators` answered `CellMissing` for 107 roles
+across 32 hosted apps (james 1 app, gertrude 11, susan 7, eve 13), most with exactly three roles
+missing. `list_apps` reports those cells as provisioned and the dry run reports them drifted, so
+the sweep attempts them on every run and they stay drifted. Not investigated: whether the apps are
+disabled or paused, or the roles were never instantiated.
+
+Since `616768fb0` the rolling driver names them on the peer's row and goes on
+(`updated-with-unhealed`, `COORDSWAP: UNHEALED`), so they no longer stop a roll. Two things remain:
+
+- Storage should report an app or role the conductor is not running as a skip row, not as drift
+  that an apply will fail on. Needs an edge roll.
+- The driver's log has no per-app `applied` row, so whether a named app was swapped cannot be read
+  from it; only the failures are named.
+
+Probe: `POST /admin/coordinators/sync?apply=false&allApps=true` on gertrude; any app in the
+unhealed list above reporting `drifted: true` is this gap.
+
 ## Not gaps
 
 - The node's own app: unchanged, still swept on the readiness path.
