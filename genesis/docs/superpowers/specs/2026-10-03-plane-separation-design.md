@@ -401,3 +401,35 @@ specimen's 7,094 content ids would be about 1.8 MB; the DHT databases are 115–
 **The check.** After the recast, a peer's conductor footprint, with wasm excluded and reported
 separately, is a small multiple of the manifest bytes it holds. The census is the baseline.
 
+## 14. Fleet readings after option E (2026-10-04, measuring session)
+
+Read from the conductor's own `hc_*` series on pin `901b02607`, three hours after the last restart.
+Evidence: `genesis/a2o/reports/recovery/shem-perf-deep-dive-20261002/fleet-hc-settled-901b02607/`
+and `fleet-cpu-split-reading/`. They sharpen three rulings and add one.
+
+- **The heartbeat's cost is in everyone validating it and in reading it back, not in writing it.**
+  The top zome function by time fleet-wide is `get_latest_peer_status_for_agent` (3.3 calls a minute
+  at a mean of 2.6 s). The top wasm call is the infrastructure integrity zome's `validate` (822 calls
+  a minute, 0.31 s per second), with its `entry_defs` third; the top host function is `zome_info`
+  at 775 calls a minute, almost all inside that validate. `record_peer_status` itself is 25 ms. The
+  validate figure is inflated by an integration burst on eve. This is §5.5 and §5.6 measured: a
+  liveness signal on the notary is paid for by every peer, and the read grows with history. It adds
+  a mechanical item: `validate` re-runs `entry_defs` through `zome_info` on every call, which the
+  HDK skill already names as a landmine.
+- **Publish time fell on five of six conductors with option E** (matthew 0.234 → 0.132 s per
+  second, gertrude 0.702 → 0.466, susan 0.369 → 0.198); eve rose under the burst.
+- **System validation is never idle.** Workflow time is 1.00–1.02 s per second on all seven
+  conductors, with missing dependencies at the selection cap of 10,000 on gertrude and 8,734 on
+  eve. Wall clock; not shown to be CPU. Tracked in
+  `alpha-conductor-sys-validation-spin-unfetchable-deps.md`.
+- **CPU is partitioned wrong, not short.** Each human's envelope is split half to the conductor and
+  half to storage. The conductors of gertrude, eve and james run at 96–99% of their limit while
+  every storage container is throttled in under 0.3% of periods. A budget-neutral re-split is
+  prepared by the measuring session and held behind the campaign's timed run. It does not replace
+  §3.1: the lookup's cost is per call and grows with history whatever the limit.
+
+One instrument limit found in the household proof: `hc_ribosome_zome_call_duration` does not
+include authorisation (it read a 5.7 ms mean for calls the client waited 1.5 s on), so it cannot
+be the per-call cost that `zome-call-cost-bounded`'s retire-when names. The check needs the
+authorising read counted, or a client-side measure.
+
