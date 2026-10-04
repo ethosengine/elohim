@@ -112,6 +112,9 @@ if [ "$rc" -eq 0 ]; then
 elif [ "$rc" -eq 4 ]; then
   verdict=DEFERRED
   echo "COORDSWAP: DEFERRED — one or more peers refused the connection (an edge roll is likely in flight); nothing applied on those peers, re-run after the roll."
+elif [ "$rc" -eq 5 ]; then
+  verdict=UNHEALED
+  echo "COORDSWAP: UNHEALED — every reachable peer took this bundle on its own app, but one or more hosted apps could not be swapped; they are named on their peer's row above."
 else
   verdict=INCOMPLETE
   echo "COORDSWAP: INCOMPLETE (driver rc=$rc) — see the rollout table above."

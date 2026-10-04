@@ -86,6 +86,9 @@
 #      apply:        every peer updated or already current
 #   1  apply: rollout stopped partway (a peer failed)
 #   2  status sweep: at least one peer unreachable/errored
+#   4  apply: one or more peers refused the connection and were deferred
+#   5  apply (--all-apps): every reachable peer took the bundle on its own
+#      app, but a hosted app on some peer could not be swapped
 #   64 usage error (bad/missing args)
 #
 # Implementation notes: bash + curl + (jq OR python3). No heredocs feeding remote
@@ -356,30 +359,60 @@ drifted_count() {
 applied_count()  { json_field "$1" appliedCount "?"; }
 err_message()    { json_field "$1" error ""; }
 
-# role_errors <json> — compact, human-readable list of per-role failures.
-# The coordinator endpoint deliberately returns HTTP 200 after a partial
-# per-role sweep, so transport success alone is not a safe apply precondition.
-role_errors() {
+# role_errors <json> — compact, human-readable list of the failures that stop
+# a rollout. The coordinator endpoint deliberately returns HTTP 200 after a
+# partial per-role sweep, so transport success alone is not a safe apply
+# precondition.
+#
+# An all-apps report names the peer's own app (`primaryAppId`). Only ITS
+# errors stop the roll: the peer's own app is the canary for the bundle. An
+# error on a hosted person's app (fleet 2026-10-04, DNA #1482: one hosted app
+# on james whose five cells the conductor no longer held answered CellMissing
+# and stopped the roll three peers short) is that app's condition, not the
+# bundle's — hosted_errors reports it and the roll goes on. A report with no
+# primaryAppId keeps every error blocking.
+role_errors() { report_errors "$1" primary; }
+
+# hosted_errors <json> — errors on apps other than the peer's own, one per
+# line. Empty for a per-app report and for a report with no primaryAppId.
+hosted_errors() { report_errors "$1" hosted; }
+
+report_errors() {
   if [ "${JSON_ENGINE}" = "jq" ]; then
-    printf '%s' "$1" | jq -r '
-      if has("blockingErrors") then (.blockingErrors | join("; "))
-      else
+    printf '%s' "$1" | jq -r --arg which "$2" '
+      if has("blockingErrors") then
+        (.primaryAppId // "") as $own
+        | if $own == "" then (if $which == "primary" then (.blockingErrors | join("; ")) else empty end)
+          elif $which == "primary" then ([.blockingErrors[] | select(startswith($own + "/"))] | join("; "))
+          else (.blockingErrors[] | select(startswith($own + "/") | not))
+          end
+      elif $which == "primary" then
         (.roles // [])
         | map(select(.error != null and .error != "") | "\(.role): \(.error)")
         | join("; ")
-      end
+      else empty end
     ' 2>/dev/null || true
   else
     python3 -c 'import json, sys
 try:
     doc = json.loads(sys.argv[1])
+    which = sys.argv[2]
     if "blockingErrors" in doc:
-        print("; ".join(doc["blockingErrors"]))
+        own = doc.get("primaryAppId") or ""
+        errs = doc["blockingErrors"]
+        mine = [e for e in errs if not own or e.startswith(own + "/")]
+        if which == "primary":
+            print("; ".join(mine))
+        else:
+            for e in errs:
+                if e not in mine:
+                    print(e)
         raise SystemExit(0)
-    roles = doc.get("roles", [])
-    print("; ".join("{}: {}".format(r.get("role", "?"), r.get("error")) for r in roles if isinstance(r, dict) and r.get("error")))
+    if which == "primary":
+        roles = doc.get("roles", [])
+        print("; ".join("{}: {}".format(r.get("role", "?"), r.get("error")) for r in roles if isinstance(r, dict) and r.get("error")))
 except Exception:
-    pass' "$1" 2>/dev/null || true
+    pass' "$1" "$2" 2>/dev/null || true
   fi
 }
 
@@ -480,7 +513,7 @@ run_status_sweep() {
 # Rolling apply: peer by peer, sequential, stop on first failure.
 # ---------------------------------------------------------------------------
 run_rolling_apply() {
-  local updated_count=0 current_count=0 deferred_count=0
+  local updated_count=0 current_count=0 deferred_count=0 unhealed_count=0
   [ "${JSON_OUT}" -eq 1 ] || { echo "=== fleet-coordswap: rolling apply ==="; echo "happ: ${HAPP_PATH}  app-id: ${APP_ID}"; echo ""; }
 
   local total="${#PEER_URLS[@]}"
@@ -554,9 +587,17 @@ run_rolling_apply() {
       return 1
     fi
 
-    local applied apply_error
+    local applied apply_error hosted_unhealed hosted_unhealed_count=0
     applied="$(applied_count "${LAST_BODY}")"
     apply_error="$(role_errors "${LAST_BODY}")"
+    # Roles the apply could not heal on apps other than the peer's own. They
+    # stay drifted, so the verification below allows exactly that many.
+    hosted_unhealed="$(hosted_errors "${LAST_BODY}")"
+    if [ -n "${hosted_unhealed}" ]; then
+      local unhealed_lines=()
+      mapfile -t unhealed_lines <<< "${hosted_unhealed}"
+      hosted_unhealed_count="${#unhealed_lines[@]}"
+    fi
     if [ -n "${apply_error}" ]; then
       add_report "${name}" "${url}" "failed-apply" "${LAST_HTTP_CODE}" "${pre_drifted}" "${applied}" "${apply_error}"
       [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${pre_drifted}" "${applied}" "FAILED (apply): ${apply_error}"
@@ -585,6 +626,16 @@ run_rolling_apply() {
       report_rollout_failure "${updated_count}" "${total}" "${i}"
       return 1
     fi
+    if [ "${hosted_unhealed_count}" -gt 0 ] && [ "${post_drifted}" -le "${hosted_unhealed_count}" ] 2>/dev/null; then
+      # Every role still drifted is one the apply named as failed on a hosted
+      # app. The peer took the bundle; those apps did not. Say so and go on.
+      unhealed_count=$((unhealed_count + 1))
+      local unhealed_note
+      unhealed_note="${hosted_unhealed//$'\n'/; }"
+      add_report "${name}" "${url}" "updated-with-unhealed" "${LAST_HTTP_CODE}" "${post_drifted}" "${applied}" "${unhealed_note}"
+      [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${post_drifted}" "${applied}" "UNHEALED hosted apps (${hosted_unhealed_count} roles): ${unhealed_note}"
+      continue
+    fi
     if [ "${post_drifted}" != "0" ]; then
       add_report "${name}" "${url}" "failed-verify" "${LAST_HTTP_CODE}" "${post_drifted}" "${applied}" "drift remained after apply"
       [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${post_drifted}" "${applied}" "FAILED (verify): drift remained after apply"
@@ -602,7 +653,9 @@ run_rolling_apply() {
   else
     print_final_table
     echo ""
-    if [ "${deferred_count}" -gt 0 ]; then
+    if [ "${unhealed_count}" -gt 0 ]; then
+      echo "ROLLOUT REACHED EVERY PEER, HOSTED APPS UNHEALED: ${updated_count}/${total} peers updated, ${current_count} already current, ${unhealed_count} with hosted apps the swap could not heal (named above), ${deferred_count} deferred"
+    elif [ "${deferred_count}" -gt 0 ]; then
       echo "ROLLOUT COMPLETE WITH DEFERRALS: ${updated_count}/${total} peers updated, ${current_count} already current, ${deferred_count} deferred (unreachable — re-run to cover them)"
     else
       echo "ROLLOUT COMPLETE: ${updated_count}/${total} peers updated, ${current_count} already current"
@@ -612,6 +665,9 @@ run_rolling_apply() {
   # peer that WAS reached failed) — but they are not silent success either:
   # return 4 so callers (fleet-coordswap-dispatch.sh) can print an honest
   # DEFERRED verdict rather than reporting a clean rollout.
+  # 5: every reachable peer took the bundle on its own app, but a hosted app
+  # somewhere did not — not a clean rollout, and not a stopped one.
+  [ "${unhealed_count}" -eq 0 ] || return 5
   [ "${deferred_count}" -eq 0 ] || return 4
   return 0
 }

@@ -39,7 +39,7 @@ jq -e '.[0].verdict == "error" and (.[0].note | contains("dnaHashMismatch"))' "$
 # The DNA builder has python3 but no jq. Exercise that exact parser fallback
 # under a minimal PATH so jq cannot be discovered from the host.
 mkdir -p "$ROOT/python-path"
-for command in bash basename cat head mktemp python3 rm sed tail tr; do
+for command in awk bash basename cat head mktemp python3 rm sed tail tr; do
   ln -s "$(command -v "$command")" "$ROOT/python-path/$command"
 done
 set +e
@@ -121,7 +121,8 @@ jq -e '.[0].verdict == "updated" and .[1].verdict == "up-to-date"' "$ROOT/applie
 
 # --all-apps: the peer answers for every app on its conductor. A hosted app on
 # another DNA lineage is reported and does not hold the rollout; a pending role
-# on a hosted app is applied; a blocking error on a hosted app stops the roll.
+# on a hosted app is applied; an error in a report that names no primary app
+# stops the roll.
 all_pending='{"apply":false,"apps":[{"appId":"elohim","roles":[]},{"appId":"hosted-a","roles":[{"role":"lamad","drifted":true,"applied":false,"error":null},{"role":"imagodei","drifted":true,"applied":false,"error":"dnaHashMismatch: other lineage"}]}],"driftedCount":2,"appliedCount":0,"pendingCount":1,"blockingErrors":[]}'
 all_applied='{"apply":true,"apps":[],"driftedCount":2,"appliedCount":1,"pendingCount":0,"blockingErrors":[]}'
 all_clean='{"apply":false,"apps":[],"driftedCount":1,"appliedCount":0,"pendingCount":0,"blockingErrors":[]}'
@@ -146,4 +147,49 @@ set -e
 jq -e '.[0].verdict == "failed-pre-check" and (.[0].note | contains("hosted-a/lamad"))' "$ROOT/all-apps-blocked.json" >/dev/null \
   || fail "all-apps blocking error did not name the app and role"
 
-echo 'fleet-coordswap: role-error refusal, first-peer stop, clean apply, and all-apps passed'
+# A hosted app the conductor cannot swap (fleet 2026-10-04: CellMissing on all
+# five roles of one hosted app) is that app's condition. The peer names it and
+# the roll reaches the peers after it; the peer's own app failing still stops it.
+stranded_pending='{"apply":false,"apps":[],"primaryAppId":"elohim","driftedCount":3,"appliedCount":0,"pendingCount":3,"blockingErrors":[]}'
+stranded_applied='{"apply":true,"apps":[],"primaryAppId":"elohim","driftedCount":3,"appliedCount":1,"pendingCount":2,"blockingErrors":["hosted-x/lamad: update_coordinators failed: CellMissing","hosted-x/imagodei: update_coordinators failed: CellMissing"]}'
+stranded_after='{"apply":false,"apps":[],"primaryAppId":"elohim","driftedCount":2,"appliedCount":0,"pendingCount":2,"blockingErrors":[]}'
+for engine_path in "$PATH" "$ROOT/python-path"; do
+  : > "$CALLS"
+  printf '%s' "$stranded_pending" > "$ROOT/one-false.json"
+  printf '%s' "$stranded_applied" > "$ROOT/one-true.json"
+  printf '%s' "$stranded_after" > "$ROOT/one-false-after.json"
+  printf '%s' "$all_clean" > "$ROOT/two-false.json"
+  set +e
+  PATH="$engine_path" bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/all-apps-stranded.json" 2> "$ROOT/all-apps-stranded.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 5 ] || { cat "$ROOT/all-apps-stranded.json" "$ROOT/all-apps-stranded.err" >&2; fail "a stranded hosted app returned $rc, expected 5"; }
+  [ "$(cat "$CALLS")" = $'one false\none true\none false\ntwo false' ] || fail "a stranded hosted app kept the roll from the next peer"
+  jq -e '.[0].verdict == "updated-with-unhealed" and (.[0].note | contains("hosted-x/lamad")) and (.[0].note | contains("hosted-x/imagodei")) and .[1].verdict == "up-to-date"' "$ROOT/all-apps-stranded.json" >/dev/null \
+    || fail "a stranded hosted app was not named on its peer's row"
+done
+
+# More drift left than the apply named as failed is still a failed verification.
+: > "$CALLS"
+printf '%s' '{"apply":false,"apps":[],"primaryAppId":"elohim","driftedCount":3,"appliedCount":0,"pendingCount":3,"blockingErrors":[]}' > "$ROOT/one-false-after.json"
+set +e
+bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/all-apps-unexplained.json"
+rc=$?
+set -e
+[ "$rc" -eq 1 ] || fail "unexplained drift after apply returned $rc, expected 1"
+jq -e '.[0].verdict == "failed-verify"' "$ROOT/all-apps-unexplained.json" >/dev/null || fail "unexplained drift was not a failed verification"
+
+# The peer's own app failing stops the roll, hosted errors beside it or not.
+: > "$CALLS"
+printf '%s' '{"apply":true,"apps":[],"primaryAppId":"elohim","driftedCount":3,"appliedCount":0,"pendingCount":3,"blockingErrors":["elohim/lamad: update_coordinators failed: boom","hosted-x/lamad: update_coordinators failed: CellMissing"]}' > "$ROOT/one-true.json"
+set +e
+bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/all-apps-own-failed.json"
+rc=$?
+set -e
+[ "$rc" -eq 1 ] || fail "the peer's own app failing returned $rc, expected 1"
+[ "$(cat "$CALLS")" = $'one false\none true' ] || fail "the peer's own app failing did not stop the roll"
+jq -e '.[0].verdict == "failed-apply" and (.[0].note | contains("elohim/lamad")) and (.[0].note | contains("hosted-x") | not)' "$ROOT/all-apps-own-failed.json" >/dev/null \
+  || fail "the peer's own failure was not the stated reason"
+
+echo 'fleet-coordswap: role-error refusal, first-peer stop, clean apply, all-apps, and stranded hosted apps passed'
+

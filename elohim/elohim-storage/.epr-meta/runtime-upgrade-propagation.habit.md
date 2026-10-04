@@ -260,3 +260,12 @@ is served by the new coordinator" / missing node: every lineage-matching install
 proven on the household, owed on the fleet (the first all-apps driver run, then campaign 1.4 leg 2). Two paths still leave a hosted
 app behind — an app provisioned after a coordinator-only release, and release adoption's `already_runs_target` exit:
 genesis/data/timeline/backlog/hosted-app-coordinator-coverage-gaps.md.
+DELTA 2026-10-04 (fleet, first all-apps driver run; green NOT re-earned on the fleet): edge #1537 rolled the all-apps storage to
+all seven alpha peers; DNA #1482 ran the driver with `--all-apps`. adam, matthew, jessica: drift 0. james: drifted 20, applied 15,
+then the roll STOPPED: hosted app `elohim-conductor-3-f3f0cc` answered `CellMissing` on all five roles, and the driver read a hosted
+app's error as a failed peer, so gertrude, susan and eve were never reached (`COORDSWAP: INCOMPLETE (driver rc=1)`, warn-only, build
+SUCCESS). The operator's hosted app on conductor-4 is behind james in the order and is unchanged. Driver fix: in an all-apps report
+only the peer's own app (`primaryAppId`) stops the roll; a hosted app's errors are named on the peer's row (`updated-with-unhealed`),
+drift left after apply must not exceed the roles the apply named as failed, and the run ends rc 5 / `COORDSWAP: UNHEALED` so it is
+not read as clean. `scripts/ci/fleet-coordswap.test.sh` covers both JSON engines. Owed: the second driver run reaching the last
+three peers; why that app's cells are missing (not investigated); a storage-side skip row for an app the conductor is not running.
