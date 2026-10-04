@@ -363,8 +363,8 @@ fn delegated_slice_is_exposed_and_subtracted_before_the_split() {
     assert_eq!(rendered.edgenode_cpu_limit, "6000m");
     assert_eq!(rendered.conductor_memory_limit, "3840Mi");
     assert_eq!(rendered.storage_memory_limit, "2304Mi");
-    assert_eq!(rendered.conductor_cpu_limit, "3000m");
-    assert_eq!(rendered.storage_cpu_limit, "3000m");
+    assert_eq!(rendered.conductor_cpu_limit, "4500m");
+    assert_eq!(rendered.storage_cpu_limit, "1500m");
     assert_eq!(rendered.delegated.len(), 1);
     assert_eq!(rendered.delegated[0].name, "compute-worker");
     assert_eq!(rendered.delegated[0].memory_bytes, 2 * GIB);

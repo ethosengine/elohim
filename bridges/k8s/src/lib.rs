@@ -174,7 +174,7 @@ fn share(value: Option<u64>, numerator: u64, denominator: u64, unit: &str) -> (S
 }
 
 /// Render limits from the root bound after delegated slices, requests from the archetype
-/// floor (or a pinned override), and the exact 5/8 memory, 1/2 CPU split with the remainder
+/// floor (or a pinned override), and the exact 5/8 memory, 1/2 CPU-request and 3/4 CPU-limit split with the remainder
 /// to storage.
 pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
     let delegated = delegated_slices(manifest)?;
@@ -265,7 +265,7 @@ pub fn render_envelope(manifest: &RuntimeManifest) -> Result<RenderedEnvelope> {
     let (cmr, smr) = share(Some(memory / MIB), 5, 8, "Mi");
     let (cml, sml) = share(memory_limit, 5, 8, "Mi");
     let (ccr, scr) = share(Some(cpu), 1, 2, "m");
-    let (ccl, scl) = share(cpu_limit, 1, 2, "m");
+    let (ccl, scl) = share(cpu_limit, 3, 4, "m");
     Ok(RenderedEnvelope {
         edgenode_memory_request: format!("{}Mi", memory / MIB),
         edgenode_memory_limit: memory_limit.map_or(String::new(), |v| format!("{v}Mi")),

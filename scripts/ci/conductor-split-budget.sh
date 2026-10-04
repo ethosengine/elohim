@@ -9,7 +9,9 @@
 # sandbox-free and proven in this pipeline.
 #
 # CONTRACT: conductor + storage shares sum EXACTLY to the input on every
-# dimension (memory 5/8 : 3/8, cpu 1/2 : 1/2, floor rounding with the
+# dimension (memory 5/8 : 3/8, cpu request 1/2 : 1/2, cpu limit 3/4 : 1/4 — the
+# limit is what CFS throttles on and the conductor is the side that hits it; the
+# request is the scheduling guarantee and stays even — floor rounding with the
 # remainder always falling to the STORAGE side). Empty inputs pass through as
 # empty (pre-split behaviour for a human that declares nothing).
 #
@@ -18,7 +20,8 @@
 set -euo pipefail
 
 MEM_NUM=5; MEM_DEN=8
-CPU_NUM=1; CPU_DEN=2
+CPU_REQ_NUM=1; CPU_REQ_DEN=2
+CPU_LIM_NUM=3; CPU_LIM_DEN=4
 
 to_mi() { # k8s memory quantity -> integer Mi (floor)
   local v="$1"
@@ -42,9 +45,9 @@ split_mem() { # -> "conductorMi storageMi"
   local c=$(( mi * MEM_NUM / MEM_DEN ))
   echo "$c $(( mi - c ))"
 }
-split_cpu() { # -> "conductorM storageM"
+split_cpu() { # <quantity> <num> <den> -> "conductorM storageM"
   local m; m="$(to_m "$1")"
-  local c=$(( m * CPU_NUM / CPU_DEN ))
+  local c=$(( m * $2 / $3 ))
   echo "$c $(( m - c ))"
 }
 
@@ -53,8 +56,8 @@ out() { # emit JSON; empty input -> empty strings for that pair
   local cmr="" smr="" cml="" sml="" ccr="" scr="" ccl="" scl=""
   if [ -n "$mr" ]; then read -r a b <<<"$(split_mem "$mr")"; cmr="${a}Mi"; smr="${b}Mi"; fi
   if [ -n "$ml" ]; then read -r a b <<<"$(split_mem "$ml")"; cml="${a}Mi"; sml="${b}Mi"; fi
-  if [ -n "$cr" ]; then read -r a b <<<"$(split_cpu "$cr")"; ccr="${a}m"; scr="${b}m"; fi
-  if [ -n "$cl" ]; then read -r a b <<<"$(split_cpu "$cl")"; ccl="${a}m"; scl="${b}m"; fi
+  if [ -n "$cr" ]; then read -r a b <<<"$(split_cpu "$cr" "$CPU_REQ_NUM" "$CPU_REQ_DEN")"; ccr="${a}m"; scr="${b}m"; fi
+  if [ -n "$cl" ]; then read -r a b <<<"$(split_cpu "$cl" "$CPU_LIM_NUM" "$CPU_LIM_DEN")"; ccl="${a}m"; scl="${b}m"; fi
   printf '{"conductorMemoryRequest":"%s","storageMemoryRequest":"%s","conductorMemoryLimit":"%s","storageMemoryLimit":"%s","conductorCpuRequest":"%s","storageCpuRequest":"%s","conductorCpuLimit":"%s","storageCpuLimit":"%s"}\n' \
     "$cmr" "$smr" "$cml" "$sml" "$ccr" "$scr" "$ccl" "$scl"
 }

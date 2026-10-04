@@ -1567,11 +1567,17 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
 // Ratios (observed behaviour, 2026-08-31): memory conductor 5/8 — the conductor
 // is the RAM consumer, RSS ∝ corpus at full arc (~2.5 GB on alpha), while
 // storage-alone RSS is a few hundred MB and needs headroom only for import
-// bursts. CPU 1/2 — no measurement yet discriminates the two sides, so the
-// neutral halving is the honest default.
+// bursts. CPU LIMIT conductor 3/4, CPU REQUEST still 1/2 (measured on alpha, 2026-10-04, Prometheus 1h/6h/24h
+// per container): at the earlier 1/2 the conductors of james, gertrude and eve
+// ran at 96-99% of their limit and were CFS-throttled in 96-99% of periods
+// (jessica 81% / 78%), while every storage container was throttled in under
+// 0.3% of periods and its 24h p95 was 0.07-0.33 cores against limits of 1-2
+// (adam's, the busiest, 1.51 against 4). Evidence:
+// genesis/a2o/reports/recovery/shem-perf-deep-dive-20261002/fleet-cpu-split-reading/.
 /**
  * Budget-neutral conductor/storage split, computed by
- * scripts/ci/conductor-split-budget.sh (memory 5/8 : 3/8, cpu 1/2 : 1/2,
+ * scripts/ci/conductor-split-budget.sh (memory 5/8 : 3/8, cpu request 1/2 : 1/2,
+ * cpu limit 3/4 : 1/4,
  * floor rounding, remainder to storage — conductor + storage sum EXACTLY to
  * the human's edgenode* envelope on every dimension).
  *
