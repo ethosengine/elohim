@@ -132,6 +132,90 @@ When(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Operator registration authority
+// ---------------------------------------------------------------------------
+
+interface OperatorRegistrationAnswer {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+const OPERATOR_REGISTRATION_ANSWER = 'operatorRegistrationAnswer';
+
+async function registerAsOperator(
+  world: E2EWorld,
+  doorwayId: string,
+  bootstrapKey: string | undefined
+): Promise<void> {
+  const doorway = world.getDoorway(doorwayId);
+  const runId = randomUUID().slice(0, 8);
+  const { request } = await import('undici');
+  const { statusCode, body } = await request(`${doorway.url}/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      humanId: '',
+      agentPubKey: '',
+      identifier: `e2e-stranger-${runId}@test.elohim.host`,
+      identifierType: 'email',
+      password: `E2ePass!${runId}`,
+      displayName: `Stranger (E2E ${runId})`,
+      agencyPhase: 'doorway',
+      ...(bootstrapKey === undefined ? {} : { adminBootstrapKey: bootstrapKey }),
+    }),
+  });
+  const text = await body.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    parsed = { raw: text };
+  }
+  const answer: OperatorRegistrationAnswer = { status: statusCode, body: parsed };
+  world.contentIds.set(OPERATOR_REGISTRATION_ANSWER, JSON.stringify(answer));
+}
+
+function operatorRegistrationAnswer(world: E2EWorld): OperatorRegistrationAnswer {
+  const stored = world.contentIds.get(OPERATOR_REGISTRATION_ANSWER);
+  assert.ok(stored, 'no operator registration was attempted in this scenario');
+  return JSON.parse(stored) as OperatorRegistrationAnswer;
+}
+
+When(
+  'a stranger asks doorway {string} to register them as its operator without the bootstrap key',
+  async function (this: E2EWorld, doorwayId: string) {
+    await registerAsOperator(this, doorwayId, undefined);
+  }
+);
+
+When(
+  'a stranger asks doorway {string} to register them as its operator with a wrong bootstrap key',
+  async function (this: E2EWorld, doorwayId: string) {
+    await registerAsOperator(this, doorwayId, `not-the-key-${randomUUID()}`);
+  }
+);
+
+Then(
+  'the doorway refuses the registration with code {string}',
+  function (this: E2EWorld, code: string) {
+    const answer = operatorRegistrationAnswer(this);
+    assert.strictEqual(
+      answer.status,
+      403,
+      `Expected 403 but the doorway answered ${answer.status}: ${JSON.stringify(answer.body)}`
+    );
+    assert.strictEqual(answer.body.code, code);
+  }
+);
+
+Then('the refusal carries no session and no profile', function (this: E2EWorld) {
+  const { body } = operatorRegistrationAnswer(this);
+  for (const field of ['token', 'humanId', 'agentPubKey', 'profile']) {
+    assert.ok(!(field in body), `the refusal carries "${field}": ${JSON.stringify(body)}`);
+  }
+});
+
 Then(
   '{word} should have admin permission level',
   async function (this: E2EWorld, humanName: string) {

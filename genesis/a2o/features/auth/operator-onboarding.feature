@@ -27,6 +27,26 @@ Feature: Operator Onboarding
     Then the auth response should include a token
     And RegularUser should not have admin permission level
 
+  # The operator is the person the doorway itself runs as: its own agent on
+  # the network. An admin is any account holding admin permission; the
+  # operator is one of them, and both are proven by the same bootstrap key
+  # (the codes below say ADMIN_KEY because that is the key's name).
+  # An ordinary registration gets a hosted identity of its own. A registration
+  # that asks to be "the doorway" instead claims the operator's identity, so it
+  # needs the same proof as the genesis moment above, on a fresh doorway and on
+  # a settled one alike.
+  @concern:operator-registration-authority
+  Scenario: A stranger cannot register as the doorway's operator
+    When a stranger asks doorway "alpha" to register them as its operator without the bootstrap key
+    Then the doorway refuses the registration with code "OPERATOR_KEY_REQUIRED"
+    And the refusal carries no session and no profile
+
+  @concern:operator-registration-authority
+  Scenario: A wrong bootstrap key does not make a stranger the operator
+    When a stranger asks doorway "alpha" to register them as its operator with a wrong bootstrap key
+    Then the doorway refuses the registration with code "ADMIN_KEY_REJECTED"
+    And the refusal carries no session and no profile
+
   # --- Federation peer configuration ---
 
   Scenario: Matthew configures a federation peer
