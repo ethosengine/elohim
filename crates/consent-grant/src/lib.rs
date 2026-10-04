@@ -34,10 +34,18 @@
 //! The code is bound to the asking terminal twice: by the PKCE verifier only
 //! that terminal holds, and by the device key the request named.
 //!
-//! Everything here is a side-effect-free function over plain data. Callers
-//! supply the time, the store and the transport.
+//! ## One ceremony, any host
+//!
+//! [`ceremony`] holds the steps a portal performs. A single peer runtime runs
+//! them alone, with its own node signing and [`MemoryStore`] holding the
+//! delivery: only the device is needed to start. A doorway mounts the same
+//! steps for people it hosts.
+//!
+//! Apart from [`MemoryStore`], everything here is a side-effect-free function
+//! over plain data. Callers supply the time, the signing and the transport.
 
 pub mod act;
+pub mod ceremony;
 pub mod consent;
 pub mod delivery;
 pub mod hash_shape;
@@ -46,6 +54,7 @@ pub mod request;
 pub mod return_path;
 
 pub use act::{ActRefusal, RequestedAct};
+pub use ceremony::{issue, redeem, settle, ConsentView, Held, IssueRefusal, MemoryStore, Taken};
 pub use consent::{Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent};
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,

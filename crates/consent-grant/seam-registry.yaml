@@ -153,8 +153,7 @@ decisionPoints:
         status: partial
         justification: >
           The predicate reports `AlreadyRedeemed` for a redeemed grant, but single redemption
-          under concurrency depends on the caller marking the grant with a compare-and-set.
-          That store does not exist yet; the requirement is stated in the module doc.
+          under concurrency depends on the store's atomic take; see `settle`.
       - id: C7
         status: n-a
         justification: Nothing is advertised.
@@ -278,4 +277,73 @@ decisionPoints:
         kind: unit
       - path: crates/consent-grant/src/consent.rs
         testName: the_record_carries_no_label_and_no_delivery_state
+        kind: unit
+
+  - name: issue
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/ceremony.rs
+      modulePath: consent_grant::ceremony::issue
+      line: 97
+    summary: >
+      Decides whether a signed consent may be held for the asking terminal: its address must
+      be its own, it must have been made for this request (challenge, device key, client), and
+      at least one party must have signed it. Returns what to hold and how the code returns.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A record made for another terminal's request, or one nobody signed, cannot be issued;
+          the host cannot substitute a different agreement for the one the person gave.
+      - id: C5
+        status: partial
+        justification: >
+          Presence of a signature is required here; its validity is the host's to verify
+          against the controller's key before calling. No key material reaches this crate.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C12
+        status: answered
+        justification: Only the record the controller agreed to and signed is released.
+    contractTests:
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: only_a_signed_record_made_for_this_request_is_issued
+        kind: unit
+
+  - name: settle
+    kind: verdict-fn
+    sourceLocation:
+      file: src/ceremony.rs
+      modulePath: consent_grant::ceremony::settle
+      line: 139
+    summary: >
+      Decides what a terminal receives for a presented code, given what the store's atomic take
+      returned. A fresh take is checked by `admit_redemption`; an earlier take or an unknown
+      code is refused. The delivery is already consumed when this runs.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: Every delivery ends redeemed, burned or swept; none waits indefinitely.
+      - id: C4
+        status: answered
+        justification: Unknown, already-redeemed and each mismatch are distinct refusals.
+      - id: C6b
+        status: answered
+        justification: >
+          Single redemption rests on the store's take being atomic. `MemoryStore::take` does it
+          under one lock, proven by `concurrent_redemptions_of_one_code_yield_one_consent`. A
+          host with another store must supply the same take.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+    contractTests:
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: concurrent_redemptions_of_one_code_yield_one_consent
+        kind: unit
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: a_stranger_with_the_code_gets_nothing_and_spoils_it_for_everyone
+        kind: unit
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: one_runtime_runs_the_whole_ceremony
         kind: unit
