@@ -24,6 +24,17 @@ Feature: Coordinator logic rolls across peers without anyone restarting
   next — so a bad bundle or a wedged peer halts the rollout instead of
   spreading.
 
+  A peer does not only run its own app. It may also host people who reach the
+  network through a gateway instead of running a peer of their own: each
+  hosted person has their own installation of the app on that peer, with their
+  own agent key, created on the day they joined. An app is made of several
+  named parts (its roles: learning, identity, governance and so on), and each
+  role carries its own coordinator code. A rollout that updates only the
+  peer's own app leaves every hosted person on the code their app was created
+  with, while the peer itself looks healthy. What they then write in the old
+  format, peers on the fix refuse. So the fix has to reach every app on the
+  peer, and the peer has to say which apps and which roles it reached.
+
   Background:
     Given a mesh whose conductor-hosted cells run the installed hApp bundle
     And a steward has rebuilt the bundle with a coordinator-only fix
@@ -54,3 +65,16 @@ Feature: Coordinator logic rolls across peers without anyone restarting
     Then the peer reports that the bundle belongs to a different DNA lineage
     And no swap happens on any peer
     And the steward is pointed at the DNA-lineage migration path instead
+
+  # Found 2026-10-04 on the alpha fleet: the rollout had covered one app per
+  # peer, the peer's own.
+  @wip @concern:coordinator-hot-swap
+  Scenario: people hosted on a peer receive the fix along with the peer itself
+    Given a peer that also hosts several people, each with their own app on that peer
+    And every hosted person's app was created before the fix and runs the old coordinator code
+    When the steward applies the bundle to that peer
+    Then the peer reports the outcome for each app and each of its roles by name
+    And every hosted person is served by a function that only the new coordinator code provides
+    And what a hosted person writes after the rollout is accepted by peers on the fix
+    And each hosted person keeps the same agent key and the same data as before
+    And an app whose DNA hash differs from the bundle's is named as skipped and left unchanged

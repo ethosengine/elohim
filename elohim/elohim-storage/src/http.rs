@@ -5657,7 +5657,12 @@ impl HttpServer {
     /// hot-swap vehicle (backlog `upgrade-propagation-p2p-design-arc`).
     ///
     /// `POST /admin/coordinators/sync?apply=true|false&appId=<id>`
+    /// `POST /admin/coordinators/sync?apply=true|false&allApps=true`
     /// Body: raw `.happ` bundle bytes (`application/octet-stream`, 64 MiB cap).
+    ///
+    /// `allApps=true` sweeps every installed app on the bundle's DNA lineage
+    /// (a hosted person's app is one more installed app) and returns one report
+    /// per app; without it the sweep covers the one app `appId` names.
     ///
     /// Runs the SAME per-role coordinator-drift sweep the boot path runs
     /// (`happ_manager::sync_coordinators_report`), against the posted bundle
@@ -5726,10 +5731,21 @@ impl HttpServer {
             /// is exactly the failure this alias makes impossible.
             #[serde(alias = "app_id")]
             app_id: Option<String>,
+            /// Sweep EVERY app on this conductor that is on the bundle's DNA
+            /// lineage — the node's own and each hosted person's. The response
+            /// is then one report per app.
+            #[serde(alias = "all_apps")]
+            all_apps: Option<bool>,
         }
         let query: SyncQuery =
             serde_urlencoded::from_str(req.uri().query().unwrap_or("")).unwrap_or_default();
         let apply = query.apply.unwrap_or(false);
+        let all_apps = query.all_apps.unwrap_or(false);
+        if all_apps && query.app_id.is_some() {
+            return Ok(response::bad_request(
+                "allApps=true and appId are mutually exclusive — name one app, or sweep all",
+            ));
+        }
         let app_id = query.app_id.clone().unwrap_or_else(|| {
             self.happ_app_id
                 .clone()
@@ -5813,6 +5829,17 @@ impl HttpServer {
             bundle_bytes = bytes.len(),
             "POST /admin/coordinators/sync — running coordinator drift sweep"
         );
+
+        if all_apps {
+            let outcome =
+                crate::happ_manager::sync_coordinators_all_apps(&admin_ws, &temp.0, apply, None)
+                    .await;
+            drop(temp);
+            return Ok(match outcome {
+                Ok(report) => response::ok(&report),
+                Err(e) => response::internal_error(&format!("coordinator sync failed: {e}")),
+            });
+        }
 
         let outcome =
             crate::happ_manager::sync_coordinators_report(&admin_ws, &app_id, &temp.0, apply).await;

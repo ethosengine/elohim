@@ -623,11 +623,53 @@ impl CoordinatorBundleVehicle {
             return Err(refusal);
         }
 
+        // The node's own app now runs the release. Every other app on this
+        // conductor that is on the same DNA lineage — one per hosted person —
+        // takes the same coordinators, or a hosted person keeps the ones their
+        // app was provisioned with. A cell on another lineage is reported and
+        // left alone; a same-lineage role left behind is a mixture.
+        let others = crate::happ_manager::sync_coordinators_all_apps(
+            &self.admin,
+            bundle,
+            true,
+            Some(&self.app_id),
+        )
+        .await
+        .map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!("sync_coordinators_all_apps failed after the node's own app swapped: {e}"),
+            )
+        })?;
+        let left_behind = others.unhealed_on_lineage();
+        if !left_behind.is_empty() {
+            tracing::error!(
+                channel = %verified.channel_id,
+                release_cid = %verified.release_cid,
+                left_behind = ?left_behind,
+                vehicle,
+                "release-adoption: PARTIAL APPLY refused — other apps on this conductor were not brought to the release"
+            );
+            return Err(AdoptionRefusal::new(
+                RefusalReason::ApplyFailed,
+                format!(
+                    "PARTIAL APPLY — the node's own app '{}' runs the release, but {} (app/role) \
+                     on the same DNA lineage did not: {left_behind:?}. No rollback is attempted",
+                    self.app_id,
+                    left_behind.len()
+                ),
+            ));
+        }
+        let mut detail = detail;
+        detail["otherApps"] = serde_json::to_value(&others).unwrap_or(serde_json::Value::Null);
+
         tracing::info!(
             channel = %verified.channel_id,
             release_cid = %verified.release_cid,
             drifted = report.drifted_count,
             applied = report.applied_count,
+            other_apps_swept = others.apps.len(),
+            other_apps_applied = others.applied_count,
             vehicle,
             "release-adoption: coordinator hot-swap applied (no re-key, no DHT churn)"
         );

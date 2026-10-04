@@ -1502,6 +1502,18 @@ async fn sync_coordinators_for_app_info(
     apply: bool,
 ) -> anyhow::Result<CoordinatorSyncReport> {
     let role_dnas = bundle_role_dna_files(happ_path).await?;
+    Ok(sweep_app_roles(admin_ws, app_info, &role_dnas, apply).await)
+}
+
+/// The per-role sweep of ONE app against an already-resolved bundle. Split from
+/// [`sync_coordinators_for_app_info`] so the conductor-wide sweep
+/// ([`sync_coordinators_all_apps`]) unpacks the bundle once, not once per app.
+async fn sweep_app_roles(
+    admin_ws: &AdminWebsocket,
+    app_info: &holochain_client::AppInfo,
+    role_dnas: &std::collections::BTreeMap<String, DnaFile>,
+    apply: bool,
+) -> CoordinatorSyncReport {
     let mut roles: Vec<CoordinatorRoleReport> = Vec::new();
     let mut drifted = 0usize;
     let mut applied_count = 0usize;
@@ -1664,13 +1676,259 @@ async fn sync_coordinators_for_app_info(
         "coordinator sweep complete — a peer with unhealed roles is running a MIXTURE"
     );
 
-    Ok(CoordinatorSyncReport {
+    CoordinatorSyncReport {
         app_id: app_info.installed_app_id.clone(),
         apply,
         roles,
         drifted_count: drifted,
         applied_count,
-    })
+    }
+}
+
+/// Why an installed app takes NO part in a conductor-wide coordinator sweep.
+///
+/// Eligibility is decided by DNA LINEAGE, never by the shape of the app id: an
+/// app is swept for the roles whose installed DNA hash equals the bundle's,
+/// whoever installed it and whatever it is called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AppSweepSkip {
+    /// The caller already swept this app (the boot path sweeps the node's own
+    /// app on the readiness path, then everything else off it).
+    AlreadySwept,
+    /// None of the app's roles is carried by the bundle — a different hApp.
+    NoRoleInBundle,
+    /// The app shares role names with the bundle but every such cell is on a
+    /// different DNA hash. `update_coordinators` matches integrity zomes by
+    /// name, so this app must be left alone: it needs the migration path.
+    NoRoleOnBundleLineage,
+    /// `AppStatus::Unrecoverable` is terminal by the conductor's own
+    /// definition; hot-swapping onto it is unsafe auto-remediation.
+    Unrecoverable,
+}
+
+impl AppSweepSkip {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            AppSweepSkip::AlreadySwept => "already_swept",
+            AppSweepSkip::NoRoleInBundle => "no_role_in_bundle",
+            AppSweepSkip::NoRoleOnBundleLineage => "no_role_on_bundle_lineage",
+            AppSweepSkip::Unrecoverable => "unrecoverable",
+        }
+    }
+}
+
+/// Pure: does this installed app take part in a conductor-wide sweep? `None` =
+/// sweep it. `installed` and `bundle` map role name → DNA hash; `installed`
+/// holds only roles with a provisioned cell.
+pub(crate) fn app_sweep_skip(
+    installed: &BTreeMap<String, String>,
+    bundle: &BTreeMap<String, String>,
+    unrecoverable: bool,
+    already_swept: bool,
+) -> Option<AppSweepSkip> {
+    if already_swept {
+        return Some(AppSweepSkip::AlreadySwept);
+    }
+    if unrecoverable {
+        return Some(AppSweepSkip::Unrecoverable);
+    }
+    let mut shared = installed
+        .iter()
+        .filter_map(|(role, dna)| bundle.get(role).map(|b| dna == b))
+        .peekable();
+    if shared.peek().is_none() {
+        return Some(AppSweepSkip::NoRoleInBundle);
+    }
+    if !shared.any(|same_lineage| same_lineage) {
+        return Some(AppSweepSkip::NoRoleOnBundleLineage);
+    }
+    None
+}
+
+/// An installed app the conductor-wide sweep left alone, and why.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoordinatorAppSkip {
+    pub app_id: String,
+    pub reason: String,
+    /// role → installed DNA hash, so a lineage skip names what it compared.
+    pub installed_dna: BTreeMap<String, String>,
+}
+
+/// Whole-conductor outcome: one [`CoordinatorSyncReport`] per swept app, so
+/// every row is (app, role). A conductor that hosts people carries one app per
+/// person; a count of roles with no app dimension cannot say which of them a
+/// coordinator release reached.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoordinatorConductorReport {
+    pub apply: bool,
+    pub apps_installed: usize,
+    pub apps: Vec<CoordinatorSyncReport>,
+    pub skipped_apps: Vec<CoordinatorAppSkip>,
+    /// role → bundle DNA hash: the lineage every app was measured against.
+    pub bundle_dna: BTreeMap<String, String>,
+    pub drifted_count: usize,
+    pub applied_count: usize,
+    /// `app/role` for every role left drifted or errored and not applied.
+    pub unhealed: Vec<String>,
+}
+
+impl CoordinatorConductorReport {
+    /// `app/role` rows left behind on the BUNDLE'S lineage — the mixture a
+    /// later sweep could still heal. A `dnaHashMismatch` row is excluded: that
+    /// cell is on another lineage and no coordinator release can reach it.
+    pub fn unhealed_on_lineage(&self) -> Vec<String> {
+        self.apps
+            .iter()
+            .flat_map(|app| {
+                app.roles
+                    .iter()
+                    .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
+                    .filter(|r| {
+                        !r.error
+                            .as_deref()
+                            .is_some_and(|e| e.starts_with("dnaHashMismatch:"))
+                    })
+                    .map(move |r| format!("{}/{}", app.app_id, r.role))
+            })
+            .collect()
+    }
+}
+
+/// role → DNA hash for every role of the app that has a provisioned cell.
+fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, String> {
+    app_info
+        .cell_info
+        .iter()
+        .filter_map(|(role, cells)| {
+            cells.iter().find_map(|c| match c {
+                CellInfo::Provisioned(p) => {
+                    Some((role.to_string(), p.cell_id.dna_hash().to_string()))
+                }
+                _ => None,
+            })
+        })
+        .collect()
+}
+
+/// Sweep EVERY installed app on this conductor whose cells are on the bundle's
+/// DNA lineage — the node's own app and each hosted person's app alike.
+///
+/// `update_coordinators` is addressed by cell id, so sweeping the node's own
+/// app never reached a hosted person's cells: a hosted app kept the
+/// coordinators it was provisioned with for as long as it lived (found
+/// 2026-10-04, when a hosted app issued a head delegation in a format the
+/// current zome refuses). Storage owns coordinators for everything on its
+/// conductor; the doorway only installs.
+///
+/// The work is bounded before each call, because a conductor call cannot be
+/// cancelled: apps are swept strictly one at a time, one admin request in
+/// flight, and eligibility is decided from `list_apps` alone so an app on
+/// another lineage costs no call at all. `skip_app` names an app the caller
+/// already swept.
+pub async fn sync_coordinators_all_apps(
+    admin_ws: &AdminWebsocket,
+    happ_path: &Path,
+    apply: bool,
+    skip_app: Option<&str>,
+) -> anyhow::Result<CoordinatorConductorReport> {
+    let role_dnas = bundle_role_dna_files(happ_path).await?;
+    let bundle_dna: BTreeMap<String, String> = role_dnas
+        .iter()
+        .map(|(role, dna)| (role.clone(), dna.dna_hash().to_string()))
+        .collect();
+    let apps = admin_ws
+        .list_apps(None)
+        .await
+        .map_err(|e| anyhow::anyhow!("list_apps failed: {e}"))?;
+
+    let mut reports: Vec<CoordinatorSyncReport> = Vec::new();
+    let mut skipped_apps: Vec<CoordinatorAppSkip> = Vec::new();
+    for app_info in &apps {
+        let installed_dna = installed_role_dna(app_info);
+        let unrecoverable = matches!(app_info.status, AppStatus::Unrecoverable(..));
+        let already_swept = skip_app == Some(app_info.installed_app_id.as_str());
+        if let Some(skip) =
+            app_sweep_skip(&installed_dna, &bundle_dna, unrecoverable, already_swept)
+        {
+            info!(
+                app_id = app_info.installed_app_id.as_str(),
+                skip = skip.label(),
+                installed_dna = ?installed_dna,
+                "coordinator sweep: app SKIPPED — not the same as finding it clean"
+            );
+            skipped_apps.push(CoordinatorAppSkip {
+                app_id: app_info.installed_app_id.clone(),
+                reason: skip.label().to_string(),
+                installed_dna,
+            });
+            continue;
+        }
+        reports.push(sweep_app_roles(admin_ws, app_info, &role_dnas, apply).await);
+        tokio::task::yield_now().await;
+    }
+
+    let unhealed: Vec<String> = reports
+        .iter()
+        .flat_map(|app| {
+            app.roles
+                .iter()
+                .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
+                .map(move |r| format!("{}/{}", app.app_id, r.role))
+        })
+        .collect();
+    let report = CoordinatorConductorReport {
+        apply,
+        apps_installed: apps.len(),
+        drifted_count: reports.iter().map(|r| r.drifted_count).sum(),
+        applied_count: reports.iter().map(|r| r.applied_count).sum(),
+        apps: reports,
+        skipped_apps,
+        bundle_dna,
+        unhealed,
+    };
+    info!(
+        apply,
+        apps_installed = report.apps_installed,
+        apps_swept = report.apps.len(),
+        apps_skipped = report.skipped_apps.len(),
+        drifted_count = report.drifted_count,
+        applied_count = report.applied_count,
+        unhealed = ?report.unhealed,
+        "coordinator sweep complete for every app on this conductor"
+    );
+    Ok(report)
+}
+
+/// The boot path's second half: after the node's own app is swept and the node
+/// is ready, sweep every other app on the conductor. Runs off the readiness
+/// path — a conductor carrying dozens of hosted apps must not hold the node's
+/// own readiness behind them.
+pub async fn sweep_other_apps_at_boot(admin_ws: &AdminWebsocket, happ_path: &Path, own_app: &str) {
+    let apply = coordinator_update_allowed();
+    match sync_coordinators_all_apps(admin_ws, happ_path, apply, Some(own_app)).await {
+        Ok(report) if report.apps.is_empty() => info!(
+            own_app,
+            apps_installed = report.apps_installed,
+            "No other app on this conductor is on the bundle's DNA lineage"
+        ),
+        Ok(report) => info!(
+            own_app,
+            apps_swept = report.apps.len(),
+            drifted_roles = report.drifted_count,
+            applied_roles = report.applied_count,
+            gate_allows_apply = apply,
+            unhealed = ?report.unhealed,
+            "Coordinator-zome drift handled for the other apps on this conductor"
+        ),
+        Err(e) => error!(
+            own_app,
+            error = %e,
+            "coordinator sweep of the other apps FAILED — hosted apps keep the coordinators \
+             they were provisioned with until resolved"
+        ),
+    }
 }
 
 /// Ensure an app WebSocket interface exists on [`APP_INTERFACE_PORT`].
@@ -2005,6 +2263,112 @@ mod tests {
             .as_str()
             .expect("error is a string")
             .starts_with("dnaHashMismatch:"));
+    }
+
+    fn dna_map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(r, d)| (r.to_string(), d.to_string()))
+            .collect()
+    }
+
+    /// A hosted person's app is swept because its cells are on the bundle's
+    /// lineage — nothing about its id is consulted.
+    #[test]
+    fn an_app_on_the_bundle_lineage_is_swept_whatever_it_is_called() {
+        let bundle = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-B")]);
+        let hosted = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-B")]);
+        assert_eq!(app_sweep_skip(&hosted, &bundle, false, false), None);
+        // One role on the lineage is enough; the per-role guard refuses the rest.
+        let mixed = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-OLD")]);
+        assert_eq!(app_sweep_skip(&mixed, &bundle, false, false), None);
+    }
+
+    #[test]
+    fn an_app_on_another_lineage_or_another_happ_is_left_alone() {
+        let bundle = dna_map(&[("lamad", "uhC0k-A")]);
+        assert_eq!(
+            app_sweep_skip(&dna_map(&[("lamad", "uhC0k-OLD")]), &bundle, false, false),
+            Some(AppSweepSkip::NoRoleOnBundleLineage)
+        );
+        assert_eq!(
+            app_sweep_skip(&dna_map(&[("other", "uhC0k-A")]), &bundle, false, false),
+            Some(AppSweepSkip::NoRoleInBundle)
+        );
+        assert_eq!(
+            app_sweep_skip(&BTreeMap::new(), &bundle, false, false),
+            Some(AppSweepSkip::NoRoleInBundle)
+        );
+    }
+
+    #[test]
+    fn an_unrecoverable_or_already_swept_app_is_skipped_even_on_the_lineage() {
+        let bundle = dna_map(&[("lamad", "uhC0k-A")]);
+        let app = dna_map(&[("lamad", "uhC0k-A")]);
+        assert_eq!(
+            app_sweep_skip(&app, &bundle, true, false),
+            Some(AppSweepSkip::Unrecoverable)
+        );
+        assert_eq!(
+            app_sweep_skip(&app, &bundle, false, true),
+            Some(AppSweepSkip::AlreadySwept)
+        );
+    }
+
+    /// The conductor report carries one row per (app, role), and separates a
+    /// healable mixture from a cell on another lineage.
+    #[test]
+    fn conductor_report_names_app_and_role_and_excludes_foreign_lineage_from_the_mixture() {
+        let old = dna_map(&[("content_store", "uhCok-old")]);
+        let new = dna_map(&[("content_store", "uhCok-new")]);
+        let mut healed = role_report("lamad", old.clone(), new.clone());
+        healed.applied = true;
+        let mut failed = role_report("imagodei", old.clone(), new.clone());
+        failed.error = Some("update_coordinators failed: boom".to_string());
+        let mut foreign = role_report("lamad", old, new);
+        foreign.error = lineage_mismatch_error("uhC0k-OLD", "uhC0k-A");
+
+        let report = CoordinatorConductorReport {
+            apply: true,
+            apps_installed: 3,
+            apps: vec![
+                CoordinatorSyncReport {
+                    app_id: "elohim".to_string(),
+                    apply: true,
+                    roles: vec![healed],
+                    drifted_count: 1,
+                    applied_count: 1,
+                },
+                CoordinatorSyncReport {
+                    app_id: "hosted-a".to_string(),
+                    apply: true,
+                    roles: vec![failed, foreign],
+                    drifted_count: 2,
+                    applied_count: 0,
+                },
+            ],
+            skipped_apps: vec![CoordinatorAppSkip {
+                app_id: "other".to_string(),
+                reason: AppSweepSkip::NoRoleInBundle.label().to_string(),
+                installed_dna: BTreeMap::new(),
+            }],
+            bundle_dna: dna_map(&[("lamad", "uhC0k-A")]),
+            drifted_count: 3,
+            applied_count: 1,
+            unhealed: vec![
+                "hosted-a/imagodei".to_string(),
+                "hosted-a/lamad".to_string(),
+            ],
+        };
+        assert_eq!(report.unhealed_on_lineage(), vec!["hosted-a/imagodei"]);
+
+        let v = serde_json::to_value(&report).expect("report serializes");
+        assert_eq!(v["appsInstalled"], 3);
+        assert_eq!(v["apps"][1]["appId"], "hosted-a");
+        assert_eq!(v["apps"][1]["roles"][0]["role"], "imagodei");
+        assert_eq!(v["skippedApps"][0]["reason"], "no_role_in_bundle");
+        assert_eq!(v["bundleDna"]["lamad"], "uhC0k-A");
+        assert!(v.get("skipped_apps").is_none());
     }
 
     /// snake_case never leaves the Rust boundary — the wire shape is camelCase.

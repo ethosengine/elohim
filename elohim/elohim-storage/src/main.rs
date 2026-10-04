@@ -1191,6 +1191,18 @@ async fn async_main(
 
         info!("Embedded conductor ready, hApp installed");
 
+        // The boot sweep above healed the node's OWN app. Every other app on
+        // this conductor — one per hosted person — is swept here, off the
+        // readiness path.
+        {
+            let ws = admin_ws.clone();
+            let happ_path = args.happ_path.clone();
+            let own_app = args.app_id.clone();
+            tokio::spawn(async move {
+                happ_manager::sweep_other_apps_at_boot(&ws, &happ_path, &own_app).await;
+            });
+        }
+
         // Capture an Arc<AdminWebsocket> for downstream use by the step-zero
         // substrate agent_info publisher + subscriber (wired below when the
         // feature flag is on). AdminWebsocket is Clone (its internal state is
