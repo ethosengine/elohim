@@ -676,3 +676,18 @@ bounds what a stale party can do in the meantime. The first matches the model th
 operator described (born locally, stronger when witnessed, affirmed later) and
 places finality on the live plane, where peers present together witness a change.
 It needs an answer to who the witnesses are for a subject, and for one person alone.
+
+### 12.10 Ruling: final by witness (operator, 2026-10-04)
+
+A change of standing is provisional until a named body witnesses it. A provisional
+change displaces nothing. This is the premise for the next design; 12.3-12.5 and
+12.8 remain superseded.
+
+Two things the ruling leaves to that design, with the working assumptions it will
+start from and must state as assumptions until the operator confirms them:
+
+- **Who witnesses a change for a subject.** Assumed: the body the subject's
+  standing record names, which defaults to the collective that stewards its
+  namespace, and failing that a quorum of the peers holding the content.
+- **One person alone.** Assumed: their own acts are final for them and provisional
+  to everyone else until someone witnesses them.
