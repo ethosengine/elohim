@@ -666,7 +666,71 @@ fn apply_ordered_content_head(
     ctx: &AppContext,
 ) -> Result<content_diesel::StampOutcome, StorageError> {
     let head = validate_ordered_content_head(content_id, head_action_hash, ordering, head)?;
+    let outcome =
+        crate::p2p::projection_reconcile::project_authenticated_content_head(&head, pool, ctx)?;
+    if outcome != content_diesel::StampOutcome::NoRow {
+        return Ok(outcome);
+    }
+    // No local row. This node's OWN cell declared an earned canonical head
+    // (the signal comes from this node's app only), and the conductor just
+    // resolved and authenticated the exact payload: the node holds the head,
+    // so it holds the row. Without this, content another agent authored on a
+    // cell with no storage of its own (a hosted person's cell) has no row on
+    // any node, and a delegate that adopted it cannot publish to it (fleet
+    // 2026-10-04, backlog `hosted-authored-content-has-no-storage-row`).
+    // Seed the row from the verified head, then stamp through the same guard.
+    // The legacy unordered arm and the reconcile sweep still never insert.
+    seed_row_from_declared_head(&head, pool, ctx)?;
+    info!(
+        id = %content_id,
+        hash = %head_action_hash,
+        "Declared canonical head had no local row — row seeded from the conductor-verified head"
+    );
     crate::p2p::projection_reconcile::project_authenticated_content_head(&head, pool, ctx)
+}
+
+/// Insert the SQL row for a head this node's own cell declared and the
+/// conductor authenticated. Field mapping mirrors the `ContentCommitted` arm.
+fn seed_row_from_declared_head(
+    head: &crate::services::conductor_writes::ContentHeadWire,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<(), StorageError> {
+    let c = &head.content;
+    let size_i32 = c
+        .content_size_bytes
+        .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+    let patch = ContentProjectionPatch {
+        blob_cid: c.blob_cid.clone(),
+        content_size_bytes: size_i32,
+        title: Some(c.title.clone()),
+        description: Some(c.description.clone()),
+        content_type: Some(c.content_type.clone()),
+        content_format: Some(c.content_format.clone()),
+        reach: Some(c.reach.clone()),
+        metadata_json: Some(c.metadata_json.clone()),
+        ..Default::default()
+    }
+    .carry_verified_version(
+        &c.id,
+        &c.content,
+        c.blob_cid.as_deref(),
+        &c.tags,
+        &c.metadata_json,
+    );
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+    // Anchor only: the declaration is stamped by the caller's second pass,
+    // through the canonical move guard.
+    content_diesel::upsert_with_anchor(
+        &mut conn,
+        ctx,
+        &c.id,
+        patch,
+        head.head_action_hash.as_str(),
+        content_diesel::HeadElection::PreserveExistingDeclaration,
+    )
 }
 
 fn ordered_head_from_batch(
@@ -1310,6 +1374,34 @@ mod tests {
             .is_none(),
             "an absent lamad slot must not fall back to the infrastructure client or touch SQL"
         );
+    }
+
+    #[test]
+    fn a_head_this_cell_declared_seeds_the_row_when_no_local_row_exists() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "hosted-authored-root";
+        let ordering = crate::db::content_diesel::CanonicalOrdering::new(20, true);
+
+        let outcome = apply_ordered_content_head(
+            id,
+            &HoloHashB64("uhCkk-root".into()),
+            ordering,
+            ordered_head(id, "uhCkk-root", "blob-root", ordering),
+            &pool,
+            &ctx,
+        )
+        .expect("an own-cell canonical declaration with no local row seeds one");
+        assert_ne!(outcome, content_diesel::StampOutcome::NoRow);
+
+        let mut conn = pool.get().expect("connection");
+        let row =
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .expect("read")
+                .expect("the adopted head has a row");
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-root"));
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-root"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-root"));
     }
 
     #[test]

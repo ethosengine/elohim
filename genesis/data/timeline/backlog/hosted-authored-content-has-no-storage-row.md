@@ -52,10 +52,34 @@ root" → "a delegate publishes an update to it" / missing node: some storage ho
 root / probe: GET /db/content/<root id> on the hosting node's doorway returns 200 after the hosted
 cell's create_content / current state: 404, by construction.`
 
-## What was done instead
+## What was done (2026-10-04, same day)
 
-Leg 2 re-authors the root through a storage write path (the row and the DHT entry are written
-together), with a new delegation and adoption. That closes the campaign and leaves this gap open.
+Re-authoring the root through a storage write path was considered and dropped: storage's write
+path calls `create_content` through the node's own app (`conductor_writes::call_create_content`
+on storage's `HcClient`), so the root's author would be the node's agent, not the hosted person.
+**[V]** That changes whose root it is, which is the thing leg 2 is proving.
+
+Narrow fix instead, in `rea_projection.rs::apply_ordered_content_head`: when this node's OWN cell
+declares an earned canonical head (an ordered `ContentHeadDeclared`, which storage only receives
+from its own app) and the conductor has resolved and authenticated the exact payload, a missing
+local row is seeded from that verified head and then stamped through the usual canonical guard.
+The adopting node holds the head, so it holds the row. Unit test:
+`a_head_this_cell_declared_seeds_the_row_when_no_local_row_exists`.
+
+Unchanged on purpose: the legacy unordered signal arm and the reconcile sweep still never insert,
+and a node that has not itself declared the head still gets no row.
+
+To use it on an already-declared head: rebuild and restart storage, then repeat the declaration.
+An idempotent declaration still emits the signal (`content_store`, the declare extern's doc).
+
+P2P design gate, short form: no new entity, entry type, route or wire message. Content stays
+Notarized (A) with the DHT as truth; this changes only when its SQLite projection is created.
+Head-plane cost: one row per foreign-authored head a node's own cell adopts. Reach is carried
+from the verified entry unchanged.
+
+Still open below: a node whose cell has NOT declared the head (the hosting node itself, any
+third peer) holds no row, so the root is still invisible there until the adopter's row is
+advertised and acquired. Not proven on a household or the fleet; the a2o story is owed.
 
 ## Before designing a fix
 
