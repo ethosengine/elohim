@@ -70,8 +70,9 @@ node to add.
 Taking the capture's recommendation (its §8 question 3):
 
 - **A pool is a `Collective`** with a charter that says what the pool is for.
-- **It holds a resource** classified `commons-pool:<kind>` (storage, index, inference, serving,
-  compute). The resource is the thing governed. Any treasury that funds its care is a separate
+- **It holds a resource** classified `commons-pool:<kind>`. The kind is an open label that says
+  what the pool is for (storage, index, inference, serving and compute are the ones §4 uses); it
+  is not a closed list. The resource is the thing governed. Any treasury that funds its care is a separate
   resource; the two are never confused (`hardware-providence-commons.md` §8).
 - **A member contributes by a commitment that names the collective**, using the actions that
   exist: `replicates-content` for storage, `delegates-compute` for compute. The commitment's
@@ -99,7 +100,9 @@ stewards and is not designed here.
 (the existing bounds checks). (2) Its counterparty is a collective. (3) The caller has a
 membership in that collective with no withdrawal height. (4) The request is inside the
 commitment's scope, rate and reach ceiling. (5) The thing drawn admits the caller at its own
-reach. A failure at any step is a refusal that names the step.
+reach. A failure at any step is a refusal that names the step. Steps 1 to 4 can be built on what
+exists. Step 5 cannot: no check of what a particular reader may see exists today (§6). Until it
+does, a pool can only hold things whose reach already admits every member.
 
 **Existing grants are unaffected.** A commitment whose counterparty is an agent key is checked as
 it is today. The collective case is an added arm, not a replacement.
@@ -151,7 +154,8 @@ it is today. The collective case is an added arm, not a replacement.
 
 ### Network stakes
 
-A pool behaves under all four declared stages. The membership check and the reach check are
+A pool behaves under all four declared network stages (Simulacra, Bootstrap, Coordinated, Enforced;
+`elohim-storage/src/trust/stage.rs`). The membership check and the reach check are
 floor-protected: they never cheapen. What may be priced by stage is how deeply a member's
 contributed bytes are re-verified.
 
@@ -174,16 +178,21 @@ see, join and compel?
 - **See:** who the members are, and what each has committed. That is inside the collective's own
   membrane and is acceptable there. They must not see who drew what: draws are read as ranges of
   addressed archives so that a read leaves no query, and any count leaves the reader's device only
-  as a sum (boundary 2; the consumer-blinded census, which is specified and not built).
+  as a sum. Boundary 2 says an activity ledger is held by the holon it describes and is never
+  joined from outside. Of the three parts of this line, range reads and keeping no joining record
+  can be built on the blob layer as it is; counts leaving only as sums need the consumer-blinded
+  census, which is specified and not built.
 - **Join:** nothing across pools. A person's membership in two pools is joined by no one but that
-  person (boundary 5).
+  person (boundary 5: correlating identities across namespaces is an act of consent, never a join
+  or an inference).
 - **Compel:** nothing from a member's device beyond what that member committed, and that
   commitment can be revoked. A pool cannot require anything that must never leave a device.
 - **What a pool may never hold:** a person's attention, revealed preferences, private notes and
   reflections (`manifesto.md:438`, boundary 1). A pool that would need them is refused. Compute
   travels to the data on the person's own device; the data does not travel to the pool.
-- **Counted identities:** admission to a pool never rests on how many members vouch. Identities are free to
-  mint. A member's weight in a pool comes from what they have carried over time under a steward's
+- **Counted identities:** identities are free to mint, so any rule that counts them can be met by
+  minting more. Admission to a pool therefore never rests on how many members vouch. A member's
+  weight in a pool comes from what they have carried over time under a steward's
   standing.
 
 A pool design that fails any line above is a refusal, not a mitigation to schedule.
@@ -208,6 +217,11 @@ Each row is built from parts that exist plus the one missing node, and each has 
 | Serving near the reader | the doorway's reach-keyed cache; `serve-blob` events; addressed archives read by range | CDN, edge cache | serving by a patron's own device has no story; a doorway re-asks standing at serve time only as a red habit |
 | Compute near the work | `delegates-compute`; the compute request and its events; the tevah envelope for the guest | compute | no offer of a berth and no matching; fulfilment is not notarized |
 | A view across many holders | flat coverage rollup; the pool's index as a measure its members compute over what they hold | analytics | no carrier for an aggregate across DHTs; no witness quorum; no bound on how small a counted group may be |
+
+For a first pool that only shares storage among people who know each other, none of these gaps
+blocks: holders reading what they hold is acceptable inside that circle. Blind custody blocks any
+pool whose holders should not read. The inference, compute and cross-holder rows each need their
+own gap closed before that service exists at all.
 
 Two things in this table have no conventional analog and are where the design is stronger than
 what it resembles: admission by earned reach in place of a price, and recovery by people who know

@@ -3,6 +3,7 @@ title: The working-version standard — how an app keeps a thing that is still b
 id: working-version-sdk-standard-design
 status: Draft
 class: architecture
+serves: dataplane-convergence
 date: 2026-10-04
 context-tier: disclosed
 steward: human:matthew
@@ -108,7 +109,8 @@ becomes a condition for what worked without it.
 - **Head-plane cost:** none. A working version adds no head, no provider record and no conductor
   round-trip. Republishing adds one version to a head that already exists. This is the point of
   the layer: change is free of the notary until it is published.
-- **Network stakes:** behaves the same under all four declared stages. It touches no
+- **Network stakes:** behaves the same under all four declared network stages (Simulacra,
+  Bootstrap, Coordinated, Enforced; `elohim-storage/src/trust/stage.rs`). It touches no
   floor-protected cost. Republish inherits the head path's pricing.
 - **Address:** for a thing that is already published, the existing document id for its content
   (`node:{id}`, to become cell-qualified under spec 2026-09-08). For a thing never yet published,
@@ -180,7 +182,11 @@ and `quiltPolicy`:
 | `republish` | `author`, `circle-agreement`, `governance-act` | who must agree before a version is submitted |
 | `passing` | a list of names | what unstored, in-the-moment state the type has (presence, cursor, selection) |
 
-Absent block means `kept: none`. `republish` makes OD-7 a per-type declaration. Only `author`
+Absent block means `kept: none`. `republish` makes OD-7 a per-type declaration; its three values
+are the three answers that open decision lists (the author alone, the people editing together, an
+act of the governing body), and a type picks one because a shared recipe and a community charter
+do not want the same rule. `passing` is a list of names only: what passing state means is the
+app's to define, and the standard needs to know just that it exists and is never stored. Only `author`
 (with the existing device delegation) can be honoured by today's zome gate; the other two are
 declared values with no enforcement yet.
 
@@ -207,8 +213,10 @@ In `@elohim/storage-client` beside `AutomergeSync`, mirrored in `crates/elohim-s
 **Republish is a submission.** The notary runs an election among candidates
 (`select_canonical_winner`); a submitted version can lose. `republish()` returns `pending`, then
 `elected`, `lost` or `refused`. A lost version stays as a working version the person can merge
-forward and submit again. Two people who each fix and republish from one working version submit
-two candidates; the election chooses, and the other is `lost`.
+forward and submit again. `fix()` freezes the values on the device that calls it. Two people whose
+copies have converged fix the same values and get the same address: one candidate. Two people who
+fix before their copies have converged submit two candidates; the election chooses, and the other
+is `lost`.
 
 `refused` is the gate saying no before any election: the caller may not republish this thing (not
 its author, no delegation, or the type's `republish` rule is not met).
@@ -254,9 +262,9 @@ it is waiting.
 
 ## 8. Mixed versions
 
-A change carries the schema version of the client that wrote it. A reader translates what it reads
-into its own shape, because a writer cannot know every reader that will exist; how the version is
-carried is left to the build. Nothing requires every device to upgrade before any device can write. Where a
+This section states a requirement; the mechanism is not designed and is listed in §9. A change
+carries the schema version of the client that wrote it. A reader translates what it reads into its
+own shape, because a writer cannot know every reader that will exist. Nothing requires every device to upgrade before any device can write. Where a
 translation would lose something an older client cannot express, the older client reads and does
 not write that field.
 
@@ -271,12 +279,12 @@ Each is a missing node, named and not designed here.
 | Changes cannot be sealed to a circle | spec 2026-08-23 (blind custody), not built | the doorway refusal in §3 |
 | Document ids are not cell-qualified | spec 2026-09-08, not built | a working version cannot say which cell it belongs to |
 | The browser keeps no document across a reload | `content-doc-sync.service.ts` | no working version for a hosted person |
-| The TypeScript client reads `new_heads`; the server sends `newHeads` | `sync.ts:97,132`; `http.rs:6994,7053` | the first sync re-sends the whole document |
+| How a schema version is carried on a change, and how a reader translates | not designed | §8 is a requirement without a mechanism |
 | `circle-agreement` and `governance-act` republish | zome gate is author or delegated device | declared, not enforced |
 
 ## 10. The story it is measured by
 
-`genesis/a2o/features/federation/local-first-shared-sheet.feature` (on branch
-`sprint/2026-09-22-localfirst-vision`, not yet on `dev`) and its one runnable seam,
-`dataplane/hub-carries-edit.feature`. When the vision feature reaches `dev`, its offline-edit and
-closed-laptop scenarios are this standard's acceptance.
+`genesis/a2o/features/federation/local-first-shared-sheet.feature` (a vision feature, every step
+undefined) and its one runnable seam, `dataplane/hub-carries-edit.feature`
+(`@concern:hub-carries-edit`, a check of the `dataplane-convergence` habit, born red). The vision
+feature's offline-edit and closed-laptop scenarios are this standard's acceptance.
