@@ -1050,6 +1050,67 @@ pub(crate) fn synthetic_identity_fallback_allowed(
     matches!(stage, seam_contracts::freshness::NetworkStage::Simulacra)
 }
 
+/// Why a registration that acts on the doorway's own agent was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OperatorAuthorityRefusal {
+    /// The doorway has no admin key configured, so nothing can prove the operator.
+    Unconfigured,
+    /// The caller supplied no key.
+    Missing,
+    /// The caller's key is not the doorway's admin key.
+    Mismatch,
+}
+
+impl OperatorAuthorityRefusal {
+    fn code(self) -> &'static str {
+        match self {
+            Self::Unconfigured => "ADMIN_KEY_UNCONFIGURED",
+            Self::Missing => "OPERATOR_KEY_REQUIRED",
+            Self::Mismatch => "ADMIN_KEY_REJECTED",
+        }
+    }
+
+    fn message(self) -> &'static str {
+        match self {
+            Self::Unconfigured => {
+                "This doorway has no admin key configured, so nobody can register as its operator"
+            }
+            Self::Missing => {
+                "Registering as the doorway's operator requires the doorway's admin key"
+            }
+            Self::Mismatch => "Admin bootstrap key does not match the configured admin key",
+        }
+    }
+}
+
+/// Whether the caller may register on the doorway's OWN agent.
+///
+/// `agencyPhase = "doorway"` creates, or recovers, the Human on the doorway's
+/// singleton conductor agent: the operator's identity. The phase is chosen by
+/// the caller, so without this check any unauthenticated registration could
+/// name it and, once the operator's Human exists, receive a session bound to
+/// that Human through the "already has a Human profile" recovery. On a fresh
+/// doorway the first such caller would BECOME the operator's Human.
+///
+/// The only operator evidence the doorway holds today is `API_KEY_ADMIN`. It
+/// proves the caller holds the doorway's admin secret, not that they control
+/// the operator's agent key. Fails closed: an unset or empty configured key
+/// refuses everyone.
+pub(crate) fn operator_registration_authority(
+    supplied: Option<&str>,
+    configured: Option<&str>,
+) -> Result<(), OperatorAuthorityRefusal> {
+    let configured = match configured {
+        Some(k) if !k.is_empty() => k,
+        _ => return Err(OperatorAuthorityRefusal::Unconfigured),
+    };
+    match supplied {
+        None | Some("") => Err(OperatorAuthorityRefusal::Missing),
+        Some(k) if k == configured => Ok(()),
+        Some(_) => Err(OperatorAuthorityRefusal::Mismatch),
+    }
+}
+
 /// Re-qualify an identifier's local-part with the doorway's gateway domain. Idempotent
 /// for an already-own-domain identifier (no double-qualify); converges bare,
 /// full-own-domain, and full-foreign-domain inputs all to `localpart@gateway`.
@@ -1240,6 +1301,27 @@ async fn handle_register(
         // operator's conductor. No provisioning step — the doorway IS the
         // conductor for this identity.
         "doorway" => {
+            // This phase acts on the operator's own identity, for a first
+            // registration and for the recovery below alike, so it is refused
+            // before any zome call unless the caller proves operator authority.
+            if let Err(refusal) = operator_registration_authority(
+                body.admin_bootstrap_key.as_deref(),
+                state.args.api_key_admin.as_deref(),
+            ) {
+                warn!(
+                    identifier = %body.identifier,
+                    code = refusal.code(),
+                    "Doorway: refused agencyPhase=doorway registration without operator authority"
+                );
+                return json_response(
+                    StatusCode::FORBIDDEN,
+                    &ErrorResponse {
+                        error: refusal.message().into(),
+                        code: Some(refusal.code().into()),
+                    },
+                );
+            }
+
             // Prefer a caller-supplied canonical human_id — the same override the
             // node/device branch below already honors — over minting a fresh UUID.
             // Minting an unconditional UUID here is the root cause of a household-
@@ -6359,6 +6441,65 @@ mod tests {
     /// The synthetic-identity fallback is reachable ONLY under a DECLARED
     /// `Simulacra` stage, and retires itself at `Bootstrap` and above — the same
     /// designed expiry as the pre-coordination loopback grant.
+    // ── Registering on the doorway's own agent needs operator authority ─────
+
+    #[test]
+    fn operator_registration_is_refused_without_a_key() {
+        assert_eq!(
+            operator_registration_authority(None, Some("k")),
+            Err(OperatorAuthorityRefusal::Missing)
+        );
+        assert_eq!(
+            operator_registration_authority(Some(""), Some("k")),
+            Err(OperatorAuthorityRefusal::Missing)
+        );
+    }
+
+    #[test]
+    fn operator_registration_is_refused_with_the_wrong_key() {
+        assert_eq!(
+            operator_registration_authority(Some("other"), Some("k")),
+            Err(OperatorAuthorityRefusal::Mismatch)
+        );
+    }
+
+    #[test]
+    fn operator_registration_fails_closed_when_no_admin_key_is_configured() {
+        for configured in [None, Some("")] {
+            for supplied in [None, Some(""), Some("k")] {
+                assert_eq!(
+                    operator_registration_authority(supplied, configured),
+                    Err(OperatorAuthorityRefusal::Unconfigured),
+                    "supplied={supplied:?} configured={configured:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn operator_registration_is_admitted_with_the_admin_key() {
+        assert_eq!(
+            operator_registration_authority(Some("k"), Some("k")),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn operator_registration_refusals_carry_distinct_codes() {
+        assert_eq!(
+            OperatorAuthorityRefusal::Missing.code(),
+            "OPERATOR_KEY_REQUIRED"
+        );
+        assert_eq!(
+            OperatorAuthorityRefusal::Mismatch.code(),
+            "ADMIN_KEY_REJECTED"
+        );
+        assert_eq!(
+            OperatorAuthorityRefusal::Unconfigured.code(),
+            "ADMIN_KEY_UNCONFIGURED"
+        );
+    }
+
     #[test]
     fn synthetic_identity_fallback_is_simulacra_only() {
         use seam_contracts::freshness::NetworkStage;
