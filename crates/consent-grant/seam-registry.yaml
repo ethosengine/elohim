@@ -20,7 +20,7 @@ decisionPoints:
     sourceLocation:
       file: src/request.rs
       modulePath: consent_grant::request::admit_request
-      line: 115
+      line: 171
     summary: >
       Decides whether a terminal's request is fit to put in front of a person: known domain and
       client, well-formed device key and network, plain bounded label, a non-empty set of
@@ -111,7 +111,7 @@ decisionPoints:
     sourceLocation:
       file: src/redeem.rs
       modulePath: consent_grant::redeem::admit_redemption
-      line: 123
+      line: 245
     summary: >
       Decides whether a terminal may collect an approved grant: the code's digest matches, the
       grant is unredeemed and unexpired, the client and device key are the ones that asked, and

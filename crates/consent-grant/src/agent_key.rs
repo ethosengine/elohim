@@ -35,6 +35,16 @@ pub fn is_dna_hash(text: &str) -> bool {
     has_shape(text, DNA_PREFIX)
 }
 
+/// A participant key as local tooling names it: an ed25519 `did:key`, which
+/// is `z6Mk` followed by 44 base58 characters.
+pub fn is_participant_key(text: &str) -> bool {
+    const BASE58: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    match text.strip_prefix("did:key:z6Mk") {
+        Some(rest) => rest.len() == 44 && rest.bytes().all(|b| BASE58.contains(&b)),
+        None => false,
+    }
+}
+
 /// Short form for a consent screen: enough for a person to compare against
 /// what their terminal printed, not enough to mistake for the key.
 pub fn fingerprint(agent_key: &str) -> String {
@@ -88,6 +98,22 @@ mod tests {
         let dna = "uhC0kZezl4k2nZa5ZyU5O5H-5vH5LYpvwkSwkVx4G1wS_sHB4GTOt";
         assert!(is_dna_hash(dna));
         assert!(!is_dna_hash(
+            "uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl"
+        ));
+    }
+
+    #[test]
+    fn a_participant_key_is_an_ed25519_did_key() {
+        let key = format!("did:key:z6Mk{}", "h".repeat(44));
+        assert!(is_participant_key(&key));
+        assert!(!is_participant_key(&key[..key.len() - 1]));
+        assert!(!is_participant_key(&key.replace("z6Mk", "z6LS")));
+        // 0, O, I and l are not base58.
+        assert!(!is_participant_key(&format!(
+            "did:key:z6Mk{}",
+            "0".repeat(44)
+        )));
+        assert!(!is_participant_key(
             "uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl"
         ));
     }

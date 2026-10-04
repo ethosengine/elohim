@@ -13,8 +13,14 @@ pub const MAX_ITEM_ID_LEN: usize = 256;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum RequestedAct {
-    /// Bind this device's key to the person's identity (`device.enroll`).
+    /// Bind this device's node key to the person's identity (`device.enroll`).
+    /// Asking for this is what makes the device a stewarded peer; a request
+    /// without it is an ephemeral sign-in that leaves no binding behind.
     EnrollDevice,
+    /// Also bind the device's participant key, the one its local tooling
+    /// signs attribution with (`participant.bind`). Only alongside
+    /// [`Self::EnrollDevice`].
+    BindParticipantKey,
     /// Delegate the head of one content root to this device
     /// (`content.head:<item-id>`).
     DelegateHead { item_id: String },
@@ -36,12 +42,22 @@ impl ActRefusal {
 }
 
 const ENROLL: &str = "device.enroll";
+const BIND_PARTICIPANT: &str = "participant.bind";
 const HEAD_PREFIX: &str = "content.head:";
 
 impl RequestedAct {
+    /// Whether the act lapses. A delegation is granted until a time; an
+    /// enrollment stands until it is revoked.
+    pub fn is_time_bound(&self) -> bool {
+        matches!(self, Self::DelegateHead { .. })
+    }
+
     pub fn parse(text: &str) -> Result<Self, ActRefusal> {
         if text == ENROLL {
             return Ok(Self::EnrollDevice);
+        }
+        if text == BIND_PARTICIPANT {
+            return Ok(Self::BindParticipantKey);
         }
         if let Some(item_id) = text.strip_prefix(HEAD_PREFIX) {
             let well_formed = !item_id.is_empty()
@@ -65,6 +81,7 @@ impl std::fmt::Display for RequestedAct {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EnrollDevice => f.write_str(ENROLL),
+            Self::BindParticipantKey => f.write_str(BIND_PARTICIPANT),
             Self::DelegateHead { item_id } => write!(f, "{HEAD_PREFIX}{item_id}"),
         }
     }
@@ -89,7 +106,11 @@ mod tests {
 
     #[test]
     fn acts_round_trip_through_their_strings() {
-        for text in ["device.enroll", "content.head:fct-module-01"] {
+        for text in [
+            "device.enroll",
+            "participant.bind",
+            "content.head:fct-module-01",
+        ] {
             assert_eq!(RequestedAct::parse(text).unwrap().to_string(), text);
         }
     }

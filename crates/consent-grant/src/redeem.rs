@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::act::RequestedAct;
 use crate::pkce;
-use crate::request::AdmittedRequest;
+use crate::request::{AdmittedRequest, Standing};
 use crate::return_path::{is_token, ReturnPath};
 
 /// Shortest code a portal may issue: 32 URL-safe characters is at least 190
@@ -24,6 +24,80 @@ pub fn code_digest(code: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(code.as_bytes()))
 }
 
+/// What the controller granted. Every approval produces a grant, and what the
+/// device may do afterwards is read from these claims and nowhere else: a
+/// person may grant less than was asked, never more.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrantedClaims {
+    /// The acts the controller agreed to sign, a subset of those asked for.
+    pub acts: Vec<RequestedAct>,
+    /// Present exactly when binding the participant key was granted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_key: Option<String>,
+    /// When the time-bound acts lapse. `None` when none was granted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid_until_micros: Option<i64>,
+}
+
+impl GrantedClaims {
+    pub fn standing(&self) -> Standing {
+        Standing::of(&self.acts)
+    }
+}
+
+/// A controller's decision on an admitted request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Approval {
+    /// Agent keys of the controllers who approved.
+    pub approved_by: Vec<String>,
+    /// The acts they agreed to, chosen from those asked for.
+    pub granted_acts: Vec<RequestedAct>,
+    /// The lifetime they agreed to for time-bound acts.
+    pub valid_for_secs: Option<u64>,
+}
+
+impl Approval {
+    /// Approve the request exactly as asked.
+    pub fn in_full(admitted: &AdmittedRequest, approved_by: Vec<String>) -> Self {
+        let r = admitted.request();
+        Self {
+            approved_by,
+            granted_acts: r.acts.clone(),
+            valid_for_secs: r.valid_for_secs,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IssueRefusal {
+    CodeWeak,
+    Unapproved,
+    GrantedNothing,
+    GrantedBeyondRequest,
+    ParticipantBindNeedsEnrollment,
+    ValidityMissing,
+    ValidityUngranted,
+    ValidityBeyondRequest,
+    WindowInvalid,
+}
+
+impl IssueRefusal {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::CodeWeak => "issue_code_weak",
+            Self::Unapproved => "issue_unapproved",
+            Self::GrantedNothing => "issue_granted_nothing",
+            Self::GrantedBeyondRequest => "issue_granted_beyond_request",
+            Self::ParticipantBindNeedsEnrollment => "issue_participant_bind_needs_enrollment",
+            Self::ValidityMissing => "issue_validity_missing",
+            Self::ValidityUngranted => "issue_validity_ungranted",
+            Self::ValidityBeyondRequest => "issue_validity_beyond_request",
+            Self::WindowInvalid => "issue_window_invalid",
+        }
+    }
+}
+
 /// An approved request awaiting redemption. Ephemeral: rebuilt by asking again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +106,7 @@ pub struct StoredGrant {
     pub client_id: String,
     pub device_key: String,
     pub network_dna: String,
-    pub acts: Vec<RequestedAct>,
+    pub claims: GrantedClaims,
     pub code_challenge: String,
     pub state: String,
     pub return_path: ReturnPath,
@@ -45,32 +119,80 @@ pub struct StoredGrant {
 impl StoredGrant {
     /// Record a controller's approval of an admitted request.
     ///
-    /// `code` is the portal's freshly drawn random token; `None` is returned
-    /// if it is too short or outside the URL-safe alphabet, so a weak code
-    /// cannot be issued by mistake.
+    /// `code` is the portal's freshly drawn random token and `code_ttl_micros`
+    /// how long it may wait to be redeemed. The claims are checked against the
+    /// request here, so a portal cannot issue a grant wider than what the
+    /// person was shown.
     pub fn issue(
         admitted: &AdmittedRequest,
         code: &str,
-        approved_by: Vec<String>,
+        approval: Approval,
         now_micros: i64,
-        ttl_micros: i64,
-    ) -> Option<Self> {
-        if !is_token(code, MIN_CODE_LEN, MAX_CODE_LEN) || approved_by.is_empty() || ttl_micros <= 0
-        {
-            return None;
+        code_ttl_micros: i64,
+    ) -> Result<Self, IssueRefusal> {
+        use IssueRefusal as R;
+
+        if !is_token(code, MIN_CODE_LEN, MAX_CODE_LEN) {
+            return Err(R::CodeWeak);
+        }
+        if approval.approved_by.is_empty() {
+            return Err(R::Unapproved);
         }
         let r = admitted.request();
-        Some(Self {
+        let granted = &approval.granted_acts;
+        if granted.is_empty() {
+            return Err(R::GrantedNothing);
+        }
+        let distinct = granted
+            .iter()
+            .enumerate()
+            .all(|(i, act)| !granted[..i].contains(act));
+        if !distinct || !granted.iter().all(|act| r.acts.contains(act)) {
+            return Err(R::GrantedBeyondRequest);
+        }
+        let binds_participant = granted.contains(&RequestedAct::BindParticipantKey);
+        if binds_participant && Standing::of(granted) != Standing::StewardedPeer {
+            return Err(R::ParticipantBindNeedsEnrollment);
+        }
+        let time_bound = granted.iter().any(RequestedAct::is_time_bound);
+        let valid_until_micros = match (approval.valid_for_secs, time_bound) {
+            (None, false) => None,
+            (Some(_), false) => return Err(R::ValidityUngranted),
+            (None, true) => return Err(R::ValidityMissing),
+            (Some(secs), true) => {
+                if secs == 0 || r.valid_for_secs.is_none_or(|asked| secs > asked) {
+                    return Err(R::ValidityBeyondRequest);
+                }
+                let micros = i64::try_from(secs)
+                    .ok()
+                    .and_then(|s| s.checked_mul(1_000_000))
+                    .and_then(|m| now_micros.checked_add(m))
+                    .ok_or(R::WindowInvalid)?;
+                Some(micros)
+            }
+        };
+        if code_ttl_micros <= 0 {
+            return Err(R::WindowInvalid);
+        }
+        Ok(Self {
             code_digest: code_digest(code),
             client_id: r.client_id.clone(),
             device_key: r.device_key.clone(),
             network_dna: r.network_dna.clone(),
-            acts: r.acts.clone(),
+            claims: GrantedClaims {
+                acts: approval.granted_acts,
+                participant_key: binds_participant
+                    .then(|| r.participant_key.clone())
+                    .flatten(),
+                valid_until_micros,
+            },
             code_challenge: r.code_challenge.clone(),
             state: r.state.clone(),
             return_path: r.return_path,
-            approved_by,
-            expires_at_micros: now_micros.checked_add(ttl_micros)?,
+            approved_by: approval.approved_by,
+            expires_at_micros: now_micros
+                .checked_add(code_ttl_micros)
+                .ok_or(R::WindowInvalid)?,
             redeemed: false,
         })
     }
@@ -157,14 +279,52 @@ mod tests {
     use crate::agent_key::sample_key;
     use crate::request::admit_request;
     use crate::request::tests::{policy, request, VERIFIER};
+    use crate::request::AdmittedRequest;
 
     const CODE: &str = "c0dec0dec0dec0dec0dec0dec0dec0de";
     const NOW: i64 = 1_000_000;
     const TTL: i64 = 300_000_000;
 
+    fn approver() -> Vec<String> {
+        vec![sample_key(9)]
+    }
+
     fn grant() -> StoredGrant {
         let admitted = admit_request(&request(), &policy()).unwrap();
-        StoredGrant::issue(&admitted, CODE, vec![sample_key(9)], NOW, TTL).unwrap()
+        let approval = Approval::in_full(&admitted, approver());
+        StoredGrant::issue(&admitted, CODE, approval, NOW, TTL).unwrap()
+    }
+
+    /// A request for everything: enroll, bind the participant key, and one
+    /// time-bound delegation for an hour.
+    fn wide() -> AdmittedRequest {
+        let mut r = request();
+        r.acts = vec![
+            RequestedAct::EnrollDevice,
+            RequestedAct::BindParticipantKey,
+            head(),
+        ];
+        r.participant_key = Some(format!("did:key:z6Mk{}", "h".repeat(44)));
+        r.valid_for_secs = Some(3600);
+        admit_request(&r, &policy()).unwrap()
+    }
+
+    fn head() -> RequestedAct {
+        RequestedAct::DelegateHead {
+            item_id: "item".into(),
+        }
+    }
+
+    fn issue(
+        acts: Vec<RequestedAct>,
+        valid_for_secs: Option<u64>,
+    ) -> Result<StoredGrant, IssueRefusal> {
+        let approval = Approval {
+            approved_by: approver(),
+            granted_acts: acts,
+            valid_for_secs,
+        };
+        StoredGrant::issue(&wide(), CODE, approval, NOW, TTL)
     }
 
     fn redemption() -> Redemption {
@@ -238,15 +398,83 @@ mod tests {
     }
 
     #[test]
-    fn a_weak_code_or_an_unapproved_grant_cannot_be_issued() {
-        let admitted = admit_request(&request(), &policy()).unwrap();
-        let approver = vec![sample_key(9)];
-        assert!(StoredGrant::issue(&admitted, "short", approver.clone(), NOW, TTL).is_none());
-        assert!(
-            StoredGrant::issue(&admitted, &"a#".repeat(16), approver.clone(), NOW, TTL).is_none()
+    fn every_approval_yields_a_grant_whose_claims_say_what_was_granted() {
+        let full = StoredGrant::issue(
+            &wide(),
+            CODE,
+            Approval::in_full(&wide(), approver()),
+            NOW,
+            TTL,
+        )
+        .unwrap();
+        assert_eq!(full.claims.standing(), Standing::StewardedPeer);
+        assert!(full.claims.participant_key.is_some());
+        assert_eq!(full.claims.valid_until_micros, Some(NOW + 3600 * 1_000_000));
+
+        // The person keeps only the delegation: still a grant, now ephemeral.
+        let narrowed = issue(vec![head()], Some(600)).unwrap();
+        assert_eq!(narrowed.claims.standing(), Standing::Ephemeral);
+        assert_eq!(narrowed.claims.acts, vec![head()]);
+        assert_eq!(narrowed.claims.participant_key, None);
+        assert_eq!(
+            narrowed.claims.valid_until_micros,
+            Some(NOW + 600 * 1_000_000)
         );
-        assert!(StoredGrant::issue(&admitted, CODE, vec![], NOW, TTL).is_none());
-        assert!(StoredGrant::issue(&admitted, CODE, approver.clone(), NOW, 0).is_none());
-        assert!(StoredGrant::issue(&admitted, CODE, approver, i64::MAX, TTL).is_none());
+
+        // Enrollment alone carries no lifetime.
+        let enrolled = issue(vec![RequestedAct::EnrollDevice], None).unwrap();
+        assert_eq!(enrolled.claims.valid_until_micros, None);
+        assert_eq!(enrolled.claims.participant_key, None);
+    }
+
+    #[test]
+    fn a_grant_is_never_wider_than_the_request() {
+        use IssueRefusal as R;
+        let other = RequestedAct::DelegateHead {
+            item_id: "other".into(),
+        };
+        assert_eq!(issue(vec![other], Some(600)), Err(R::GrantedBeyondRequest));
+        assert_eq!(
+            issue(vec![head(), head()], Some(600)),
+            Err(R::GrantedBeyondRequest)
+        );
+        assert_eq!(
+            issue(vec![head()], Some(3601)),
+            Err(R::ValidityBeyondRequest)
+        );
+        assert_eq!(issue(vec![head()], Some(0)), Err(R::ValidityBeyondRequest));
+        assert_eq!(issue(vec![], None), Err(R::GrantedNothing));
+    }
+
+    #[test]
+    fn granted_claims_stay_coherent() {
+        use IssueRefusal as R;
+        assert_eq!(
+            issue(vec![RequestedAct::BindParticipantKey], None),
+            Err(R::ParticipantBindNeedsEnrollment)
+        );
+        assert_eq!(issue(vec![head()], None), Err(R::ValidityMissing));
+        assert_eq!(
+            issue(vec![RequestedAct::EnrollDevice], Some(600)),
+            Err(R::ValidityUngranted)
+        );
+    }
+
+    #[test]
+    fn a_weak_code_or_an_unapproved_grant_cannot_be_issued() {
+        use IssueRefusal as R;
+        let admitted = admit_request(&request(), &policy()).unwrap();
+        let ok = || Approval::in_full(&admitted, approver());
+        let issue = |code: &str, approval, now, ttl| {
+            StoredGrant::issue(&admitted, code, approval, now, ttl)
+        };
+        assert_eq!(issue("short", ok(), NOW, TTL), Err(R::CodeWeak));
+        assert_eq!(issue(&"a#".repeat(16), ok(), NOW, TTL), Err(R::CodeWeak));
+        assert_eq!(
+            issue(CODE, Approval::in_full(&admitted, vec![]), NOW, TTL),
+            Err(R::Unapproved)
+        );
+        assert_eq!(issue(CODE, ok(), NOW, 0), Err(R::WindowInvalid));
+        assert_eq!(issue(CODE, ok(), i64::MAX, TTL), Err(R::WindowInvalid));
     }
 }

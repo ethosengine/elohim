@@ -17,13 +17,21 @@ pub struct GrantRequest {
     pub domain: String,
     /// The registered relying party asking (for example the `elohim` CLI).
     pub client_id: String,
-    /// The agent key of the conductor that will act under the grant.
+    /// The agent key of the node that will act under the grant.
     pub device_key: String,
+    /// The device's participant key, present exactly when the request asks to
+    /// bind it (`participant.bind`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_key: Option<String>,
     /// What the person will see this device called on the consent screen.
     pub label: String,
     /// The network the device is on. A controller signs only for this one.
     pub network_dna: String,
     pub acts: Vec<RequestedAct>,
+    /// How long the time-bound acts should last. Required when any is asked
+    /// for; the controller may grant less.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid_for_secs: Option<u64>,
     /// PKCE `S256` challenge; the terminal keeps the verifier.
     pub code_challenge: String,
     /// Opaque value the terminal checks on return, so a code that arrives is
@@ -38,6 +46,8 @@ pub struct GrantPolicy {
     pub known_clients: Vec<String>,
     pub max_label_len: usize,
     pub max_acts: usize,
+    /// Longest a time-bound act may be asked for.
+    pub max_valid_for_secs: u64,
 }
 
 impl GrantPolicy {
@@ -50,7 +60,39 @@ impl GrantPolicy {
             known_clients: clients.into_iter().map(Into::into).collect(),
             max_label_len: 64,
             max_acts: 16,
+            max_valid_for_secs: 12 * 60 * 60,
         }
+    }
+}
+
+/// What the device will be once the request is approved. The consent screen
+/// says which, because they are different promises.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Standing {
+    /// Signed in for named, time-bound acts. Nothing binds the device to the
+    /// person afterwards.
+    Ephemeral,
+    /// Enrolled as one of the person's devices: a peer runtime acting for
+    /// them under their controllers.
+    StewardedPeer,
+}
+
+impl Standing {
+    /// The standing a set of acts amounts to.
+    pub fn of(acts: &[RequestedAct]) -> Self {
+        if acts.contains(&RequestedAct::EnrollDevice) {
+            Self::StewardedPeer
+        } else {
+            Self::Ephemeral
+        }
+    }
+}
+
+impl GrantRequest {
+    /// The standing asked for. What is granted may be less: read it from the
+    /// grant's claims.
+    pub fn standing(&self) -> Standing {
+        Standing::of(&self.acts)
     }
 }
 
@@ -64,6 +106,13 @@ pub enum RequestRefusal {
     ActsEmpty,
     ActsTooMany,
     ActsRepeated,
+    ParticipantKeyMalformed,
+    ParticipantKeyUnasked,
+    ParticipantKeyMissing,
+    ParticipantBindNeedsEnrollment,
+    ValidityMissing,
+    ValidityUnasked,
+    ValidityOutOfBounds,
     ChallengeMalformed,
     StateMalformed,
     ReturnPortRestricted,
@@ -81,6 +130,13 @@ impl RequestRefusal {
             Self::ActsEmpty => "request_acts_empty",
             Self::ActsTooMany => "request_acts_too_many",
             Self::ActsRepeated => "request_acts_repeated",
+            Self::ParticipantKeyMalformed => "request_participant_key_malformed",
+            Self::ParticipantKeyUnasked => "request_participant_key_unasked",
+            Self::ParticipantKeyMissing => "request_participant_key_missing",
+            Self::ParticipantBindNeedsEnrollment => "request_participant_bind_needs_enrollment",
+            Self::ValidityMissing => "request_validity_missing",
+            Self::ValidityUnasked => "request_validity_unasked",
+            Self::ValidityOutOfBounds => "request_validity_out_of_bounds",
             Self::ChallengeMalformed => "request_challenge_malformed",
             Self::StateMalformed => "request_state_malformed",
             Self::ReturnPortRestricted => "request_return_port_restricted",
@@ -147,6 +203,35 @@ pub fn admit_request(
     if request.acts.iter().collect::<HashSet<_>>().len() != request.acts.len() {
         return Err(R::ActsRepeated);
     }
+    // A participant key travels exactly when binding it is asked for, so the
+    // consent screen never shows a key nobody asked to bind, and never binds
+    // one it did not show.
+    let binds_participant = request.acts.contains(&RequestedAct::BindParticipantKey);
+    match (&request.participant_key, binds_participant) {
+        (None, false) => {}
+        (Some(_), false) => return Err(R::ParticipantKeyUnasked),
+        (None, true) => return Err(R::ParticipantKeyMissing),
+        (Some(key), true) => {
+            if !agent_key::is_participant_key(key) {
+                return Err(R::ParticipantKeyMalformed);
+            }
+            if request.standing() != Standing::StewardedPeer {
+                return Err(R::ParticipantBindNeedsEnrollment);
+            }
+        }
+    }
+    // A lifetime is stated exactly when something asked for can lapse.
+    let time_bound = request.acts.iter().any(RequestedAct::is_time_bound);
+    match (request.valid_for_secs, time_bound) {
+        (None, false) => {}
+        (Some(_), false) => return Err(R::ValidityUnasked),
+        (None, true) => return Err(R::ValidityMissing),
+        (Some(secs), true) => {
+            if secs == 0 || secs > policy.max_valid_for_secs {
+                return Err(R::ValidityOutOfBounds);
+            }
+        }
+    }
     if !pkce::challenge_is_well_formed(&request.code_challenge) {
         return Err(R::ChallengeMalformed);
     }
@@ -178,9 +263,11 @@ pub(crate) mod tests {
             domain: GRANT_DOMAIN.into(),
             client_id: "elohim-cli".into(),
             device_key: sample_key(7),
+            participant_key: None,
             label: "Matthew's workspace".into(),
             network_dna: NETWORK.into(),
             acts: vec![RequestedAct::EnrollDevice],
+            valid_for_secs: None,
             code_challenge: pkce::challenge(VERIFIER),
             state: "s".repeat(32),
             return_path: ReturnPath::Paste,
@@ -239,6 +326,77 @@ pub(crate) mod tests {
         );
     }
 
+    fn participant_key() -> String {
+        format!("did:key:z6Mk{}", "h".repeat(44))
+    }
+
+    #[test]
+    fn enrollment_is_what_makes_a_stewarded_peer() {
+        assert_eq!(request().standing(), Standing::StewardedPeer);
+        let mut ephemeral = request();
+        ephemeral.acts = vec![RequestedAct::DelegateHead {
+            item_id: "item".into(),
+        }];
+        ephemeral.valid_for_secs = Some(3600);
+        assert_eq!(ephemeral.standing(), Standing::Ephemeral);
+        assert!(admit_request(&ephemeral, &policy()).is_ok());
+    }
+
+    #[test]
+    fn a_stewarded_peer_may_bind_its_participant_key() {
+        let mut r = request();
+        r.acts.push(RequestedAct::BindParticipantKey);
+        r.participant_key = Some(participant_key());
+        assert!(admit_request(&r, &policy()).is_ok());
+    }
+
+    #[test]
+    fn a_participant_key_travels_exactly_when_binding_is_asked() {
+        use RequestRefusal as R;
+        assert_eq!(
+            refused(|r| r.participant_key = Some(participant_key())),
+            R::ParticipantKeyUnasked
+        );
+        assert_eq!(
+            refused(|r| r.acts.push(RequestedAct::BindParticipantKey)),
+            R::ParticipantKeyMissing
+        );
+        assert_eq!(
+            refused(|r| {
+                r.acts.push(RequestedAct::BindParticipantKey);
+                r.participant_key = Some("did:key:z6Mkshort".into());
+            }),
+            R::ParticipantKeyMalformed
+        );
+        assert_eq!(
+            refused(|r| {
+                r.acts = vec![RequestedAct::BindParticipantKey];
+                r.participant_key = Some(participant_key());
+            }),
+            R::ParticipantBindNeedsEnrollment
+        );
+    }
+
+    #[test]
+    fn a_lifetime_is_stated_exactly_when_something_can_lapse() {
+        use RequestRefusal as R;
+        let head = || RequestedAct::DelegateHead {
+            item_id: "item".into(),
+        };
+        assert_eq!(refused(|r| r.valid_for_secs = Some(60)), R::ValidityUnasked);
+        assert_eq!(refused(|r| r.acts.push(head())), R::ValidityMissing);
+        for secs in [0, 12 * 60 * 60 + 1] {
+            assert_eq!(
+                refused(|r| {
+                    r.acts.push(head());
+                    r.valid_for_secs = Some(secs);
+                }),
+                R::ValidityOutOfBounds,
+                "{secs}"
+            );
+        }
+    }
+
     #[test]
     fn a_label_is_plain_bounded_text() {
         use RequestRefusal as R;
@@ -273,6 +431,13 @@ pub(crate) mod tests {
             R::ActsEmpty,
             R::ActsTooMany,
             R::ActsRepeated,
+            R::ParticipantKeyMalformed,
+            R::ParticipantKeyUnasked,
+            R::ParticipantKeyMissing,
+            R::ParticipantBindNeedsEnrollment,
+            R::ValidityMissing,
+            R::ValidityUnasked,
+            R::ValidityOutOfBounds,
             R::ChallengeMalformed,
             R::StateMalformed,
             R::ReturnPortRestricted,
