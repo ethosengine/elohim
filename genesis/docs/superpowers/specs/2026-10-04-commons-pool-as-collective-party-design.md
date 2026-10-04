@@ -57,7 +57,8 @@ can be a party to a commitment.**
   grant, the holder of a resource, or the thing a member contributes to.
 
 So a pool today could only be built as every member granting to every other member. That is the
-node to add.
+node to add. It is one missing idea and several changes to how commitments are enforced; §3 lists
+them, and they are not small.
 
 - *Missing node:* chain `commons capacity` / between `a member's commitment to give storage or
   compute` → `another member's draw on it` / missing node: the collective as the commitment's
@@ -75,15 +76,17 @@ Taking the capture's recommendation (its §8 question 3):
   is not a closed list. The resource is the thing governed. Any treasury that funds its care is a separate
   resource; the two are never confused (`hardware-providence-commons.md` §8).
 - **A member contributes by a commitment that names the collective**, using the actions that
-  exist: `replicates-content` for storage, `delegates-compute` for compute. The commitment's
-  bounds carry the pool as `epr_scope`, a `reach_ceiling`, a rate and a rotation, as they do today.
+  exist: `replicates-content` for storage, `delegates-compute` for compute. The collective's
+  address goes in the commitment's `recipient` field. The bounds (`epr_scope`, `reach_ceiling`, a
+  rate, a rotation) keep their present meaning; `epr_scope` names task addresses or `*` today and
+  cannot name a pool.
 - **A member's device gives no more than the constitutional share allows.** The commons band and
   the `collective_pct` field already bound it (`constitutional_ratio_registry.rs`).
 - **A draw is admitted by membership and reach**, not by being named. The check reads: is the
   caller a current member of the collective this commitment names, within the bounds, at a reach
   the thing drawn admits.
-- **A contribution can be withdrawn.** `revokes-commitment` exists; `Membership` records a
-  withdrawal height after which nothing accrues.
+- **A contribution can be withdrawn.** `revokes-commitment` exists; a `Membership` is withdrawn
+  by an update that sets a withdrawal height, after which nothing accrues.
 
 Nobody holds a pool's key, because a pool has none. A collective is founded by a person's signed
 act (`founder_agent_cid`) and every later change to it — a membership, a role, a withdrawal — is
@@ -97,12 +100,14 @@ membership and a revocation of the commitments. Dissolving a pool is a governanc
 stewards and is not designed here.
 
 **The draw check, in order.** (1) The commitment exists, is not revoked and is inside its window
-(the existing bounds checks). (2) Its counterparty is a collective. (3) The caller has a
-membership in that collective with no withdrawal height. (4) The request is inside the
-commitment's scope, rate and reach ceiling. (5) The thing drawn admits the caller at its own
-reach. A failure at any step is a refusal that names the step. Steps 1 to 4 can be built on what
-exists. Step 5 cannot: no check of what a particular reader may see exists today (§6). Until it
-does, a pool can only hold things whose reach already admits every member.
+(the existing bounds checks). (2) Its recipient is a collective. (3) The caller's membership in
+that collective is current. A withdrawal is an update to the membership, so reading the original
+membership entry and finding no withdrawal height is the stale-state mistake the existing code
+warns against (`qahal_coordinator.rs:572`); the check must use the existing current-membership
+test, which follows updates. (4) The request is inside the commitment's scope, rate and reach
+ceiling. (5) The thing drawn admits the caller at its own reach, by the existing read gate
+(`api/content_reach_gate.rs`), on every path a pool serves through (§6). A failure at any step is
+a refusal that names the step.
 
 **Existing grants are unaffected.** A commitment whose counterparty is an agent key is checked as
 it is today. The collective case is an added arm, not a replacement.
@@ -121,9 +126,13 @@ it is today. The collective case is an added arm, not a replacement.
 ### Entity: a contribution
 
 - **Classification:** Notarized (A), reusing the existing `Commitment` entry
-  (`{action, payload_json, signed_at}`). The parties are fields inside the payload; the payload's
-  shape is checked in the mishpat coordinator (`commitments.rs:684-689, 1406`), so admitting a
-  collective as the counterparty is a coordinator change. DNA-hash-neutral.
+  (`{action, payload_json, signed_at}`). The parties are fields inside the payload. The integrity
+  zome requires `provider` and `recipient` to be present, non-blank strings and the bound fields
+  to exist (`mishpat_integrity/src/lib.rs:859`); it does not require an agent key. The
+  coordinator checks the rest (`commitments.rs:684-689, 1406`). A collective's address as the
+  recipient string therefore passes integrity validation as it stands. DNA-hash-neutral, on the
+  condition that the integrity requirements are left as they are; changing how a party is
+  represented would need its own analysis.
 - **Head-plane cost:** one commitment per member per kind of capacity per pool, never one per
   item contributed. At a thousand members and five kinds that is five thousand commitments for a
   large pool. That is above the count (about five hundred) at which the gate requires a bundling
@@ -135,10 +144,17 @@ it is today. The collective case is an added arm, not a replacement.
   order-of-magnitude reading from the gate's single measured anchor, not a computed number.
 - **Address:** agent-scoped composite: the member, the pool, the kind.
 - **Coordinator:** the existing commitment create, with `validate_delegates_compute` and the
-  `replicates-*` validators accepting a collective address in the counterparty field.
-- **Projection:** the existing commitments projection. Storage's grant handling stops requiring an
-  agent key for the recipient (`compute_grants.rs:97`) and resolves a collective through
-  `Membership`.
+  `replicates-*` validators accepting a collective address in `recipient`.
+- **Enforcement changes in storage.** Admitting a collective is more than lifting one check:
+  - grant creation requires the recipient to be an agent key (`api/compute_grants.rs:97`);
+  - a task is authorized only when the grant's recipient equals the task's requester
+    (`api/compute_tasks.rs:80`); for a collective this becomes "the requester is a current member
+    of the recipient";
+  - a capacity commitment for replication has no counterparty at all, and a content replication
+    commitment uses the content's head as both recipient and scope
+    (`mishpat_projection.rs:636`); a commitment of a range to a pool needs its own projection and
+    its own enforcement;
+  - membership must be resolved through its updates (step 3 of the draw check).
 - **Routes:** none new. Compute records stay local-SDK-facing and travel between peers on the DHT,
   as today.
 
@@ -147,10 +163,11 @@ it is today. The collective case is an added arm, not a replacement.
 - **Classification:** the request and its completion are the existing REA events
   (`rakia-compute-request-v1`, `serve-blob`). The requester-side `compute-fulfilled` event is a
   local projection today and is not notarized; that is a gap this design inherits, not one it adds.
-- **Who drew what is not recorded at the pool.** A holder that serves a range of an archive sees
-  that a range was asked for, not what the reader was looking for, and keeps no record that joins
-  a reader to a thing. See the SDO and RWA test (named for social dominance and authoritarian
-  following: what could the few who seek to dominate see, join and compel).
+- **A holder that serves a draw knows who drew and which bytes.** The draw check identifies the
+  caller, and the holder serves the bytes. Reading a range of a large archive hides what the
+  reader was looking for inside it; it does not hide the fetch. See the SDO and RWA test (named
+  for social dominance and authoritarian following: what could the few who seek to dominate see,
+  join and compel).
 
 ### Network stakes
 
@@ -166,8 +183,8 @@ contributed bytes are re-verified.
 - **Custody:** many holders chosen for independent failure, not for number. The threshold is a
   separate dial from the membership.
 - **Freshness:** a read from a pool carries the head it was read at.
-- **Linkability:** holding for a pool reveals membership. Drawing from it must not reveal what was
-  drawn.
+- **Linkability:** holding for a pool reveals membership. Drawing from it reveals to the serving
+  holder that this member fetched these bytes.
 - **Cost bearer:** the members whose devices carry it, recorded as REA events.
 
 ### SDO and RWA test
@@ -176,15 +193,22 @@ If the largest holder in a pool, or a majority of its stewards, were captured: w
 see, join and compel?
 
 - **See:** who the members are, and what each has committed. That is inside the collective's own
-  membrane and is acceptable there. They must not see who drew what: draws are read as ranges of
-  addressed archives so that a read leaves no query, and any count leaves the reader's device only
-  as a sum. Boundary 2 says an activity ledger is held by the holon it describes and is never
-  joined from outside. Of the three parts of this line, range reads and keeping no joining record
-  can be built on the blob layer as it is; counts leaving only as sums need the consumer-blinded
-  census, which is specified and not built.
-- **Join:** nothing across pools. A person's membership in two pools is joined by no one but that
-  person (boundary 5: correlating identities across namespaces is an act of consent, never a join
-  or an inference).
+  membrane and is acceptable there. They also see, for every draw they serve, which member
+  fetched which bytes. That is the honest limit of this design: inside a pool, members who hold
+  can see what other members fetch from them. It is the same limit the boundaries state for any
+  holon (peers inside see each other), and it means a pool is the wrong home for anything a
+  member would not want its holders to know they read. What can be kept: holders keep no ledger
+  of draws (boundary 2: an activity ledger is held by the holon it describes and is never joined
+  from outside), a range read hides the question inside a large archive, and a count leaves a
+  reader's device only as a sum once the consumer-blinded census exists.
+- **Join:** a person's memberships in two pools carry the same member address, so anyone who can
+  read both membership lists can join them. Boundary 5 (correlating identities across namespaces
+  is an act of consent) is therefore not met by structure. It is met only where the lists are not
+  readable from outside each collective.
+- **Not designed here:** a draw that does not identify the member to the holder (admission proved
+  to one party, bytes served by another, or a proof of membership that names no one), and a
+  member address that differs per pool. Both are needed before a pool may hold anything sensitive
+  to who reads it. Until then that is a refusal: such things do not go in a pool.
 - **Compel:** nothing from a member's device beyond what that member committed, and that
   commitment can be revoked. A pool cannot require anything that must never leave a device.
 - **What a pool may never hold:** a person's attention, revealed preferences, private notes and
@@ -245,7 +269,9 @@ This is what the capture does not say, and it is the local-first reading of a po
    too: a recipe is an addressed thing the member's own commitment admits by scope, it runs inside
    the device's compute envelope with a quota carved from what the member gave, and a recipe the
    commitment does not name does not run.
-5. **A draw is blind.** The pool does not learn who read what.
+5. **A draw is seen only by the holder that serves it.** That holder knows who fetched and which
+   bytes; it keeps no ledger of it and nothing leaves the pool. A pool that needs more than this
+   waits on the unlinkable draw (§3).
 6. **A read says how fresh it is.** It carries the head it was read at; a stale answer is marked
    stale.
 7. **Giving is bounded from outside the pool.** The share of a device a pool may use is set by the
@@ -260,9 +286,11 @@ This is what the capture does not say, and it is the local-first reading of a po
 Reach admits, standing governs, and carrying is recorded. Two things this depends on are not
 ready, and the design says so plainly:
 
-- **Reach is checked for the author only.** There is no check of what a particular reader may see
-  at the moment of serving, and no freshness stamp (the capture's row 1). Every draw reads through
-  that check; without it a pool cannot admit by reach.
+- **A reader's reach is checked on some paths, not all.** Content reads over HTTP pass a gate that
+  asks what this reader may see (`api/content_reach_gate.rs`). The document-sync routes and the
+  peer-to-peer document handler ask nothing, and the capture records the blob pantry re-serving
+  without a re-check. There is no freshness stamp on a read. A pool may serve only through paths
+  that carry the check; the capture's row 1 is narrower than it reads there, and still open.
 - **Standing has no settled record.** The design for standing records failed review and is being
   redrafted. Who may steward a pool, and who may speak for it, waits on that. A pool's membership
   and roles (`Steward`, `Contributor`, `Observer`) exist and are enough for a first pool among

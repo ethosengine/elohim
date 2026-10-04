@@ -99,8 +99,11 @@ becomes a condition for what worked without it.
     version` / missing node: circle-held merging state that is durable on its holders and has no
     notary footprint; probe: delete every holder's copy and the unpublished change is gone, by
     design / current state: exists only as a projection of already-published content.
-- **Decision:** a working version is an Automerge document in the holder's local document store;
-  one that is the author's alone lives under the `personal:` prefix. Automerge is what the merging
+- **Decision:** a working version is an Automerge document in the holder's local document store,
+  and it is never the document the projector writes published values into. That document
+  (`node:{id}`) receives publication writes (`sync/projector.rs:267`); unpublished values placed
+  there would meet them. A working version is its own document: under the `personal:` prefix
+  while it is the author's alone, and under a separate id of its own when it is shared. Automerge is what the merging
   layer already runs; this standard does not reopen that choice.
   A draft that must travel with the person's chain (for example across a device migration) is
   additionally checkpointed as a Private (B) entry at a moment the person chooses, never per
@@ -112,17 +115,23 @@ becomes a condition for what worked without it.
 - **Network stakes:** behaves the same under all four declared network stages (Simulacra,
   Bootstrap, Coordinated, Enforced; `elohim-storage/src/trust/stage.rs`). It touches no
   floor-protected cost. Republish inherits the head path's pricing.
-- **Address:** for a thing that is already published, the existing document id for its content
-  (`node:{id}`, to become cell-qualified under spec 2026-09-08). For a thing never yet published,
-  an agent-scoped composite: the author's agent, the content type, and a local name chosen at
-  creation. Justification for the local name: no content exists to hash yet.
+- **Address:** an agent-scoped composite: the agent who opened it, the content id it was opened
+  from (or the content type, for a thing never yet published), and a local name chosen at
+  creation. It records the published head it was opened from. Justification for the local name:
+  no content exists to hash yet. Document ids become cell-qualified under spec 2026-09-08.
 - **Source of truth:** the holders' local document stores, until republish. After republish, the
   DHT, as for any content.
 - **Integrity zome and DNA-hash class:** no change. DNA-hash-neutral.
-- **Coordinator:** existing functions only. A new version's bytes go through the existing content
-  write; the head is declared through `declare_content_head`
-  (`elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs:5586`), which returns the head
-  output for the content id the route accepts.
+- **Coordinator:** existing functions only, and there are two paths, which the 2026-08-07 ruling
+  keeps apart.
+  - *The root author, or a device they delegated.* A new version is an update on the root author's
+    own chain and becomes the head of that chain. `declare_content_head`
+    (`content_store/src/lib.rs:5586`) only re-affirms the head or re-declares an older version the
+    root author wrote (`:5647`); it is not how a new version is submitted.
+  - *Anyone else.* Their version is written on their own chain and offered through a canonical-head
+    declaration (`declare_earned_canonical_head`; `POST /db/content/{id}/canonical-head`). That
+    declaration is a candidate in the election (`select_canonical_winner`, `:3154`): earned
+    declarations outrank staging ones, then the declaration's time, then its link hash.
 - **Projections:** the existing ones. The projector already writes published values into the
   document; the reverse direction stays as ruled: values in a document never reach an authoritative
   column except through a conductor-verified path.
@@ -203,20 +212,25 @@ In `@elohim/storage-client` beside `AutomergeSync`, mirrored in `crates/elohim-s
 | `open(contentId)` | makes a working version from the published head the device holds | works |
 | `start(contentType)` | makes a working version of a thing never yet published | works |
 | `edit(change)` | applies a change function to the local copy (the shape Automerge's own `change` takes); merges with others when present | works |
-| `widen(to)` | admits named people, or a reach no wider than the origin's, to the circle | recorded in the working version; takes effect when they are reachable. How an admitted person learns of it waits on the circle check (§9) |
+| `widen(to)` | admits named people, or a reach no wider than the origin's, to the circle | prepared and signed by the person; takes effect when they are reachable. The admission is a signed record of its own, never a field in the working version: what peers merge is unauthenticated and cannot carry authority (§9) |
 | `fix()` | freezes the current values as a version and computes its content address, the same address the published version will have | works on any device |
-| `republish()` | signs the fixed version, writes it, and declares it as head | needs the key: see below |
+| `republish()` | signs the fixed version, writes it, and submits it by the caller's path (§3) | needs the key: see below |
 | `state()` | per other copy: caught up, behind, unknown; and the republish outcome | works |
 | `history()`, `revert(to)` | the changes so far; return to any earlier point | works |
 | `discard()` | drops the working version | works |
 
-**Republish is a submission.** The notary runs an election among candidates
-(`select_canonical_winner`); a submitted version can lose. `republish()` returns `pending`, then
-`elected`, `lost` or `refused`. A lost version stays as a working version the person can merge
-forward and submit again. `fix()` freezes the values on the device that calls it. Two people whose
-copies have converged fix the same values and get the same address: one candidate. Two people who
-fix before their copies have converged submit two candidates; the election chooses, and the other
-is `lost`.
+**What republish returns.** For the root author the new version is the head of their chain once
+written. For anyone else it is a candidate, and a candidate can lose. Either way the head others
+see is whatever the election currently says, and that can change when a later declaration
+arrives. So `republish()` reports an observed state, never a final one: `pending` (written, not
+yet seen in the election), `current` (the election's present answer), `not-current` (another
+candidate is), or `refused`. The existing route answers with a head view or an error; reporting
+these states is new work in the SDK, built on reading the head back. A version that is not
+current stays as a working version the person can merge forward and submit again.
+
+`fix()` freezes the values on the device that calls it. Two people who fix the same values get the
+same content address, and still make two declarations: candidates are told apart by their
+declaration, not by their content.
 
 `refused` is the gate saying no before any election: the caller may not republish this thing (not
 its author, no delegation, or the type's `republish` rule is not met).
@@ -274,7 +288,8 @@ Each is a missing node, named and not designed here.
 
 | Gap | Where | Consequence until it lands |
 |---|---|---|
-| The sync routes ask neither who is calling nor what reach admits them | `http.rs` route manifest; backlog `http-reach-enforcement-gap` | a circle cannot be enforced |
+| The sync routes ask neither who is calling nor what reach admits them. The write route is marked as needing a signed-in caller, which is a declaration the doorway does not yet enforce. The peer-to-peer handler serves and merges documents directly | `http.rs:6974,7046,16303`; `p2p/mod.rs:7930`; backlog `http-reach-enforcement-gap` | a circle cannot be enforced |
+| No signed record admits a person to a circle | none exists | `kept: circle` is declared and cannot be honoured; today a working version is the author's alone |
 | The reach check is not called on any sync path | `p2p/reach_authorization.rs` | same |
 | Changes cannot be sealed to a circle | spec 2026-08-23 (blind custody), not built | the doorway refusal in §3 |
 | Document ids are not cell-qualified | spec 2026-09-08, not built | a working version cannot say which cell it belongs to |
