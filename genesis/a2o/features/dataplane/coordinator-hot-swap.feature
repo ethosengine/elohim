@@ -77,4 +77,4 @@ Feature: Coordinator logic rolls across peers without anyone restarting
     And every hosted person is served by a function that only the new coordinator code provides
     And what a hosted person writes after the rollout is accepted by peers on the fix
     And each hosted person keeps the same agent key and the same data as before
-    And an app whose DNA hash differs from the bundle's is named as skipped and left unchanged
+    And any app or role whose DNA hash differs from the bundle's is named in the report and left unchanged

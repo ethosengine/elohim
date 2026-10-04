@@ -100,7 +100,11 @@ echo "COORDSWAP: rolling coordinator hot-swap → env=$TARGET_ENV"
 echo "COORDSWAP: peers: $PEERS"
 
 rc=0
-bash "$DRIVER" --happ "$HAPP" --peers "$PEERS" --apply --timeout 180 || rc=$?
+# --all-apps: a hosted person's app is one more installed app on the peer's
+# conductor, and the per-app sweep never reached it. Timeout from the household
+# measurement (2026-10-04): 20 apps / 20 swapped roles in 14.4s against a 5s dry
+# run, about 0.5s per swapped role; 600s covers 50 apps x 5 roles several times.
+bash "$DRIVER" --happ "$HAPP" --peers "$PEERS" --apply --all-apps --timeout 600 || rc=$?
 
 if [ "$rc" -eq 0 ]; then
   verdict=SUCCESS

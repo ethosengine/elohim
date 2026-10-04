@@ -5831,9 +5831,18 @@ impl HttpServer {
         );
 
         if all_apps {
-            let outcome =
-                crate::happ_manager::sync_coordinators_all_apps(&admin_ws, &temp.0, apply, None)
-                    .await;
+            let own_app = self
+                .happ_app_id
+                .clone()
+                .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
+            let outcome = crate::happ_manager::sync_coordinators_all_apps(
+                &admin_ws,
+                &temp.0,
+                apply,
+                None,
+                Some(&own_app),
+            )
+            .await;
             drop(temp);
             return Ok(match outcome {
                 Ok(report) => response::ok(&report),

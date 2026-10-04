@@ -119,4 +119,31 @@ bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --js
 jq -e '.[0].verdict == "updated" and .[1].verdict == "up-to-date"' "$ROOT/applied.json" >/dev/null \
   || fail "good apply/status semantics changed"
 
-echo 'fleet-coordswap: role-error refusal, first-peer stop, and clean apply passed'
+# --all-apps: the peer answers for every app on its conductor. A hosted app on
+# another DNA lineage is reported and does not hold the rollout; a pending role
+# on a hosted app is applied; a blocking error on a hosted app stops the roll.
+all_pending='{"apply":false,"apps":[{"appId":"elohim","roles":[]},{"appId":"hosted-a","roles":[{"role":"lamad","drifted":true,"applied":false,"error":null},{"role":"imagodei","drifted":true,"applied":false,"error":"dnaHashMismatch: other lineage"}]}],"driftedCount":2,"appliedCount":0,"pendingCount":1,"blockingErrors":[]}'
+all_applied='{"apply":true,"apps":[],"driftedCount":2,"appliedCount":1,"pendingCount":0,"blockingErrors":[]}'
+all_clean='{"apply":false,"apps":[],"driftedCount":1,"appliedCount":0,"pendingCount":0,"blockingErrors":[]}'
+: > "$CALLS"
+printf '%s' "$all_pending" > "$ROOT/one-false.json"
+printf '%s' "$all_applied" > "$ROOT/one-true.json"
+printf '%s' "$all_clean" > "$ROOT/one-false-after.json"
+printf '%s' "$all_clean" > "$ROOT/two-false.json"
+bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/all-apps.json"
+[ "$(cat "$CALLS")" = $'one false\none true\none false\ntwo false' ] || fail "all-apps rolling apply call order changed"
+jq -e '.[0].verdict == "updated" and .[1].verdict == "up-to-date"' "$ROOT/all-apps.json" >/dev/null \
+  || fail "all-apps: a hosted cell on another lineage held the rollout open"
+
+: > "$CALLS"
+printf '%s' '{"apply":false,"apps":[],"driftedCount":1,"appliedCount":0,"pendingCount":1,"blockingErrors":["hosted-a/lamad: get_dna_definition failed"]}' > "$ROOT/one-false.json"
+set +e
+PATH="$ROOT/python-path" bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/all-apps-blocked.json"
+rc=$?
+set -e
+[ "$rc" -eq 1 ] || fail "all-apps blocking error returned $rc, expected 1"
+[ "$(cat "$CALLS")" = 'one false' ] || fail "all-apps blocking error reached an apply or the next peer"
+jq -e '.[0].verdict == "failed-pre-check" and (.[0].note | contains("hosted-a/lamad"))' "$ROOT/all-apps-blocked.json" >/dev/null \
+  || fail "all-apps blocking error did not name the app and role"
+
+echo 'fleet-coordswap: role-error refusal, first-peer stop, clean apply, and all-apps passed'

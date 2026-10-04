@@ -98,12 +98,15 @@ SCRIPT_NAME="$(basename "$0")"
 
 usage() {
   cat >&2 <<EOF
-Usage: ${SCRIPT_NAME} --happ <path.happ> --peers <peer-list> [--apply] [--app-id elohim] [--timeout 120] [--json]
+Usage: ${SCRIPT_NAME} --happ <path.happ> --peers <peer-list> [--apply] [--app-id elohim | --all-apps] [--timeout 120] [--json]
 
   --happ PATH        path to the .happ bundle to sync (required)
   --peers LIST       comma-separated peer list: name=url or url (required)
   --apply            perform the hot-swap (default: dry-run status sweep only)
   --app-id ID        app_id query param (default: elohim)
+  --all-apps         sweep EVERY app on each peer's conductor that is on the
+                      bundle's DNA lineage (one app per hosted person), not
+                      only the peer's own app
   --timeout SECS     per-request curl timeout in seconds (default: 120)
   --json             emit the collected per-peer reports as one JSON array
                       on stdout, suppressing the human-readable table
@@ -117,6 +120,7 @@ HAPP_PATH=""
 PEERS_RAW=""
 APPLY=0
 APP_ID="elohim"
+ALL_APPS=0
 TIMEOUT=120
 JSON_OUT=0
 
@@ -131,6 +135,10 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || usage
       PEERS_RAW="$2"
       shift 2
+      ;;
+    --all-apps)
+      ALL_APPS=1
+      shift
       ;;
     --apply)
       APPLY=1
@@ -277,6 +285,10 @@ done
 post_sync() {
   local base_url="$1" apply_flag="$2" raw http_code body curl_status
   local url="${base_url}/admin/coordinators/sync?apply=${apply_flag}&app_id=${APP_ID}"
+  # A hosted person's app is one more installed app on the peer's conductor;
+  # the per-app sweep never reaches it. A peer too old to know `all_apps`
+  # ignores it and answers for its own app (no pendingCount in the body).
+  [ "${ALL_APPS}" -eq 0 ] || url="${base_url}/admin/coordinators/sync?apply=${apply_flag}&all_apps=true"
 
   # stderr is captured to its own temp file rather than merged with stdout
   # (2>&1): curl's `-w` trailer writes to stdout even on a connection
@@ -333,7 +345,14 @@ call_sync() {
   LAST_BODY="$(printf '%s' "${out}" | tail -n +2)"
 }
 
-drifted_count() { json_field "$1" driftedCount "?"; }
+# An all-apps report carries `pendingCount` — roles a hot-swap can still heal.
+# Its `driftedCount` also counts hosted cells on another DNA lineage, which no
+# coordinator release can reach and which must not hold a rollout open.
+drifted_count() {
+  local pending
+  pending="$(json_field "$1" pendingCount "")"
+  if [ -n "${pending}" ]; then printf '%s' "${pending}"; else json_field "$1" driftedCount "?"; fi
+}
 applied_count()  { json_field "$1" appliedCount "?"; }
 err_message()    { json_field "$1" error ""; }
 
@@ -343,14 +362,21 @@ err_message()    { json_field "$1" error ""; }
 role_errors() {
   if [ "${JSON_ENGINE}" = "jq" ]; then
     printf '%s' "$1" | jq -r '
-      (.roles // [])
-      | map(select(.error != null and .error != "") | "\(.role): \(.error)")
-      | join("; ")
+      if has("blockingErrors") then (.blockingErrors | join("; "))
+      else
+        (.roles // [])
+        | map(select(.error != null and .error != "") | "\(.role): \(.error)")
+        | join("; ")
+      end
     ' 2>/dev/null || true
   else
     python3 -c 'import json, sys
 try:
-    roles = json.loads(sys.argv[1]).get("roles", [])
+    doc = json.loads(sys.argv[1])
+    if "blockingErrors" in doc:
+        print("; ".join(doc["blockingErrors"]))
+        raise SystemExit(0)
+    roles = doc.get("roles", [])
     print("; ".join("{}: {}".format(r.get("role", "?"), r.get("error")) for r in roles if isinstance(r, dict) and r.get("error")))
 except Exception:
     pass' "$1" 2>/dev/null || true

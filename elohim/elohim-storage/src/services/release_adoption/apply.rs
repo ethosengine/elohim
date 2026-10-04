@@ -633,6 +633,7 @@ impl CoordinatorBundleVehicle {
             bundle,
             true,
             Some(&self.app_id),
+            None,
         )
         .await
         .map_err(|e| {

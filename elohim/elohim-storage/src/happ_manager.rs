@@ -1719,12 +1719,13 @@ impl AppSweepSkip {
 
 /// Pure: does this installed app take part in a conductor-wide sweep? `None` =
 /// sweep it. `installed` and `bundle` map role name → DNA hash; `installed`
-/// holds only roles with a provisioned cell.
+/// holds only roles with a provisioned cell. `primary` marks the node's own app.
 pub(crate) fn app_sweep_skip(
     installed: &BTreeMap<String, String>,
     bundle: &BTreeMap<String, String>,
     unrecoverable: bool,
     already_swept: bool,
+    primary: bool,
 ) -> Option<AppSweepSkip> {
     if already_swept {
         return Some(AppSweepSkip::AlreadySwept);
@@ -1739,7 +1740,10 @@ pub(crate) fn app_sweep_skip(
     if shared.peek().is_none() {
         return Some(AppSweepSkip::NoRoleInBundle);
     }
-    if !shared.any(|same_lineage| same_lineage) {
+    // The node's OWN app is never skipped for lineage: a bundle that does not
+    // match it is the wrong bundle for this peer, and its roles must report
+    // `dnaHashMismatch` out loud rather than vanish into a skip row.
+    if !primary && !shared.any(|same_lineage| same_lineage) {
         return Some(AppSweepSkip::NoRoleOnBundleLineage);
     }
     None
@@ -1772,9 +1776,69 @@ pub struct CoordinatorConductorReport {
     pub applied_count: usize,
     /// `app/role` for every role left drifted or errored and not applied.
     pub unhealed: Vec<String>,
+    /// The node's own app, when the caller named one.
+    pub primary_app_id: Option<String>,
+    /// Roles still drifted that a hot-swap CAN heal: drifted, not applied, and
+    /// not refused for lineage. Zero means every app this bundle can reach
+    /// runs it — the number a rolling driver waits on.
+    pub pending_count: usize,
+    /// `app/role: error` for every error that must halt a rollout. A
+    /// `dnaHashMismatch` on an app OTHER than the node's own is not one: that
+    /// cell is on another lineage and is reported, not failed.
+    pub blocking_errors: Vec<String>,
+}
+
+fn is_lineage_refusal(role: &CoordinatorRoleReport) -> bool {
+    role.error
+        .as_deref()
+        .is_some_and(|e| e.starts_with("dnaHashMismatch:"))
 }
 
 impl CoordinatorConductorReport {
+    /// Pure: fold the per-app reports into the conductor report.
+    pub(crate) fn build(
+        apply: bool,
+        apps_installed: usize,
+        apps: Vec<CoordinatorSyncReport>,
+        skipped_apps: Vec<CoordinatorAppSkip>,
+        bundle_dna: BTreeMap<String, String>,
+        primary_app: Option<&str>,
+    ) -> Self {
+        let mut unhealed = Vec::new();
+        let mut blocking_errors = Vec::new();
+        let mut pending_count = 0usize;
+        for app in &apps {
+            let primary = primary_app == Some(app.app_id.as_str());
+            for r in &app.roles {
+                let lineage = is_lineage_refusal(r);
+                if (r.drifted || r.error.is_some()) && !r.applied {
+                    unhealed.push(format!("{}/{}", app.app_id, r.role));
+                }
+                if r.drifted && !r.applied && !lineage {
+                    pending_count += 1;
+                }
+                if let Some(e) = r.error.as_deref() {
+                    if primary || !lineage {
+                        blocking_errors.push(format!("{}/{}: {e}", app.app_id, r.role));
+                    }
+                }
+            }
+        }
+        Self {
+            apply,
+            apps_installed,
+            drifted_count: apps.iter().map(|r| r.drifted_count).sum(),
+            applied_count: apps.iter().map(|r| r.applied_count).sum(),
+            apps,
+            skipped_apps,
+            bundle_dna,
+            unhealed,
+            primary_app_id: primary_app.map(str::to_string),
+            pending_count,
+            blocking_errors,
+        }
+    }
+
     /// `app/role` rows left behind on the BUNDLE'S lineage — the mixture a
     /// later sweep could still heal. A `dnaHashMismatch` row is excluded: that
     /// cell is on another lineage and no coordinator release can reach it.
@@ -1785,11 +1849,7 @@ impl CoordinatorConductorReport {
                 app.roles
                     .iter()
                     .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
-                    .filter(|r| {
-                        !r.error
-                            .as_deref()
-                            .is_some_and(|e| e.starts_with("dnaHashMismatch:"))
-                    })
+                    .filter(|r| !is_lineage_refusal(r))
                     .map(move |r| format!("{}/{}", app.app_id, r.role))
             })
             .collect()
@@ -1826,12 +1886,15 @@ fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, 
 /// cancelled: apps are swept strictly one at a time, one admin request in
 /// flight, and eligibility is decided from `list_apps` alone so an app on
 /// another lineage costs no call at all. `skip_app` names an app the caller
-/// already swept.
+/// already swept; `primary_app` names the node's own app when it is part of
+/// this sweep (it is then never skipped for lineage, and its lineage refusals
+/// are blocking).
 pub async fn sync_coordinators_all_apps(
     admin_ws: &AdminWebsocket,
     happ_path: &Path,
     apply: bool,
     skip_app: Option<&str>,
+    primary_app: Option<&str>,
 ) -> anyhow::Result<CoordinatorConductorReport> {
     let role_dnas = bundle_role_dna_files(happ_path).await?;
     let bundle_dna: BTreeMap<String, String> = role_dnas
@@ -1849,9 +1912,14 @@ pub async fn sync_coordinators_all_apps(
         let installed_dna = installed_role_dna(app_info);
         let unrecoverable = matches!(app_info.status, AppStatus::Unrecoverable(..));
         let already_swept = skip_app == Some(app_info.installed_app_id.as_str());
-        if let Some(skip) =
-            app_sweep_skip(&installed_dna, &bundle_dna, unrecoverable, already_swept)
-        {
+        let primary = primary_app == Some(app_info.installed_app_id.as_str());
+        if let Some(skip) = app_sweep_skip(
+            &installed_dna,
+            &bundle_dna,
+            unrecoverable,
+            already_swept,
+            primary,
+        ) {
             info!(
                 app_id = app_info.installed_app_id.as_str(),
                 skip = skip.label(),
@@ -1869,25 +1937,14 @@ pub async fn sync_coordinators_all_apps(
         tokio::task::yield_now().await;
     }
 
-    let unhealed: Vec<String> = reports
-        .iter()
-        .flat_map(|app| {
-            app.roles
-                .iter()
-                .filter(|r| (r.drifted || r.error.is_some()) && !r.applied)
-                .map(move |r| format!("{}/{}", app.app_id, r.role))
-        })
-        .collect();
-    let report = CoordinatorConductorReport {
+    let report = CoordinatorConductorReport::build(
         apply,
-        apps_installed: apps.len(),
-        drifted_count: reports.iter().map(|r| r.drifted_count).sum(),
-        applied_count: reports.iter().map(|r| r.applied_count).sum(),
-        apps: reports,
+        apps.len(),
+        reports,
         skipped_apps,
         bundle_dna,
-        unhealed,
-    };
+        primary_app,
+    );
     info!(
         apply,
         apps_installed = report.apps_installed,
@@ -1895,7 +1952,9 @@ pub async fn sync_coordinators_all_apps(
         apps_skipped = report.skipped_apps.len(),
         drifted_count = report.drifted_count,
         applied_count = report.applied_count,
+        pending_count = report.pending_count,
         unhealed = ?report.unhealed,
+        blocking_errors = ?report.blocking_errors,
         "coordinator sweep complete for every app on this conductor"
     );
     Ok(report)
@@ -1907,7 +1966,7 @@ pub async fn sync_coordinators_all_apps(
 /// own readiness behind them.
 pub async fn sweep_other_apps_at_boot(admin_ws: &AdminWebsocket, happ_path: &Path, own_app: &str) {
     let apply = coordinator_update_allowed();
-    match sync_coordinators_all_apps(admin_ws, happ_path, apply, Some(own_app)).await {
+    match sync_coordinators_all_apps(admin_ws, happ_path, apply, Some(own_app), None).await {
         Ok(report) if report.apps.is_empty() => info!(
             own_app,
             apps_installed = report.apps_installed,
@@ -2278,26 +2337,49 @@ mod tests {
     fn an_app_on_the_bundle_lineage_is_swept_whatever_it_is_called() {
         let bundle = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-B")]);
         let hosted = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-B")]);
-        assert_eq!(app_sweep_skip(&hosted, &bundle, false, false), None);
+        assert_eq!(app_sweep_skip(&hosted, &bundle, false, false, false), None);
         // One role on the lineage is enough; the per-role guard refuses the rest.
         let mixed = dna_map(&[("lamad", "uhC0k-A"), ("imagodei", "uhC0k-OLD")]);
-        assert_eq!(app_sweep_skip(&mixed, &bundle, false, false), None);
+        assert_eq!(app_sweep_skip(&mixed, &bundle, false, false, false), None);
     }
 
     #[test]
     fn an_app_on_another_lineage_or_another_happ_is_left_alone() {
         let bundle = dna_map(&[("lamad", "uhC0k-A")]);
         assert_eq!(
-            app_sweep_skip(&dna_map(&[("lamad", "uhC0k-OLD")]), &bundle, false, false),
+            app_sweep_skip(
+                &dna_map(&[("lamad", "uhC0k-OLD")]),
+                &bundle,
+                false,
+                false,
+                false
+            ),
             Some(AppSweepSkip::NoRoleOnBundleLineage)
         );
         assert_eq!(
-            app_sweep_skip(&dna_map(&[("other", "uhC0k-A")]), &bundle, false, false),
+            app_sweep_skip(
+                &dna_map(&[("other", "uhC0k-A")]),
+                &bundle,
+                false,
+                false,
+                false
+            ),
             Some(AppSweepSkip::NoRoleInBundle)
         );
         assert_eq!(
-            app_sweep_skip(&BTreeMap::new(), &bundle, false, false),
+            app_sweep_skip(&BTreeMap::new(), &bundle, false, false, false),
             Some(AppSweepSkip::NoRoleInBundle)
+        );
+        // The node's own app is swept anyway, so the mismatch is reported.
+        assert_eq!(
+            app_sweep_skip(
+                &dna_map(&[("lamad", "uhC0k-OLD")]),
+                &bundle,
+                false,
+                false,
+                true
+            ),
+            None
         );
     }
 
@@ -2306,11 +2388,11 @@ mod tests {
         let bundle = dna_map(&[("lamad", "uhC0k-A")]);
         let app = dna_map(&[("lamad", "uhC0k-A")]);
         assert_eq!(
-            app_sweep_skip(&app, &bundle, true, false),
+            app_sweep_skip(&app, &bundle, true, false, false),
             Some(AppSweepSkip::Unrecoverable)
         );
         assert_eq!(
-            app_sweep_skip(&app, &bundle, false, true),
+            app_sweep_skip(&app, &bundle, false, true, false),
             Some(AppSweepSkip::AlreadySwept)
         );
     }
@@ -2328,44 +2410,69 @@ mod tests {
         let mut foreign = role_report("lamad", old, new);
         foreign.error = lineage_mismatch_error("uhC0k-OLD", "uhC0k-A");
 
-        let report = CoordinatorConductorReport {
-            apply: true,
-            apps_installed: 3,
-            apps: vec![
+        let own_foreign = {
+            let mut r = role_report(
+                "mishpat",
+                dna_map(&[("z", "uhCok-old")]),
+                dna_map(&[("z", "uhCok-new")]),
+            );
+            r.error = lineage_mismatch_error("uhC0k-OLD", "uhC0k-A");
+            r
+        };
+        let mut pending = role_report(
+            "infrastructure",
+            dna_map(&[("z", "uhCok-old")]),
+            dna_map(&[("z", "uhCok-new")]),
+        );
+        pending.drifted = true;
+        let report = CoordinatorConductorReport::build(
+            true,
+            3,
+            vec![
                 CoordinatorSyncReport {
                     app_id: "elohim".to_string(),
                     apply: true,
-                    roles: vec![healed],
-                    drifted_count: 1,
+                    roles: vec![healed, own_foreign],
+                    drifted_count: 2,
                     applied_count: 1,
                 },
                 CoordinatorSyncReport {
                     app_id: "hosted-a".to_string(),
                     apply: true,
-                    roles: vec![failed, foreign],
-                    drifted_count: 2,
+                    roles: vec![failed, foreign, pending],
+                    drifted_count: 3,
                     applied_count: 0,
                 },
             ],
-            skipped_apps: vec![CoordinatorAppSkip {
+            vec![CoordinatorAppSkip {
                 app_id: "other".to_string(),
                 reason: AppSweepSkip::NoRoleInBundle.label().to_string(),
                 installed_dna: BTreeMap::new(),
             }],
-            bundle_dna: dna_map(&[("lamad", "uhC0k-A")]),
-            drifted_count: 3,
-            applied_count: 1,
-            unhealed: vec![
-                "hosted-a/imagodei".to_string(),
-                "hosted-a/lamad".to_string(),
-            ],
-        };
-        assert_eq!(report.unhealed_on_lineage(), vec!["hosted-a/imagodei"]);
+            dna_map(&[("lamad", "uhC0k-A")]),
+            Some("elohim"),
+        );
+        assert_eq!(report.drifted_count, 5);
+        assert_eq!(report.applied_count, 1);
+        // Healable and still drifted: hosted-a's failed swap and its pending role.
+        assert_eq!(report.pending_count, 2);
+        // A hosted app's lineage refusal is reported, not blocking; the node's
+        // own is blocking, and so is a failed swap anywhere.
+        assert_eq!(report.blocking_errors.len(), 2);
+        assert!(report.blocking_errors[0].starts_with("elohim/mishpat: dnaHashMismatch:"));
+        assert!(report.blocking_errors[1].starts_with("hosted-a/imagodei: update_coordinators"));
+        assert_eq!(
+            report.unhealed_on_lineage(),
+            vec!["hosted-a/imagodei", "hosted-a/infrastructure"]
+        );
 
         let v = serde_json::to_value(&report).expect("report serializes");
         assert_eq!(v["appsInstalled"], 3);
         assert_eq!(v["apps"][1]["appId"], "hosted-a");
         assert_eq!(v["apps"][1]["roles"][0]["role"], "imagodei");
+        assert_eq!(v["pendingCount"], 2);
+        assert_eq!(v["primaryAppId"], "elohim");
+        assert!(v["blockingErrors"].is_array());
         assert_eq!(v["skippedApps"][0]["reason"], "no_role_in_bundle");
         assert_eq!(v["bundleDna"]["lamad"], "uhC0k-A");
         assert!(v.get("skipped_apps").is_none());

@@ -4688,6 +4688,22 @@ habits:
       current state: observed, not diagnosed. And: the workspace peer follows its own channel at `observe`, so it never records an adoption —
       with single-role releases it CAN adopt (its lamad matched every appliesTo tonight); flipping it to `apply` closes the
       adopt-before-author wedge for publishing over an earned head (`runtime-steward-adoption-of-fleet-cut-release.md`).
+
+      DELTA 2026-10-04 (GREEN preserved; household proof only, unmeasured on the fleet): the coordinator sweep covered ONE installed app per
+      conductor, the node's own, because `update_coordinators` is addressed by cell id — every hosted person's app kept the coordinators it
+      was provisioned with (found when alpha conductor-4's hosted operator app issued a head delegation the current zome refuses). Storage
+      now sweeps every app on the bundle's DNA lineage (`happ_manager::sync_coordinators_all_apps`: boot path off readiness,
+      `POST /admin/coordinators/sync?allApps=true`, the release-adoption coordinator vehicle) and the rolling driver sends `--all-apps`.
+      Household, fork 5f4c16abe, matthew's conductor with 20 apps / 100 cells: own-app-only apply left 19 hosted apps drifted; the driver
+      with `--all-apps` applied 19/2/1 across three peers, drift 0 on re-check; the 100 dna/agent cell ids and the three conductor processes
+      unchanged; 20 swapped roles in 14.4 s against a 5 s dry run; a bundle on another lamad lineage applied nothing, 19 hosted
+      `dnaHashMismatch` rows non-blocking, the node's own blocking. The variant bundle differed by wasm hash only, so the proof is the
+      conductor's own `get_dna_definition`, not a behaviour change. Receipts: genesis/local-dev/hosted-coordinator-sweep/receipts/.
+      SEAMS: chain coordinator release reaches the fleet / between "the node's own app runs the new coordinator" → "a hosted person's call
+      is served by the new coordinator" / missing node: every lineage-matching installed app on the conductor is swept / current state:
+      proven on the household, owed on the fleet (the first all-apps driver run, then campaign 1.4 leg 2). Two paths still leave a hosted
+      app behind — an app provisioned after a coordinator-only release, and release adoption's `already_runs_target` exit:
+      genesis/data/timeline/backlog/hosted-app-coordinator-coverage-gaps.md.
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"
