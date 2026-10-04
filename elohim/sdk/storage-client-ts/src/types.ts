@@ -17,13 +17,13 @@ export interface StorageConfig {
  */
 export interface DocumentInfo {
   /** Document ID */
-  doc_id: string;
+  docId: string;
   /** Document type (e.g., "graph", "path", "personal") */
-  doc_type: string;
+  docType: string;
   /** Number of changes in the document */
-  change_count: number;
+  changeCount: number;
   /** Last modified timestamp (Unix millis) */
-  last_modified: number;
+  lastModified: number;
   /** Current heads (hex-encoded change hashes) */
   heads: string[];
 }
@@ -51,7 +51,7 @@ export interface GetDocumentResponse {
   /** Holochain app ID */
   hAppId: string;
   /** Document ID */
-  doc_id: string;
+  docId: string;
   /** Current heads (hex-encoded change hashes) */
   heads: string[];
 }
@@ -63,7 +63,7 @@ export interface GetHeadsResponse {
   /** Holochain app ID */
   hAppId: string;
   /** Document ID */
-  doc_id: string;
+  docId: string;
   /** Current heads (hex-encoded change hashes) */
   heads: string[];
 }
@@ -75,11 +75,11 @@ export interface GetChangesResponse {
   /** Holochain app ID */
   hAppId: string;
   /** Document ID */
-  doc_id: string;
+  docId: string;
   /** Changes as base64-encoded blobs */
   changes: string[];
   /** New heads after applying these changes */
-  new_heads: string[];
+  newHeads: string[];
 }
 
 /**
@@ -89,9 +89,9 @@ export interface ApplyChangesResponse {
   /** Holochain app ID */
   hAppId: string;
   /** Document ID */
-  doc_id: string;
+  docId: string;
   /** New heads after applying changes */
-  new_heads: string[];
+  newHeads: string[];
 }
 
 /**

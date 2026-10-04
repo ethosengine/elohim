@@ -7,7 +7,8 @@ title: "storage-client-ts reads `new_heads`; storage sends `newHeads` — the fi
 slug: "storage-client-sync-heads-field-mismatch"
 written: "2026-10-04"
 author: "claude (local-first design pass, 2026-10-04)"
-status: "backlog"
+status: "resolved"
+resolved: "2026-10-04"
 priority: "medium"
 tags: [storage-client-ts, automerge, sync, wire-format, camelcase, perf-bytes]
 cites:
@@ -40,6 +41,18 @@ The types are hand-written snake_case against a camelCase wire, which the Rust-t
 forbids. Generate these response types from the Rust side as the other views are, and add a test
 that round-trips a save and asserts the next sync sends nothing.
 
-## Why it matters now
+## Resolved 2026-10-04
+
+- TypeScript: the response types and `AutomergeSync` now read the camelCase wire names.
+  `tests/sync-heads-wire.test.ts` fails on the old name (107 bytes re-sent where 0 were expected)
+  and passes with the fix; the package's tests and typecheck pass.
+- Rust: `crates/elohim-storage-client/src/types.rs` had the same defect and worse. It declared
+  `app_id`, `doc_id` and `new_heads` with no rename, so it could not parse a reply at all. The six
+  response types now carry `rename_all = "camelCase"` with `hAppId` for the app id, and three
+  tests parse the server's shapes.
+- Still open: these types are hand-written on both sides. Generating them from one source is the
+  durable fix.
+
+## Why it mattered
 
 The working-version standard makes the client a writer. This is listed in its §9.
