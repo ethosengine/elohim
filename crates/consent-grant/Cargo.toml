@@ -1,0 +1,28 @@
+# crates/consent-grant — the rules of the controller-consent grant, shared by every
+# party to it: the hosted portal (doorway), the native portal (elohim-storage) and
+# the terminal that asks. Nested single-crate workspace root like its `crates/`
+# siblings; wired by path dependency.
+[workspace]
+
+[package]
+name = "elohim-consent-grant"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Controller-consent grant for the Elohim Protocol: a terminal asks, a controller approves in a portal, a single-use code returns by loopback or by paste, and the terminal redeems it. Plain-data rules only: no socket, no clock, no store."
+authors = ["Elohim Protocol"]
+license = "AGPL-3.0"
+repository = "https://github.com/ethosengine/elohim"
+publish = ["elohim"]
+
+[lib]
+name = "consent_grant"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+serde_json = "1.0"

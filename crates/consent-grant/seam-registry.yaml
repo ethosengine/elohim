@@ -1,0 +1,193 @@
+# crates/consent-grant/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json.
+# Every symbol below was read at authoring time (2026-10-04).
+
+seamRegistryVersion: 1
+crate: elohim-consent-grant
+crateRoot: crates/consent-grant
+seamLocus: >
+  The rules of the controller-consent grant: a terminal asks a controller to sign named acts,
+  the controller approves in a portal, a single-use code returns by loopback or by paste, and
+  the terminal redeems it. Plain-data predicates only, so the hosted portal (doorway), the
+  native portal (elohim-storage) and the asking terminal apply one set of rules. The grant
+  carries no authority: what it returns is an act the controller's own cell signed, verified
+  on-chain by peers.
+
+decisionPoints:
+  - name: admit_request
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/request.rs
+      modulePath: consent_grant::request::admit_request
+      line: 115
+    summary: >
+      Decides whether a terminal's request is fit to put in front of a person: known domain and
+      client, well-formed device key and network, plain bounded label, a non-empty set of
+      distinct recognised acts, a PKCE S256 challenge, an opaque state, an unprivileged loopback
+      port. Returns an `AdmittedRequest`, the only type a grant can be issued against.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Consent is a federation-plane exchange; the authority it leads to lives on the notary
+          plane (the mishpat device binding, the content head delegation). This predicate holds
+          no authority and stores nothing.
+      - id: C1
+        status: answered
+        justification: >
+          A device cannot approve itself. Admission only qualifies a request for display; the
+          approval is a controller's signature the enrollment zome checks against the person's
+          controller quorum.
+      - id: C2
+        status: n-a
+        justification: No competing candidates are ordered here.
+      - id: C3
+        status: n-a
+        justification: A single stateless verdict; there is no state to stall in.
+      - id: C4
+        status: answered
+        justification: >
+          Every refusal is a distinct `RequestRefusal`; an unrecognised act is refused
+          (`act_unknown`) rather than dropped, so consent is never given to less than was shown.
+      - id: C5
+        status: answered
+        justification: >
+          The device key in a request is treated as a claim. Its shape is checked here and its
+          possession is proven only at the zome, which refuses a binding the key did not sign.
+      - id: C6a
+        status: answered
+        justification: >
+          Work is bounded by `GrantPolicy` (label length, act count) and fixed token lengths;
+          nothing iterates over caller-controlled unbounded input.
+      - id: C6b
+        status: n-a
+        justification: Pure; no effect to repeat.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable snake_case code for the wire and the log.
+      - id: C9
+        status: n-a
+        justification: >
+          Identity lineage (re-key, supersession) is the enrollment zome's `supersedes` field,
+          not this request.
+      - id: C10
+        status: answered
+        justification: >
+          `GRANT_DOMAIN` versions the contract; a request naming another version is refused
+          (`request_domain_unsupported`) instead of being interpreted under these rules.
+      - id: C11
+        status: partial
+        justification: >
+          Size bounds are here; rate limiting of unauthenticated requests belongs to the serving
+          portal and is not yet built.
+      - id: C12
+        status: answered
+        justification: >
+          This is the consent seam: the request names exactly the acts a person will be shown,
+          and only a known client may ask.
+      - id: C13
+        status: n-a
+        justification: Authority is not graded here; acts are named and individually consented.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified; there is no residual branch.
+    contractTests:
+      - path: crates/consent-grant/src/request.rs
+        testName: each_malformation_has_its_own_refusal
+        kind: unit
+      - path: crates/consent-grant/src/request.rs
+        testName: a_label_is_plain_bounded_text
+        kind: unit
+      - path: crates/consent-grant/src/act.rs
+        testName: an_unknown_act_is_refused_not_ignored
+        kind: unit
+
+  - name: admit_redemption
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/redeem.rs
+      modulePath: consent_grant::redeem::admit_redemption
+      line: 123
+    summary: >
+      Decides whether a terminal may collect an approved grant: the code's digest matches, the
+      grant is unredeemed and unexpired, the client and device key are the ones that asked, and
+      the PKCE verifier matches the stored challenge. Refusals that show a code was seen by
+      someone else (`burns_grant`) tell the portal to discard the grant.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Federation-plane exchange; the returned act's authority is on-chain.
+      - id: C1
+        status: answered
+        justification: >
+          The redeemer must hold the verifier the asking terminal generated and name the device
+          key that was approved; neither is the portal's to supply.
+      - id: C2
+        status: n-a
+        justification: No ordering among candidates.
+      - id: C3
+        status: answered
+        justification: >
+          Every grant leaves the store: redeemed, expired, or burned. No state waits on a human
+          indefinitely.
+      - id: C4
+        status: answered
+        justification: >
+          An unknown code, an expired grant and a redeemed grant are three distinct refusals,
+          never one generic failure.
+      - id: C5
+        status: answered
+        justification: >
+          Possession of a code is evidence, not authority; redemption also requires the
+          verifier and the device key.
+      - id: C6a
+        status: answered
+        justification: Constant work per call; inputs are length-bounded tokens.
+      - id: C6b
+        status: partial
+        justification: >
+          The predicate reports `AlreadyRedeemed` for a redeemed grant, but single redemption
+          under concurrency depends on the caller marking the grant with a compare-and-set.
+          That store does not exist yet; the requirement is stated in the module doc.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C9
+        status: n-a
+        justification: No identity lineage here.
+      - id: C10
+        status: answered
+        justification: Grants are issued only from requests admitted under `GRANT_DOMAIN`.
+      - id: C11
+        status: partial
+        justification: Redemption attempt rate limiting belongs to the serving portal.
+      - id: C12
+        status: answered
+        justification: >
+          Only what the controller approved (`acts`, `approved_by`) is stored and released.
+      - id: C13
+        status: n-a
+        justification: Not graded.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified.
+    contractTests:
+      - path: crates/consent-grant/src/redeem.rs
+        testName: a_code_alone_redeems_nothing
+        kind: unit
+      - path: crates/consent-grant/src/redeem.rs
+        testName: a_grant_redeems_once_and_within_its_window
+        kind: unit
+      - path: crates/consent-grant/src/redeem.rs
+        testName: signs_of_a_seen_code_burn_the_grant
+        kind: unit
+      - path: crates/consent-grant/src/redeem.rs
+        testName: the_store_never_holds_the_code
+        kind: unit
