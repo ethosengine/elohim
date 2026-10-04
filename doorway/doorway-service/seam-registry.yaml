@@ -5670,14 +5670,15 @@ decisionPoints:
       adminBootstrapKey equal to a configured, non-empty API_KEY_ADMIN. Its hosted sibling,
       hosted_identity_recovery_authorized, allows recovery on a provisioned app only when this
       doorway's intent record shows it provisioned that agent for exactly that identifier.
-      Otherwise both answer 409 IDENTITY_RECOVERY_REFUSED.
+      Otherwise both answer 403 IDENTITY_RECOVERY_REFUSED (not 409, which registration reserves
+      for an existing account and the seeders answer by logging in).
     concernIds:
       - id: C0
         status: answered
         justification: Doorway-local authorization of one recovery branch; no entity or authority is created.
       - id: C4
         status: answered
-        justification: A refused recovery is its own 409 code, distinct from a conductor failure (503 IDENTITY_CREATION_FAILED).
+        justification: A refused recovery is its own 403 code, distinct from a conductor failure (503 IDENTITY_CREATION_FAILED) and from an existing account (409 USER_EXISTS).
       - id: C12
         status: partial
         justification: >
@@ -5693,7 +5694,7 @@ decisionPoints:
         testName: a_registration_cannot_recover_the_operators_human_without_the_operator_credential
         kind: unit
       - path: doorway/doorway-service/src/routes/auth_routes.rs
-        testName: an_identity_recovery_refusal_is_a_distinct_conflict
+        testName: an_identity_recovery_refusal_is_forbidden_not_an_existing_account
         kind: unit
     gapNote: >
       The predicate and the refusal are tested; the branch inside handle_register that calls

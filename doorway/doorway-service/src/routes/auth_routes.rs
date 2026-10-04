@@ -1057,9 +1057,17 @@ async fn hosted_identity_recovery_authorized(
 }
 
 /// The refusal both recovery branches answer with.
+///
+/// 403, NOT 409. Registration's 409 means "an account with this identifier
+/// already exists", and both seeders (`seed-humans.ts`, `seed-hosted-humans.ts`)
+/// answer any 409 by logging in. In the case this recovery exists for — the
+/// doorway's database cleared, the conductor's state kept — there is no account
+/// row to log in to, so a 409 here would surface a missing or wrong operator
+/// credential as a confusing login failure. This is an authorization refusal,
+/// and says so.
 fn identity_recovery_refused() -> Response<BoxBody> {
     json_response(
-        StatusCode::CONFLICT,
+        StatusCode::FORBIDDEN,
         &ErrorResponse {
             error: "An identity already exists on the agent this registration would use, and \
                     this doorway has no evidence that it belongs to this registrant"
@@ -6127,12 +6135,15 @@ mod tests {
     }
 
     /// The refusal is its own code, so a client (and an operator reading logs)
-    /// can tell it from a conductor failure.
+    /// can tell it from a conductor failure — and it is a 403, never the 409
+    /// that registration uses for "this account already exists" (which the
+    /// seeders answer by logging in).
     #[tokio::test]
-    async fn an_identity_recovery_refusal_is_a_distinct_conflict() {
+    async fn an_identity_recovery_refusal_is_forbidden_not_an_existing_account() {
         use http_body_util::BodyExt;
         let response = identity_recovery_refused();
-        assert_eq!(response.status(), StatusCode::CONFLICT);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_ne!(response.status(), StatusCode::CONFLICT);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["code"], "IDENTITY_RECOVERY_REFUSED");
