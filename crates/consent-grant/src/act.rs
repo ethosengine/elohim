@@ -1,89 +1,62 @@
-//! What the terminal is asking a controller to sign.
+//! What the terminal is asking a controller to agree to.
 //!
-//! Acts travel as short strings (OAuth calls them scopes) so a consent screen
-//! can list them and a log can name them. Each parses to one variant; a string
-//! this crate does not recognise is refused, never ignored, because an ignored
-//! act would be consent the person never saw.
+//! Acts travel as short strings so a consent screen can list them and a log can
+//! name them. Each parses to one variant; a string this crate does not
+//! recognise is refused, never ignored, because an ignored act would be consent
+//! the person never saw.
+//!
+//! Both acts here are recognition: they say whose device this is. Neither says
+//! what the device may do to any content.
 
 use serde::{Deserialize, Serialize};
 
-/// Longest content item id an act may name.
-pub const MAX_ITEM_ID_LEN: usize = 256;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum RequestedAct {
     /// Bind this device's node key to the person's identity (`device.enroll`).
-    /// Asking for this is what makes the device a stewarded peer; a request
-    /// without it is an ephemeral sign-in that leaves no binding behind.
     EnrollDevice,
-    /// Also bind the device's participant key, the one its local tooling
-    /// signs attribution with (`participant.bind`). Only alongside
-    /// [`Self::EnrollDevice`].
-    BindParticipantKey,
-    /// Delegate the head of one content root to this device
-    /// (`content.head:<item-id>`).
-    DelegateHead { item_id: String },
+    /// Also bind the device's cryptographic root, the key that signs what the
+    /// device produces, so the provenance of its bytes resolves to the person
+    /// (`device.bind-root`). Only alongside [`Self::EnrollDevice`].
+    BindDeviceRoot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActRefusal {
     Unknown,
-    ItemIdMalformed,
 }
 
 impl ActRefusal {
     pub fn code(self) -> &'static str {
         match self {
             Self::Unknown => "act_unknown",
-            Self::ItemIdMalformed => "act_item_id_malformed",
         }
     }
 }
 
 const ENROLL: &str = "device.enroll";
-const BIND_PARTICIPANT: &str = "participant.bind";
-const HEAD_PREFIX: &str = "content.head:";
+const BIND_ROOT: &str = "device.bind-root";
 
 impl RequestedAct {
-    /// Whether the act lapses. A delegation is granted until a time; an
-    /// enrollment stands until it is revoked.
-    pub fn is_time_bound(&self) -> bool {
-        matches!(self, Self::DelegateHead { .. })
+    pub fn parse(text: &str) -> Result<Self, ActRefusal> {
+        match text {
+            ENROLL => Ok(Self::EnrollDevice),
+            BIND_ROOT => Ok(Self::BindDeviceRoot),
+            _ => Err(ActRefusal::Unknown),
+        }
     }
 
-    pub fn parse(text: &str) -> Result<Self, ActRefusal> {
-        if text == ENROLL {
-            return Ok(Self::EnrollDevice);
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::EnrollDevice => ENROLL,
+            Self::BindDeviceRoot => BIND_ROOT,
         }
-        if text == BIND_PARTICIPANT {
-            return Ok(Self::BindParticipantKey);
-        }
-        if let Some(item_id) = text.strip_prefix(HEAD_PREFIX) {
-            let well_formed = !item_id.is_empty()
-                && item_id.len() <= MAX_ITEM_ID_LEN
-                && item_id
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'));
-            return if well_formed {
-                Ok(Self::DelegateHead {
-                    item_id: item_id.to_string(),
-                })
-            } else {
-                Err(ActRefusal::ItemIdMalformed)
-            };
-        }
-        Err(ActRefusal::Unknown)
     }
 }
 
 impl std::fmt::Display for RequestedAct {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::EnrollDevice => f.write_str(ENROLL),
-            Self::BindParticipantKey => f.write_str(BIND_PARTICIPANT),
-            Self::DelegateHead { item_id } => write!(f, "{HEAD_PREFIX}{item_id}"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -96,8 +69,20 @@ impl TryFrom<String> for RequestedAct {
 
 impl From<RequestedAct> for String {
     fn from(act: RequestedAct) -> Self {
-        act.to_string()
+        act.as_str().to_string()
     }
+}
+
+/// Whether `acts` is a coherent set: no repeats, and a device root is bound
+/// only for a device that is being enrolled.
+pub(crate) fn coherent(acts: &[RequestedAct]) -> bool {
+    let distinct = acts
+        .iter()
+        .enumerate()
+        .all(|(i, act)| !acts[..i].contains(act));
+    let root_needs_enrollment =
+        !acts.contains(&RequestedAct::BindDeviceRoot) || acts.contains(&RequestedAct::EnrollDevice);
+    distinct && root_needs_enrollment
 }
 
 #[cfg(test)]
@@ -106,40 +91,20 @@ mod tests {
 
     #[test]
     fn acts_round_trip_through_their_strings() {
-        for text in [
-            "device.enroll",
-            "participant.bind",
-            "content.head:fct-module-01",
-        ] {
+        for text in ["device.enroll", "device.bind-root"] {
             assert_eq!(RequestedAct::parse(text).unwrap().to_string(), text);
         }
     }
 
     #[test]
     fn an_unknown_act_is_refused_not_ignored() {
-        assert_eq!(
-            RequestedAct::parse("device.admin"),
-            Err(ActRefusal::Unknown)
-        );
-        assert_eq!(RequestedAct::parse(""), Err(ActRefusal::Unknown));
-    }
-
-    #[test]
-    fn a_head_act_names_one_plain_item() {
-        for bad in [
-            "content.head:",
-            "content.head:a b",
-            "content.head:fct-*",
-            "content.head:a/b",
-        ] {
+        for text in ["device.admin", "content.head:item", ""] {
             assert_eq!(
-                RequestedAct::parse(bad),
-                Err(ActRefusal::ItemIdMalformed),
-                "{bad}"
+                RequestedAct::parse(text),
+                Err(ActRefusal::Unknown),
+                "{text}"
             );
         }
-        let long = format!("content.head:{}", "a".repeat(MAX_ITEM_ID_LEN + 1));
-        assert_eq!(RequestedAct::parse(&long), Err(ActRefusal::ItemIdMalformed));
     }
 
     #[test]
@@ -147,5 +112,14 @@ mod tests {
         let json = serde_json::to_string(&RequestedAct::EnrollDevice).unwrap();
         assert_eq!(json, "\"device.enroll\"");
         assert!(serde_json::from_str::<RequestedAct>("\"nope\"").is_err());
+    }
+
+    #[test]
+    fn a_device_root_is_bound_only_with_enrollment() {
+        use RequestedAct::{BindDeviceRoot, EnrollDevice};
+        assert!(coherent(&[EnrollDevice]));
+        assert!(coherent(&[EnrollDevice, BindDeviceRoot]));
+        assert!(!coherent(&[BindDeviceRoot]));
+        assert!(!coherent(&[EnrollDevice, EnrollDevice]));
     }
 }

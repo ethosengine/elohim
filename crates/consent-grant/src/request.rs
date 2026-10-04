@@ -1,13 +1,11 @@
 //! What a terminal sends to ask, and whether a portal should show it to a
 //! person at all.
 
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 
-use crate::act::RequestedAct;
+use crate::act::{self, RequestedAct};
 use crate::return_path::{is_token, ReturnPath};
-use crate::{agent_key, pkce, GRANT_DOMAIN};
+use crate::{hash_shape, pkce, GRANT_DOMAIN};
 
 /// A terminal's request for a controller's consent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,23 +13,23 @@ use crate::{agent_key, pkce, GRANT_DOMAIN};
 pub struct GrantRequest {
     /// Must equal [`GRANT_DOMAIN`].
     pub domain: String,
-    /// The registered relying party asking (for example the `elohim` CLI).
+    /// The registered relying party asking (for example the `epr` CLI).
     pub client_id: String,
-    /// The agent key of the node that will act under the grant.
+    /// The agent key of the node that asks to be recognized.
     pub device_key: String,
-    /// The device's participant key, present exactly when the request asks to
-    /// bind it (`participant.bind`).
+    /// The device's cryptographic root, present exactly when the request asks
+    /// to bind it (`device.bind-root`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub participant_key: Option<String>,
+    pub device_root_key: Option<String>,
     /// What the person will see this device called on the consent screen.
+    /// Never part of the consent record: a label is the person's private word
+    /// for a machine.
     pub label: String,
-    /// The network the device is on. A controller signs only for this one.
+    /// The network on which the person's identity is kept.
     pub network_dna: String,
+    /// The network on which the device will act for them.
+    pub content_dna: String,
     pub acts: Vec<RequestedAct>,
-    /// How long the time-bound acts should last. Required when any is asked
-    /// for; the controller may grant less.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub valid_for_secs: Option<u64>,
     /// PKCE `S256` challenge; the terminal keeps the verifier.
     pub code_challenge: String,
     /// Opaque value the terminal checks on return, so a code that arrives is
@@ -45,9 +43,6 @@ pub struct GrantRequest {
 pub struct GrantPolicy {
     pub known_clients: Vec<String>,
     pub max_label_len: usize,
-    pub max_acts: usize,
-    /// Longest a time-bound act may be asked for.
-    pub max_valid_for_secs: u64,
 }
 
 impl GrantPolicy {
@@ -59,40 +54,7 @@ impl GrantPolicy {
         Self {
             known_clients: clients.into_iter().map(Into::into).collect(),
             max_label_len: 64,
-            max_acts: 16,
-            max_valid_for_secs: 12 * 60 * 60,
         }
-    }
-}
-
-/// What the device will be once the request is approved. The consent screen
-/// says which, because they are different promises.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Standing {
-    /// Signed in for named, time-bound acts. Nothing binds the device to the
-    /// person afterwards.
-    Ephemeral,
-    /// Enrolled as one of the person's devices: a peer runtime acting for
-    /// them under their controllers.
-    StewardedPeer,
-}
-
-impl Standing {
-    /// The standing a set of acts amounts to.
-    pub fn of(acts: &[RequestedAct]) -> Self {
-        if acts.contains(&RequestedAct::EnrollDevice) {
-            Self::StewardedPeer
-        } else {
-            Self::Ephemeral
-        }
-    }
-}
-
-impl GrantRequest {
-    /// The standing asked for. What is granted may be less: read it from the
-    /// grant's claims.
-    pub fn standing(&self) -> Standing {
-        Standing::of(&self.acts)
     }
 }
 
@@ -104,15 +66,10 @@ pub enum RequestRefusal {
     NetworkMalformed,
     LabelMalformed,
     ActsEmpty,
-    ActsTooMany,
-    ActsRepeated,
-    ParticipantKeyMalformed,
-    ParticipantKeyUnasked,
-    ParticipantKeyMissing,
-    ParticipantBindNeedsEnrollment,
-    ValidityMissing,
-    ValidityUnasked,
-    ValidityOutOfBounds,
+    ActsIncoherent,
+    DeviceRootMalformed,
+    DeviceRootUnasked,
+    DeviceRootMissing,
     ChallengeMalformed,
     StateMalformed,
     ReturnPortRestricted,
@@ -128,15 +85,10 @@ impl RequestRefusal {
             Self::NetworkMalformed => "request_network_malformed",
             Self::LabelMalformed => "request_label_malformed",
             Self::ActsEmpty => "request_acts_empty",
-            Self::ActsTooMany => "request_acts_too_many",
-            Self::ActsRepeated => "request_acts_repeated",
-            Self::ParticipantKeyMalformed => "request_participant_key_malformed",
-            Self::ParticipantKeyUnasked => "request_participant_key_unasked",
-            Self::ParticipantKeyMissing => "request_participant_key_missing",
-            Self::ParticipantBindNeedsEnrollment => "request_participant_bind_needs_enrollment",
-            Self::ValidityMissing => "request_validity_missing",
-            Self::ValidityUnasked => "request_validity_unasked",
-            Self::ValidityOutOfBounds => "request_validity_out_of_bounds",
+            Self::ActsIncoherent => "request_acts_incoherent",
+            Self::DeviceRootMalformed => "request_device_root_malformed",
+            Self::DeviceRootUnasked => "request_device_root_unasked",
+            Self::DeviceRootMissing => "request_device_root_missing",
             Self::ChallengeMalformed => "request_challenge_malformed",
             Self::StateMalformed => "request_state_malformed",
             Self::ReturnPortRestricted => "request_return_port_restricted",
@@ -144,8 +96,8 @@ impl RequestRefusal {
     }
 }
 
-/// A request that passed [`admit_request`]. Issuing a grant takes this type,
-/// so a request that was never checked cannot be issued against.
+/// A request that passed [`admit_request`]. Recording an agreement takes this
+/// type, so a request that was never checked cannot be agreed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedRequest(GrantRequest);
 
@@ -156,7 +108,7 @@ impl AdmittedRequest {
 
     /// Short device key for the consent screen.
     pub fn device_fingerprint(&self) -> String {
-        agent_key::fingerprint(&self.0.device_key)
+        hash_shape::fingerprint(&self.0.device_key)
     }
 }
 
@@ -180,10 +132,12 @@ pub fn admit_request(
     if !policy.known_clients.iter().any(|c| c == &request.client_id) {
         return Err(R::ClientUnknown);
     }
-    if !agent_key::is_agent_key(&request.device_key) {
+    if !hash_shape::is_agent_key(&request.device_key) {
         return Err(R::DeviceKeyMalformed);
     }
-    if !agent_key::is_dna_hash(&request.network_dna) {
+    if !hash_shape::is_dna_hash(&request.network_dna)
+        || !hash_shape::is_dna_hash(&request.content_dna)
+    {
         return Err(R::NetworkMalformed);
     }
     let label = request.label.trim();
@@ -197,38 +151,20 @@ pub fn admit_request(
     if request.acts.is_empty() {
         return Err(R::ActsEmpty);
     }
-    if request.acts.len() > policy.max_acts {
-        return Err(R::ActsTooMany);
+    if !act::coherent(&request.acts) {
+        return Err(R::ActsIncoherent);
     }
-    if request.acts.iter().collect::<HashSet<_>>().len() != request.acts.len() {
-        return Err(R::ActsRepeated);
-    }
-    // A participant key travels exactly when binding it is asked for, so the
+    // A device root travels exactly when binding it is asked for, so the
     // consent screen never shows a key nobody asked to bind, and never binds
     // one it did not show.
-    let binds_participant = request.acts.contains(&RequestedAct::BindParticipantKey);
-    match (&request.participant_key, binds_participant) {
+    let binds_root = request.acts.contains(&RequestedAct::BindDeviceRoot);
+    match (&request.device_root_key, binds_root) {
         (None, false) => {}
-        (Some(_), false) => return Err(R::ParticipantKeyUnasked),
-        (None, true) => return Err(R::ParticipantKeyMissing),
+        (Some(_), false) => return Err(R::DeviceRootUnasked),
+        (None, true) => return Err(R::DeviceRootMissing),
         (Some(key), true) => {
-            if !agent_key::is_participant_key(key) {
-                return Err(R::ParticipantKeyMalformed);
-            }
-            if request.standing() != Standing::StewardedPeer {
-                return Err(R::ParticipantBindNeedsEnrollment);
-            }
-        }
-    }
-    // A lifetime is stated exactly when something asked for can lapse.
-    let time_bound = request.acts.iter().any(RequestedAct::is_time_bound);
-    match (request.valid_for_secs, time_bound) {
-        (None, false) => {}
-        (Some(_), false) => return Err(R::ValidityUnasked),
-        (None, true) => return Err(R::ValidityMissing),
-        (Some(secs), true) => {
-            if secs == 0 || secs > policy.max_valid_for_secs {
-                return Err(R::ValidityOutOfBounds);
+            if !hash_shape::is_device_root_key(key) {
+                return Err(R::DeviceRootMalformed);
             }
         }
     }
@@ -248,30 +184,45 @@ pub fn admit_request(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::collections::HashSet;
+
     use super::*;
-    use crate::agent_key::sample_key;
+    use crate::hash_shape::sample_key;
 
     pub(crate) const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-    pub(crate) const NETWORK: &str = "uhC0kZezl4k2nZa5ZyU5O5H-5vH5LYpvwkSwkVx4G1wS_sHB4GTOt";
+    pub(crate) const NETWORK: &str = "uhC0kQwOEwmIBZhBT3I7vGZPz0kEL3_hqavyFW0upoO_hyEwuEglj";
+    pub(crate) const CONTENT: &str = "uhC0kZezl4k2nZa5ZyU5O5H-5vH5LYpvwkSwkVx4G1wS_sHB4GTOt";
 
     pub(crate) fn policy() -> GrantPolicy {
-        GrantPolicy::for_clients(["elohim-cli"])
+        GrantPolicy::for_clients(["epr-cli"])
+    }
+
+    pub(crate) fn device_root() -> String {
+        format!("did:key:z6Mk{}", "h".repeat(44))
     }
 
     pub(crate) fn request() -> GrantRequest {
         GrantRequest {
             domain: GRANT_DOMAIN.into(),
-            client_id: "elohim-cli".into(),
+            client_id: "epr-cli".into(),
             device_key: sample_key(7),
-            participant_key: None,
+            device_root_key: None,
             label: "Matthew's workspace".into(),
             network_dna: NETWORK.into(),
+            content_dna: CONTENT.into(),
             acts: vec![RequestedAct::EnrollDevice],
-            valid_for_secs: None,
             code_challenge: pkce::challenge(VERIFIER),
             state: "s".repeat(32),
             return_path: ReturnPath::Paste,
         }
+    }
+
+    /// Enroll and bind the device root: what a peer runtime asks for.
+    pub(crate) fn peer_request() -> GrantRequest {
+        let mut r = request();
+        r.acts.push(RequestedAct::BindDeviceRoot);
+        r.device_root_key = Some(device_root());
+        r
     }
 
     fn refused(change: impl FnOnce(&mut GrantRequest)) -> RequestRefusal {
@@ -285,6 +236,7 @@ pub(crate) mod tests {
         let admitted = admit_request(&request(), &policy()).unwrap();
         assert_eq!(admitted.request(), &request());
         assert!(admitted.device_fingerprint().contains('…'));
+        assert!(admit_request(&peer_request(), &policy()).is_ok());
     }
 
     #[test]
@@ -306,10 +258,14 @@ pub(crate) mod tests {
             refused(|r| r.network_dna = sample_key(1)),
             R::NetworkMalformed
         );
+        assert_eq!(
+            refused(|r| r.content_dna = sample_key(1)),
+            R::NetworkMalformed
+        );
         assert_eq!(refused(|r| r.acts.clear()), R::ActsEmpty);
         assert_eq!(
             refused(|r| r.acts.push(RequestedAct::EnrollDevice)),
-            R::ActsRepeated
+            R::ActsIncoherent
         );
         assert_eq!(
             refused(|r| r.code_challenge = VERIFIER[..42].into()),
@@ -326,75 +282,31 @@ pub(crate) mod tests {
         );
     }
 
-    fn participant_key() -> String {
-        format!("did:key:z6Mk{}", "h".repeat(44))
-    }
-
     #[test]
-    fn enrollment_is_what_makes_a_stewarded_peer() {
-        assert_eq!(request().standing(), Standing::StewardedPeer);
-        let mut ephemeral = request();
-        ephemeral.acts = vec![RequestedAct::DelegateHead {
-            item_id: "item".into(),
-        }];
-        ephemeral.valid_for_secs = Some(3600);
-        assert_eq!(ephemeral.standing(), Standing::Ephemeral);
-        assert!(admit_request(&ephemeral, &policy()).is_ok());
-    }
-
-    #[test]
-    fn a_stewarded_peer_may_bind_its_participant_key() {
-        let mut r = request();
-        r.acts.push(RequestedAct::BindParticipantKey);
-        r.participant_key = Some(participant_key());
-        assert!(admit_request(&r, &policy()).is_ok());
-    }
-
-    #[test]
-    fn a_participant_key_travels_exactly_when_binding_is_asked() {
+    fn a_device_root_travels_exactly_when_binding_is_asked() {
         use RequestRefusal as R;
         assert_eq!(
-            refused(|r| r.participant_key = Some(participant_key())),
-            R::ParticipantKeyUnasked
+            refused(|r| r.device_root_key = Some(device_root())),
+            R::DeviceRootUnasked
         );
         assert_eq!(
-            refused(|r| r.acts.push(RequestedAct::BindParticipantKey)),
-            R::ParticipantKeyMissing
+            refused(|r| r.acts.push(RequestedAct::BindDeviceRoot)),
+            R::DeviceRootMissing
         );
         assert_eq!(
             refused(|r| {
-                r.acts.push(RequestedAct::BindParticipantKey);
-                r.participant_key = Some("did:key:z6Mkshort".into());
+                r.acts.push(RequestedAct::BindDeviceRoot);
+                r.device_root_key = Some("did:key:z6Mkshort".into());
             }),
-            R::ParticipantKeyMalformed
+            R::DeviceRootMalformed
         );
         assert_eq!(
             refused(|r| {
-                r.acts = vec![RequestedAct::BindParticipantKey];
-                r.participant_key = Some(participant_key());
+                r.acts = vec![RequestedAct::BindDeviceRoot];
+                r.device_root_key = Some(device_root());
             }),
-            R::ParticipantBindNeedsEnrollment
+            R::ActsIncoherent
         );
-    }
-
-    #[test]
-    fn a_lifetime_is_stated_exactly_when_something_can_lapse() {
-        use RequestRefusal as R;
-        let head = || RequestedAct::DelegateHead {
-            item_id: "item".into(),
-        };
-        assert_eq!(refused(|r| r.valid_for_secs = Some(60)), R::ValidityUnasked);
-        assert_eq!(refused(|r| r.acts.push(head())), R::ValidityMissing);
-        for secs in [0, 12 * 60 * 60 + 1] {
-            assert_eq!(
-                refused(|r| {
-                    r.acts.push(head());
-                    r.valid_for_secs = Some(secs);
-                }),
-                R::ValidityOutOfBounds,
-                "{secs}"
-            );
-        }
     }
 
     #[test]
@@ -410,16 +322,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn too_many_acts_are_refused() {
-        let many = (0..17)
-            .map(|i| RequestedAct::DelegateHead {
-                item_id: format!("item-{i}"),
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(refused(|r| r.acts = many), RequestRefusal::ActsTooMany);
-    }
-
-    #[test]
     fn refusal_codes_are_distinct() {
         use RequestRefusal as R;
         let all = [
@@ -429,15 +331,10 @@ pub(crate) mod tests {
             R::NetworkMalformed,
             R::LabelMalformed,
             R::ActsEmpty,
-            R::ActsTooMany,
-            R::ActsRepeated,
-            R::ParticipantKeyMalformed,
-            R::ParticipantKeyUnasked,
-            R::ParticipantKeyMissing,
-            R::ParticipantBindNeedsEnrollment,
-            R::ValidityMissing,
-            R::ValidityUnasked,
-            R::ValidityOutOfBounds,
+            R::ActsIncoherent,
+            R::DeviceRootMalformed,
+            R::DeviceRootUnasked,
+            R::DeviceRootMissing,
             R::ChallengeMalformed,
             R::StateMalformed,
             R::ReturnPortRestricted,
@@ -448,11 +345,13 @@ pub(crate) mod tests {
 
     #[test]
     fn the_wire_form_is_camel_case() {
-        let json = serde_json::to_value(request()).unwrap();
+        let json = serde_json::to_value(peer_request()).unwrap();
         for field in [
             "clientId",
             "deviceKey",
+            "deviceRootKey",
             "networkDna",
+            "contentDna",
             "codeChallenge",
             "returnPath",
         ] {

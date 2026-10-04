@@ -7,12 +7,13 @@ seamRegistryVersion: 1
 crate: elohim-consent-grant
 crateRoot: crates/consent-grant
 seamLocus: >
-  The rules of the controller-consent grant: a terminal asks a controller to sign named acts,
-  the controller approves in a portal, a single-use code returns by loopback or by paste, and
-  the terminal redeems it. Plain-data predicates only, so the hosted portal (doorway), the
-  native portal (elohim-storage) and the asking terminal apply one set of rules. The grant
-  carries no authority: what it returns is an act the controller's own cell signed, verified
-  on-chain by peers.
+  The rules of asking a controller's consent from a terminal: the terminal asks to be
+  recognized as a person's device, a controller agrees in a portal, a single-use code returns by
+  loopback or by paste, and the terminal redeems it. Plain-data predicates only, so the hosted
+  portal (doorway), the native portal (elohim-storage) and the asking terminal apply one set of
+  rules. Recognition plane only: nothing here confers authority over content. The consent
+  record is content-addressed evidence; the binding the controller's cell signs is what peers
+  verify.
 
 decisionPoints:
   - name: admit_request
@@ -20,12 +21,13 @@ decisionPoints:
     sourceLocation:
       file: src/request.rs
       modulePath: consent_grant::request::admit_request
-      line: 171
+      line: 123
     summary: >
       Decides whether a terminal's request is fit to put in front of a person: known domain and
       client, well-formed device key and network, plain bounded label, a non-empty set of
-      distinct recognised acts, a PKCE S256 challenge, an opaque state, an unprivileged loopback
-      port. Returns an `AdmittedRequest`, the only type a grant can be issued against.
+      coherent recognised acts, a device root exactly when binding it is asked, a PKCE S256
+      challenge, an opaque state, an unprivileged loopback port. Returns an `AdmittedRequest`,
+      the only type an agreement can be recorded against.
     concernIds:
       - id: C0
         status: answered
@@ -58,8 +60,8 @@ decisionPoints:
       - id: C6a
         status: answered
         justification: >
-          Work is bounded by `GrantPolicy` (label length, act count) and fixed token lengths;
-          nothing iterates over caller-controlled unbounded input.
+          Work is bounded by `GrantPolicy` (label length), a closed two-act vocabulary and
+          fixed token lengths; nothing iterates over caller-controlled unbounded input.
       - id: C6b
         status: n-a
         justification: Pure; no effect to repeat.
@@ -109,9 +111,9 @@ decisionPoints:
   - name: admit_redemption
     kind: pure-decision-predicate
     sourceLocation:
-      file: src/redeem.rs
-      modulePath: consent_grant::redeem::admit_redemption
-      line: 245
+      file: src/delivery.rs
+      modulePath: consent_grant::delivery::admit_redemption
+      line: 140
     summary: >
       Decides whether a terminal may collect an approved grant: the code's digest matches, the
       grant is unredeemed and unexpired, the client and device key are the ones that asked, and
@@ -171,7 +173,7 @@ decisionPoints:
       - id: C12
         status: answered
         justification: >
-          Only what the controller approved (`acts`, `approved_by`) is stored and released.
+          Only the address of the record the controller agreed to is held and released.
       - id: C13
         status: n-a
         justification: Not graded.
@@ -179,15 +181,101 @@ decisionPoints:
         status: n-a
         justification: Every outcome is classified.
     contractTests:
-      - path: crates/consent-grant/src/redeem.rs
+      - path: crates/consent-grant/src/delivery.rs
         testName: a_code_alone_redeems_nothing
         kind: unit
-      - path: crates/consent-grant/src/redeem.rs
-        testName: a_grant_redeems_once_and_within_its_window
+      - path: crates/consent-grant/src/delivery.rs
+        testName: a_delivery_redeems_once_and_within_its_window
         kind: unit
-      - path: crates/consent-grant/src/redeem.rs
-        testName: signs_of_a_seen_code_burn_the_grant
+      - path: crates/consent-grant/src/delivery.rs
+        testName: signs_of_a_seen_code_burn_the_delivery
         kind: unit
-      - path: crates/consent-grant/src/redeem.rs
+      - path: crates/consent-grant/src/delivery.rs
         testName: the_store_never_holds_the_code
+        kind: unit
+
+  - name: ConsentRecord::agree
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/consent.rs
+      modulePath: consent_grant::consent::ConsentRecord::agree
+      line: 91
+    summary: >
+      Records a controller's agreement to an admitted request as a content-addressed statement:
+      what was asked, what was agreed, the identity and authority it is under, the device key
+      and, only when its binding was agreed, the device root. Refuses an agreement that is
+      empty, wider than the request, or incoherent by itself. The address excludes signatures,
+      the device label and all delivery state.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Recognition plane. The record is evidence held locally; it is not a notarized
+          authority and confers nothing over any content.
+      - id: C1
+        status: answered
+        justification: >
+          The identity and authority are supplied by the agreeing controller, never by the
+          asking terminal, and the agreed acts cannot exceed what the terminal asked.
+      - id: C2
+        status: n-a
+        justification: No ordering among candidates.
+      - id: C3
+        status: n-a
+        justification: A single stateless verdict.
+      - id: C4
+        status: answered
+        justification: >
+          What was declined is recoverable from the record (`declined_acts`); an agreement to
+          nothing is refused rather than recorded as an empty consent.
+      - id: C5
+        status: answered
+        justification: >
+          The record is evidence that consent was given. Its signatures are detached and are
+          verified by whoever holds the signers' keys; a record alone authorizes nothing.
+      - id: C6a
+        status: answered
+        justification: Closed act vocabulary and fixed-shape fields.
+      - id: C6b
+        status: answered
+        justification: >
+          The address is a pure function of the record, so recording the same agreement twice
+          yields the same address, and adding or replacing a signature never moves it.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C9
+        status: partial
+        justification: >
+          The record names the identity root and the authority it was agreed under. It does not
+          follow a later change of authority; a re-keyed identity needs a new consent.
+      - id: C10
+        status: answered
+        justification: >
+          The record carries `GRANT_DOMAIN` and refuses unknown fields on decode, so a record
+          from another version is not read under these rules.
+      - id: C11
+        status: n-a
+        justification: Reached only from an authenticated consent step.
+      - id: C12
+        status: answered
+        justification: This is the record of the consent itself, including what was declined.
+      - id: C13
+        status: n-a
+        justification: Not graded.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified.
+    contractTests:
+      - path: crates/consent-grant/src/consent.rs
+        testName: a_person_may_agree_to_less_never_more
+        kind: unit
+      - path: crates/consent-grant/src/consent.rs
+        testName: signing_again_never_moves_the_address
+        kind: unit
+      - path: crates/consent-grant/src/consent.rs
+        testName: the_record_carries_no_label_and_no_delivery_state
         kind: unit

@@ -1,7 +1,7 @@
-# crates/consent-grant — the rules of the controller-consent grant, shared by every
-# party to it: the hosted portal (doorway), the native portal (elohim-storage) and
-# the terminal that asks. Nested single-crate workspace root like its `crates/`
-# siblings; wired by path dependency.
+# crates/consent-grant — the rules of asking a controller's consent from a terminal,
+# shared by every party to it: the hosted portal (doorway), the native portal
+# (elohim-storage) and the terminal that asks. Nested single-crate workspace root
+# like its `crates/` siblings; wired by path dependency.
 [workspace]
 
 [package]
@@ -21,7 +21,11 @@ path = "src/lib.rs"
 
 [dependencies]
 base64 = "0.22"
+# The consent record is addressed exactly as every other atom is: canonical
+# dag-cbor, CIDv1. `elohim-epr` owns that codec; it is not restated here.
+elohim-epr = { path = "../../elohim/epr" }
 serde = { version = "1.0", features = ["derive"] }
+serde_ipld_dagcbor = "0.6"
 sha2 = "0.10"
 
 [dev-dependencies]

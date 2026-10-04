@@ -425,6 +425,18 @@ a key. Authorization does not read reach. A check that reads two planes in one
 comparison is the defect this section removes. The planes in §3 (recognition,
 standing, mandate, exercise) are relationships; these are the planes they live on.
 
+**A further plane, named and not designed here (operator, 2026-10-04).** The four
+above describe a persistent record, which changes rarely. There is also a live
+plane: peers online together, merging one another's changes as they happen, the
+way a CRDT does. That is where an interactive witness occurs, because a peer who
+is present can sign what it sees as it sees it. The witness ladder already has a
+rung for it: recorded, then converged, then corroborated, then notarized. The
+persistent record holds what was settled; the live plane is where peers come to
+agree on what is current. This bears on finding 2 in 12.7: whether a claim is
+still current may be a question for the live plane, not one a carried record can
+answer. Nothing in this section depends on the live plane yet, and nothing in it
+should prevent a claim being witnessed there.
+
 ### 12.2 Two properties every authority record has
 
 1. **The base case is one person with one device.** That device is the identity's
