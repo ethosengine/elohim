@@ -35,8 +35,8 @@ use crate::routes::hosted_cell::{
     issue_hosted_cell_grant, pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
 };
 use crate::routes::zome_helpers::{
-    call_create_human, call_create_human_on_conductor, call_get_my_human, get_agent_pub_key,
-    CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput, ACCOUNT_CLOSED_REASON,
+    get_agent_pub_key, CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput,
+    ACCOUNT_CLOSED_REASON,
 };
 use crate::server::AppState;
 use crate::types::DoorwayError;
@@ -998,12 +998,14 @@ fn password_too_weak(password: &str) -> bool {
 /// # What this closes
 ///
 /// `agencyPhase: "doorway"` (and `hosted` with no conductor pool) authors the
-/// Human on the doorway's SINGLETON agent — the operator's. Once that Human
-/// exists, `create_human` answers "Agent already has a Human profile" to every
-/// later registration on that path, and the recovery branch used to answer by
-/// attaching the existing Human to the new account. The agency phase comes from
-/// the unauthenticated request body, so any caller could be given an account
-/// row and a session token whose `human_id` is the operator's Human.
+/// Human on the doorway's SINGLETON agent — the operator's. `create_human` is
+/// idempotent: once that Human exists, every later registration on that path
+/// is answered with it, successfully. The agency phase comes from the
+/// unauthenticated request body, so any caller was given an account row and a
+/// session token whose `human_id` is the operator's Human. The registration
+/// now ASKS whether the agent has a Human before creating one
+/// (`routes::human_binding::bind_human`), and this predicate is the evidence
+/// required when it does.
 ///
 /// # The gate, by the auth-posture questions
 ///
@@ -1053,6 +1055,100 @@ async fn hosted_identity_recovery_authorized(
                 .await
         }
         None => false,
+    }
+}
+
+/// Why a registration could not be bound to a Human.
+enum RegistrationBindError {
+    /// A finished HTTP refusal: the recovery was not authorised (403), or the
+    /// agent is busy with another registration (503).
+    Refused(Response<BoxBody>),
+    /// The conductor failed; the arm decides what that means for it.
+    Conductor(crate::types::DoorwayError),
+}
+
+/// Bind this registration to the Human on its agent: the doorway's own agent
+/// (`provisioned` is `None`), or the app provisioned for a hosted person.
+///
+/// Asks whether the agent already has a Human BEFORE creating one. If it does,
+/// attaching it to this account is a recovery and needs evidence: the operator
+/// credential for the doorway's own agent, this doorway's provisioning record
+/// for a hosted agent. Without it: 403, nothing created, no row, no token.
+async fn bind_registration_human(
+    state: &AppState,
+    arm: &str,
+    body: &RegisterRequest,
+    provisioned: Option<&ProvisionedAgent>,
+    input: CreateHumanInput,
+) -> Result<crate::routes::zome_helpers::HumanOutput, RegistrationBindError> {
+    use crate::routes::human_binding::{
+        agent_key, agent_lock_wait, agent_locks, bind_human, log_bound, BindError, ZomeCallerAuthor,
+    };
+
+    let bound = match provisioned {
+        Some(p) => {
+            let caller = crate::services::ZomeCaller::new(
+                &p.admin_url,
+                &p.conductor_url,
+                &p.installed_app_id,
+            );
+            bind_human(
+                &ZomeCallerAuthor(&caller),
+                agent_locks(),
+                &agent_key(&p.admin_url, &p.installed_app_id),
+                agent_lock_wait(),
+                input,
+                || hosted_identity_recovery_authorized(state, &body.identifier, p),
+            )
+            .await
+        }
+        None => {
+            let Some(caller) = state.zome_caller.as_ref() else {
+                return Err(RegistrationBindError::Conductor(
+                    crate::types::DoorwayError::Internal(
+                        "ZomeCaller not available - conductor not configured?".into(),
+                    ),
+                ));
+            };
+            let authorized = operator_identity_recovery_authorized(
+                body.admin_bootstrap_key.as_deref(),
+                state.args.api_key_admin.as_deref(),
+            );
+            bind_human(
+                &ZomeCallerAuthor(caller),
+                agent_locks(),
+                &agent_key(state.args.admin_url(), &state.args.installed_app_id),
+                agent_lock_wait(),
+                input,
+                || async move { authorized },
+            )
+            .await
+        }
+    };
+
+    match bound {
+        Ok(bound) => {
+            log_bound(arm, &body.identifier, &bound);
+            Ok(bound.into_output())
+        }
+        Err(BindError::RecoveryRefused) => {
+            warn!(
+                arm,
+                identifier = %body.identifier,
+                "Refusing to attach the Human that already exists on this agent to a \
+                 registration with no evidence that it is this registrant's"
+            );
+            Err(RegistrationBindError::Refused(identity_recovery_refused()))
+        }
+        Err(BindError::Busy) => Err(RegistrationBindError::Refused(json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &ErrorResponse {
+                error: "Another registration is creating an identity on this agent; try again"
+                    .into(),
+                code: Some("IDENTITY_BUSY".into()),
+            },
+        ))),
+        Err(BindError::Conductor(e)) => Err(RegistrationBindError::Conductor(e)),
     }
 }
 
@@ -1373,8 +1469,11 @@ async fn handle_register(
                 uuid::Uuid::new_v4().to_string()
             };
 
-            let zome_result = call_create_human(
+            let zome_result = match bind_registration_human(
                 &state,
+                "doorway",
+                &body,
+                None,
                 CreateHumanInput {
                     id: generated_human_id.clone(),
                     display_name: display_name.clone(),
@@ -1384,7 +1483,12 @@ async fn handle_register(
                     location: body.location.clone(),
                 },
             )
-            .await;
+            .await
+            {
+                Ok(human_output) => Ok(human_output),
+                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Conductor(e)) => Err(e),
+            };
 
             match zome_result {
                 Ok(human_output) => {
@@ -1418,82 +1522,10 @@ async fn handle_register(
                     (human_output.human.id, agent_key, Some(profile), None)
                 }
                 Err(e) => {
-                    let err_str = e.to_string();
-                    if err_str.contains("Agent already has a Human profile") {
-                        // Conductor not reset but DB was cleared — recover. The
-                        // Human that exists is the one on the doorway's OWN
-                        // agent: only the operator may be handed it.
-                        if !operator_identity_recovery_authorized(
-                            body.admin_bootstrap_key.as_deref(),
-                            state.args.api_key_admin.as_deref(),
-                        ) {
-                            warn!(
-                                identifier = %body.identifier,
-                                "Doorway: refusing to attach the doorway agent's existing Human \
-                                 to a registration that did not present the operator credential"
-                            );
-                            return identity_recovery_refused();
-                        }
-                        warn!(
-                            identifier = %body.identifier,
-                            "Doorway: agent already has Human profile in DHT — recovering for DB re-registration"
-                        );
-                        match call_get_my_human(&state).await {
-                            Ok(Some(existing)) => {
-                                let agent_key = match get_agent_pub_key(&state) {
-                                    Ok(k) => k,
-                                    Err(e2) => {
-                                        warn!(
-                                            "Failed to get agent_pub_key during recovery: {}",
-                                            e2
-                                        );
-                                        return json_response(
-                                            StatusCode::INTERNAL_SERVER_ERROR,
-                                            &ErrorResponse {
-                                                error:
-                                                    "Failed to get agent identity during recovery"
-                                                        .into(),
-                                                code: Some("AGENT_KEY_ERROR".into()),
-                                            },
-                                        );
-                                    }
-                                };
-                                let profile = HumanProfileResponse {
-                                    id: existing.human.id.clone(),
-                                    display_name: existing.human.display_name,
-                                    bio: existing.human.bio,
-                                    affinities: existing.human.affinities,
-                                    profile_reach: existing.human.profile_reach,
-                                    location: existing.human.location,
-                                    created_at: existing.human.created_at,
-                                    updated_at: existing.human.updated_at,
-                                };
-                                (existing.human.id, agent_key, Some(profile), None)
-                            }
-                            Ok(None) => {
-                                warn!(
-                                    "get_my_human returned None despite 'already has profile' error"
-                                );
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                            Err(e2) => {
-                                warn!("Failed to recover existing Human profile: {}", e2);
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                        }
-                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
+                    // (An existing Human is not an error: `create_human` is
+                    // idempotent. `bind_registration_human` asks before it
+                    // creates, and gates the recovery there.)
+                    if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
                             "Doorway: imagodei zome unavailable, using the Simulacra \
                              synthetic-identity fallback (declared stage only): {}",
@@ -1600,36 +1632,25 @@ async fn handle_register(
                 uuid::Uuid::new_v4().to_string()
             };
 
-            let zome_result = if let Some(ref p) = provisioner_result {
-                call_create_human_on_conductor(
-                    &p.conductor_url,
-                    &p.admin_url,
-                    &p.installed_app_id,
-                    CreateHumanInput {
-                        id: generated_human_id.clone(),
-                        display_name: display_name.clone(),
-                        bio: body.bio.clone(),
-                        affinities: body.affinities.clone(),
-                        profile_reach: body.profile_reach.clone(),
-                        location: body.location.clone(),
-                    },
-                )
-                .await
-            } else {
-                // No conductor registry (dev mode or not configured) — fall back
-                // to singleton ZomeCaller
-                call_create_human(
-                    &state,
-                    CreateHumanInput {
-                        id: generated_human_id.clone(),
-                        display_name: display_name.clone(),
-                        bio: body.bio.clone(),
-                        affinities: body.affinities.clone(),
-                        profile_reach: body.profile_reach.clone(),
-                        location: body.location.clone(),
-                    },
-                )
-                .await
+            let zome_result = match bind_registration_human(
+                &state,
+                "hosted",
+                &body,
+                provisioner_result.as_ref(),
+                CreateHumanInput {
+                    id: generated_human_id.clone(),
+                    display_name: display_name.clone(),
+                    bio: body.bio.clone(),
+                    affinities: body.affinities.clone(),
+                    profile_reach: body.profile_reach.clone(),
+                    location: body.location.clone(),
+                },
+            )
+            .await
+            {
+                Ok(human_output) => Ok(human_output),
+                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Conductor(e)) => Err(e),
             };
 
             match zome_result {
@@ -1680,121 +1701,7 @@ async fn handle_register(
                     )
                 }
                 Err(e) => {
-                    let err_str = e.to_string();
-                    if err_str.contains("Agent already has a Human profile") {
-                        // Recover existing identity — but only with evidence
-                        // that it is THIS registrant's. On a provisioned app:
-                        // this doorway's own record that it provisioned that
-                        // agent for exactly this identifier. On the singleton
-                        // fallback: the operator credential.
-                        let recovery_authorized = match provisioner_result.as_ref() {
-                            Some(p) => {
-                                hosted_identity_recovery_authorized(&state, &body.identifier, p)
-                                    .await
-                            }
-                            None => operator_identity_recovery_authorized(
-                                body.admin_bootstrap_key.as_deref(),
-                                state.args.api_key_admin.as_deref(),
-                            ),
-                        };
-                        if !recovery_authorized {
-                            warn!(
-                                identifier = %body.identifier,
-                                "Hosted: refusing to attach an existing Human to a registration \
-                                 with no evidence that it is this registrant's"
-                            );
-                            return identity_recovery_refused();
-                        }
-                        // Conductor wasn't reset but DB was cleared.
-                        warn!(
-                            identifier = %body.identifier,
-                            "Hosted: agent already has Human profile in DHT — recovering for DB re-registration"
-                        );
-                        // Use a temporary ZomeCaller on the provisioned conductor if available
-                        let recovery_result = if let Some(ref p) = provisioner_result {
-                            let caller = crate::services::ZomeCaller::new(
-                                &p.admin_url,
-                                &p.conductor_url,
-                                &p.installed_app_id,
-                            );
-                            caller
-                                .call::<(), Option<crate::routes::zome_helpers::HumanOutput>>(
-                                    "imagodei",
-                                    "imagodei",
-                                    "get_my_human",
-                                    &(),
-                                )
-                                .await
-                                .map_err(|e2| {
-                                    crate::types::DoorwayError::Holochain(format!(
-                                        "get_my_human on conductor failed: {e2}"
-                                    ))
-                                })
-                        } else {
-                            call_get_my_human(&state).await
-                        };
-
-                        match recovery_result {
-                            Ok(Some(existing)) => {
-                                let agent_key = if let Some(ref p) = provisioner_result {
-                                    p.agent_pub_key.clone()
-                                } else {
-                                    match get_agent_pub_key(&state) {
-                                        Ok(k) => k,
-                                        Err(e2) => {
-                                            warn!(
-                                                "Hosted: failed to get agent_pub_key during recovery: {}",
-                                                e2
-                                            );
-                                            return json_response(
-                                                StatusCode::INTERNAL_SERVER_ERROR,
-                                                &ErrorResponse {
-                                                    error: "Failed to get agent identity during recovery".into(),
-                                                    code: Some("AGENT_KEY_ERROR".into()),
-                                                },
-                                            );
-                                        }
-                                    }
-                                };
-                                let profile = HumanProfileResponse {
-                                    id: existing.human.id.clone(),
-                                    display_name: existing.human.display_name,
-                                    bio: existing.human.bio,
-                                    affinities: existing.human.affinities,
-                                    profile_reach: existing.human.profile_reach,
-                                    location: existing.human.location,
-                                    created_at: existing.human.created_at,
-                                    updated_at: existing.human.updated_at,
-                                };
-                                (
-                                    existing.human.id,
-                                    agent_key,
-                                    Some(profile),
-                                    provisioner_result,
-                                )
-                            }
-                            Ok(None) => {
-                                warn!("Hosted: get_my_human returned None despite 'already has profile' error");
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                            Err(e2) => {
-                                warn!("Hosted: failed to recover existing Human profile: {}", e2);
-                                return json_response(
-                                    StatusCode::SERVICE_UNAVAILABLE,
-                                    &ErrorResponse {
-                                        error: format!("Failed to create Holochain identity: {e}"),
-                                        code: Some("IDENTITY_CREATION_FAILED".into()),
-                                    },
-                                );
-                            }
-                        }
-                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
+                    if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
                             "Hosted: imagodei zome unavailable, using the Simulacra \
                              synthetic-identity fallback (declared stage only): {}",
@@ -6104,10 +6011,11 @@ mod tests {
     }
 
     /// THE CLASS: a registration that names `agencyPhase: "doorway"` (or lands
-    /// on the singleton fallback) is answered "Agent already has a Human
-    /// profile" once the operator's Human exists. Attaching that Human to the
-    /// new account is refused unless the caller presents the operator
-    /// credential — and refused when none is configured.
+    /// on the singleton fallback) is answered with the operator's Human once it
+    /// exists — `create_human` is idempotent and succeeds. Attaching that Human
+    /// to the new account is refused unless the caller presents the operator
+    /// credential — and refused when none is configured. (That the gate is
+    /// actually reached is `routes::human_binding`'s tests' business.)
     #[test]
     fn a_registration_cannot_recover_the_operators_human_without_the_operator_credential() {
         let configured = Some("the-admin-key");

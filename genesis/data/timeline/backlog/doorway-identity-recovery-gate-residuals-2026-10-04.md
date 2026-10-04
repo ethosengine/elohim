@@ -30,6 +30,42 @@ The branch `fix/hosted-provisioning-stop-damage` added two refusals to `POST /au
 requirement to hosted provisioning. They close one class. This entry records what is still open, so the gate is
 not read as "registration identity is done". Line numbers are as of the commit that adds this file.
 
+## CORRECTION 2026-10-04 (later the same day) — the gate did not fire against the real DNA
+
+A live household run (`genesis/a2o/reports/recovery/recovery-gate-proof-20261004/`) showed that the
+recovery gate added in `e06b89eb8` NEVER RAN, and that the doorway-phase route was still open on the
+success path.
+
+**What this entry and the round-3 report claimed, and why it was wrong.** They said the doorway-phase and
+hosted recoveries were reached through an `"Agent already has a Human profile"` error from `create_human`, and
+that gating that error branch closed the class. `imagodei::create_human` raises no such error. It is
+idempotent (`elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs`, the "Idempotency gate" in
+`create_human`): when the calling agent already has a Human it returns that Human's hash and succeeds. The
+string exists only in a doc comment. The trace was reasoned from the doorway's own error handling, not from the
+zome, and the tests exercised the predicates without ever driving the branch — so nothing checked that the
+branch could be taken.
+
+**What was actually reachable, with the round-3 commits applied.** A registration naming the doorway agency
+phase, sent to a doorway whose own agent already had a Human, was answered `201`: an account row and a session
+token carrying the existing Human's id, and that Human's profile in the body. No credential was asked for.
+Supplying the existing Human's id in the request changed nothing. The same held for a hosted registration with
+no conductor pool (the singleton fallback), and for a hosted registration whose provisioned agent already had
+a Human.
+
+**The fix** (the commit that adds this correction). The registration ASKS before it creates:
+`routes::human_binding::bind_human` (`human_binding.rs:184`), called from every arm that creates or attaches a
+Human through `bind_registration_human` (`auth_routes.rs:1077`), reads the agent's Human under a per-agent
+lock before `create_human`. If one exists, attaching it is a recovery and needs the evidence already defined;
+without it the answer is `403 IDENTITY_RECOVERY_REFUSED` and `create_human` is not called. If none exists it
+creates, reads again, and treats a Human that is not the one it just sent as a recovery too. The dead
+error-string branches are removed. The test fake's `create_human` is idempotent like the zome's, and one test
+reads the zome source and fails if that stops being true.
+
+So the gate now fires on EVERY registration after the first on a given agent — which is what "recovery" means
+once `create_human` is idempotent. Item 1 below is unchanged: the first one is still ungated.
+
+Not yet confirmed by a live run: that the rebuilt doorway refuses the three requests the run sent.
+
 ## What was reachable before the branch (the class, now closed)
 
 An unauthenticated registration could be bound to an identity that already existed. Two routes led there.
@@ -42,6 +78,8 @@ An unauthenticated registration could be bound to an identity that already exist
 - **Through the doorway-phase recovery.** A registration naming the doorway agency phase authors its Human on
   the doorway's own conductor agent. Once that Human exists, every later registration on that path was answered
   with the existing Human, and the account row and session were issued with its `human_id` and its profile.
+  (This was reachable as a plain SUCCESS, not through an error branch — see the correction above. It stayed
+  open until the commit that adds that correction.)
 
 Fix commits: `71ad3524e` (typed faults; an install of unknown outcome is never re-offered), `39d444a87` (the
 provisioning intent log), `e06b89eb8` (full-width app ids; adoption only where the conductor's agent key equals
@@ -52,13 +90,13 @@ refusal is `403`, not `409`).
 
 ### 1. The FIRST doorway-phase registration is ungated
 
-`agency_phase` is read from the unauthenticated request body (`auth_routes.rs:1218`). In the `"doorway"` arm
-(`auth_routes.rs:1343`) `call_create_human` runs on the doorway's own conductor agent (`:1376`) with the
-caller's display name and, if supplied, the caller's `human_id`. Only the RECOVERY — the branch taken when that
-agent already has a Human — is gated (`operator_identity_recovery_authorized`, `auth_routes.rs:1024`). On a
-fresh doorway, whoever sends the first doorway-phase registration becomes the Human on the operator's agent.
-The same holds for a `hosted` registration on a doorway with no conductor pool, which falls back to the same
-singleton call (`:1621`).
+`agency_phase` is read from the unauthenticated request body (`auth_routes.rs:1314`). In the `"doorway"` arm
+(`auth_routes.rs:1439`) the Human is created on the doorway's own conductor agent with the caller's display
+name and, if supplied, the caller's `human_id`. Only the RECOVERY — a registration that finds a Human already
+on that agent — is gated (`operator_identity_recovery_authorized`, `auth_routes.rs:1026`, applied in
+`bind_registration_human`, `:1077`). On a fresh doorway, whoever sends the first doorway-phase registration
+becomes the Human on the operator's agent. The same holds for a `hosted` registration on a doorway with no
+conductor pool, which uses the same singleton agent. Every registration after that first one is gated.
 
 Exit: the agency phase must not be a caller's choice. Either the doorway-phase arm requires the operator
 credential outright, or the operator's Human is created at bootstrap by the operator's own runtime and the arm
@@ -121,8 +159,14 @@ row in any one doorway's database.
 - If the account rows are lost as well, the operator's recovery rebuilds agent mappings but no identifier
   records. An identifier typed into a form is not evidence of who is asking, so returning people are not
   re-bound to their apps.
-- The recovery branches inside `handle_register` are covered by tests of their predicates and of the refusal,
-  not by a test that drives the handler.
+- `bind_human` is tested against a fake held to the zome, and the predicates and the refusal are tested;
+  `handle_register` itself is still not driven end to end by any test.
+- Two doorway PROCESSES sharing one conductor agent could both create an identical Human in the same instant
+  and neither could tell; the zome does not say whether a call created or found the Human. No deployed shape
+  does this. The exit is a coordinator-only change that answers "created" or "existed".
+- A `node` or `device` registration (`auth_routes.rs:1740`) makes no conductor call for the Human and writes
+  the caller-supplied `human_id` straight into the account row and the session token. No evidence is asked for
+  that the id is the caller's.
 
 ## Readiness
 

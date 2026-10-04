@@ -1043,6 +1043,14 @@ fn worst_case_mint(deadline: Duration) -> Duration {
     deadline * 3 + crate::conductor::dns_resolve_timeout()
 }
 
+/// The longest a fresh caller can take to make `calls` zome calls in a row: one
+/// connect handshake, one credential mint, and the calls — each at the
+/// per-call deadline. The bound a waiter on such a sequence is given.
+pub(crate) fn worst_case_first_calls(calls: u32) -> Duration {
+    let deadline = zome_call_timeout();
+    reconnect_budget(deadline) + worst_case_mint(deadline) + deadline * calls
+}
+
 /// One established connection to ONE conductor.
 struct Connection {
     app_ws: AppWebsocket,

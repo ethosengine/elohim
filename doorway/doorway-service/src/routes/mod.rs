@@ -28,6 +28,7 @@ pub mod federation;
 pub mod freshness;
 pub mod health;
 pub mod hosted_cell;
+pub mod human_binding;
 pub mod identity;
 pub mod import;
 pub mod import_ws;

@@ -334,6 +334,40 @@ lazy_static! {
     )
     .unwrap();
 
+    /// The wiped-store verdict, one series per value (`unknown`, `not_wiped`,
+    /// `wiped`); exactly one is 1.
+    pub static ref PROVISIONING_STORE_VERDICT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "doorway_provisioning_store_verdict",
+            "Whether the doorway's provisioning records were lost: unknown, not_wiped or wiped.",
+        ),
+        &["verdict"],
+    )
+    .unwrap();
+
+    /// Pool conductors that have not answered what they host since boot. While
+    /// this is non-zero over an empty store, the verdict is `unknown`.
+    pub static ref PROVISIONING_CONDUCTORS_UNWALKED: IntGauge = IntGauge::new(
+        "doorway_provisioning_conductors_unwalked",
+        "Pool conductors not yet successfully asked what they host since boot.",
+    )
+    .unwrap();
+
+    /// Hosted apps the walked conductors report.
+    pub static ref HOSTED_APPS_SEEN: IntGauge = IntGauge::new(
+        "doorway_hosted_apps_seen",
+        "Hosted apps reported by the conductors walked since boot.",
+    )
+    .unwrap();
+
+    /// Hosted apps seen minus records in the intent log, floored at zero: at
+    /// least this many hosted apps have no record here.
+    pub static ref HOSTED_APPS_UNRECORDED: IntGauge = IntGauge::new(
+        "doorway_hosted_apps_unrecorded",
+        "Hosted apps on conductors in excess of provisioning records (a count difference).",
+    )
+    .unwrap();
+
     /// Credential mints the doorway stopped waiting for. The conductor does not
     /// cancel them, so each may have authored a `CapGrant` the doorway holds no
     /// credential for. The durable cure is an idempotent grant (fork work).
@@ -809,6 +843,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROVISIONING_READY.clone()));
         let _ = REGISTRY.register(Box::new(PROVISIONING_RECOVERY_REQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(SIGNING_MINTS_ABANDONED_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_STORE_VERDICT.clone()));
+        let _ = REGISTRY.register(Box::new(PROVISIONING_CONDUCTORS_UNWALKED.clone()));
+        let _ = REGISTRY.register(Box::new(HOSTED_APPS_SEEN.clone()));
+        let _ = REGISTRY.register(Box::new(HOSTED_APPS_UNRECORDED.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BREAKER_OPEN_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(UPSTREAM_BACKPRESSURE_HONORED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(ADMISSION_SHED_TOTAL.clone()));
@@ -1051,6 +1089,23 @@ pub fn set_provision_intents_stuck(reason: &str, count: u64) {
 pub fn set_provisioning_readiness(ready: bool, recovery_required: bool) {
     PROVISIONING_READY.set(i64::from(ready));
     PROVISIONING_RECOVERY_REQUIRED.set(i64::from(recovery_required));
+}
+
+/// The wiped-store verdict (`unknown` | `not_wiped` | `wiped`) and how many
+/// conductors are still unwalked.
+pub fn set_store_verdict(verdict: &str, conductors_unwalked: usize) {
+    for value in ["unknown", "not_wiped", "wiped"] {
+        PROVISIONING_STORE_VERDICT
+            .with_label_values(&[value])
+            .set(i64::from(value == verdict));
+    }
+    PROVISIONING_CONDUCTORS_UNWALKED.set(i64::try_from(conductors_unwalked).unwrap_or(i64::MAX));
+}
+
+/// Hosted apps the conductors report, and how many exceed the log's records.
+pub fn set_hosted_apps(seen: usize, unrecorded: u64) {
+    HOSTED_APPS_SEEN.set(i64::try_from(seen).unwrap_or(i64::MAX));
+    HOSTED_APPS_UNRECORDED.set(i64::try_from(unrecorded).unwrap_or(i64::MAX));
 }
 
 /// A credential mint was given up on with its outcome unknown.

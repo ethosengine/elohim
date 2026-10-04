@@ -39,7 +39,7 @@ use tracing::{debug, info, warn};
 
 use super::agent_key::{canonical_agent_key, lookup_forms};
 use super::provision_intent::{IntentState, ProvisionIntent, StuckReason, ABANDONED_RECORD_TTL};
-use super::registry::{ConductorInfo, ConductorRegistry};
+use super::registry::{ConductorInfo, ConductorRegistry, StoreVerdict};
 use super::typed_admin::{
     AdminConnector, AppInfoDetailed, FaultClass, LiveAdminConnector, ProvisionAdmin,
 };
@@ -446,23 +446,17 @@ impl AgentProvisioner {
                     };
                     match from_account {
                         Some(step) => step,
-                        // This doorway's records were empty at boot while its
-                        // conductors host people. "No record" then means "I do
-                        // not know", not "new" — and guessing "new" mints a
-                        // second identity for everyone who comes back.
-                        None if self.registry.recovery_required() => {
-                            Step::Done(Err(ProvisionError::Unresolved {
-                                conductors: self.pool_conductor_ids(),
-                                detail: "this doorway's provisioning records were empty at \
-                                         startup while its conductors already host apps, so it \
-                                         cannot tell whether this person is new; an operator \
-                                         must run POST /admin/provisioning/recover"
-                                    .to_string(),
-                            }))
-                        }
-                        // By this doorway's records the person was never
-                        // attempted.
-                        None => self.offer(user_identifier, None).await,
+                        // "No record" means "new" only if the doorway knows its
+                        // records are intact. Empty at boot over conductors that
+                        // host people is WIPED; empty at boot with a conductor
+                        // not yet asked is UNKNOWN. Guessing "new" in either
+                        // mints a second identity for everyone who comes back.
+                        None => match self.store_refusal() {
+                            Some(refusal) => Step::Done(Err(refusal)),
+                            // By this doorway's records the person was never
+                            // attempted.
+                            None => self.offer(user_identifier, None).await,
+                        },
                     }
                 }
             };
@@ -484,6 +478,96 @@ impl AgentProvisioner {
             detail: "another provisioning attempt for this person kept changing the record"
                 .to_string(),
         })
+    }
+
+    /// Why a person with no record may not be provisioned as new right now, if
+    /// there is a reason.
+    ///
+    /// The two refusals are deliberately different answers:
+    ///
+    /// - `Wiped` → `PROVISIONING_UNRESOLVED`. This person may have an app the
+    ///   doorway lost its record of; an OPERATOR must run recovery.
+    /// - `Unknown` → `PROVISIONING_NOT_READY`. The doorway has not finished
+    ///   learning its own state: some conductor has not yet answered what it
+    ///   hosts. Nothing is known to be unresolved for this person, no operator
+    ///   action is needed, and it clears by itself once the named conductors
+    ///   answer.
+    fn store_refusal(&self) -> Option<ProvisionError> {
+        let state = self.registry.store_state();
+        match state.verdict {
+            StoreVerdict::NotWiped => None,
+            StoreVerdict::Wiped => Some(ProvisionError::Unresolved {
+                conductors: self.pool_conductor_ids(),
+                detail: format!(
+                    "this doorway's provisioning records were empty at startup while its \
+                     conductors already host {} app(s), so it cannot tell whether this person \
+                     is new; an operator must run POST /admin/provisioning/recover",
+                    state.hosted_apps_seen
+                ),
+            }),
+            StoreVerdict::Unknown => Some(ProvisionError::NotReady(format!(
+                "this doorway's provisioning records were empty at startup and it has not yet \
+                 been able to ask every conductor what it hosts (not yet answered: {}), so it \
+                 cannot tell whether this person is new; nothing was sent to any conductor",
+                if state.unwalked.is_empty() {
+                    "none — the intent log itself could not be read".to_string()
+                } else {
+                    state.unwalked.join(", ")
+                }
+            ))),
+        }
+    }
+
+    /// Ask every pool conductor that has not yet answered since boot what it
+    /// hosts, and record the answer. Returns the conductors STILL unwalked.
+    ///
+    /// Only a successful listing counts: a conductor that cannot be reached
+    /// stays unwalked, and the wiped-store verdict stays `Unknown` because of
+    /// it. Agent mappings are registered from what a conductor reports — a
+    /// conductor that was down at boot would otherwise never have its hosted
+    /// agents routed.
+    pub async fn walk_unwalked_conductors(&self) -> Vec<String> {
+        let unwalked = self.registry.store_state().unwalked;
+        for conductor_id in &unwalked {
+            let Some(conductor) = self.registry.get_conductor_info(conductor_id) else {
+                continue;
+            };
+            let listed = match self.connector.connect(&conductor.admin_url).await {
+                Ok(admin) => admin.list_apps().await,
+                Err(fault) => Err(fault),
+            };
+            match listed {
+                Ok(apps) => {
+                    let hosted: Vec<_> = apps
+                        .into_iter()
+                        .filter(|app| app.installed_app_id != self.app_id)
+                        .collect();
+                    for app in &hosted {
+                        for form in lookup_forms(&app.agent_pub_key) {
+                            if self.registry.get_conductor_for_agent(&form).is_none() {
+                                let _ = self
+                                    .registry
+                                    .register_agent(&form, conductor_id, &app.installed_app_id)
+                                    .await;
+                            }
+                        }
+                    }
+                    self.registry.mark_walked(conductor_id, hosted.len());
+                    info!(
+                        conductor = %conductor_id,
+                        hosted_apps = hosted.len(),
+                        verdict = self.registry.store_state().verdict.as_str(),
+                        "Conductor walked: it answered what it hosts"
+                    );
+                }
+                Err(fault) => debug!(
+                    conductor = %conductor_id,
+                    error = %fault,
+                    "Conductor not walked yet — it could not be asked what it hosts"
+                ),
+            }
+        }
+        self.registry.store_state().unwalked
     }
 
     fn pool_conductor_ids(&self) -> Vec<String> {
@@ -1630,6 +1714,12 @@ impl AgentProvisioner {
             report
                 .conductors_walked
                 .push(conductor.conductor_id.clone());
+            self.registry.mark_walked(
+                &conductor.conductor_id,
+                apps.iter()
+                    .filter(|app| app.installed_app_id != self.app_id)
+                    .count(),
+            );
             for app in apps {
                 // The doorway's own app is not a hosted person's.
                 if app.installed_app_id == self.app_id {
@@ -1705,11 +1795,15 @@ impl AgentProvisioner {
         unclaimed.sort();
         report.apps_without_an_account = unclaimed;
 
+        // Only a walk that reached EVERY conductor is a recovery. A partial one
+        // clears nothing: `Wiped` stays wiped, and `Unknown` stays unknown for
+        // the conductors that did not answer — recovery cannot clear what it
+        // could not ask.
         report.complete = report.conductors_unreachable.is_empty();
         if report.complete {
-            self.registry.set_recovery_required(false);
+            self.registry.mark_recovered();
         }
-        report.recovery_required = self.registry.recovery_required();
+        self.fill_store_state(&mut report);
         self.fill_log_state(&mut report).await;
         info!(
             complete = report.complete,
@@ -1778,12 +1872,18 @@ impl AgentProvisioner {
 
     /// The log's state without walking any conductor.
     pub async fn recovery_status(&self) -> RecoveryReport {
-        let mut report = RecoveryReport {
-            recovery_required: self.registry.recovery_required(),
-            ..RecoveryReport::default()
-        };
+        let mut report = RecoveryReport::default();
+        self.fill_store_state(&mut report);
         self.fill_log_state(&mut report).await;
         report
+    }
+
+    fn fill_store_state(&self, report: &mut RecoveryReport) {
+        let state = self.registry.store_state();
+        report.recovery_required = state.verdict == StoreVerdict::Wiped;
+        report.store_verdict = state.verdict.as_str();
+        report.conductors_unwalked = state.unwalked;
+        report.hosted_apps_seen = state.hosted_apps_seen;
     }
 
     // ── the log ─────────────────────────────────────────────────────────────
@@ -1981,8 +2081,15 @@ fn install_in_flight_bound() -> std::time::Duration {
 pub struct RecoveryReport {
     /// Every conductor in the pool answered. Only then is recovery complete.
     pub complete: bool,
-    /// Whether registration of people without a record is still refused.
+    /// Whether registration of people without a record is still refused
+    /// because the store was found wiped.
     pub recovery_required: bool,
+    /// `unknown` | `not_wiped` | `wiped` — see `conductor::registry::store_verdict`.
+    pub store_verdict: &'static str,
+    /// Pool conductors that have not answered what they host since boot.
+    pub conductors_unwalked: Vec<String>,
+    /// Hosted apps reported by the conductors walked so far.
+    pub hosted_apps_seen: usize,
     pub intent_store_available: bool,
     pub conductors_walked: Vec<String>,
     pub conductors_unreachable: Vec<String>,
@@ -2065,11 +2172,49 @@ pub async fn publish_intent_counts(registry: &ConductorRegistry) {
         }
         Err(e) => debug!(error = %e, "Provisioning intent counts unavailable"),
     }
-    let recovery_required = registry.recovery_required();
+    let state = registry.store_state();
     crate::metrics::set_provisioning_readiness(
-        store.available() && !recovery_required,
-        recovery_required,
+        store.available() && state.verdict == StoreVerdict::NotWiped,
+        state.verdict == StoreVerdict::Wiped,
     );
+    crate::metrics::set_store_verdict(state.verdict.as_str(), state.unwalked.len());
+    // Hosted apps the conductors report against live records in the log. A
+    // DIFFERENCE OF COUNTS, not a join: it says "at least this many hosted apps
+    // have no record here" (apps installed before the log existed, or records
+    // lost). The exact list, joined on agent key against the account rows, is
+    // the recovery report's `appsWithoutAnAccount`.
+    if let Ok(total) = store.total().await {
+        crate::metrics::set_hosted_apps(
+            state.hosted_apps_seen,
+            (state.hosted_apps_seen as u64).saturating_sub(total),
+        );
+    }
+}
+
+/// Say, once, how the store verdict settled.
+pub fn log_store_verdict(walker: &AgentProvisioner) {
+    let state = walker.registry.store_state();
+    match state.verdict {
+        StoreVerdict::Wiped => tracing::error!(
+            hosted_apps = state.hosted_apps_seen,
+            "This doorway's provisioning records are EMPTY but its conductors already host apps \
+             — a wiped or restored database. Registration of anyone without a record answers \
+             PROVISIONING_UNRESOLVED until an operator runs POST /admin/provisioning/recover"
+        ),
+        verdict => info!(
+            verdict = verdict.as_str(),
+            hosted_apps = state.hosted_apps_seen,
+            "Every conductor has answered what it hosts — provisioning store verdict settled"
+        ),
+    }
+}
+
+/// How long to wait before asking the unwalked conductors again: doubling from
+/// one second, capped at the counts period. A conductor that starts after the
+/// doorway is asked within seconds of coming up, and one that stays down costs
+/// one connect attempt per period.
+pub fn walk_backoff(attempt: u32) -> std::time::Duration {
+    std::time::Duration::from_secs(1u64 << attempt.min(6)).min(INTENT_COUNTS_PERIOD)
 }
 
 /// The OLD app id: six hex digits of the identifier's hash. Test-only — the
@@ -4154,7 +4299,7 @@ mod tests {
         let pool = Arc::new(FakePool::default());
         let store = Arc::new(MemoryIntentStore::new());
         let doorway = doorway_over(&pool, &store, A_FIRST).await;
-        doorway.registry.set_recovery_required(true);
+        wiped(&doorway);
 
         let error = doorway
             .provision_agent(USER)
@@ -4166,7 +4311,7 @@ mod tests {
         assert_eq!(pool.total_keys_generated(), 0);
         assert!(store.is_empty());
 
-        doorway.registry.set_recovery_required(false);
+        doorway.registry.mark_recovered();
         doorway.provision_agent(USER).await.expect("after recovery");
     }
 
@@ -4177,7 +4322,7 @@ mod tests {
         let store = Arc::new(MemoryIntentStore::new());
         let doorway = doorway_over(&pool, &store, A_FIRST).await;
         let first = doorway.provision_agent(USER).await.expect("provisioned");
-        doorway.registry.set_recovery_required(true);
+        wiped(&doorway);
 
         let again = doorway.provision_agent(USER).await.expect("has a record");
         assert_eq!(again.agent_pub_key, first.agent_pub_key);
@@ -4192,7 +4337,7 @@ mod tests {
         let pool = Arc::new(FakePool::default());
         let store = Arc::new(MemoryIntentStore::new());
         let doorway = doorway_over(&pool, &store, A_FIRST).await;
-        doorway.registry.set_recovery_required(true);
+        wiped(&doorway);
         let alice_key = raw_agent_key(232);
         let orphan_key = raw_agent_key(233);
         let alice_app = legacy_short_app_id(DEFAULT_APP_ID, "conductor-b", ALICE);
@@ -4248,7 +4393,14 @@ mod tests {
         let pool = Arc::new(FakePool::default());
         let store = Arc::new(MemoryIntentStore::new());
         let doorway = doorway_over(&pool, &store, A_FIRST).await;
-        doorway.registry.set_recovery_required(true);
+        wiped(&doorway);
+        place_app(
+            &pool,
+            "conductor-a",
+            "elohim-conductor-a-someone",
+            &raw_agent_key(235),
+            "running",
+        );
         pool.with("conductor-b", |c| c.dark = true);
 
         let report = doorway.rebuild_from_conductors(&[]).await;
@@ -4353,5 +4505,186 @@ mod tests {
         );
         doorway.forget(USER).await;
         assert!(store.is_empty());
+    }
+
+    // ── an unknown is never a negative: the wiped-store verdict ─────────────
+
+    use crate::conductor::registry::StoreVerdict as Verdict;
+
+    /// A doorway whose store was empty at boot and whose conductor-a has
+    /// answered that it hosts three apps: wiped.
+    fn wiped(doorway: &AgentProvisioner) {
+        doorway.registry.track_store_loss(Some(0));
+        doorway.registry.mark_walked("conductor-a", 3);
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::Wiped);
+    }
+
+    /// THE LIVE DEFECT. The doorway boots before its conductors: every one is
+    /// unreachable. That is UNKNOWN, not "they hold nothing". When a conductor
+    /// becomes reachable holding hosted apps over an empty store, the verdict
+    /// settles to WIPED. In BOTH states a person with no record is refused and
+    /// is never offered to a conductor.
+    #[tokio::test]
+    async fn a_doorway_that_boots_before_its_conductors_does_not_treat_everyone_as_new() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        pool.with("conductor-a", |c| c.dark = true);
+        pool.with("conductor-b", |c| c.dark = true);
+        doorway.registry.track_store_loss(Some(0));
+
+        // Boot: nothing reachable.
+        let still = doorway.walk_unwalked_conductors().await;
+        assert_eq!(
+            still,
+            vec!["conductor-a".to_string(), "conductor-b".to_string()]
+        );
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::Unknown);
+
+        let error = doorway.provision_agent(USER).await.expect_err("unknown");
+        assert_eq!(error.code(), "PROVISIONING_NOT_READY");
+        assert!(
+            error.to_string().contains("conductor-a") && error.to_string().contains("conductor-b"),
+            "the refusal must name the conductors not yet asked: {error}"
+        );
+        assert!(store.is_empty());
+
+        // conductor-a comes up. It hosts people this doorway has no record of.
+        pool.with("conductor-a", |c| c.dark = false);
+        place_app(
+            &pool,
+            "conductor-a",
+            "elohim-conductor-a-someone",
+            &raw_agent_key(240),
+            "running",
+        );
+        place_app(
+            &pool,
+            "conductor-a",
+            "elohim-conductor-a-someone-else",
+            &raw_agent_key(241),
+            "running",
+        );
+        let still = doorway.walk_unwalked_conductors().await;
+        assert_eq!(still, vec!["conductor-b".to_string()]);
+        let state = doorway.registry.store_state();
+        assert_eq!(
+            state.verdict,
+            Verdict::Wiped,
+            "hosted apps over an empty store"
+        );
+        assert_eq!(state.hosted_apps_seen, 2);
+
+        let error = doorway.provision_agent(USER).await.expect_err("wiped");
+        assert_eq!(error.code(), "PROVISIONING_UNRESOLVED");
+        assert!(error.to_string().contains("recover"), "{error}");
+
+        // Never offered to a conductor, in either state.
+        assert_eq!(pool.total_keys_generated(), 0);
+        assert_eq!(pool.total_installs_received(), 0);
+        assert!(store.is_empty());
+        // …and the walk registered the agents it found, so they are routable.
+        assert!(doorway
+            .registry
+            .get_conductor_for_agent(&provisioned_agent_key(&raw_agent_key(240)))
+            .is_some());
+    }
+
+    /// An empty store over conductors that have ALL answered "nobody" is a new
+    /// deployment: registration proceeds.
+    #[tokio::test]
+    async fn an_empty_store_over_verifiably_empty_conductors_is_a_new_deployment() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        doorway.registry.track_store_loss(Some(0));
+
+        assert!(doorway.walk_unwalked_conductors().await.is_empty());
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::NotWiped);
+
+        doorway
+            .provision_agent(USER)
+            .await
+            .expect("everyone IS new here");
+    }
+
+    /// One of two conductors never becomes reachable: the verdict stays
+    /// Unknown, and the refusal names it.
+    #[tokio::test]
+    async fn a_conductor_that_never_answers_keeps_the_verdict_unknown_and_is_named() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        pool.with("conductor-b", |c| c.dark = true);
+        doorway.registry.track_store_loss(Some(0));
+
+        for _ in 0..3 {
+            assert_eq!(
+                doorway.walk_unwalked_conductors().await,
+                vec!["conductor-b".to_string()]
+            );
+        }
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::Unknown);
+        // The conductor that answered is not asked again.
+        assert_eq!(pool.with("conductor-a", |c| c.connects_received), 1);
+
+        let error = doorway.provision_agent(USER).await.expect_err("unknown");
+        assert_eq!(error.code(), "PROVISIONING_NOT_READY");
+        assert!(error.to_string().contains("conductor-b"), "{error}");
+        assert!(!error.to_string().contains("conductor-a,"), "{error}");
+        assert_eq!(pool.total_keys_generated(), 0);
+    }
+
+    /// Unknown is not clearable by recovery: a recovery walk that cannot reach
+    /// the unanswered conductor is incomplete and leaves the verdict where it
+    /// was.
+    #[tokio::test]
+    async fn recovery_cannot_clear_an_unknown_it_could_not_ask() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        pool.with("conductor-b", |c| c.dark = true);
+        doorway.registry.track_store_loss(Some(0));
+        doorway.walk_unwalked_conductors().await;
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::Unknown);
+
+        let report = doorway.rebuild_from_conductors(&[]).await;
+
+        assert!(!report.complete);
+        assert_eq!(report.store_verdict, "unknown");
+        assert_eq!(report.conductors_unwalked, vec!["conductor-b".to_string()]);
+        assert_eq!(doorway.registry.store_state().verdict, Verdict::Unknown);
+        let error = doorway
+            .provision_agent(USER)
+            .await
+            .expect_err("still unknown");
+        assert_eq!(error.code(), "PROVISIONING_NOT_READY");
+    }
+
+    /// A store that HAD records at boot is not wiped, and a conductor that is
+    /// down does not stop anyone registering.
+    #[tokio::test]
+    async fn a_store_with_records_registers_people_while_a_conductor_is_down() {
+        let pool = Arc::new(FakePool::default());
+        let store = Arc::new(MemoryIntentStore::new());
+        let doorway = doorway_over(&pool, &store, A_FIRST).await;
+        pool.with("conductor-b", |c| c.dark = true);
+        doorway.registry.track_store_loss(Some(5));
+        doorway.walk_unwalked_conductors().await;
+
+        let state = doorway.registry.store_state();
+        assert_eq!(state.verdict, Verdict::NotWiped);
+        assert_eq!(state.unwalked, vec!["conductor-b".to_string()]);
+        doorway.provision_agent(USER).await.expect("not blocked");
+    }
+
+    /// The walk retries quickly at first and never slower than the counts
+    /// period.
+    #[test]
+    fn the_walk_backs_off_to_the_counts_period() {
+        assert_eq!(walk_backoff(0), std::time::Duration::from_secs(1));
+        assert_eq!(walk_backoff(3), std::time::Duration::from_secs(8));
+        assert_eq!(walk_backoff(40), INTENT_COUNTS_PERIOD);
+        assert!(walk_backoff(6) <= INTENT_COUNTS_PERIOD);
     }
 }

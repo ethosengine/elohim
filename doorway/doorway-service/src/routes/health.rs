@@ -88,8 +88,14 @@ pub struct HealthResponse {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProvisioningHealth {
-    /// `intent_store_available && !recovery_required`.
+    /// The intent store is available and the store verdict is `not_wiped`.
     pub ready: bool,
+    /// `unknown` | `not_wiped` | `wiped`. `unknown` = the store was empty at
+    /// boot and some conductor has not yet answered what it hosts; it settles
+    /// by itself. `wiped` needs an operator.
+    pub store_verdict: &'static str,
+    /// Pool conductors that have not answered what they host since boot.
+    pub conductors_unwalked: Vec<String>,
     /// The provisioning intent log can be read and written. `false` refuses
     /// hosted provisioning (`PROVISIONING_NOT_READY`).
     pub intent_store_available: bool,
@@ -105,16 +111,21 @@ impl ProvisioningHealth {
         match &state.conductor_registry {
             Some(registry) => {
                 let intent_store_available = registry.intents().available();
-                let recovery_required = registry.recovery_required();
+                let state = registry.store_state();
+                let not_wiped = state.verdict == crate::conductor::StoreVerdict::NotWiped;
                 Self {
-                    ready: intent_store_available && !recovery_required,
+                    ready: intent_store_available && not_wiped,
+                    store_verdict: state.verdict.as_str(),
+                    conductors_unwalked: state.unwalked,
                     intent_store_available,
-                    recovery_required,
+                    recovery_required: state.verdict == crate::conductor::StoreVerdict::Wiped,
                 }
             }
             // No conductor pool: nothing is provisioned, nothing is refused.
             None => Self {
                 ready: true,
+                store_verdict: crate::conductor::StoreVerdict::NotWiped.as_str(),
+                conductors_unwalked: Vec::new(),
                 intent_store_available: true,
                 recovery_required: false,
             },

@@ -29,7 +29,9 @@ pub use provision_intent::{
     IntentState, IntentStore, MemoryIntentStore, MongoIntentStore, ProvisionIntent, StuckReason,
 };
 pub use provisioner::{AgentProvisioner, Existence, ProvisionError, ProvisionedAgent};
-pub use registry::{store_looks_wiped, ConductorEntry, ConductorInfo, ConductorRegistry};
+pub use registry::{
+    store_verdict, ConductorEntry, ConductorInfo, ConductorRegistry, StoreState, StoreVerdict,
+};
 pub use router::ConductorRouter;
 pub use typed_admin::{AdminFault, FaultClass, TypedAdminClient};
 pub use typed_app::TypedAppClient;

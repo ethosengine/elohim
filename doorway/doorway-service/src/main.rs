@@ -554,54 +554,77 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     // Discover existing agents on each conductor (populate registry for affinity routing)
     // Without this, agents provisioned before the registry existed would have no
     // conductor affinity → requests load-balance via ClusterIP → CellMissing on wrong conductor
-    //
-    // The walk also answers a second question: do the conductors already host
-    // people this doorway has no record of? A database wiped or restored empty
-    // while the conductors kept their apps makes every returning person look
-    // new, and provisioning them "fresh" would mint each a second identity. The
-    // walk runs on every pool size for that reason; it REGISTERS mappings only
-    // for a multi-conductor pool, as before.
-    let hosted_apps_on_conductors = discover_existing_agents(
-        &registry,
-        &conductor_urls,
-        &args.installed_app_id,
-        conductor_urls.len() > 1,
-    )
-    .await;
+    if conductor_urls.len() > 1 {
+        discover_existing_agents(&registry, &conductor_urls).await;
+    }
+
+    // Were this doorway's records lost while its conductors kept their people?
+    // A doorway that persists (Mongo configured) tracks that from here. The
+    // verdict starts UNKNOWN and settles only as conductors ANSWER what they
+    // host — a conductor that cannot be reached yet is not a conductor that
+    // hosts nobody. The doorway routinely starts before its conductor; the
+    // walk below, and its retries, are what make that order safe.
     if state.mongo.is_some() {
-        match registry.intents().total().await {
-            Ok(intent_records) => {
-                if doorway::conductor::store_looks_wiped(
-                    registry.persisted_mappings_at_boot(),
-                    intent_records,
-                    hosted_apps_on_conductors,
-                ) {
-                    registry.set_recovery_required(true);
-                    error!(
-                        hosted_apps_on_conductors,
-                        "This doorway's provisioning records are EMPTY but its conductors already \
-                         host apps — a wiped or restored database. Registration of anyone without \
-                         a record answers PROVISIONING_UNRESOLVED until an operator runs \
-                         POST /admin/provisioning/recover"
-                    );
-                }
+        let intent_records = match registry.intents().total().await {
+            Ok(total) => Some(total),
+            Err(e) => {
+                warn!(error = %e, "Could not read the provisioning intent log at startup");
+                None
             }
-            Err(e) => warn!(error = %e, "Could not read the provisioning intent log at startup"),
-        }
+        };
+        registry.track_store_loss(intent_records);
     }
 
     let registry = Arc::new(registry);
     state.conductor_registry = Some(Arc::clone(&registry));
 
+    // Walk the conductors until every one has answered what it hosts: at once,
+    // then with backoff. This is what settles the store verdict; until it does,
+    // a person with no record is not provisioned as new.
+    {
+        let walker = doorway::conductor::AgentProvisioner::new(Arc::clone(&registry))
+            .with_app_id(args.installed_app_id.clone());
+        tokio::spawn(async move {
+            let mut attempt = 0u32;
+            loop {
+                let unwalked = walker.walk_unwalked_conductors().await;
+                if unwalked.is_empty() {
+                    break;
+                }
+                if attempt == 0 {
+                    warn!(
+                        unwalked = ?unwalked,
+                        "Some conductors have not yet answered what they host — the \
+                         provisioning store verdict stays open until they do"
+                    );
+                }
+                tokio::time::sleep(doorway::conductor::provisioner::walk_backoff(attempt)).await;
+                attempt = attempt.saturating_add(1);
+            }
+            doorway::conductor::provisioner::log_store_verdict(&walker);
+        });
+    }
+
     // Publish the intent log's counts and readiness OFF the request path: a
-    // periodic task, each pass bounded by its own period.
+    // periodic task, each pass bounded by its own period. It also walks any
+    // conductor that is unwalked — one that joined the pool after the loop
+    // above finished.
     {
         let registry = Arc::clone(&registry);
+        let walker = doorway::conductor::AgentProvisioner::new(Arc::clone(&registry))
+            .with_app_id(args.installed_app_id.clone());
         tokio::spawn(async move {
             let period = doorway::conductor::provisioner::INTENT_COUNTS_PERIOD;
             let mut tick = tokio::time::interval(period);
             loop {
                 tick.tick().await;
+                if !registry.store_state().unwalked.is_empty()
+                    && tokio::time::timeout(period, walker.walk_unwalked_conductors())
+                        .await
+                        .is_err()
+                {
+                    warn!("Walking the unwalked conductors did not finish within the period");
+                }
                 if tokio::time::timeout(
                     period,
                     doorway::conductor::provisioner::publish_intent_counts(&registry),
@@ -2234,12 +2257,7 @@ async fn mint_app_auth_token(
 /// Stores each agent key under both base64-standard and base64-url-safe
 /// encodings so the registry lookup matches regardless of which format
 /// the JWT agent_pub_key uses.
-async fn discover_existing_agents(
-    registry: &ConductorRegistry,
-    conductor_urls: &[String],
-    base_app_id: &str,
-    register_mappings: bool,
-) -> usize {
+async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: &[String]) {
     use base64::Engine;
     use std::time::Duration;
 
@@ -2249,8 +2267,6 @@ async fn discover_existing_agents(
     );
 
     let mut total_discovered = 0usize;
-    // Apps installed FOR a hosted person — every app but the doorway's own.
-    let mut hosted_apps = 0usize;
 
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
@@ -2307,13 +2323,6 @@ async fn discover_existing_agents(
         match list_apps_result {
             Ok(apps) => {
                 let mut conductor_agents = 0usize;
-                hosted_apps += apps
-                    .iter()
-                    .filter(|app| app.installed_app_id != base_app_id)
-                    .count();
-                if !register_mappings {
-                    continue;
-                }
                 for app in &apps {
                     // Encode in both formats to match any JWT key encoding
                     let key_std =
@@ -2371,7 +2380,6 @@ async fn discover_existing_agents(
     } else {
         info!("Agent discovery complete: no new agents found (registry may already be populated)");
     }
-    hosted_apps
 }
 
 /// Derive app WebSocket URL from conductor admin URL.
