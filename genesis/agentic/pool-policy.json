@@ -85,7 +85,11 @@
   },
   "_cargo_env_overrides_comment": "genesis/orchestrator/gate-runner.mjs (gateChildEnv) reads cargo_env_overrides for a per-project cargo env, in place of declaring run.cargo.env on the project in build-manifest.json, because the rakia-validated manifest schema (source in the pinned elohim/rakia submodule, operator-owned) does not accept that key yet. Merge rule: a manifest run.cargo.env (once a project can declare one, after the schema widens) wins on a key conflict; an entry here only fills the gap until then. Move an entry back to its build-manifest.json once elohim/rakia's GateProject.run.cargo accepts `env` (mirror already lives in genesis/orchestrator/manifest.schema.json ~:161-166). NOTE: every key under a project entry here is exported verbatim as gate cargo env (run-local-gate.sh) — no `_`-prefixed comment keys inside an entry, only alongside it.",
   "_cargo_env_overrides_evidence_elohim_storage": "T8, 2026-09-07: storage gate build phase measured 15.4 GB RSS at cargo's default job count — enough to trip the workspace RAM guard's shed line when the local mesh conductors are also up (~1.2G RSS each) — vs 5.4 GB at CARGO_BUILD_JOBS=1, for +12% wall-clock. Backlog atom: genesis/data/timeline/backlog/cargo-test-memory-shed-storage-gate.md.",
+  "_cargo_env_overrides_toolchain_pin": "The \"*\" entry applies to EVERY gate project that declares run.cargo (gate-runner.mjs gateChildEnv); a per-project entry or a manifest run.cargo.env overrides it key by key. RUSTUP_TOOLCHAIN pins the LOCAL gate's Rust: the workspace `stable` moves ahead of the build images' Rust (1.91-1.94) and its newer clippy lints fail unchanged code; observed 2026-10-04 with clippy 0.1.99 (doorway 28 lint errors, elohim-storage 74). 1.96.1 is the nearest pinned toolchain installed here (CI images are older). run-local-gate.sh REFUSES, naming the fix, when the pinned toolchain is not installed.",
   "cargo_env_overrides": {
+    "*": {
+      "RUSTUP_TOOLCHAIN": "1.96.1"
+    },
     "eprfs": {
       "CARGO_BUILD_JOBS": "1",
       "RUST_TEST_THREADS": "1"

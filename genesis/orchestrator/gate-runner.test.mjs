@@ -151,11 +151,11 @@ describe('manifest-driven local gate registry', () => {
 
     assert.equal(
       gateChildEnv(declared, {}).GATE_CARGO_ENV,
-      '{"CARGO_BUILD_JOBS":"2","RUST_TEST_THREADS":"2"}'
+      '{"RUSTUP_TOOLCHAIN":"1.96.1","CARGO_BUILD_JOBS":"2","RUST_TEST_THREADS":"2"}'
     );
-    // A project without the key must be unchanged — and must not inherit a stale
+    // A project with no declared env gets only the pool-policy toolchain pin, and must not inherit a stale
     // GATE_CARGO_ENV from the parent environment.
-    assert.equal(Object.hasOwn(gateChildEnv(bare, { GATE_CARGO_ENV: '{"X":"1"}' }), 'GATE_CARGO_ENV'), false);
+    assert.equal(gateChildEnv(bare, { GATE_CARGO_ENV: '{"X":"1"}' }).GATE_CARGO_ENV, '{"RUSTUP_TOOLCHAIN":"1.96.1"}');
     assert.equal(Object.hasOwn(gateChildEnv(none, {}), 'GATE_CARGO_ENV'), false);
     assert.equal(Object.hasOwn(gateChildEnv(declared, { cargoEnv: undefined, PATH: '/bin' }), 'PATH'), true);
 
@@ -188,7 +188,7 @@ describe('manifest-driven local gate registry', () => {
     const noManifestEnv = { name: 'eprfs', run: { cargo: { targetDir: '/tmp/x' } } };
     const filled = gateChildEnv(noManifestEnv, {});
     assert.ok(Object.hasOwn(filled, 'GATE_CARGO_ENV'), 'pool-policy override applies when the manifest declares no cargo.env');
-    assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1' });
+    assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1', RUSTUP_TOOLCHAIN: '1.96.1' });
 
     const withManifestEnv = {
       name: 'eprfs',
@@ -197,16 +197,36 @@ describe('manifest-driven local gate registry', () => {
     const won = gateChildEnv(withManifestEnv, {});
     assert.deepStrictEqual(
       JSON.parse(won.GATE_CARGO_ENV),
-      { CARGO_BUILD_JOBS: '3', RUST_TEST_THREADS: '1' },
+      { CARGO_BUILD_JOBS: '3', RUST_TEST_THREADS: '1', RUSTUP_TOOLCHAIN: '1.96.1' },
       'a manifest-declared cargo.env value wins over the pool-policy override; undeclared keys are still filled'
     );
 
     const storage = registry.get('elohim-storage');
-    assert.deepStrictEqual(JSON.parse(gateChildEnv(storage, {}).GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1' },
+    assert.deepStrictEqual(JSON.parse(gateChildEnv(storage, {}).GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUSTUP_TOOLCHAIN: '1.96.1' },
       'the storage cap is declared on its manifest, no longer in pool-policy');
 
     const neither = { name: 'not-a-real-project-xyz', run: { cargo: { workspace: 'x' } } };
-    assert.equal(Object.hasOwn(gateChildEnv(neither, {}), 'GATE_CARGO_ENV'), false);
+    assert.deepStrictEqual(JSON.parse(gateChildEnv(neither, {}).GATE_CARGO_ENV), { RUSTUP_TOOLCHAIN: '1.96.1' },
+      'the "*" pool-policy entry pins the local gate toolchain for every cargo project');
+    assert.equal(Object.hasOwn(gateChildEnv({ name: 'not-a-real-project-xyz', run: {} }, {}), 'GATE_CARGO_ENV'), false,
+      'a project without run.cargo gets no toolchain pin');
+    assert.equal(
+      JSON.parse(gateChildEnv({ name: 'x', run: { cargo: { workspace: 'x', env: { RUSTUP_TOOLCHAIN: '1.94.0' } } } }, {}).GATE_CARGO_ENV).RUSTUP_TOOLCHAIN,
+      '1.94.0', 'a manifest may override the pinned toolchain per project');
+    assert.equal(
+      JSON.parse(gateChildEnv(neither, { RUSTUP_TOOLCHAIN: 'nightly' }).GATE_CARGO_ENV).RUSTUP_TOOLCHAIN,
+      '1.96.1', 'the declared pin is exported over the caller environment, like any other cargo env key');
+  });
+
+  test('a pinned toolchain that is not installed refuses with the fix named', () => {
+    const r = spawnSync(
+      'bash',
+      [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
+        ROOT, 'selftest', '.', 'root-just', '_gate-selftest-env', '', '', 'dev', ''],
+      { encoding: 'utf8', env: { ...process.env, GATE_CARGO_ENV: '{"RUSTUP_TOOLCHAIN":"0.0.1-not-installed"}' } }
+    );
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /pinned Rust toolchain '0\.0\.1-not-installed' is not installed; run: rustup toolchain install 0\.0\.1-not-installed/);
   });
 
   test('unknown targets fail instead of silently running the wrong gate', () => {

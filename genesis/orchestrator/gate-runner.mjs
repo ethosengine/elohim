@@ -114,13 +114,17 @@ function loadPoolPolicy(root) {
 //
 // Merge rule: the manifest's own `run.cargo.env` is the project's contract and
 // always wins; `pool-policy.cargo_env_overrides[project.name]` only fills keys the
-// manifest left undeclared. This lets pool-policy carry today's cap (schema-pinned
+// manifest left undeclared, and `cargo_env_overrides["*"]` fills what both left.
+// run-local-gate.sh exports declared values over the caller's environment. This lets pool-policy carry today's cap (schema-pinned
 // out of the manifest) without silently overriding a project that later declares
 // its own value once the rakia schema is widened.
 export function gateChildEnv(project, baseEnv, root = ROOT) {
   const policy = loadPoolPolicy(root);
-  const override = (policy.cargo_env_overrides || {})[project.name] || {};
-  const declared = { ...override, ...((project.run.cargo || {}).env || {}) };
+  const overrides = policy.cargo_env_overrides || {};
+  // "*" is the all-cargo-projects default (the local gate's RUSTUP_TOOLCHAIN pin); only a
+  // project that goes through the cargo path (declares run.cargo) receives it.
+  const shared = project.run.cargo ? overrides['*'] || {} : {};
+  const declared = { ...shared, ...(overrides[project.name] || {}), ...((project.run.cargo || {}).env || {}) };
   const childEnv = { ...baseEnv };
   // A git hook exports GIT_DIR (the pre-push pins it absolute so gate cwds resolve the repo);
   // a gate that spawns `git` in a TEMP repo then operates on the main repo instead

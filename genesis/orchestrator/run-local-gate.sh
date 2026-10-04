@@ -93,6 +93,15 @@ NODE
   unset GATE_CARGO_ENV
 fi
 
+# A declared RUSTUP_TOOLCHAIN that is not installed must refuse, not fall back to the default.
+if [[ -n "${RUSTUP_TOOLCHAIN:-}" ]]; then
+  if ! rustup toolchain list 2>/dev/null | awk '{print $1}' | grep -Eqx "${RUSTUP_TOOLCHAIN}(-.*)?"; then
+    echo "gate $project_name: pinned Rust toolchain '$RUSTUP_TOOLCHAIN' is not installed; run: rustup toolchain install $RUSTUP_TOOLCHAIN" >&2
+    exit 2
+  fi
+  echo "  [$project_name] rust toolchain: $RUSTUP_TOOLCHAIN"
+fi
+
 case "$kind" in
   just)
     exec just --justfile "$repo_root/$project_dir/justfile" \
