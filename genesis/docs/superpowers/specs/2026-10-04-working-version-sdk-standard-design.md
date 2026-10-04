@@ -103,7 +103,11 @@ becomes a condition for what worked without it.
   and it is never the document the projector writes published values into. That document
   (`node:{id}`) receives publication writes (`sync/projector.rs:267`); unpublished values placed
   there would meet them. A working version is its own document: under the `personal:` prefix
-  while it is the author's alone, and under a separate id of its own when it is shared. Automerge is what the merging
+  while it is the author's alone, and under a separate id of its own when it is shared. The
+  prefix is only a label today: document listing and serving make no exception for it
+  (`p2p/mod.rs:8130`). The standard therefore requires that a document held for its author alone
+  is excluded from serving, from listing and from automatic sync, on every path. That exclusion
+  does not exist and is listed in §9. Automerge is what the merging
   layer already runs; this standard does not reopen that choice.
   A draft that must travel with the person's chain (for example across a device migration) is
   additionally checkpointed as a Private (B) entry at a moment the person chooses, never per
@@ -122,16 +126,23 @@ becomes a condition for what worked without it.
 - **Source of truth:** the holders' local document stores, until republish. After republish, the
   DHT, as for any content.
 - **Integrity zome and DNA-hash class:** no change. DNA-hash-neutral.
-- **Coordinator:** existing functions only, and there are two paths, which the 2026-08-07 ruling
-  keeps apart.
+- **Coordinator:** existing functions only, and there are three paths, which the 2026-08-07
+  ruling keeps apart.
   - *The root author, or a device they delegated.* A new version is an update on the root author's
     own chain and becomes the head of that chain. `declare_content_head`
     (`content_store/src/lib.rs:5586`) only re-affirms the head or re-declares an older version the
     root author wrote (`:5647`); it is not how a new version is submitted.
-  - *Anyone else.* Their version is written on their own chain and offered through a canonical-head
-    declaration (`declare_earned_canonical_head`; `POST /db/content/{id}/canonical-head`). That
-    declaration is a candidate in the election (`select_canonical_winner`, `:3154`): earned
-    declarations outrank staging ones, then the declaration's time, then its link hash.
+  - *An earned declaration.* The root author, a device carrying their signed delegation, or the
+    bootstrap steward may declare a version as the earned canonical head
+    (`declare_earned_canonical_head`, `:6196`; reached through `POST /db/content/{id}/head` with a
+    delegation).
+  - *Anyone else.* Their version is written on their own chain and offered through a staging
+    canonical-head declaration (`declare_canonical_content_head`;
+    `POST /db/content/{id}/canonical-head`).
+
+  Every declaration is a candidate in the election (`select_canonical_winner`, `:3154`): earned
+  declarations outrank staging ones, then the declaration's time, then its link hash. A staging
+  declaration therefore loses to any earned one.
 - **Projections:** the existing ones. The projector already writes published values into the
   document; the reverse direction stays as ruled: values in a document never reach an authoritative
   column except through a conductor-verified path.
@@ -232,8 +243,10 @@ current stays as a working version the person can merge forward and submit again
 same content address, and still make two declarations: candidates are told apart by their
 declaration, not by their content.
 
-`refused` is the gate saying no before any election: the caller may not republish this thing (not
-its author, no delegation, or the type's `republish` rule is not met).
+`refused` is a gate saying no before any election: the type's `republish` rule is not met, or the
+caller asked for an earned declaration without being the root author, their delegate or the
+bootstrap steward. A caller with no such standing is not refused a staging declaration; it is
+simply outranked.
 
 **Refusals each verb owes.** `open` on a thing the device does not hold: refused, naming that it
 must be fetched first. `republish` without `fix`: fixes first. `widen` past the origin's reach:
@@ -259,8 +272,11 @@ completes when the other party arrives.
 
 The sync-state contract already defines the vocabulary: position, declared, and whether the first
 contains the second (`SyncStreamState`, `p2p/sync_state.rs`; for Automerge documents, position is
-the local heads and declared is the remote heads). The SDK surfaces it per copy as `caught-up`,
-`behind` or `not-computable` (`StreamSyncState` in `api/dataplane.ts`). No new words.
+the local heads and declared is the remote heads). The words to show are the ones the SDK already
+uses for other streams: `caught-up`, `behind`, `not-computable` (`StreamSyncState` in
+`api/dataplane.ts`). No new words. The reading itself is new work: today that type covers
+replication, pull and projection, and a document sync returns only the document, whether it
+changed, and its heads (`sync.ts:31`). A per-document, per-copy state has to be built.
 
 The person is shown, at least: what is only on this device; which other copies are caught up,
 behind or unknown; whether a version is pending, elected or lost. A wait on the network says that
@@ -289,6 +305,8 @@ Each is a missing node, named and not designed here.
 | Gap | Where | Consequence until it lands |
 |---|---|---|
 | The sync routes ask neither who is calling nor what reach admits them. The write route is marked as needing a signed-in caller, which is a declaration the doorway does not yet enforce. The peer-to-peer handler serves and merges documents directly | `http.rs:6974,7046,16303`; `p2p/mod.rs:7930`; backlog `http-reach-enforcement-gap` | a circle cannot be enforced |
+| A document held for its author alone is listed, served and synced like any other | `p2p/mod.rs:8130`; `sync/doc_store.rs:303` | a solo draft is not private until this exclusion exists; it must not be written to a store that serves |
+| No per-document, per-copy sync state | `api/dataplane.ts:63`; `sync.ts:31` | §6 cannot be shown |
 | No signed record admits a person to a circle | none exists | `kept: circle` is declared and cannot be honoured; today a working version is the author's alone |
 | The reach check is not called on any sync path | `p2p/reach_authorization.rs` | same |
 | Changes cannot be sealed to a circle | spec 2026-08-23 (blind custody), not built | the doorway refusal in §3 |

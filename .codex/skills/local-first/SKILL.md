@@ -93,10 +93,12 @@ output. Otherwise use the names that exist. Do not mint others.
 - **A draft starts with its author alone.** The published thing's reach is a ceiling for the
   working version, not its starting audience. Widening is an act the person takes.
 - **Republishing is a submission.** The root author's new version becomes the head of their own
-  chain; anyone else's is a candidate in an election and can lose. Show what the election says
+  chain; a declaration by anyone else is a candidate in an election and can lose. Show what the election says
   now (pending, current, not current) and never show it as final.
 - **A working version is its own document.** It is never the document published values are
-  projected into, and who may edit it is a signed record, never a field inside it.
+  projected into, and who may edit it is a signed record, never a field inside it. One held for
+  its author alone is not listed, served or synced; if the store cannot promise that, the draft
+  does not go in it.
 - **Merging is agreement, not legitimacy.** What peers merge is unauthenticated until a version is
   declared and elected. Never show merged state with the mark of an anchored one.
 - **A gesture passes, then lands.** State that changes many times a second is passing state; the
@@ -127,9 +129,9 @@ act of trust, not one per item. If a design joins a person to everyone with no a
 that is a way to be captured.
 
 For a pool: `genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md`
-§5 lists what a pool owes the devices that carry it. A holder that serves a draw knows who drew
-and which bytes, so nothing a person would not want its holders to see them read belongs in a
-pool.
+§5 lists what a pool owes the devices that carry it. As the parts stand, who belongs to a pool
+and who draws compute from it are public records, so a pool is for public purposes only: nothing
+sensitive to who belongs or who reads goes in one.
 
 ## 5. What the person is shown
 

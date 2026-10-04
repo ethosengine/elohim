@@ -163,9 +163,10 @@ it is today. The collective case is an added arm, not a replacement.
 - **Classification:** the request and its completion are the existing REA events
   (`rakia-compute-request-v1`, `serve-blob`). The requester-side `compute-fulfilled` event is a
   local projection today and is not notarized; that is a gap this design inherits, not one it adds.
-- **A holder that serves a draw knows who drew and which bytes.** The draw check identifies the
-  caller, and the holder serves the bytes. Reading a range of a large archive hides what the
-  reader was looking for inside it; it does not hide the fetch. See the SDO and RWA test (named
+- **A draw is recorded and names the one who drew.** A compute draw is a notarized request and
+  completion, readable network-wide. A byte draw is seen by the holder that serves it. Reading a
+  range of a large archive hides what the reader was looking for inside it; it does not hide the
+  fetch. See the SDO and RWA test (named
   for social dominance and authoritarian following: what could the few who seek to dominate see,
   join and compel).
 
@@ -183,8 +184,8 @@ contributed bytes are re-verified.
 - **Custody:** many holders chosen for independent failure, not for number. The threshold is a
   separate dial from the membership.
 - **Freshness:** a read from a pool carries the head it was read at.
-- **Linkability:** holding for a pool reveals membership. Drawing from it reveals to the serving
-  holder that this member fetched these bytes.
+- **Linkability:** belonging to a pool is public. Drawing compute from it is a public record.
+  Drawing bytes reveals to the serving holder that this member fetched them.
 - **Cost bearer:** the members whose devices carry it, recorded as REA events.
 
 ### SDO and RWA test
@@ -192,23 +193,33 @@ contributed bytes are re-verified.
 If the largest holder in a pool, or a majority of its stewards, were captured: what could they
 see, join and compel?
 
-- **See:** who the members are, and what each has committed. That is inside the collective's own
-  membrane and is acceptable there. They also see, for every draw they serve, which member
-  fetched which bytes. That is the honest limit of this design: inside a pool, members who hold
-  can see what other members fetch from them. It is the same limit the boundaries state for any
-  holon (peers inside see each other), and it means a pool is the wrong home for anything a
-  member would not want its holders to know they read. What can be kept: holders keep no ledger
-  of draws (boundary 2: an activity ledger is held by the holon it describes and is never joined
-  from outside), a range read hides the question inside a large archive, and a count leaves a
-  reader's device only as a sum once the consumer-blinded census exists.
-- **Join:** a person's memberships in two pools carry the same member address, so anyone who can
-  read both membership lists can join them. Boundary 5 (correlating identities across namespaces
-  is an act of consent) is therefore not met by structure. It is met only where the lists are not
-  readable from outside each collective.
-- **Not designed here:** a draw that does not identify the member to the holder (admission proved
-  to one party, bytes served by another, or a proof of membership that names no one), and a
-  member address that differs per pool. Both are needed before a pool may hold anything sensitive
-  to who reads it. Until then that is a refusal: such things do not go in a pool.
+- **See:** more than a pool's own members can. As the code stands there is no membrane around a
+  pool:
+  - *Membership is public.* `Membership` is an ordinary public entry
+    (`imagodei_integrity/src/lib.rs:947`) and listing a collective's members asks nothing of the
+    caller (`qahal_coordinator.rs:128`). Anyone in the network can read who belongs to a pool.
+  - *A compute draw is a public record.* The request names its requester and provider and carries
+    its envelope (`content_store/src/compute_task.rs:252`), reading and listing requests is
+    unguarded (`:150`), and the holder notarizes completion (`:334`).
+  - *A byte draw is seen by the holder that serves it,* which knows who fetched which bytes and
+    emits a serving event.
+
+  So a pool built on these parts is one whose membership and whose draws on compute are visible to
+  the whole network. That is acceptable for a pool whose purpose is public: a commons index, a
+  public map, shared build compute. It fails boundary 6 (taking part is itself sensitive) for
+  anything narrower, and boundary 2 (an activity ledger is held by the holon it describes). The
+  accounting this design asks for in §5 and the privacy it would like are in direct tension: to
+  record who carried a draw is to record the draw. The reconciliation that is specified and not
+  built is the consumer-blinded census, which records the carrying without naming the reader.
+- **Join:** a person's memberships in two pools carry the same member address, and membership
+  lists are public, so anyone can join them. Boundary 5 (correlating identities across namespaces
+  is an act of consent) is not met.
+- **Not designed here, and required before any pool narrower than public:** membership that is
+  readable only inside the collective; a member address that differs per pool; a draw record that
+  does not name the reader; a draw that does not identify the member to the holder (admission
+  proved to one party and bytes served by another, or a proof of membership that names no one).
+  Until these exist this is a refusal: this design builds public-purpose pools only, and nothing
+  sensitive to who belongs or who reads goes in one.
 - **Compel:** nothing from a member's device beyond what that member committed, and that
   commitment can be revoked. A pool cannot require anything that must never leave a device.
 - **What a pool may never hold:** a person's attention, revealed preferences, private notes and
@@ -242,9 +253,9 @@ Each row is built from parts that exist plus the one missing node, and each has 
 | Compute near the work | `delegates-compute`; the compute request and its events; the tevah envelope for the guest | compute | no offer of a berth and no matching; fulfilment is not notarized |
 | A view across many holders | flat coverage rollup; the pool's index as a measure its members compute over what they hold | analytics | no carrier for an aggregate across DHTs; no witness quorum; no bound on how small a counted group may be |
 
-For a first pool that only shares storage among people who know each other, none of these gaps
-blocks: holders reading what they hold is acceptable inside that circle. Blind custody blocks any
-pool whose holders should not read. The inference, compute and cross-holder rows each need their
+For a first pool that shares storage of public things, none of these gaps blocks: its holders
+may read what they hold, and its membership and draws being visible is acceptable for a public
+purpose (§3). Blind custody blocks any pool whose holders should not read. The inference, compute and cross-holder rows each need their
 own gap closed before that service exists at all.
 
 Two things in this table have no conventional analog and are where the design is stronger than
@@ -269,9 +280,10 @@ This is what the capture does not say, and it is the local-first reading of a po
    too: a recipe is an addressed thing the member's own commitment admits by scope, it runs inside
    the device's compute envelope with a quota carved from what the member gave, and a recipe the
    commitment does not name does not run.
-5. **A draw is seen only by the holder that serves it.** That holder knows who fetched and which
-   bytes; it keeps no ledger of it and nothing leaves the pool. A pool that needs more than this
-   waits on the unlinkable draw (§3).
+5. **A draw is honest about who can see it.** Today a compute draw is a public record naming the
+   requester, a byte draw is seen by its holder, and membership is public (§3). A pool says so to
+   the people who join it. A pool that needs less visibility than this waits on the work §3 lists
+   and is not built before it.
 6. **A read says how fresh it is.** It carries the head it was read at; a stale answer is marked
    stale.
 7. **Giving is bounded from outside the pool.** The share of a device a pool may use is set by the
@@ -293,7 +305,7 @@ ready, and the design says so plainly:
   that carry the check; the capture's row 1 is narrower than it reads there, and still open.
 - **Standing has no settled record.** The design for standing records failed review and is being
   redrafted. Who may steward a pool, and who may speak for it, waits on that. A pool's membership
-  and roles (`Steward`, `Contributor`, `Observer`) exist and are enough for a first pool among
+  and roles (`Steward`, `Contributor`, `Observer`) exist and are enough for a first public-purpose pool among
   people who already know each other.
 
 ## 7. Open questions for the operator
@@ -302,8 +314,9 @@ Carried from the capture's §8 with its recommendations. These are decisions, no
 
 1. **The first pool.** Recommended there: a street-imagery pool, because it exercises contribution,
    provenance, derivation at the sensor and serving in one corpus. A smaller first step is a pool
-   whose only capacity is storage among the household mesh's three peers, which exercises the
-   missing node and nothing else.
+   whose only capacity is storage of public things among the household mesh's three peers, which
+   exercises the missing node and nothing else. Both are public-purpose pools, which is all this
+   design can build (§3).
 2. **The revenue cap.** A pool that funds itself past a declared share of its members'
    contribution is captured. Recommended there: a locked ceiling per kind of pool.
 3. **Who may train on a pool.** Recommended there: contribution terms carry reciprocity,
