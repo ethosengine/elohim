@@ -550,8 +550,9 @@ The one-device base case and carried positive proof were judged achievable.
 
 ### 12.8 Second design, against the findings
 
-> **Status: under review.** This replaces 12.3-12.5. It has not passed review and
-> is not to be implemented until it does.
+> **Status: failed review, do not implement.** This replaced 12.3-12.5. A second
+> adversarial review on 2026-10-04 judged it unsound; see 12.9. Review is capped
+> at these two rounds until the operator rules on finality.
 
 **The subject is a root, never a name (finding 1).** Standing attaches to a
 content root's action hash. A second root made under the same content id is a
@@ -642,3 +643,36 @@ logic in the content and governance zomes.
 **Still open:** name binding; vote-constituted standing; corpus-scoped standing;
 the closed list of recovery grounds and the contest procedure; how a holder accepts
 many heads without approving each by hand; the bundle's size ceiling.
+
+### 12.9 Second review, and the question it leaves
+
+Of the eight findings, one was judged resolved (5, the explicit initial-stewardship
+policy), six partly resolved, and one not resolved (2, currency).
+
+What 12.8 got wrong:
+
+- **Epochs order heads; they do not make a change current.** A succeeded holder
+  still wins wherever no higher-epoch head has appeared, even where the succession
+  is known. A withdrawn device is not stopped at all when the withdrawal is an
+  identity-authority change, because that does not advance the subject's epoch.
+- **"Lower address wins" is not finality.** An outgoing holder can sign a
+  legitimate succession and a competing one that keeps itself, grind the second to
+  a lower address, and extend it. Repeated self-successions also inflate epochs.
+- **Naming the founding authority's recovery power does not limit it.**
+- **Still unspecified:** how a receiver authenticates the constitution it is shown;
+  acceptance quorum; bundle delivery, since a digest authenticates bytes and does
+  not deliver them; what replay binding each claim signs over; migration of
+  existing roots; and keeping a higher-epoch proposal from displacing an earned head.
+
+What held: the integrity author check stops a stranger's first-standing link; a
+counterfeit root gains nothing over the original; one device authoring alone works;
+carried verification is achievable once the bundle travels with the declaration.
+
+**The open question is finality, and it is the operator's to rule on.** A network
+with no global order cannot make a change of standing current everywhere at once.
+Either a change becomes final when a named body witnesses it, and is provisional
+until then; or changes are never final, only eventually agreed, and the design
+bounds what a stale party can do in the meantime. The first matches the model the
+operator described (born locally, stronger when witnessed, affirmed later) and
+places finality on the live plane, where peers present together witness a change.
+It needs an answer to who the witnesses are for a subject, and for one person alone.
