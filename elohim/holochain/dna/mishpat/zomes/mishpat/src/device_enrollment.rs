@@ -458,6 +458,94 @@ pub fn sign_device_enrollment(intent: DeviceIntent) -> ExternResult<Proof> {
         agent: me,
     })
 }
+/// What a controller signs to put their agreement on a device consent.
+///
+/// A consent record is the content-addressed statement of what a device asked
+/// for and what the person agreed to. It is evidence, kept apart from the
+/// binding that actually recognizes the device. The controller signs the
+/// record's address, which commits to every byte of it.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct DeviceConsent {
+    pub authority: ActionHash,
+    pub identity_root: ActionHash,
+    /// The consent record's content address (CIDv1, dag-cbor).
+    pub consent_cid: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SignedDeviceConsent {
+    pub consent: DeviceConsent,
+    pub proof: Proof,
+}
+
+const CONSENT_DOMAIN: &str = "elohim:device-consent:v1:";
+/// A CIDv1 with a sha2-256 digest is 59 characters in base32; the ceiling
+/// leaves room for another codec and no room for anything else.
+const MAX_CONSENT_CID_LEN: usize = 96;
+
+/// The exact bytes signed. Domain-separated, so a signature gathered for a
+/// consent can never be replayed as an enrollment or any other identity act.
+fn consent_message(consent: &DeviceConsent) -> Result<Vec<u8>, &'static str> {
+    let cid = consent.consent_cid.as_bytes();
+    let plain = !cid.is_empty()
+        && cid.len() <= MAX_CONSENT_CID_LEN
+        && cid
+            .iter()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit());
+    if !plain {
+        return Err("consent address is not a base32 content address");
+    }
+    let mut message = Vec::with_capacity(CONSENT_DOMAIN.len() + cid.len());
+    message.extend_from_slice(CONSENT_DOMAIN.as_bytes());
+    message.extend_from_slice(cid);
+    Ok(message)
+}
+
+/// Whether `signer` may put this identity's agreement on `consent`: the consent
+/// must name the identity the authority belongs to, and the signer must be one
+/// of its controllers. A device is never a controller, so a device cannot agree
+/// to its own recognition.
+fn consent_signer_stands(
+    authority: &Authority,
+    consent: &DeviceConsent,
+    signer: &AgentPubKey,
+) -> Result<(), &'static str> {
+    if authority.chain_root != consent.identity_root {
+        return Err("consent names a different identity");
+    }
+    if !authority.controllers.contains(signer) {
+        return Err("only a controller of this identity may agree for it");
+    }
+    Ok(())
+}
+
+/// Explicit ceremony signing only: a controller agrees to one consent record.
+#[hdk_extern]
+pub fn sign_device_consent(consent: DeviceConsent) -> ExternResult<Proof> {
+    crate::invocation::authorize("sign_device_consent", &consent)?;
+    let message = consent_message(&consent).map_err(refuse)?;
+    let authority = current_authority(consent.authority.clone())?;
+    let me = agent_info()?.agent_initial_pubkey;
+    consent_signer_stands(&authority, &consent, &me).map_err(refuse)?;
+    Ok(Proof {
+        signature: hdk::ed25519::sign_raw(me.clone(), message)?,
+        agent: me,
+    })
+}
+
+/// Whether a controller of the named identity signed this consent. Any holder
+/// of a consent can ask; the answer is recomputed here and trusts nothing the
+/// caller says about who the controllers are.
+#[hdk_extern]
+pub fn verify_device_consent(signed: SignedDeviceConsent) -> ExternResult<bool> {
+    let message = consent_message(&signed.consent).map_err(refuse)?;
+    let authority = current_authority(signed.consent.authority.clone())?;
+    if consent_signer_stands(&authority, &signed.consent, &signed.proof.agent).is_err() {
+        return Ok(false);
+    }
+    verify_signature_raw(signed.proof.agent, signed.proof.signature, message)
+}
+
 fn verify_binding(binding: &DeviceBinding) -> ExternResult<Authority> {
     if binding.action != "binds-identity" || binding.binding_kind != "device-v1" {
         return Err(refuse("not an additive device binding"));
@@ -721,6 +809,76 @@ mod tests {
     fn key(n: u8) -> AgentPubKey {
         AgentPubKey::from_raw_32(vec![n; 32])
     }
+    fn action(n: u8) -> ActionHash {
+        ActionHash::from_raw_32(vec![n; 32])
+    }
+    fn consent(cid: &str) -> DeviceConsent {
+        DeviceConsent {
+            authority: action(2),
+            identity_root: action(1),
+            consent_cid: cid.into(),
+        }
+    }
+    fn authority_of(controllers: Vec<AgentPubKey>) -> Authority {
+        Authority {
+            action: "binds-identity".into(),
+            binding_kind: "authority-v1".into(),
+            chain_root: action(1),
+            human_id: "human".into(),
+            human_dna: DnaHash::from_raw_32(vec![3; 32]),
+            network_dna: DnaHash::from_raw_32(vec![4; 32]),
+            head_key: key(1),
+            controllers,
+            controller_policy: ControllerPolicy {
+                kind: "self".into(),
+                m: None,
+                n: None,
+            },
+            authorization: "development-network".into(),
+            previous_authority: None,
+            signatures: vec![],
+        }
+    }
+    const CID: &str = "bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    #[test]
+    fn a_consent_signature_is_bound_to_its_own_domain_and_address() {
+        let message = consent_message(&consent(CID)).unwrap();
+        assert!(message.starts_with(CONSENT_DOMAIN.as_bytes()));
+        assert!(message.ends_with(CID.as_bytes()));
+        assert_ne!(
+            message,
+            consent_message(&consent(&CID.replace("bafy", "bafk"))).unwrap()
+        );
+        // Never the bytes an enrollment signs.
+        assert!(!CONSENT_DOMAIN.contains(DOMAIN));
+    }
+
+    #[test]
+    fn a_consent_address_is_a_plain_content_address() {
+        for bad in [
+            "",
+            "BAFYREI",
+            "bafy rei",
+            "bafyrei/../x",
+            &"a".repeat(MAX_CONSENT_CID_LEN + 1),
+        ] {
+            assert!(consent_message(&consent(bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn only_a_controller_of_the_named_identity_agrees_for_it() {
+        let authority = authority_of(vec![key(1)]);
+        assert!(consent_signer_stands(&authority, &consent(CID), &key(1)).is_ok());
+        // A device, or anyone else, is not a controller.
+        assert!(consent_signer_stands(&authority, &consent(CID), &key(7)).is_err());
+        // A controller of some other identity cannot agree for this one.
+        let mut other = consent(CID);
+        other.identity_root = action(9);
+        assert!(consent_signer_stands(&authority, &other, &key(1)).is_err());
+    }
+
     #[test]
     fn policy_threshold_is_owned_by_controller_policy_not_device() {
         let policy = |kind: &str, m, n| ControllerPolicy {
