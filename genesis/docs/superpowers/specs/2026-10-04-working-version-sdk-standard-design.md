@@ -128,8 +128,9 @@ becomes a condition for what worked without it.
 - **Integrity zome and DNA-hash class:** no change. DNA-hash-neutral.
 - **Coordinator:** existing functions only, and there are three paths, which the 2026-08-07
   ruling keeps apart.
-  - *The root author, or a device they delegated.* A new version is an update on the root author's
-    own chain and becomes the head of that chain. `declare_content_head`
+  - *The root author.* A new version is an update on the root author's own chain and becomes the
+    head of that chain. A delegated device writes under its own agent, so it does not take this
+    path; it takes the next one. `declare_content_head`
     (`content_store/src/lib.rs:5586`) only re-affirms the head or re-declares an older version the
     root author wrote (`:5647`); it is not how a new version is submitted.
   - *An earned declaration.* The root author, a device carrying their signed delegation, or the
@@ -142,7 +143,7 @@ becomes a condition for what worked without it.
 
   Every declaration is a candidate in the election (`select_canonical_winner`, `:3154`): earned
   declarations outrank staging ones, then the declaration's time, then its link hash. A staging
-  declaration therefore loses to any earned one.
+  declaration never moves a head that was earned.
 - **Projections:** the existing ones. The projector already writes published values into the
   document; the reverse direction stays as ruled: values in a document never reach an authoritative
   column except through a conductor-verified path.
@@ -245,8 +246,10 @@ declaration, not by their content.
 
 `refused` is a gate saying no before any election: the type's `republish` rule is not met, or the
 caller asked for an earned declaration without being the root author, their delegate or the
-bootstrap steward. A caller with no such standing is not refused a staging declaration; it is
-simply outranked.
+bootstrap steward. A staging declaration is also refused where an earned head already stands,
+unless it declares its lineage over that head (`content_store/src/lib.rs:6159`); when admitted it
+shows only as a staging candidate and does not move the head until an earned declaration
+promotes it.
 
 **Refusals each verb owes.** `open` on a thing the device does not hold: refused, naming that it
 must be fetched first. `republish` without `fix`: fixes first. `widen` past the origin's reach:

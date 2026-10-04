@@ -160,8 +160,9 @@ it is today. The collective case is an added arm, not a replacement.
 
 ### Entity: a draw
 
-- **Classification:** the request and its completion are the existing REA events
-  (`rakia-compute-request-v1`, `serve-blob`). The requester-side `compute-fulfilled` event is a
+- **Classification:** existing records. A compute request is an REA commitment
+  (`rakia-compute-request-v1`, `content_store/src/compute_task.rs:253`); the holder's completion
+  is an economic event (`:334`); serving bytes emits a `serve-blob` event. The requester-side `compute-fulfilled` event is a
   local projection today and is not notarized; that is a gap this design inherits, not one it adds.
 - **A draw is recorded and names the one who drew.** A compute draw is a notarized request and
   completion, readable network-wide. A byte draw is seen by the holder that serves it. Reading a
