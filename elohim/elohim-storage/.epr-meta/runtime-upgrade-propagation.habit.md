@@ -278,3 +278,7 @@ failed ... CellMissing`; 32 hosted apps in all, most with exactly three roles mi
 which, and campaign 1.4 leg 2 (a delegation the current zome accepts) is the acceptance. Owed: why list_apps reports provisioned
 cells the conductor does not hold on 32 apps (genesis/data/timeline/backlog/hosted-app-coordinator-coverage-gaps.md); a per-app
 `applied` row in the driver's output so a named app's outcome is readable from the log.
+DELTA 2026-10-04c (fleet, reported by the Che workspace's probe, not re-read here): after DNA #1483 the operator's hosted app
+`elohim-conductor-4-927dff` runs the node's own lamad and mishpat coordinators, and a delegation it then issued carries the issuance
+hash and the device binding the current zome requires; the 2026-10-04 refusal (`legacy grant cannot authorize a new publication`)
+is gone. Eleven other hosted apps on conductor-4 are still on older lamad coordinators (the `CellMissing` set, backlog gap 3).
