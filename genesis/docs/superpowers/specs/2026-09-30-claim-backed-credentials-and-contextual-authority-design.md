@@ -547,3 +547,98 @@ see; device labels and the consent record that produced a mandate are not notari
    staging, earned and carried paths. The generic declarer gate is open today.
 
 The one-device base case and carried positive proof were judged achievable.
+
+### 12.8 Second design, against the findings
+
+> **Status: under review.** This replaces 12.3-12.5. It has not passed review and
+> is not to be implemented until it does.
+
+**The subject is a root, never a name (finding 1).** Standing attaches to a
+content root's action hash. A second root made under the same content id is a
+different subject and has no bearing on the first. Which root a name means is a
+separate question, answered by the steward of the namespace that binds the name,
+as a declared dependency; "earliest root retrievable" is not an answer and is
+removed with the rest. Name binding is a dependency of this design, not part of it.
+
+**First standing applies a stated policy (findings 1, 5).** Every network carries
+an initial-stewardship policy in its constitution: the recognized identity that
+creates a new subject is its initial steward, and that stewardship is transferable
+and recoverable. The first-standing link on a root cites that policy. It is valid
+at the integrity level only when its author is the author of the root it is placed
+on. That check moves the DNA hash, which is accepted. If two first-standing links
+appear on one root, the one with the lower action hash stands; nothing is frozen.
+First standing is therefore governance applying a rule to a fact of provenance, not
+provenance acting as authority.
+
+**A standing chain has epochs, and the election reads them first (findings 2, 3).**
+Each standing record names its predecessor and an epoch one higher. A mandate, an
+acceptance and a head declaration each name the standing record and epoch they act
+under. The election orders candidates by epoch before anything else. A head
+declared under a higher epoch beats every head under a lower one, so a holder who
+was succeeded, or a device whose mandate rested on an earlier epoch, loses as soon
+as the current holder declares or re-affirms a head. A peer that has not yet seen
+the succession is behind, not wrong: it converges when the record reaches it.
+Nothing accepted earlier is erased from history.
+
+- Sharing and succession are both successor records; sharing keeps the earlier
+  holders in the new set.
+- A successor needs the outgoing holders' signatures, checked against each
+  identity's own authenticated controller policy with the quorum check the device
+  binding already uses (`verify_quorum`), not the lineage check (finding 7).
+- Two valid successors of one predecessor are a conflict, not a freeze: the one
+  with the lower record address stands. An identity that lets one controller sign
+  alone accepts that one controller can hand its standing on; a quorum policy is
+  the protection.
+
+**Revocation is a successor, not a lookup (finding 2).** Withdrawing a device's
+mandate, or its binding, is recorded as a successor epoch of the standing chain or
+of the identity's authority. Heads the device declares afterwards name a stale
+epoch and lose the election. A mandated device's head still needs the holder's
+acceptance to reach the earned tier, which is what stops a withdrawn device
+backdating a head.
+
+**Recovery belongs to a body the subject names (finding 4).** A standing record
+names its recovery body and threshold. The network's constitution names a witness
+body as the last resort, and the declared network stage says how it may be
+constituted: at the bootstrap stage it may be the founding authority, stated
+openly as such; at the coordinated and enforced stages it must be a quorum
+independent of that authority. A recovery record states its grounds from a closed
+list and takes effect after a contest window in which the current holders may
+object. A person alone on a network of one has no one to recover them, and the
+design says so.
+
+**Claims are addressed apart from their notarization (finding 7).** A standing
+record, a mandate and an acceptance are each a canonical claim body with its own
+content address. The governance commitment that notarizes one carries the claim's
+address and the constituting signatures. A later witness adds an affirmation that
+cites the claim's address. The claim's address never changes.
+
+**Carried proof is a bundle (finding 6).** A head declaration's link tag carries
+the digest of a proof bundle: the standing chain from first standing to the epoch
+acted under, each holder's authority and controller policy, the mandate, the
+device binding and the acceptance. The bundle is a content-addressed blob with a
+stated ceiling on size and on chain length. A receiver verifies it from its bytes.
+A network that has never seen the author can do the same.
+
+**One verification, every path (finding 8).** A single function decides authoring
+standing from a bundle, a subject, a declarer and a head. The staging, earned and
+carried paths all call it. Proposing a head (the staging tier) requires only
+recognition: who is proposing. Earning requires standing.
+
+**The live plane carries currency.** Peers online together exchange, per subject,
+the highest epoch each has seen. That is how a peer that is behind catches up
+quickly. It adds speed; the epoch ordering above is what makes the outcome the
+same without it.
+
+**The one-device case.** One person with one device is the sole controller of
+their identity, initial steward of what they create, and declares heads with no
+mandate, no acceptance and no one else. Every other record in this section appears
+only when a second device or another person does.
+
+**What moves the DNA hash:** the first-standing link's author check, and the
+removal of the root-author rule's link conventions. Everything else is coordinator
+logic in the content and governance zomes.
+
+**Still open:** name binding; vote-constituted standing; corpus-scoped standing;
+the closed list of recovery grounds and the contest procedure; how a holder accepts
+many heads without approving each by hand; the bundle's size ceiling.
