@@ -28,6 +28,11 @@ elohim-epr-rea = { path = "../epr-rea", default-features = false }
 # See genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md
 elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts" }
 
+# The consent ceremony a portal performs (device recognition): request admission,
+# the addressed consent record, single-use delivery. The peer runtime mounts it so
+# one device can run the whole ceremony alone; the doorway mounts the same steps.
+elohim-consent-grant = { version = "0.1.0", path = "../../crates/consent-grant" }
+
 # SDK boundary types — View types migrate here incrementally from views.rs
 elohim-sdk = { path = "../../crates/elohim-sdk" }
 

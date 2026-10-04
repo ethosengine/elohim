@@ -34,13 +34,16 @@ use crate::request::AdmittedRequest;
 use crate::return_path::{return_target, ReturnTarget};
 
 /// What a consent screen shows. Everything a person needs to decide, and
-/// nothing they could not check against their own terminal.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// nothing they could not check against their own terminal. This is the wire
+/// form every host returns, so one consent screen serves them all.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConsentView {
     pub client_id: String,
     pub label: String,
     pub device_fingerprint: String,
     /// Shown only when binding the device root is asked for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_root_fingerprint: Option<String>,
     /// Each thing asked for, to be agreed to or declined separately.
     pub asked_acts: Vec<RequestedAct>,
@@ -72,7 +75,8 @@ pub enum IssueRefusal {
     AddressBroken,
     /// The record was not made for this request.
     RequestMismatch,
-    /// Nobody has signed it. An unsigned record is not a consent.
+    /// No controller has signed it. Without a controller's signature a record
+    /// is not a consent, whoever else has signed.
     Unsigned,
     Delivery(DeliveryRefusal),
 }
@@ -111,7 +115,7 @@ pub fn issue(
     {
         return Err(IssueRefusal::RequestMismatch);
     }
-    if consent.signatures.is_empty() {
+    if !consent.controller_signed() {
         return Err(IssueRefusal::Unsigned);
     }
     let delivery = PendingDelivery::issue(admitted, &consent.cid, code, now_micros, ttl_micros)
@@ -230,7 +234,7 @@ pub fn redeem(
 mod tests {
     use super::*;
     use crate::consent::tests::peer_record;
-    use crate::consent::ConsentSignature;
+    use crate::consent::{ConsentSignature, SignerRole};
     use crate::hash_shape::sample_key;
     use crate::request::admit_request;
     use crate::request::tests::{peer_request, policy, request, VERIFIER};
@@ -248,6 +252,7 @@ mod tests {
         SignedConsent::new(peer_record())
             .unwrap()
             .with_signature(ConsentSignature {
+                role: SignerRole::Controller,
                 signer: sample_key(9),
                 signature: "controller".into(),
             })
@@ -311,7 +316,17 @@ mod tests {
         use IssueRefusal as R;
         let unsigned = SignedConsent::new(peer_record()).unwrap();
         assert_eq!(
-            issue(&admitted(), unsigned, CODE, NOW, TTL),
+            issue(&admitted(), unsigned.clone(), CODE, NOW, TTL),
+            Err(R::Unsigned)
+        );
+        // The device's own signature, or a witness's, is not agreement.
+        let device_only = unsigned.with_signature(ConsentSignature {
+            role: SignerRole::Device,
+            signer: sample_key(7),
+            signature: "device".into(),
+        });
+        assert_eq!(
+            issue(&admitted(), device_only, CODE, NOW, TTL),
             Err(R::Unsigned)
         );
 

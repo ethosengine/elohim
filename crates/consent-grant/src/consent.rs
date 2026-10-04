@@ -144,11 +144,25 @@ impl ConsentRecord {
     }
 }
 
+/// In what capacity a party signed. The floor today is deterministic: the
+/// controller who agreed and the device that asked. A witness is anyone else
+/// who was present and attests to it, which is where an elohim attending the
+/// person adds its signature as that role matures. A witness strengthens a
+/// record; a record never needs one to be valid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SignerRole {
+    Controller,
+    Device,
+    Witness,
+}
+
 /// One party's signature over a record's canonical bytes. Detached: it is not
 /// part of what the record's address covers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsentSignature {
+    pub role: SignerRole,
     /// The signer's key, in the form its kind is written (an agent key).
     pub signer: String,
     /// Base64 of the raw signature over [`ConsentRecord::canonical_bytes`].
@@ -173,12 +187,21 @@ impl SignedConsent {
         })
     }
 
-    /// Add a signature. A signer already present is replaced, so re-signing
-    /// never grows the set. The address does not change.
+    /// Add a signature. A signer already present in the same role is replaced,
+    /// so re-signing never grows the set. The address does not change.
     pub fn with_signature(mut self, signature: ConsentSignature) -> Self {
-        self.signatures.retain(|s| s.signer != signature.signer);
+        self.signatures
+            .retain(|s| !(s.signer == signature.signer && s.role == signature.role));
         self.signatures.push(signature);
         self
+    }
+
+    /// Whether a controller has signed. This is the floor a consent must meet
+    /// to be issued; a device or witness signature alone is not agreement.
+    pub fn controller_signed(&self) -> bool {
+        self.signatures
+            .iter()
+            .any(|s| s.role == SignerRole::Controller)
     }
 
     /// Whether the stated address is the record's own. Signature validity is
@@ -284,18 +307,21 @@ pub(crate) mod tests {
     fn signing_again_never_moves_the_address() {
         let signed = SignedConsent::new(peer_record()).unwrap();
         let cid = signed.cid.clone();
-        let sign = |who: u8, sig: &str| ConsentSignature {
+        let sign = |role, who: u8, sig: &str| ConsentSignature {
+            role,
             signer: sample_key(who),
             signature: sig.into(),
         };
         let signed = signed
-            .with_signature(sign(9, "controller"))
-            .with_signature(sign(7, "device"))
-            .with_signature(sign(9, "controller-again"));
+            .with_signature(sign(SignerRole::Controller, 9, "controller"))
+            .with_signature(sign(SignerRole::Device, 7, "device"))
+            .with_signature(sign(SignerRole::Controller, 9, "controller-again"))
+            .with_signature(sign(SignerRole::Witness, 5, "elohim"));
         assert_eq!(signed.cid, cid);
         assert!(signed.address_holds());
-        assert_eq!(signed.signatures.len(), 2);
+        assert_eq!(signed.signatures.len(), 3);
         assert_eq!(signed.signatures[1].signature, "controller-again");
+        assert!(signed.controller_signed());
     }
 
     #[test]

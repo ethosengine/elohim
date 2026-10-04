@@ -55,7 +55,8 @@ pub mod custody_facing; // custody-observation loader for the typed custody fold
 pub mod custody_rotation; // author a successor custody pledge when the content's blob rotates under it
 pub mod custody_standing; // station 3b — resolves the custody facts the private-reach gate decides on
 pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss
-pub mod device_capacity; // Phase 4 T7 — available bytes helper
+pub mod device_capacity;
+pub mod device_consent; // device recognition ceremony, node-local mount of `consent_grant` // Phase 4 T7 — available bytes helper
 pub mod did_identity_store; // did:elohim assembly store — implements the did-bridge ElohimIdentityStore contract (spec §3.4)
 pub mod disposition_service;
 pub mod distribution;

@@ -590,6 +590,10 @@ pub struct HttpServer {
     /// Registry of per-cell HcClient instances for zome forwarding (Phase 11).
     /// Wired at startup via `with_hc_registry`. None = conductor bridge unavailable.
     hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
+    /// Signed device consents waiting for the terminal that asked. In memory
+    /// by design: a delivery lives minutes, needs no database, and is recovered
+    /// by asking again after a restart (`services::device_consent`).
+    consent_deliveries: Arc<consent_grant::MemoryStore>,
     /// Embedded conductor manager — wired at startup (embedded mode only) so the
     /// authority-arc actuation endpoint can rewrite the conductor-config and
     /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
@@ -1344,6 +1348,7 @@ impl HttpServer {
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
+            consent_deliveries: Arc::new(consent_grant::MemoryStore::new()),
             conductor_manager: None,
             reconcile_kick: None,
             admin_websocket: None,
@@ -2875,6 +2880,17 @@ impl HttpServer {
                     Ok(response::service_unavailable("Database not enabled"))
                 }
             }
+
+            // Device consent ceremony (recognition): what the consent screen
+            // shows for a terminal's request. Pure admission, no state, no
+            // approver. Node-local like /session/exchange, so not declared in
+            // build_manifest().
+            (Method::POST, "/auth/consent/view") => self.handle_consent_view(req).await,
+
+            // Device consent ceremony: the asking terminal redeems its code for
+            // the signed consent, once. Guarded by the terminal's own verifier
+            // and device key, so it needs no session.
+            (Method::POST, "/auth/consent/redeem") => self.handle_consent_redeem(req).await,
 
             // Auth identity endpoint: same wire shape as doorway's /auth/me so
             // the standalone peer OAuth portal bundle can consume either source
@@ -13289,6 +13305,36 @@ impl HttpServer {
     /// TTL, issuer-side truth — never persisted here). The conductor's
     /// `/auth/me` remains authority over doorway claims; this exchange only
     /// SEEDS a LocalSession.
+    /// POST /auth/consent/view — what the consent screen shows for a request.
+    async fn handle_consent_view(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(crate::services::device_consent::consent_view(&body))
+    }
+
+    /// POST /auth/consent/redeem — the asking terminal collects its consent.
+    async fn handle_consent_redeem(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(crate::services::device_consent::redeem_code(
+            &self.consent_deliveries,
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        ))
+    }
+
     async fn handle_session_exchange(
         &self,
         req: Request<Incoming>,

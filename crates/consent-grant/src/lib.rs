@@ -55,7 +55,9 @@ pub mod return_path;
 
 pub use act::{ActRefusal, RequestedAct};
 pub use ceremony::{issue, redeem, settle, ConsentView, Held, IssueRefusal, MemoryStore, Taken};
-pub use consent::{Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent};
+pub use consent::{
+    Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent, SignerRole,
+};
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
