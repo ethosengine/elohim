@@ -543,6 +543,8 @@ build-state, see the dated assessments in §6.)
 | Multi-tenancy / regions | shem multi-tenant + cells + household locality |
 | Backup / DR | quilt RS(N,K) + social-recovery quorum |
 | IoT / edge devices | Track-3 spoke (3.10, thin 3.1) |
+| Shared capacity pools (storage, index, compute a household lacks alone) | a `Collective` party to its members' `replicates-*` / `delegates-compute` commitments (3.11, 3.4); design `commons-pool-as-collective-party-design` |
+| Managed inference / model serving | `delegates-compute` to a pool with an inference scope + local inference (thick 3.1); compute travels to the data; no model address or delegation path yet |
 
 **The inversion — where human-scale doesn't match but EXCEEDS.** The whole **social /
 governance / trust / recovery plane has no hyperscaler equivalent**, and that is the point.
