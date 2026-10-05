@@ -3,36 +3,11 @@ import { css, html, LitElement, nothing, type PropertyValues } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { keyed } from 'lit/directives/keyed.js';
 
-/** What happened at one step. */
-export type WitnessAct = 'checked' | 'signed' | 'recorded' | 'seen';
+import type { WitnessAct, WitnessRelation, WitnessStep, WitnessStepState } from './witness-step.js';
 
-/**
- * Who did it, from the person's point of view. `this-device` is the node on
- * the machine the person is using right now.
- */
-export type WitnessRelation =
-  | 'you'
-  | 'this-device'
-  | 'your-device'
-  | 'your-doorway'
-  | 'vouches-for-you'
-  | 'others';
-
-export type WitnessStepState = 'waiting' | 'working' | 'done' | 'failed';
-
-/** One step of the trail, exactly as the host observed it. */
-export interface WitnessStep {
-  id: string;
-  act: WitnessAct;
-  relation: WitnessRelation;
-  /** The party's name as the person knows it. Never read for `others`. */
-  label?: string;
-  /** How many others took part. Only read for `others`. */
-  count?: number;
-  state: WitnessStepState;
-  /** Plain reason, shown when the step failed. */
-  note?: string;
-}
+// The step model lives Lit-free in witness-step.ts; re-exported here so the
+// element's public types stay where consumers already import them.
+export type { WitnessAct, WitnessRelation, WitnessStep, WitnessStepState } from './witness-step.js';
 
 export type WitnessTrailMode = 'live' | 'settled';
 export type WitnessTrailLayout = 'rotate' | 'list';

@@ -56,6 +56,7 @@ export type {
   DeviceConsentPhase,
   DeviceConsentRequest,
   DeviceConsentSigner,
+  DeviceConsentStringOverrides,
   DeviceConsentStrings,
   KnownDeviceRefusalCode,
 } from './elohim-imagodei-device-consent-card.js';

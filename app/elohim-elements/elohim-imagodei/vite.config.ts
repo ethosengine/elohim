@@ -9,6 +9,8 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.ts'),
         register: resolve(__dirname, 'src/register.ts'),
         'federated-identifier': resolve(__dirname, 'src/federated-identifier.ts'),
+        'witness-step': resolve(__dirname, 'src/witness-step.ts'),
+        'device-consent': resolve(__dirname, 'src/device-consent/index.ts'),
       },
       formats: ['es'],
       fileName: (_format, entry) => `${entry}.js`,

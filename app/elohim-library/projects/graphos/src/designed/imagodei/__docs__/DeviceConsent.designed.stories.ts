@@ -41,7 +41,7 @@ import 'elohim-imagodei/register';
 import type {
   AuthorityResolution,
   DeviceConsentRequest,
-  DeviceConsentStrings,
+  DeviceConsentStringOverrides,
 } from 'elohim-imagodei';
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ const CODE_REMAINING_MS = 4 * 60_000 + 12_000;
 const heNamed = (host: string | undefined, fallback: string): string =>
   host ? `${fallback} (${host})` : fallback;
 
-const HE_STRINGS: Partial<DeviceConsentStrings> = {
+const HE_STRINGS: DeviceConsentStringOverrides = {
   reviewHeading: label => `מכשיר בשם "${label}" מבקש לפעול בשמך`,
   signedInAs: person => `נכנסת בתור ${person}`,
   deviceKeyLabel: 'מפתח המכשיר',

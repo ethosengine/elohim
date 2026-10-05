@@ -2,10 +2,11 @@ import { CapabilityAwareElement } from 'elohim-core';
 import { css, html, LitElement, nothing, type PropertyValues } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
+import type { DeviceAct } from './device-consent/wire.js';
 import type { TrustMode } from './elohim-imagodei-trust-indicator.js';
 
-/** The two acts a device can ask its person to agree to. */
-export type DeviceAct = 'device.enroll' | 'device.bind-root';
+/** The two acts a device can ask its person to agree to (its home is the approval wire). */
+export type { DeviceAct } from './device-consent/wire.js';
 
 /** What the device asked for (supplied by the host from the doorway's request view). */
 export interface DeviceConsentRequest {
@@ -40,7 +41,10 @@ export type KnownDeviceRefusalCode =
   | 'request_acts_incoherent'
   | 'act_unknown'
   | 'redemption_expired'
-  | 'consent_unavailable';
+  | 'consent_unavailable'
+  | 'consent_not_signed_in'
+  | 'consent_identity_unbootstrapped'
+  | 'consent_signing_unavailable';
 
 /**
  * Every visible sentence the card speaks. Hosts may replace any subset through
@@ -84,10 +88,27 @@ export interface DeviceConsentStrings {
   declinedHeading: string;
   declinedBody: (label: string) => string;
   refusedHeading: string;
+  /**
+   * Headings that replace `refusedHeading` for one code — a wait or a missing
+   * set-up is not a refusal and must not be headed as one.
+   */
+  refusalHeading: Partial<Record<KnownDeviceRefusalCode, string>>;
   refusal: Record<KnownDeviceRefusalCode, string>;
   refusedUnknown: string;
   refusalCodeLabel: string;
 }
+
+/**
+ * What a host may pass as `strings`: any sentence, and any refusal sentence or
+ * heading by code — including codes the card has no default for. Refusal maps
+ * merge per code with the defaults instead of replacing them.
+ */
+export type DeviceConsentStringOverrides = Partial<
+  Omit<DeviceConsentStrings, 'refusal' | 'refusalHeading'>
+> & {
+  refusal?: Partial<Record<string, string>>;
+  refusalHeading?: Partial<Record<string, string>>;
+};
 
 const named = (host: string | undefined, fallback: string): string =>
   host ? `${fallback} (${host})` : fallback;
@@ -137,6 +158,11 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
   declinedHeading: 'Nothing was approved',
   declinedBody: label => `“${label}” is not recognized as your device. You can close this tab.`,
   refusedHeading: 'This request can’t go ahead',
+  refusalHeading: {
+    consent_not_signed_in: 'Sign in first',
+    consent_identity_unbootstrapped: 'Not ready to approve yet',
+    consent_signing_unavailable: 'Waiting on the signer',
+  },
   refusal: {
     request_acts_incoherent:
       'The device asked to bind its root key without also being enrolled, and that can’t be done on its own.',
@@ -145,6 +171,12 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     redemption_expired:
       'The code ran out before it was used. Start again from the terminal on your device.',
     consent_unavailable: 'Approvals can’t be taken right now. Please try again in a little while.',
+    consent_not_signed_in:
+      'You need to be signed in to approve this. Sign in, and you’ll come straight back here.',
+    consent_identity_unbootstrapped:
+      'The node that holds your key hasn’t recorded who you are yet, so it can’t approve anything for you. Nothing is wrong with this request.',
+    consent_signing_unavailable:
+      'The node that holds your key can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.',
   },
   refusedUnknown: 'Something stopped this request. Start again from the terminal on your device.',
   refusalCodeLabel: 'Reference',
@@ -154,12 +186,6 @@ const ENROLL: DeviceAct = 'device.enroll';
 const BIND_ROOT: DeviceAct = 'device.bind-root';
 const ACT_ORDER: DeviceAct[] = [ENROLL, BIND_ROOT];
 const KNOWN_ACTS = new Set<string>(ACT_ORDER);
-const KNOWN_REFUSALS = new Set<string>([
-  'request_acts_incoherent',
-  'act_unknown',
-  'redemption_expired',
-  'consent_unavailable',
-]);
 
 /**
  * Wrap a person-supplied name (device label, person, host) in Unicode
@@ -202,7 +228,7 @@ const ANNOUNCE_SECONDS = [30, 10];
  * @prop {string} code - One-time code to paste (phase `code`)
  * @prop {number} expiresAt - Code expiry, epoch ms (phase `code`)
  * @prop {string} refusalCode - Machine code for phase `refused`
- * @prop {Partial<DeviceConsentStrings>} strings - Replace any visible sentence (property only)
+ * @prop {DeviceConsentStringOverrides} strings - Replace any visible sentence; refusal sentences and headings merge per code (property only)
  *
  * @fires {CustomEvent<{agreedActs: DeviceAct[], declinedActs: DeviceAct[]}>} approve - Person approved; agreed/declined in askedActs order
  * @fires {CustomEvent<{reason: 'user-rejected'}>} decline - Person declined
@@ -562,7 +588,7 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   @property({ attribute: 'refusal-code' }) refusalCode?: string;
 
   /** Replace any visible sentence; unspecified keys use the English defaults. */
-  @property({ attribute: false }) strings: Partial<DeviceConsentStrings> = {};
+  @property({ attribute: false }) strings: DeviceConsentStringOverrides = {};
 
   /** The person's choices, keyed by act. Absent = agreed (all asked acts start agreed). */
   @state() private _choice: Partial<Record<DeviceAct, boolean>> = {};
@@ -576,7 +602,18 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   private _lastAnnounced?: string;
 
   private get _s(): DeviceConsentStrings {
-    return { ...DEVICE_CONSENT_STRINGS_EN, ...this.strings };
+    return { ...DEVICE_CONSENT_STRINGS_EN, ...this.strings } as DeviceConsentStrings;
+  }
+
+  /** Refusal sentences and headings by code: the defaults, then the host's, per code. */
+  private get _refusals(): {
+    sentence: Partial<Record<string, string>>;
+    heading: Partial<Record<string, string>>;
+  } {
+    return {
+      sentence: { ...DEVICE_CONSENT_STRINGS_EN.refusal, ...this.strings.refusal },
+      heading: { ...DEVICE_CONSENT_STRINGS_EN.refusalHeading, ...this.strings.refusalHeading },
+    };
   }
 
   /** Asked acts the card understands, in protocol order, de-duplicated. */
@@ -916,11 +953,13 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   private _renderRefused() {
     const s = this._s;
     const code = this.refusalCode ?? '';
-    const sentence = KNOWN_REFUSALS.has(code)
-      ? s.refusal[code as KnownDeviceRefusalCode]
-      : s.refusedUnknown;
+    const { sentence: sentences, heading: headings } = this._refusals;
+    const byCode = (map: Partial<Record<string, string>>): string | undefined =>
+      Object.hasOwn(map, code) ? map[code] : undefined;
+    const sentence = byCode(sentences) ?? s.refusedUnknown;
+    const heading = byCode(headings) ?? s.refusedHeading;
     return html`
-      ${this._heading(s.refusedHeading)}
+      ${this._heading(heading)}
       <p part="message">${sentence}</p>
       ${code
         ? html`

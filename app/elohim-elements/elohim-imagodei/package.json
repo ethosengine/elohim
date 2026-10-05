@@ -29,6 +29,14 @@
       "import": "./dist/federated-identifier.js",
       "types": "./dist/federated-identifier.d.ts"
     },
+    "./witness-step": {
+      "import": "./dist/witness-step.js",
+      "types": "./dist/witness-step.d.ts"
+    },
+    "./device-consent": {
+      "import": "./dist/device-consent.js",
+      "types": "./dist/device-consent/index.d.ts"
+    },
     "./tokens.scss": "./tokens.scss"
   },
   "files": [

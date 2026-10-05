@@ -442,6 +442,9 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     ['act_unknown', 'doesn’t recognize'],
     ['redemption_expired', 'ran out before it was used'],
     ['consent_unavailable', 'can’t be taken right now'],
+    ['consent_not_signed_in', 'you’ll come straight back here'],
+    ['consent_identity_unbootstrapped', 'hasn’t recorded who you are yet'],
+    ['consent_signing_unavailable', 'This is a wait, not a refusal'],
     ['something_new', 'Something stopped this request'],
   ];
   for (const [code, sentence] of refusals) {
@@ -457,6 +460,47 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
       expect(q(el, '[part="refusal-code"] code')!.textContent).to.equal(code);
     });
   }
+
+  it('heads a wait as a wait, not as a refusal', async () => {
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <elohim-imagodei-device-consent-card
+        .request=${ENROLL_ONLY}
+        phase="refused"
+        refusal-code="consent_signing_unavailable"
+      ></elohim-imagodei-device-consent-card>
+    `);
+    expect(q(el, '[part="heading"]')!.textContent).to.include('Waiting on the signer');
+    expect(q(el, '[part="heading"]')!.textContent).not.to.include('can’t go ahead');
+  });
+
+  it('takes a host’s sentence for one code and keeps the defaults for the rest', async () => {
+    const strings = {
+      refusal: {
+        act_unknown: 'This device asked for something this device doesn’t recognize.',
+        approval_interrupted: 'You left while this was being approved.',
+      },
+      refusalHeading: { approval_interrupted: 'Approval not sent again' },
+    };
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <elohim-imagodei-device-consent-card
+        .request=${ENROLL_ONLY}
+        .strings=${strings}
+        phase="refused"
+        refusal-code="act_unknown"
+      ></elohim-imagodei-device-consent-card>
+    `);
+    expect(q(el, '[part="message"]')!.textContent).to.include('this device doesn’t recognize');
+    expect(q(el, '[part="heading"]')!.textContent).to.include('can’t go ahead');
+
+    el.refusalCode = 'approval_interrupted';
+    await el.updateComplete;
+    expect(q(el, '[part="message"]')!.textContent).to.include('You left while');
+    expect(q(el, '[part="heading"]')!.textContent).to.include('Approval not sent again');
+
+    el.refusalCode = 'redemption_expired';
+    await el.updateComplete;
+    expect(q(el, '[part="message"]')!.textContent).to.include('ran out before it was used');
+  });
 
   it('moves focus to the new heading on a phase change', async () => {
     const el = await review(ENROLL_ONLY);
