@@ -1589,6 +1589,24 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Anchored content rows still carrying no liveness verdict
+    /// (`dht_anchor_hash IS NOT NULL AND dht_anchor_state IS NULL`), as counted
+    /// by the last anchor-verify pass (`p2p::anchor_verify`). Drains toward the
+    /// rows this node's conductor genuinely cannot confirm.
+    pub static ref ANCHOR_UNVERIFIED_ROWS: IntGauge = IntGauge::new(
+        "elohim_anchor_unverified_rows",
+        "Anchored content rows with no own-conductor liveness verdict, at the last verify pass.",
+    )
+    .unwrap();
+
+    /// Rows the anchor-verify pass marked `live` because this node's own
+    /// conductor resolved exactly their anchor as the canonical head.
+    pub static ref ANCHOR_VERIFIED_BY_PASS: IntCounter = IntCounter::new(
+        "elohim_anchor_verified_by_pass_total",
+        "Anchored rows marked live by the anchor-verify pass.",
+    )
+    .unwrap();
+
     /// Fetch-the-row-on-announce decisions (`p2p::announce_fetch::AnnounceFetch`),
     /// one per applied content-node doc whose reverse projection healed nothing.
     ///
@@ -3361,6 +3379,8 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(HEAD_ADOPTION_TRIGGER.clone()));
         let _ = REGISTRY.register(Box::new(ANNOUNCE_ROW_FETCH.clone()));
+        let _ = REGISTRY.register(Box::new(ANCHOR_UNVERIFIED_ROWS.clone()));
+        let _ = REGISTRY.register(Box::new(ANCHOR_VERIFIED_BY_PASS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         // Pre-touch the always-live combination so the series renders before
@@ -4287,6 +4307,13 @@ fn observe_sync_projected_apply_staleness_at(
 /// [`HEAD_ADOPTION_TRIGGER`] for the closed `outcome` vocabulary.
 pub fn inc_head_adoption_trigger(outcome: &str) {
     HEAD_ADOPTION_TRIGGER.with_label_values(&[outcome]).inc();
+}
+
+/// Publish what one anchor-verify pass found: rows it marked live, and rows
+/// still unverified afterwards.
+pub fn record_anchor_verify_pass(verified: u64, still_unverified: i64) {
+    ANCHOR_VERIFIED_BY_PASS.inc_by(verified);
+    ANCHOR_UNVERIFIED_ROWS.set(still_unverified);
 }
 
 /// Record one fetch-the-row-on-announce decision. See [`ANNOUNCE_ROW_FETCH`]

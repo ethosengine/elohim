@@ -221,6 +221,115 @@ fn mark_anchor_live_for_resolved_head(
     .map_err(|e| StorageError::Internal(format!("mark anchor live for resolved head: {e}")))
 }
 
+/// Forget the liveness verdict for ONE row whose anchor just moved without a
+/// witness. Private — only the stamp transaction calls it.
+fn clear_anchor_verdict(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<usize, StorageError> {
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .filter(content::dht_anchor_state.is_not_null()),
+    )
+    .set((
+        content::dht_anchor_state.eq(None::<&str>),
+        content::dht_anchor_checked_at.eq(None::<String>),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("clear anchor verdict: {e}")))
+}
+
+/// The own conductor resolved `resolved_action_hash` as this id's CANONICAL
+/// head: record `live` if — and only if — that is the hash the row is anchored
+/// to. Returns whether a row was marked.
+///
+/// The verify-only twin of [`stamp_own_conductor_canonical_head`] for a caller
+/// that must not touch the head (the anchor-verify pass,
+/// `p2p::anchor_verify`): it writes the verdict and nothing else — no head, no
+/// patch, no `updated_at` — so it cannot move, fill or refresh anything. The
+/// same witness rule applies: the hash MUST come from this node's own
+/// conductor's canonical answer, never from peer input.
+pub fn confirm_anchor_live(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    resolved_action_hash: &str,
+) -> Result<bool, StorageError> {
+    mark_anchor_live_for_resolved_head(conn, ctx, id, resolved_action_hash).map(|n| n > 0)
+}
+
+/// One anchored row no own-conductor read has judged yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnverifiedAnchorRow {
+    pub id: String,
+    pub dht_anchor_hash: String,
+    pub updated_at: String,
+}
+
+/// Anchored rows with no liveness verdict (`dht_anchor_state IS NULL`), oldest
+/// `updated_at` first, strictly after the `(updated_at, id)` keyset cursor.
+///
+/// bounded-work: one indexed-order scan, `limit` rows.
+pub fn list_unverified_anchored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    after: Option<(&str, &str)>,
+    limit: i64,
+) -> Result<Vec<UnverifiedAnchorRow>, StorageError> {
+    if limit <= 0 {
+        return Ok(Vec::new());
+    }
+    let mut q = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::dht_anchor_state.is_null())
+        .into_boxed();
+    if let Some((updated_at, id)) = after {
+        q = q.filter(
+            content::updated_at
+                .gt(updated_at.to_string())
+                .or(content::updated_at
+                    .eq(updated_at.to_string())
+                    .and(content::id.gt(id.to_string()))),
+        );
+    }
+    let rows: Vec<(String, Option<String>, String)> = q
+        .select((content::id, content::dht_anchor_hash, content::updated_at))
+        .order((content::updated_at.asc(), content::id.asc()))
+        .limit(limit)
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("list_unverified_anchored failed: {e}")))?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, anchor, updated_at)| {
+            anchor
+                .filter(|a| !a.trim().is_empty())
+                .map(|dht_anchor_hash| UnverifiedAnchorRow {
+                    id,
+                    dht_anchor_hash,
+                    updated_at,
+                })
+        })
+        .collect())
+}
+
+/// How many anchored rows still carry no liveness verdict.
+pub fn count_unverified_anchored(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<i64, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::dht_anchor_hash.is_not_null())
+        .filter(content::dht_anchor_state.is_null())
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("count_unverified_anchored failed: {e}")))
+}
+
 /// Heal candidates for the DEAD-anchor class — the second arm
 /// `reanchor_backfill` was missing.
 ///
@@ -2240,7 +2349,10 @@ pub fn stamp_declared_head_mode(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnchorWitness {
     /// The stamp carries no liveness observation of its own (a courier's
-    /// evidence, a signal, a declare route). `dht_anchor_state` is untouched.
+    /// evidence, the legacy unordered signal arm, a declare route). It can
+    /// never CLAIM a verdict; when it moves the anchor to a different hash it
+    /// clears the standing one (which was about the previous action), and a
+    /// same-hash stamp leaves the verdict alone.
     None,
     /// THIS node's own conductor resolved exactly this action hash as the id's
     /// canonical head, in the call that produced the stamp's arguments.
@@ -2271,7 +2383,16 @@ enum AnchorWitness {
 /// `HealCanonical` (rule `heal-fills-never-moves`). Callers holding a fallback
 /// answer, or a head that arrived as peer input (a courier's record, a doc
 /// hint, a gossiped declaration), MUST use [`stamp_declared_head_mode`], which
-/// never touches `dht_anchor_state`.
+/// never claims `live` (and clears a verdict left over from a different hash).
+///
+/// The own cell's ORDERED `ContentHeadDeclared` arm counts as this witness —
+/// not because the signal is own-cell, but because that arm re-resolves the
+/// head through the own conductor and refuses unless the answer is canonical
+/// and names the signalled action (`rea_projection::validate_ordered_content_head`).
+/// The LEGACY unordered arm does not: it stamps the hash the signal carries
+/// with no resolve, and "this cell declared X" is not "the conductor resolves
+/// X as canonical". On the authoring node that arm re-stamps the hash
+/// `upsert_with_anchor` already marked live, which is a same-hash stamp.
 ///
 /// Contract tests: `own_conductor_canonical_stamp_marks_the_anchor_live`,
 /// `a_stamp_without_the_own_conductor_witness_leaves_anchor_state_alone`,
@@ -2312,6 +2433,16 @@ fn stamp_declared_head_witnessed(
 ) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
     let (outcome, widened) = conn.transaction(|conn| {
+        // The anchor BEFORE the stamp — read inside the transaction, so the
+        // "did the hash change?" test below cannot race another writer.
+        let prior_anchor: Option<String> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .select(content::dht_anchor_hash)
+            .first::<Option<String>>(conn)
+            .optional()
+            .map_err(|e| StorageError::Internal(format!("Stamp anchor lookup: {e}")))?
+            .flatten();
         let stamped = stamp_declared_head_mode_transaction(
             conn,
             ctx,
@@ -2322,10 +2453,26 @@ fn stamp_declared_head_witnessed(
             mode,
             canonical_ordering,
         )?;
-        if witness == AnchorWitness::OwnConductorCanonical
-            && matches!(stamped.0, StampOutcome::Stamped | StampOutcome::Refreshed)
-        {
-            mark_anchor_live_for_resolved_head(conn, ctx, id, head_action_hash)?;
+        if matches!(stamped.0, StampOutcome::Stamped | StampOutcome::Refreshed) {
+            match witness {
+                AnchorWitness::OwnConductorCanonical => {
+                    mark_anchor_live_for_resolved_head(conn, ctx, id, head_action_hash)?;
+                }
+                // The liveness verdict is ABOUT an action hash. A stamp that
+                // moves the anchor to a different hash without bringing its own
+                // observation leaves a verdict about the PREVIOUS action
+                // standing beside the new one — `live` for a hash nobody here
+                // resolved (or `dead` for one nobody here judged). Clear it:
+                // the honest state of an unjudged anchor is `unverified`, and
+                // the anchor-verify pass re-earns `live` from the own conductor.
+                // A SAME-hash stamp never clears: the verdict is still about
+                // the anchor the row holds (the authoring node's
+                // `upsert_with_anchor` → `ContentHeadDeclared` order relies on it).
+                AnchorWitness::None if prior_anchor.as_deref() != Some(head_action_hash) => {
+                    clear_anchor_verdict(conn, ctx, id)?;
+                }
+                AnchorWitness::None => {}
+            }
         }
         Ok::<_, StorageError>(stamped)
     })?;
@@ -5891,6 +6038,238 @@ mod tests {
                 "{id}: a stamp with no own-conductor witness must not claim liveness"
             );
         }
+    }
+
+    /// The verdict is about an action hash. A stamp that MOVES the anchor
+    /// without an own-conductor witness must not leave `live` standing for a
+    /// hash nobody here resolved; a same-hash stamp must never clear it.
+    #[test]
+    fn a_witnessless_move_clears_the_verdict_and_a_same_hash_stamp_keeps_it() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("row")).unwrap();
+        stamp_own_conductor_canonical_head(&mut conn, &ctx, "row", "uhCkk-A", None, None, None)
+            .unwrap();
+        assert_eq!(anchor_state_of(&mut conn, &ctx, "row"), AnchorState::Live);
+
+        // Same hash, plain stamp, every mode: still live.
+        for mode in [
+            StampMode::Declare,
+            StampMode::LegacySignal,
+            StampMode::HealCanonical,
+            StampMode::GapFill,
+        ] {
+            assert_eq!(
+                stamp_declared_head_mode(&mut conn, &ctx, "row", "uhCkk-A", None, None, mode, None)
+                    .unwrap(),
+                StampOutcome::Refreshed,
+                "{mode:?}"
+            );
+            assert_eq!(
+                anchor_state_of(&mut conn, &ctx, "row"),
+                AnchorState::Live,
+                "{mode:?}: a same-hash stamp must never clear the verdict"
+            );
+        }
+
+        // A peer-sourced MOVE to a different hash: the old verdict does not
+        // transfer to the new anchor.
+        assert_eq!(
+            stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "row",
+                "uhCkk-B",
+                None,
+                None,
+                StampMode::Declare,
+                None
+            )
+            .unwrap(),
+            StampOutcome::Stamped
+        );
+        let row = get_content(&mut conn, &ctx, "row", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-B"));
+        assert_eq!(
+            AnchorState::from_column(row.dht_anchor_state.as_deref()),
+            AnchorState::Unverified
+        );
+        assert!(row.dht_anchor_checked_at.is_none());
+
+        // A `dead` verdict about the old hash does not transfer either.
+        mark_anchor_state(&mut conn, &ctx, &["row".to_string()], AnchorState::Dead).unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "row",
+            "uhCkk-C",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "row"),
+            AnchorState::Unverified
+        );
+
+        // A refused move changes nothing, the verdict included.
+        stamp_own_conductor_canonical_head(&mut conn, &ctx, "row", "uhCkk-C", None, None, None)
+            .unwrap();
+        assert_eq!(
+            stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "row",
+                "uhCkk-D",
+                None,
+                None,
+                StampMode::GapFill,
+                None
+            )
+            .unwrap(),
+            StampOutcome::SkippedDeclared
+        );
+        assert_eq!(anchor_state_of(&mut conn, &ctx, "row"), AnchorState::Live);
+    }
+
+    /// THE AUTHORING NODE'S ORDER. The commit projection marks the row live
+    /// (`upsert_with_anchor`); the node's own `ContentHeadDeclared` then stamps
+    /// the SAME action — through the plain stamp on the legacy unordered arm,
+    /// through the own-conductor stamp on the ordered arm (which re-resolves
+    /// the head before stamping). Neither may cost the row its verdict.
+    #[test]
+    fn the_authoring_nodes_commit_then_declare_sequence_stays_live() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("authored")).unwrap();
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "authored",
+            ContentProjectionPatch::default(),
+            "uhCkk-authored-1",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "authored"),
+            AnchorState::Live
+        );
+
+        // Legacy unordered signal arm: same hash, no witness of its own.
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "authored",
+            "uhCkk-authored-1",
+            None,
+            None,
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "authored"),
+            AnchorState::Live
+        );
+
+        // Ordered signal arm: the own conductor re-resolved this exact head.
+        stamp_own_conductor_canonical_head(
+            &mut conn,
+            &ctx,
+            "authored",
+            "uhCkk-authored-1",
+            None,
+            Some(ContentProjectionPatch::default()),
+            Some(CanonicalOrdering::new(10, true)),
+        )
+        .unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "authored"),
+            AnchorState::Live
+        );
+
+        // The next version: commit projection first, then the declaration.
+        upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            "authored",
+            ContentProjectionPatch::default(),
+            "uhCkk-authored-2",
+            HeadElection::Declare,
+        )
+        .unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "authored",
+            "uhCkk-authored-2",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "authored", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-authored-2"));
+        assert_eq!(
+            AnchorState::from_column(row.dht_anchor_state.as_deref()),
+            AnchorState::Live
+        );
+    }
+
+    /// The verify-only mark and the unverified inventory the anchor-verify
+    /// pass pages through: hash-exact, keyset-ordered, and shrinking as rows
+    /// are confirmed.
+    #[test]
+    fn unverified_anchored_rows_are_listed_by_cursor_and_confirmed_by_exact_hash() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        for id in ["a", "b", "c"] {
+            create_content(&mut conn, &ctx, mk_plain(id)).unwrap();
+            stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                id,
+                &format!("uhCkk-{id}"),
+                None,
+                None,
+                StampMode::Declare,
+                None,
+            )
+            .unwrap();
+        }
+        create_content(&mut conn, &ctx, mk_plain("unanchored")).unwrap();
+        assert_eq!(count_unverified_anchored(&mut conn, &ctx).unwrap(), 3);
+
+        let first = list_unverified_anchored(&mut conn, &ctx, None, 2).unwrap();
+        assert_eq!(first.len(), 2);
+        let last = first.last().unwrap();
+        let rest = list_unverified_anchored(&mut conn, &ctx, Some((&last.updated_at, &last.id)), 2)
+            .unwrap();
+        assert_eq!(rest.len(), 1);
+        let mut seen: Vec<_> = first.iter().chain(&rest).map(|r| r.id.clone()).collect();
+        seen.sort();
+        assert_eq!(seen, ["a", "b", "c"]);
+
+        // A different hash confirms nothing; the exact hash does.
+        assert!(!confirm_anchor_live(&mut conn, &ctx, "a", "uhCkk-other").unwrap());
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "a"),
+            AnchorState::Unverified
+        );
+        assert!(confirm_anchor_live(&mut conn, &ctx, "a", "uhCkk-a").unwrap());
+        assert_eq!(anchor_state_of(&mut conn, &ctx, "a"), AnchorState::Live);
+        assert_eq!(count_unverified_anchored(&mut conn, &ctx).unwrap(), 2);
+        assert!(list_unverified_anchored(&mut conn, &ctx, None, 0)
+            .unwrap()
+            .is_empty());
     }
 
     /// A refused move writes nothing — the verdict included. The row's anchor

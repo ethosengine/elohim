@@ -31,6 +31,7 @@
 pub mod acquisition;
 pub mod acquisition_dispatch; // pull-leg dispatch planning across libp2p + iroh (row 13)
 pub mod adapters;
+pub mod anchor_verify; // bounded pass: own-conductor liveness verdict for anchored rows nothing else revisits
 pub mod announce_fetch; // event-driven row delivery: fetch the row on a doc announce, re-offer the trigger on store
 pub mod attention_tending;
 pub mod behaviour;

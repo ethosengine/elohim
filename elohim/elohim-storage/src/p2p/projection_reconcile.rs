@@ -2808,6 +2808,13 @@ pub async fn run_heal(
         humans_local_bound,
         "projection-reconcile: heal complete"
     );
+
+    // ANCHOR-VERIFY — the tail of this single-flight leg, so it never runs
+    // bridge-absent or beside a heal. The arms above only revisit rows that
+    // are un-anchored or divergent; this asks the own conductor about a
+    // bounded page of anchored rows nothing else will ever ask about, and
+    // marks `live` the ones it confirms. Never moves a head.
+    crate::p2p::anchor_verify::run_pass(resolver, pool, pacing.batch_extern_budget).await;
 }
 
 /// Witness-bootstrap (GAP 1.5): author a notarized head through the conductor for

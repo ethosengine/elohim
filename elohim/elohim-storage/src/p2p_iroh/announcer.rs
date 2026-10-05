@@ -109,7 +109,7 @@ pub fn spawn_transport_manifest_announcer(
         let doorway = inputs
             .doorway_url
             .clone()
-            .and_then(|url| super::doorway_bootstrap::doorway_client().map(|c| (url, c)));
+            .zip(super::doorway_bootstrap::doorway_client());
         if let Some((url, _)) = doorway.as_ref() {
             info!(doorway = %url, "transport manifest announcer: also posting to the doorway bulletin board");
         }
