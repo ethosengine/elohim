@@ -895,3 +895,11 @@ alpha went from 42 of 49 rows unverified to 49 of 49 `live`, apex from 38 of 45 
 at 16:49 UTC. `coordinators.observed` is still false on both doorways: no sweep has touched a peer since the roll, so the standing
 coordinator pass is unproven on the fleet until the next DNA build. Owed: leg 2 from Che for the 75 s budget; the coordinator read after
 the next DNA build.
+
+DELTA 2026-10-05d (RED preserved; the wasm-store retention pin is ON the fleet, the post-roll fleet measure is a no-measure): conductor
+fork pin 5f4c16abe -> 3c1e80525 (wasm no installed DNA definition references is pruned) rolled to all 7 alpha conductors in edge #1549,
+with storage `1.0.0-dev-4dde4f3d` (content rows counted on the storage pod). Roll gates: five peers released in 60–421 s, adam reached its
+900 s deadline unsettled, matthew rolled last. The validate-only sibling, edge #1550, ended NOT_BUILT: fleet-quiesce never held 330 s inside
+2,700 s — three passing stretches (3, 6 and 6 polls) each broken by matthew reporting not caught up or one actionable divergence — so no
+sprint report and no saga movement. Owed: a validate-only measure once matthew holds caughtUp; the conductor-side footprint gauges' first
+read, to see whether the wasm store stops growing per coordinator update.
