@@ -402,6 +402,7 @@ const CRATE_READ_FNS: &[&str] = &[
     // verifies controller proofs across imagodei and mishpat; none of these
     // read paths register a device, repair links, or author a commitment.
     "get_human_by_agent_key",
+    "get_my_human", // → get_human_by_agent_key for the calling agent
     "get_human_root_evidence",
     "resolve_device_identity",
     "get_membership_by_action",

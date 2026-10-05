@@ -255,6 +255,8 @@ pub trait ControllerCell: Send + Sync {
     /// Create this cell's agent's Human record. The extern returns the existing
     /// one, writing nothing, when the agent already has one.
     async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure>;
+    /// This cell's agent's Human record, when it has one.
+    async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure>;
 }
 
 /// What a person supplies to begin their identity: the minimum the imagodei
@@ -524,6 +526,15 @@ pub async fn begin_identity(
     body: &[u8],
 ) -> Result<Begun, Refused> {
     let input: BeginInput = parse(body)?;
+    begin_with(cell, input).await
+}
+
+/// [`begin_identity`] from an already-read input, for the declaration's
+/// reconcile, which begins an identity from a file rather than a request.
+pub async fn begin_with(
+    cell: Option<&dyn ControllerCell>,
+    input: BeginInput,
+) -> Result<Begun, Refused> {
     let name = input.display_name.trim().to_string();
     let reach = input.profile_reach.unwrap_or_else(|| "private".into());
     let id = input
@@ -755,7 +766,7 @@ async fn sign_and_issue(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use consent_grant::{pkce, Agreement, ReturnPath, Unattended, GRANT_DOMAIN};
     use http_body_util::BodyExt;
@@ -923,12 +934,12 @@ mod tests {
 
     /// A controller cell that answers as configured and remembers what it was
     /// asked to sign.
-    struct FakeCell {
+    pub(crate) struct FakeCell {
         standing: Mutex<Result<CellStanding, CellFailure>>,
         signs: Result<(), CellFailure>,
         asked: Mutex<Vec<ApprovalRequest>>,
-        bootstraps: Mutex<Vec<String>>,
-        humans: Mutex<Vec<NewHuman>>,
+        pub(crate) bootstraps: Mutex<Vec<String>>,
+        pub(crate) humans: Mutex<Vec<NewHuman>>,
     }
 
     fn ready() -> CellStanding {
@@ -942,7 +953,7 @@ mod tests {
     }
 
     impl FakeCell {
-        fn new(standing: Result<CellStanding, CellFailure>) -> Self {
+        pub(crate) fn new(standing: Result<CellStanding, CellFailure>) -> Self {
             Self {
                 standing: Mutex::new(standing),
                 signs: Ok(()),
@@ -965,6 +976,18 @@ mod tests {
             self.bootstraps.lock().unwrap().push(identity_root.into());
             *self.standing.lock().unwrap() = Ok(ready());
             Ok(())
+        }
+        async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure> {
+            Ok(self
+                .humans
+                .lock()
+                .unwrap()
+                .last()
+                .map(|h| consent_grant::ExistingIdentity {
+                    human_id: h.id.clone(),
+                    display_name: h.display_name.clone(),
+                    profile_reach: h.profile_reach.clone(),
+                }))
         }
         async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure> {
             self.humans.lock().unwrap().push(human.clone());

@@ -594,6 +594,9 @@ pub struct HttpServer {
     /// by design: a delivery lives minutes, needs no database, and is recovered
     /// by asking again after a restart (`services::device_consent`).
     consent_deliveries: Arc<consent_grant::MemoryStore>,
+    /// What the identity declaration's last reconcile did, for
+    /// `GET /auth/identity/declaration` (`services::identity_declaration`).
+    identity_declaration_status: Arc<std::sync::Mutex<Option<serde_json::Value>>>,
     /// Embedded conductor manager — wired at startup (embedded mode only) so the
     /// authority-arc actuation endpoint can rewrite the conductor-config and
     /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
@@ -1361,6 +1364,7 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             consent_deliveries: Arc::new(consent_grant::MemoryStore::new()),
+            identity_declaration_status: Arc::new(std::sync::Mutex::new(None)),
             conductor_manager: None,
             reconcile_kick: None,
             admin_websocket: None,
@@ -1916,6 +1920,10 @@ impl HttpServer {
             max_concurrent = MAX_CONCURRENT_REQUESTS,
             "HTTP server listening"
         );
+        if let Some(path) = crate::services::identity_declaration::path() {
+            info!(path = %path.display(), "identity declaration: watching");
+            tokio::spawn(self.clone().watch_identity_declaration(path));
+        }
 
         loop {
             let (stream, remote_addr) = listener.accept().await?;
@@ -2921,6 +2929,9 @@ impl HttpServer {
             // Human, its authority and a session. This machine only.
             (Method::POST, "/auth/identity/begin") => {
                 Box::pin(self.handle_identity_begin(req)).await
+            }
+            (Method::GET, "/auth/identity/declaration") => {
+                Box::pin(self.handle_identity_declaration(req)).await
             }
 
             // The asking device's own node, for its terminal: what this node
@@ -13464,32 +13475,7 @@ impl HttpServer {
             .as_ref()
             .map(|c| c.agent())
             .ok_or_else(|| StorageError::Internal("controller cell vanished".into()))?;
-        let mut conn = pool
-            .get()
-            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
-        // Reuse the person's active session on this node; otherwise open one.
-        // No doorway authenticated it, so its doorway field is left empty, which
-        // never allowlists a doorway for `/session/exchange`.
-        let (session, session_created) = match db::local_sessions::get_active_session(&mut conn)? {
-            Some(s) if s.agent_pub_key == agent => (s, false),
-            _ => (
-                db::local_sessions::create_session(
-                    &mut conn,
-                    db::local_sessions::CreateLocalSessionInput {
-                        id: None,
-                        human_id: begun.human_id.clone(),
-                        agent_pub_key: agent,
-                        doorway_url: String::new(),
-                        doorway_id: None,
-                        identifier: begun.identifier.clone(),
-                        display_name: Some(begun.display_name.clone()),
-                        profile_image_hash: None,
-                        bootstrap_url: None,
-                    },
-                )?,
-                true,
-            ),
-        };
+        let (session, session_created) = Self::open_person_session(&pool, &begun, agent)?;
         let created = begun.human_created || begun.authority_created || session_created;
         let body = serde_json::json!({
             "standing": begun.standing,
@@ -13517,6 +13503,182 @@ impl HttpServer {
             )
             .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
+    }
+
+    /// The person's session on this node: their active one, or a new one.
+    /// No doorway authenticated it, so its doorway field is left empty, which
+    /// never allowlists a doorway for `/session/exchange`.
+    fn open_person_session(
+        pool: &DbPool,
+        begun: &crate::services::device_consent::Begun,
+        agent: String,
+    ) -> Result<(crate::db::models::LocalSession, bool), StorageError> {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        Ok(match db::local_sessions::get_active_session(&mut conn)? {
+            Some(s) if s.agent_pub_key == agent => (s, false),
+            _ => (
+                db::local_sessions::create_session(
+                    &mut conn,
+                    db::local_sessions::CreateLocalSessionInput {
+                        id: None,
+                        human_id: begun.human_id.clone(),
+                        agent_pub_key: agent,
+                        doorway_url: String::new(),
+                        doorway_id: None,
+                        identifier: begun.identifier.clone(),
+                        display_name: Some(begun.display_name.clone()),
+                        profile_image_hash: None,
+                        bootstrap_url: None,
+                    },
+                )?,
+                true,
+            ),
+        })
+    }
+
+    /// Apply the identity declaration (`services::identity_declaration`) at
+    /// start and whenever its file changes.
+    ///
+    /// The file is on this node's own disk, so applying it is a this-machine
+    /// act, the same authority as `epr identity begin` typed here. It begins
+    /// an identity only when the node has none, never changes one that exists,
+    /// and opens the person's session as begin does.
+    async fn watch_identity_declaration(self: Arc<Self>, path: std::path::PathBuf) {
+        use crate::services::device_consent::ControllerCell;
+        use crate::services::identity_declaration::{read, reconcile, Reconciled};
+        // bounded-work: one stat(2) per POLL_INTERVAL_SECS tick; a read and
+        // one reconcile (a handful of zome calls) only when the file's
+        // (mtime, length) changed or the last attempt could not reach the
+        // node. Skip-missed-ticks: a stall coalesces, never bursts.
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+            crate::runtime_config::POLL_INTERVAL_SECS,
+        ));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut settled: Option<(Option<std::time::SystemTime>, u64)> = None;
+        loop {
+            ticker.tick().await;
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+            let signature = (meta.modified().ok(), meta.len());
+            if settled == Some(signature) {
+                continue;
+            }
+            let at = chrono::Utc::now().to_rfc3339();
+            let declaration = match read(&path) {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(error = %e, "identity declaration: unreadable; nothing applied");
+                    self.note_declaration(serde_json::json!({
+                        "at": at, "code": "identity_declaration_unreadable", "detail": e,
+                    }));
+                    settled = Some(signature);
+                    continue;
+                }
+            };
+            let Some(cell) = self.own_controller_cell() else {
+                self.note_declaration(serde_json::json!({
+                    "at": at, "code": "identity_reconcile_failed",
+                    "detail": "the node's conductor is not reachable yet",
+                }));
+                continue;
+            };
+            let outcome = reconcile(&cell, &declaration).await;
+            let mut detail = String::new();
+            match &outcome {
+                Reconciled::Applied(begun) => {
+                    let session = self
+                        .db_pool
+                        .as_ref()
+                        .map(|pool| Self::open_person_session(pool, begun, cell.agent()));
+                    if let Some(Err(e)) = session {
+                        detail = format!("identity applied; session not opened: {e}");
+                    }
+                    info!(
+                        code = outcome.code(),
+                        human_created = begun.human_created,
+                        authority_created = begun.authority_created,
+                        "identity declaration applied"
+                    );
+                }
+                Reconciled::Disagrees(conflict) => {
+                    detail = conflict.to_string();
+                    warn!(
+                        code = outcome.code(),
+                        "identity declaration refused: {conflict}"
+                    );
+                }
+                Reconciled::Failed(why) => {
+                    detail = why.clone();
+                    warn!(
+                        code = outcome.code(),
+                        "identity declaration not applied yet: {why}"
+                    );
+                }
+                Reconciled::Undeclared => {}
+            }
+            if !outcome.retry() {
+                settled = Some(signature);
+            }
+            self.note_declaration(serde_json::json!({
+                "at": at, "code": outcome.code(), "detail": detail,
+            }));
+        }
+    }
+
+    fn note_declaration(&self, status: serde_json::Value) {
+        *self
+            .identity_declaration_status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(status);
+    }
+
+    /// GET /auth/identity/declaration — the declaration this node reads, what
+    /// its last reconcile did, and the identity as it is, for this machine's
+    /// terminal. Reads only.
+    async fn handle_identity_declaration(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            foreign_origin_refusal, remote_caller_refusal, ControllerCell,
+        };
+        if let Some(refused) = remote_caller_refusal(caller_is_local(&req))
+            .or_else(|| foreign_origin_refusal(req.headers()))
+        {
+            return Ok(refused);
+        }
+        let path = crate::services::identity_declaration::path();
+        let (declared, read_error) = match &path {
+            Some(p) if p.exists() => match crate::services::identity_declaration::read(p) {
+                Ok(d) => (Some(d), None),
+                Err(e) => (None, Some(e)),
+            },
+            _ => (None, None),
+        };
+        let current = match self.own_controller_cell() {
+            Some(cell) => cell.my_human().await.ok().flatten().map(|h| {
+                serde_json::json!({
+                    "humanId": h.human_id, "displayName": h.display_name,
+                    "profileReach": h.profile_reach,
+                })
+            }),
+            None => None,
+        };
+        let last = self
+            .identity_declaration_status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        Ok(response::ok(&serde_json::json!({
+            "path": path.map(|p| p.display().to_string()),
+            "declared": declared,
+            "readError": read_error,
+            "lastReconcile": last,
+            "current": current,
+        })))
     }
 
     /// GET /auth/device/self, POST /auth/device/enroll.

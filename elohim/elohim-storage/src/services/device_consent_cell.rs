@@ -98,6 +98,19 @@ struct CreateHumanWire<'a> {
     location: Option<String>,
 }
 
+/// The imagodei coordinator's `HumanOutput`, as far as a declaration compares.
+#[derive(Deserialize, Debug)]
+struct HumanOutputWire {
+    human: HumanWire,
+}
+
+#[derive(Deserialize, Debug)]
+struct HumanWire {
+    id: String,
+    display_name: String,
+    profile_reach: String,
+}
+
 #[derive(Deserialize, Debug)]
 struct CommitmentOutputWire {
     action_hash: ActionHash,
@@ -270,6 +283,30 @@ impl ControllerCell for ConductorControllerCell {
             consent: proof(proofs.consent),
             enrollment: proofs.enrollment.map(proof),
         })
+    }
+
+    async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure> {
+        if self.hc.cell_id_for_role(MISHPAT_ROLE) != Some(&self.cell) {
+            return Err(CellFailure::Unavailable(
+                "this node reads a Human only for its own cell".into(),
+            ));
+        }
+        let payload = ExternIO::encode(())
+            .map_err(|e| CellFailure::Unavailable(e.to_string()))?
+            .into_vec();
+        let answer = self
+            .hc
+            .call_zome_imagodei("imagodei", "get_my_human", payload)
+            .await
+            .map_err(failure)?;
+        let human: Option<HumanOutputWire> = ExternIO::from(answer)
+            .decode()
+            .map_err(|e| CellFailure::Unavailable(format!("human decode: {e}")))?;
+        Ok(human.map(|h| consent_grant::ExistingIdentity {
+            human_id: h.human.id,
+            display_name: h.human.display_name,
+            profile_reach: h.human.profile_reach,
+        }))
     }
 
     async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure> {
