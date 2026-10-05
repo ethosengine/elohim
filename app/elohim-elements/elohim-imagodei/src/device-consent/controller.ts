@@ -67,6 +67,8 @@ export interface DeviceConsentPageState {
   refusalCode?: string;
   /** The node's own plain reason, when its refusal gave one (asked to sign in again). */
   refusalReason?: string;
+  /** Phase `handed-back`: the node delivered the code over a private network itself. */
+  handedBackOverNetwork?: boolean;
   /** Who secured the approval: live while signing, settled once it is done. */
   trail: WitnessStep[] | null;
   /** What the approval rests on, as the node counted it. */
@@ -187,7 +189,7 @@ export class DeviceConsentController {
       this.set({ phase: CODE, code: outcome.code, expiresAt: outcome.expiresAt });
       this.remember({ phase: CODE, code: outcome.code, expiresAt: outcome.expiresAt });
     } else if (outcome.phase === HANDED_BACK) {
-      this.set({ phase: HANDED_BACK });
+      this.set({ phase: HANDED_BACK, handedBackOverNetwork: !outcome.url });
       this.remember({ phase: HANDED_BACK });
       if (outcome.url) this.options.handBack(outcome.url);
     } else {

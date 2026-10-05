@@ -142,11 +142,11 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     expect(card.getAttribute('signer')).toBe('peer-conductor');
   });
 
-  it('tells the person plainly that this device holds the key and signs, and never names a doorway', async () => {
+  it('tells the person plainly that the device holding the key signs, and never names a doorway', async () => {
     const fixture = await create();
     const card = q(fixture, 'device-consent-card') as Card;
     const signer = card.strings?.signerOwnNode?.();
-    expect(signer).toBe('This device holds your key, and will sign this as you when you approve.');
+    expect(signer).toBe('The device that holds your key will sign this as you when you approve.');
     expect(JSON.stringify(card.strings?.refusal)).not.toMatch(/doorway/i);
   });
 
@@ -162,7 +162,7 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     const trail = q(fixture, 'device-consent-witness-trail') as HTMLElement & { steps?: unknown[] };
     expect(trail.steps).toEqual(agreed().witnesses);
     expect(q(fixture, 'device-consent-standing')?.textContent).toContain(
-      'This device signed as you, and that is enough: this approval is complete.'
+      'The device that holds your key signed as you, and that is enough: this approval is complete.'
     );
   });
 
@@ -194,7 +194,7 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
   it('says what the identity rests on while the person decides', async () => {
     const fixture = await create();
     expect(q(fixture, 'identity-standing')?.textContent).toContain(
-      'Your identity rests on this device alone.'
+      'Your identity rests on one device alone: the device that holds your key.'
     );
   });
 
@@ -206,8 +206,10 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     expect(begin.textContent).toContain('Begin your identity on this device');
     expect(begin.textContent).toContain('Nothing is sent to any host.');
     expect(begin.textContent).toContain('Then you’ll come back here to approve “workspace”.');
-    // One field asked for, and an optional sign-in secret said to be optional.
-    expect(begin.querySelectorAll('input')).toHaveLength(2);
+    // One field asked for; a sign-in word and a sign-in secret, each said to be optional.
+    expect(begin.querySelectorAll('input')).toHaveLength(3);
+    expect(begin.textContent).toContain('Sign-in word (optional)');
+    expect(begin.textContent).toContain('Leave it empty to sign in with the name above.');
     expect(begin.textContent).toContain('Sign-in secret (optional)');
     expect(begin.textContent).not.toMatch(/doorway/i);
     expect(port.client.agree).not.toHaveBeenCalled();
@@ -225,6 +227,7 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     expect(q(fixture, 'identity-begin')).not.toBeNull();
 
     (q(fixture, 'identity-name') as HTMLInputElement).value = 'Matthew';
+    (q(fixture, 'identity-word') as HTMLInputElement).value = ' matthew ';
     (q(fixture, 'identity-begin')!.querySelector('form') as HTMLFormElement).dispatchEvent(
       new Event('submit')
     );
@@ -232,7 +235,10 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     await settle();
     fixture.detectChanges();
 
-    expect(port.identity.begin).toHaveBeenCalledWith({ displayName: 'Matthew' });
+    expect(port.identity.begin).toHaveBeenCalledWith({
+      displayName: 'Matthew',
+      identifier: 'matthew',
+    });
     expect((q(fixture, 'device-consent-card') as Card).phase).toBe('review');
     expect(port.client.agree).toHaveBeenCalledTimes(1);
     expect(port.client.view).toHaveBeenCalledTimes(1);

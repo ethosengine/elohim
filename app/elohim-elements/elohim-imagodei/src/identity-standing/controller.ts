@@ -127,7 +127,7 @@ export class IdentityStandingController {
    * Resolves true once the node has answered with what the identity rests
    * on. A second call while one is on its way sends nothing.
    */
-  async begin(displayName: string, secret?: string): Promise<boolean> {
+  async begin(displayName: string, secret?: string, identifier?: string): Promise<boolean> {
     if (this.current.phase === 'beginning' || this.current.phase === 'standing') return false;
     const name = displayName.trim();
     if (!name) {
@@ -137,7 +137,12 @@ export class IdentityStandingController {
     }
     this.set({ phase: 'beginning', beginRefusal: undefined, displayName: name });
 
-    const body = secret ? { displayName: name, secret } : { displayName: name };
+    const word = identifier?.trim();
+    const body = {
+      displayName: name,
+      ...(word ? { identifier: word } : {}),
+      ...(secret ? { secret } : {}),
+    };
     const result = await this.options.client.begin(body).catch(() => NO_ANSWER);
     if (result.ok && isStandingView(result.body?.standing)) {
       this.set({

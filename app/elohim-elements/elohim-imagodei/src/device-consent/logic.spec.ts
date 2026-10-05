@@ -19,7 +19,7 @@ import {
   standingFor,
   trailAfterAgreement,
 } from './logic.js';
-import { approveCommand } from '../terminal.js';
+import { approveCommand, approvePendingCommand } from '../terminal.js';
 
 import { approvalWords } from './words.js';
 import type { ConsentAgreeResponse } from './wire.js';
@@ -385,6 +385,10 @@ describe('approvalWords — the host names the key holder', () => {
       callerNotLocal: 'Ours.',
     });
     expect(own.card.refusal?.['consent_caller_not_local']).to.equal('Ours.');
+  });
+
+  it('builds the command for an ask listed on the node by its number', () => {
+    expect(approvePendingCommand(3)).to.equal('epr device approve 3');
   });
 
   it('builds the terminal command with the link as one word', () => {

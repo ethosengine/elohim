@@ -9,7 +9,8 @@
  *   (`retry=<seconds>` for slowed, `reason=<text>` for paused), `word=<text>`
  * - signed in (`phase=standing`): `asks=listed|empty|nobody|unknown|absent`
  *   (default listed), `delivered=0` to show a code instead of a hand-back,
- *   `told=0` for a declined device that could not be told
+ *   `told=0` for a declined device that could not be told, `decide=not-local`
+ *   for a decide refused because the page is neither signed in nor on the node
  * - `sign_in=1` — sent back to sign in again (the form, though a session is open)
  * - `refusal=<code>` — a refused begin (e.g. identity_name_malformed,
  *   consent_caller_not_local, consent_signing_unavailable)
@@ -140,7 +141,7 @@ export function previewPendingClient(search: string): PendingAsksClient {
               askedActs: ['device.enroll', 'device.bind-root'],
               secondsLeft: 252,
               state: { kind: 'unassigned' },
-              stateWords: 'That device has no identity of its own yet.',
+              stateWords: 'has no identity of its own',
               addressedHere: true,
               forIdentity: PERSON,
             },
@@ -152,7 +153,7 @@ export function previewPendingClient(search: string): PendingAsksClient {
               askedActs: ['device.enroll'],
               secondsLeft: 38,
               state: { kind: 'own-identity', made: '2026-09-30' },
-              stateWords: 'That device already began an identity of its own.',
+              stateWords: 'began an identity of its own and has made things under it',
               addressedHere: false,
               forIdentity: PERSON,
             },
@@ -166,6 +167,13 @@ export function previewPendingClient(search: string): PendingAsksClient {
       body: { ...view, asks: view.asks.filter(ask => !declined.has(ask.number)) },
     }),
     decide: async body => {
+      if (params.get('decide') === 'not-local') {
+        return {
+          ok: false,
+          status: 403,
+          body: { error: 'not signed in here', code: 'consent_caller_not_local' },
+        };
+      }
       if (body.answer?.agreedActs.length === 0) {
         declined.add(Number(body.ask));
         return {

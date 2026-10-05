@@ -98,8 +98,16 @@ export class DeviceApprovalComponent implements OnInit {
    * Begin the identity in place, then return to the approval. Nothing was
    * signed before, and nothing is sent again until the person approves.
    */
-  async onBegin({ displayName, secret }: { displayName: string; secret?: string }): Promise<void> {
-    if (await this.identityController.begin(displayName, secret)) {
+  async onBegin({
+    displayName,
+    secret,
+    identifier,
+  }: {
+    displayName: string;
+    secret?: string;
+    identifier?: string;
+  }): Promise<void> {
+    if (await this.identityController.begin(displayName, secret, identifier)) {
       await this.controller.resume();
     }
   }

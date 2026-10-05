@@ -12,8 +12,12 @@ import type { IdentityStandingView } from './wire.js';
 
 /** How the person knows the node answering. */
 export interface StandingHostWords {
-  /** Inside a sentence: "this device". */
+  /** Inside a sentence: "this device", "the device that holds your key". */
   inSentence: string;
+  /** What one device alone is, after "rests on" (default: "<inSentence> alone"). */
+  alone?: string;
+  /** Said when the node answering is not one of the devices (default: "it is not <inSentence>"). */
+  notThisOne?: string;
 }
 
 /** Keep a person-given name from reordering the sentence around it. */
@@ -42,7 +46,7 @@ export function personName(
 // eslint-disable-next-line sonarjs/function-return-type -- a sentence or none: none when there is nothing to say
 export function standingLine(
   view: IdentityStandingView | null | undefined,
-  { inSentence }: StandingHostWords,
+  { inSentence, alone, notThisOne }: StandingHostWords,
   displayName?: string
 ): string | undefined {
   if (!view || view.controllerCount < 1) return undefined;
@@ -51,11 +55,13 @@ export function standingLine(
   const n = view.controllerCount;
   if (n === 1) {
     if (view.thisNodeIsController) {
+      const restsOn = alone ?? `${inSentence} alone`;
       return name
-        ? `Your identity, ${name}, rests on ${inSentence} alone.`
-        : `Your identity rests on ${inSentence} alone.`;
+        ? `Your identity, ${name}, rests on ${restsOn}.`
+        : `Your identity rests on ${restsOn}.`;
     }
-    return `One of your own devices speaks for you${as}, and it is not ${inSentence}.`;
+    const notIt = notThisOne ?? `it is not ${inSentence}`;
+    return `One of your own devices speaks for you${as}, and ${notIt}.`;
   }
   const among = view.thisNodeIsController ? `, ${inSentence} among them` : '';
   const approve =

@@ -361,7 +361,8 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
     // The node answered in its own identity words: it is a person's own node.
     if (['standing', 'begin', 'not-signed-in', 'refused'].includes(identity.phase)) return 'own';
-    const trustMode = this.authority()?.trustMode;
+    // Only what /auth/me actually named counts; an unnamed mode is not "hosted".
+    const trustMode = this.trustModeDeclared() ? this.authority()?.trustMode : undefined;
     if (trustMode === 'peer-conductor') return 'own';
     if (trustMode === 'doorway-host') return 'default';
     return 'none';
@@ -376,6 +377,9 @@ export class AppComponent implements OnInit, AfterViewInit {
   /** The development-only preview, loaded on demand (absent from production builds). */
   devicePreview = signal<Type<unknown> | null>(null);
 
+  /** Whether `/auth/me` named its trust mode (an unnamed one is not "hosted"). */
+  trustModeDeclared = signal(false);
+
   /** Pre-fetched authority resolution from `GET /auth/me`. Null until fetch completes. */
   authority = signal<AuthorityResolution | null>(null);
 
@@ -385,11 +389,15 @@ export class AppComponent implements OnInit, AfterViewInit {
   @ViewChild('loginCard') loginCardRef?: ElementRef<HTMLElement>;
 
   async ngOnInit(): Promise<void> {
-    // Pre-fetch authority so the shell receives it as a property (not via its own fetch).
-    // Failure is non-fatal — shell renders placeholder chrome and emits authority-needed.
-    void this._prefetchAuthority();
-
     const search = window.location.search;
+    // Pre-fetch authority so the shell receives it as a property (not via its own fetch),
+    // for the hand-off and OAuth consent paths. The device approval page and the root ask
+    // the node itself first, so a signed-out load does not also read /auth/me only to be
+    // refused; the root reads it when the node does not answer for itself.
+    // Failure is non-fatal — shell renders placeholder chrome and emits authority-needed.
+    if (readStewardHandoff(search) || new URLSearchParams(search).has('client_id')) {
+      void this._prefetchAuthority();
+    }
 
     // 0) Device approval. The page talks only to this node; no hand-off or
     //    OAuth consent rides on its URL.
@@ -490,6 +498,8 @@ export class AppComponent implements OnInit, AfterViewInit {
   private _showRoot(page: RootPage): void {
     if (page === 'legacy') {
       this.mode.set('login');
+      // The node did not answer for itself: /auth/me says who hosts this page, if anyone.
+      void this._prefetchAuthority();
       return;
     }
     this.mode.set(page);
@@ -499,11 +509,13 @@ export class AppComponent implements OnInit, AfterViewInit {
   async onIdentityBegin({
     displayName,
     secret,
+    identifier,
   }: {
     displayName: string;
     secret?: string;
+    identifier?: string;
   }): Promise<void> {
-    if (await this.identityController.begin(displayName, secret)) {
+    if (await this.identityController.begin(displayName, secret, identifier)) {
       this._returnAfterSignIn(window.location.search);
     }
   }
@@ -530,7 +542,9 @@ export class AppComponent implements OnInit, AfterViewInit {
       ...(returnTo ? { returnTo } : {}),
     });
     if (!ok || this._returnAfterSignIn(search)) return;
-    // Signed in at the root: show what the identity rests on, without the sign-in ask.
+    // Signed in at the root: read again who answers for this page and what the
+    // identity rests on, so header and standing are right without a reload.
+    await this._prefetchAuthority();
     const params = new URLSearchParams(search);
     params.delete(SIGN_IN_PARAM);
     const rest = params.toString();
@@ -545,6 +559,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   /** Sign out of this node; this browser's key is forgotten with it. */
   async onSignOut(): Promise<void> {
     await this.signInController.signOut();
+    await this._prefetchAuthority();
     await this._readIdentity('');
   }
 
@@ -609,11 +624,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     // trustMode is DISCOVERED here from /auth/me, never configured — the same
     // bundle runs in doorway-host and peer-conductor modes and learns which
     // from the wire (peer-conductor after a successful steward handoff).
-    const authority = await this.resolverService.fetchAuthority();
-    if (authority) {
-      this.authority.set(authority);
-    }
-    // Null ⇒ leave authority null; the shell emits authority-needed.
+    const answer = await this.resolverService.fetchAuthorityAnswer();
+    this.authority.set(answer?.authority ?? null);
+    this.trustModeDeclared.set(answer?.trustModeDeclared ?? false);
+    // Null ⇒ authority null; the shell emits authority-needed.
   }
 
   ngAfterViewInit(): void {

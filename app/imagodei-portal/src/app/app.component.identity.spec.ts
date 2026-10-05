@@ -78,8 +78,10 @@ describe('AppComponent — the root, for a person on their own device', () => {
     expect(begin.textContent).toContain(
       'Until you add another device, this device alone speaks for you.'
     );
-    // One field asked for, and an optional sign-in secret said to be optional.
-    expect(begin.querySelectorAll('input')).toHaveLength(2);
+    // One field asked for; a sign-in word and a sign-in secret, each said to be optional.
+    expect(begin.querySelectorAll('input')).toHaveLength(3);
+    expect(begin.textContent).toContain('Sign-in word (optional)');
+    expect(begin.textContent).toContain('Leave it empty to sign in with the name above.');
     expect(begin.textContent).toContain('Sign-in secret (optional)');
     expect(begin.textContent).not.toMatch(/doorway/i);
     expect(root.querySelector('elohim-imagodei-federated-resolver')).toBeNull();
@@ -104,7 +106,7 @@ describe('AppComponent — the root, for a person on their own device', () => {
     expect(begin.init?.method).toBe('POST');
     expect(JSON.parse(begin.init!.body as string)).toEqual({ displayName: 'Matthew' });
     expect(root.querySelector('[data-testid="identity-standing"]')?.textContent).toBe(
-      'Your identity rests on this device alone.'
+      'Your identity rests on one device alone: the device that holds your key.'
     );
     expect(header(root)?.strings?.ownNodeLabel).toBe('Your own device holds your key');
     // Nothing asked of any other server.
@@ -124,7 +126,7 @@ describe('AppComponent — the root, for a person on their own device', () => {
       (fixture.nativeElement as HTMLElement).querySelector('[data-testid="identity-standing"]')
         ?.textContent
     ).toBe(
-      '2 of your own devices speak for you, this device among them. Any one of them can approve a new device for you.'
+      '2 of your own devices speak for you, the device that holds your key among them. Any one of them can approve a new device for you.'
     );
   });
 
@@ -205,6 +207,10 @@ describe('AppComponent — the root, for a person on their own device', () => {
       (fixture.nativeElement as HTMLElement).querySelector('[data-testid="identity-standing"]')
         ?.textContent
     ).toContain('matthew');
+    // Read again after signing in, so the header and the standing are right without a reload.
+    const loginAt = calls.findIndex(c => c.url.includes('/auth/login'));
+    expect(calls.slice(loginAt).some(c => c.url.includes('/auth/me'))).toBe(true);
+    expect(calls.slice(loginAt).some(c => c.url.includes('/auth/identity/standing'))).toBe(true);
   });
 
   it('says a slowed sign-in is a wait, and for how long', async () => {
@@ -252,6 +258,22 @@ describe('AppComponent — the root, for a person on their own device', () => {
     await fixture.componentInstance.onSignOut();
     expect(calls.some(c => c.url.includes('/auth/logout'))).toBe(true);
     expect(fixture.componentInstance.mode()).toBe('sign-in');
+  });
+
+  it('a signed-out load asks the node once, not /auth/me as well', async () => {
+    routes['/auth/identity/standing'] = () =>
+      json(401, { code: 'consent_not_signed_in', hasIdentity: true, signInSecretSet: true });
+    await render();
+    expect(calls.some(c => c.url.includes('/auth/me'))).toBe(false);
+  });
+
+  it('never says “Hosted via” for a host whose /auth/me names no trust mode', async () => {
+    routes['/auth/me'] = () => json(200, { authority: { label: '' } });
+    const fixture = await render();
+    await settle();
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="portal-header-empty"]')).not.toBeNull();
   });
 
   it('says nothing in the header when nothing is known, rather than “Hosted via” no one', async () => {

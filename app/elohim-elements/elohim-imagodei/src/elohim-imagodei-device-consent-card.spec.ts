@@ -500,6 +500,24 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     expect(q(el, '[part="refusal-code"]')).to.equal(null);
   });
 
+  it('handed back over a private network: the device has it and enrolls itself, no terminal named', async () => {
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <elohim-imagodei-device-consent-card
+        .request=${ENROLL_ONLY}
+        phase="handed-back"
+        handed-back-to="network"
+      ></elohim-imagodei-device-consent-card>
+    `);
+    expect(q(el, '[part="heading"]')!.textContent).to.include('The device has it');
+    expect(q(el, '[part="message"]')!.textContent).to.include(
+      'reached the device over the private network, and it enrolls itself now'
+    );
+    expect(q(el, '[part="message"]')!.textContent).not.to.include('terminal on this machine');
+    el.handedBackTo = 'this-machine';
+    await el.updateComplete;
+    expect(q(el, '[part="message"]')!.textContent).to.include('terminal on this machine');
+  });
+
   it('heads a wait as a wait, not as a refusal', async () => {
     const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
       <elohim-imagodei-device-consent-card

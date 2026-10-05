@@ -18,8 +18,7 @@ import {
   type IdentityPageState,
 } from 'elohim-imagodei/identity-standing';
 
-/** This host's name for the node answering. */
-const HERE = { inSentence: 'this device' };
+import { NODE_SIDE } from './standing-words.js';
 
 /** Why a begin did not happen, in this host's words. */
 const BEGIN_REFUSAL: Record<string, string> = {
@@ -83,7 +82,7 @@ const BEGIN_UNAVAILABLE =
 
         <form
           class="identity__form"
-          (submit)="onSubmit($event, nameInput.value, secretInput.value)"
+          (submit)="onSubmit($event, nameInput.value, secretInput.value, wordInput.value)"
         >
           <label for="identity-name">The name you want shown</label>
           <input
@@ -97,6 +96,22 @@ const BEGIN_UNAVAILABLE =
             [attr.aria-describedby]="refusal ? 'identity-refusal' : null"
             [attr.aria-invalid]="state.beginRefusal === nameMalformed ? 'true' : null"
           />
+          <label for="identity-word">Sign-in word (optional)</label>
+          <input
+            #wordInput
+            id="identity-word"
+            name="identifier"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            data-testid="identity-word"
+            aria-describedby="identity-word-what"
+            [disabled]="state.phase === 'beginning'"
+          />
+          <p id="identity-word-what" class="identity__muted identity__hint">
+            What you’ll sign in with — one short word works best. Leave it empty to sign in with the
+            name above.
+          </p>
           <label for="identity-secret">Sign-in secret (optional)</label>
           <input
             #secretInput
@@ -255,13 +270,17 @@ export class IdentityViewComponent {
   /** A sign-out is on its way. */
   @Input() signingOut = false;
 
-  @Output() readonly begin = new EventEmitter<{ displayName: string; secret?: string }>();
+  @Output() readonly begin = new EventEmitter<{
+    displayName: string;
+    secret?: string;
+    identifier?: string;
+  }>();
   @Output() readonly signOut = new EventEmitter<void>();
 
   readonly nameMalformed = IDENTITY_CODE.nameMalformed;
 
   get standing(): string | undefined {
-    return standingLine(this.state.standing, HERE, this.state.displayName);
+    return standingLine(this.state.standing, NODE_SIDE, this.state.displayName);
   }
 
   /** The begin was refused because this page is on another machine. */
@@ -280,8 +299,13 @@ export class IdentityViewComponent {
     return beginCommand(this.state.displayName?.trim() || 'Your name');
   }
 
-  onSubmit(event: Event, displayName: string, secret: string): void {
+  onSubmit(event: Event, displayName: string, secret: string, identifier: string): void {
     event.preventDefault();
-    this.begin.emit(secret ? { displayName, secret } : { displayName });
+    const word = identifier.trim();
+    this.begin.emit({
+      displayName,
+      ...(word ? { identifier: word } : {}),
+      ...(secret ? { secret } : {}),
+    });
   }
 }

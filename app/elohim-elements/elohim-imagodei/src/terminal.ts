@@ -19,3 +19,8 @@ export function approveCommand(link: string): string {
 export function beginCommand(name: string): string {
   return `epr identity begin --name ${shellQuote(name)}`;
 }
+
+/** Approve an ask listed on that node from its terminal: `epr device approve <number>`. */
+export function approvePendingCommand(number: number): string {
+  return `epr device approve ${number}`;
+}

@@ -10,6 +10,7 @@ import {
 } from './controller.js';
 import {
   approvalIsFor,
+  askingDeviceLine,
   listsNothingLine,
   noticeAsksSignIn,
   noticeLine,
@@ -145,6 +146,13 @@ describe('deciding an ask with the approval page’s own card and controller', (
     expect(handBacks).to.have.length(0);
   });
 
+  it('marks a code the node delivered as handed back over the network', async () => {
+    const { ctl } = review();
+    await ctl.start();
+    await ctl.approve({ agreedActs: ['device.enroll'] });
+    expect(ctl.state.handedBackOverNetwork).to.equal(true);
+  });
+
   it('shows the code to type in when the node could not hand it back', async () => {
     const { ctl } = review({
       ok: true,
@@ -265,6 +273,16 @@ describe('the panel’s words', () => {
       'This device does not speak for anyone, so it lists no requests.'
     );
     expect(listsNothingLine(LISTED)).to.equal(undefined);
+  });
+
+  it('reads the asking node’s predicate as a sentence, as the terminal does', () => {
+    expect(askingDeviceLine('has no identity of its own')).to.equal(
+      'The asking device has no identity of its own.'
+    );
+    expect(askingDeviceLine('began an identity of its own and has made things under it.')).to.equal(
+      'The asking device began an identity of its own and has made things under it.'
+    );
+    expect(askingDeviceLine('  ')).to.equal('');
   });
 
   it('says how long is left plainly', () => {

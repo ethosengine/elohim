@@ -36,7 +36,7 @@ const LISTED: PendingAsksView = {
       askedActs: ['device.enroll'],
       secondsLeft: 250,
       state: { kind: 'unassigned' },
-      stateWords: 'That device has no identity of its own yet.',
+      stateWords: 'has no identity of its own',
       addressedHere: true,
       forIdentity: PERSON,
     },
@@ -109,7 +109,7 @@ describe('PendingAsksComponent — devices asking over the private network', () 
     expect(ask.textContent).toContain('uhCAk…7Lq2');
     expect(ask.textContent).toContain('Asks to enroll this device.');
     expect(ask.textContent).toContain('About 4 minutes left');
-    expect(ask.textContent).toContain('That device has no identity of its own yet.');
+    expect(ask.textContent).toContain('The asking device has no identity of its own.');
     expect(q(f, 'pending-for')?.textContent).toContain('matthew (Matthew)');
     expect((f.nativeElement as HTMLElement).textContent).not.toContain('h-4c1d');
   });
@@ -188,14 +188,34 @@ describe('PendingAsksComponent — devices asking over the private network', () 
       ask: '1',
       answer: { agreedActs: ['device.enroll'] },
     });
-    expect((q(f, 'device-consent-card') as HTMLElement & { phase?: string }).phase).toBe(
-      'handed-back'
-    );
+    const handed = q(f, 'device-consent-card') as HTMLElement & { phase?: string };
+    expect(handed.phase).toBe('handed-back');
+    // Over the private network, not to a terminal on this machine.
+    expect(handed.getAttribute('handed-back-to')).toBe('network');
     (q(f, 'pending-back') as HTMLButtonElement).click();
     await settle();
     f.detectChanges();
     expect(q(f, 'pending-asks')).not.toBeNull();
     expect(client.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('a decide refused for a page not signed in names the ask’s number in the terminal command', async () => {
+    client.decide.mockResolvedValue({
+      ok: false,
+      status: 403,
+      body: { error: 'x', code: 'consent_caller_not_local' },
+    });
+    const f = await create();
+    (q(f, 'pending-review-1') as HTMLButtonElement).click();
+    await settle();
+    f.detectChanges();
+    q(f, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    f.detectChanges();
+    expect(q(f, 'device-consent-command')?.textContent?.trim()).toBe('epr device approve 1');
+    expect(q(f, 'device-consent-elsewhere')?.textContent).not.toContain('open this same link');
   });
 
   it('gives a node that speaks for nobody one line and no list; nothing without a network', async () => {

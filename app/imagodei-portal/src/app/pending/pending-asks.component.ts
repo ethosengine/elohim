@@ -30,6 +30,7 @@ import type { IdentityPageState } from 'elohim-imagodei/identity-standing';
 import {
   PendingAsksController,
   approvalIsFor,
+  askingDeviceLine,
   listsNothingLine,
   noticeAsksSignIn,
   noticeLine,
@@ -61,6 +62,7 @@ const ACT_NAMES: Record<string, string> = {
           [state]="review"
           [identity]="identity"
           [showIdentityLine]="false"
+          [pendingNumber]="reviewedNumber"
           (approved)="onApprove($event)"
           (declined)="onDecline()"
           (expired)="onExpired()"
@@ -121,7 +123,7 @@ const ACT_NAMES: Record<string, string> = {
                   </p>
                 }
                 <p>Asks to {{ actsOf(ask) }}.</p>
-                <p class="pending__muted">{{ ask.stateWords }}</p>
+                <p class="pending__muted">{{ askingDevice(ask) }}</p>
                 <p class="pending__muted">{{ left(ask) }}</p>
                 <button
                   type="button"
@@ -278,6 +280,15 @@ export class PendingAsksComponent implements OnInit {
 
   actsOf(ask: PendingAskView): string {
     return ask.askedActs.map(act => ACT_NAMES[act] ?? act).join(' and ');
+  }
+
+  /** The node's predicate as a sentence: "The asking device has no identity of its own." */
+  askingDevice(ask: PendingAskView): string {
+    return askingDeviceLine(ask.stateWords);
+  }
+
+  get reviewedNumber(): number | undefined {
+    return this.reviewed?.number;
   }
 
   left(ask: PendingAskView): string {

@@ -25,6 +25,7 @@ import {
   NODE_CODE,
   approvalWords,
   approveCommand,
+  approvePendingCommand,
   type DeviceConsentApproval,
   type DeviceConsentPageState,
 } from 'elohim-imagodei/device-consent';
@@ -32,8 +33,23 @@ import { standingLine, type IdentityPageState } from 'elohim-imagodei/identity-s
 import { isSessionProofRefusal } from 'elohim-imagodei/session-key';
 
 import { IdentityViewComponent } from '../identity/identity-view.component.js';
+import { NODE_SIDE } from '../identity/standing-words.js';
 
-const THIS_DEVICE_WORDS = approvalWords({ name: 'This device', inSentence: 'this device' });
+/**
+ * The page may be open on another machine, signed in over a session, where
+ * "this device" would read as the browser's own machine: the key holder is
+ * named from the node's side, which is true wherever the page is open.
+ */
+const HOLDER = 'The device that holds your key';
+const THIS_DEVICE_WORDS = approvalWords({
+  name: HOLDER,
+  inSentence: 'the device that holds your key',
+});
+const CARD_STRINGS = {
+  ...THIS_DEVICE_WORDS.card,
+  signerOwnNode: () => `${HOLDER} will sign this as you when you approve.`,
+  signingOwnNode: () => `${HOLDER} is signing this as you. One moment.`,
+};
 
 const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedActs: [] };
 
@@ -63,6 +79,7 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
         <elohim-imagodei-device-consent-card
           data-testid="device-consent-card"
           signer="peer-conductor"
+          [attr.handed-back-to]="state.handedBackOverNetwork ? 'network' : 'this-machine'"
           [request]="cardRequest"
           [phase]="state.phase"
           [personLabel]="cardPersonLabel"
@@ -108,10 +125,14 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
             >
               Sign in
             </button>
-            <p>
-              Or, on the machine that holds your key, open this same link in a browser there, or run
-              this in its terminal:
-            </p>
+            @if (pendingNumber !== undefined) {
+              <p>Or, on the machine that holds your key, run this in its terminal:</p>
+            } @else {
+              <p>
+                Or, on the machine that holds your key, open this same link in a browser there, or
+                run this in its terminal:
+              </p>
+            }
             <code class="device-approval__command" data-testid="device-consent-command">
               {{ command }}
             </code>
@@ -248,6 +269,8 @@ export class DeviceApprovalViewComponent {
   @Input() identity?: IdentityPageState;
   /** Say what the identity rests on under the card (off where the page already says it). */
   @Input() showIdentityLine = true;
+  /** For an ask listed on the node: its number, which the terminal command names. */
+  @Input() pendingNumber?: number;
   /** This page's own link, for the terminal command when it is open elsewhere. */
   @Input() link = '';
   /** How long the live trail waits before showing (the dev preview pins it to 0). */
@@ -259,9 +282,13 @@ export class DeviceApprovalViewComponent {
   /** The person chose to sign in again, as a witness attending them asked. */
   @Output() readonly signInAgain = new EventEmitter<void>();
   /** The person asked to begin their identity here, with this name. */
-  @Output() readonly beginIdentity = new EventEmitter<{ displayName: string; secret?: string }>();
+  @Output() readonly beginIdentity = new EventEmitter<{
+    displayName: string;
+    secret?: string;
+    identifier?: string;
+  }>();
 
-  readonly cardStrings = THIS_DEVICE_WORDS.card;
+  readonly cardStrings = CARD_STRINGS;
   /** The standing line says what the approval rests on; the trail need not guess. */
   readonly trailStrings = THIS_DEVICE_WORDS.trail;
 
@@ -295,11 +322,7 @@ export class DeviceApprovalViewComponent {
     return this.showIdentityLine &&
       this.state.phase === 'review' &&
       this.identity?.phase === 'standing'
-      ? standingLine(
-          this.identity.standing,
-          { inSentence: 'this device' },
-          this.identity.displayName
-        )
+      ? standingLine(this.identity.standing, NODE_SIDE, this.identity.displayName)
       : undefined;
   }
 
@@ -329,8 +352,11 @@ export class DeviceApprovalViewComponent {
     return this.state.phase === 'refused' && this.state.refusalCode === NODE_CODE.callerNotLocal;
   }
 
+  /** The same approval from that machine's terminal: the ask's number, or this page's link. */
   get command(): string {
-    return approveCommand(this.link);
+    return this.pendingNumber !== undefined
+      ? approvePendingCommand(this.pendingNumber)
+      : approveCommand(this.link);
   }
 
   onApprove(event: Event): void {

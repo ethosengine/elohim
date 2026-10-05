@@ -62,6 +62,17 @@ export function noticeAsksSignIn(notice: PendingNotice | undefined): boolean {
   );
 }
 
+/**
+ * What the asking node says of itself, as a sentence: the node gives a
+ * predicate ("has no identity of its own"), which reads as "The asking
+ * device has no identity of its own." — as the terminal says it.
+ */
+export function askingDeviceLine(stateWords: string): string {
+  let words = stateWords.trim();
+  while (words.endsWith('.')) words = words.slice(0, -1);
+  return words ? `The asking device ${words}.` : '';
+}
+
 /** "About 4 minutes left", "40 seconds left", "No time left". */
 export function timeLeft(seconds: number): string {
   if (seconds <= 0) return 'No time left';

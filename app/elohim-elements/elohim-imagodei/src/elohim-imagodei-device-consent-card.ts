@@ -91,6 +91,9 @@ export interface DeviceConsentStrings {
   expiredBody: string;
   handedBackHeading: string;
   handedBackBody: string;
+  /** The code went to the asking device over the private network, not to a terminal here. */
+  handedBackOverNetworkHeading: string;
+  handedBackOverNetworkBody: string;
   declinedHeading: string;
   declinedBody: (label: string) => string;
   refusedHeading: string;
@@ -167,6 +170,9 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     'It was only good for a few minutes. Start again from the terminal on your device to get a new one.',
   handedBackHeading: 'Your device has it',
   handedBackBody: 'The terminal on this machine has received the code. You can close this tab.',
+  handedBackOverNetworkHeading: 'The device has it',
+  handedBackOverNetworkBody:
+    'The code reached the device over the private network, and it enrolls itself now. Nothing more is needed here.',
   declinedHeading: 'Nothing was approved',
   declinedBody: label => `“${label}” is not recognized as your device. You can close this tab.`,
   refusedHeading: 'This request can’t go ahead',
@@ -266,6 +272,7 @@ const ANNOUNCE_SECONDS = [30, 10];
  * @prop {string} code - One-time code to paste (phase `code`)
  * @prop {number} expiresAt - Code expiry, epoch ms (phase `code`)
  * @prop {string} refusalCode - Machine code for phase `refused`
+ * @prop {'this-machine'|'network'} handedBackTo - Where the code went in phase `handed-back` (default this-machine)
  * @prop {DeviceConsentStringOverrides} strings - Replace any visible sentence; refusal sentences and headings merge per code (property only)
  *
  * @fires {CustomEvent<{agreedActs: DeviceAct[], declinedActs: DeviceAct[]}>} approve - Person approved; agreed/declined in askedActs order
@@ -632,6 +639,13 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   /** Machine code for phase `refused`. */
   @property({ attribute: 'refusal-code' }) refusalCode?: string;
 
+  /**
+   * Where the code went in phase `handed-back`: a terminal on this machine
+   * (`this-machine`, the default) or the asking device over a private network.
+   */
+  @property({ attribute: 'handed-back-to' }) handedBackTo: 'this-machine' | 'network' =
+    'this-machine';
+
   /** Replace any visible sentence; unspecified keys use the English defaults. */
   @property({ attribute: false }) strings: DeviceConsentStringOverrides = {};
 
@@ -841,7 +855,12 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       case 'code':
         return this._renderCode();
       case 'handed-back':
-        return this._renderMessage(this._s.handedBackHeading, this._s.handedBackBody);
+        return this.handedBackTo === 'network'
+          ? this._renderMessage(
+              this._s.handedBackOverNetworkHeading,
+              this._s.handedBackOverNetworkBody
+            )
+          : this._renderMessage(this._s.handedBackHeading, this._s.handedBackBody);
       case 'declined':
         return this._renderMessage(
           this._s.declinedHeading,

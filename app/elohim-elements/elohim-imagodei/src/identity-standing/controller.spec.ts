@@ -117,6 +117,13 @@ describe('IdentityStandingController — what an identity rests on, and beginnin
     });
   });
 
+  it('sends the sign-in word with begin when one is given', async () => {
+    const c = screen();
+    c.offerBegin();
+    await c.begin('Matthew Dowell', undefined, '  matthew ');
+    expect(begins[0]).to.deep.equal({ displayName: 'Matthew Dowell', identifier: 'matthew' });
+  });
+
   it('sends a sign-in secret with begin only when one is given', async () => {
     const c = screen();
     c.offerBegin();
@@ -280,6 +287,25 @@ describe('standingLine — a fact, never a warning', () => {
     expect(personName(ALONE, 'Matthew')).to.equal(undefined);
     expect(standingLine({ ...ALONE, identifier: '  ' }, words)).to.equal(
       'Your identity rests on this device alone.'
+    );
+  });
+
+  it('words the device from the node’s side when the host asks it to', () => {
+    const node = {
+      inSentence: 'the device that holds your key',
+      alone: 'one device alone: the device that holds your key',
+      notThisOne: 'it is not the device serving this page',
+    };
+    expect(standingLine(ALONE, node)).to.equal(
+      'Your identity rests on one device alone: the device that holds your key.'
+    );
+    expect(standingLine(SEVERAL, node)).to.equal(
+      '3 of your own devices speak for you, the device that holds your key among them. Any one of them can approve a new device for you.'
+    );
+    expect(
+      standingLine({ ...ALONE, thisNodeIsController: false, restsOnThisNodeAlone: false }, node)
+    ).to.equal(
+      'One of your own devices speaks for you, and it is not the device serving this page.'
     );
   });
 

@@ -119,14 +119,14 @@ export class StandaloneResolver {
     if (!resp.ok) {
       let error = `http-${resp.status}`;
       try {
-        const body = await resp.json() as { error?: string };
+        const body = (await resp.json()) as { error?: string };
         if (body.error) error = body.error;
       } catch {
         // body may not be JSON — keep the http-status fallback
       }
       return { error };
     }
-    return await resp.json() as LoginOutcome;
+    return (await resp.json()) as LoginOutcome;
   }
 
   /**
@@ -176,20 +176,36 @@ export class StandaloneResolver {
    * the shell to render placeholder chrome / emit `authority-needed`.
    */
   async fetchAuthority(): Promise<AuthorityResolution | null> {
+    return (await this.fetchAuthorityAnswer())?.authority ?? null;
+  }
+
+  /**
+   * The same read, saying also whether `/auth/me` named its trust mode. A
+   * host that names none is given `doorway-host` for the shell's sake, but a
+   * page deciding what its header may claim must not read that as "a
+   * doorway hosts this person".
+   */
+  async fetchAuthorityAnswer(): Promise<{
+    authority: AuthorityResolution;
+    trustModeDeclared: boolean;
+  } | null> {
     try {
       const resp = await fetch('/auth/me', { credentials: 'include' });
       if (!resp.ok) return null;
       const data = (await resp.json()) as Record<string, unknown>;
       const authorityData = (data['authority'] as Record<string, string> | undefined) ?? {};
+      const declared = data['trustMode'] as AuthorityResolution['trustMode'] | undefined;
       return {
-        trustMode:
-          (data['trustMode'] as AuthorityResolution['trustMode'] | undefined) ?? 'doorway-host',
+        trustModeDeclared: declared !== undefined,
         authority: {
-          label: (authorityData['label'] as string | undefined) ?? '',
-          id: authorityData['id'] as string | undefined,
+          trustMode: declared ?? 'doorway-host',
+          authority: {
+            label: (authorityData['label'] as string | undefined) ?? '',
+            id: authorityData['id'] as string | undefined,
+          },
+          flywheelHint: data['flywheelHint'] as boolean | undefined,
+          attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
         },
-        flywheelHint: data['flywheelHint'] as boolean | undefined,
-        attestors: data['attestors'] as AuthorityResolution['attestors'] | undefined,
       };
     } catch {
       return null;
@@ -210,7 +226,7 @@ export class StandaloneResolver {
     if (!resp.ok) {
       throw new Error(`exchange failed: ${resp.status}`);
     }
-    return await resp.json() as { session: unknown };
+    return (await resp.json()) as { session: unknown };
   }
 
   /**
@@ -228,6 +244,6 @@ export class StandaloneResolver {
     if (!resp.ok) {
       throw new Error(`prepare failed: ${resp.status}`);
     }
-    return await resp.json() as ConsentContext;
+    return (await resp.json()) as ConsentContext;
   }
 }
