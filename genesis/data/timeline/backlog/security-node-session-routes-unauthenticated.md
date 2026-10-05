@@ -107,6 +107,13 @@ these routes, so the doorway forwards none of them.
   was approved from that session; after sign-out the same cookie was refused 403 by decide and
   agree, and `/auth/me` answered 401.
 
+## Closed 2026-10-05: a copied cookie cannot make the node sign
+
+A sign-in session may be bound to a key the browser holds (RFC 9449 DPoP, adapted to a cookie);
+over TLS it must be. A bound session must present a valid proof from its key on every route that
+makes the node sign and on sign-out. What a stolen bound cookie can still do is read
+(`/auth/me`, standing, the pending list): device-recognition row 9.
+
 ## Must-have before floor readiness: no secret or cookie in the clear
 
 **Required, not optional hardening.** A sign-in secret and a session cookie must not cross a

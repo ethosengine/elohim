@@ -60,6 +60,7 @@ state`.
 | 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. Row 1's sign-in is built |
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
 | 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
+| 9 | A sign-in session bound to a key the browser holds | Built (RFC 9449 DPoP, adapted): signing routes and sign-out need the key's proof; reads do not yet |
 
 ## Row 1 — a remote session that proves the person
 
@@ -269,6 +270,37 @@ and is never acted on by itself.
   node's operator confirming what will happen to its machine; a portal view of the pending list
   (`GET /auth/consent/pending` and `POST /auth/consent/pending/decide` are ready for one);
   carrier 2.
+
+## Row 9 — a sign-in session bound to a key the browser holds
+
+- **Chain:** sign-in / the routes that make the node sign.
+- **Built (2026-10-05):** a sign-in may bind its session to a public key (`sessionKey: {alg, jwk}`,
+  ES256 or EdDSA), proven at binding by a `DPoP` proof on the sign-in request itself; over TLS the
+  key is required (`signin_needs_session_key`); over plain http from another machine it may be
+  absent, logged once as unbound. A bound session must then present a valid proof from that key
+  (compared by RFC 7638 thumbprint) on agree, bootstrap, begin, pending decide and sign-out:
+  `session_proof_missing`, `session_proof_invalid`, `session_proof_stale`, `session_proof_replayed`.
+  Rules: `consent_grant::dpop` (`session_proof_verdict`, `ReplaySet`); one question in storage,
+  `node_account::signing_verdict`. A copied cookie is worth nothing on those routes.
+- **Proofs on reads (open):** `/auth/me`, `GET /auth/identity/standing` and `GET
+  /auth/consent/pending` ask only for the session. A stolen cookie can still read the person's
+  sign-in word, name, human id and agent key, the identity's root, authority and controllers, and
+  the devices asking with their keys and labels. It cannot approve, decline, bootstrap, begin or
+  sign out. Missing node: between "a request carries a bound session" and "the node answers a
+  read": the key's proof on reads too; probe: a bound cookie with no proof gets 401 from each read.
+- **A witnessed-moment fact, not built:** a first-seen session key on a new address is the kind
+  of fact an attending witness would look at (`MomentKind::SignIn`), and could pause on.
+- **Platform authenticator (passkey) sign-in, not built:** the path to biometrics and the
+  direction for replacing the password: a WebAuthn credential whose public key the node keeps on
+  the account and whose assertion proves the person at sign-in, with no secret sent at all (it
+  also answers the floor-readiness must-have of row 1). The verifier interface
+  (`consent_grant::dpop::AlgVerifier`, keyed by `alg`) is where a platform-held key under another
+  algorithm is an addition.
+- **A local-only channel for same-machine acts, not built:** today "this machine" is a loopback
+  peer address, which any proxy on the machine passes. A loopback-only listener or a socket file
+  would make same-machine acts this machine's alone.
+- **One unlock for the keystore and the sign-in, not built:** the conductor's keystore passphrase
+  and the sign-in secret are separate today; one unlock that opens both is recorded, not designed.
 
 ## shift_objective
 
