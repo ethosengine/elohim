@@ -330,8 +330,8 @@ describe('approvalWords — the host names the key holder', () => {
 
   it('asks for more only for a quorum the person set up', () => {
     const line = device.standing({ kind: 'short', more: 1, required: 2, signed: 1 })!;
-    expect(line).to.include('You asked for 2 of your own devices');
-    expect(line).to.include('1 more of your own devices must agree');
+    expect(line).to.include('You asked that 2 of the devices that speak for you agree');
+    expect(line).to.include('1 more of them must agree');
   });
 
   it('says nothing when there is no count', () => {

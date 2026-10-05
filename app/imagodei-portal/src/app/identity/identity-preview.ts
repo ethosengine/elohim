@@ -8,7 +8,7 @@
  * - `refusal=<code>` — a refused begin (e.g. identity_name_malformed,
  *   consent_caller_not_local, consent_signing_unavailable)
  * - `name=<text>` — the name already typed
- * - `stewards=<n>&required=<n>&here=0|1` — what the identity rests on (default
+ * - `devices=<n>&required=<n>&here=0|1` — what the identity rests on (default
  *   1 of 1, this device one of them); `created=1` says a session was opened
  *
  * AppComponent imports this only when `ngDevMode` is on, which optimized
@@ -20,17 +20,17 @@ import type { IdentityPageState, IdentityStandingView } from 'elohim-imagodei/id
 export function previewIdentityState(search: string): IdentityPageState {
   const params = new URLSearchParams(search);
   const phase = params.get('phase') ?? 'begin';
-  const stewards = Math.max(1, Number(params.get('stewards') ?? 1));
+  const devices = Math.max(1, Number(params.get('devices') ?? 1));
   const here = params.get('here') !== '0';
   const standing: IdentityStandingView = {
     identityRoot: 'uhCAkJ3u…root',
     authority: 'uhCEkV7q…authority',
     networkDna: 'uhC0kP2m…dna',
-    controllers: Array.from({ length: stewards }, (_, i) => `uhCAkdevice${i}`),
-    controllerCount: stewards,
+    controllers: Array.from({ length: devices }, (_, i) => `uhCAkdevice${i}`),
+    controllerCount: devices,
     required: Math.max(1, Number(params.get('required') ?? 1)),
     thisNodeIsController: here,
-    restsOnThisNodeAlone: here && stewards === 1,
+    restsOnThisNodeAlone: here && devices === 1,
   };
   if (phase === 'not-signed-in') return { phase: 'not-signed-in', standing: null };
   if (phase === 'standing') {

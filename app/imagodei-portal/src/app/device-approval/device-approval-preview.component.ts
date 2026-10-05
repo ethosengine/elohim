@@ -11,7 +11,7 @@
  * - `reveal=now` — pin the live trail's reveal delay to 0 so a render shows it
  * - `begin=1` — this node has no identity yet: the begin step in place
  *   (`beginning=1` for its wait, `refusal=<code>` for a refused begin)
- * - `stewards=<n>&required=<n>` (with `phase=review`) — what the identity
+ * - `devices=<n>&required=<n>` (with `phase=review`) — what the identity
  *   rests on, said while the person decides
  * - `code=consent_caller_not_local` — the page open on another machine,
  *   with the terminal command for the same link
@@ -107,18 +107,18 @@ export class DeviceApprovalPreviewComponent {
         beginRefusal: p.get('refusal') ?? undefined,
       };
     }
-    const stewards = Math.max(1, Number(p.get('stewards') ?? 1));
+    const devices = Math.max(1, Number(p.get('devices') ?? 1));
     return {
       phase: 'standing',
       standing: {
         identityRoot: 'uhCAkJ3u…root',
         authority: 'uhCEkV7q…authority',
         networkDna: 'uhC0kP2m…dna',
-        controllers: Array.from({ length: stewards }, (_, i) => `uhCAkdevice${i}`),
-        controllerCount: stewards,
+        controllers: Array.from({ length: devices }, (_, i) => `uhCAkdevice${i}`),
+        controllerCount: devices,
         required: Math.max(1, Number(p.get('required') ?? 1)),
         thisNodeIsController: true,
-        restsOnThisNodeAlone: stewards === 1,
+        restsOnThisNodeAlone: devices === 1,
       },
     };
   }

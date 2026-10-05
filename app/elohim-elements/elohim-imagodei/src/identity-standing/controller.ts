@@ -3,7 +3,7 @@
  * piece a portal mounts beside the device approval page.
  *
  * Service gravity: UX-surface. The node behind /auth/identity/* decides
- * whether an identity exists, makes and keeps its key, counts its stewards
+ * whether an identity exists, makes and keeps its key, counts the devices that speak for the person
  * and refuses a caller on another machine; this controller only sequences
  * what the person sees, and keeps one rule of its own: a begin already on
  * its way is never sent again.

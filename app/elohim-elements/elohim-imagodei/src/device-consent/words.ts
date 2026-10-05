@@ -52,9 +52,6 @@ const CALLER_NOT_LOCAL_HEADING = 'Approve on the machine that holds your key';
 /** "Your doorway (alpha.elohim.host)" when the card has a host name, else "Your doorway". */
 const named = (name: string, host?: string): string => (host ? `${name} (${host})` : name);
 
-/** "1 more of your own devices", "2 more of your own devices". */
-const devices = (n: number): string => `${n} more of your own devices`;
-
 export function approvalWords(holder: KeyHolderWords): ApprovalWords {
   const { name, inSentence } = holder;
   const signer = (host?: string) =>
@@ -94,9 +91,9 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
           return `${name} signed as you, and that is enough: this approval is complete. If you have other devices, they can affirm it later.`;
         case 'short':
           // Only a quorum the person set up asks for more than one.
-          return `You asked for ${standing.required} of your own devices to agree to approvals like this. ${devices(standing.more)} must agree before it counts.`;
+          return `You asked that ${standing.required} of the devices that speak for you agree to approvals like this. ${standing.more} more of them must agree before it counts.`;
         case 'enough':
-          return `This approval rests on ${standing.signed} of your own devices, as many as you asked for.`;
+          return `This approval rests on ${standing.signed} of the devices that speak for you, as many as you asked for.`;
         default:
           return undefined;
       }

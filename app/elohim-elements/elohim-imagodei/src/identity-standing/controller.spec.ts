@@ -208,29 +208,29 @@ describe('identity standing rules', () => {
 describe('standingLine — a fact, never a warning', () => {
   const words = { inSentence: 'this device' };
 
-  it('one steward, this one', () => {
+  it('one device speaks for the person, this one', () => {
     expect(standingLine(ALONE, words)).to.equal('Your identity rests on this device alone.');
   });
 
-  it('one steward, another one', () => {
+  it('one device speaks for the person, another one', () => {
     expect(
       standingLine({ ...ALONE, thisNodeIsController: false, restsOnThisNodeAlone: false }, words)
-    ).to.equal('Your identity rests on one of your own devices, not on this device.');
+    ).to.equal('One of your own devices speaks for you, and it is not this device.');
   });
 
-  it('several stewards: any one of them can approve', () => {
+  it('several devices speak for the person: any one of them can approve', () => {
     expect(standingLine(SEVERAL, words)).to.equal(
-      'Your identity rests on 3 of your own devices, this device among them. Any one of them can approve a new device.'
+      '3 of your own devices speak for you, this device among them. Any one of them can approve a new device for you.'
     );
   });
 
-  it('several stewards and a quorum the person set up', () => {
+  it('several devices and a quorum the person set up', () => {
     expect(standingLine({ ...SEVERAL, required: 2 }, words)).to.equal(
-      'Your identity rests on 3 of your own devices, this device among them. 2 of them must agree to approve a new device.'
+      '3 of your own devices speak for you, this device among them. A new device is approved for you once 2 of them agree.'
     );
   });
 
-  it('never reads as a shortfall, and says nothing without stewards', () => {
+  it('never reads as a shortfall, and says nothing when no device speaks for the person', () => {
     for (const v of [ALONE, SEVERAL]) {
       expect(standingLine(v, words)).not.to.match(/only|warning|not enough|risk|backup/i);
     }

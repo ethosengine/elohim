@@ -16,14 +16,14 @@ export interface IdentityStandingView {
   identityRoot: string;
   authority: string;
   networkDna: string;
-  /** Every steward (controller) the person's identity authority names. */
+  /** Every device that speaks for the person (a controller), as their identity authority names them. */
   controllers: string[];
   controllerCount: number;
   /** How many of them the person's own policy asks to approve a new device. */
   required: number;
-  /** Whether the node answering is one of the stewards. */
+  /** Whether the node answering is one of the devices that speak for the person. */
   thisNodeIsController: boolean;
-  /** Whether the node answering is the only steward. */
+  /** Whether the node answering is the only device that speaks for the person. */
   restsOnThisNodeAlone: boolean;
 }
 

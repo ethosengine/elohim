@@ -1,7 +1,9 @@
 /**
  * What an identity rests on, said plainly, built around the host's own name
- * for the node answering ("this device"). A fact, never a warning: one steward
- * is a whole identity, and only a quorum the person set up asks for more.
+ * for the node answering ("this device"). A fact, never a warning: one device
+ * speaking for the person is a whole identity, and only a quorum the person
+ * set up asks for more. The person is the steward of their identity; a
+ * device only speaks for them.
  *
  * English only, like the elements' own defaults.
  */
@@ -14,7 +16,7 @@ export interface StandingHostWords {
   inSentence: string;
 }
 
-/** The one line saying what the identity rests on; none when the view gives no stewards. */
+/** The one line saying what the identity rests on; none when no device speaks for the person. */
 // eslint-disable-next-line sonarjs/function-return-type -- a sentence or none: none when there is nothing to say
 export function standingLine(
   view: IdentityStandingView | null | undefined,
@@ -25,12 +27,12 @@ export function standingLine(
   if (n === 1) {
     return view.thisNodeIsController
       ? `Your identity rests on ${inSentence} alone.`
-      : `Your identity rests on one of your own devices, not on ${inSentence}.`;
+      : `One of your own devices speaks for you, and it is not ${inSentence}.`;
   }
   const among = view.thisNodeIsController ? `, ${inSentence} among them` : '';
   const approve =
     view.required > 1
-      ? `${view.required} of them must agree to approve a new device.`
-      : 'Any one of them can approve a new device.';
-  return `Your identity rests on ${n} of your own devices${among}. ${approve}`;
+      ? `A new device is approved for you once ${view.required} of them agree.`
+      : 'Any one of them can approve a new device for you.';
+  return `${n} of your own devices speak for you${among}. ${approve}`;
 }

@@ -483,7 +483,7 @@ describe('DeviceConsentComponent', () => {
       await ready(fixture);
 
       expect(card(fixture).phase).toBe('code');
-      expect(standing(fixture)?.textContent).toContain('2 more of your own devices must agree');
+      expect(standing(fixture)?.textContent).toContain('2 more of them must agree');
     });
 
     it('words a page on another machine its own way, without a terminal command', async () => {

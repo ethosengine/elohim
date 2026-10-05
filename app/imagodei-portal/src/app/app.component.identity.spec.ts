@@ -122,7 +122,7 @@ describe('AppComponent — the root, for a person on their own device', () => {
       (fixture.nativeElement as HTMLElement).querySelector('[data-testid="identity-standing"]')
         ?.textContent
     ).toBe(
-      'Your identity rests on 2 of your own devices, this device among them. Any one of them can approve a new device.'
+      '2 of your own devices speak for you, this device among them. Any one of them can approve a new device for you.'
     );
   });
 
