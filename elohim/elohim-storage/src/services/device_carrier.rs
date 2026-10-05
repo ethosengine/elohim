@@ -21,6 +21,16 @@
 //! - Not reachable from the network beyond the one protocol message. The list,
 //!   the decision and the device's announce are this-machine-only routes.
 //!
+//! Who lists. A node lists an ask only when it speaks for a person: its own
+//! cell is a controller of an identity's authority. A joined device that is
+//! not a controller, or a node with no identity, drops every ask with its
+//! reason and answers the asking device nothing at all, so it never appears to
+//! the asking terminal as a node that lists the ask. Whom the node speaks for is
+//! read from its own cell into memory (`Carrier::speaks`) by one refresher,
+//! every `SPEAKS_REFRESH_SECS` and at once when this node's identity may have
+//! changed (`identity_changed`), never per incoming ask. A read older than
+//! `SPEAKS_MAX_AGE_MICROS` counts as unknown, and unknown lists nothing.
+//!
 //! Identity namespaces stay apart: the carrier sees a transport id, kept only
 //! to answer the peer that asked; the request names the device's agent key,
 //! which is what a person is shown. The two are never compared.
@@ -29,8 +39,13 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use consent_grant::{
     redeem, Ask, CarryRequest, CarryResponse, Dropped, GrantRequest, Listed, MemoryStore,
-    NodeState, PendingAsks, ASK_LIFE_MICROS,
+    NodeState, PendingAsks, Speaks, ASK_LIFE_MICROS,
 };
+
+/// How often the refresher reads whom this node speaks for.
+pub const SPEAKS_REFRESH_SECS: u64 = 30;
+/// How old that read may be before it counts as unknown.
+pub const SPEAKS_MAX_AGE_MICROS: i64 = 120 * 1_000_000;
 use tracing::{info, warn};
 
 /// Everything the carrier holds, for this process.
@@ -43,6 +58,10 @@ pub struct Carrier {
     self_key: OnceLock<String>,
     /// This node's own announce, when it is the asking device.
     announce: Mutex<Option<Announce>>,
+    /// Whom this node speaks for, as last read from its own cell, and when.
+    speaks: Mutex<Option<(Speaks, i64)>>,
+    /// Woken when this node's identity may have changed.
+    speaks_changed: tokio::sync::Notify,
 }
 
 /// The device's side of one ask.
@@ -79,6 +98,8 @@ pub fn carrier() -> &'static Carrier {
         deliveries: Arc::new(MemoryStore::new()),
         self_key: OnceLock::new(),
         announce: Mutex::new(None),
+        speaks: Mutex::new(None),
+        speaks_changed: tokio::sync::Notify::new(),
     })
 }
 
@@ -93,6 +114,32 @@ impl Carrier {
 
     pub fn self_key(&self) -> Option<&str> {
         self.self_key.get().map(String::as_str)
+    }
+
+    /// Whom this node speaks for: the last read, or unknown when there is none
+    /// or it is older than `SPEAKS_MAX_AGE_MICROS`.
+    pub fn speaks(&self, now_micros: i64) -> Speaks {
+        match &*self.speaks.lock().unwrap_or_else(|e| e.into_inner()) {
+            Some((speaks, at)) if now_micros < at.saturating_add(SPEAKS_MAX_AGE_MICROS) => {
+                speaks.clone()
+            }
+            _ => Speaks::Unknown,
+        }
+    }
+
+    /// Record a fresh read of whom this node speaks for.
+    pub fn set_speaks(&self, speaks: Speaks, now_micros: i64) {
+        let mut slot = self.speaks.lock().unwrap_or_else(|e| e.into_inner());
+        if slot.as_ref().map(|(s, _)| s) != Some(&speaks) {
+            info!(speaks = %speaks.words(), "device carrier: whom this node speaks for");
+        }
+        *slot = Some((speaks, now_micros));
+    }
+
+    /// This node's identity may have changed (begun, bootstrapped, enrolled,
+    /// declared): read whom it speaks for again now.
+    pub fn identity_changed(&self) {
+        self.speaks_changed.notify_one();
     }
 
     fn announce_lock(&self) -> std::sync::MutexGuard<'_, Option<Announce>> {
@@ -131,10 +178,11 @@ impl Carrier {
         }
     }
 
-    /// Answer one carrier request from the peer `source`.
-    pub fn on_request(&self, source: &str, request: CarryRequest) -> CarryResponse {
-        match request {
-            CarryRequest::Ask { ask } => self.on_ask(source, ask),
+    /// Answer one carrier request from the peer `source`. `None` is silence:
+    /// the asking device is told nothing.
+    pub fn on_request(&self, source: &str, request: CarryRequest) -> Option<CarryResponse> {
+        Some(match request {
+            CarryRequest::Ask { ask } => return self.on_ask(source, ask),
             CarryRequest::Code { state, code, .. } => self.on_code(source, &state, code),
             CarryRequest::Redeem { redemption } => {
                 // bounded-work: one sweep over deliveries that each live minutes.
@@ -161,17 +209,19 @@ impl Carrier {
                     }
                 }
             }
-        }
+        })
     }
 
-    fn on_ask(&self, source: &str, ask: Ask) -> CarryResponse {
+    fn on_ask(&self, source: &str, ask: Ask) -> Option<CarryResponse> {
         let device = consent_grant::hash_shape::fingerprint(&ask.request.device_key);
+        let now = now_micros();
         match self.pending.admit(
             ask,
             source,
             self.self_key(),
+            &self.speaks(now),
             &super::device_consent::policy(),
-            now_micros(),
+            now,
         ) {
             Ok(listed) => {
                 let (number, how) = match listed {
@@ -182,14 +232,23 @@ impl Carrier {
                     source,
                     device, number, "device carrier: ask received and {how}"
                 );
-                CarryResponse::Listed {
+                Some(CarryResponse::Listed {
                     number,
                     approver: self.self_key().map(str::to_string),
-                }
+                })
             }
             Err(dropped) => {
                 let code = dropped.code();
                 match dropped {
+                    // Not an approving node for anyone: dropped, and the
+                    // asking device is told nothing.
+                    Dropped::SpeaksForNobody | Dropped::StandingUnknown => {
+                        info!(
+                            source,
+                            device, code, "device carrier: ask received and dropped unanswered"
+                        );
+                        return None;
+                    }
                     Dropped::Malformed(_) | Dropped::NotForThisApprover => {
                         info!(
                             source,
@@ -203,9 +262,9 @@ impl Carrier {
                         )
                     }
                 }
-                CarryResponse::Refused {
+                Some(CarryResponse::Refused {
                     code: code.to_string(),
-                }
+                })
             }
         }
     }
@@ -282,20 +341,70 @@ fn carrier_absent() -> Response<Full<Bytes>> {
     )
 }
 
-/// `GET /auth/consent/pending`: what is asking this node.
-pub fn pending_list(link: Option<&dyn CarrierLink>) -> Response<Full<Bytes>> {
+/// `GET /auth/consent/pending`: what is asking this node, and whose
+/// identity an approval here would be for. A node that speaks for nobody
+/// lists nothing and says so.
+pub fn pending_list(link: Option<&dyn CarrierLink>, speaks: &Speaks) -> Response<Full<Bytes>> {
     let now = now_micros();
-    let asks: Vec<PendingView> = carrier()
-        .pending
-        .list(now)
-        .iter()
-        .map(|p| PendingView::of(p, now))
-        .collect();
+    let asks: Vec<PendingView> = match speaks {
+        Speaks::Person(_) => carrier()
+            .pending
+            .list(now)
+            .iter()
+            .map(|p| PendingView::of(p, now, speaks))
+            .collect(),
+        Speaks::Nobody | Speaks::Unknown => Vec::new(),
+    };
     response::ok(&serde_json::json!({
         "carrier": if link.is_some() { "private-network" } else { "absent" },
         "approver": carrier().self_key(),
+        "speaksFor": speaks,
+        "speaksForWords": speaks.words(),
         "asks": asks,
     }))
+}
+
+/// Read whom this node speaks for from its own cell into the carrier. A cell
+/// that cannot answer leaves the last read to age into unknown.
+pub async fn refresh_speaks(cell: &dyn ControllerCell) {
+    if let Some(speaks) = read_speaks(cell).await {
+        carrier().set_speaks(speaks, now_micros());
+    }
+}
+
+/// Whom this node speaks for, from its own cell: one standing read, and one
+/// read of its Human only when it is a controller. `None` when the cell
+/// cannot answer.
+pub async fn read_speaks(cell: &dyn ControllerCell) -> Option<Speaks> {
+    use super::device_consent::CellStanding;
+    let me = cell.agent();
+    Some(match cell.standing().await {
+        Ok(CellStanding::Ready(standing)) => {
+            let person = if standing.controllers.contains(&me) {
+                cell.my_human().await.ok().flatten()
+            } else {
+                None
+            };
+            Speaks::of(Some(&standing), &me, person.as_ref())
+        }
+        Ok(CellStanding::NoPerson | CellStanding::Unbootstrapped { .. }) => Speaks::Nobody,
+        Err(why) => {
+            warn!(
+                ?why,
+                "device carrier: whom this node speaks for could not be read"
+            );
+            return None;
+        }
+    })
+}
+
+/// Wait until the next refresh is due: `SPEAKS_REFRESH_SECS`, or sooner when
+/// this node's identity may have changed.
+pub async fn until_speaks_refresh() {
+    tokio::select! {
+        _ = tokio::time::sleep(std::time::Duration::from_secs(SPEAKS_REFRESH_SECS)) => {}
+        _ = carrier().speaks_changed.notified() => {}
+    }
 }
 
 /// The body of `POST /auth/consent/pending/decide`.
@@ -326,24 +435,45 @@ pub async fn decide_pending(
     beat: &dyn WitnessBeat,
     link: Option<&dyn CarrierLink>,
     declaration: &Declaration,
+    speaks: &Speaks,
     signed_in: bool,
     body: &[u8],
 ) -> Response<Full<Bytes>> {
-    match decide_inner(store, cell, beat, link, declaration, signed_in, body).await {
+    match decide_inner(
+        store,
+        cell,
+        beat,
+        link,
+        declaration,
+        speaks,
+        signed_in,
+        body,
+    )
+    .await
+    {
         Ok(answer) => answer,
         Err(refused) => *refused,
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn decide_inner(
     store: &MemoryStore,
     cell: Option<&dyn ControllerCell>,
     beat: &dyn WitnessBeat,
     link: Option<&dyn CarrierLink>,
     declaration: &Declaration,
+    speaks: &Speaks,
     signed_in: bool,
     body: &[u8],
 ) -> Result<Response<Full<Bytes>>, Refused> {
+    if speaks.person().is_none() {
+        return Err(Box::new(refusal(
+            StatusCode::CONFLICT,
+            &speaks.words(),
+            "node_speaks_for_nobody",
+        )));
+    }
     if !signed_in {
         return Err(Box::new(refusal(
             StatusCode::UNAUTHORIZED,
@@ -383,7 +513,7 @@ async fn decide_inner(
                     "error": reasons.last().cloned().unwrap_or_default(),
                     "code": "pending_needs_answer",
                     "reasons": reasons,
-                    "ask": PendingView::of(&pending, now),
+                    "ask": PendingView::of(&pending, now, speaks),
                 }),
             ));
         }
@@ -668,13 +798,28 @@ mod tests {
             deliveries: Arc::new(MemoryStore::new()),
             self_key: OnceLock::new(),
             announce: Mutex::new(None),
+            speaks: Mutex::new(None),
+            speaks_changed: tokio::sync::Notify::new(),
         }
+    }
+
+    /// A node that speaks for the fake cell's person.
+    fn speaking() -> Speaks {
+        let ConsentStanding::Ready(standing) = ready() else {
+            unreachable!()
+        };
+        Speaks::of(
+            Some(&standing),
+            crate::services::device_consent::tests::CONTROLLER,
+            None,
+        )
     }
 
     #[test]
     fn an_approving_node_lists_an_ask_and_says_which_it_is() {
         let c = fresh();
         c.set_self_key("uhCAkApprover".into());
+        c.set_speaks(speaking(), now_micros());
         let ask = Ask {
             request: request(),
             state: NodeState::Unassigned,
@@ -682,10 +827,10 @@ mod tests {
         };
         assert_eq!(
             c.on_request("peer-a", CarryRequest::Ask { ask: ask.clone() }),
-            CarryResponse::Listed {
+            Some(CarryResponse::Listed {
                 number: 1,
                 approver: Some("uhCAkApprover".into())
-            }
+            })
         );
         let mut elsewhere = ask;
         elsewhere.for_approver = Some("uhCAkOther".into());
@@ -693,11 +838,114 @@ mod tests {
             "uhCAk0t54SuXFHcSgZ4Bx9gQeXPf7zlckCS0ol65f7cgFl3DucibY".into();
         assert_eq!(
             c.on_request("peer-a", CarryRequest::Ask { ask: elsewhere }),
-            CarryResponse::Refused {
+            Some(CarryResponse::Refused {
                 code: "ask_for_another_approver".into()
-            }
+            })
         );
         assert_eq!(c.pending.len(), 1);
+    }
+
+    #[test]
+    fn a_node_that_speaks_for_nobody_drops_asks_and_answers_nothing() {
+        let c = fresh();
+        c.set_self_key(key(60));
+        let ask = || CarryRequest::Ask {
+            ask: Ask {
+                request: request(),
+                state: NodeState::Unassigned,
+                for_approver: None,
+            },
+        };
+        // Never read: unknown, so nothing is listed and nothing is said.
+        assert_eq!(c.speaks(now_micros()), Speaks::Unknown);
+        assert_eq!(c.on_request("peer-a", ask()), None);
+        // A joined device that is not a controller.
+        c.set_speaks(Speaks::Nobody, now_micros());
+        assert_eq!(c.on_request("peer-a", ask()), None);
+        assert!(c.pending.is_empty());
+        // A read too old counts as unknown.
+        c.set_speaks(speaking(), now_micros() - SPEAKS_MAX_AGE_MICROS - 1);
+        assert_eq!(c.speaks(now_micros()), Speaks::Unknown);
+        assert_eq!(c.on_request("peer-a", ask()), None);
+        // Fresh, and a controller: listed.
+        c.set_speaks(speaking(), now_micros());
+        assert!(matches!(
+            c.on_request("peer-a", ask()),
+            Some(CarryResponse::Listed { number: 1, .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn whom_a_node_speaks_for_is_read_from_its_own_cell() {
+        use crate::services::device_consent::tests::{CONTROLLER, IDENTITY};
+        let ready_cell = FakeCell::new(Ok(ready()));
+        let read = read_speaks(&ready_cell).await.unwrap();
+        assert_eq!(read.person().unwrap().identity_root, IDENTITY);
+        // The cell's key resolves to an identity whose authority does not name it.
+        let joined = FakeCell::new(Ok(ConsentStanding::Ready(
+            consent_grant::ControllerStanding {
+                identity_root: IDENTITY.into(),
+                authority: "a".into(),
+                network_dna: "n".into(),
+                controllers: vec![key(61)],
+                required: 1,
+            },
+        )));
+        assert_ne!(key(61), CONTROLLER);
+        assert_eq!(read_speaks(&joined).await, Some(Speaks::Nobody));
+        let none = FakeCell::new(Ok(ConsentStanding::NoPerson));
+        assert_eq!(read_speaks(&none).await, Some(Speaks::Nobody));
+        let down = FakeCell::new(Err(
+            crate::services::device_consent::CellFailure::Unavailable("down".into()),
+        ));
+        assert_eq!(read_speaks(&down).await, None);
+    }
+
+    #[tokio::test]
+    async fn the_list_says_whom_the_node_speaks_for_and_a_node_for_nobody_lists_nothing() {
+        let bytes = |r: Response<Full<Bytes>>| async move {
+            let b = r.into_body().collect().await.unwrap().to_bytes();
+            serde_json::from_slice::<serde_json::Value>(&b).unwrap()
+        };
+        listed(45, NodeState::Unassigned);
+        let nobody = bytes(pending_list(None, &Speaks::Nobody)).await;
+        assert_eq!(nobody["speaksFor"], serde_json::json!({"kind": "nobody"}));
+        assert_eq!(nobody["asks"], serde_json::json!([]));
+        assert!(nobody["speaksForWords"]
+            .as_str()
+            .unwrap()
+            .contains("speaks for nobody"));
+        let person = bytes(pending_list(None, &speaking())).await;
+        assert_eq!(person["speaksFor"]["kind"], "person");
+        let asks = person["asks"].as_array().unwrap();
+        assert!(!asks.is_empty());
+        for a in asks {
+            assert_eq!(
+                a["forIdentity"]["identityRoot"],
+                crate::services::device_consent::tests::IDENTITY
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_node_that_speaks_for_nobody_decides_nothing() {
+        let device = listed(46, NodeState::Unassigned);
+        let cell = FakeCell::new(Ok(ready()));
+        let answer = decide_pending(
+            &MemoryStore::new(),
+            Some(&cell),
+            &consent_grant::Unattended,
+            None,
+            &declaring(46),
+            &Speaks::Nobody,
+            true,
+            &serde_json::to_vec(&serde_json::json!({ "ask": device })).unwrap(),
+        )
+        .await;
+        assert_eq!(answer.status(), StatusCode::CONFLICT);
+        let b = answer.into_body().collect().await.unwrap().to_bytes();
+        let v: serde_json::Value = serde_json::from_slice(&b).unwrap();
+        assert_eq!(v["code"], "node_speaks_for_nobody");
     }
 
     #[test]
@@ -712,6 +960,7 @@ mod tests {
                     approver: None,
                 },
             )
+            .unwrap()
         };
         assert_eq!(
             code("peer-a", &"s".repeat(32)),
@@ -748,6 +997,7 @@ mod tests {
     }
 
     use crate::services::device_consent::tests::{ready, FakeCell};
+    use crate::services::device_consent::CellStanding as ConsentStanding;
     use http_body_util::BodyExt;
 
     /// A carrier link that answers every message with `CodeTaken` and keeps
@@ -781,8 +1031,9 @@ mod tests {
                     state,
                     for_approver: None,
                 },
-                "peer-device",
+                &format!("peer-device-{n}"),
                 None,
+                &speaking(),
                 &crate::services::device_consent::policy(),
                 now_micros(),
             )
@@ -815,6 +1066,7 @@ mod tests {
             &consent_grant::Unattended,
             Some(link),
             declaration,
+            &speaking(),
             true,
             &serde_json::to_vec(&body).unwrap(),
         )
@@ -835,7 +1087,7 @@ mod tests {
         assert_eq!(answer["handedBack"]["taken"], true);
         let sent = link.0.lock().unwrap().clone();
         assert_eq!(sent.len(), 1);
-        assert_eq!(sent[0].0, "peer-device");
+        assert_eq!(sent[0].0, "peer-device-41");
         assert!(matches!(&sent[0].1, CarryRequest::Code { state, .. } if *state == "s".repeat(32)));
         assert!(carrier().pending.pick(&device, now_micros()).is_none());
     }
@@ -908,6 +1160,7 @@ mod tests {
             &consent_grant::Unattended,
             None,
             &Declaration::default(),
+            &speaking(),
             false,
             b"{\"ask\":\"1\"}",
         )
@@ -935,6 +1188,7 @@ mod tests {
                 },
             },
         );
+        let refused = refused.unwrap();
         assert_eq!(
             refused,
             CarryResponse::Refused {

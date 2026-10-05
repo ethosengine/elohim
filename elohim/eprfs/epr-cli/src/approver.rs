@@ -533,6 +533,9 @@ fn ask_at_terminal(act: RequestedAct) -> Outcome<bool> {
 struct PendingAnswer {
     carrier: String,
     approver: Option<String>,
+    /// Whom the node speaks for; absent from a node that predates it.
+    #[serde(default)]
+    speaks_for: Option<consent_grant::Speaks>,
     asks: Vec<PendingView>,
 }
 
@@ -552,7 +555,13 @@ pub(crate) fn pending_lines(view: &PendingView) -> Vec<String> {
     for act in &view.asked_acts {
         lines.push(format!("     asks to {} ({act})", act_words(*act)));
     }
-    lines.push(format!("     this node {}", view.state_words));
+    lines.push(format!("     the asking node {}", view.state_words));
+    if let Some(identity) = &view.for_identity {
+        lines.push(format!(
+            "     {}",
+            consent_grant::Speaks::Person(identity.clone()).words()
+        ));
+    }
     lines
 }
 
@@ -574,6 +583,14 @@ pub fn pending(args: &[String]) -> Outcome<ExitCode> {
             "This node is {}.",
             consent_grant::hash_shape::fingerprint(me)
         );
+    }
+    match &answer.speaks_for {
+        Some(speaks @ consent_grant::Speaks::Person(_)) => println!("{}", speaks.words()),
+        Some(speaks) => {
+            println!("{}", speaks.words());
+            return Ok(ExitCode::SUCCESS);
+        }
+        None => {}
     }
     if answer.asks.is_empty() {
         println!("Nothing is asking.");
@@ -926,11 +943,24 @@ mod tests {
             state: consent_grant::NodeState::Unassigned,
             state_words: "has no identity of its own".into(),
             addressed_here: false,
+            for_identity: None,
         };
         let lines = pending_lines(&view);
         assert_eq!(lines[0], "  2  home  key uhCAkiqcz…TGMzzl  4:01 left");
         assert!(lines[1].contains("recognize this device as one of yours"));
-        assert_eq!(lines[2], "     this node has no identity of its own");
+        assert_eq!(lines[2], "     the asking node has no identity of its own");
+        assert_eq!(lines.len(), 3);
+        let mut joined = view.clone();
+        joined.for_identity = Some(consent_grant::SpeaksFor {
+            human_id: Some("matthew".into()),
+            display_name: Some("Matthew".into()),
+            identity_root: "uhCkkzY_ZvJaVbaFzi46J_LbGgFEUEQVMlWN5rpSdxGYdOG_3sQYp".into(),
+            identity_fingerprint: "uhCkkzY_Z…_3sQYp".into(),
+        });
+        assert_eq!(
+            pending_lines(&joined)[3],
+            "     An approval here is for Matthew (matthew), identity uhCkkzY_Z…_3sQYp."
+        );
     }
 
     #[test]

@@ -26,6 +26,8 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::act::RequestedAct;
+use crate::controller::ControllerStanding;
+use crate::declaration::ExistingIdentity;
 use crate::hash_shape::fingerprint;
 use crate::request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 
@@ -91,6 +93,90 @@ impl NodeState {
     }
 }
 
+/// Whose identity an approval on this node would be for: the identity whose
+/// authority names this node as one of its controllers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeaksFor {
+    /// The id of the person's Human record, when it can be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// The Human record the identity is rooted in.
+    pub identity_root: String,
+    pub identity_fingerprint: String,
+}
+
+/// Whether this node may approve devices for anyone, and for whom.
+///
+/// A node lists asks only when it speaks for a person. A joined device that is
+/// not a controller, or a node with no identity, speaks for nobody. A node that
+/// joined someone's identity as it is still speaks for the identity it began,
+/// and only for that one, which is why the identity is shown with every ask.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+pub enum Speaks {
+    Person(SpeaksFor),
+    /// This node is a controller of no identity.
+    Nobody,
+    /// This node's standing has not been read recently enough to say.
+    Unknown,
+}
+
+impl Speaks {
+    /// From what this node's own cell says. `standing` is the authority of the
+    /// identity the cell's agent resolves to, when it has one; `person` is the
+    /// cell's own Human record. Only an authority that names `me` as a
+    /// controller makes this node speak for anyone.
+    pub fn of(
+        standing: Option<&ControllerStanding>,
+        me: &str,
+        person: Option<&ExistingIdentity>,
+    ) -> Self {
+        match standing {
+            Some(s) if s.controllers.iter().any(|k| k == me) => Self::Person(SpeaksFor {
+                human_id: person.map(|p| p.human_id.clone()),
+                display_name: person.map(|p| p.display_name.clone()),
+                identity_root: s.identity_root.clone(),
+                identity_fingerprint: fingerprint(&s.identity_root),
+            }),
+            _ => Self::Nobody,
+        }
+    }
+
+    pub fn person(&self) -> Option<&SpeaksFor> {
+        match self {
+            Self::Person(p) => Some(p),
+            _ => None,
+        }
+    }
+
+    /// The sentence a person at this node is shown.
+    pub fn words(&self) -> String {
+        match self {
+            Self::Person(p) => {
+                let who = match (&p.display_name, &p.human_id) {
+                    (Some(name), Some(id)) => format!("{name} ({id})"),
+                    (Some(name), None) => name.clone(),
+                    (None, Some(id)) => id.clone(),
+                    (None, None) => "a person".to_string(),
+                };
+                format!(
+                    "An approval here is for {who}, identity {}.",
+                    p.identity_fingerprint
+                )
+            }
+            Self::Nobody => "This node speaks for nobody, so it lists nothing: it is not one of \
+                             the nodes that may approve a device for anyone."
+                .to_string(),
+            Self::Unknown => "This node cannot say yet whom it speaks for, so it lists nothing \
+                              for now."
+                .to_string(),
+        }
+    }
+}
+
 /// What a device sends over a carrier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,6 +218,10 @@ impl PendingAsk {
 /// Why an ask was not listed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dropped {
+    /// This node speaks for nobody, so it lists nothing.
+    SpeaksForNobody,
+    /// This node's standing is not known recently enough to list anything.
+    StandingUnknown,
     /// Not a request a portal would show a person.
     Malformed(RequestRefusal),
     /// Addressed to another approving node.
@@ -145,6 +235,8 @@ pub enum Dropped {
 impl Dropped {
     pub fn code(&self) -> &'static str {
         match self {
+            Self::SpeaksForNobody => "ask_node_speaks_for_nobody",
+            Self::StandingUnknown => "ask_node_standing_unknown",
             Self::Malformed(r) => r.code(),
             Self::NotForThisApprover => "ask_for_another_approver",
             Self::Full => "ask_list_full",
@@ -185,15 +277,22 @@ impl PendingAsks {
     }
 
     /// List `ask` from `source`, or say why not. `me` is this node's agent
-    /// key, when it is known.
+    /// key, when it is known; `speaks` is whom this node speaks for. A node
+    /// that speaks for nobody, or cannot yet say, lists nothing.
     pub fn admit(
         &self,
         ask: Ask,
         source: &str,
         me: Option<&str>,
+        speaks: &Speaks,
         policy: &GrantPolicy,
         now_micros: i64,
     ) -> Result<Listed, Dropped> {
+        match speaks {
+            Speaks::Person(_) => {}
+            Speaks::Nobody => return Err(Dropped::SpeaksForNobody),
+            Speaks::Unknown => return Err(Dropped::StandingUnknown),
+        }
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
         if let Some(wanted) = &ask.for_approver {
             if me != Some(wanted.as_str()) {
@@ -289,10 +388,15 @@ pub struct PendingView {
     pub state_words: String,
     /// Whether the device addressed this node by name.
     pub addressed_here: bool,
+    /// Whose identity an approval of this ask here would be for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub for_identity: Option<SpeaksFor>,
 }
 
 impl PendingView {
-    pub fn of(p: &PendingAsk, now_micros: i64) -> Self {
+    /// `speaks` is whom this node speaks for now, shown with the ask so
+    /// nobody approves a device into the wrong identity.
+    pub fn of(p: &PendingAsk, now_micros: i64, speaks: &Speaks) -> Self {
         let r = &p.ask.request;
         Self {
             number: p.number,
@@ -305,6 +409,7 @@ impl PendingView {
             state: p.ask.state,
             state_words: p.ask.state.words().to_string(),
             addressed_here: p.ask.for_approver.is_some(),
+            for_identity: speaks.person().cloned(),
         }
     }
 }
@@ -312,8 +417,35 @@ impl PendingView {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::hash_shape::sample_key;
-    use crate::request::tests::{policy, request};
+    use crate::hash_shape::{sample_action, sample_key};
+    use crate::request::tests::{policy, request, NETWORK};
+
+    /// A node that speaks for the person rooted at `sample_action(1)`.
+    pub(crate) fn speaks() -> Speaks {
+        Speaks::of(
+            Some(&standing(&[sample_key(9)])),
+            &sample_key(9),
+            Some(&person()),
+        )
+    }
+
+    fn standing(controllers: &[String]) -> ControllerStanding {
+        ControllerStanding {
+            identity_root: sample_action(1),
+            authority: sample_action(2),
+            network_dna: NETWORK.into(),
+            controllers: controllers.to_vec(),
+            required: 1,
+        }
+    }
+
+    fn person() -> ExistingIdentity {
+        ExistingIdentity {
+            human_id: "matthew".into(),
+            display_name: "Matthew".into(),
+            profile_reach: "private".into(),
+        }
+    }
 
     pub(crate) fn ask(device: u8) -> Ask {
         let mut r = request();
@@ -331,15 +463,15 @@ pub(crate) mod tests {
     fn an_ask_is_listed_and_the_same_device_replaces_its_own() {
         let list = PendingAsks::new();
         assert_eq!(
-            list.admit(ask(1), "peer-a", None, &policy(), NOW),
+            list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW),
             Ok(Listed::New(1))
         );
         assert_eq!(
-            list.admit(ask(2), "peer-a", None, &policy(), NOW),
+            list.admit(ask(2), "peer-a", None, &speaks(), &policy(), NOW),
             Ok(Listed::New(2))
         );
         assert_eq!(
-            list.admit(ask(1), "peer-b", None, &policy(), NOW + 5),
+            list.admit(ask(1), "peer-b", None, &speaks(), &policy(), NOW + 5),
             Ok(Listed::Replaced(1))
         );
         let listed = list.list(NOW + 6);
@@ -351,26 +483,40 @@ pub(crate) mod tests {
     fn the_list_is_bounded_by_count_source_and_life() {
         let list = PendingAsks::new();
         for d in 0..MAX_PER_SOURCE as u8 {
-            list.admit(ask(d + 1), "peer-a", None, &policy(), NOW)
+            list.admit(ask(d + 1), "peer-a", None, &speaks(), &policy(), NOW)
                 .unwrap();
         }
         assert_eq!(
-            list.admit(ask(90), "peer-a", None, &policy(), NOW),
+            list.admit(ask(90), "peer-a", None, &speaks(), &policy(), NOW),
             Err(Dropped::SourceOverLimit)
         );
         for d in 0..(MAX_PENDING - MAX_PER_SOURCE) as u8 {
-            list.admit(ask(d + 20), &format!("peer-{d}"), None, &policy(), NOW)
-                .unwrap();
+            list.admit(
+                ask(d + 20),
+                &format!("peer-{d}"),
+                None,
+                &speaks(),
+                &policy(),
+                NOW,
+            )
+            .unwrap();
         }
         assert_eq!(list.len(), MAX_PENDING);
         assert_eq!(
-            list.admit(ask(99), "peer-z", None, &policy(), NOW),
+            list.admit(ask(99), "peer-z", None, &speaks(), &policy(), NOW),
             Err(Dropped::Full)
         );
         // Five minutes later they are gone, and room is made.
         assert!(list.list(NOW + ASK_LIFE_MICROS).is_empty());
         assert!(list
-            .admit(ask(99), "peer-z", None, &policy(), NOW + ASK_LIFE_MICROS)
+            .admit(
+                ask(99),
+                "peer-z",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + ASK_LIFE_MICROS
+            )
             .is_ok());
     }
 
@@ -380,20 +526,34 @@ pub(crate) mod tests {
         let mut addressed = ask(1);
         addressed.for_approver = Some(sample_key(9));
         assert_eq!(
-            list.admit(addressed.clone(), "p", Some(&sample_key(8)), &policy(), NOW),
+            list.admit(
+                addressed.clone(),
+                "p",
+                Some(&sample_key(8)),
+                &speaks(),
+                &policy(),
+                NOW
+            ),
             Err(Dropped::NotForThisApprover)
         );
         assert_eq!(
-            list.admit(addressed.clone(), "p", None, &policy(), NOW),
+            list.admit(addressed.clone(), "p", None, &speaks(), &policy(), NOW),
             Err(Dropped::NotForThisApprover)
         );
         assert!(list
-            .admit(addressed, "p", Some(&sample_key(9)), &policy(), NOW)
+            .admit(
+                addressed,
+                "p",
+                Some(&sample_key(9)),
+                &speaks(),
+                &policy(),
+                NOW
+            )
             .is_ok());
         let mut bad = ask(2);
         bad.request.client_id = "stranger".into();
         assert_eq!(
-            list.admit(bad, "p", None, &policy(), NOW)
+            list.admit(bad, "p", None, &speaks(), &policy(), NOW)
                 .unwrap_err()
                 .code(),
             "request_client_unknown"
@@ -403,7 +563,8 @@ pub(crate) mod tests {
     #[test]
     fn an_ask_is_picked_by_number_key_or_fingerprint_and_never_by_its_source() {
         let list = PendingAsks::new();
-        list.admit(ask(1), "peer-a", None, &policy(), NOW).unwrap();
+        list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW)
+            .unwrap();
         let key = sample_key(1);
         for text in ["1", key.as_str(), fingerprint(&key).as_str()] {
             assert!(list.pick(text, NOW).is_some(), "{text}");
@@ -446,8 +607,9 @@ pub(crate) mod tests {
     #[test]
     fn the_view_shows_the_device_its_acts_and_its_state() {
         let list = PendingAsks::new();
-        list.admit(ask(1), "peer-a", None, &policy(), NOW).unwrap();
-        let view = PendingView::of(&list.list(NOW)[0], NOW + 60_000_000);
+        list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW)
+            .unwrap();
+        let view = PendingView::of(&list.list(NOW)[0], NOW + 60_000_000, &speaks());
         assert_eq!(view.seconds_left, 240);
         assert_eq!(view.device_fingerprint, fingerprint(&sample_key(1)));
         let json = serde_json::to_value(&view).unwrap();
@@ -461,5 +623,81 @@ pub(crate) mod tests {
         ] {
             assert!(json.get(field).is_some(), "{field}");
         }
+    }
+
+    #[test]
+    fn a_node_lists_only_when_it_speaks_for_a_person() {
+        let list = PendingAsks::new();
+        assert_eq!(
+            list.admit(ask(1), "peer-a", None, &Speaks::Nobody, &policy(), NOW),
+            Err(Dropped::SpeaksForNobody)
+        );
+        assert_eq!(
+            list.admit(ask(1), "peer-a", None, &Speaks::Unknown, &policy(), NOW),
+            Err(Dropped::StandingUnknown)
+        );
+        assert!(list.is_empty());
+        assert_eq!(
+            Dropped::SpeaksForNobody.code(),
+            "ask_node_speaks_for_nobody"
+        );
+        assert_eq!(Dropped::StandingUnknown.code(), "ask_node_standing_unknown");
+        assert_eq!(
+            list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW),
+            Ok(Listed::New(1))
+        );
+    }
+
+    #[test]
+    fn a_node_speaks_only_for_the_identity_whose_authority_names_it() {
+        let me = sample_key(9);
+        // A controller of its own identity, joined to someone else's as it is
+        // or not: it speaks for the identity it is a controller of.
+        let mine = Speaks::of(
+            Some(&standing(std::slice::from_ref(&me))),
+            &me,
+            Some(&person()),
+        );
+        let p = mine.person().expect("speaks for a person");
+        assert_eq!(p.identity_root, sample_action(1));
+        assert_eq!(p.identity_fingerprint, fingerprint(&sample_action(1)));
+        assert_eq!(p.human_id.as_deref(), Some("matthew"));
+        assert!(mine.words().contains("Matthew (matthew)"));
+        // A joined device: its key resolves to the person's identity, whose
+        // authority does not name it.
+        assert_eq!(
+            Speaks::of(Some(&standing(&[sample_key(3)])), &me, None),
+            Speaks::Nobody
+        );
+        // No identity at all.
+        assert_eq!(Speaks::of(None, &me, None), Speaks::Nobody);
+        assert!(Speaks::Nobody.words().contains("speaks for nobody"));
+    }
+
+    #[test]
+    fn the_view_names_whose_identity_an_approval_is_for() {
+        let list = PendingAsks::new();
+        list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW)
+            .unwrap();
+        let view = PendingView::of(&list.list(NOW)[0], NOW, &speaks());
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(
+            json["forIdentity"],
+            serde_json::json!({
+                "humanId": "matthew",
+                "displayName": "Matthew",
+                "identityRoot": sample_action(1),
+                "identityFingerprint": fingerprint(&sample_action(1)),
+            })
+        );
+        let wire = serde_json::to_value(speaks()).unwrap();
+        assert_eq!(wire["kind"], "person");
+        assert_eq!(wire["identityRoot"], sample_action(1));
+        assert_eq!(
+            serde_json::to_value(Speaks::Nobody).unwrap(),
+            serde_json::json!({"kind": "nobody"})
+        );
+        let back: Speaks = serde_json::from_value(wire).unwrap();
+        assert_eq!(back, speaks());
     }
 }

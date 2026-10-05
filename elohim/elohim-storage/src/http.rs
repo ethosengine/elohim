@@ -1924,23 +1924,25 @@ impl HttpServer {
             max_concurrent = MAX_CONCURRENT_REQUESTS,
             "HTTP server listening"
         );
-        // The carrier names this node by its agent key once the cell
-        // is reachable.
-        {
+        // The carrier names this node by its agent key once the cell is
+        // reachable, and knows whom this node speaks for (only a node that
+        // speaks for a person lists asks). Only a node that runs a carrier
+        // reads it.
+        if self.p2p_handle.is_some() {
             let server = self.clone();
             tokio::spawn(async move {
+                use crate::services::device_carrier as carrier;
                 use crate::services::device_consent::ControllerCell;
-                // bounded-work: one cheap lookup per POLL_INTERVAL_SECS until
-                // the key is known, then the task ends.
-                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
-                    crate::runtime_config::POLL_INTERVAL_SECS,
-                ));
+                // bounded-work: one standing read (and one Human read when
+                // this node is a controller) per SPEAKS_REFRESH_SECS, or
+                // sooner when this node's identity may have changed; never
+                // per incoming ask.
                 loop {
-                    ticker.tick().await;
                     if let Some(cell) = server.own_controller_cell() {
-                        crate::services::device_carrier::carrier().set_self_key(cell.agent());
-                        return;
+                        carrier::carrier().set_self_key(cell.agent());
+                        carrier::refresh_speaks(&cell).await;
                     }
+                    carrier::until_speaks_refresh().await;
                 }
             });
         }
@@ -2947,12 +2949,16 @@ impl HttpServer {
                 Box::pin(self.handle_identity(req, false)).await
             }
             (Method::POST, "/auth/identity/bootstrap") => {
-                Box::pin(self.handle_identity(req, true)).await
+                let answer = Box::pin(self.handle_identity(req, true)).await;
+                crate::services::device_carrier::carrier().identity_changed();
+                answer
             }
             // Begin a person's identity on this node with no doorway: their
             // Human, its authority and a session. This machine only.
             (Method::POST, "/auth/identity/begin") => {
-                Box::pin(self.handle_identity_begin(req)).await
+                let answer = Box::pin(self.handle_identity_begin(req)).await;
+                crate::services::device_carrier::carrier().identity_changed();
+                answer
             }
             (Method::GET, "/auth/identity/declaration") => {
                 Box::pin(self.handle_identity_declaration(req)).await
@@ -2962,7 +2968,12 @@ impl HttpServer {
             // is, and enrolling it with what the terminal collected. Answered
             // only to callers on this machine.
             (Method::GET, "/auth/device/self") | (Method::POST, "/auth/device/enroll") => {
-                Box::pin(self.handle_device_step(req)).await
+                let enrolling = req.method() == Method::POST;
+                let answer = Box::pin(self.handle_device_step(req)).await;
+                if enrolling {
+                    crate::services::device_carrier::carrier().identity_changed();
+                }
+                answer
             }
 
             // The first carrier (`services::device_carrier`): asks that came
@@ -13625,6 +13636,7 @@ impl HttpServer {
             let mut detail = String::new();
             match &outcome {
                 Reconciled::Applied(begun) => {
+                    crate::services::device_carrier::carrier().identity_changed();
                     let session = self
                         .db_pool
                         .as_ref()
@@ -13822,7 +13834,10 @@ impl HttpServer {
         let link = self.carrier_link();
         let link_ref = link.as_deref();
         Ok(match (method, path.as_str()) {
-            (Method::GET, "/auth/consent/pending") => carrier::pending_list(link_ref),
+            (Method::GET, "/auth/consent/pending") => carrier::pending_list(
+                link_ref,
+                &carrier::carrier().speaks(chrono::Utc::now().timestamp_micros()),
+            ),
             (Method::POST, "/auth/consent/pending/decide") => {
                 let declaration = crate::services::identity_declaration::path()
                     .filter(|p| p.exists())
@@ -13835,6 +13850,7 @@ impl HttpServer {
                     &consent_grant::Unattended,
                     link_ref,
                     &declaration,
+                    &carrier::carrier().speaks(chrono::Utc::now().timestamp_micros()),
                     signed_in,
                     &body,
                 )

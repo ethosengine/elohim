@@ -86,7 +86,8 @@ pub use delivery::{
 };
 pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
 pub use pending::{
-    Ask, Dropped, Listed, Made, NodeState, PendingAsk, PendingAsks, PendingView, ASK_LIFE_MICROS,
+    Ask, Dropped, Listed, Made, NodeState, PendingAsk, PendingAsks, PendingView, Speaks, SpeaksFor,
+    ASK_LIFE_MICROS,
 };
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};

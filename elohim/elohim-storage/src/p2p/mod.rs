@@ -1270,17 +1270,19 @@ fn device_carry_pending() -> &'static std::sync::Mutex<
 
 /// Answer a carrier message from `peer`. The transport id is passed to the
 /// carrier only to answer that peer; it is never taken for the device's key.
-fn device_carry_answer(peer: &PeerId, bytes: &[u8]) -> Vec<u8> {
+/// `None` is silence: the response channel is dropped and the peer is told
+/// nothing (a node that speaks for nobody, `services::device_carrier`).
+fn device_carry_answer(peer: &PeerId, bytes: &[u8]) -> Option<Vec<u8>> {
     let answer = match consent_grant::CarryRequest::from_bytes(bytes) {
         Ok(request) => {
-            crate::services::device_carrier::carrier().on_request(&peer.to_string(), request)
+            crate::services::device_carrier::carrier().on_request(&peer.to_string(), request)?
         }
         Err(code) => {
             warn!(peer = %peer, "device carrier: unreadable message");
             consent_grant::CarryResponse::Refused { code }
         }
     };
-    answer.to_bytes()
+    Some(answer.to_bytes())
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -6854,11 +6856,16 @@ impl P2PNode {
                     debug!(peer = %peer, request = ?request, "Received EPR request");
                     let response = match request {
                         // The carrier needs the asking peer, which the EPR
-                        // handlers never see; it is answered here.
+                        // handlers never see; it is answered here. Silence
+                        // drops the channel, so the peer hears nothing.
                         EprRequest::DeviceCarry(bytes) => {
-                            EprResponse::DeviceCarry(device_carry_answer(&peer, &bytes))
+                            device_carry_answer(&peer, &bytes).map(EprResponse::DeviceCarry)
                         }
-                        request => self.handle_epr_request(request).await,
+                        request => Some(self.handle_epr_request(request).await),
+                    };
+                    let Some(response) = response else {
+                        drop(channel);
+                        return;
                     };
                     let mut swarm = self.swarm.write().await;
                     if let Err(e) = swarm

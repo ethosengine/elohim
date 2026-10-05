@@ -145,7 +145,7 @@ pub fn decide(deciders: &[&dyn Decider], ask: &PendingAsk) -> Result<Decision, V
 mod tests {
     use super::*;
     use crate::declaration::DeclaredDevice;
-    use crate::pending::tests::ask;
+    use crate::pending::tests::{ask, speaks};
     use crate::pending::{Made, PendingAsks};
     use crate::request::tests::policy;
 
@@ -153,7 +153,8 @@ mod tests {
         let list = PendingAsks::new();
         let mut a = ask(1);
         a.state = state;
-        list.admit(a, "peer", None, &policy(), 0).unwrap();
+        list.admit(a, "peer", None, &speaks(), &policy(), 0)
+            .unwrap();
         list.list(0).remove(0)
     }
 

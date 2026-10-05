@@ -353,10 +353,12 @@ decisionPoints:
     sourceLocation:
       file: src/pending.rs
       modulePath: consent_grant::pending::PendingAsks::admit
-      line: 189
+      line: 282
     summary: >
       Decides whether an ask that arrived over the private network is put on the approving
-      node's list: it must be an admissible request, addressed to this node or to none, and fit
+      node's list: this node must speak for a person (`Speaks::Person`; a node that speaks for
+      nobody, or cannot yet say, lists nothing), and it must be an admissible request, addressed
+      to this node or to none, and fit
       the bounds (32 asks, four per source, five minutes each). The same device asking again
       replaces its earlier ask. Over a bound it is dropped, never queued. Listing causes no
       signature; it only makes the ask visible to the deciders.
@@ -377,8 +379,9 @@ decisionPoints:
       - id: C4
         status: answered
         justification: >
-          Each drop is a distinct `Dropped` with a stable code (`ask_for_another_approver`,
-          `ask_list_full`, `ask_source_over_limit`, or the request's own refusal), and is logged.
+          Each drop is a distinct `Dropped` with a stable code (`ask_node_speaks_for_nobody`,
+          `ask_node_standing_unknown`, `ask_for_another_approver`, `ask_list_full`,
+          `ask_source_over_limit`, or the request's own refusal), and is logged.
       - id: C5
         status: answered
         justification: >
@@ -406,6 +409,9 @@ decisionPoints:
         kind: unit
       - path: crates/consent-grant/src/pending.rs
         testName: an_ask_is_picked_by_number_key_or_fingerprint_and_never_by_its_source
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_lists_only_when_it_speaks_for_a_person
         kind: unit
 
   - name: decide
@@ -461,7 +467,7 @@ decisionPoints:
     sourceLocation:
       file: src/pending.rs
       modulePath: consent_grant::pending::NodeState::of
-      line: 71
+      line: 73
     summary: >
       Classifies what an asking node is, honestly: unassigned, an identity of its own with
       nothing made, an identity of its own having made things, or joined to someone. What it has
@@ -483,4 +489,49 @@ decisionPoints:
     contractTests:
       - path: crates/consent-grant/src/pending.rs
         testName: a_node_says_what_it_is_and_unknown_is_never_nothing
+        kind: unit
+
+  - name: Speaks::of
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::Speaks::of
+      line: 132
+    summary: >
+      Decides whether this node may approve devices for anyone, and for whom: only when the
+      authority of the identity its cell resolves to names this node among its controllers. A
+      joined device that is not a controller, or a node with no identity, speaks for nobody. A
+      node that joined someone's identity as it is speaks only for the identity it began, which
+      every listed ask then names (`PendingView.forIdentity`) so nobody approves a device into
+      the wrong identity.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Speaking for a person here only lets the node list asks; signing is still the agree
+          path, which checks the same authority at sign time.
+      - id: C4
+        status: answered
+        justification: Person, nobody and unknown are distinct; unknown lists nothing.
+      - id: C5
+        status: answered
+        justification: >
+          Read from this node's own cell (standing, then its Human only when it is a controller),
+          never from anything a peer says.
+      - id: C12
+        status: answered
+        justification: >
+          Whom an approval would be for is shown with every ask, by the person's Human id, name
+          and identity fingerprint.
+      - id: C13
+        status: partial
+        justification: >
+          The roles stay apart (whose, who operates, whether it may approve), but the node still
+          cannot tell the person from its operator; backlog row 6.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_speaks_only_for_the_identity_whose_authority_names_it
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: the_view_names_whose_identity_an_approval_is_for
         kind: unit

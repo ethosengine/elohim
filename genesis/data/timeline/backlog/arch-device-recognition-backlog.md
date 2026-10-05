@@ -213,14 +213,20 @@ and is never acted on by itself.
   with an error and are simply not approving nodes.
 - **Multicast must reach.** Discovery is libp2p mDNS; a host or network that blocks multicast never
   lists the ask.
-- **A node that may not approve still lists asks.** In the live run (2026-10-05) a joined device
-  that is not a controller listed a later ask, offered `epr device approve <number>`, and the
-  asking terminal printed it as a node that lists the ask. Deciding there was refused only
-  because no person is signed in on that node (`consent_not_signed_in`), not because it may not
-  approve. A node with an identity of its own that joined as it is would be signed in as its own
-  person. Missing node: between "an ask reaches a node" and "the node lists it": whether this node
-  may approve for anyone (it is a controller of some identity); probe: a joined non-controller
-  answers the ask `ask_not_an_approving_node` and is absent from the asking terminal's list.
+- **CLOSED 2026-10-05: a node that may not approve still listed asks.** A joined device that was
+  not a controller listed a later ask, and the asking terminal showed it as a node that lists it.
+  Now a node lists only when it speaks for a person (`consent_grant::Speaks`: its own cell is a
+  controller of an identity's authority). Whom it speaks for is read from its own cell into
+  memory every 30 s and at once after begin, bootstrap, enroll or an applied declaration; a read
+  older than 120 s counts as unknown and lists nothing. A node that speaks for nobody drops the
+  ask (`ask_node_speaks_for_nobody`, logged) and answers nothing, so the asking terminal never
+  shows it; `GET /auth/consent/pending` and `epr device pending` say it speaks for nobody. Every
+  listed ask names whose identity an approval would be for (`forIdentity`). Live re-run: the
+  joined device no longer appears as a lister. **What remains:** a node that joined as it is still
+  speaks for the identity it began and lists asks for it, named but not otherwise guarded; the
+  node cannot tell the person from its operator (row 6); a controller removed by another node's
+  successor authority keeps listing for up to the 30 s refresh (lists only; the agree path
+  re-checks the authority).
 - **Signed in means the no-cookie fallback.** `epr device approve` on the approving node carried
   no session cookie; the decide route counted the node's person as signed in through the session
   fallback that row 1 and `security-node-session-routes-unauthenticated` describe.
