@@ -486,6 +486,21 @@ describe('DeviceConsentComponent', () => {
       expect(standing(fixture)?.textContent).toContain('2 more of your own devices must agree');
     });
 
+    it('words a page on another machine its own way, without a terminal command', async () => {
+      const fixture = create();
+      await ready(fixture);
+      const strings = (
+        card(fixture) as HTMLElement & {
+          strings?: { refusal?: Record<string, string>; refusalHeading?: Record<string, string> };
+        }
+      ).strings;
+      expect(strings?.refusal?.['consent_caller_not_local']).toBe(
+        'Your doorway would not sign this from where it was asked, so nothing was signed. Start again from the terminal on your device.'
+      );
+      expect(strings?.refusalHeading?.['consent_caller_not_local']).toBe('Not signed from here');
+      expect(fixture.nativeElement.textContent).not.toContain('epr device approve');
+    });
+
     it('declining shows no standing line and no code', async () => {
       const fixture = create();
       await ready(fixture);

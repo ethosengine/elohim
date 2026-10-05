@@ -10,14 +10,31 @@
  * This component only supplies what is this host's own — the key holder is
  * "this device", the cookie client, the way to sign in and come back. Nothing
  * here asks any other server anything.
+ *
+ * Beside the approval it reads what the person's identity rests on. If this
+ * node has none yet, the person begins it in place and comes back to the
+ * approval, with nothing sent twice.
  */
 
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  OnInit,
+  Output,
+  inject,
+  signal,
+} from '@angular/core';
 import {
   DeviceConsentController,
+  NODE_CODE,
   type DeviceConsentApproval,
   type DeviceConsentPageState,
 } from 'elohim-imagodei/device-consent';
+import {
+  IdentityStandingController,
+  type IdentityPageState,
+} from 'elohim-imagodei/identity-standing';
 
 import { DEVICE_APPROVAL_PORT } from './device-approval-port.js';
 import { DeviceApprovalViewComponent } from './device-approval-view.component.js';
@@ -30,7 +47,10 @@ import { DeviceApprovalViewComponent } from './device-approval-view.component.js
   template: `
     <imagodei-portal-device-approval-view
       [state]="state()"
+      [identity]="identity()"
+      [link]="link"
       (approved)="onApprove($event)"
+      (beginIdentity)="onBegin($event)"
       (declined)="onDecline()"
       (expired)="onExpired()"
     />
@@ -44,13 +64,43 @@ export class DeviceApprovalComponent implements OnInit {
     client: this.port.client,
     signIn: () => this.port.signIn(),
     handBack: url => this.port.handBack(url),
-    onChange: state => this.state.set(state),
+    onChange: state => {
+      this.state.set(state);
+      // The node says it holds no identity for the person: offer to begin here.
+      if (state.phase === 'refused' && state.refusalCode === NODE_CODE.identityUnbootstrapped) {
+        this.identityController.offerBegin();
+      }
+    },
+  });
+  private readonly identityController = new IdentityStandingController({
+    client: this.port.identity,
+    onChange: state => {
+      this.identity.set(state);
+      this.identityChange.emit(state);
+    },
   });
 
+  /** What the identity rests on, for the page's header (the root's shell). */
+  @Output() readonly identityChange = new EventEmitter<IdentityPageState>();
+
   readonly state = signal<DeviceConsentPageState>(this.controller.state);
+  readonly identity = signal<IdentityPageState>(this.identityController.state);
+  /** This page's own link, shown as a terminal command if it is open on another machine. */
+  readonly link = globalThis.location.href;
 
   ngOnInit(): void {
     void this.controller.start();
+    void this.identityController.read();
+  }
+
+  /**
+   * Begin the identity in place, then return to the approval. Nothing was
+   * signed before, and nothing is sent again until the person approves.
+   */
+  async onBegin(displayName: string): Promise<void> {
+    if (await this.identityController.begin(displayName)) {
+      await this.controller.resume();
+    }
   }
 
   onApprove(approval: DeviceConsentApproval): void {

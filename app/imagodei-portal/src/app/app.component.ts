@@ -7,10 +7,17 @@ import {
   OnInit,
   Type,
   ViewChild,
+  computed,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {
+  IdentityStandingController,
+  createIdentityStandingClient,
+  type IdentityPageState,
+} from 'elohim-imagodei/identity-standing';
 import { DeviceApprovalComponent } from './device-approval/device-approval.component';
+import { IdentityViewComponent } from './identity/identity-view.component';
 import { portalBase } from './device-approval/device-approval-port';
 import { RETURN_TO_PARAM, safePortalReturn } from './services/portal-return';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
@@ -22,7 +29,7 @@ import {
 } from './services/steward-login-controller';
 import type { AuthorityResolution } from 'elohim-imagodei';
 
-type PortalMode = 'login' | 'consent' | 'steward-login' | 'device-consent';
+type PortalMode = 'login' | 'consent' | 'steward-login' | 'device-consent' | 'identity';
 // 'steward-login' is the transient "Connecting to your steward portal…" step;
 // the shell only knows 'resolve' | 'login' | 'consent' | 'callback', so while
 // mode is 'steward-login' we hold the shell on 'resolve' and render our own
@@ -30,6 +37,25 @@ type PortalMode = 'login' | 'consent' | 'steward-login' | 'device-consent';
 type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
 type StewardPhase = 'connecting' | 'failed' | 'unreachable';
 type DevicePage = 'live' | 'preview';
+
+/**
+ * What the shell's header may say, from what this page actually knows:
+ * - `own`: the node answering holds the person's key (it answered in its own
+ *   identity words, or the session is a peer-conductor one);
+ * - `will-hold`: no identity here yet; beginning makes the key on this device;
+ * - `default`: a doorway hosts this person (discovered from /auth/me) — the
+ *   shell's own header says so;
+ * - `none`: nothing is known — say nothing rather than something false.
+ */
+type HeaderKind = 'own' | 'will-hold' | 'default' | 'none';
+
+/** This host's header words. */
+const HEADER_WORDS = {
+  own: { ownNodeLabel: 'Your own device holds your key' },
+  // True even when the page is open on another machine: the node serving it
+  // is the one that makes and keeps the key.
+  'will-hold': { ownNodeLabel: 'Your own device will make and keep your key' },
+} as const;
 
 /**
  * Which device approval page a path names, if any: `consent/device` under the
@@ -42,10 +68,15 @@ export function devicePageFor(pathname: string): DevicePage | null {
   return null;
 }
 
+/** The development-only identity preview: `identity/preview` under the portal's base. */
+export function identityPreviewFor(pathname: string): boolean {
+  return pathname.replace(/\/+$/, '').endsWith('/identity/preview');
+}
+
 @Component({
   selector: 'imagodei-portal-root',
   standalone: true,
-  imports: [CommonModule, DeviceApprovalComponent],
+  imports: [CommonModule, DeviceApprovalComponent, IdentityViewComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
   // ApplicationRef tick skips it and freezes change detection for the whole
@@ -55,7 +86,33 @@ export function devicePageFor(pathname: string): DevicePage | null {
     <main>
       <h1 class="visually-hidden">Elohim Portal</h1>
       <elohim-imagodei-portal-shell #shell [attr.step]="step()" [authority]="authority()">
-        <ng-container *ngIf="mode() === 'login' && step() === 'resolve'">
+        <!-- The header says only what this page knows about who holds the
+             key, in this host's words; with nothing known it says nothing,
+             and it never shows a witness line the page below would contradict. -->
+        <ng-container *ngIf="headerWords() as words">
+          <elohim-imagodei-trust-indicator
+            slot="header"
+            data-testid="portal-trust"
+            trust-mode="peer-conductor"
+            [strings]="words"
+          ></elohim-imagodei-trust-indicator>
+        </ng-container>
+        <span
+          *ngIf="headerKind() === 'none'"
+          slot="header"
+          data-testid="portal-header-empty"
+        ></span>
+
+        <ng-container *ngIf="mode() === 'identity'">
+          <imagodei-portal-identity-view
+            slot="primary"
+            [state]="identityState()"
+            [returnNote]="identityReturnNote()"
+            (begin)="onIdentityBegin($event)"
+          ></imagodei-portal-identity-view>
+        </ng-container>
+
+        <ng-container *ngIf="mode() === 'login' && step() === 'resolve' && !identityPending()">
           <elohim-imagodei-federated-resolver
             #resolver
             slot="primary"
@@ -104,18 +161,10 @@ export function devicePageFor(pathname: string): DevicePage | null {
         </ng-container>
 
         <ng-container *ngIf="mode() === 'device-consent'">
-          <!-- On the person's own node nothing is hosted, and the page below
-               names who signed: the header says only what holds the key,
-               in this host's words, and no witness line. -->
-          <elohim-imagodei-trust-indicator
-            slot="header"
-            data-testid="device-consent-trust"
-            trust-mode="peer-conductor"
-            [strings]="ownDeviceHeaderWords"
-          ></elohim-imagodei-trust-indicator>
           <imagodei-portal-device-approval
             *ngIf="devicePage() === 'live'"
             slot="primary"
+            (identityChange)="identityState.set($event)"
           ></imagodei-portal-device-approval>
           <div *ngIf="devicePreview() as preview" slot="primary">
             <ng-container *ngComponentOutlet="preview"></ng-container>
@@ -195,8 +244,39 @@ export class AppComponent implements OnInit, AfterViewInit {
   /** The doorway origin to offer as a "return to your doorway" action. */
   stewardReturnUrl = signal<string>('');
 
-  /** The native header's words: the person's own device holds their key. */
-  readonly ownDeviceHeaderWords = { ownNodeLabel: 'Your own device holds your key' };
+  /** What the person's identity rests on, at the node that served this page. */
+  private readonly identityController = new IdentityStandingController({
+    client: createIdentityStandingClient(),
+    onChange: state => this.identityState.set(state),
+  });
+  identityState = signal<IdentityPageState>(this.identityController.state);
+  /** True while the root is still asking the node about the identity. */
+  identityPending = signal(false);
+  /** Where a begin at the root will bring the person back to, if anywhere. */
+  identityReturnNote = signal<string | undefined>(undefined);
+
+  /** What the header may say; see {@link HeaderKind}. */
+  readonly headerKind = computed<HeaderKind>(() => {
+    const mode = this.mode();
+    const identity = this.identityState();
+    if (mode === 'device-consent') {
+      return identity.phase === 'begin' || identity.phase === 'beginning' ? 'will-hold' : 'own';
+    }
+    if (mode === 'identity') {
+      if (identity.phase === 'begin' || identity.phase === 'beginning') return 'will-hold';
+      return identity.standing?.thisNodeIsController ? 'own' : 'none';
+    }
+    // The node answered in its own identity words: it is a person's own node.
+    if (['standing', 'begin', 'not-signed-in', 'refused'].includes(identity.phase)) return 'own';
+    const trustMode = this.authority()?.trustMode;
+    if (trustMode === 'peer-conductor') return 'own';
+    if (trustMode === 'doorway-host') return 'default';
+    return 'none';
+  });
+  readonly headerWords = computed(() => {
+    const kind = this.headerKind();
+    return kind === 'own' || kind === 'will-hold' ? HEADER_WORDS[kind] : null;
+  });
 
   /** Which device approval page this is, when the path names one. */
   devicePage = signal<DevicePage | null>(null);
@@ -270,6 +350,50 @@ export class AppComponent implements OnInit, AfterViewInit {
 
     // 2) Direct OAuth consent request (no handoff).
     await this._enterConsentIfRequested(search);
+    if (this.mode() !== 'login') return;
+
+    // 3) Everything else: what does the person's identity rest on here?
+    if (
+      identityPreviewFor(window.location.pathname) &&
+      (typeof ngDevMode === 'undefined' || ngDevMode)
+    ) {
+      // Development only, removed from optimized builds like the approval preview.
+      const preview = await import('./identity/identity-preview');
+      this.identityState.set(preview.previewIdentityState(search));
+      if (['standing', 'begin', 'beginning'].includes(this.identityState().phase)) {
+        this.mode.set('identity');
+      }
+      return;
+    }
+    await this._readIdentity(search);
+  }
+
+  /**
+   * Ask the node what the person's identity rests on. With none yet, offer
+   * to begin it here; with one, say what it rests on. Anything else — no one
+   * signed in, a host that does not answer — leaves the sign-in as it was.
+   */
+  private async _readIdentity(search: string): Promise<void> {
+    this.identityPending.set(true);
+    try {
+      await this.identityController.read();
+    } finally {
+      this.identityPending.set(false);
+    }
+    const phase = this.identityState().phase;
+    if (phase === 'standing' || phase === 'begin') {
+      this.mode.set('identity');
+      if (new URLSearchParams(search).has(RETURN_TO_PARAM)) {
+        this.identityReturnNote.set('Then you’ll go straight back to where you were.');
+      }
+    }
+  }
+
+  /** Begin the identity on this device, then go back to where the person came from. */
+  async onIdentityBegin(displayName: string): Promise<void> {
+    if (await this.identityController.begin(displayName)) {
+      this._returnAfterSignIn(window.location.search);
+    }
   }
 
   /**

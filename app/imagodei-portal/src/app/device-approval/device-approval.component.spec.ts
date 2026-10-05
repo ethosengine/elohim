@@ -10,6 +10,7 @@ import type {
   ConsentViewResponse,
   ConsentWireResult,
 } from 'elohim-imagodei/device-consent';
+import type { IdentityStandingView } from 'elohim-imagodei/identity-standing';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { devicePageFor } from '../app.component.js';
@@ -42,6 +43,29 @@ const agreed = (partial: Partial<ConsentAgreeResponse> = {}): ConsentAgreeRespon
   ...partial,
 });
 
+const ALONE: IdentityStandingView = {
+  identityRoot: 'uhCAkroot',
+  authority: 'uhCEkauthority',
+  networkDna: 'uhC0kdna',
+  controllers: ['uhCAkworkspace'],
+  controllerCount: 1,
+  required: 1,
+  thisNodeIsController: true,
+  restsOnThisNodeAlone: true,
+};
+
+const BEGUN = {
+  standing: ALONE,
+  session: { id: 'sess-1', humanId: 'h-1', identifier: 'h-1' },
+  created: { human: true, authority: true, session: true },
+};
+
+const unbootstrapped = {
+  ok: false,
+  status: 409,
+  body: { error: 'no identity here', code: 'consent_identity_unbootstrapped' },
+};
+
 type Card = HTMLElement & {
   phase?: string;
   refusalCode?: string;
@@ -63,6 +87,7 @@ describe('devicePageFor — which paths are the device approval page', () => {
 describe('DeviceApprovalComponent — the native portal’s mount of the shared page', () => {
   let port: {
     client: { view: ReturnType<typeof vi.fn>; agree: ReturnType<typeof vi.fn> };
+    identity: { standing: ReturnType<typeof vi.fn>; begin: ReturnType<typeof vi.fn> };
     signIn: ReturnType<typeof vi.fn>;
     handBack: ReturnType<typeof vi.fn>;
   };
@@ -80,6 +105,10 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     );
     port = {
       client: { view: vi.fn().mockResolvedValue(ok(VIEW)), agree: vi.fn() },
+      identity: {
+        standing: vi.fn().mockResolvedValue(ok(ALONE)),
+        begin: vi.fn().mockResolvedValue(ok(BEGUN)),
+      },
       signIn: vi.fn(),
       handBack: vi.fn(),
     };
@@ -160,5 +189,72 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     fixture.detectChanges();
     expect((q(fixture, 'device-consent-card') as Card).phase).toBe('declined');
     expect(port.client.agree).not.toHaveBeenCalled();
+  });
+
+  it('says what the identity rests on while the person decides', async () => {
+    const fixture = await create();
+    expect(q(fixture, 'identity-standing')?.textContent).toContain(
+      'Your identity rests on this device alone.'
+    );
+  });
+
+  it('offers the begin step in place when this node has no identity, and asks nothing else', async () => {
+    port.identity.standing.mockResolvedValue(unbootstrapped);
+    const fixture = await create();
+    expect(q(fixture, 'device-consent-card')).toBeNull();
+    const begin = q(fixture, 'identity-begin')!;
+    expect(begin.textContent).toContain('Begin your identity on this device');
+    expect(begin.textContent).toContain('Nothing is sent to any host.');
+    expect(begin.textContent).toContain('Then you’ll come back here to approve “workspace”.');
+    expect(begin.querySelectorAll('input')).toHaveLength(1);
+    expect(begin.querySelector('input[type="password"]')).toBeNull();
+    expect(port.client.agree).not.toHaveBeenCalled();
+  });
+
+  it('after an approval the node could not sign for want of an identity: begin, then back to review, sending nothing twice', async () => {
+    port.identity.standing.mockResolvedValue({ ok: false, status: 404, body: null });
+    port.client.agree.mockResolvedValue(unbootstrapped);
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    fixture.detectChanges();
+    expect(q(fixture, 'identity-begin')).not.toBeNull();
+
+    (q(fixture, 'identity-name') as HTMLInputElement).value = 'Matthew';
+    (q(fixture, 'identity-begin')!.querySelector('form') as HTMLFormElement).dispatchEvent(
+      new Event('submit')
+    );
+    await settle();
+    await settle();
+    fixture.detectChanges();
+
+    expect(port.identity.begin).toHaveBeenCalledWith({ displayName: 'Matthew' });
+    expect((q(fixture, 'device-consent-card') as Card).phase).toBe('review');
+    expect(port.client.agree).toHaveBeenCalledTimes(1);
+    expect(port.client.view).toHaveBeenCalledTimes(1);
+  });
+
+  it('on a page open on another machine, shows the same link as a terminal command to copy', async () => {
+    port.client.agree.mockResolvedValue({
+      ok: false,
+      status: 403,
+      body: { error: 'not local', code: 'consent_caller_not_local' },
+    });
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    fixture.detectChanges();
+
+    expect((q(fixture, 'device-consent-card') as Card).refusalCode).toBe(
+      'consent_caller_not_local'
+    );
+    expect(q(fixture, 'device-consent-command')?.textContent?.trim()).toBe(
+      `epr device approve '${window.location.href}'`
+    );
+    expect(q(fixture, 'device-consent-witness-trail')).toBeNull();
   });
 });

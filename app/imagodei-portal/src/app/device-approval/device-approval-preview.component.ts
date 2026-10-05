@@ -9,6 +9,12 @@
  * - `witnesses=1` — sample reported witnesses under the code
  * - `required=<n>&signed=<n>` — the node's count (default 1 of 1)
  * - `reveal=now` — pin the live trail's reveal delay to 0 so a render shows it
+ * - `begin=1` — this node has no identity yet: the begin step in place
+ *   (`beginning=1` for its wait, `refusal=<code>` for a refused begin)
+ * - `stewards=<n>&required=<n>` (with `phase=review`) — what the identity
+ *   rests on, said while the person decides
+ * - `code=consent_caller_not_local` — the page open on another machine,
+ *   with the terminal command for the same link
  *
  * AppComponent loads this only when `ngDevMode` is on, which optimized
  * (production) builds replace with `false`: the chunk is removed at build
@@ -27,6 +33,7 @@ import {
   type DeviceConsentPageState,
   type KeyHolderStep,
 } from 'elohim-imagodei/device-consent';
+import type { IdentityPageState } from 'elohim-imagodei/identity-standing';
 import type { WitnessStep } from 'elohim-imagodei/witness-step';
 
 import { DeviceApprovalViewComponent } from './device-approval-view.component.js';
@@ -67,7 +74,12 @@ const SAMPLE_WITNESSES: WitnessStep[] = [
   imports: [DeviceApprovalViewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <imagodei-portal-device-approval-view [state]="state()" [trailRevealAfterMs]="revealAfterMs" />
+    <imagodei-portal-device-approval-view
+      [state]="state()"
+      [identity]="identity"
+      [link]="link"
+      [trailRevealAfterMs]="revealAfterMs"
+    />
   `,
 })
 export class DeviceApprovalPreviewComponent {
@@ -77,6 +89,39 @@ export class DeviceApprovalPreviewComponent {
   private readonly expiresAt = Date.now() + 4 * 60_000 + 12_000;
 
   readonly revealAfterMs = this.params.get('reveal') === 'now' ? 0 : 400;
+
+  /** A link of the shape a terminal prints, for the elsewhere command. */
+  readonly link =
+    'http://workspace.local:8090/auth/portal/consent/device?request=eyJjbGllbnRJZCI6ImVwci1jbGkifQ';
+
+  /** What the identity controller would hold for this preview. */
+  readonly identity: IdentityPageState = this.sampleIdentity();
+
+  private sampleIdentity(): IdentityPageState {
+    const p = this.params;
+    if (p.get('begin') === '1') {
+      return {
+        phase: p.get('beginning') === '1' ? 'beginning' : 'begin',
+        standing: null,
+        displayName: p.get('name') ?? undefined,
+        beginRefusal: p.get('refusal') ?? undefined,
+      };
+    }
+    const stewards = Math.max(1, Number(p.get('stewards') ?? 1));
+    return {
+      phase: 'standing',
+      standing: {
+        identityRoot: 'uhCAkJ3u…root',
+        authority: 'uhCEkV7q…authority',
+        networkDna: 'uhC0kP2m…dna',
+        controllers: Array.from({ length: stewards }, (_, i) => `uhCAkdevice${i}`),
+        controllerCount: stewards,
+        required: Math.max(1, Number(p.get('required') ?? 1)),
+        thisNodeIsController: true,
+        restsOnThisNodeAlone: stewards === 1,
+      },
+    };
+  }
 
   readonly state = computed<DeviceConsentPageState>(() => {
     const asked = this.params.get('phase') as DeviceConsentPagePhase | null;

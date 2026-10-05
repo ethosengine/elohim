@@ -14,11 +14,17 @@ import {
   createDeviceConsentClient,
   type DeviceConsentClient,
 } from 'elohim-imagodei/device-consent';
+import {
+  createIdentityStandingClient,
+  type IdentityStandingClient,
+} from 'elohim-imagodei/identity-standing';
 
 import { signInUrl } from '../services/portal-return.js';
 
 export interface DeviceApprovalPort {
   client: DeviceConsentClient;
+  /** What the person's identity rests on, and beginning it, at the same node. */
+  identity: IdentityStandingClient;
   /** Send the person to this portal's sign-in and straight back to this page. */
   signIn(): void;
   /** Hand the code to the asking terminal's listener on this machine (top-level navigation). */
@@ -34,6 +40,7 @@ export const DEVICE_APPROVAL_PORT = new InjectionToken<DeviceApprovalPort>('DEVI
   providedIn: 'root',
   factory: () => ({
     client: createDeviceConsentClient(),
+    identity: createIdentityStandingClient(),
     signIn: () => {
       const { pathname, search } = globalThis.location;
       globalThis.location.assign(signInUrl(portalBase(), pathname + search));

@@ -33,7 +33,15 @@ export type DeviceConsentPhase = Exclude<DeviceConsentPagePhase, 'loading'>;
  * How this host names the node that holds a hosted person's key: their
  * doorway, which holds it and signs as them.
  */
-const DOORWAY_WORDS = approvalWords({ name: 'Your doorway', inSentence: 'your doorway' });
+const DOORWAY_WORDS = approvalWords({
+  name: 'Your doorway',
+  inSentence: 'your doorway',
+  // A doorway signs for a hosted person from its own servers; there is no
+  // terminal of theirs on that machine to send them to.
+  callerNotLocal:
+    'Your doorway would not sign this from where it was asked, so nothing was signed. Start again from the terminal on your device.',
+  callerNotLocalHeading: 'Not signed from here',
+});
 
 const EMPTY_REQUEST: ConsentViewResponse = {
   clientId: '',

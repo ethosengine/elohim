@@ -23,7 +23,13 @@ describe('AppComponent — the native device approval page’s header', () => {
     globalThis.fetch = async () => new Response('not found', { status: 404 });
   });
 
+  beforeEach(() => {
+    identityAnswer = { ok: false, status: 404, body: null };
+  });
+
   afterEach(() => TestBed.resetTestingModule());
+
+  let identityAnswer: { ok: false; status: number; body: unknown };
 
   async function render(): Promise<HTMLElement> {
     TestBed.configureTestingModule({
@@ -35,6 +41,10 @@ describe('AppComponent — the native device approval page’s header', () => {
             client: {
               view: async () => ({ ok: false, status: 404, body: null }),
               agree: async () => ({ ok: false, status: 404, body: null }),
+            },
+            identity: {
+              standing: async () => identityAnswer,
+              begin: async () => ({ ok: false, status: 404, body: null }),
             },
             signIn: () => undefined,
             handBack: () => undefined,
@@ -52,7 +62,7 @@ describe('AppComponent — the native device approval page’s header', () => {
 
   it('says, in this host’s words, that the person’s own device holds their key', async () => {
     const root = await render();
-    const chip = root.querySelector('[data-testid="device-consent-trust"]') as
+    const chip = root.querySelector('[data-testid="portal-trust"]') as
       | (HTMLElement & { strings?: { ownNodeLabel?: string } })
       | null;
     expect(chip?.getAttribute('slot')).toBe('header');
@@ -66,5 +76,18 @@ describe('AppComponent — the native device approval page’s header', () => {
     expect(header).toHaveLength(1);
     expect(root.querySelector('elohim-imagodei-attestor-row')).toBeNull();
     expect(root.textContent).not.toMatch(/hosted via|no witnesses/i);
+  });
+
+  it('while the person begins their identity in place, says the key will be made here', async () => {
+    identityAnswer = {
+      ok: false,
+      status: 409,
+      body: { error: 'none', code: 'consent_identity_unbootstrapped' },
+    };
+    const root = await render();
+    const chip = root.querySelector('[data-testid="portal-trust"]') as
+      | (HTMLElement & { strings?: { ownNodeLabel?: string } })
+      | null;
+    expect(chip?.strings?.ownNodeLabel).toBe('Your own device will make and keep your key');
   });
 });
