@@ -213,6 +213,17 @@ and is never acted on by itself.
   with an error and are simply not approving nodes.
 - **Multicast must reach.** Discovery is libp2p mDNS; a host or network that blocks multicast never
   lists the ask.
+- **A node that may not approve still lists asks.** In the live run (2026-10-05) a joined device
+  that is not a controller listed a later ask, offered `epr device approve <number>`, and the
+  asking terminal printed it as a node that lists the ask. Deciding there was refused only
+  because no person is signed in on that node (`consent_not_signed_in`), not because it may not
+  approve. A node with an identity of its own that joined as it is would be signed in as its own
+  person. Missing node: between "an ask reaches a node" and "the node lists it": whether this node
+  may approve for anyone (it is a controller of some identity); probe: a joined non-controller
+  answers the ask `ask_not_an_approving_node` and is absent from the asking terminal's list.
+- **Signed in means the no-cookie fallback.** `epr device approve` on the approving node carried
+  no session cookie; the decide route counted the node's person as signed in through the session
+  fallback that row 1 and `security-node-session-routes-unauthenticated` describe.
 - **Not built:** a clean start (a new key) for a node with an identity of its own; the joining
   node's operator confirming what will happen to its machine; a portal view of the pending list
   (`GET /auth/consent/pending` and `POST /auth/consent/pending/decide` are ready for one);
