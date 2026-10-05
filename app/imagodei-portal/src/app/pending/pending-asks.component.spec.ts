@@ -26,7 +26,7 @@ const LISTED: PendingAsksView = {
   carrier: 'private-network',
   approver: 'uhCAkme',
   speaksFor: { kind: 'person', ...PERSON },
-  speaksForWords: 'An approval here is for h-4c1d, identity uhCkk…root.',
+  speaksForWords: 'An approval here is for matthew (Matthew), identity uhCkk…root.',
   asks: [
     {
       number: 1,
@@ -114,17 +114,49 @@ describe('PendingAsksComponent — devices asking over the private network', () 
     expect((f.nativeElement as HTMLElement).textContent).not.toContain('h-4c1d');
   });
 
-  it('opens the same review card; declining makes no call', async () => {
+  it('opens the same review card; declining tells the node, and the ask leaves the list', async () => {
+    client.decide.mockResolvedValue({
+      ok: true,
+      body: { number: 1, decidedBy: 'answer', declined: true, handedBack: { taken: true } },
+    });
     const f = await create();
     (q(f, 'pending-review-1') as HTMLButtonElement).click();
     await settle();
     f.detectChanges();
     const card = q(f, 'device-consent-card') as HTMLElement & { phase?: string };
     expect(card.phase).toBe('review');
+
+    client.list.mockResolvedValue({ ok: true, body: { ...LISTED, asks: [] } });
     card.dispatchEvent(new CustomEvent('decline'));
+    await settle();
+    await settle();
     f.detectChanges();
-    expect(card.phase).toBe('declined');
-    expect(client.decide).not.toHaveBeenCalled();
+
+    expect(client.decide).toHaveBeenCalledWith({ ask: '1', answer: { agreedActs: [] } });
+    expect(q(f, 'device-consent-card')).toBeNull();
+    expect(q(f, 'pending-ask-1')).toBeNull();
+    expect(q(f, 'pending-notice')?.textContent).toContain('Nothing was approved.');
+    expect(q(f, 'pending-notice')?.textContent).toContain(
+      'was told, so its terminal stops waiting.'
+    );
+  });
+
+  it('a decline the node refused stays on the card and says why', async () => {
+    client.decide.mockResolvedValue({
+      ok: false,
+      status: 401,
+      body: { code: 'session_proof_stale' },
+    });
+    const f = await create();
+    (q(f, 'pending-review-1') as HTMLButtonElement).click();
+    await settle();
+    f.detectChanges();
+    q(f, 'device-consent-card')!.dispatchEvent(new CustomEvent('decline'));
+    await settle();
+    f.detectChanges();
+    expect((q(f, 'device-consent-card') as HTMLElement & { phase?: string }).phase).toBe('review');
+    expect(q(f, 'pending-notice')?.textContent).toContain('Nothing was declined');
+    expect(q(f, 'pending-sign-in-again')).not.toBeNull();
   });
 
   it('decides with the acts agreed, and goes back to the list', async () => {
@@ -172,12 +204,14 @@ describe('PendingAsksComponent — devices asking over the private network', () 
       body: {
         ...LISTED,
         speaksFor: { kind: 'nobody' },
-        speaksForWords: 'This node speaks for nobody.',
+        speaksForWords: 'This device does not speak for anyone, so it lists no requests.',
         asks: [],
       },
     });
     let f = await create();
-    expect(q(f, 'pending-lists-nothing')?.textContent).toBe('This node speaks for nobody.');
+    expect(q(f, 'pending-lists-nothing')?.textContent).toBe(
+      'This device does not speak for anyone, so it lists no requests.'
+    );
     expect(q(f, 'pending-asks')).toBeNull();
     TestBed.resetTestingModule();
 

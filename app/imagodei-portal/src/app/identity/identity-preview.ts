@@ -8,7 +8,8 @@
  * - sign-in: `refusal=invalid|slowed|paused|needs-session-key|needs-secure-channel|missing`
  *   (`retry=<seconds>` for slowed, `reason=<text>` for paused), `word=<text>`
  * - signed in (`phase=standing`): `asks=listed|empty|nobody|unknown|absent`
- *   (default listed), `delivered=0` to show a code instead of a hand-back
+ *   (default listed), `delivered=0` to show a code instead of a hand-back,
+ *   `told=0` for a declined device that could not be told
  * - `sign_in=1` — sent back to sign in again (the form, though a session is open)
  * - `refusal=<code>` — a refused begin (e.g. identity_name_malformed,
  *   consent_caller_not_local, consent_signing_unavailable)
@@ -123,7 +124,7 @@ export function previewPendingClient(search: string): PendingAsksClient {
       which === 'nobody' || which === 'unknown' ? { kind: which } : { kind: 'person', ...PERSON },
     speaksForWords:
       which === 'nobody'
-        ? 'This node speaks for nobody, so it lists nothing: it is not one of the nodes that may approve a device for anyone.'
+        ? 'This device does not speak for anyone, so it lists no requests.'
         : which === 'unknown'
           ? 'This node cannot say yet whom it speaks for, so it lists nothing for now.'
           : 'An approval here is for matthew (Matthew), identity uhCkk…J3uQ.',
@@ -158,22 +159,40 @@ export function previewPendingClient(search: string): PendingAsksClient {
           ]
         : [],
   };
+  const declined = new Set<number>();
   return {
-    list: async () => ({ ok: true, body: view }),
-    decide: async body => ({
+    list: async () => ({
       ok: true,
-      body: {
-        number: Number(body.ask),
-        decidedBy: 'answer',
-        agreed: {
-          returnTarget: { kind: 'display', value: 'K7QF-2MXD-9PLA' },
-          expiresAt: Date.now() + 4 * 60_000,
-          consentCid: 'bafyreiconsentpreview',
-          controllers: { required: 1, signed: 1 },
-          witnesses: [{ id: 'uhCAkme', act: 'signed', relation: 'this-device', state: 'done' }],
-        },
-        handedBack: { taken: params.get('delivered') !== '0' },
-      },
+      body: { ...view, asks: view.asks.filter(ask => !declined.has(ask.number)) },
     }),
+    decide: async body => {
+      if (body.answer?.agreedActs.length === 0) {
+        declined.add(Number(body.ask));
+        return {
+          ok: true,
+          body: {
+            number: Number(body.ask),
+            decidedBy: 'answer',
+            declined: true,
+            handedBack: { taken: params.get('told') !== '0' },
+          },
+        };
+      }
+      return {
+        ok: true,
+        body: {
+          number: Number(body.ask),
+          decidedBy: 'answer',
+          agreed: {
+            returnTarget: { kind: 'display', value: 'K7QF-2MXD-9PLA' },
+            expiresAt: Date.now() + 4 * 60_000,
+            consentCid: 'bafyreiconsentpreview',
+            controllers: { required: 1, signed: 1 },
+            witnesses: [{ id: 'uhCAkme', act: 'signed', relation: 'this-device', state: 'done' }],
+          },
+          handedBack: { taken: params.get('delivered') !== '0' },
+        },
+      };
+    },
   };
 }

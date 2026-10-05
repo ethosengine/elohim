@@ -6,8 +6,10 @@
  *
  * Reviewing an ask opens the same card and decision as a link: the shared
  * device approval controller, with a review client that decides the ask on
- * this node. Declining makes no call and no signature. A node that speaks
- * for nobody gets one line and no list; with no private network, nothing.
+ * this node. Declining is a real act here: the node signs nothing, the ask
+ * leaves the list, and the asking device is told so its terminal stops
+ * waiting. A node that speaks for nobody gets one line and no list; with no
+ * private network, nothing.
  */
 
 import {
@@ -29,6 +31,8 @@ import {
   PendingAsksController,
   approvalIsFor,
   listsNothingLine,
+  noticeAsksSignIn,
+  noticeLine,
   pendingAskConsentClient,
   pendingAskRequestParam,
   timeLeft,
@@ -62,7 +66,22 @@ const ACT_NAMES: Record<string, string> = {
           (expired)="onExpired()"
           (signInAgain)="onSignInAgain()"
         />
-        @if (review.phase !== 'signing') {
+        @if (state().notice; as notice) {
+          <p class="pending__notice" role="status" data-testid="pending-notice">
+            {{ lineFor(notice) }}
+          </p>
+          @if (asksSignIn) {
+            <button
+              type="button"
+              class="pending__action"
+              data-testid="pending-sign-in-again"
+              (click)="signInNeeded.emit()"
+            >
+              Sign in again
+            </button>
+          }
+        }
+        @if (review.phase !== 'signing' && state().declining === undefined) {
           <button
             type="button"
             class="pending__action pending__action--quiet"
@@ -78,6 +97,11 @@ const ACT_NAMES: Record<string, string> = {
         @case ('listed') {
           <section class="pending" aria-labelledby="pending-title" data-testid="pending-asks">
             <h2 id="pending-title" class="pending__title">Devices asking to join</h2>
+            @if (state().notice; as notice) {
+              <p class="pending__notice" role="status" data-testid="pending-notice">
+                {{ lineFor(notice) }}
+              </p>
+            }
             <p class="pending__muted">
               These devices are asking over the private network. Compare each key with the one its
               terminal shows before reviewing it.
@@ -147,6 +171,11 @@ const ACT_NAMES: Record<string, string> = {
 
       .pending__muted {
         opacity: 0.85;
+      }
+
+      .pending__notice {
+        padding-inline-start: 0.75rem;
+        border-inline-start: 3px solid color-mix(in srgb, currentColor 30%, transparent);
       }
 
       .pending__ask {
@@ -219,6 +248,7 @@ export class PendingAsksComponent implements OnInit {
 
   private list?: PendingAsksController;
   private decision?: DeviceConsentController;
+  private reviewed?: PendingAskView;
 
   ngOnInit(): void {
     this.list = new PendingAsksController({
@@ -231,6 +261,14 @@ export class PendingAsksComponent implements OnInit {
   get approvalFor(): string {
     const speaks = this.state().view?.speaksFor;
     return approvalIsFor(speaks?.kind === 'person' ? speaks : undefined);
+  }
+
+  lineFor(notice: NonNullable<PendingPageState['notice']>): string {
+    return noticeLine(notice);
+  }
+
+  get asksSignIn(): boolean {
+    return noticeAsksSignIn(this.state().notice);
   }
 
   get nothingLine(): string | undefined {
@@ -248,6 +286,8 @@ export class PendingAsksComponent implements OnInit {
 
   /** Open the same card and decision as a link, for this ask. */
   review(ask: PendingAskView): void {
+    this.list?.dismiss();
+    this.reviewed = ask;
     this.decision = new DeviceConsentController({
       requestParam: pendingAskRequestParam(ask),
       holder: { relation: 'this-device' },
@@ -264,8 +304,19 @@ export class PendingAsksComponent implements OnInit {
     void this.decision?.approve(approval);
   }
 
-  onDecline(): void {
-    this.decision?.decline();
+  /**
+   * Decline the ask on the node: nothing is signed, it leaves the list, and
+   * the asking device is told. Back to the list with that said; a decline
+   * the node did not take stays here, with why.
+   */
+  async onDecline(): Promise<void> {
+    const ask = this.reviewed;
+    if (!ask || !this.list) return;
+    if (await this.list.decline(ask)) {
+      this.decision = undefined;
+      this.reviewed = undefined;
+      this.reviewing.set(null);
+    }
   }
 
   onSignInAgain(): void {
@@ -278,6 +329,8 @@ export class PendingAsksComponent implements OnInit {
 
   backToList(): void {
     this.decision = undefined;
+    this.reviewed = undefined;
+    this.list?.dismiss();
     this.reviewing.set(null);
     void this.list?.read();
   }

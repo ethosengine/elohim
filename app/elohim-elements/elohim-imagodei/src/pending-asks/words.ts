@@ -1,16 +1,19 @@
 /**
  * What the pending-asks panel says, built from the node's answer. Whose
- * identity an approval is for leads with the sign-in word; the record id is
- * never shown. A node that speaks for nobody, or cannot say yet, gets the
- * node's own one line and no list.
+ * identity an approval is for leads with the sign-in word. A node that
+ * speaks for nobody, or cannot say yet, gets the node's own one line (which
+ * the node keeps person-safe) and no list.
  */
 
+import { isSessionProofRefusal } from '../session-key/index.js';
+
+import type { PendingNotice } from './controller.js';
 import type { PendingAsksView, SpeaksForPerson } from './wire.js';
 
 /** Keep a person-given name from reordering the sentence around it. */
 const isolate = (value: string): string => `⁨${value}⁩`;
 
-/** "matthew (Matthew)", "matthew", "Matthew" — never the record id. */
+/** "matthew (Matthew)", "matthew", "Matthew"; none when the node named no one. */
 // eslint-disable-next-line sonarjs/function-return-type -- a name or none
 export function whoFor(person: Omit<SpeaksForPerson, 'kind'> | undefined): string | undefined {
   const word = person?.identifier?.trim();
@@ -35,6 +38,28 @@ export function approvalIsFor(person: Omit<SpeaksForPerson, 'kind'> | undefined)
 // eslint-disable-next-line sonarjs/function-return-type -- a sentence or none
 export function listsNothingLine(view: PendingAsksView): string | undefined {
   return view.speaksFor.kind === 'person' ? undefined : view.speaksForWords;
+}
+
+/** After a decline: nothing was approved, and whether the asking device was told. */
+export function noticeLine(notice: PendingNotice): string {
+  const who = isolate(notice.label);
+  if (notice.kind === 'declined') {
+    return notice.told
+      ? `Nothing was approved. “${who}” was told, so its terminal stops waiting.`
+      : `Nothing was approved. “${who}” could not be told, so its terminal waits until its request runs out.`;
+  }
+  if (notice.code === 'consent_reauthentication_asked' || isSessionProofRefusal(notice.code)) {
+    return `Nothing was declined: this browser’s sign-in can no longer be confirmed. Sign in again, then decline “${who}” again.`;
+  }
+  return `Nothing was declined: this device did not take the answer for “${who}”. Try again in a moment.`;
+}
+
+/** Whether a failed decline is one signing in again can help. */
+export function noticeAsksSignIn(notice: PendingNotice | undefined): boolean {
+  return (
+    notice?.kind === 'decline-failed' &&
+    (notice.code === 'consent_reauthentication_asked' || isSessionProofRefusal(notice.code))
+  );
 }
 
 /** "About 4 minutes left", "40 seconds left", "No time left". */

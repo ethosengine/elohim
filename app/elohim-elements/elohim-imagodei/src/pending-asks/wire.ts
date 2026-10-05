@@ -18,7 +18,7 @@ export interface SpeaksForPerson {
   kind: 'person';
   /** The sign-in word: a claim, shown, never used to decide. */
   identifier?: string;
-  /** The Human record's id. Never shown to a person. */
+  /** The Human record's id. Never shown, and nothing here reads it. */
   humanId?: string;
   displayName?: string;
   identityRoot: string;
@@ -76,7 +76,13 @@ export type PendingDecideResponse =
       agreed: ConsentAgreeResponse;
       handedBack: { taken: boolean; answer?: unknown; error?: string };
     }
-  | { number: number; decidedBy: string; declined: true };
+  | {
+      number: number;
+      decidedBy: string;
+      declined: true;
+      /** Whether the asking device took the answer, so its terminal stops waiting. */
+      handedBack?: { taken: boolean };
+    };
 
 export interface PendingAsksClient {
   list(): Promise<SameOriginResult<PendingAsksView>>;
