@@ -252,6 +252,37 @@ pub trait ControllerCell: Send + Sync {
     /// Record the identity authority for the Human `identity_root`, with this
     /// cell as its first and only controller.
     async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure>;
+    /// Create this cell's agent's Human record. The extern returns the existing
+    /// one, writing nothing, when the agent already has one.
+    async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure>;
+}
+
+/// What a person supplies to begin their identity: the minimum the imagodei
+/// `create_human` extern requires.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewHuman {
+    pub id: String,
+    pub display_name: String,
+    /// `public`, `community` or `private`.
+    pub profile_reach: String,
+}
+
+/// Who may make this node's key sign as its person.
+///
+/// The person's own node signs for a caller on its own machine. Nothing else
+/// a caller can bring today proves it is the person: `POST /session` takes
+/// whoever asks, `GET /session` hands any caller the active session's id, and
+/// with no cookie the single active session stands in for everyone. So a
+/// caller from any other address is refused by name, whatever session it
+/// presents. Reads are not affected.
+pub fn signing_caller_refusal(caller_is_local: bool) -> Option<Response<Full<Bytes>>> {
+    (!caller_is_local).then(|| {
+        refusal(
+            StatusCode::FORBIDDEN,
+            "this signs with this node's key as you, so it is done on this node's own machine",
+            "consent_caller_not_local",
+        )
+    })
 }
 
 fn unavailable(detail: &str) -> Response<Full<Bytes>> {
@@ -451,6 +482,114 @@ pub async fn bootstrap_identity(
         ),
         Err(refused) => *refused,
     }
+}
+
+/// What a person on this node's machine sends to begin their identity here.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BeginInput {
+    /// What the person is called. Required: the Human record cannot be empty.
+    pub display_name: String,
+    /// The Human's id. A random one is drawn when absent, as a doorway does.
+    #[serde(default)]
+    pub human_id: Option<String>,
+    /// The word the person signs in with. Defaults to the Human's id.
+    #[serde(default)]
+    pub identifier: Option<String>,
+    /// Defaults to `private`: a profile begun on one's own node is shown to
+    /// no one until the person says otherwise.
+    #[serde(default)]
+    pub profile_reach: Option<String>,
+}
+
+/// What beginning an identity did, for the host to finish with a session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Begun {
+    pub standing: StandingView,
+    pub human_id: String,
+    pub identifier: String,
+    pub display_name: String,
+    pub human_created: bool,
+    pub authority_created: bool,
+}
+
+const MAX_NAME_LEN: usize = 128;
+
+/// Begin a person's identity on this node, with no doorway: create their
+/// Human if the node has none, record the identity authority if there is
+/// none, and say what was done. Every step is skipped when already done, so
+/// asking again writes nothing. The host then opens the person's session.
+pub async fn begin_identity(
+    cell: Option<&dyn ControllerCell>,
+    body: &[u8],
+) -> Result<Begun, Refused> {
+    let input: BeginInput = parse(body)?;
+    let name = input.display_name.trim().to_string();
+    let reach = input.profile_reach.unwrap_or_else(|| "private".into());
+    let id = input
+        .human_id
+        .map(|h| h.trim().to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let identifier = input
+        .identifier
+        .map(|i| i.trim().to_string())
+        .unwrap_or_else(|| id.clone());
+    let fits = |t: &str| {
+        !t.is_empty() && t.chars().count() <= MAX_NAME_LEN && !t.chars().any(char::is_control)
+    };
+    if !fits(&name) || !fits(&id) || !fits(&identifier) {
+        return Err(Box::new(refusal(
+            StatusCode::BAD_REQUEST,
+            "a name, id and sign-in word are each plain text of at most 128 characters",
+            "identity_name_malformed",
+        )));
+    }
+    if !matches!(reach.as_str(), "public" | "community" | "private") {
+        return Err(Box::new(refusal(
+            StatusCode::BAD_REQUEST,
+            "a profile is public, community or private",
+            "identity_reach_unknown",
+        )));
+    }
+    let Some(cell) = cell else {
+        return Err(Box::new(unavailable("no conductor client")));
+    };
+    let mut human_created = false;
+    let mut authority_created = false;
+    let mut standing = cell
+        .standing()
+        .await
+        .map_err(|f| Box::new(cell_failure(f)))?;
+    if standing == CellStanding::NoPerson {
+        let human = NewHuman {
+            id: id.clone(),
+            display_name: name.clone(),
+            profile_reach: reach,
+        };
+        cell.create_human(&human)
+            .await
+            .map_err(|f| Box::new(cell_failure(f)))?;
+        human_created = true;
+        standing = cell
+            .standing()
+            .await
+            .map_err(|f| Box::new(cell_failure(f)))?;
+    }
+    if let CellStanding::Unbootstrapped { identity_root } = &standing {
+        cell.bootstrap(identity_root)
+            .await
+            .map_err(|f| Box::new(cell_failure(f)))?;
+        authority_created = true;
+    }
+    let ready = ready_standing(cell).await?;
+    Ok(Begun {
+        standing: StandingView::of(&ready, &cell.agent()),
+        human_id: id,
+        identifier,
+        display_name: name,
+        human_created,
+        authority_created,
+    })
 }
 
 // =============================================================================
@@ -789,6 +928,7 @@ mod tests {
         signs: Result<(), CellFailure>,
         asked: Mutex<Vec<ApprovalRequest>>,
         bootstraps: Mutex<Vec<String>>,
+        humans: Mutex<Vec<NewHuman>>,
     }
 
     fn ready() -> CellStanding {
@@ -808,6 +948,7 @@ mod tests {
                 signs: Ok(()),
                 asked: Mutex::new(Vec::new()),
                 bootstraps: Mutex::new(Vec::new()),
+                humans: Mutex::new(Vec::new()),
             }
         }
     }
@@ -823,6 +964,13 @@ mod tests {
         async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure> {
             self.bootstraps.lock().unwrap().push(identity_root.into());
             *self.standing.lock().unwrap() = Ok(ready());
+            Ok(())
+        }
+        async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure> {
+            self.humans.lock().unwrap().push(human.clone());
+            *self.standing.lock().unwrap() = Ok(CellStanding::Unbootstrapped {
+                identity_root: IDENTITY.into(),
+            });
             Ok(())
         }
         async fn sign(&self, approval: &ApprovalRequest) -> Result<ApprovalProofs, CellFailure> {
@@ -869,6 +1017,63 @@ mod tests {
         let (status, read) = json(identity_standing(Some(&cell), true).await).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(read, view);
+    }
+
+    #[tokio::test]
+    async fn a_person_begins_on_their_own_node_with_no_doorway() {
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        let begun = begin_identity(Some(&cell), br#"{"displayName":"Matthew"}"#)
+            .await
+            .unwrap();
+        assert!(begun.human_created && begun.authority_created);
+        assert!(begun.standing.rests_on_this_node_alone);
+        assert_eq!(begun.identifier, begun.human_id);
+        let humans = cell.humans.lock().unwrap().clone();
+        assert_eq!(humans.len(), 1);
+        assert_eq!(humans[0].display_name, "Matthew");
+        assert_eq!(humans[0].profile_reach, "private");
+        assert_eq!(humans[0].id, begun.human_id);
+
+        // Again: nothing more is created.
+        let again = begin_identity(Some(&cell), br#"{"displayName":"Matthew"}"#)
+            .await
+            .unwrap();
+        assert!(!again.human_created && !again.authority_created);
+        assert_eq!(again.standing, begun.standing);
+        assert_eq!(cell.humans.lock().unwrap().len(), 1);
+        assert_eq!(cell.bootstraps.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_begin_names_what_is_wrong_with_it() {
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        for (body, code) in [
+            (r#"{"displayName":"   "}"#, "identity_name_malformed"),
+            (r#"{"displayName":"a\nb"}"#, "identity_name_malformed"),
+            (
+                r#"{"displayName":"M","profileReach":"commons"}"#,
+                "identity_reach_unknown",
+            ),
+        ] {
+            let refused = begin_identity(Some(&cell), body.as_bytes())
+                .await
+                .unwrap_err();
+            let (status, json_body) = json(*refused).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+            assert_eq!(json_body["code"], code, "{body}");
+        }
+        let refused = begin_identity(Some(&cell), br#"{"displayName":"M","doorwayUrl":"x"}"#)
+            .await
+            .unwrap_err();
+        assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+        assert!(cell.humans.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn only_this_machine_may_make_the_node_sign_as_its_person() {
+        assert!(signing_caller_refusal(true).is_none());
+        let refused = signing_caller_refusal(false).unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

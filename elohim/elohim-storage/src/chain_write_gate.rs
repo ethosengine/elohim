@@ -500,6 +500,7 @@ pub const CRATE_WRITE_FNS: &[&str] = &[
     "create_agent_peer_binding",
     "create_collab_agreement",
     "create_collective",
+    "create_human",           // Human entry + IdToHuman + AgentKeyToHuman links
     "create_self_revocation", // cross-DNA bridge → elohim chain
     "issue_attestation",
     "remove_portal_host",

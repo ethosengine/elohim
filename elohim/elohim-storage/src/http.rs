@@ -2917,6 +2917,11 @@ impl HttpServer {
             (Method::POST, "/auth/identity/bootstrap") => {
                 Box::pin(self.handle_identity(req, true)).await
             }
+            // Begin a person's identity on this node with no doorway: their
+            // Human, its authority and a session. This machine only.
+            (Method::POST, "/auth/identity/begin") => {
+                Box::pin(self.handle_identity_begin(req)).await
+            }
 
             // The asking device's own node, for its terminal: what this node
             // is, and enrolling it with what the terminal collected. Answered
@@ -13406,10 +13411,11 @@ impl HttpServer {
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         use crate::services::device_consent::{
             bootstrap_identity, cross_site_refusal, foreign_origin_refusal, identity_standing,
-            ControllerCell,
+            signing_caller_refusal, ControllerCell,
         };
         let refused = if bootstrap {
-            cross_site_refusal(req.headers())
+            signing_caller_refusal(caller_is_local(&req))
+                .or_else(|| cross_site_refusal(req.headers()))
         } else {
             foreign_origin_refusal(req.headers())
         };
@@ -13424,6 +13430,93 @@ impl HttpServer {
         } else {
             identity_standing(cell, signed_in).await
         })
+    }
+
+    /// POST /auth/identity/begin — a person on this node's machine begins their
+    /// identity here: Human, authority and a session, with no doorway field.
+    async fn handle_identity_begin(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            begin_identity, cross_site_refusal, signing_caller_refusal, ControllerCell,
+        };
+        if let Some(refused) = signing_caller_refusal(caller_is_local(&req))
+            .or_else(|| cross_site_refusal(req.headers()))
+        {
+            return Ok(refused);
+        }
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(response::service_unavailable("Database not enabled"));
+        };
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        let cell = self.own_controller_cell();
+        let begun =
+            match begin_identity(cell.as_ref().map(|c| c as &dyn ControllerCell), &body).await {
+                Ok(begun) => begun,
+                Err(refused) => return Ok(*refused),
+            };
+        let agent = cell
+            .as_ref()
+            .map(|c| c.agent())
+            .ok_or_else(|| StorageError::Internal("controller cell vanished".into()))?;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        // Reuse the person's active session on this node; otherwise open one.
+        // No doorway authenticated it, so its doorway field is left empty, which
+        // never allowlists a doorway for `/session/exchange`.
+        let (session, session_created) = match db::local_sessions::get_active_session(&mut conn)? {
+            Some(s) if s.agent_pub_key == agent => (s, false),
+            _ => (
+                db::local_sessions::create_session(
+                    &mut conn,
+                    db::local_sessions::CreateLocalSessionInput {
+                        id: None,
+                        human_id: begun.human_id.clone(),
+                        agent_pub_key: agent,
+                        doorway_url: String::new(),
+                        doorway_id: None,
+                        identifier: begun.identifier.clone(),
+                        display_name: Some(begun.display_name.clone()),
+                        profile_image_hash: None,
+                        bootstrap_url: None,
+                    },
+                )?,
+                true,
+            ),
+        };
+        let created = begun.human_created || begun.authority_created || session_created;
+        let body = serde_json::json!({
+            "standing": begun.standing,
+            "session": { "id": session.id, "humanId": session.human_id, "identifier": session.identifier },
+            "created": {
+                "human": begun.human_created,
+                "authority": begun.authority_created,
+                "session": session_created,
+            },
+        });
+        let status = if created {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        };
+        Ok(Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(
+                header::SET_COOKIE,
+                format!(
+                    "elohim_session={}; HttpOnly; SameSite=Lax; Path=/",
+                    session.id
+                ),
+            )
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap())
     }
 
     /// GET /auth/device/self, POST /auth/device/enroll.
@@ -13470,8 +13563,12 @@ impl HttpServer {
         &self,
         req: Request<Incoming>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        use crate::services::device_consent::{agree, cross_site_refusal, ControllerCell};
-        if let Some(refused) = cross_site_refusal(req.headers()) {
+        use crate::services::device_consent::{
+            agree, cross_site_refusal, signing_caller_refusal, ControllerCell,
+        };
+        if let Some(refused) = signing_caller_refusal(caller_is_local(&req))
+            .or_else(|| cross_site_refusal(req.headers()))
+        {
             return Ok(refused);
         }
         let signed_in = self.person_signed_in(req.headers())?;
@@ -21199,6 +21296,23 @@ mod session_exchange_tests {
     }
 
     // Cookie-extraction helper unit coverage.
+    #[test]
+    fn only_a_loopback_connection_counts_as_this_machine() {
+        let with = |addr: Option<&str>| {
+            let mut req = Request::builder().uri("/").body(()).unwrap();
+            if let Some(a) = addr {
+                req.extensions_mut().insert(CallerAddr(a.parse().unwrap()));
+            }
+            caller_is_local(&req)
+        };
+        assert!(with(Some("127.0.0.1:5000")));
+        assert!(with(Some("[::1]:5000")));
+        assert!(!with(Some("10.1.19.170:5000")));
+        assert!(!with(Some("192.168.1.20:5000")));
+        // A request that did not come through `serve` carries no address.
+        assert!(!with(None));
+    }
+
     #[test]
     fn extract_session_cookie_parses_pairs() {
         let mut headers = hyper::HeaderMap::new();

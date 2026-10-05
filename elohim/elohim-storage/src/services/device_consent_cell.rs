@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use super::device_consent::{
     ApprovalProofs, ApprovalRequest, BindingReceipt, CellFailure, CellStanding, ControllerCell,
-    DeviceCell, DeviceSelf,
+    DeviceCell, DeviceSelf, NewHuman,
 };
 use crate::error::StorageError;
 use crate::hc_client::{HcClient, MISHPAT_ROLE};
@@ -85,6 +85,17 @@ struct DeviceBindingWire {
     intent: DeviceIntentWire,
     controllers: Vec<ProofWire>,
     possession: ProofWire,
+}
+
+/// The imagodei coordinator's `CreateHumanInput`.
+#[derive(Serialize, Debug)]
+struct CreateHumanWire<'a> {
+    id: &'a str,
+    display_name: &'a str,
+    bio: Option<String>,
+    affinities: Vec<String>,
+    profile_reach: &'a str,
+    location: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -259,6 +270,30 @@ impl ControllerCell for ConductorControllerCell {
             consent: proof(proofs.consent),
             enrollment: proofs.enrollment.map(proof),
         })
+    }
+
+    async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure> {
+        // Ordinary credentials reach the client's own imagodei cell only.
+        if self.hc.cell_id_for_role(MISHPAT_ROLE) != Some(&self.cell) {
+            return Err(CellFailure::Unavailable(
+                "this node creates a Human only for its own cell".into(),
+            ));
+        }
+        let payload = ExternIO::encode(CreateHumanWire {
+            id: &human.id,
+            display_name: &human.display_name,
+            bio: None,
+            affinities: Vec::new(),
+            profile_reach: &human.profile_reach,
+            location: None,
+        })
+        .map_err(|e| CellFailure::Unavailable(format!("human encoding: {e}")))?
+        .into_vec();
+        self.hc
+            .call_zome_imagodei("imagodei", "create_human", payload)
+            .await
+            .map_err(failure)?;
+        Ok(())
     }
 
     async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure> {
