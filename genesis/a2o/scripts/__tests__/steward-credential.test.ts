@@ -59,6 +59,31 @@ void test('the issuer credential is assigned, listed and carries exact payload b
   }
 });
 
+void test('a device consent and a whole approval are identity ceremonies, each bound to its exact payload', () => {
+  for (const operation of ['sign_device_consent', 'sign_device_approval']) {
+    const exact = {
+      ...mandate(),
+      delegate: null,
+      subjects: [],
+      binding: null,
+      operations: [operation],
+      exact_payload_json: '{"consent":1}',
+    };
+    const cap = scopedCapability(exact, 'mishpat', new Uint8Array(64), 99);
+    assert.equal(cap.functions.type, 'listed');
+    if (cap.functions.type === 'listed')
+      assert.equal(
+        cap.functions.value.some(([zome, fn]) => zome === 'mishpat' && fn === operation),
+        true
+      );
+    // Never without the exact payload, and never on the content surface.
+    assert.throws(() =>
+      scopedCapability({ ...exact, exact_payload_json: null }, 'mishpat', new Uint8Array(64), 99)
+    );
+    assert.throws(() => scopedCapability(exact, 'content_store', new Uint8Array(64), 99));
+  }
+});
+
 void test('the ceremony refuses wildcards, duplicates, missing bindings, expired grants and mixed authority surfaces', () => {
   for (const changed of [
     { subjects: [{ id: '*', root }] },

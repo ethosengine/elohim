@@ -54,6 +54,8 @@ const CONTENT_OPERATIONS = new Set([
 ]);
 const CEREMONY_OPERATIONS = new Set([
   'bootstrap_device_identity',
+  'sign_device_consent',
+  'sign_device_approval',
   'sign_device_enrollment',
   'sign_device_revocation',
   'revoke_identity_device',
