@@ -25,8 +25,11 @@ export { ElohimImagodeiSettingsPalette } from './elohim-imagodei-settings-palett
 
 export { ElohimImagodeiStewardConfigureBanner } from './elohim-imagodei-steward-configure-banner.js';
 
-export { ElohimImagodeiTrustIndicator } from './elohim-imagodei-trust-indicator.js';
-export type { TrustMode } from './elohim-imagodei-trust-indicator.js';
+export {
+  ElohimImagodeiTrustIndicator,
+  TRUST_INDICATOR_STRINGS_EN,
+} from './elohim-imagodei-trust-indicator.js';
+export type { TrustIndicatorStrings, TrustMode } from './elohim-imagodei-trust-indicator.js';
 
 export { ElohimImagodeiAttestorRow } from './elohim-imagodei-attestor-row.js';
 export type { AttestorRef } from './elohim-imagodei-attestor-row.js';

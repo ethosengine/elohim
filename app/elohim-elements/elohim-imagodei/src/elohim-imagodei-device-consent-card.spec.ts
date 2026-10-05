@@ -303,6 +303,29 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     expect(text(el)).to.include('Only that terminal can use it');
   });
 
+  it('code: stays on one line in a narrow card, the type shrinking to fit', async () => {
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <div style="inline-size: 240px">
+        <elohim-imagodei-device-consent-card
+          .request=${ENROLL_ONLY}
+          phase="code"
+          code="K7QF-2MXD-9PLA"
+          .expiresAt=${Date.now() + 5 * 60_000}
+        ></elohim-imagodei-device-consent-card>
+      </div>
+    `);
+    const card = el.querySelector('elohim-imagodei-device-consent-card')!;
+    await card.updateComplete;
+    const code = q(card, '[part="code"]')!;
+    const style = getComputedStyle(code);
+    expect(style.whiteSpace).to.equal('nowrap');
+    expect(Number.parseFloat(style.fontSize)).to.be.below(28);
+    // One line box tall: the code did not wrap.
+    expect(code.getBoundingClientRect().height).to.be.below(
+      Number.parseFloat(style.lineHeight) * 1.5 + Number.parseFloat(style.paddingTop) * 2
+    );
+  });
+
   it('code: the live region speaks in whole minutes, not every second', async () => {
     const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
       <elohim-imagodei-device-consent-card

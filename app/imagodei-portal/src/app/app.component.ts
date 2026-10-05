@@ -104,6 +104,15 @@ export function devicePageFor(pathname: string): DevicePage | null {
         </ng-container>
 
         <ng-container *ngIf="mode() === 'device-consent'">
+          <!-- On the person's own node nothing is hosted, and the page below
+               names who signed: the header says only what holds the key,
+               in this host's words, and no witness line. -->
+          <elohim-imagodei-trust-indicator
+            slot="header"
+            data-testid="device-consent-trust"
+            trust-mode="peer-conductor"
+            [strings]="ownDeviceHeaderWords"
+          ></elohim-imagodei-trust-indicator>
           <imagodei-portal-device-approval
             *ngIf="devicePage() === 'live'"
             slot="primary"
@@ -185,6 +194,9 @@ export class AppComponent implements OnInit, AfterViewInit {
   stewardMessage = signal<string>('');
   /** The doorway origin to offer as a "return to your doorway" action. */
   stewardReturnUrl = signal<string>('');
+
+  /** The native header's words: the person's own device holds their key. */
+  readonly ownDeviceHeaderWords = { ownNodeLabel: 'Your own device holds your key' };
 
   /** Which device approval page this is, when the path names one. */
   devicePage = signal<DevicePage | null>(null);

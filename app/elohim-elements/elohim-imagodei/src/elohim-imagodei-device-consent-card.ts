@@ -249,7 +249,7 @@ const ANNOUNCE_SECONDS = [30, 10];
  * @cssprop --elohim-device-consent-decline-fg - Decline button foreground (default: inherit)
  * @cssprop --elohim-device-consent-code-bg - One-time code background (default: 6% currentColor mix)
  * @cssprop --elohim-device-consent-code-font - One-time code font family (default: ui-monospace, monospace)
- * @cssprop --elohim-device-consent-code-size - One-time code font size (default: 1.75rem)
+ * @cssprop --elohim-device-consent-code-size - One-time code font size (default: scales with the card's width, 1rem to 1.75rem); the code never wraps
  * @cssprop --elohim-device-consent-focus-ring - Focus outline (FULL shorthand; default: 2px solid currentColor)
  *
  * @csspart card - The outer container (carries data-phase)
@@ -292,6 +292,8 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       display: grid;
       gap: var(--elohim-device-consent-gap, 1rem);
       min-inline-size: 0;
+      /* The code's type scales with the card's own width (cqi below). */
+      container-type: inline-size;
     }
 
     [part='heading'] {
@@ -473,7 +475,12 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       );
       border-radius: var(--elohim-device-consent-radius, 6px);
       font-family: var(--elohim-device-consent-code-font, ui-monospace, monospace);
-      font-size: var(--elohim-device-consent-code-size, 1.75rem);
+      /* The code is copied and compared by eye, so it stays on one line:
+         its type shrinks to the card's width, and a block too narrow even
+         for that scrolls instead of breaking it at a hyphen. */
+      font-size: var(--elohim-device-consent-code-size, clamp(1rem, 8cqi, 1.75rem));
+      white-space: nowrap;
+      overflow-x: auto;
       letter-spacing: 0.08em;
       line-height: 1.3;
       overflow-wrap: anywhere;
