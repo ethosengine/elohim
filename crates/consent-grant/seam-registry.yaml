@@ -686,7 +686,7 @@ decisionPoints:
     sourceLocation:
       file: src/signin.rs
       modulePath: consent_grant::signin::AttemptLimiter::check
-      line: 210
+      line: 232
     summary: >
       How often a sign-in may be tried: three free failures per source and ten for the node's one
       account, then a delay that doubles with each failure up to fifteen minutes; a quiet spell
@@ -704,4 +704,102 @@ decisionPoints:
         kind: unit
       - path: crates/consent-grant/src/signin.rs
         testName: the_delay_never_exceeds_its_ceiling_and_sources_stay_bounded
+        kind: unit
+
+  - name: session_proof_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/dpop.rs
+      modulePath: consent_grant::dpop::session_proof_verdict
+      line: 437
+    summary: >
+      RFC 9449 (DPoP) adapted to a cookie-carried session: a session bound to a key must present,
+      on each request to a route that makes the node sign and on sign-out, a compact JWS (typ
+      dpop+jwt, alg ES256 or EdDSA, the public jwk) whose key's RFC 7638 thumbprint is the
+      session's, signing claims jti, htm (the method), htu (compared on its path alone: scheme,
+      host, query and fragment ignored, since the node may sit behind a proxy), iat within 60
+      seconds either way, and bsh (base64url SHA-256 of the exact body bytes; not in the RFC). An
+      unbound session needs none. bind_session_key applies the same check at sign-in with the
+      offered key. Verification sits behind AlgVerifier, keyed by alg: a platform-held key under
+      another algorithm is an addition, not a change. Parsing is strict: three segments, no crit,
+      no other alg, never none, no private key members.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: A copied cookie cannot make the node sign; only the bound key's signature over this request can.
+      - id: C4
+        status: answered
+        justification: Missing, invalid, stale and replayed are distinct refusals; each asks only for a fresh sign-in.
+      - id: C5
+        status: answered
+        justification: >
+          The key in the proof is compared by thumbprint to the one bound at sign-in, whose
+          possession was proven then; the signature covers method, path and body.
+      - id: C6a
+        status: answered
+        justification: Proofs are cut at 4096 bytes and jti at 128 characters; parsing is three fixed segments.
+    contractTests:
+      - path: crates/consent-grant/src/dpop.rs
+        testName: the_worked_example_verifies_byte_for_byte
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: both_algorithms_verify_and_are_compared_by_thumbprint
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: each_way_a_proof_fails_is_refused_by_name
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: only_two_algorithms_and_only_public_keys_are_accepted
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: an_unbound_session_needs_no_proof_and_a_bound_one_does
+        kind: unit
+
+  - name: ReplaySet::first_use
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/dpop.rs
+      modulePath: consent_grant::dpop::ReplaySet::first_use
+      line: 372
+    summary: >
+      A proof is single use: keyed by key thumbprint and jti, each kept 120 seconds (twice the iat
+      window, beyond which a proof is stale anyway). In memory, at most 4096 entries, swept by age;
+      when still full the proof is refused, and the set never grows.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: Capped and swept by age; over the cap refuses instead of growing.
+      - id: C6b
+        status: answered
+        justification: A replayed proof is refused; the same jti under another key is another proof.
+      - id: C3
+        status: partial
+        justification: >
+          In memory: a restart forgets the set, so a proof captured in its last 60 seconds could be
+          replayed once after a restart within its iat window.
+    contractTests:
+      - path: crates/consent-grant/src/dpop.rs
+        testName: the_replay_set_is_bounded_and_forgets_by_age
+        kind: unit
+
+  - name: sign_in_key_rule
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::sign_in_key_rule
+      line: 108
+    summary: >
+      Over TLS a sign-in must bind its session to a key (signin_needs_session_key, 400); over plain
+      http from another machine it may be unbound and is logged once as such; on this machine
+      either.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Each channel and key combination has its answer.
+      - id: C12
+        status: partial
+        justification: Plain http stays unbound by necessity; the floor-readiness must-have covers it.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: over_tls_a_sign_in_binds_a_key_and_in_the_clear_it_may_not
         kind: unit

@@ -79,7 +79,8 @@ impl Decider for NoElohimAttending {
 pub struct ByDeclaration<'a>(pub &'a Declaration);
 
 /// Why a node with an identity of its own goes to whoever answers.
-pub const OWN_IDENTITY_REASON: &str = "this node already has an identity of its own, so it is not \
+pub const OWN_IDENTITY_REASON: &str =
+    "the asking device already has an identity of its own, so it is not \
     approved by declaration; joining it keeps its key and leaves what it made as it was";
 
 impl Decider for ByDeclaration<'_> {
@@ -98,7 +99,7 @@ impl Decider for ByDeclaration<'_> {
                 reason: OWN_IDENTITY_REASON.into(),
             },
             NodeState::Joined => Decision::Defer {
-                reason: "this node is already one of someone's nodes, so it is not approved by \
+                reason: "the asking device already speaks for someone, so it is not approved by \
                          declaration"
                     .into(),
             },

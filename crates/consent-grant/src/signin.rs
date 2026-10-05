@@ -98,12 +98,30 @@ fn channel_verdict(channel: Channel, plain_allowed: bool) -> Result<bool, SignIn
     }
 }
 
+/// Whether a sign-in must bind its session to a key the browser holds
+/// ([`crate::dpop`]). Over TLS it must: a browser on a secure page can always
+/// hold one, and then a copied cookie is worth nothing on the routes that make
+/// the node sign. Over plain http from another machine it may not (the
+/// browser cannot hold one there): allowed unbound, and `Ok(true)` says so for
+/// the host to log once. On this machine either is fine: this-machine acts
+/// need no session at all.
+pub fn sign_in_key_rule(channel: Channel, offers_key: bool) -> Result<bool, SignInRefusal> {
+    match (channel, offers_key) {
+        (_, true) => Ok(false),
+        (Channel::Tls, false) => Err(SignInRefusal::NeedsSessionKey),
+        (Channel::Plain, false) => Ok(true),
+        (Channel::Loopback, false) => Ok(false),
+    }
+}
+
 /// Every way a sign-in is refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignInRefusal {
     /// From another machine, not over TLS. Not produced while
     /// [`PLAIN_SIGN_IN_ALLOWED`] holds.
     NeedsSecureChannel,
+    /// Over TLS, with no session key offered.
+    NeedsSessionKey,
     /// Too many recent failures; try again after this many seconds.
     Slowed { retry_after_secs: u64 },
     /// No sign-in secret is set on this node.
@@ -118,6 +136,7 @@ impl SignInRefusal {
     pub fn code(&self) -> &'static str {
         match self {
             Self::NeedsSecureChannel => "signin_needs_secure_channel",
+            Self::NeedsSessionKey => "signin_needs_session_key",
             Self::Slowed { .. } => "signin_slowed",
             Self::SecretUnset => "signin_secret_unset",
             // The doorway's code, so one form reads both.
@@ -132,6 +151,9 @@ impl SignInRefusal {
             Self::NeedsSecureChannel => "signing in from another machine needs a secure \
                                          connection (https) to this node; sign in on the node's \
                                          own machine, or reach it through its https address"
+                .to_string(),
+            Self::NeedsSessionKey => "this browser did not offer a key to bind the sign-in to; \
+                                      reload the page and sign in again"
                 .to_string(),
             Self::Slowed { retry_after_secs } => {
                 format!("too many sign-in attempts; try again in {retry_after_secs} seconds")
@@ -322,6 +344,22 @@ mod tests {
         assert_eq!(sign_in_channel_verdict(Channel::Plain), Ok(true));
         assert_eq!(sign_in_channel_verdict(Channel::Tls), Ok(false));
         assert_eq!(sign_in_channel_verdict(Channel::Loopback), Ok(false));
+    }
+
+    #[test]
+    fn over_tls_a_sign_in_binds_a_key_and_in_the_clear_it_may_not() {
+        assert_eq!(sign_in_key_rule(Channel::Tls, true), Ok(false));
+        assert_eq!(
+            sign_in_key_rule(Channel::Tls, false),
+            Err(SignInRefusal::NeedsSessionKey)
+        );
+        assert_eq!(
+            SignInRefusal::NeedsSessionKey.code(),
+            "signin_needs_session_key"
+        );
+        assert_eq!(sign_in_key_rule(Channel::Plain, false), Ok(true));
+        assert_eq!(sign_in_key_rule(Channel::Plain, true), Ok(false));
+        assert_eq!(sign_in_key_rule(Channel::Loopback, false), Ok(false));
     }
 
     #[test]

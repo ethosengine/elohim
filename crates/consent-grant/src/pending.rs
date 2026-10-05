@@ -88,7 +88,7 @@ impl NodeState {
             Self::OwnIdentity {
                 made: Made::Unknown,
             } => "began an identity of its own; whether it made anything under it is not known",
-            Self::Joined => "is already one of someone's nodes",
+            Self::Joined => "already speaks for someone",
         }
     }
 }
@@ -169,19 +169,19 @@ impl Speaks {
                     (Some(word), Some(name), _) if word != name => format!("{word} ({name})"),
                     (Some(word), _, _) => word.clone(),
                     (None, Some(name), _) => name.clone(),
-                    (None, None, Some(id)) => id.clone(),
-                    (None, None, None) => "a person".to_string(),
+                    // Never the record id: a person reads this.
+                    (None, None, _) => "a person".to_string(),
                 };
                 format!(
                     "An approval here is for {who}, identity {}.",
                     p.identity_fingerprint
                 )
             }
-            Self::Nobody => "This node speaks for nobody, so it lists nothing: it is not one of \
-                             the nodes that may approve a device for anyone."
-                .to_string(),
-            Self::Unknown => "This node cannot say yet whom it speaks for, so it lists nothing \
-                              for now."
+            Self::Nobody => {
+                "This device does not speak for anyone, so it lists no requests.".to_string()
+            }
+            Self::Unknown => "This device cannot say yet whom it speaks for, so it lists no \
+                              requests for now."
                 .to_string(),
         }
     }
@@ -743,7 +743,7 @@ pub(crate) mod tests {
         );
         // No identity at all.
         assert_eq!(Speaks::of(None, &me, None, None), Speaks::Nobody);
-        assert!(Speaks::Nobody.words().contains("speaks for nobody"));
+        assert!(Speaks::Nobody.words().contains("does not speak for anyone"));
     }
 
     #[test]

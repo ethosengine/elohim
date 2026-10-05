@@ -54,6 +54,7 @@ pub mod controller;
 pub mod decide;
 pub mod declaration;
 pub mod delivery;
+pub mod dpop;
 pub mod enrollment;
 pub mod hash_shape;
 pub mod pending;
@@ -86,6 +87,11 @@ pub use declaration::{
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
+pub use dpop::{
+    bind_session_key, body_hash, check_proof, htu_path, read_proof, session_proof_verdict,
+    verifier, AlgVerifier, BoundKey, Proof, ProofFacts, ProofRefusal, ReplaySet, SessionKey,
+    IAT_WINDOW_SECS,
+};
 pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
 pub use pending::{
     Ask, Dropped, Listed, Made, NodeState, PendingAsk, PendingAsks, PendingView, Speaks, SpeaksFor,
@@ -94,8 +100,9 @@ pub use pending::{
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
 pub use signin::{
-    attend_sign_in, channel, may_make_node_sign, sign_in_channel_verdict, AttemptLimiter, Channel,
-    SignInClaims, SignInRefusal, PLAIN_SIGN_IN_ALLOWED, SESSION_LIFE_MICROS,
+    attend_sign_in, channel, may_make_node_sign, sign_in_channel_verdict, sign_in_key_rule,
+    AttemptLimiter, Channel, SignInClaims, SignInRefusal, PLAIN_SIGN_IN_ALLOWED,
+    SESSION_LIFE_MICROS,
 };
 pub use verify::{check_delivered, DeliveredRefusal};
 pub use witness::{

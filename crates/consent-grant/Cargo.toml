@@ -30,5 +30,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_ipld_dagcbor = "0.6"
 sha2 = "0.10"
+# Session-key proofs (`dpop`): the two algorithms a browser or a platform key
+# store can hold today. ed25519-dalek is already in the tree (elohim-epr);
+# p256 is RustCrypto's pure-Rust P-256, verification only.
+ed25519-dalek = "2.1"
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
 
 [dev-dependencies]

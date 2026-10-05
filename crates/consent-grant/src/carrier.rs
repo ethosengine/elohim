@@ -37,6 +37,13 @@ pub enum CarryRequest {
     Redeem {
         redemption: Redemption,
     },
+    /// The approving node declined the request with `state`: nothing was
+    /// signed, and the device's terminal stops waiting and says so.
+    Declined {
+        state: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        approver: Option<String>,
+    },
 }
 
 /// What the other node answers.
@@ -53,6 +60,8 @@ pub enum CarryResponse {
     Refused { code: String },
     /// The device's node holds the code for its terminal.
     CodeTaken,
+    /// The device's node took the decline; its terminal stops waiting.
+    DeclineTaken,
     /// What the code redeemed.
     Delivered { delivered: Box<Delivered> },
 }
