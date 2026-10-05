@@ -105,6 +105,60 @@ count, blob count or row count on any peer.
 | `content.db` + WAL | 3 MB + 5–9 MB | |
 | Kept coordinator bundle | 9.3 MB | |
 
+**Alpha fleet, storage volume by file class, 2026-10-05 19:28 UTC** (first
+read of the §6 gauges, after edge #1547; MB, file length).
+
+| Peer | Blobs | Blob files | Second blob store (`blobs_iroh`) | Extraction cache | Content db + log | Release adoption | Known holders per shard: 1 / 2 / 3 / 4 / 5+ |
+|---|---|---|---|---|---|---|---|
+| matthew | 1,192 | 273 | 1,110 | 1,141 | 34 | 47 | 266 / 4 / 3 / 0 / 0 |
+| adam | 787 | 176 | 663 | 966 | 30 | 25 | 172 / 2 / 3 / 0 / 0 |
+| jessica | 264 | 99 | 1.5 | none | 14 | 25 | 93 / 3 / 2 / 2 / 0 |
+| james | 267 | 43 | 1.5 | none | 12 | 25 | 38 / 3 / 3 / 1 / 0 |
+| susan | 268 | 42 | 1.5 | none | 9 | 25 | 38 / 1 / 3 / 0 / 0 |
+| eve | 257 | 39 | 1.5 | none | 9 | 21 | 36 / 2 / 1 / 2 / 0 |
+| gertrude | 257 | 39 | 1.5 | none | 9 | 12 | 34 / 4 / 1 / 2 / 0 |
+
+What this read establishes:
+
+- **The fleet's blob stores are not the seed corpus.** A quiet peer holds
+  257–268 MB in about 40 files, roughly 6.5 MB a file. The household's full
+  store is 31.8 MB in 3,574 files. The fleet holds few, large blobs; the
+  small per-content blobs are not there.
+- **Small-file slack is not the fleet's problem.** Allocated bytes match file
+  length on the blob stores. The §4 item that suggested otherwise is withdrawn
+  for the fleet; it stands for the household's filesystem only.
+- **Matthew and adam hold their blobs about three times.** Once in the blob
+  store, once more in a second store of nearly the same size, and once
+  unpacked in an extraction cache. Matthew's storage is 3.5 GB of which
+  1.2 GB is the blobs themselves.
+- **No shard on any peer is known to five holders.** Almost every shard is
+  known to one.
+- **The conductor split is still unread.** The conductor pods did not restart:
+  they take a new image only when the conductor pin moves or an operator asks.
+  No conductor pod exports the new gauges yet.
+
+**Where the growth is (14-day history of each peer's used bytes, against
+build logs).**
+
+- **Matthew accumulates app releases.** Each app build that changes content
+  publishes four zips (two apps, browser and server) totalling 23.66 MB, read
+  from the app pipeline's log. Matthew grew from 801 MB to 1,250 MB between
+  2026-09-21 and 2026-10-03, in steps that are whole multiples of 23.66 MB:
+  19 releases, 449 MB. Identical bundles deduplicate; nothing was seen to
+  delete an old release. With the second blob store and the extraction cache
+  tracking it, the volume grows about three times that.
+- **The quiet peers do not grow.** Gertrude and eve held 269.7 MB on
+  2026-09-21 and 269.9 MB today. App releases do not replicate to them. Their
+  ~40 files match the ~41 shards each registers, mostly with one known
+  holder. What those shards are has not been identified: no stored-blob log
+  line, CID or source was found.
+- **Adam** rose from 636 MB to 825 MB between 2026-09-21 and 2026-09-24; not
+  investigated.
+
+So the storage-side runaway is one peer's release history, and it is the
+ten-release window of §7 with no bound: 19 releases held where 10 are
+declared. The quiet peers' 270 MB is a separate, static question.
+
 ## 4. Where the excess is
 
 Ranked by measured bytes. The first three are owed regardless of design.
