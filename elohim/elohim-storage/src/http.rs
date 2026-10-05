@@ -2887,6 +2887,12 @@ impl HttpServer {
             // build_manifest().
             (Method::POST, "/auth/consent/view") => self.handle_consent_view(req).await,
 
+            // Device consent ceremony: the person, signed in on this node,
+            // agrees, and this node's own cell signs as their controller.
+            // Node-local; refuses cross-site callers before anything else.
+            // Boxed so this branch does not grow every request's future.
+            (Method::POST, "/auth/consent/agree") => Box::pin(self.handle_consent_agree(req)).await,
+
             // Device consent ceremony: the asking terminal redeems its code for
             // the signed consent, once. Guarded by the terminal's own verifier
             // and device key, so it needs no session.
@@ -13318,6 +13324,67 @@ impl HttpServer {
         Ok(crate::services::device_consent::consent_view(&body))
     }
 
+    /// The local session a request speaks for, resolved one way for every
+    /// route that asks: the session an `elohim_session` cookie names, when it
+    /// exists and is active; otherwise the single active session (the
+    /// Tauri-native path, which carries no cookie).
+    fn resolve_local_session(
+        conn: &mut diesel::SqliteConnection,
+        cookie_session_id: Option<String>,
+    ) -> Result<Option<crate::db::models::LocalSession>, StorageError> {
+        if let Some(id) = cookie_session_id {
+            match db::local_sessions::get_session_by_id(conn, &id)? {
+                Some(s) if s.is_active == 1 => return Ok(Some(s)),
+                // Cookie names a missing or deactivated session — ignore it and
+                // fall back to the active-session behavior.
+                _ => {}
+            }
+        }
+        db::local_sessions::get_active_session(conn)
+    }
+
+    /// POST /auth/consent/agree — the signed-in person agrees, and this node's
+    /// own cell signs as their controller.
+    async fn handle_consent_agree(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{agree, cross_site_refusal, ControllerCell};
+        if let Some(refused) = cross_site_refusal(req.headers()) {
+            return Ok(refused);
+        }
+        let signed_in = match &self.db_pool {
+            Some(pool) => {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+                Self::resolve_local_session(&mut conn, extract_session_cookie(req.headers()))?
+                    .is_some()
+            }
+            // No session store, so nobody can be signed in here.
+            None => false,
+        };
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        let cell = self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .and_then(crate::services::device_consent_cell::ConductorControllerCell::own);
+        Ok(agree(
+            &self.consent_deliveries,
+            cell.as_ref().map(|c| c as &dyn ControllerCell),
+            &consent_grant::Unattended,
+            signed_in,
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await)
+    }
+
     /// POST /auth/consent/redeem — the asking terminal collects its consent.
     async fn handle_consent_redeem(
         &self,
@@ -13559,28 +13626,12 @@ impl HttpServer {
         // request carries one AND that session exists and is active (multi-
         // session browser path, GAP-2b). Otherwise fall through to the single
         // active session — Tauri-native compat must not change.
-        let cookie_session = match cookie_session_id {
-            Some(id) => match db::local_sessions::get_session_by_id(&mut conn, &id)? {
-                Some(s) if s.is_active == 1 => Some(s),
-                // Cookie names a missing or deactivated session — ignore it and
-                // fall back to the active-session behavior.
-                _ => None,
-            },
-            None => None,
-        };
-
-        let session = match cookie_session {
-            Some(s) => s,
-            None => {
-                let Some(active) = db::local_sessions::get_active_session(&mut conn)? else {
-                    return Ok(Response::builder()
-                        .status(StatusCode::UNAUTHORIZED)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
-                        .unwrap());
-                };
-                active
-            }
+        let Some(session) = Self::resolve_local_session(&mut conn, cookie_session_id)? else {
+            return Ok(Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
+                .unwrap());
         };
 
         // Derive a human-readable conductor label from what we know about this

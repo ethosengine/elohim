@@ -416,6 +416,13 @@ const CRATE_READ_FNS: &[&str] = &[
     "get_commitment_record",
     "get_commitment_state_links",
     "get_lineage_successors",
+    // The device consent ceremony. `my_consent_standing` reads the Human (a
+    // bridge read through `get_my_human`), the deterministic bootstrap entry and
+    // its authority history; `sign_device_approval` signs with `sign_raw` and
+    // commits nothing. The CapGrant that authorizes it is a separate admin-socket
+    // write, serialized by `grant_capability_serialized`.
+    "my_consent_standing",
+    "sign_device_approval",
     // --- infrastructure ----------------------------------------------------
     "find_publishers",
     "get_latest_peer_status_for_agent",
