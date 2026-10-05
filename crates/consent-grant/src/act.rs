@@ -74,8 +74,9 @@ impl From<RequestedAct> for String {
 }
 
 /// Whether `acts` is a coherent set: no repeats, and a device root is bound
-/// only for a device that is being enrolled.
-pub(crate) fn coherent(acts: &[RequestedAct]) -> bool {
+/// only for a device that is being enrolled. A terminal checks this before it
+/// asks, so an incoherent request never reaches a portal.
+pub fn coherent(acts: &[RequestedAct]) -> bool {
     let distinct = acts
         .iter()
         .enumerate()

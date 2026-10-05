@@ -29,6 +29,22 @@ pub fn is_agent_key(text: &str) -> bool {
     has_shape(text, AGENT_PREFIX)
 }
 
+/// The 39 raw bytes behind a `u…` hash of any kind, or `None` when it is not
+/// one. Callers check the kind with the `is_*` functions first.
+pub fn raw_39(text: &str) -> Option<Vec<u8>> {
+    let bytes = URL_SAFE_NO_PAD.decode(text.strip_prefix('u')?).ok()?;
+    (bytes.len() == AGENT_KEY_LEN).then_some(bytes)
+}
+
+/// The ed25519 public key an agent key carries: its 32 bytes after the
+/// 3-byte prefix.
+pub fn agent_public_key(text: &str) -> Option<[u8; 32]> {
+    if !is_agent_key(text) {
+        return None;
+    }
+    raw_39(text)?[3..35].try_into().ok()
+}
+
 /// A DNA hash names the network a device is on, so a controller never signs
 /// for a network the device did not ask about.
 pub fn is_dna_hash(text: &str) -> bool {
@@ -148,6 +164,16 @@ mod tests {
         assert!(!is_device_root_key(
             "uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl"
         ));
+    }
+
+    #[test]
+    fn an_agent_key_yields_its_public_key_and_nothing_else_does() {
+        let key = sample_key(7);
+        assert_eq!(agent_public_key(&key), Some([7; 32]));
+        assert_eq!(raw_39(&key).unwrap().len(), 39);
+        assert_eq!(agent_public_key(&sample_action(7)), None);
+        assert_eq!(raw_39("not a hash"), None);
+        assert_eq!(raw_39(""), None);
     }
 
     #[test]

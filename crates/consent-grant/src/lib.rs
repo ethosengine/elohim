@@ -55,6 +55,7 @@ pub mod hash_shape;
 pub mod pkce;
 pub mod request;
 pub mod return_path;
+pub mod verify;
 pub mod witness;
 
 pub use act::{ActRefusal, RequestedAct};
@@ -66,13 +67,14 @@ pub use consent::{
     consent_message, Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent,
     SignerRole, CONSENT_SIGNING_DOMAIN,
 };
-pub use controller::{ControllerStanding, StandingRefusal};
+pub use controller::{ControllerStanding, StandingRefusal, StandingView};
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
 pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
+pub use verify::{check_delivered, DeliveredRefusal};
 pub use witness::{attend, Unattended, WitnessBeat};
 
 /// Version tag every request names. A portal refuses a request for a version

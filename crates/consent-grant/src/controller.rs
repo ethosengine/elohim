@@ -30,6 +30,41 @@ pub struct ControllerStanding {
     pub required: usize,
 }
 
+/// What a portal is told about the identity a person's node speaks for, so it
+/// can say what the identity rests on before any device asks.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandingView {
+    pub identity_root: String,
+    pub authority: String,
+    pub network_dna: String,
+    /// Every steward (controller) the authority names.
+    pub controllers: Vec<String>,
+    pub controller_count: usize,
+    /// How many of them the person's declared policy asks to approve a device.
+    pub required: usize,
+    /// Whether the node answering is one of the stewards.
+    pub this_node_is_controller: bool,
+    /// Whether the node answering is the only steward.
+    pub rests_on_this_node_alone: bool,
+}
+
+impl StandingView {
+    pub fn of(standing: &ControllerStanding, this_node: &str) -> Self {
+        let this_node_is_controller = standing.controllers.iter().any(|c| c == this_node);
+        Self {
+            identity_root: standing.identity_root.clone(),
+            authority: standing.authority.clone(),
+            network_dna: standing.network_dna.clone(),
+            controllers: standing.controllers.clone(),
+            controller_count: standing.controllers.len(),
+            required: standing.required,
+            this_node_is_controller,
+            rests_on_this_node_alone: this_node_is_controller && standing.controllers.len() == 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandingRefusal {
     /// The request names a network this identity is not kept on.
@@ -103,6 +138,28 @@ mod tests {
             standing().admits(&elsewhere, &sample_key(9)),
             Err(StandingRefusal::NetworkForeign)
         );
+    }
+
+    #[test]
+    fn the_view_says_whether_the_identity_rests_on_this_node_alone() {
+        let mut alone = standing();
+        alone.controllers.truncate(1);
+        let view = StandingView::of(&alone, &sample_key(9));
+        assert!(view.this_node_is_controller && view.rests_on_this_node_alone);
+        assert_eq!(view.controller_count, 1);
+        let shared = StandingView::of(&standing(), &sample_key(9));
+        assert!(shared.this_node_is_controller && !shared.rests_on_this_node_alone);
+        let elsewhere = StandingView::of(&alone, &sample_key(3));
+        assert!(!elsewhere.this_node_is_controller && !elsewhere.rests_on_this_node_alone);
+        let json = serde_json::to_value(&view).unwrap();
+        for field in [
+            "identityRoot",
+            "controllerCount",
+            "required",
+            "restsOnThisNodeAlone",
+        ] {
+            assert!(json.get(field).is_some(), "{field}");
+        }
     }
 
     #[test]

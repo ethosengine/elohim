@@ -58,6 +58,56 @@ impl EnrollmentIntent {
     }
 }
 
+impl EnrollmentIntent {
+    /// The exact bytes every proof on this intent signs: the mishpat zome's
+    /// `serde_json` encoding of its `DeviceIntent`, in which each hash is the
+    /// array of its 39 raw bytes and the time is its microseconds. `None` when
+    /// the domain is not [`ENROLLMENT_DOMAIN`] or a hash is malformed, since no
+    /// zome would sign such an intent.
+    pub fn signed_bytes(&self) -> Option<Vec<u8>> {
+        use crate::hash_shape::{is_action_hash, is_agent_key, is_dna_hash, raw_39};
+        if self.domain != ENROLLMENT_DOMAIN
+            || !is_action_hash(&self.authority)
+            || !is_action_hash(&self.identity_root)
+            || !is_agent_key(&self.device_key)
+            || !is_dna_hash(&self.network_dna)
+            || !is_dna_hash(&self.content_dna)
+            || self
+                .supersedes
+                .as_deref()
+                .is_some_and(|s| !is_action_hash(s))
+        {
+            return None;
+        }
+        let array = |text: &str| -> Option<String> {
+            let bytes = raw_39(text)?;
+            let items: Vec<String> = bytes.iter().map(u8::to_string).collect();
+            Some(format!("[{}]", items.join(",")))
+        };
+        let supersedes = match &self.supersedes {
+            Some(s) => array(s)?,
+            None => "null".to_string(),
+        };
+        Some(
+            format!(
+                concat!(
+                    r#"{{"domain":"{}","authority":{},"identity_root":{},"device_key":{},"#,
+                    r#""network_dna":{},"content_dna":{},"issued_at":{},"supersedes":{}}}"#
+                ),
+                ENROLLMENT_DOMAIN,
+                array(&self.authority)?,
+                array(&self.identity_root)?,
+                array(&self.device_key)?,
+                array(&self.network_dna)?,
+                array(&self.content_dna)?,
+                self.issued_at_micros,
+                supersedes,
+            )
+            .into_bytes(),
+        )
+    }
+}
+
 /// One controller's signature on an enrollment intent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,6 +189,24 @@ mod tests {
         later.agreed_at_micros += 1;
         let other = ConsentRecord::agree(&admitted, later).unwrap();
         assert!(!enrollment.is_agreed_in(&other));
+    }
+
+    #[test]
+    fn the_signed_bytes_are_the_zomes_json_of_the_intent() {
+        let intent = EnrollmentIntent::agreed_in(&peer_record()).unwrap();
+        let bytes = String::from_utf8(intent.signed_bytes().unwrap()).unwrap();
+        assert!(bytes
+            .starts_with(r#"{"domain":"elohim:device-enrollment:v1","authority":[132,41,36,2,2,"#));
+        assert!(bytes.ends_with(&format!(
+            r#""issued_at":{},"supersedes":null}}"#,
+            intent.issued_at_micros
+        )));
+        let mut foreign = intent.clone();
+        foreign.domain = "elohim:device-enrollment:v0".into();
+        assert_eq!(foreign.signed_bytes(), None);
+        let mut broken = intent;
+        broken.device_key = "uhCAk".into();
+        assert_eq!(broken.signed_bytes(), None);
     }
 
     #[test]
