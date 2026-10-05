@@ -423,6 +423,8 @@ const CRATE_READ_FNS: &[&str] = &[
     // write, serialized by `grant_capability_serialized`.
     "my_consent_standing",
     "sign_device_approval",
+    // Signs possession of an enrollment intent with `sign_raw`; commits nothing.
+    "sign_device_enrollment",
     // --- infrastructure ----------------------------------------------------
     "find_publishers",
     "get_latest_peer_status_for_agent",
@@ -506,6 +508,8 @@ pub const CRATE_WRITE_FNS: &[&str] = &[
     // --- mishpat -----------------------------------------------------------
     "create_commitment",
     "create_commitment_state_link",
+    "bootstrap_device_identity", // → notarize: one binds-identity Commitment
+    "enroll_identity_device",    // → notarize: one binds-identity Commitment
     // --- node-registry -----------------------------------------------------
     "carry_from", // → carry_page
     "create_shard_assignment",

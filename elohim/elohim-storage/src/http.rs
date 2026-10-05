@@ -1125,6 +1125,18 @@ fn verify_shards_against_manifest(
 /// absent, unparseable, or carries no `elohim_session` pair. Used by
 /// `GET /auth/me` to project the cookie-named session (GAP-2b multi-session
 /// browser path) in preference to the single active session.
+/// The address a request's connection came from, recorded by `serve`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CallerAddr(pub std::net::SocketAddr);
+
+/// Whether a request came from this machine. A request with no recorded
+/// address (one that did not arrive through `serve`) is not.
+fn caller_is_local<B>(req: &Request<B>) -> bool {
+    req.extensions()
+        .get::<CallerAddr>()
+        .is_some_and(|addr| addr.0.ip().is_loopback())
+}
+
 fn extract_session_cookie(headers: &hyper::HeaderMap) -> Option<String> {
     let cookie_header = headers.get(header::COOKIE)?.to_str().ok()?;
     for pair in cookie_header.split(';') {
@@ -1914,8 +1926,11 @@ impl HttpServer {
                 // Admission moved from per-CONNECTION (acquire().await, which queued
                 // under burst and wedged /health) to per-REQUEST (try_acquire shed)
                 // in handle_request — see the Pillar 2 admission gate there.
-                let service = service_fn(move |req| {
+                let service = service_fn(move |mut req: Request<Incoming>| {
                     let server = server.clone();
+                    // The caller's address, for the few routes that answer only
+                    // this machine (`caller_is_local`).
+                    req.extensions_mut().insert(CallerAddr(remote_addr));
                     async move { server.handle_request(req).await }
                 });
 
@@ -2892,6 +2907,23 @@ impl HttpServer {
             // Node-local; refuses cross-site callers before anything else.
             // Boxed so this branch does not grow every request's future.
             (Method::POST, "/auth/consent/agree") => Box::pin(self.handle_consent_agree(req)).await,
+
+            // The signed-in person's identity on this node: what it rests on,
+            // and beginning it here with this node as its first steward.
+            // Node-local; same session and cross-site defence as agree.
+            (Method::GET, "/auth/identity/standing") => {
+                Box::pin(self.handle_identity(req, false)).await
+            }
+            (Method::POST, "/auth/identity/bootstrap") => {
+                Box::pin(self.handle_identity(req, true)).await
+            }
+
+            // The asking device's own node, for its terminal: what this node
+            // is, and enrolling it with what the terminal collected. Answered
+            // only to callers on this machine.
+            (Method::GET, "/auth/device/self") | (Method::POST, "/auth/device/enroll") => {
+                Box::pin(self.handle_device_step(req)).await
+            }
 
             // Device consent ceremony: the asking terminal redeems its code for
             // the signed consent, once. Guarded by the terminal's own verifier
@@ -13343,6 +13375,95 @@ impl HttpServer {
         db::local_sessions::get_active_session(conn)
     }
 
+    /// Whether the request speaks for a person signed in on this node, resolved
+    /// the way `/auth/me` resolves it.
+    fn person_signed_in(&self, headers: &hyper::HeaderMap) -> Result<bool, StorageError> {
+        let Some(pool) = &self.db_pool else {
+            // No session store, so nobody can be signed in here.
+            return Ok(false);
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        Ok(Self::resolve_local_session(&mut conn, extract_session_cookie(headers))?.is_some())
+    }
+
+    /// This node's own mishpat cell, as the person's controller.
+    fn own_controller_cell(
+        &self,
+    ) -> Option<crate::services::device_consent_cell::ConductorControllerCell> {
+        self.hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .and_then(crate::services::device_consent_cell::ConductorControllerCell::own)
+    }
+
+    /// GET /auth/identity/standing, POST /auth/identity/bootstrap.
+    async fn handle_identity(
+        &self,
+        req: Request<Incoming>,
+        bootstrap: bool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            bootstrap_identity, cross_site_refusal, foreign_origin_refusal, identity_standing,
+            ControllerCell,
+        };
+        let refused = if bootstrap {
+            cross_site_refusal(req.headers())
+        } else {
+            foreign_origin_refusal(req.headers())
+        };
+        if let Some(refused) = refused {
+            return Ok(refused);
+        }
+        let signed_in = self.person_signed_in(req.headers())?;
+        let cell = self.own_controller_cell();
+        let cell = cell.as_ref().map(|c| c as &dyn ControllerCell);
+        Ok(if bootstrap {
+            bootstrap_identity(cell, signed_in).await
+        } else {
+            identity_standing(cell, signed_in).await
+        })
+    }
+
+    /// GET /auth/device/self, POST /auth/device/enroll.
+    async fn handle_device_step(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            cross_site_refusal, device_enroll, device_self, foreign_origin_refusal,
+            remote_caller_refusal, DeviceCell,
+        };
+        if let Some(refused) = remote_caller_refusal(caller_is_local(&req)) {
+            return Ok(refused);
+        }
+        let enroll = req.method() == Method::POST;
+        let refused = if enroll {
+            cross_site_refusal(req.headers())
+        } else {
+            foreign_origin_refusal(req.headers())
+        };
+        if let Some(refused) = refused {
+            return Ok(refused);
+        }
+        let cell = self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .and_then(crate::services::device_consent_cell::ConductorDeviceCell::own);
+        let cell = cell.as_ref().map(|c| c as &dyn DeviceCell);
+        if !enroll {
+            return Ok(device_self(cell).await);
+        }
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(device_enroll(cell, &body).await)
+    }
+
     /// POST /auth/consent/agree — the signed-in person agrees, and this node's
     /// own cell signs as their controller.
     async fn handle_consent_agree(
@@ -13353,27 +13474,13 @@ impl HttpServer {
         if let Some(refused) = cross_site_refusal(req.headers()) {
             return Ok(refused);
         }
-        let signed_in = match &self.db_pool {
-            Some(pool) => {
-                let mut conn = pool
-                    .get()
-                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
-                Self::resolve_local_session(&mut conn, extract_session_cookie(req.headers()))?
-                    .is_some()
-            }
-            // No session store, so nobody can be signed in here.
-            None => false,
-        };
+        let signed_in = self.person_signed_in(req.headers())?;
         let body = req
             .collect()
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
             .to_bytes();
-        let cell = self
-            .hc_registry
-            .as_ref()
-            .and_then(|r| r.lamad_client())
-            .and_then(crate::services::device_consent_cell::ConductorControllerCell::own);
+        let cell = self.own_controller_cell();
         Ok(agree(
             &self.consent_deliveries,
             cell.as_ref().map(|c| c as &dyn ControllerCell),

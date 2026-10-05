@@ -21,16 +21,26 @@
 //! - `redeem`: the terminal collects the signed consent and the signed
 //!   enrollment it completes on its own cell.
 //!
+//! Two more for the person's identity on this node:
+//!
+//! - `identity standing`: what the signed-in person's identity rests on.
+//! - `identity bootstrap`: begin the identity here, with this node as its
+//!   first steward. Asking again when it exists writes nothing.
+//!
+//! And two for the asking device's own node, answered only to a terminal on
+//! the same machine: what this node is (`device self`), and enrolling it with
+//! what the terminal collected (`device enroll`).
+//!
 //! One controller's agreement is enough. An identity with other controllers
 //! may have them affirm the device later; nothing here waits for them.
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use consent_grant::{
-    admit_request, attend, issue, redeem, AdmittedRequest, AgreedView, ConsentRecord,
-    ConsentSignature, ConsentView, ControllerProof, ControllerStanding, Enrollment,
-    EnrollmentIntent, GrantPolicy, GrantRequest, MemoryStore, Redemption, RequestedAct,
-    SignedConsent, SignerRole, WitnessBeat,
+    admit_request, attend, check_delivered, issue, redeem, AdmittedRequest, AgreedView,
+    ConsentRecord, ConsentSignature, ConsentView, ControllerProof, ControllerStanding, Delivered,
+    Enrollment, EnrollmentIntent, GrantPolicy, GrantRequest, MemoryStore, Redemption, RequestedAct,
+    SignedConsent, SignerRole, StandingView, WitnessBeat,
 };
 use http_body_util::Full;
 use hyper::body::Bytes;
@@ -128,20 +138,30 @@ pub fn redeem_code(store: &MemoryStore, body: &[u8], now_micros: i64) -> Respons
 /// node's portal is served by this node or from the same machine. A caller
 /// that sends no `Origin` is not a browser page and is let through.
 pub fn cross_site_refusal(headers: &HeaderMap) -> Option<Response<Full<Bytes>>> {
-    let refuse = || {
-        Some(refusal(
-            StatusCode::FORBIDDEN,
-            "agreeing must come from this node's own portal",
-            "consent_origin_refused",
-        ))
-    };
-    let text = |name: header::HeaderName| headers.get(name).and_then(|v| v.to_str().ok());
-    let is_json = text(header::CONTENT_TYPE)
+    let is_json = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(';').next())
         .is_some_and(|v| v.trim().eq_ignore_ascii_case("application/json"));
     if !is_json {
-        return refuse();
+        return Some(origin_refused());
     }
+    foreign_origin_refusal(headers)
+}
+
+fn origin_refused() -> Response<Full<Bytes>> {
+    refusal(
+        StatusCode::FORBIDDEN,
+        "this must come from this node's own portal",
+        "consent_origin_refused",
+    )
+}
+
+/// The origin half of [`cross_site_refusal`], for reads: a page on another
+/// site may not read what a person's identity rests on either.
+pub fn foreign_origin_refusal(headers: &HeaderMap) -> Option<Response<Full<Bytes>>> {
+    let refuse = || Some(origin_refused());
+    let text = |name: header::HeaderName| headers.get(name).and_then(|v| v.to_str().ok());
     if text(header::HeaderName::from_static("sec-fetch-site")) == Some("cross-site") {
         return refuse();
     }
@@ -184,8 +204,11 @@ struct AgreeInput {
 pub enum CellStanding {
     /// The cell's agent has no Human record.
     NoPerson,
-    /// There is a Human, but `bootstrap_device_identity` has not run for it.
-    Unbootstrapped,
+    /// There is a Human (`identity_root`), but `bootstrap_device_identity` has
+    /// not run for it.
+    Unbootstrapped {
+        identity_root: String,
+    },
     Ready(ControllerStanding),
 }
 
@@ -226,6 +249,9 @@ pub trait ControllerCell: Send + Sync {
     fn agent(&self) -> String;
     async fn standing(&self) -> Result<CellStanding, CellFailure>;
     async fn sign(&self, approval: &ApprovalRequest) -> Result<ApprovalProofs, CellFailure>;
+    /// Record the identity authority for the Human `identity_root`, with this
+    /// cell as its first and only controller.
+    async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure>;
 }
 
 fn unavailable(detail: &str) -> Response<Full<Bytes>> {
@@ -296,24 +322,9 @@ pub async fn agree(
     let Some(cell) = cell else {
         return unavailable("no conductor client");
     };
-    let standing = match cell.standing().await {
-        Ok(CellStanding::Ready(standing)) => standing,
-        Ok(CellStanding::NoPerson) => {
-            return refusal(
-                StatusCode::CONFLICT,
-                "this node has no person yet; register one here before approving a device",
-                "consent_identity_unbootstrapped",
-            )
-        }
-        Ok(CellStanding::Unbootstrapped) => {
-            return refusal(
-                StatusCode::CONFLICT,
-                "your identity has no authority record yet; set up device identity on this \
-                 node (bootstrap_device_identity) before approving a device",
-                "consent_identity_unbootstrapped",
-            )
-        }
-        Err(failure) => return cell_failure(failure),
+    let standing = match ready_standing(cell).await {
+        Ok(standing) => standing,
+        Err(refused) => return *refused,
     };
     let signer = cell.agent();
     if let Err(r) = standing.admits(&admitted, &signer) {
@@ -350,6 +361,206 @@ pub async fn agree(
             Err(refused) => return *refused,
         };
     response::ok(&AgreedView::of(&held.0, held.1, standing.required, &signer))
+}
+
+fn no_person() -> Response<Full<Bytes>> {
+    refusal(
+        StatusCode::CONFLICT,
+        "this node has no person yet; register one here before your identity can begin",
+        "consent_identity_unbootstrapped",
+    )
+}
+
+fn unbootstrapped() -> Response<Full<Bytes>> {
+    refusal(
+        StatusCode::CONFLICT,
+        "your identity has no authority record yet; create your identity on this node \
+         (POST /auth/identity/bootstrap) before approving a device",
+        "consent_identity_unbootstrapped",
+    )
+}
+
+/// The standing of an identity that already has its authority, or the refusal
+/// that says what it is missing.
+async fn ready_standing(cell: &dyn ControllerCell) -> Result<ControllerStanding, Refused> {
+    match cell.standing().await {
+        Ok(CellStanding::Ready(standing)) => Ok(standing),
+        Ok(CellStanding::NoPerson) => Err(Box::new(no_person())),
+        Ok(CellStanding::Unbootstrapped { .. }) => Err(Box::new(unbootstrapped())),
+        Err(failure) => Err(Box::new(cell_failure(failure))),
+    }
+}
+
+fn not_signed_in() -> Response<Full<Bytes>> {
+    refusal(
+        StatusCode::UNAUTHORIZED,
+        "sign in on this node first",
+        "consent_not_signed_in",
+    )
+}
+
+/// What the signed-in person's identity rests on. Reads only.
+pub async fn identity_standing(
+    cell: Option<&dyn ControllerCell>,
+    signed_in: bool,
+) -> Response<Full<Bytes>> {
+    if !signed_in {
+        return not_signed_in();
+    }
+    let Some(cell) = cell else {
+        return unavailable("no conductor client");
+    };
+    match ready_standing(cell).await {
+        Ok(standing) => response::ok(&StandingView::of(&standing, &cell.agent())),
+        Err(refused) => *refused,
+    }
+}
+
+/// Begin the signed-in person's identity on this node: record its authority,
+/// with this node as its first steward.
+///
+/// From the person's side this can be asked any number of times. When the
+/// authority already exists it is returned and nothing is written; otherwise
+/// the cell records it (one capability grant and one authority record on the
+/// cell's chain) and the new standing is returned.
+pub async fn bootstrap_identity(
+    cell: Option<&dyn ControllerCell>,
+    signed_in: bool,
+) -> Response<Full<Bytes>> {
+    if !signed_in {
+        return not_signed_in();
+    }
+    let Some(cell) = cell else {
+        return unavailable("no conductor client");
+    };
+    let identity_root = match cell.standing().await {
+        Ok(CellStanding::Ready(standing)) => {
+            return response::ok(&StandingView::of(&standing, &cell.agent()))
+        }
+        Ok(CellStanding::NoPerson) => return no_person(),
+        Ok(CellStanding::Unbootstrapped { identity_root }) => identity_root,
+        Err(failure) => return cell_failure(failure),
+    };
+    if let Err(failure) = cell.bootstrap(&identity_root).await {
+        return cell_failure(failure);
+    }
+    match ready_standing(cell).await {
+        Ok(standing) => response::json_response(
+            StatusCode::CREATED,
+            &StandingView::of(&standing, &cell.agent()),
+        ),
+        Err(refused) => *refused,
+    }
+}
+
+// =============================================================================
+// The asking device's own node
+// =============================================================================
+
+/// What this node is, for a terminal on it building its request.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceSelf {
+    /// The agent key the node would be enrolled under.
+    pub device_key: String,
+    /// The network the node's identity cell is on.
+    pub network_dna: String,
+    /// The network the node's content cell is on.
+    pub content_dna: String,
+}
+
+/// Where the node notarized its joining record.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BindingReceipt {
+    pub binding_action: String,
+    pub binding_entry: String,
+}
+
+/// The asking device's own cell: what it is, and enrolling it.
+#[async_trait]
+pub trait DeviceCell: Send + Sync {
+    async fn whoami(&self) -> Result<DeviceSelf, CellFailure>;
+    /// Sign possession of the enrollment's intent and notarize the binding on
+    /// this cell's chain.
+    async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure>;
+}
+
+/// What the terminal hands its own node to enroll: the request it made and what
+/// it collected for it.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EnrollInput {
+    request: GrantRequest,
+    delivered: Delivered,
+}
+
+/// Refuse a device step from anyone not on this machine. These steps make the
+/// node's own key sign and have no person signed in to vouch for the caller, so
+/// only a terminal on the node's own machine may ask.
+pub fn remote_caller_refusal(caller_is_local: bool) -> Option<Response<Full<Bytes>>> {
+    (!caller_is_local).then(|| {
+        refusal(
+            StatusCode::FORBIDDEN,
+            "only a terminal on this node's own machine may ask this",
+            "device_caller_not_local",
+        )
+    })
+}
+
+/// This node's device key and networks, for the terminal building its request.
+pub async fn device_self(cell: Option<&dyn DeviceCell>) -> Response<Full<Bytes>> {
+    let Some(cell) = cell else {
+        return unavailable("no conductor client");
+    };
+    match cell.whoami().await {
+        Ok(me) => response::ok(&me),
+        Err(failure) => cell_failure(failure),
+    }
+}
+
+/// Enroll this node with what its terminal collected.
+///
+/// The node checks again what the terminal checked (the consent is this
+/// request's and every signature verifies), and that the request is for this
+/// node's own key and network, before its key signs anything.
+pub async fn device_enroll(cell: Option<&dyn DeviceCell>, body: &[u8]) -> Response<Full<Bytes>> {
+    let input: EnrollInput = match parse(body) {
+        Ok(input) => input,
+        Err(refused) => return *refused,
+    };
+    if let Err(r) = check_delivered(&input.delivered, &input.request) {
+        return refusal(
+            StatusCode::BAD_REQUEST,
+            "what was collected is not a valid consent for this request",
+            r.code(),
+        );
+    }
+    let Some(enrollment) = &input.delivered.enrollment else {
+        return refusal(
+            StatusCode::BAD_REQUEST,
+            "the consent does not agree to enroll this device",
+            "device_enrollment_not_agreed",
+        );
+    };
+    let Some(cell) = cell else {
+        return unavailable("no conductor client");
+    };
+    let me = match cell.whoami().await {
+        Ok(me) => me,
+        Err(failure) => return cell_failure(failure),
+    };
+    if input.request.device_key != me.device_key || input.request.network_dna != me.network_dna {
+        return refusal(
+            StatusCode::CONFLICT,
+            "the consent is for another node's key or network",
+            "device_not_this_node",
+        );
+    }
+    match cell.enroll(enrollment).await {
+        Ok(receipt) => response::json_response(StatusCode::CREATED, &receipt),
+        Err(failure) => cell_failure(failure),
+    }
 }
 
 /// Have the controller sign, let the witness beat attend, and hold the result.
@@ -574,9 +785,10 @@ mod tests {
     /// A controller cell that answers as configured and remembers what it was
     /// asked to sign.
     struct FakeCell {
-        standing: Result<CellStanding, CellFailure>,
+        standing: Mutex<Result<CellStanding, CellFailure>>,
         signs: Result<(), CellFailure>,
         asked: Mutex<Vec<ApprovalRequest>>,
+        bootstraps: Mutex<Vec<String>>,
     }
 
     fn ready() -> CellStanding {
@@ -592,9 +804,10 @@ mod tests {
     impl FakeCell {
         fn new(standing: Result<CellStanding, CellFailure>) -> Self {
             Self {
-                standing,
+                standing: Mutex::new(standing),
                 signs: Ok(()),
                 asked: Mutex::new(Vec::new()),
+                bootstraps: Mutex::new(Vec::new()),
             }
         }
     }
@@ -605,7 +818,12 @@ mod tests {
             CONTROLLER.into()
         }
         async fn standing(&self) -> Result<CellStanding, CellFailure> {
-            self.standing.clone()
+            self.standing.lock().unwrap().clone()
+        }
+        async fn bootstrap(&self, identity_root: &str) -> Result<(), CellFailure> {
+            self.bootstraps.lock().unwrap().push(identity_root.into());
+            *self.standing.lock().unwrap() = Ok(ready());
+            Ok(())
         }
         async fn sign(&self, approval: &ApprovalRequest) -> Result<ApprovalProofs, CellFailure> {
             self.asked.lock().unwrap().push(approval.clone());
@@ -621,6 +839,187 @@ mod tests {
                 }),
             })
         }
+    }
+
+    // --- identity -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn an_identity_begins_here_once_and_asking_again_writes_nothing() {
+        let cell = FakeCell::new(Ok(CellStanding::Unbootstrapped {
+            identity_root: IDENTITY.into(),
+        }));
+        let (status, refused) = json(identity_standing(Some(&cell), true).await).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(refused["code"], "consent_identity_unbootstrapped");
+
+        let (status, view) = json(bootstrap_identity(Some(&cell), true).await).await;
+        assert_eq!(status, StatusCode::CREATED, "{view}");
+        assert_eq!(view["identityRoot"], IDENTITY);
+        assert_eq!(view["authority"], AUTHORITY);
+        assert_eq!(view["controllerCount"], 1);
+        assert_eq!(view["required"], 1);
+        assert_eq!(view["restsOnThisNodeAlone"], true);
+        assert_eq!(cell.bootstraps.lock().unwrap().as_slice(), [IDENTITY]);
+
+        let (status, again) = json(bootstrap_identity(Some(&cell), true).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(again, view);
+        assert_eq!(cell.bootstraps.lock().unwrap().len(), 1);
+
+        let (status, read) = json(identity_standing(Some(&cell), true).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(read, view);
+    }
+
+    #[tokio::test]
+    async fn an_identity_cannot_begin_for_nobody_or_for_a_stranger() {
+        let cell = FakeCell::new(Ok(CellStanding::NoPerson));
+        let (status, refused) = json(bootstrap_identity(Some(&cell), true).await).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(refused["code"], "consent_identity_unbootstrapped");
+        assert!(cell.bootstraps.lock().unwrap().is_empty());
+
+        for response in [
+            bootstrap_identity(Some(&cell), false).await,
+            identity_standing(Some(&cell), false).await,
+        ] {
+            let (status, refused) = json(response).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED);
+            assert_eq!(refused["code"], "consent_not_signed_in");
+        }
+        let (status, refused) = json(identity_standing(None, true).await).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(refused["code"], "consent_signing_unavailable");
+    }
+
+    #[test]
+    fn a_page_on_another_site_cannot_read_the_standing_either() {
+        let host = ("host", "127.0.0.1:8090");
+        assert!(foreign_origin_refusal(&headers(&[host])).is_none());
+        assert!(
+            foreign_origin_refusal(&headers(&[host, ("origin", "http://localhost:4200")]))
+                .is_none()
+        );
+        assert!(
+            foreign_origin_refusal(&headers(&[host, ("origin", "https://evil.example")])).is_some()
+        );
+    }
+
+    // --- the asking device ---------------------------------------------------
+
+    use elohim_epr::proof::{sign, AgentKeypair};
+
+    fn agent_of(key: &AgentKeypair) -> String {
+        holochain_types::prelude::AgentPubKey::from_raw_32(key.public_key_bytes().to_vec())
+            .to_string()
+    }
+
+    /// What an honest steward delivers for `request()`, signed by a real key.
+    fn honestly_delivered() -> Delivered {
+        let key = AgentKeypair::from_secret(&[9; 32]).unwrap();
+        let steward = agent_of(&key);
+        let admitted = admit_request(&request(), &policy()).unwrap();
+        let record = ConsentRecord::agree(
+            &admitted,
+            Agreement {
+                identity_root: IDENTITY.into(),
+                authority: AUTHORITY.into(),
+                agreed_acts: vec![RequestedAct::EnrollDevice],
+                agreed_at_micros: NOW,
+            },
+        )
+        .unwrap();
+        let consent = SignedConsent::new(record.clone()).unwrap();
+        let signature = URL_SAFE_NO_PAD.encode(sign(&key, &consent.message()));
+        let intent = EnrollmentIntent::agreed_in(&record).unwrap();
+        let proof = URL_SAFE_NO_PAD.encode(sign(&key, &intent.signed_bytes().unwrap()));
+        Delivered {
+            consent: consent.with_signature(ConsentSignature {
+                role: SignerRole::Controller,
+                signer: steward.clone(),
+                signature,
+            }),
+            enrollment: Some(Enrollment {
+                intent,
+                controllers: vec![ControllerProof {
+                    agent: steward,
+                    signature: proof,
+                }],
+            }),
+        }
+    }
+
+    struct FakeDevice {
+        enrolled: Mutex<Vec<Enrollment>>,
+    }
+
+    #[async_trait]
+    impl DeviceCell for FakeDevice {
+        async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
+            Ok(DeviceSelf {
+                device_key: AGENT.into(),
+                network_dna: NETWORK.into(),
+                content_dna: CONTENT.into(),
+            })
+        }
+        async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure> {
+            self.enrolled.lock().unwrap().push(enrollment.clone());
+            Ok(BindingReceipt {
+                binding_action: AUTHORITY.into(),
+                binding_entry: "uhCEk".into(),
+            })
+        }
+    }
+
+    fn enroll_body(request: &GrantRequest, delivered: &Delivered) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({ "request": request, "delivered": delivered }))
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_device_enrolls_only_with_a_consent_that_checks() {
+        let device = FakeDevice {
+            enrolled: Mutex::new(Vec::new()),
+        };
+        let (status, me) = json(device_self(Some(&device)).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(me["deviceKey"], AGENT);
+        assert_eq!(me["contentDna"], CONTENT);
+
+        let (status, receipt) = json(
+            device_enroll(
+                Some(&device),
+                &enroll_body(&request(), &honestly_delivered()),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{receipt}");
+        assert_eq!(receipt["bindingAction"], AUTHORITY);
+        assert_eq!(device.enrolled.lock().unwrap().len(), 1);
+
+        let mut forged = honestly_delivered();
+        forged.consent.signatures[0].signature = URL_SAFE_NO_PAD.encode([0u8; 64]);
+        let (status, refused) =
+            json(device_enroll(Some(&device), &enroll_body(&request(), &forged)).await).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(refused["code"], "delivered_signature_invalid");
+
+        // A consent made for some other node's key never reaches this one's.
+        let mut other = request();
+        other.device_key = AGENT_OTHER_NODE.into();
+        let (_, refused) =
+            json(device_enroll(Some(&device), &enroll_body(&other, &honestly_delivered())).await)
+                .await;
+        assert_eq!(refused["code"], "delivered_not_this_request");
+        assert_eq!(device.enrolled.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_device_step_answers_only_its_own_machine() {
+        assert!(remote_caller_refusal(true).is_none());
+        let refused = remote_caller_refusal(false).unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
 
     fn agree_body(request: &GrantRequest, acts: &[&str]) -> Vec<u8> {
@@ -772,21 +1171,28 @@ mod tests {
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(refused["code"], "consent_signing_unavailable");
 
-        for standing in [CellStanding::Unbootstrapped, CellStanding::NoPerson] {
+        for standing in [
+            CellStanding::Unbootstrapped {
+                identity_root: IDENTITY.into(),
+            },
+            CellStanding::NoPerson,
+        ] {
             let (status, refused) = agree_with(&store, &FakeCell::new(Ok(standing)), &body).await;
             assert_eq!(status, StatusCode::CONFLICT);
             assert_eq!(refused["code"], "consent_identity_unbootstrapped");
         }
         let (_, refused) = agree_with(
             &store,
-            &FakeCell::new(Ok(CellStanding::Unbootstrapped)),
+            &FakeCell::new(Ok(CellStanding::Unbootstrapped {
+                identity_root: IDENTITY.into(),
+            })),
             &body,
         )
         .await;
         assert!(refused["error"]
             .as_str()
             .unwrap()
-            .contains("bootstrap_device_identity"));
+            .contains("/auth/identity/bootstrap"));
 
         let (status, refused) = agree_with(
             &store,

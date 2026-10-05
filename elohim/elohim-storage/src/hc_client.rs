@@ -1304,7 +1304,10 @@ impl HcClient {
     /// `serde_json::to_string` of the payload) and a short expiry, and the call
     /// is signed with that key over a socket opened for it.
     ///
-    /// **One chain write per call: the `CapGrant`.** It is not revoked. A
+    /// **One chain write per call for the mandate: the `CapGrant`**, plus
+    /// whatever the extern itself writes (none for the signing externs, one
+    /// authority record for `bootstrap_device_identity`). The grant is not
+    /// revoked. A
     /// revocation is a second write, and on this conductor line it does not
     /// take the grant out of the per-call scan (`valid_cap_grants` still loads
     /// every assigned grant and then checks it for deletion); the mandate's
@@ -1328,6 +1331,7 @@ impl HcClient {
             ZomeCallCapGrant, ZomeName,
         };
         refuse_write_on_closed_chain(cell_id, zome_name, MANDATE_GRANT)?;
+        refuse_write_on_closed_chain(cell_id, zome_name, fn_name)?;
 
         let draw = |buf: &mut [u8]| {
             getrandom::fill(buf)
@@ -1414,22 +1418,42 @@ impl HcClient {
         .await
         .map_err(|e| StorageError::Connection(format!("App connect failed: {e}")))?;
 
-        let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
-        let result = observe_conductor_attempt(
-            zome_name,
-            fn_name,
-            AdmissionClass::Interactive.label(),
-            app_ws.call_zome(
-                ZomeCallTarget::CellId(cell_id.clone()),
-                zome_name.into(),
-                fn_name.into(),
-                ExternIO::from(payload),
-            ),
-        )
-        .await;
-        result
-            .map(|io| io.into_vec())
-            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {e}")))
+        // The extern itself may write (bootstrap_device_identity does), so it
+        // goes through the same per-chain gate as every other zome call: reads
+        // straight through, writes under the cell's chain lock.
+        let chain_key = crate::chain_write_gate::chain_key_of(cell_id);
+        let (result, _rtt) =
+            crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
+                let payload = payload.clone();
+                let target = cell_id.clone();
+                let app_ws = app_ws.clone();
+                let offered_zome = zome_name.to_owned();
+                let offered_fn = fn_name.to_owned();
+                async move {
+                    let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
+                    crate::chain_write_gate::finish_offered_call(async move {
+                        let result = observe_conductor_attempt(
+                            &offered_zome,
+                            &offered_fn,
+                            AdmissionClass::Interactive.label(),
+                            app_ws.call_zome(
+                                ZomeCallTarget::CellId(target),
+                                offered_zome.clone().into(),
+                                offered_fn.clone().into(),
+                                ExternIO::from(payload),
+                            ),
+                        )
+                        .await;
+                        drop(_permit);
+                        result
+                            .map(|io| io.into_vec())
+                            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {e}")))
+                    })
+                    .await
+                }
+            })
+            .await?;
+        Ok(result)
     }
 
     /// A handle to this client's conductor ADMIN websocket.
