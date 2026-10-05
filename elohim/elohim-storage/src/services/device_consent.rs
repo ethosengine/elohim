@@ -239,6 +239,10 @@ pub struct ApprovalProofs {
     pub consent: ControllerProof,
     /// Over the enrollment intent, when one was asked for.
     pub enrollment: Option<ControllerProof>,
+    /// When the cell approved as a device of the person rather than a root
+    /// controller, the joining record it speaks through, which the joining
+    /// device names in its binding.
+    pub via: Option<String>,
 }
 
 /// The cell that signs as the person's controller. On a person's own node it is
@@ -258,6 +262,22 @@ pub trait ControllerCell: Send + Sync {
     async fn create_human(&self, human: &NewHuman) -> Result<(), CellFailure>;
     /// This cell's agent's Human record, when it has one.
     async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure>;
+    /// The devices the network shows speaking for the person rooted at
+    /// `identity_root`, each verified by the coordinator's rule. A read.
+    async fn devices(
+        &self,
+        _identity_root: &str,
+    ) -> Result<consent_grant::DevicesRead, CellFailure> {
+        Err(CellFailure::Unavailable(
+            "this cell does not read devices".into(),
+        ))
+    }
+    /// Affirm, from this cell's chain, that `device`'s joining record stands.
+    /// Affirming is not approving: it adds no voice and changes no verdict.
+    /// One mandate grant, one affirmation record and its discovery link.
+    async fn affirm(&self, _device: &consent_grant::StandingDevice) -> Result<(), CellFailure> {
+        Err(CellFailure::Unavailable("this cell does not affirm".into()))
+    }
 }
 
 /// Where this node reads back the word its person signs in with, for
@@ -411,6 +431,7 @@ pub async fn agree(
         cell,
         beat,
         &input.request,
+        None,
         input.agreed_acts,
         now_micros,
     )
@@ -438,6 +459,7 @@ pub async fn agree_request(
     cell: Option<&dyn ControllerCell>,
     beat: &dyn WitnessBeat,
     request: &GrantRequest,
+    asking: Option<consent_grant::NodeState>,
     agreed_acts: Vec<RequestedAct>,
     now_micros: i64,
 ) -> Result<AgreedView, Refused> {
@@ -476,7 +498,12 @@ pub async fn agree_request(
         })?;
     let consent =
         SignedConsent::new(record).map_err(|r| Box::new(response::internal_error(r.code())))?;
-    let held = sign_and_issue(store, cell, beat, &admitted, consent, &signer, now_micros).await?;
+    let context = consent_grant::AuthorizationContext {
+        approver: speaker_context(&standing, &signer),
+        asking_device_has_own_identity: asking
+            .map(|state| matches!(state, consent_grant::NodeState::OwnIdentity { .. })),
+    };
+    let held = sign_and_issue(store, cell, beat, &admitted, consent, context, now_micros).await?;
     Ok(AgreedView::of(&held.0, held.1, standing.required, &signer))
 }
 
@@ -530,10 +557,62 @@ pub async fn identity_standing(
     };
     match ready_standing(cell).await {
         Ok(standing) => {
-            response::ok(&named(StandingView::of(&standing, &cell.agent()), cell, names).await)
+            let me = cell.agent();
+            let mut view = StandingView::of(&standing, &me);
+            // The devices that speak, as the network shows them. A read that
+            // fails or is slow leaves the list off; the counts are then this
+            // node's own cell's.
+            if let Some(read) = read_devices(cell, &standing.identity_root).await {
+                view = view.with_devices(read, &me);
+            }
+            response::ok(&named(view, cell, names).await)
         }
         Err(refused) => *refused,
     }
+}
+
+/// How long a witnessed moment or a standing read waits for the network's
+/// list of devices before going on without it.
+const DEVICES_READ_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Read the devices that speak for the person, bounded by
+/// [`DEVICES_READ_WAIT`], and keep the read for the witnessed moments.
+async fn read_devices(
+    cell: &dyn ControllerCell,
+    identity_root: &str,
+) -> Option<consent_grant::DevicesRead> {
+    match tokio::time::timeout(DEVICES_READ_WAIT, cell.devices(identity_root)).await {
+        Ok(Ok(read)) => {
+            super::device_affirmation::keep(identity_root, &read, now_millis());
+            Some(read)
+        }
+        Ok(Err(why)) => {
+            warn!(
+                ?why,
+                "device consent: the devices that speak could not be read"
+            );
+            None
+        }
+        Err(_) => {
+            warn!("device consent: the devices that speak were not read in time");
+            None
+        }
+    }
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// What a witness is shown about who speaks at a moment: from the last read
+/// of the devices kept (never a fresh network read at the moment).
+pub fn speaker_context(standing: &ControllerStanding, me: &str) -> consent_grant::SpeakerContext {
+    let now = now_millis();
+    let read = super::device_affirmation::recent(&standing.identity_root, now);
+    consent_grant::SpeakerContext::of(standing, read.as_ref(), me, now)
 }
 
 /// Begin the signed-in person's identity on this node: record its authority,
@@ -838,10 +917,12 @@ async fn sign_and_issue(
     beat: &dyn WitnessBeat,
     admitted: &AdmittedRequest,
     consent: SignedConsent,
-    signer: &str,
+    context: consent_grant::AuthorizationContext,
     now_micros: i64,
 ) -> Result<(consent_grant::Held, consent_grant::ReturnTarget), Refused> {
-    let consent = match attend(beat, admitted, consent) {
+    let signer = cell.agent();
+    let signer = signer.as_str();
+    let consent = match attend(beat, admitted, consent, context) {
         Ok(consent) => consent,
         Err(consent_grant::Paused { reason }) => {
             warn!(
@@ -873,9 +954,20 @@ async fn sign_and_issue(
         signer: proofs.consent.agent,
         signature: proofs.consent.signature,
     });
+    // A joined device approving names the joining record it speaks through,
+    // so the asking device can name it in its own record.
+    let approved_via: Vec<consent_grant::ApprovedVia> = proofs
+        .via
+        .iter()
+        .map(|binding| consent_grant::ApprovedVia {
+            agent: signer.to_string(),
+            binding: binding.clone(),
+        })
+        .collect();
     let enrollment = intent.map(|intent| Enrollment {
         intent,
         controllers: proofs.enrollment.into_iter().collect(),
+        approved_via,
     });
     let code = draw_code().map_err(|e| Box::new(response::internal_error(&e.to_string())))?;
     // bounded-work: see `redeem_code`.
@@ -949,6 +1041,7 @@ pub(crate) mod tests {
                 agent: CONTROLLER.into(),
                 signature: "enrollment-sig".into(),
             }],
+            approved_via: vec![],
         });
         let signed = SignedConsent::new(record)
             .unwrap()
@@ -1077,6 +1170,8 @@ pub(crate) mod tests {
             network_dna: NETWORK.into(),
             controllers: vec![CONTROLLER.into()],
             required: 1,
+            speaks_via: None,
+            also_speaks_for: vec![],
         })
     }
 
@@ -1136,6 +1231,7 @@ pub(crate) mod tests {
                     agent: CONTROLLER.into(),
                     signature: "enrollment-sig".into(),
                 }),
+                via: None,
             })
         }
     }
@@ -1307,6 +1403,7 @@ pub(crate) mod tests {
                     agent: approver,
                     signature: proof,
                 }],
+                approved_via: vec![],
             }),
         }
     }

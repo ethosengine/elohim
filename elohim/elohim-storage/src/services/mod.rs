@@ -55,6 +55,7 @@ pub mod custody_facing; // custody-observation loader for the typed custody fold
 pub mod custody_rotation; // author a successor custody pledge when the content's blob rotates under it
 pub mod custody_standing; // station 3b — resolves the custody facts the private-reach gate decides on
 pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss
+pub mod device_affirmation; // each device of a person affirms the others it saw join: bounded, logged, not approving
 pub mod device_capacity;
 pub mod device_carrier; // the first device-consent carrier: asks over local discovery, decided on the approving node
 pub mod device_consent; // device recognition ceremony, node-local mount of `consent_grant` // Phase 4 T7 — available bytes helper

@@ -1996,6 +1996,33 @@ impl HttpServer {
                 }
             });
         }
+        // Each device of the person affirms the others it saw join.
+        // bounded-work: one standing read and one devices read a pass, at most
+        // AFFIRM_PER_PASS affirmations, a pass FIRST_PASS_AFTER_SECS after
+        // start and then every AFFIRM_EVERY_SECS (device_affirmation).
+        if self.hc_registry.is_some() {
+            let server = self.clone();
+            tokio::spawn(async move {
+                use crate::services::device_affirmation as affirmation;
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    affirmation::FIRST_PASS_AFTER_SECS,
+                ))
+                .await;
+                loop {
+                    if let Some(cell) = server.own_controller_cell() {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis() as i64)
+                            .unwrap_or(0);
+                        affirmation::pass(&cell, now).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        affirmation::AFFIRM_EVERY_SECS,
+                    ))
+                    .await;
+                }
+            });
+        }
         // Make the sign-in decoy now, so a wrong word never costs more than a
         // wrong secret (`node_account::sign_in_verdict`).
         tokio::task::spawn_blocking(|| {
@@ -14293,12 +14320,28 @@ impl HttpServer {
         let Some(account) = account else {
             return Ok(refuse(SignInRefusal::SecretUnset));
         };
-        // A sign-in is a witnessed moment; nobody attends by default.
+        // A sign-in is a witnessed moment; nobody attends by default. What
+        // the witness is shown about this node as a speaker comes from the
+        // last read kept, never a network read at the moment.
+        let speaker = match self.own_controller_cell() {
+            Some(cell) => {
+                use crate::services::device_consent::{CellStanding, ControllerCell};
+                let me = cell.agent();
+                match cell.standing().await {
+                    Ok(CellStanding::Ready(s)) if s.controllers.contains(&me) => {
+                        Some(crate::services::device_consent::speaker_context(&s, &me))
+                    }
+                    _ => None,
+                }
+            }
+            None => None,
+        };
         if let Err(r) = consent_grant::attend_sign_in(
             &consent_grant::Unattended,
             &consent_grant::SignInClaims {
                 identifier: account.identifier.clone(),
                 channel,
+                speaker,
             },
         ) {
             warn!(source, code = r.code(), "sign-in paused by a witness");
@@ -14540,13 +14583,13 @@ impl HttpServer {
             return NodeState::Unassigned;
         };
         let me = cell.agent();
-        let (has_human, controllers) = match cell.standing().await {
-            Ok(CellStanding::NoPerson) => (false, None),
-            Ok(CellStanding::Unbootstrapped { .. }) => (true, None),
-            Ok(CellStanding::Ready(s)) => (true, Some(s.controllers)),
+        let (has_human, controllers, joined) = match cell.standing().await {
+            Ok(CellStanding::NoPerson) => (false, None, false),
+            Ok(CellStanding::Unbootstrapped { .. }) => (true, None, false),
+            Ok(CellStanding::Ready(s)) => (true, Some(s.controllers), s.speaks_via.is_some()),
             // Cannot tell: report an identity of its own, made unknown, rather
             // than claim the node is unassigned.
-            Err(_) => (true, None),
+            Err(_) => (true, None, false),
         };
         let human_id = cell.my_human().await.ok().flatten().map(|h| h.human_id);
         let made = match (&self.db_pool, has_human) {
@@ -14574,7 +14617,7 @@ impl HttpServer {
             }
             _ => Made::Unknown,
         };
-        NodeState::of(has_human, controllers.as_deref(), &me, made)
+        NodeState::of(has_human, controllers.as_deref(), joined, &me, made)
     }
 
     /// The carrier's this-machine-only routes.

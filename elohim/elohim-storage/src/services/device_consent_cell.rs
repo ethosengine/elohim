@@ -37,6 +37,8 @@ const SIGN_APPROVAL: &str = "sign_device_approval";
 const BOOTSTRAP: &str = "bootstrap_device_identity";
 const SIGN_ENROLLMENT: &str = "sign_device_enrollment";
 const ENROLL: &str = "enroll_identity_device";
+const DEVICES: &str = "identity_devices";
+const AFFIRM: &str = "affirm_identity_device";
 /// How long the mandate for one approval stays usable. Long enough for one
 /// call on a busy conductor; after it the grant authorizes nothing.
 const MANDATE_WINDOW: Duration = Duration::from_secs(120);
@@ -85,6 +87,17 @@ struct DeviceBindingWire {
     intent: DeviceIntentWire,
     controllers: Vec<ProofWire>,
     possession: ProofWire,
+    /// Omitted when every approver is a root controller, so the zome reads
+    /// the same bytes it always did.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    approved_via: Vec<ApprovedViaWire>,
+}
+
+/// A device approver and the joining record it speaks through.
+#[derive(Serialize, Deserialize, Debug)]
+struct ApprovedViaWire {
+    agent: AgentPubKey,
+    binding: ActionHash,
 }
 
 /// The imagodei coordinator's `CreateHumanInput`.
@@ -128,6 +141,8 @@ struct CommitmentOutputWire {
 struct DeviceApprovalProofsWire {
     consent: ProofWire,
     enrollment: Option<ProofWire>,
+    #[serde(default)]
+    via: Option<ActionHash>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -137,6 +152,41 @@ struct ConsentStandingWire {
     controllers: Vec<AgentPubKey>,
     required: usize,
     network_dna: DnaHash,
+    #[serde(default)]
+    speaks_via: Option<ActionHash>,
+    #[serde(default)]
+    also_speaks_for: Vec<ActionHash>,
+}
+
+/// The mishpat coordinator's `IdentityDevice`.
+#[derive(Deserialize, Debug)]
+struct IdentityDeviceWire {
+    device_key: AgentPubKey,
+    binding: ActionHash,
+    content_dna: DnaHash,
+    approved_by: Vec<AgentPubKey>,
+    joined_at: Timestamp,
+    affirmed_by: Vec<AgentPubKey>,
+}
+
+/// The mishpat coordinator's `IdentityDevices`.
+#[derive(Deserialize, Debug)]
+struct IdentityDevicesWire {
+    #[allow(dead_code)]
+    identity_root: ActionHash,
+    roots: Vec<AgentPubKey>,
+    devices: Vec<IdentityDeviceWire>,
+    not_standing: u32,
+    truncated: bool,
+}
+
+/// The qahal `VerifyDeviceInput` that `affirm_identity_device` takes. Field
+/// order matters: the mandate carries its exact JSON.
+#[derive(Serialize, Debug)]
+struct VerifyDeviceWire {
+    binding: ActionHash,
+    expected_device: AgentPubKey,
+    expected_content_dna: DnaHash,
 }
 
 /// A `u…` hash string as the zome's type. The `u` check comes first because
@@ -259,6 +309,8 @@ impl ControllerCell for ConductorControllerCell {
                     network_dna: s.network_dna.to_string(),
                     controllers: s.controllers.iter().map(ToString::to_string).collect(),
                     required: s.required,
+                    speaks_via: s.speaks_via.map(|v| v.to_string()),
+                    also_speaks_for: s.also_speaks_for.iter().map(ToString::to_string).collect(),
                 }),
             },
         })
@@ -289,7 +341,75 @@ impl ControllerCell for ConductorControllerCell {
         Ok(ApprovalProofs {
             consent: proof(proofs.consent),
             enrollment: proofs.enrollment.map(proof),
+            via: proofs.via.map(|v| v.to_string()),
         })
+    }
+
+    async fn devices(
+        &self,
+        identity_root: &str,
+    ) -> Result<consent_grant::DevicesRead, CellFailure> {
+        let root: ActionHash = hash(identity_root, "identity")?;
+        let payload = ExternIO::encode(&root)
+            .map_err(|e| CellFailure::Unavailable(e.to_string()))?
+            .into_vec();
+        let answer = self
+            .hc
+            .call_zome_mishpat(MISHPAT_ZOME, DEVICES, payload)
+            .await
+            .map_err(failure)?;
+        let read: IdentityDevicesWire = ExternIO::from(answer)
+            .decode()
+            .map_err(|e| CellFailure::Unavailable(format!("devices decode: {e}")))?;
+        let me = self.agent();
+        Ok(consent_grant::DevicesRead {
+            roots: read.roots.iter().map(ToString::to_string).collect(),
+            devices: read
+                .devices
+                .into_iter()
+                .map(|d| {
+                    let device_key = d.device_key.to_string();
+                    consent_grant::StandingDevice {
+                        device_fingerprint: consent_grant::hash_shape::fingerprint(&device_key),
+                        this_device: device_key == me,
+                        device_key,
+                        binding: d.binding.to_string(),
+                        content_dna: d.content_dna.to_string(),
+                        joined_at: d.joined_at.as_millis(),
+                        approved_by: d.approved_by.iter().map(ToString::to_string).collect(),
+                        affirmed_count: d.affirmed_by.len(),
+                        affirmed_by: d.affirmed_by.iter().map(ToString::to_string).collect(),
+                    }
+                })
+                .collect(),
+            not_standing: read.not_standing,
+            truncated: read.truncated,
+        })
+    }
+
+    async fn affirm(&self, device: &consent_grant::StandingDevice) -> Result<(), CellFailure> {
+        let wire = VerifyDeviceWire {
+            binding: hash(&device.binding, "joining record")?,
+            expected_device: hash(&device.device_key, "device")?,
+            expected_content_dna: hash(&device.content_dna, "content network")?,
+        };
+        let json = serde_json::to_string(&wire)
+            .map_err(|e| CellFailure::Unavailable(format!("affirmation encoding: {e}")))?;
+        let payload = ExternIO::encode(&wire)
+            .map_err(|e| CellFailure::Unavailable(format!("affirmation encoding: {e}")))?
+            .into_vec();
+        self.hc
+            .call_zome_mandated(
+                &self.cell,
+                MISHPAT_ZOME,
+                AFFIRM,
+                payload,
+                json,
+                MANDATE_WINDOW,
+            )
+            .await
+            .map_err(failure)?;
+        Ok(())
     }
 
     async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure> {
@@ -452,6 +572,16 @@ impl DeviceCell for ConductorDeviceCell {
             intent,
             controllers,
             possession,
+            approved_via: enrollment
+                .approved_via
+                .iter()
+                .map(|v| {
+                    Ok(ApprovedViaWire {
+                        agent: hash(&v.agent, "approver")?,
+                        binding: hash(&v.binding, "approver record")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, CellFailure>>()?,
         };
         let payload = ExternIO::encode(&binding)
             .map_err(|e| CellFailure::Unavailable(format!("binding encoding: {e}")))?

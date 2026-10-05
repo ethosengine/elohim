@@ -22,8 +22,9 @@
 //!   the decision and the device's announce are this-machine-only routes.
 //!
 //! Who lists. A node lists an ask only when it speaks for a person: its own
-//! cell is a controller of an identity's authority. A joined device that is
-//! not a controller, or a node with no identity, drops every ask with its
+//! cell is a root controller of an identity's authority, or a device whose
+//! joining record stands (every device of a person speaks for them). A node
+//! whose record no longer stands, or with no identity, drops every ask with its
 //! reason and answers the asking device nothing at all, so it never appears to
 //! the asking terminal as a node that lists the ask. Whom the node speaks for is
 //! read from its own cell into memory (`Carrier::speaks`) by one refresher,
@@ -593,7 +594,16 @@ async fn decide_inner(
             "carry_needs_paste_return",
         )));
     }
-    let agreed = agree_request(store, cell, beat, &pending.ask.request, acts, now).await?;
+    let agreed = agree_request(
+        store,
+        cell,
+        beat,
+        &pending.ask.request,
+        Some(pending.ask.state),
+        acts,
+        now,
+    )
+    .await?;
     carrier().pending.decided(pending.number, now);
     info!(
         number = pending.number,
@@ -926,7 +936,7 @@ mod tests {
         // Never read: unknown, so nothing is listed and nothing is said.
         assert_eq!(c.speaks(now_micros()), Speaks::Unknown);
         assert_eq!(c.on_request("peer-a", ask()), None);
-        // A joined device that is not a controller.
+        // A node that speaks for nobody.
         c.set_speaks(Speaks::Nobody, now_micros());
         assert_eq!(c.on_request("peer-a", ask()), None);
         assert!(c.pending.is_empty());
@@ -977,7 +987,8 @@ mod tests {
         assert!(named
             .words()
             .starts_with("An approval here is for matthew (Matthew),"));
-        // The cell's key resolves to an identity whose authority does not name it.
+        // The cell's key resolves to an identity it does not speak for: neither
+        // a root controller nor a device whose joining record stands.
         let joined = FakeCell::new(Ok(ConsentStanding::Ready(
             consent_grant::ControllerStanding {
                 identity_root: IDENTITY.into(),
@@ -985,6 +996,8 @@ mod tests {
                 network_dna: "n".into(),
                 controllers: vec![key(61)],
                 required: 1,
+                speaks_via: None,
+                also_speaks_for: vec![],
             },
         )));
         assert_ne!(key(61), CONTROLLER);
