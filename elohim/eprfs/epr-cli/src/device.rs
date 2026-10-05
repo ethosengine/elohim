@@ -47,12 +47,14 @@ pub fn usage() -> &'static str {
     "usage:\n  epr device ask --portal <steward portal URL> --label <name> \
      [--act device.enroll] [--act device.bind-root] [--loopback] \
      [--steward <steward node URL>] [--node <this node URL>]\n  \
-     epr device redeem '<code#state>' [--node <this node URL>]"
+     epr device redeem '<code#state>' [--node <this node URL>]\n  \
+     epr device approve '<link or request>' [--only <act>]... [--yes] [--node <this node URL>]"
 }
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
         Some("ask") => ask(&args[1..]),
+        Some("approve") => crate::steward::approve(&args[1..]),
         Some("redeem") => {
             let (pasted, opts) = match args.get(1) {
                 Some(p) if !p.starts_with("--") => (p.clone(), Options::parse(&args[2..])?),
@@ -197,14 +199,6 @@ struct DeviceSelf {
 
 fn ask(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
-    let portal = opts
-        .portal
-        .clone()
-        .ok_or("ask needs --portal: the portal of the steward who will approve")?;
-    let label = opts
-        .label
-        .clone()
-        .ok_or("ask needs --label: what to call this device")?;
     let texts = if opts.acts.is_empty() {
         vec!["device.enroll".to_string()]
     } else {
@@ -222,7 +216,29 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
         ));
     }
     let node = opts.node.clone().unwrap_or_else(|| DEFAULT_NODE.into());
-    let steward = opts.steward.clone().unwrap_or_else(|| portal.clone());
+    // What this node declares about asking fills what the flags leave out.
+    let declared = if opts.portal.is_none() || opts.label.is_none() {
+        crate::steward::node_declaration(node.trim_end_matches('/'))
+            .declared
+            .and_then(|d| d.asking)
+    } else {
+        None
+    };
+    let portal = opts
+        .portal
+        .clone()
+        .or_else(|| declared.as_ref().map(|a| a.portal.clone()))
+        .ok_or("ask needs --portal: the portal of the steward who will approve (or declare it in [asking])")?;
+    let label = opts
+        .label
+        .clone()
+        .or_else(|| declared.as_ref().map(|a| a.label.clone()))
+        .ok_or("ask needs --label: what to call this device (or declare it in [asking])")?;
+    let steward = opts
+        .steward
+        .clone()
+        .or_else(|| declared.as_ref().and_then(|a| a.steward.clone()))
+        .unwrap_or_else(|| portal.clone());
 
     let me: DeviceSelf = json_call("GET", &format!("{node}/auth/device/self"), None)
         .map_err(|e| format!("this device's node did not answer: {e}"))?;
@@ -440,22 +456,52 @@ fn json_call<T: serde::de::DeserializeOwned>(
     url: &str,
     body: Option<&[u8]>,
 ) -> Outcome<T> {
-    let (status, bytes) = http(method, url, body)?;
+    json_call_with(method, url, body, &[]).map(|(value, _)| value)
+}
+
+/// [`json_call`] with extra request headers, also returning the response's
+/// header block.
+pub(crate) fn json_call_with<T: serde::de::DeserializeOwned>(
+    method: &str,
+    url: &str,
+    body: Option<&[u8]>,
+    headers: &[(&str, &str)],
+) -> Outcome<(T, String)> {
+    let (status, head, bytes) = http_with(method, url, body, headers)?;
     if (200..300).contains(&status) {
-        return serde_json::from_slice(&bytes).map_err(|e| format!("unreadable answer: {e}"));
+        let value =
+            serde_json::from_slice(&bytes).map_err(|e| format!("unreadable answer: {e}"))?;
+        return Ok((value, head));
     }
-    Err(match serde_json::from_slice::<Refusal>(&bytes) {
+    Err(refusal_text(status, &bytes))
+}
+
+/// A node's refusal as a person reads it: its code, then its plain sentence.
+pub(crate) fn refusal_text(status: u16, bytes: &[u8]) -> String {
+    match serde_json::from_slice::<Refusal>(bytes) {
         Ok(Refusal {
             error,
             code: Some(code),
         }) => format!("{code}: {}", error.unwrap_or_default()),
-        _ => format!("HTTP {status}: {}", String::from_utf8_lossy(&bytes)),
-    })
+        _ => format!("HTTP {status}: {}", String::from_utf8_lossy(bytes)),
+    }
 }
 
 /// A minimal HTTP/1.1 client for `http://` nodes. A steward or device node is
 /// reached on this machine or the person's own network; TLS is not spoken here.
+#[cfg(test)]
 fn http(method: &str, url: &str, body: Option<&[u8]>) -> Outcome<(u16, Vec<u8>)> {
+    http_with(method, url, body, &[]).map(|(status, _, body)| (status, body))
+}
+
+/// [`http`] with extra request headers, returning the status, the header
+/// block and the body.
+pub(crate) fn http_with(
+    method: &str,
+    url: &str,
+    body: Option<&[u8]>,
+    headers: &[(&str, &str)],
+) -> Outcome<(u16, String, Vec<u8>)> {
     let rest = url.strip_prefix("http://").ok_or_else(|| {
         format!("{url}: only http:// node addresses are reachable from this terminal")
     })?;
@@ -475,6 +521,9 @@ fn http(method: &str, url: &str, body: Option<&[u8]>) -> Outcome<(u16, Vec<u8>)>
             body.len()
         ));
     }
+    for (name, value) in headers {
+        request.push_str(&format!("{name}: {value}\r\n"));
+    }
     request.push_str("\r\n");
     stream
         .write_all(request.as_bytes())
@@ -484,10 +533,15 @@ fn http(method: &str, url: &str, body: Option<&[u8]>) -> Outcome<(u16, Vec<u8>)>
     stream
         .read_to_end(&mut raw)
         .map_err(|e| format!("{authority}: {e}"))?;
-    parse_response(&raw)
+    parse_response_with_head(&raw)
 }
 
+#[cfg(test)]
 fn parse_response(raw: &[u8]) -> Outcome<(u16, Vec<u8>)> {
+    parse_response_with_head(raw).map(|(status, _, body)| (status, body))
+}
+
+fn parse_response_with_head(raw: &[u8]) -> Outcome<(u16, String, Vec<u8>)> {
     let split = raw
         .windows(4)
         .position(|w| w == b"\r\n\r\n")
@@ -503,14 +557,12 @@ fn parse_response(raw: &[u8]) -> Outcome<(u16, Vec<u8>)> {
         l.to_ascii_lowercase().starts_with("transfer-encoding:")
             && l.to_ascii_lowercase().contains("chunked")
     });
-    Ok((
-        status,
-        if chunked {
-            dechunk(body)?
-        } else {
-            body.to_vec()
-        },
-    ))
+    let body = if chunked {
+        dechunk(body)?
+    } else {
+        body.to_vec()
+    };
+    Ok((status, head.into_owned(), body))
 }
 
 fn dechunk(mut body: &[u8]) -> Outcome<Vec<u8>> {
@@ -569,7 +621,14 @@ mod tests {
 
     #[test]
     fn the_steward_is_never_assumed() {
-        let refused = ask(&["--label".into(), "workspace".into()]).unwrap_err();
+        // Port 1 never answers, so no declaration can supply a portal either.
+        let refused = ask(&[
+            "--label".into(),
+            "workspace".into(),
+            "--node".into(),
+            "http://127.0.0.1:1".into(),
+        ])
+        .unwrap_err();
         assert!(refused.contains("--portal"), "{refused}");
     }
 

@@ -57,6 +57,16 @@ fn main() -> ExitCode {
             }
         };
     }
+    // `identity` is the steward's own act on the node that holds their key.
+    if raw.first().map(String::as_str) == Some("identity") {
+        return match elohim_epr_cli::steward::run_identity(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr identity: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     // `canon-lift` likewise: it renders a generated artifact set (and a freshness verdict over
     // it), not a Report, so it is dispatched before the Report-shaped commands.
     if raw.first().map(String::as_str) == Some("canon-lift") {
@@ -267,5 +277,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem> ...>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...>"
 }
