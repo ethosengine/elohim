@@ -271,6 +271,10 @@ pub trait IdentifierSource: Send + Sync {
     fn recorded(&self, human_id: &str, agent: &str) -> Option<String>;
     /// The identity this node's declaration names, if any.
     fn declared(&self) -> Option<consent_grant::DeclaredIdentity>;
+    /// The person's name as they gave it to this node, when it keeps one.
+    fn display_name(&self, _human_id: &str, _agent: &str) -> Option<String> {
+        None
+    }
 }
 
 /// No source: the person is named without a sign-in word.
@@ -304,11 +308,18 @@ async fn named(
     cell: &dyn ControllerCell,
     names: &dyn IdentifierSource,
 ) -> StandingView {
-    let identifier = match cell.my_human().await {
-        Ok(Some(human)) => identifier_of(names, &human, &cell.agent()),
-        _ => None,
+    let agent = cell.agent();
+    let (identifier, display_name) = match cell.my_human().await {
+        Ok(Some(human)) => (
+            identifier_of(names, &human, &agent),
+            names
+                .display_name(&human.human_id, &agent)
+                .or(Some(human.display_name)),
+        ),
+        _ => (None, None),
     };
     view.with_identifier(identifier)
+        .with_display_name(display_name)
 }
 
 /// What a person supplies to begin their identity: the minimum the imagodei
@@ -321,19 +332,24 @@ pub struct NewHuman {
     pub profile_reach: String,
 }
 
-/// Who may make this node's key sign as its person.
+/// Who may make this node's key sign as its person
+/// (`consent_grant::may_make_node_sign`).
 ///
-/// The person's own node signs for a caller on its own machine. Nothing else
-/// a caller can bring today proves it is the person: `POST /session` takes
-/// whoever asks, `GET /session` hands any caller the active session's id, and
-/// with no cookie the single active session stands in for everyone. So a
-/// caller from any other address is refused by name, whatever session it
-/// presents. Reads are not affected.
-pub fn signing_caller_refusal(caller_is_local: bool) -> Option<Response<Full<Bytes>>> {
-    (!caller_is_local).then(|| {
+/// A caller on this node's own machine, or a request carrying a session
+/// proven by sign-in for this node's own person (`POST /auth/login`,
+/// `services::node_account`). A session minted any other way (`POST
+/// /session`, `/session/exchange`, the single active session a cookie-less
+/// local caller stands on) proves nobody to another machine. Anything else is
+/// refused by name. Reads are not affected.
+pub fn signing_caller_refusal(
+    caller_is_local: bool,
+    proven_by_signin: bool,
+) -> Option<Response<Full<Bytes>>> {
+    (!consent_grant::may_make_node_sign(caller_is_local, proven_by_signin)).then(|| {
         refusal(
             StatusCode::FORBIDDEN,
-            "this signs with this node's key as you, so it is done on this node's own machine",
+            "this signs with this node's key as you, so it is done on this node's own machine, \
+             or after signing in to this node",
             "consent_caller_not_local",
         )
     })
@@ -576,6 +592,10 @@ pub struct BeginInput {
     /// no one until the person says otherwise.
     #[serde(default)]
     pub profile_reach: Option<String>,
+    /// A sign-in secret to set at once, so the person can sign in from
+    /// another machine (`services::node_account`). Never stored as given.
+    #[serde(default)]
+    pub secret: Option<String>,
 }
 
 /// What beginning an identity did, for the host to finish with a session.
@@ -1202,8 +1222,9 @@ pub(crate) mod tests {
 
     #[test]
     fn only_this_machine_may_make_the_node_sign_as_its_person() {
-        assert!(signing_caller_refusal(true).is_none());
-        let refused = signing_caller_refusal(false).unwrap();
+        assert!(signing_caller_refusal(true, false).is_none());
+        assert!(signing_caller_refusal(false, true).is_none());
+        let refused = signing_caller_refusal(false, false).unwrap();
         assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
 

@@ -5216,3 +5216,43 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: whom_a_node_speaks_for_is_read_from_its_own_cell, kind: unit }
       - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: the_list_says_whom_the_node_speaks_for_and_a_node_for_nobody_lists_nothing, kind: unit }
       - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_node_that_speaks_for_nobody_decides_nothing, kind: unit }
+
+  - name: sign_in_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/node_account.rs
+      modulePath: services::node_account::sign_in_verdict
+      line: 240
+    summary: >
+      Whether a sign-in word and secret prove this node's own person. The word is compared in
+      constant time as SHA-256 digests; the secret is always checked with Argon2id (the argon2
+      crate's defaults, as the doorway: v19, m=19456 KiB, t=2, p=1), against a decoy made at start
+      when the word is wrong, so a wrong word and a wrong secret cost the same and answer the same
+      (401 INVALID_CREDENTIALS). No secret set answers signin_secret_unset, naming the command to
+      run on the node.
+    concernIds:
+      - { id: C0, status: answered, justification: "The account is node-local SQLite (Path C): never on the DHT, a source chain, the declaration, a sync or a projection." }
+      - { id: C4, status: answered, justification: "A wrong word and a wrong secret are one refusal; no secret set is its own." }
+      - { id: C6a, status: answered, justification: "At most two hashes at once (a semaphore), each of a secret bounded to 1024 bytes; the limiter runs before." }
+      - { id: C12, status: answered, justification: "Only this node's own person can sign in; a lost secret is set again from the node's own machine (the deterministic floor)." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_wrong_word_and_a_wrong_secret_answer_the_same, kind: unit }
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
+
+  - name: request_proven
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/node_account.rs
+      modulePath: services::node_account::request_proven
+      line: 359
+    summary: >
+      The one question every signing route asks: does this request carry a session proven by
+      sign-in for this node's own person. Today the cookie's session is the whole proof. Sessions
+      carry `proven_by` (password) and an always-empty `bound_key`; a session bound to a key is
+      refused here until per-request signatures are checked here, so no route changes then.
+    concernIds:
+      - { id: C1, status: answered, justification: "Only a live (unexpired, not signed out, not superseded by a new secret) sign-in session counts." }
+      - { id: C5, status: partial, justification: "The cookie is a bearer token; key binding is the named next step." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
+      - { path: elohim/elohim-storage/src/http.rs, testName: auth_me_from_another_machine_without_a_cookie_is_nobody, kind: unit }

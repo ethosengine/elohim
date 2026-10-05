@@ -249,7 +249,9 @@ impl Carrier {
                         );
                         return None;
                     }
-                    Dropped::Malformed(_) | Dropped::NotForThisApprover => {
+                    Dropped::Malformed(_)
+                    | Dropped::NotForThisApprover
+                    | Dropped::AlreadyDecided => {
                         info!(
                             source,
                             device, code, "device carrier: ask received and dropped"
@@ -527,7 +529,7 @@ async fn decide_inner(
     };
     let (acts, by) = match decision {
         Decision::Decline { by } => {
-            carrier().pending.remove(pending.number);
+            carrier().pending.decided(pending.number, now);
             info!(number = pending.number, ?by, "device carrier: ask declined");
             return Ok(response::ok(&serde_json::json!({
                 "number": pending.number, "decidedBy": by, "declined": true,
@@ -544,7 +546,7 @@ async fn decide_inner(
         )));
     }
     let agreed = agree_request(store, cell, beat, &pending.ask.request, acts, now).await?;
-    carrier().pending.remove(pending.number);
+    carrier().pending.decided(pending.number, now);
     info!(
         number = pending.number,
         ?by,
@@ -1056,10 +1058,16 @@ mod tests {
         holochain_types::prelude::AgentPubKey::from_raw_32(vec![n; 32]).to_string()
     }
 
+    fn state_of(n: u8) -> String {
+        format!("state{n:0>27}")
+    }
+
     /// List an ask from a device with key `key(n)` on the global carrier.
     fn listed(n: u8, state: NodeState) -> String {
         let mut r = request();
         r.device_key = key(n);
+        // Each ask its own state token: a decided one is remembered by it.
+        r.state = state_of(n);
         carrier()
             .pending
             .admit(
@@ -1125,7 +1133,7 @@ mod tests {
         let sent = link.0.lock().unwrap().clone();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].0, "peer-device-41");
-        assert!(matches!(&sent[0].1, CarryRequest::Code { state, .. } if *state == "s".repeat(32)));
+        assert!(matches!(&sent[0].1, CarryRequest::Code { state, .. } if *state == state_of(41)));
         assert!(carrier().pending.pick(&device, now_micros()).is_none());
     }
 

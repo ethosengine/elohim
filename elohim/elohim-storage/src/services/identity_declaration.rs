@@ -121,6 +121,7 @@ pub async fn reconcile(cell: &dyn ControllerCell, declaration: &Declaration) -> 
         human_id: declared.human_id.clone(),
         identifier: declared.identifier.clone(),
         profile_reach: Some(declared.reach().to_string()),
+        secret: None,
     };
     match begin_with(Some(cell), input).await {
         Ok(begun) => Reconciled::Applied(Box::new(begun)),
