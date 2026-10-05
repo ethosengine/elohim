@@ -1431,19 +1431,37 @@ async fn async_main(
                 let (s, c) = (storage_dir.clone(), conductor_dir.clone());
                 let pool = holder_pool.clone();
                 let walked = tokio::task::spawn_blocking(move || {
-                    let holders = pool
-                        .and_then(|p| p.get().ok())
-                        .and_then(|mut conn| fp::known_holder_distribution(&mut conn).ok());
+                    // Content rows are counted here, on the pod that holds the
+                    // content database: the memory-attribution sampler runs only
+                    // beside an embedded conductor, where that database is empty.
+                    let mut docs = Vec::new();
+                    let holders = pool.and_then(|p| p.get().ok()).and_then(|mut conn| {
+                        for ctx in [
+                            elohim_storage::db::AppContext::default_lamad(),
+                            elohim_storage::db::AppContext::default_elohim(),
+                        ] {
+                            if let Ok(n) =
+                                elohim_storage::db::content_diesel::content_count(&mut conn, &ctx)
+                            {
+                                docs.push((ctx.h_app_id().to_string(), n.max(0) as u64));
+                            }
+                        }
+                        fp::known_holder_distribution(&mut conn).ok()
+                    });
                     (
                         fp::walk(&s, fp::classify_storage),
                         fp::walk(&c, fp::classify_conductor),
                         holders,
+                        docs,
                     )
                 })
                 .await;
-                if let Ok((storage, conductor, holders)) = walked {
+                if let Ok((storage, conductor, holders, docs)) = walked {
                     if let Some(h) = holders {
                         elohim_storage::metrics::set_shard_known_holders(&h);
+                    }
+                    for (app, n) in docs {
+                        elohim_storage::metrics::set_corpus_docs(&app, n);
                     }
                     elohim_storage::metrics::set_store_footprint(
                         "storage",
