@@ -17,6 +17,8 @@ import {
   standingFor,
   trailAfterAgreement,
 } from './logic.js';
+import { approveCommand } from '../terminal.js';
+
 import { approvalWords } from './words.js';
 import type { ConsentAgreeResponse } from './wire.js';
 
@@ -349,6 +351,28 @@ describe('approvalWords — the host names the key holder', () => {
     expect(all + signer).not.to.match(/doorway/i);
     expect(signer).to.equal(
       'This device holds your key, and will sign this as you when you approve.'
+    );
+  });
+
+  it('says a page on another machine is not a retry, and lets a host word it its own way', () => {
+    expect(device.card.refusal?.['consent_caller_not_local']).to.include(
+      'open on a different machine from the one that holds your key'
+    );
+    expect(device.card.refusalHeading?.['consent_caller_not_local']).to.equal(
+      'Approve on the machine that holds your key'
+    );
+    expect(nothingWasSigned('consent_caller_not_local')).to.equal(true);
+    const own = approvalWords({
+      name: 'Your doorway',
+      inSentence: 'your doorway',
+      callerNotLocal: 'Ours.',
+    });
+    expect(own.card.refusal?.['consent_caller_not_local']).to.equal('Ours.');
+  });
+
+  it('builds the terminal command with the link as one word', () => {
+    expect(approveCommand('http://localhost:8090/auth/portal/consent/device?request=e30')).to.equal(
+      "epr device approve 'http://localhost:8090/auth/portal/consent/device?request=e30'"
     );
   });
 

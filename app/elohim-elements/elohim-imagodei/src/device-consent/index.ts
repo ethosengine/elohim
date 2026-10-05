@@ -10,3 +10,4 @@ export * from './logic.js';
 export * from './progress.js';
 export * from './words.js';
 export * from './controller.js';
+export { approveCommand, shellQuote } from '../terminal.js';

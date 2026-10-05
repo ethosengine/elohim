@@ -10,6 +10,8 @@
  * Framework-free and Lit-free; both sign-in portals import it.
  */
 
+import { sameOriginJson, type SameOriginOptions, type SameOriginResult } from '../same-origin.js';
+
 import type { WitnessStep } from '../witness-step.js';
 
 export const CONSENT_VIEW_PATH = '/auth/consent/view';
@@ -66,14 +68,8 @@ export interface ConsentRefusalBody {
   code: string;
 }
 
-/**
- * What a call came back with. `status` 0 means no answer at all (offline,
- * blocked, the node unreachable); `body` is whatever JSON the refusal
- * carried, or null.
- */
-export type ConsentWireResult<T> =
-  | { ok: true; body: T }
-  | { ok: false; status: number; body: unknown };
+/** What a call came back with (see {@link SameOriginResult}). */
+export type ConsentWireResult<T> = SameOriginResult<T>;
 
 /** The two calls the approval page makes. */
 export interface DeviceConsentClient {
@@ -83,41 +79,16 @@ export interface DeviceConsentClient {
   agree(body: ConsentAgreeRequest): Promise<ConsentWireResult<ConsentAgreeResponse>>;
 }
 
-export interface DeviceConsentClientOptions {
-  /** Defaults to the global `fetch`. */
-  fetch?: typeof fetch;
-  /**
-   * Extra headers per call — how a host that keeps its session outside a
-   * cookie (a bearer token) proves it. Cookies on this origin are always sent.
-   */
-  headers?: () => Record<string, string>;
-}
+export type DeviceConsentClientOptions = SameOriginOptions;
 
 /** Same-origin client for `/auth/consent/*`. */
 export function createDeviceConsentClient(
   options: DeviceConsentClientOptions = {}
 ): DeviceConsentClient {
-  const post = async <T>(path: string, body: unknown): Promise<ConsentWireResult<T>> => {
-    const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
-    let response: Response;
-    try {
-      response = await doFetch(path, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', ...options.headers?.() },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      return { ok: false, status: 0, body: null };
-    }
-    const payload: unknown = await response.json().catch(() => null);
-    return response.ok
-      ? { ok: true, body: payload as T }
-      : { ok: false, status: response.status, body: payload };
-  };
-
   return {
-    view: async request => post<ConsentViewResponse>(CONSENT_VIEW_PATH, request),
-    agree: async body => post<ConsentAgreeResponse>(CONSENT_AGREE_PATH, body),
+    view: async request =>
+      sameOriginJson<ConsentViewResponse>(options, 'POST', CONSENT_VIEW_PATH, request),
+    agree: async body =>
+      sameOriginJson<ConsentAgreeResponse>(options, 'POST', CONSENT_AGREE_PATH, body),
   };
 }

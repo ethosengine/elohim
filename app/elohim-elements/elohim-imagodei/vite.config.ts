@@ -11,6 +11,7 @@ export default defineConfig({
         'federated-identifier': resolve(__dirname, 'src/federated-identifier.ts'),
         'witness-step': resolve(__dirname, 'src/witness-step.ts'),
         'device-consent': resolve(__dirname, 'src/device-consent/index.ts'),
+        'identity-standing': resolve(__dirname, 'src/identity-standing/index.ts'),
       },
       formats: ['es'],
       fileName: (_format, entry) => `${entry}.js`,

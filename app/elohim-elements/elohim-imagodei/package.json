@@ -37,6 +37,10 @@
       "import": "./dist/device-consent.js",
       "types": "./dist/device-consent/index.d.ts"
     },
+    "./identity-standing": {
+      "import": "./dist/identity-standing.js",
+      "types": "./dist/identity-standing/index.d.ts"
+    },
     "./tokens.scss": "./tokens.scss"
   },
   "files": [

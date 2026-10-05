@@ -258,6 +258,42 @@ describe('DeviceConsentController — the approval page both portals mount', () 
       });
     }
 
+    it('on consent_caller_not_local: says so, shows no witness, keeps nothing', async () => {
+      agreeResult = async () => refused(403, NODE_CODE.callerNotLocal);
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      expect(controller.state.refusalCode).to.equal('consent_caller_not_local');
+      expect(controller.state.trail).to.equal(null);
+      expect(memory.store.size).to.equal(0);
+    });
+
+    it('comes back to review after beginning, and sends nothing until approved again', async () => {
+      agreeResult = async () => refused(409, NODE_CODE.identityUnbootstrapped);
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      expect(controller.state.refusalCode).to.equal(NODE_CODE.identityUnbootstrapped);
+
+      await controller.resume();
+      expect(controller.state.phase).to.equal('review');
+      expect(controller.state.refusalCode).to.equal(undefined);
+      expect(calls.view).to.have.length(1);
+      expect(calls.agree).to.have.length(1);
+
+      agreeResult = async () => ok(answer());
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      expect(controller.state.phase).to.equal('code');
+      expect(calls.agree).to.have.length(2);
+    });
+
+    it('does not resume past a refusal after which something may have been signed', async () => {
+      agreeResult = async () => refused(400, 'act_unknown');
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      await controller.resume();
+      expect(controller.state.phase).to.equal('refused');
+      expect(controller.state.refusalCode).to.equal('act_unknown');
+    });
+
     it('on no one signed in: forgets the attempt and sends the person to sign in', async () => {
       agreeResult = async () => refused(401);
       const { controller } = await reviewing();

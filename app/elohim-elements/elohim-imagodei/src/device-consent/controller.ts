@@ -191,6 +191,24 @@ export class DeviceConsentController {
     }
   }
 
+  /**
+   * Come back to the approval after a refusal that signed nothing — the
+   * person has since begun their identity, or the signer is back. The page
+   * returns to review; nothing is sent until the person approves again, so
+   * nothing is ever sent twice.
+   */
+  async resume(): Promise<void> {
+    const { phase, refusalCode, view } = this.current;
+    if (phase !== 'refused' || !refusalCode || !nothingWasSigned(refusalCode)) return;
+    this.memory.forget(this.requestParam);
+    if (view) {
+      this.set({ phase: 'review', refusalCode: undefined, trail: null, standing: null });
+      return;
+    }
+    this.set({ phase: 'loading', refusalCode: undefined, trail: null });
+    await this.loadView();
+  }
+
   /** Declining signs nothing, so nothing is sent. */
   decline(): void {
     if (this.current.phase !== 'review') return;

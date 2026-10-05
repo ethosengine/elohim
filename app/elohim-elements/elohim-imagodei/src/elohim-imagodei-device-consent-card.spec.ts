@@ -468,6 +468,7 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     ['consent_not_signed_in', 'you’ll come straight back here'],
     ['consent_identity_unbootstrapped', 'hasn’t recorded who you are yet'],
     ['consent_signing_unavailable', 'This is a wait, not a refusal'],
+    ['consent_caller_not_local', 'open on a different machine from the one that holds your key'],
     ['something_new', 'Something stopped this request'],
   ];
   for (const [code, sentence] of refusals) {

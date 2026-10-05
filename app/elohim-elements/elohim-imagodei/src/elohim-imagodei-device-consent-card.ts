@@ -44,7 +44,8 @@ export type KnownDeviceRefusalCode =
   | 'consent_unavailable'
   | 'consent_not_signed_in'
   | 'consent_identity_unbootstrapped'
-  | 'consent_signing_unavailable';
+  | 'consent_signing_unavailable'
+  | 'consent_caller_not_local';
 
 /**
  * Every visible sentence the card speaks. Hosts may replace any subset through
@@ -162,6 +163,7 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     consent_not_signed_in: 'Sign in first',
     consent_identity_unbootstrapped: 'Not ready to approve yet',
     consent_signing_unavailable: 'Waiting on the signer',
+    consent_caller_not_local: 'Approve on the machine that holds your key',
   },
   refusal: {
     request_acts_incoherent:
@@ -177,6 +179,8 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
       'The node that holds your key hasn’t recorded who you are yet, so it can’t approve anything for you. Nothing is wrong with this request.',
     consent_signing_unavailable:
       'The node that holds your key can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.',
+    consent_caller_not_local:
+      'This page is open on a different machine from the one that holds your key, so nothing was signed. Approving happens on that machine.',
   },
   refusedUnknown: 'Something stopped this request. Start again from the terminal on your device.',
   refusalCodeLabel: 'Reference',

@@ -39,6 +39,11 @@ export const NODE_CODE = {
   identityUnbootstrapped: 'consent_identity_unbootstrapped',
   /** The node cannot reach its signer right now — a wait. Nothing was signed. */
   signingUnavailable: 'consent_signing_unavailable',
+  /**
+   * This page is open on another machine; the node signs only for a caller
+   * on its own. Nothing was signed, and approving happens on that machine.
+   */
+  callerNotLocal: 'consent_caller_not_local',
 } as const;
 
 /**
@@ -48,6 +53,7 @@ export const NODE_CODE = {
 const NOTHING_SIGNED = new Set<string>([
   NODE_CODE.identityUnbootstrapped,
   NODE_CODE.signingUnavailable,
+  NODE_CODE.callerNotLocal,
 ]);
 
 /** True when a refusal says the node signed nothing (safe to approve again later). */
