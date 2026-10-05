@@ -24,6 +24,9 @@ cites:
   - elohim/elohim-storage/src/services/node_account.rs
   - elohim/elohim-storage/src/services/device_consent.rs
   - elohim/elohim-storage/src/services/device_carrier.rs
+  - elohim/elohim-storage/src/services/device_affirmation.rs
+  - crates/consent-grant/src/controller.rs
+  - crates/consent-grant/src/witness.rs
   - elohim/elohim-storage/src/services/identity_declaration.rs
   - elohim/eprfs/epr-cli/src/device.rs
   - elohim/eprfs/epr-cli/src/approver.rs
@@ -56,13 +59,16 @@ state`.
 | 2 | A declared pair of nodes completes the ceremony with nobody carrying anything (carriers: private-network discovery, a doorway's relay/signal) | Carrier 1 built; carrier 2 not |
 | 3 | A device's root key is bound to the person | Recorded in the consent only |
 | 4 | A revoked device re-enrolls | `supersedes` always None |
-| 5 | A declared approvals count above one is enforced | Read and reported; not enforceable |
+| 5 | A declared approvals count above one is enforced | Superseded by row 12: a policy above one counts distinct devices that speak and is verified; no write sets such a policy yet |
 | 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. Row 1's sign-in is built |
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
 | 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
 | 9 | A sign-in session bound to a key the browser holds | Built (RFC 9449 DPoP, adapted): signing routes and sign-out need the key's proof; reads do not yet |
 | 10 | A second device of the person as a human witness ("is this you?") | Recorded; nothing designed |
 | 11 | A node serves its own native portal | Not built: the browser run served it from a front at the same origin |
+| 12 | Every device of a person speaks for them, and any may approve the next | Built (coordinator only, DNA hash unchanged); affirmation automatic; sweettest and live run |
+| 13 | Who may withdraw a device's voice | Open question: root controllers only, as before |
+| 14 | A device of the person contests another's joining ("I saw it; I do not affirm it") | Missing node: no contest exists |
 
 ## Row 1 — a remote session that proves the person
 
@@ -173,6 +179,10 @@ and is never acted on by itself.
 - **Chain:** controller policy.
 - **Between:** "the person declares `approvalsNeeded = N`" → "a device is recognized only after N
   of the nodes that speak for the person approve".
+- **Superseded (2026-10-05) by row 12.** The rule no longer needs the authority rewritten per
+  join: a policy above one counts distinct devices that speak (root controllers or joined devices
+  whose records stand), and `classify_approvers` verifies it. What remains of this row is the
+  policy write alone: nothing yet writes an authority whose policy asks for more than one, below.
 - **Missing node:** a successor authority write path. Nothing yet creates an authority with
   `previous_authority` set, so the controller set and policy cannot change from the bootstrap's
   `self` policy. `current_successor` in `device_enrollment.rs` reads successors; nothing writes
@@ -190,8 +200,8 @@ and is never acted on by itself.
 - **Reframed (operator ruling 2026-10-05, the OAuth model).** Three roles stay distinct: whose
   node it is (the person it speaks for); who operates it (whoever runs the machine and answers for
   what happens to it: the person, a relative, an elohim or the commons); and whether it may
-  approve other nodes (one of the controllers the person's authority names; joining does not make
-  a node one). Operating a node confers no say over the identity it speaks for. But "the node
+  approve other nodes (every device that speaks for the person may: row 12 superseded the earlier
+  "joining does not make a node one"). Operating a node confers no say over the identity it speaks for. But "the node
   cannot tell the person from whoever is at the machine" is **not** a gap to close by asking the
   person for proof on each act. A signed-in device acts with the person's authority, as in OAuth.
   Noticing that something is off and asking for re-authentication is the witness's job, at the
@@ -233,8 +243,10 @@ and is never acted on by itself.
   - after `register_device_identity`, the key resolves to the person it joined, so its earlier
     work would trace there, which the story forbids;
   - so the device's own node registers only when it had no Human of its own. A node with one is
-    enrolled and verifiable by any peer, its key keeps resolving to the identity it began, and it
-    does not itself report the person it joined.
+    enrolled and verifiable by any peer, its key keeps resolving to the identity it began.
+  - since row 12 it also names the person it joined: it speaks for both identities, approvals on it
+    are for the one it began, and standing (`alsoSpeaksFor`), the pending list's words and `epr
+    identity standing` name the other, never guessing which.
 
 ## Row 8 — the first carrier's remaining gaps
 
@@ -338,12 +350,111 @@ and is never acted on by itself.
   portal is redeemed with `--approver <the node's http address>`; the CLI keeps the request when
   the node was unreachable, so nothing is spent.
 
+## Row 12 — every device of a person speaks for them, and any may approve the next
+
+- **Chain:** controller policy / device lifecycle (story: `device-provisioning-paths.feature`,
+  commit `b14f31cff`).
+- **Between:** "a device joins the person's identity" → "it approves the person's next device,
+  with the first device away".
+- **Built (2026-10-05), coordinator only.** The authority record stays the root and the policy and
+  is never rewritten by a join. Each joining record stands alone, verified by walking its
+  approvers' own joining records back to the authority. The rule, in four sentences
+  (`device_enrollment.rs` module header):
+  1. A joining record stands when it names a current authority of its identity, the joining device
+     signed it, and the authority's root controllers have not revoked it.
+  2. At least as many distinct approvers as the person's policy requires (one by default) signed
+     it, never the joining device itself, and each approver is a root controller of the authority
+     or a device whose own joining record, which this record names, stands by this same rule for
+     the same identity.
+  3. The walk back to the authority goes at most 8 records deep and reads at most 24 records; a
+     record met again on its own way back refuses as a cycle, and one reached by two approvers'
+     ways is read once.
+  4. Read now, an approver whose joining record was revoked no longer counts, so what it approved
+     stops verifying too; read at an authenticated earlier moment
+     (`verify_historical_device_binding`), it counts if its revocation came after that moment.
+- **Wire.** `DeviceBinding.approved_via` (omitted when every approver is a root, so earlier records
+  keep their bytes), `DeviceApprovalProofs.via`, `ConsentStanding.speaks_via` / `also_speaks_for`,
+  and the read `identity_devices(identity_root)` (who approved each device, when it joined, who
+  affirmed it). Standing's `controllers`, `controllerCount`, `thisNodeIsController`,
+  `restsOnThisNodeAlone` and the agree answer's `controllers: {required, signed}` keep their names
+  and now count devices that speak, not root controllers only; standing gains `devices` and
+  `alsoSpeaksFor`.
+- **Revocation, as built.** Unchanged in who: the authority's root controllers. Read now it
+  cascades (rule 4). Read at an authenticated earlier moment, a device a since-revoked device
+  approved still verifies. The ruling asked that what a revoked device approved earlier keep
+  verifying at the current read too; that is not sound on the evidence the zome holds, because a
+  joining record's time is chosen by its author, so a stolen and revoked key could approve a new
+  device with a backdated record. The sound anchor, not built: an affirmation, made before the
+  revocation, by a device whose own way back does not pass through the revoked one. Row 13 holds
+  the who.
+- **Affirmation (automatic).** Each speaking node, a minute after start and then every 30
+  minutes, reads its standing and `identity_devices` and affirms at most 4 devices it did not
+  approve, has not affirmed, and is not, oldest first (`services::device_affirmation`); a node
+  away catches up on its next passes. Per pass: one standing read and one devices read; per
+  affirmation: one mandate grant, one affirmation record and its discovery link. Affirming is not
+  approving: no voice, no policy count, no verdict changes.
+- **The witnessed moments' context.** Device authorization hands the witness, as data and never
+  a threshold: whether the approver is a root, how long it has spoken, how many others affirmed its
+  own joining, how many devices speak, and whether the asking device began an identity of its own
+  (when it said so over the carrier). Sign-in hands the first four about this node. Both come from
+  the last devices read kept, never a network read at the moment.
+- **Probe:** sweettest `device_enrollment` stage `every_device_speaks_for_its_person` (A begins; B
+  approved by A; C approved by B alone, verified by a fourth agent; two approvals at once both
+  stand; self-approval, double counting and an unshown record refuse; required = 2 refuses one and
+  accepts two distinct; revoked B cannot approve, C verifies before the revocation and not now),
+  unit tests on the walk's depth, cycle and work bounds, and a live single-conductor run (a third
+  device approved from the second).
+- **Live run (2026-10-05, one isolated conductor, four apps):** A began; B asked over a link and A
+  approved; C asked with B's portal and **B approved alone**; C redeemed with `--approver` B and a
+  fourth app verified C's binding (`verify_device_binding`, identity root and authority A's). After
+  a restart each node's first pass affirmed what it did not approve (A affirmed C, C affirmed B),
+  and `epr identity standing` on A and on B reads "3 nodes speak for you" with each device, its
+  approver and "affirmed by one other device".
+- **Also found there:** a joined device's terminal has no way to sign in from the CLI. `epr
+  identity begin` is the only verb that keeps a session; on a joined node the person signs in by
+  the portal or `POST /auth/login`, and the terminal then holds no cookie (the run wrote the one
+  login returned into the CLI's session file). Missing node: `epr identity signin` on the node's
+  own machine.
+- **Not built:** the policy write (row 5); depth and cycle bounds are unit-tested, not reached in
+  the sweettest (a chain nine devices deep is not built there, and content addressing makes a real
+  cycle unconstructible: the refusal is defence in depth).
+
+## Row 13 — who may withdraw a device's voice
+
+- **Chain:** device lifecycle / revocation.
+- **Between:** "a device of the person is lost or stolen" → "its voice is withdrawn, and the
+  person knows what that withdraws".
+- **Open question.** Today only the authority's root controllers may revoke a joining record, and
+  that is all existing revocation verification can check. The risks either way: a stolen joined
+  device can approve new devices but cannot revoke, so it cannot lock the person out, but it can
+  add devices until a root revokes it; losing the root (the first node) leaves no one able to
+  revoke; and revoking a device withdraws, at the current read, every device whose way back runs
+  through it, including the person's own later devices. Letting devices revoke each other would
+  let a stolen device revoke the person's real ones. Not settled; the record asks.
+- **Probe:** a decided rule, then a sweettest that revokes by it in both orders (revoke then
+  approve, approve then revoke) with historical reads.
+
+## Row 14 — a device of the person contests another's joining
+
+- **Chain:** affirmation (row 12) / witnessed moments.
+- **Between:** "a device of the person saw another join" → "it says it does not affirm it, and
+  that reaches the person and the device".
+- **Missing node:** a contest, the counterpart of `affirm_identity_device`: "I saw it; I do not
+  affirm it". Nothing in `device_enrollment` records one (the zome's only "contested" is an
+  authority branch). Mishpat's generic `create_challenge` names any entity id but is not linked
+  from a joining record and `identity_devices` does not read it. Counter-evidence always reaches
+  its subject: a contest must be discoverable from the contested joining record and shown with it,
+  to the person and to the contested device, never only to its author.
+- **Probe:** device D contests C's joining; `identity_devices` shows C with D's contest and C's
+  own standing names it.
+- **Current state:** nothing; affirmations only.
+
 ## shift_objective
 
 ```
 Pick the highest row that a single slice can close end to end on an isolated stack: row 1's
 floor-readiness must-have (no sign-in secret in the clear: node TLS, or a PAKE / key-bound
 sign-in) first, then row 4 (supersedes), then design
-rows 3, 5 and 7 through the p2p-design-gate before any zome change. Each row closes with its
+rows 3, 5's policy write, 7, 13 and 14 through the p2p-design-gate before any zome change. Each row closes with its
 probe passing live and a one-line delta here.
 ```
