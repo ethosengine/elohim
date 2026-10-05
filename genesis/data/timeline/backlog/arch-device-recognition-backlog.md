@@ -12,6 +12,7 @@ priority: "high"
 tags: [device-consent, recognition, identity, mishpat, imagodei, elohim-storage, epr-cli, story-maintainer]
 relatedNodeIds:
   - security-node-session-routes-unauthenticated
+  - arch-confidentiality-plane-backlog
   - genesis/a2o/features/auth/device-provisioning-paths.feature
   - genesis/a2o/features/auth/device-consent-grant.feature
 cites:
@@ -19,6 +20,8 @@ cites:
   - crates/consent-grant/src/declaration.rs
   - crates/consent-grant/src/pending.rs
   - crates/consent-grant/src/decide.rs
+  - crates/consent-grant/src/signin.rs
+  - elohim/elohim-storage/src/services/node_account.rs
   - elohim/elohim-storage/src/services/device_consent.rs
   - elohim/elohim-storage/src/services/device_carrier.rs
   - elohim/elohim-storage/src/services/identity_declaration.rs
@@ -49,12 +52,12 @@ state`.
 
 | # | Missing node | Current state |
 |---|---|---|
-| 1 | A remote session that proves the person | Remote callers refused |
+| 1 | A remote session that proves the person | Built: sign-in to the node's own person; must-have before floor readiness: no secret in the clear |
 | 2 | A declared pair of nodes completes the ceremony with nobody carrying anything (carriers: private-network discovery, a doorway's relay/signal) | Carrier 1 built; carrier 2 not |
 | 3 | A device's root key is bound to the person | Recorded in the consent only |
 | 4 | A revoked device re-enrolls | `supersedes` always None |
 | 5 | A declared approvals count above one is enforced | Read and reported; not enforceable |
-| 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. What remains is row 1 |
+| 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. Row 1's sign-in is built |
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
 | 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
 
@@ -72,9 +75,24 @@ state`.
   3. agree and bootstrap accept a remote caller only with a cookie naming such a session.
 - **Probe:** from a non-loopback address, an exchange-proven cookie approves and a forged session
   is refused.
-- **Current state:** remote callers are refused 403 `consent_caller_not_local`, so approving
-  happens on the node's own machine only (`epr device approve`, or a browser there). The session
-  surface itself is open: [security-node-session-routes-unauthenticated](epr:security-node-session-routes-unauthenticated).
+- **Current state (2026-10-05): built, by the OAuth model**, a native proof that needs no
+  doorway: the node signs in its own person. `epr identity secret` (this machine only) sets an
+  Argon2id verifier in the node-local account; `POST /auth/login` opens a session proven by
+  sign-in; the signing routes and the pending list and decide accept a caller on this machine or
+  such a session, nothing else (`consent_grant::may_make_node_sign`). Assertion 1 holds: the
+  session routes answer only this machine. Assertion 3 holds for sign-in sessions. Assertion 2 is
+  not taken: an exchange-made session stays no proof (by design; the exchange keeps its own job).
+  Live from 10.1.19.170: sign-in, approval of a pending device from that session, sign-out, the
+  same cookie refused. Details:
+  [security-node-session-routes-unauthenticated](epr:security-node-session-routes-unauthenticated).
+- **Must-have before floor readiness (required, not optional hardening):** a sign-in secret and a
+  session cookie must not cross a network in the clear. Allowed today by operator ruling and
+  logged at warn; one line closes it (`consent_grant::PLAIN_SIGN_IN_ALLOWED`). Satisfied by the
+  node terminating TLS, or a sign-in that never sends the secret (a password-authenticated key
+  exchange, or a key-bound sign-in). Also recorded as
+  [arch-confidentiality-plane-backlog](epr:arch-confidentiality-plane-backlog) row 13.
+- **What remains:** passkeys; a second factor; sign-in from a device that is itself enrolled (its
+  key proving the person); TLS on a home LAN; a proxy on the node's own machine looks local.
 
 ## Row 2 — a declared pair completes the ceremony with nobody carrying anything
 
@@ -177,9 +195,9 @@ and is never acted on by itself.
   witnessed moment (`consent_grant::witness`: an attending witness may pause and the agree path
   answers 401 `consent_reauthentication_asked`; nobody attends by default, so nothing pauses
   today). No added load for the person.
-- **What remains real, recorded elsewhere:** the session routes that mint a session with no
-  sign-in at all ([security-node-session-routes-unauthenticated](epr:security-node-session-routes-unauthenticated));
-  and remote approval needing a real sign-in (row 1).
+- **What remained real is now built (2026-10-05):** the session routes answer only this machine,
+  and remote approval needs a real sign-in (row 1). An attending witness's "sign in again" now
+  has somewhere to go: `POST /auth/login`, itself a witnessed moment (`MomentKind::SignIn`).
 - **"Operator of record"** for a node is its own record, on the standing side, and is not
   designed.
 - **The witnessed moment is one of many.** The device-authorization moment is one witnessed
@@ -187,14 +205,12 @@ and is never acted on by itself.
   for witnessed moments (the kind, the claims handed over, the outcomes proceed / proceed with a
   signature / pause for re-authentication) is not designed; the shape lives in
   `crates/consent-grant/src/witness.rs` until it is.
-- **The sign-in word is a claim with no identity-side home.** It is shown wherever the person is
-  named (`identifier` on `speaksFor`, `forIdentity` and the standing view), and never used to
-  decide or join. It is not on the Human record (no field, and the record is public on the DHT,
-  where a sign-in word that is an address would leak). The node reads it back from the newest
-  session it recorded for its own identity, else from its identity declaration. Missing node:
-  between "the person gives a sign-in word at begin" and "the node names the person by it": a
-  durable, private home for the word on the identity side; probe: after every session is deleted
-  and with no declaration, `epr identity standing` still names the person by their word.
+- **The sign-in word's home (closed 2026-10-05).** It is shown wherever the person is named and
+  never used to decide or join. It is not on the Human record (public on the DHT). Its lasting,
+  private home is now the node-local account (`node_account`), written at begin (route or
+  declaration) and by `epr identity secret`; the node reads it there first, then a session, then
+  the declaration. An identity begun before the account existed gains one at its first
+  `epr identity secret`.
 
 ## Row 7 — a node with an identity of its own knows whose device it is
 
@@ -242,9 +258,13 @@ and is never acted on by itself.
   controller removed by another node's
   successor authority keeps listing for up to the 30 s refresh (lists only; the agree path
   re-checks the authority).
-- **Signed in means the no-cookie fallback.** `epr device approve` on the approving node carried
-  no session cookie; the decide route counted the node's person as signed in through the session
-  fallback that row 1 and `security-node-session-routes-unauthenticated` describe.
+- **Signed in means the no-cookie fallback, on this machine only (narrowed 2026-10-05).** A local
+  `epr device approve` still counts the node's person as signed in through the single active
+  session; a caller from another machine now needs a session proven by sign-in (row 1).
+- **CLOSED 2026-10-05: a decided ask was listed again.** The asking device's next announce round
+  could arrive between the decision and the code reaching it (seen live, 1.4 ms after the
+  decision) and was listed anew. Decided asks are now remembered by their state token for the
+  ask's life and dropped as `ask_already_decided`.
 - **Not built:** a clean start (a new key) for a node with an identity of its own; the joining
   node's operator confirming what will happen to its machine; a portal view of the pending list
   (`GET /auth/consent/pending` and `POST /auth/consent/pending/decide` are ready for one);
@@ -254,7 +274,8 @@ and is never acted on by itself.
 
 ```
 Pick the highest row that a single slice can close end to end on an isolated stack: row 1's
-session-surface half (loopback-only session routes) first, then row 4 (supersedes), then design
+floor-readiness must-have (no sign-in secret in the clear: node TLS, or a PAKE / key-bound
+sign-in) first, then row 4 (supersedes), then design
 rows 3, 5 and 7 through the p2p-design-gate before any zome change. Each row closes with its
 probe passing live and a one-line delta here.
 ```

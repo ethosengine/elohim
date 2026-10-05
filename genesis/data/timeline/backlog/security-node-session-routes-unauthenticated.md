@@ -12,12 +12,15 @@ priority: "high"
 tags: [security, authentication, sessions, elohim-storage, loopback, device-consent, trustful-self]
 relatedNodeIds:
   - arch-device-recognition-backlog
+  - arch-confidentiality-plane-backlog
   - genesis/a2o/features/auth/device-provisioning-paths.feature
   - genesis/a2o/features/auth/device-consent-grant.feature
 cites:
   - elohim/elohim-storage/src/http.rs
   - elohim/elohim-storage/src/main.rs
   - elohim/elohim-storage/src/services/device_consent.rs
+  - elohim/elohim-storage/src/services/node_account.rs
+  - crates/consent-grant/src/signin.rs
   - elohim/elohim-storage/src/services/session_exchange.rs
   - genesis/orchestrator/manifests/network-policies.yaml
   - genesis/orchestrator/manifests/edgenode/alpha.yaml
@@ -27,7 +30,7 @@ cites:
 
 # A node's session routes answer anyone who reaches its port
 
-## What is open
+## What was open (before sign-in, kept as the record)
 
 elohim-storage keeps the person's sign-in on their node as a `local_sessions` row.
 The routes that manage it trust whoever can reach the HTTP port:
@@ -61,7 +64,7 @@ that matters:
 `genesis/local-dev/device-consent/`):** `POST http://10.1.19.170:8191/session` from a
 non-loopback address answered **201** and became the active session. `DELETE /session` cleared it.
 
-## What is closed
+## Closed first: the signing routes
 
 Since commit `404962377`, the three routes that make the node sign as its person (approving a
 device, bootstrapping an identity, beginning one) answer only callers on the node's own machine:
@@ -77,16 +80,64 @@ The doorway-hosted path is not exposed by this hole and was not changed by the f
 signs through its own conductor connection, and storage's `build_manifest()` declares none of
 these routes, so the doorway forwards none of them.
 
-## What would close the rest
+## Closed 2026-10-05: sign-in, and the session routes
 
-1. Answer `POST /session`, `GET /session`, `GET /session/all` and `DELETE /session` only to
-   loopback callers. Their only known users (the Tauri shell, its webview and the connection
-   strategy) are on the same machine. This also stops a remote caller seeding the exchange
-   allowlist.
-2. Drop the no-cookie fallback for any caller that is not on this machine.
-3. Consider binding storage's HTTP to loopback by default where nothing off the machine needs it
-   (Tauri), and keep the public Che endpoint off the person's signing surface. The latter already
-   holds by the loopback rule.
+- **The node signs its own person in** (the OAuth model: the node is the authorization server for
+  its own person). `POST /auth/identity/secret` (this machine only; `epr identity secret` reads the
+  secret without echo or from stdin, never from an argument) keeps an Argon2id verifier in the
+  node-local `node_account` table, the lasting home of the sign-in word. `POST /auth/login` (the
+  doorway's request shape) checks the word and secret for this node's own person only, with a
+  per-source and per-account growing delay, constant-time word comparison, and one answer for a
+  wrong word and a wrong secret; it opens a session proven by sign-in (thirty days, ended by
+  `POST /auth/logout` or a new secret) in an HttpOnly, SameSite=Strict cookie, `Secure` over TLS.
+- **Who may make the node sign:** a caller on this machine, or a request carrying a session proven
+  by sign-in (`consent_grant::may_make_node_sign`, asked through one function,
+  `HttpServer::signed_in_by_proof`). A session from `POST /session` or `/session/exchange` proves
+  nobody to another machine.
+- **Items 1 and 2 above are closed:** `POST /session`, `GET /session`, `GET /session/all`,
+  `DELETE /session` and `POST /session/intent` answer only callers on this machine (403
+  `session_caller_not_local`); the no-cookie fallback to the single active session applies only to
+  callers on this machine. Their callers, all on this machine: the Tauri shell
+  (`steward/device/src-tauri/src/lib.rs`, `http://localhost:8090`), its webview
+  (`tauri-auth.service.ts`, `environment.client.storageUrl` defaulting to localhost) and the
+  connection strategy (`tauri-connection-strategy.ts`, localhost). `/session/intent` has no caller
+  in the tree.
+- **Live (2026-10-05, isolated stack, from 10.1.19.170):** `POST /session` and `GET /session`
+  answered 403; sign-in over plain http was accepted with the warn line logged; a pending device
+  was approved from that session; after sign-out the same cookie was refused 403 by decide and
+  agree, and `/auth/me` answered 401.
+
+## Must-have before floor readiness: no secret or cookie in the clear
+
+**Required, not optional hardening.** A sign-in secret and a session cookie must not cross a
+network in the clear. Today a sign-in from another machine over plain http is **allowed** by
+operator ruling (2026-10-05: no real secrets, no real networks at risk) and logged at warn once per
+sign-in (`sign-in: a sign-in secret crossed a network in the clear`). The decision is one place,
+`consent_grant::sign_in_channel_verdict` with `PLAIN_SIGN_IN_ALLOWED = true`; closing it is that one
+line. What would satisfy the requirement:
+- the node terminating TLS itself (today it terminates none; the only TLS it can know of is a
+  proxy named in `ELOHIM_TRUSTED_PROXIES` that sends `X-Forwarded-Proto: https`), or
+- a sign-in exchange that never sends the secret: a password-authenticated key exchange, or a
+  key-bound sign-in (the session already carries `proven_by` and an always-empty `bound_key` for
+  that step).
+
+This intersects the unbuilt encryption layer:
+[arch-confidentiality-plane-backlog](epr:arch-confidentiality-plane-backlog) row 13.
+
+## What remains
+
+1. **The secret in the clear**, above.
+2. **"This machine" includes any proxy on it.** A doorway or a reverse proxy on the node's own
+   machine makes every caller it forwards look local. The doorway forwards only routes storage's
+   `build_manifest()` declares, and none of the signing or session routes is declared; a reverse
+   proxy the operator adds in front of storage would need `ELOHIM_TRUSTED_PROXIES` and the loopback
+   rule would still trust it.
+3. **Passkeys, a second factor, sign-in from a device that is itself enrolled** (the device's key
+   proving the person, no secret at all), and **TLS on a home LAN** (no public name, so no
+   ordinary certificate).
+4. **Bind storage's HTTP to loopback by default** where nothing off the machine needs it (Tauri).
+5. `/session/exchange`'s allowlist seeding is closed now that `POST /session` is local-only; its
+   redeemed agent is still not checked against this node's own.
 
 What is still unproven: Che routing was reasoned from the devfile, not measured. No kubectl was
 used.
@@ -94,9 +145,8 @@ used.
 ## shift_objective
 
 ```
-Make every node session route (POST/GET/GET all/DELETE /session) answer only callers on the
-node's own machine, refuse the no-cookie fallback for any other caller, and prove both with a
-handler test per route plus one live probe from a non-loopback address on an isolated stack.
-Keep the Tauri shell working (it calls from localhost) and leave /session/exchange's contract
-intact.
+Close the floor-readiness must-have: no sign-in secret or session cookie crosses a network in
+the clear. Either the node terminates TLS, or sign-in stops sending the secret (a password-
+authenticated key exchange or a key-bound sign-in), then set PLAIN_SIGN_IN_ALLOWED to false and
+prove a plain-http sign-in from a non-loopback address is refused signin_needs_secure_channel.
 ```
