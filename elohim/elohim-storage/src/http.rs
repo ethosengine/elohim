@@ -3020,14 +3020,14 @@ impl HttpServer {
             }
             (Method::POST, "/auth/identity/bootstrap") => {
                 let answer = Box::pin(self.handle_identity(req, true)).await;
-                crate::services::device_carrier::carrier().identity_changed();
+                self.refresh_speaks_now().await;
                 answer
             }
             // Begin a person's identity on this node with no doorway: their
             // Human, its authority and a session. This machine only.
             (Method::POST, "/auth/identity/begin") => {
                 let answer = Box::pin(self.handle_identity_begin(req)).await;
-                crate::services::device_carrier::carrier().identity_changed();
+                self.refresh_speaks_now().await;
                 answer
             }
             (Method::GET, "/auth/identity/declaration") => {
@@ -3051,7 +3051,7 @@ impl HttpServer {
                 let enrolling = req.method() == Method::POST;
                 let answer = Box::pin(self.handle_device_step(req)).await;
                 if enrolling {
-                    crate::services::device_carrier::carrier().identity_changed();
+                    self.refresh_speaks_now().await;
                 }
                 answer
             }
@@ -13706,6 +13706,19 @@ impl HttpServer {
         })
     }
 
+    /// Read whom this node speaks for now, before answering, so the next
+    /// request (the portal's pending list right after begin) sees it. Found
+    /// in the browser run: the list said "does not speak for anyone" for the
+    /// seconds the background refresh took.
+    async fn refresh_speaks_now(&self) {
+        if self.p2p_handle.is_none() {
+            return;
+        }
+        if let Some(cell) = self.own_controller_cell() {
+            crate::services::device_carrier::refresh_speaks(&cell, &self.identifier_source()).await;
+        }
+    }
+
     /// Where this node reads back its person's sign-in word.
     fn identifier_source(&self) -> NodeIdentifierSource {
         NodeIdentifierSource {
@@ -13887,7 +13900,7 @@ impl HttpServer {
             let mut detail = String::new();
             match &outcome {
                 Reconciled::Applied(begun) => {
-                    crate::services::device_carrier::carrier().identity_changed();
+                    self.refresh_speaks_now().await;
                     let session = self
                         .db_pool
                         .as_ref()
@@ -14367,6 +14380,38 @@ impl HttpServer {
                 .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
             if crate::services::node_account::end_session(&mut conn, &token)? {
                 info!(source, "sign-in: a session was ended by sign-out");
+            }
+            // On this machine the cookie may name the local session begin
+            // opened, which the single-active-session fallback would keep
+            // standing on: sign-out ends it too, or signing out here would do
+            // nothing a person can see (found in the browser run).
+            if caller_is_local(&req)
+                && db::local_sessions::get_session_by_id(&mut conn, &token)?.is_some()
+                && db::local_sessions::deactivate_session(&mut conn, &token)?
+            {
+                info!(
+                    source,
+                    "sign-in: this machine's local session was ended by sign-out"
+                );
+            }
+        }
+        // A caller on this machine with no session cookie stands on the single
+        // active session (the fallback), so signing out ends that one. A
+        // browser that closed loses begin's session cookie, and its sign-out
+        // would otherwise end nothing.
+        if caller_is_local(&req) && extract_session_cookie(req.headers()).is_none() {
+            if let Some(pool) = &self.db_pool {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+                if let Some(active) = db::local_sessions::get_active_session(&mut conn)? {
+                    if db::local_sessions::deactivate_session(&mut conn, &active.id)? {
+                        info!(
+                            source,
+                            "sign-in: this machine's active session was ended by sign-out"
+                        );
+                    }
+                }
             }
         }
         Ok(Response::builder()
@@ -14983,7 +15028,8 @@ impl HttpServer {
             self.self_peer_id.clone()
         } else {
             let addr = self.bind_addr;
-            if addr.ip().is_loopback() {
+            // A wildcard bind address names no place a person knows.
+            if addr.ip().is_loopback() || addr.ip().is_unspecified() {
                 "your conductor on this device".to_string()
             } else {
                 addr.to_string()

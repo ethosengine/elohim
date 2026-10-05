@@ -585,7 +585,9 @@ pub struct BeginInput {
     /// The Human's id. A random one is drawn when absent, as a doorway does.
     #[serde(default)]
     pub human_id: Option<String>,
-    /// The word the person signs in with. Defaults to the Human's id.
+    /// The word the person signs in with. Defaults to the name they gave: a
+    /// word they know. (Defaulting to the record's id, as before, left a
+    /// person who set a secret unable to sign in: nobody knows a record id.)
     #[serde(default)]
     pub identifier: Option<String>,
     /// Defaults to `private`: a profile begun on one's own node is shown to
@@ -638,7 +640,7 @@ pub async fn begin_with(
     let identifier = input
         .identifier
         .map(|i| i.trim().to_string())
-        .unwrap_or_else(|| id.clone());
+        .unwrap_or_else(|| name.clone());
     let fits = |t: &str| {
         !t.is_empty() && t.chars().count() <= MAX_NAME_LEN && !t.chars().any(char::is_control)
     };
@@ -1178,7 +1180,9 @@ pub(crate) mod tests {
             .unwrap();
         assert!(begun.human_created && begun.authority_created);
         assert!(begun.standing.rests_on_this_node_alone);
-        assert_eq!(begun.identifier, begun.human_id);
+        // The sign-in word defaults to the name given, never the record id.
+        assert_eq!(begun.identifier, "Matthew");
+        assert_eq!(begun.standing.identifier.as_deref(), Some("Matthew"));
         let humans = cell.humans.lock().unwrap().clone();
         assert_eq!(humans.len(), 1);
         assert_eq!(humans[0].display_name, "Matthew");

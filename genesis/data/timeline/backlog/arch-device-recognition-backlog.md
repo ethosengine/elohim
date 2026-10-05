@@ -61,6 +61,8 @@ state`.
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
 | 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
 | 9 | A sign-in session bound to a key the browser holds | Built (RFC 9449 DPoP, adapted): signing routes and sign-out need the key's proof; reads do not yet |
+| 10 | A second device of the person as a human witness ("is this you?") | Recorded; nothing designed |
+| 11 | A node serves its own native portal | Not built: the browser run served it from a front at the same origin |
 
 ## Row 1 — a remote session that proves the person
 
@@ -301,6 +303,40 @@ and is never acted on by itself.
   would make same-machine acts this machine's alone.
 - **One unlock for the keystore and the sign-in, not built:** the conductor's keystore passphrase
   and the sign-in secret are separate today; one unlock that opens both is recorded, not designed.
+
+## Row 10 — a second device of the person as a human witness
+
+- **Chain:** witnessed moments (row 9's sign-in moment, device authorization; `consent_grant::witness`).
+- **Between:** "a witnessed moment is attended by nobody, or by an elohim" → "the person themselves
+  attends from another of their devices".
+- **Missing node:** the familiar "X is trying to do this, is this you?" check, as one more
+  attendant of a witnessed moment: at sign-in or device authorization, a second device of the
+  person is asked and answers, and its answer is a witness signature (`Witnessing::
+  ProceedWithSignatures`) or a pause (`PauseForReauthentication`). The answering device need not
+  run a full conductor: a spoke-type device (the HTTP/WS participation track) is enough. Optional
+  and opt-in; it strengthens and is never a condition for what works alone. It rides whichever
+  carrier reaches the second device (private-network discovery, row 2's carrier 1, or a doorway's
+  relay, carrier 2).
+- **Probe:** with a second device opted in, a sign-in waits for its answer; its "yes" adds a
+  witness signature, its "no" pauses with its reason; with none opted in nothing waits.
+- **Current state:** nothing designed. Related: row 9's witnessed-moments note and its passkey
+  (platform authenticator) row.
+
+## Row 11 — a node serves its own native portal
+
+- **Chain:** sign-in / approving from another machine.
+- **Between:** "the person opens their node's address in a browser" → "the native portal
+  (`app/imagodei-portal`, `<base href="/auth/portal/">`) loads from the node".
+- **Missing node:** elohim-storage serves no `/auth/portal`; sign-in redirects there
+  (`redirect: "/auth/portal"`), but on a node only a doorway (an EPR projection) or a front serves
+  it. Probe: `GET <node>/auth/portal/` answers the bundle's `index.html` and its assets at the
+  node's own origin.
+- **Current state (browser run, 2026-10-05):** served from a small front at the node's origin
+  (`genesis/local-dev/device-consent/front.mjs`: static bundle under `/auth/portal/`, everything
+  else forwarded byte for byte).
+- **Also found there:** `epr device redeem` speaks only `http://`, so a code shown by an https
+  portal is redeemed with `--approver <the node's http address>`; the CLI keeps the request when
+  the node was unreachable, so nothing is spent.
 
 ## shift_objective
 

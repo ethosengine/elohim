@@ -53,7 +53,7 @@ pub fn usage() -> &'static str {
      [--act device.enroll] [--act device.bind-root] [--loopback | --announce] \
      [--approver <approving node URL>] [--node <this node URL>]\n    \
      (with no portal named or declared, the device announces on its private network)\n  \
-     epr device redeem '<code#state>' [--node <this node URL>]\n  \
+     epr device redeem '<code#state>' [--approver <approving node URL>] [--node <this node URL>]\n  \
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline"
@@ -71,7 +71,13 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
             };
             let (code, state) = parse_pasted(&pasted)
                 .ok_or("that is not a code: it should look like code#state")?;
-            let pending = Pending::load(state)?;
+            let mut pending = Pending::load(state)?;
+            // The approving node may be named again, by its own http address,
+            // when the portal that showed the code is one this terminal cannot
+            // reach (an https origin).
+            if let Some(approver) = opts.approver.clone() {
+                pending.approver = approver;
+            }
             let node = opts.node.unwrap_or_else(|| pending.node.clone());
             redeem(pending, code, &node)
         }
@@ -256,7 +262,7 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
         .approver
         .clone()
         .or_else(|| declared.as_ref().and_then(|a| a.approver.clone()))
-        .unwrap_or_else(|| portal.clone());
+        .unwrap_or_else(|| origin_of(&portal));
 
     let me: DeviceSelf = json_call("GET", &format!("{node}/auth/device/self"), None)
         .map_err(|e| format!("this device's node did not answer: {e}"))?;
@@ -533,6 +539,20 @@ struct BindingReceipt {
     binding_action: String,
 }
 
+/// The origin (`scheme://host[:port]`) of a portal URL: the approving node
+/// answers its routes at the root, whatever path its portal is served under
+/// (`/auth/portal`).
+fn origin_of(url: &str) -> String {
+    match url.find("://") {
+        Some(i) => {
+            let rest = &url[i + 3..];
+            let end = rest.find('/').unwrap_or(rest.len());
+            format!("{}{}", &url[..i + 3], &rest[..end])
+        }
+        None => url.trim_end_matches('/').to_string(),
+    }
+}
+
 fn redemption_for(pending: &Pending, code: &str) -> consent_grant::Redemption {
     let request = &pending.request;
     consent_grant::Redemption {
@@ -549,14 +569,30 @@ fn redeem(pending: Pending, code: &str, node: &str) -> Outcome<ExitCode> {
         "{}/auth/consent/redeem",
         pending.approver.trim_end_matches('/')
     );
-    let delivered: Delivered = match json_call("POST", &url, Some(&body)) {
+    // Unreached, nothing was spent: the request is kept and the same code can
+    // be tried again. Any answer the node refuses with spends the code.
+    let (status, _, bytes) = match http_with("POST", &url, Some(&body), &[]) {
+        Ok(answer) => answer,
+        Err(e) => {
+            return Err(format!(
+                "the approving node could not be reached ({e}); nothing was spent, so try the \
+                 same code again, naming the node's http address with --approver <url> if \
+                 needed"
+            ))
+        }
+    };
+    if !(200..300).contains(&status) {
+        pending.forget();
+        return Err(format!(
+            "the approving node did not hand over the consent: {}",
+            refusal_text(status, &bytes)
+        ));
+    }
+    let delivered: Delivered = match serde_json::from_slice(&bytes) {
         Ok(d) => d,
         Err(e) => {
-            // Any refusal leaves the code spent at the approving node; a new request is needed.
             pending.forget();
-            return Err(format!(
-                "the approving node did not hand over the consent: {e}"
-            ));
+            return Err(format!("the approving node's answer is unreadable: {e}"));
         }
     };
     finish(pending, delivered, node)
@@ -832,5 +868,15 @@ mod tests {
     #[test]
     fn a_pasted_state_cannot_name_a_path() {
         assert!(Pending::load("../../etc/passwd").is_err());
+    }
+
+    #[test]
+    fn the_approving_node_is_the_portals_origin_not_its_path() {
+        assert_eq!(
+            origin_of("https://10.1.19.170:9443/auth/portal"),
+            "https://10.1.19.170:9443"
+        );
+        assert_eq!(origin_of("http://127.0.0.1:8191/"), "http://127.0.0.1:8191");
+        assert_eq!(origin_of("http://127.0.0.1:8191"), "http://127.0.0.1:8191");
     }
 }
