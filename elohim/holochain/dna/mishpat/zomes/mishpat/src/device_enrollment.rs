@@ -3,6 +3,29 @@
 //! Every reader repeats authorization: generic Commitment integrity validation
 //! does not confer identity authority. Lifecycle links are discovery, not proof.
 //! No device enters the controller set, and no SQL row can authorize enrollment.
+//!
+//! Every device a person has joined speaks for them, and any of them may
+//! approve the next. The authority record stays the root and the person's
+//! policy and is never rewritten by a join; each joining record stands alone
+//! and is verified by walking its approvers' own joining records back to the
+//! authority ([`binding_stands`]). The rule, in four sentences:
+//!
+//! 1. A joining record stands when it names a current authority of its
+//!    identity, the joining device signed it, and the authority's root
+//!    controllers have not revoked it.
+//! 2. At least as many distinct approvers as the person's policy requires
+//!    (one by default) signed it, never the joining device itself, and each
+//!    approver is a root controller of the authority or a device whose own
+//!    joining record, which this record names, stands by this same rule for
+//!    the same identity.
+//! 3. The walk back to the authority goes at most `MAX_APPROVAL_DEPTH`
+//!    records deep and reads at most `MAX_APPROVAL_VISITS` records; a record
+//!    met again on its own way back refuses as a cycle, and one reached by
+//!    two approvers' ways is read once.
+//! 4. Read now, an approver whose joining record was revoked no longer
+//!    counts, so what it approved stops verifying too; read at an
+//!    authenticated earlier moment (`verify_historical_device_binding`), it
+//!    counts if its revocation came after that moment.
 use crate::commitment_record::get_commitment_record;
 use crate::commitments::CommitmentOutput;
 use hdk::prelude::*;
@@ -62,9 +85,33 @@ pub struct DeviceBinding {
     pub action: String,
     pub binding_kind: String,
     pub intent: DeviceIntent,
+    /// The approvals: each a signature over the intent by a root controller
+    /// of the authority or by a device that speaks for the person.
     pub controllers: Vec<Proof>,
     pub possession: Proof,
+    /// For each approver that is a device rather than a root controller, the
+    /// joining record by which it speaks for the person. Unsigned evidence:
+    /// the verifier checks each one names that approver and stands. Absent
+    /// (and absent from the encoding) when every approver is a root
+    /// controller, so earlier records keep their exact bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approved_via: Vec<ApprovedVia>,
 }
+/// A device approver and the joining record by which it speaks.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ApprovedVia {
+    pub agent: AgentPubKey,
+    pub binding: ActionHash,
+}
+
+/// How deep the walk from a joining record back to its authority may go.
+pub const MAX_APPROVAL_DEPTH: usize = 8;
+/// How many joining records one walk may read.
+pub const MAX_APPROVAL_VISITS: usize = 24;
+/// How many discovery links one read of an identity's devices follows.
+const MAX_DEVICE_LINKS: usize = 64;
+/// How many affirmations of one device a read follows.
+const MAX_AFFIRMATION_LINKS: usize = 32;
 pub use qahal_types::{VerifiedDevice, VerifyDeviceInput};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeviceRevocation {
@@ -142,6 +189,276 @@ fn authorized_signers(authority: &Authority, proofs: &[Proof]) -> Result<(), Str
     }
     Ok(())
 }
+/// Who an approval's signer is to the person.
+#[derive(Debug, PartialEq)]
+enum Approver {
+    /// A root controller named by the authority.
+    Root,
+    /// A device that speaks through the joining record named.
+    Device(ActionHash),
+}
+
+/// The pure part of the approval rule (rule 2): who signed, that each signer
+/// counts once, that the joining device did not approve itself, that each
+/// device approver names the record it speaks through, and that enough of
+/// them signed. Signatures and the named records are checked by the caller.
+fn classify_approvers(
+    authority: &Authority,
+    intent: &DeviceIntent,
+    proofs: &[Proof],
+    via: &[ApprovedVia],
+) -> Result<Vec<Approver>, String> {
+    let required = threshold(&authority.controller_policy, &authority.controllers)?;
+    if via.len() > proofs.len() {
+        return Err("more approvers named than approved".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::with_capacity(proofs.len());
+    for proof in proofs {
+        if proof.agent == intent.device_key {
+            return Err("a device cannot approve its own joining".into());
+        }
+        if !seen.insert(proof.agent.clone()) {
+            return Err("one device cannot approve twice".into());
+        }
+        if authority.controllers.contains(&proof.agent) {
+            out.push(Approver::Root);
+        } else {
+            match via.iter().find(|v| v.agent == proof.agent) {
+                Some(v) => out.push(Approver::Device(v.binding.clone())),
+                None => {
+                    return Err("an approver does not show that it speaks for this person".into())
+                }
+            }
+        }
+    }
+    if seen.len() < required {
+        return Err("not enough of the person's devices approved".into());
+    }
+    Ok(out)
+}
+
+/// When a walk reads its records: now, at an authenticated earlier moment,
+/// or for their structure alone (that they were made by the rule, revoked or
+/// not, which is what naming a record as superseded or revoked needs).
+#[derive(Clone, Copy, Debug)]
+enum Mode {
+    Now,
+    At(i64),
+    Structure,
+}
+
+/// One verification walk: the records on the way back from the one being
+/// verified (so a record met again on its own way back refuses as a cycle),
+/// the records already found standing (read once, however many approvers
+/// lead to them), and how many records it has read (rule 3).
+struct Walk {
+    mode: Mode,
+    path: Vec<ActionHash>,
+    stood: std::collections::HashMap<ActionHash, (DeviceBinding, Authority)>,
+    visits: usize,
+}
+impl Walk {
+    fn new(mode: Mode) -> Self {
+        Self {
+            mode,
+            path: Vec::new(),
+            stood: std::collections::HashMap::new(),
+            visits: 0,
+        }
+    }
+    fn enter(&mut self, hash: &ActionHash, depth: usize) -> ExternResult<()> {
+        if depth > MAX_APPROVAL_DEPTH {
+            return Err(refuse("device approval chain exceeds depth bound"));
+        }
+        if self.path.contains(hash) {
+            return Err(refuse("device approval chain cycles"));
+        }
+        self.visits += 1;
+        if self.visits > MAX_APPROVAL_VISITS {
+            return Err(refuse("device approval walk exceeds work bound"));
+        }
+        self.path.push(hash.clone());
+        Ok(())
+    }
+    fn stood(&mut self, hash: ActionHash, found: &(DeviceBinding, Authority)) {
+        self.path.retain(|h| h != &hash);
+        self.stood.insert(hash, found.clone());
+    }
+    fn authority(&self, hash: ActionHash) -> ExternResult<Authority> {
+        match self.mode {
+            Mode::Now => current_authority(hash),
+            Mode::At(at) => authority_at(hash, at),
+            Mode::Structure => authority_history(hash, 0).map(|(a, _)| a),
+        }
+    }
+}
+
+/// Rule 2 on one binding: every approval's signature, and that each device
+/// approver's own joining record stands under the same walk.
+fn check_approvals(
+    authority: &Authority,
+    binding: &DeviceBinding,
+    walk: &mut Walk,
+    depth: usize,
+) -> ExternResult<()> {
+    let classes = classify_approvers(
+        authority,
+        &binding.intent,
+        &binding.controllers,
+        &binding.approved_via,
+    )
+    .map_err(|e| refuse(&e))?;
+    let message = bytes(&binding.intent)?;
+    for (proof, class) in binding.controllers.iter().zip(classes) {
+        if !verify_signature_raw(
+            proof.agent.clone(),
+            proof.signature.clone(),
+            message.clone(),
+        )? {
+            return Err(refuse("forged identity proof"));
+        }
+        if let Approver::Device(via) = class {
+            let (approver, _) = binding_stands(via, walk, depth + 1)?;
+            if approver.intent.device_key != proof.agent
+                || approver.intent.identity_root != binding.intent.identity_root
+            {
+                return Err(refuse(
+                    "an approver's joining record is for another device or identity",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rules 1 and 2 on a binding's content, under an authority already read.
+fn binding_proofs(
+    binding: &DeviceBinding,
+    authority: &Authority,
+    walk: &mut Walk,
+    depth: usize,
+) -> ExternResult<()> {
+    if binding.action != "binds-identity" || binding.binding_kind != "device-v1" {
+        return Err(refuse("not an additive device binding"));
+    }
+    check_intent_context(&binding.intent)?;
+    check_intent_identity(&binding.intent, authority)?;
+    let message = bytes(&binding.intent)?;
+    if binding.possession.agent != binding.intent.device_key
+        || !verify_signature_raw(
+            binding.possession.agent.clone(),
+            binding.possession.signature.clone(),
+            message,
+        )?
+    {
+        return Err(refuse("device key possession not proven"));
+    }
+    check_approvals(authority, binding, walk, depth)
+}
+
+/// Whether the joining record at `hash` stands by the module's rule, under
+/// `walk`'s mode. Returns the record and the authority it stands under.
+fn binding_stands(
+    hash: ActionHash,
+    walk: &mut Walk,
+    depth: usize,
+) -> ExternResult<(DeviceBinding, Authority)> {
+    if let Some(found) = walk.stood.get(&hash) {
+        return Ok(found.clone());
+    }
+    walk.enter(&hash, depth)?;
+    let (native, entry, binding): (_, _, DeviceBinding) = record(hash.clone(), "binds-identity")?;
+    if entry.payload_json.as_bytes() != bytes(&binding)?
+        || entry.signed_at != binding.intent.issued_at.as_micros().to_string()
+    {
+        return Err(refuse("noncanonical device binding envelope"));
+    }
+    if let Mode::At(at) = walk.mode {
+        if native.action().timestamp().as_micros() > at {
+            return Err(refuse("device joining postdates the witnessed moment"));
+        }
+    }
+    let authority = walk.authority(binding.intent.authority.clone())?;
+    binding_proofs(&binding, &authority, walk, depth)?;
+    if !matches!(walk.mode, Mode::Structure) {
+        for target in lifecycle(hash_entry(&entry)?, &authority.controllers)? {
+            // A discovered lifecycle prerequisite that cannot be fetched is
+            // pending, never evidence of absence.
+            let (revocation_record, _, revocation): (_, _, DeviceRevocation) =
+                record(target, "revokes-commitment")?;
+            let (target_entry, _) = binding_record(revocation.target.clone())?;
+            if target_entry == entry {
+                verify_revocation(&revocation, &binding)?;
+                match walk.mode {
+                    Mode::At(at) if revocation_record.action().timestamp().as_micros() > at => {}
+                    Mode::At(_) => {
+                        return Err(refuse("device withdrawal preceded witnessed exercise"))
+                    }
+                    _ => return Err(refuse("device binding revoked")),
+                }
+            }
+        }
+    }
+    let found = (binding, authority);
+    walk.stood(hash, &found);
+    Ok(found)
+}
+
+/// This cell's own joining records, newest first, at most 16: the device
+/// enrolls itself, so its records are on its own chain.
+fn my_bindings() -> ExternResult<Vec<(ActionHash, DeviceBinding)>> {
+    let me = agent_info()?.agent_initial_pubkey;
+    let expected: ScopedEntryDefIndex = mishpat_integrity::UnitEntryTypes::Commitment.try_into()?;
+    let records = query(
+        ChainQueryFilter::new()
+            .entry_type(EntryType::App(AppEntryDef::new(
+                expected.zome_type,
+                expected.zome_index,
+                EntryVisibility::Public,
+            )))
+            .include_entries(true),
+    )?;
+    let mut out = Vec::new();
+    for record in records.into_iter().rev() {
+        let Ok(Some(entry)) = record.entry().to_app_option::<Commitment>() else {
+            continue;
+        };
+        if entry.action != "binds-identity" {
+            continue;
+        }
+        let Ok(binding) = serde_json::from_str::<DeviceBinding>(&entry.payload_json) else {
+            continue;
+        };
+        if binding.binding_kind == "device-v1" && binding.intent.device_key == me {
+            out.push((record.action_address().clone(), binding));
+            if out.len() >= 16 {
+                break;
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// How this cell speaks for the identity `authority` belongs to: as one of
+/// its root controllers (`Some(None)`), through its own joining record that
+/// stands now (`Some(Some(record))`), or not at all (`None`).
+fn my_voice(authority: &Authority) -> ExternResult<Option<Option<ActionHash>>> {
+    let me = agent_info()?.agent_initial_pubkey;
+    if authority.controllers.contains(&me) {
+        return Ok(Some(None));
+    }
+    for (hash, binding) in my_bindings()? {
+        if binding.intent.identity_root != authority.chain_root {
+            continue;
+        }
+        if binding_stands(hash.clone(), &mut Walk::new(Mode::Now), 0).is_ok() {
+            return Ok(Some(Some(hash)));
+        }
+    }
+    Ok(None)
+}
+
 fn verify_quorum(authority: &Authority, proofs: &[Proof], message: Vec<u8>) -> ExternResult<()> {
     authorized_signers(authority, proofs).map_err(|e| refuse(&e))?;
     for proof in proofs {
@@ -407,6 +724,18 @@ pub struct ConsentStanding {
     pub required: usize,
     /// The network the authority is kept on, which a device must name.
     pub network_dna: DnaHash,
+    /// When this cell speaks for the identity as a device rather than a root
+    /// controller, the joining record it speaks through. It is then counted
+    /// in `controllers`, whose meaning is "devices that speak for the person"
+    /// as far as this cell can say without reading the network's list
+    /// (`identity_devices` reads that).
+    #[serde(default)]
+    pub speaks_via: Option<ActionHash>,
+    /// Other identities this cell also speaks for through a joining record
+    /// (a node that began an identity of its own and joined another as it
+    /// is). Approvals made here are for `identity_root`, never these.
+    #[serde(default)]
+    pub also_speaks_for: Vec<ActionHash>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -513,10 +842,35 @@ fn current_successor(start: ActionHash) -> ExternResult<ActionHash> {
 /// any chain, and an absent authority is reported, never created.
 #[hdk_extern]
 pub fn my_consent_standing(_: ()) -> ExternResult<Option<ConsentStanding>> {
-    let Some(identity_root) = my_human()? else {
-        return Ok(None);
-    };
     let network_dna = dna_info()?.hash;
+    // The identities this cell speaks for through its own joining records.
+    let mut joined: Vec<(ActionHash, ActionHash)> = Vec::new();
+    for (hash, binding) in my_bindings()? {
+        if joined
+            .iter()
+            .any(|(root, _)| root == &binding.intent.identity_root)
+        {
+            continue;
+        }
+        if binding_stands(hash.clone(), &mut Walk::new(Mode::Now), 0).is_ok() {
+            joined.push((binding.intent.identity_root.clone(), hash));
+        }
+    }
+    // The identity approvals are for: the one this cell's key resolves to (its
+    // own, or the person's it registered as a device of), else the first it
+    // joined.
+    let identity_root = match my_human()? {
+        Some(root) => root,
+        None => match joined.first() {
+            Some((root, _)) => root.clone(),
+            None => return Ok(None),
+        },
+    };
+    let also_speaks_for: Vec<ActionHash> = joined
+        .iter()
+        .filter(|(root, _)| root != &identity_root)
+        .map(|(root, _)| root.clone())
+        .collect();
     let human = human_root(identity_root.clone())?;
     let Some(bootstrap) = bootstrap_action(&human, network_dna.clone())? else {
         return Ok(Some(ConsentStanding {
@@ -525,19 +879,168 @@ pub fn my_consent_standing(_: ()) -> ExternResult<Option<ConsentStanding>> {
             controllers: Vec::new(),
             required: 0,
             network_dna,
+            speaks_via: None,
+            also_speaks_for,
         }));
     };
     let current = current_successor(bootstrap)?;
     let authority = current_authority(current.clone())?;
     let required =
         threshold(&authority.controller_policy, &authority.controllers).map_err(|e| refuse(&e))?;
+    let me = agent_info()?.agent_initial_pubkey;
+    let mut controllers = authority.controllers.clone();
+    let speaks_via = if controllers.contains(&me) {
+        None
+    } else {
+        let via = joined
+            .iter()
+            .find(|(root, _)| root == &authority.chain_root)
+            .map(|(_, hash)| hash.clone());
+        if via.is_some() {
+            controllers.push(me);
+        }
+        via
+    };
     Ok(Some(ConsentStanding {
         identity_root: authority.chain_root,
         authority: Some(current),
-        controllers: authority.controllers,
+        controllers,
         required,
         network_dna,
+        speaks_via,
+        also_speaks_for,
     }))
+}
+
+/// One device that speaks for a person, as the network shows it.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IdentityDevice {
+    pub device_key: AgentPubKey,
+    pub binding: ActionHash,
+    /// The content network the device joined on, which verifying or affirming
+    /// it names.
+    pub content_dna: DnaHash,
+    /// Who approved it: root controllers or devices of the person.
+    pub approved_by: Vec<AgentPubKey>,
+    /// When it joined (its joining record's own time).
+    pub joined_at: Timestamp,
+    /// The person's other devices that have affirmed it since: distinct,
+    /// each speaking for the person, neither the device nor its approvers.
+    pub affirmed_by: Vec<AgentPubKey>,
+}
+
+/// The devices that speak for a person, found from the identity's root and
+/// each verified by the module's rule.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IdentityDevices {
+    pub identity_root: ActionHash,
+    /// The authority's root controllers.
+    pub roots: Vec<AgentPubKey>,
+    pub devices: Vec<IdentityDevice>,
+    /// Discovery links followed whose record did not stand (or could not be
+    /// read yet): never counted, never shown as a device.
+    pub not_standing: u32,
+    /// Whether more links existed than one read follows.
+    pub truncated: bool,
+}
+
+fn discovery(
+    base: AnyLinkableHash,
+    prefix: &str,
+    cap: usize,
+) -> ExternResult<(Vec<ActionHash>, bool)> {
+    let links = get_links(
+        LinkQuery::try_new(base, LinkTypes::CommitmentByState)?,
+        GetStrategy::Network,
+    )?;
+    let mut targets: Vec<(Timestamp, ActionHash)> = links
+        .into_iter()
+        .filter(|l| l.tag.0.starts_with(prefix.as_bytes()))
+        .filter_map(|l| l.target.into_action_hash().map(|t| (l.timestamp, t)))
+        .collect();
+    targets.sort();
+    targets.dedup_by(|a, b| a.1 == b.1);
+    let truncated = targets.len() > cap;
+    targets.truncate(cap);
+    Ok((targets.into_iter().map(|(_, t)| t).collect(), truncated))
+}
+
+/// Every device that speaks for the person rooted at `identity_root`, with
+/// who approved it and who has affirmed it. A read; bounded by
+/// `MAX_DEVICE_LINKS` records (each walked within the rule's bounds) and
+/// `MAX_AFFIRMATION_LINKS` affirmations per device.
+#[hdk_extern]
+pub fn identity_devices(identity_root: ActionHash) -> ExternResult<IdentityDevices> {
+    let human = human_root(identity_root.clone())?;
+    let bootstrap = bootstrap_action(&human, dna_info()?.hash)?
+        .ok_or_else(|| refuse("identity has no authority yet"))?;
+    let authority = current_authority(current_successor(bootstrap)?)?;
+    let (targets, truncated) =
+        discovery(identity_root.clone().into(), "device|", MAX_DEVICE_LINKS)?;
+    let mut devices: Vec<IdentityDevice> = Vec::new();
+    let mut not_standing = 0u32;
+    for hash in targets {
+        match binding_stands(hash.clone(), &mut Walk::new(Mode::Now), 0) {
+            Ok((binding, _)) if binding.intent.identity_root == identity_root => {
+                if devices
+                    .iter()
+                    .any(|d| d.device_key == binding.intent.device_key)
+                {
+                    continue;
+                }
+                let joined_at = get_commitment_record(hash.clone())?
+                    .map(|r| r.action().timestamp())
+                    .unwrap_or(binding.intent.issued_at);
+                devices.push(IdentityDevice {
+                    device_key: binding.intent.device_key.clone(),
+                    binding: hash,
+                    content_dna: binding.intent.content_dna.clone(),
+                    approved_by: binding
+                        .controllers
+                        .iter()
+                        .map(|p| p.agent.clone())
+                        .collect(),
+                    joined_at,
+                    affirmed_by: Vec::new(),
+                });
+            }
+            _ => not_standing += 1,
+        }
+    }
+    let speakers: Vec<AgentPubKey> = authority
+        .controllers
+        .iter()
+        .cloned()
+        .chain(devices.iter().map(|d| d.device_key.clone()))
+        .collect();
+    for device in devices.iter_mut() {
+        let (affirmations, _) = discovery(
+            device.binding.clone().into(),
+            "affirmed|",
+            MAX_AFFIRMATION_LINKS,
+        )?;
+        for action in affirmations {
+            let Ok(affirmation) = verify_device_affirmation(action) else {
+                continue;
+            };
+            let witness = affirmation.witness;
+            if affirmation.device.binding_action_hash == device.binding
+                && speakers.contains(&witness)
+                && witness != device.device_key
+                && !device.approved_by.contains(&witness)
+                && !device.affirmed_by.contains(&witness)
+            {
+                device.affirmed_by.push(witness);
+            }
+        }
+    }
+    Ok(IdentityDevices {
+        identity_root,
+        roots: authority.controllers,
+        devices,
+        not_standing,
+        truncated,
+    })
 }
 
 fn binding_record(hash: ActionHash) -> ExternResult<(Commitment, DeviceBinding)> {
@@ -549,28 +1052,14 @@ fn binding_record(hash: ActionHash) -> ExternResult<(Commitment, DeviceBinding)>
     }
     Ok((entry, binding))
 }
+/// That a binding was made by the rule, revoked or not: its approvals and
+/// their approvers' records checked for structure alone (rule 2, rule 3).
 fn historical_binding_proofs(binding: &DeviceBinding) -> ExternResult<()> {
     let (authority, _) = authority_history(binding.intent.authority.clone(), 0)?;
-    if binding.action != "binds-identity"
-        || binding.binding_kind != "device-v1"
-        || binding.intent.domain != DOMAIN
-        || binding.intent.network_dna != dna_info()?.hash
-        || binding.intent.identity_root != authority.chain_root
-    {
+    if binding.intent.identity_root != authority.chain_root {
         return Err(refuse("invalid historical device binding context"));
     }
-    let message = bytes(&binding.intent)?;
-    verify_quorum(&authority, &binding.controllers, message.clone())?;
-    if binding.possession.agent != binding.intent.device_key
-        || !verify_signature_raw(
-            binding.possession.agent.clone(),
-            binding.possession.signature.clone(),
-            message,
-        )?
-    {
-        return Err(refuse("historical device possession not proven"));
-    }
-    Ok(())
+    binding_proofs(binding, &authority, &mut Walk::new(Mode::Structure), 0)
 }
 fn validate_intent(intent: &DeviceIntent) -> ExternResult<Authority> {
     check_intent_context(intent)?;
@@ -599,23 +1088,36 @@ fn check_intent_identity(intent: &DeviceIntent, authority: &Authority) -> Extern
     }
     Ok(())
 }
-/// This cell's signature on an intent already checked against `authority`.
-fn enrollment_proof(intent: &DeviceIntent, authority: &Authority) -> ExternResult<Proof> {
+/// This cell's signature on an intent already checked against `authority`:
+/// the joining device's possession, or an approval from a root controller or
+/// a device that speaks for the person, with the record it speaks through.
+fn enrollment_proof(
+    intent: &DeviceIntent,
+    authority: &Authority,
+) -> ExternResult<(Proof, Option<ActionHash>)> {
     let me = agent_info()?.agent_initial_pubkey;
-    if me != intent.device_key && !authority.controllers.contains(&me) {
-        return Err(refuse("caller cannot authorize this device binding"));
-    }
-    Ok(Proof {
-        signature: hdk::ed25519::sign_raw(me.clone(), bytes(intent)?)?,
-        agent: me,
-    })
+    let via = if me == intent.device_key {
+        None
+    } else {
+        match my_voice(authority)? {
+            Some(via) => via,
+            None => return Err(refuse("caller cannot authorize this device binding")),
+        }
+    };
+    Ok((
+        Proof {
+            signature: hdk::ed25519::sign_raw(me.clone(), bytes(intent)?)?,
+            agent: me,
+        },
+        via,
+    ))
 }
 /// Explicit ceremony signing only. Ordinary publication never calls this.
 #[hdk_extern]
 pub fn sign_device_enrollment(intent: DeviceIntent) -> ExternResult<Proof> {
     crate::invocation::authorize("sign_device_enrollment", &intent)?;
     let authority = validate_intent(&intent)?;
-    enrollment_proof(&intent, &authority)
+    enrollment_proof(&intent, &authority).map(|(proof, _)| proof)
 }
 /// What a controller signs to put their agreement on a device consent.
 ///
@@ -635,6 +1137,10 @@ pub struct DeviceConsent {
 pub struct SignedDeviceConsent {
     pub consent: DeviceConsent,
     pub proof: Proof,
+    /// When the signer is a device rather than a root controller, the joining
+    /// record it speaks through.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<ActionHash>,
 }
 
 const CONSENT_DOMAIN: &str = "elohim:device-consent:v1:";
@@ -660,10 +1166,11 @@ fn consent_message(consent: &DeviceConsent) -> Result<Vec<u8>, &'static str> {
     Ok(message)
 }
 
-/// Whether `signer` may put this identity's agreement on `consent`: the consent
-/// must name the identity the authority belongs to, and the signer must be one
-/// of its controllers. A device is never a controller, so a device cannot agree
-/// to its own recognition.
+/// Whether `signer` may put this identity's agreement on `consent` as a root
+/// controller: the consent must name the identity the authority belongs to.
+/// A device that speaks for the person agrees through its joining record
+/// instead ([`consent_signer_speaks`]).
+#[cfg(test)]
 fn consent_signer_stands(
     authority: &Authority,
     consent: &DeviceConsent,
@@ -678,15 +1185,51 @@ fn consent_signer_stands(
     Ok(())
 }
 
-/// This cell's agreement on `consent`, under an authority already resolved.
-fn consent_proof(consent: &DeviceConsent, authority: &Authority) -> ExternResult<Proof> {
+/// Whether `signer` speaks for the identity `consent` names: a root
+/// controller, or a device whose joining record `via` names it and stands now.
+fn consent_signer_speaks(
+    authority: &Authority,
+    consent: &DeviceConsent,
+    signer: &AgentPubKey,
+    via: Option<&ActionHash>,
+) -> ExternResult<bool> {
+    if authority.chain_root != consent.identity_root {
+        return Ok(false);
+    }
+    if authority.controllers.contains(signer) {
+        return Ok(true);
+    }
+    let Some(via) = via else {
+        return Ok(false);
+    };
+    let (binding, _) = binding_stands(via.clone(), &mut Walk::new(Mode::Now), 0)?;
+    Ok(&binding.intent.device_key == signer
+        && binding.intent.identity_root == consent.identity_root)
+}
+
+/// This cell's agreement on `consent`, under an authority already resolved,
+/// and the joining record it speaks through when it is a device.
+fn consent_proof(
+    consent: &DeviceConsent,
+    authority: &Authority,
+) -> ExternResult<(Proof, Option<ActionHash>)> {
     let message = consent_message(consent).map_err(refuse)?;
     let me = agent_info()?.agent_initial_pubkey;
-    consent_signer_stands(authority, consent, &me).map_err(refuse)?;
-    Ok(Proof {
-        signature: hdk::ed25519::sign_raw(me.clone(), message)?,
-        agent: me,
-    })
+    if authority.chain_root != consent.identity_root {
+        return Err(refuse("consent names a different identity"));
+    }
+    let Some(via) = my_voice(authority)? else {
+        return Err(refuse(
+            "only a device that speaks for this identity may agree for it",
+        ));
+    };
+    Ok((
+        Proof {
+            signature: hdk::ed25519::sign_raw(me.clone(), message)?,
+            agent: me,
+        },
+        via,
+    ))
 }
 
 /// Explicit ceremony signing only: a controller agrees to one consent record.
@@ -696,7 +1239,7 @@ pub fn sign_device_consent(consent: DeviceConsent) -> ExternResult<Proof> {
     // A malformed address is refused before anything is read from the network.
     consent_message(&consent).map_err(refuse)?;
     let authority = current_authority(consent.authority.clone())?;
-    consent_proof(&consent, &authority)
+    consent_proof(&consent, &authority).map(|(proof, _)| proof)
 }
 
 /// Everything a controller signs when they approve a device, asked for once.
@@ -717,6 +1260,10 @@ pub struct DeviceApproval {
 pub struct DeviceApprovalProofs {
     pub consent: Proof,
     pub enrollment: Option<Proof>,
+    /// When this cell approved as a device rather than a root controller, the
+    /// joining record it speaks through; the device names it in its binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<ActionHash>,
 }
 
 /// An enrollment signed in an approval must be for the identity and authority
@@ -743,17 +1290,21 @@ pub fn sign_device_approval(approval: DeviceApproval) -> ExternResult<DeviceAppr
         check_intent_context(intent)?;
     }
     let authority = current_authority(approval.consent.authority.clone())?;
-    let consent = consent_proof(&approval.consent, &authority)?;
+    let (consent, via) = consent_proof(&approval.consent, &authority)?;
     let enrollment = match &approval.enrollment {
         Some(intent) => {
             check_intent_identity(intent, &authority)?;
-            Some(enrollment_proof(intent, &authority)?)
+            if intent.device_key == agent_info()?.agent_initial_pubkey {
+                return Err(refuse("a device cannot approve its own joining"));
+            }
+            Some(enrollment_proof(intent, &authority)?.0)
         }
         None => None,
     };
     Ok(DeviceApprovalProofs {
         consent,
         enrollment,
+        via,
     })
 }
 
@@ -764,38 +1315,41 @@ pub fn sign_device_approval(approval: DeviceApproval) -> ExternResult<DeviceAppr
 pub fn verify_device_consent(signed: SignedDeviceConsent) -> ExternResult<bool> {
     let message = consent_message(&signed.consent).map_err(refuse)?;
     let authority = current_authority(signed.consent.authority.clone())?;
-    if consent_signer_stands(&authority, &signed.consent, &signed.proof.agent).is_err() {
+    if !consent_signer_speaks(
+        &authority,
+        &signed.consent,
+        &signed.proof.agent,
+        signed.via.as_ref(),
+    )? {
         return Ok(false);
     }
     verify_signature_raw(signed.proof.agent, signed.proof.signature, message)
 }
 
+/// A binding about to be notarized, checked now (rules 1 to 3).
 fn verify_binding(binding: &DeviceBinding) -> ExternResult<Authority> {
-    if binding.action != "binds-identity" || binding.binding_kind != "device-v1" {
-        return Err(refuse("not an additive device binding"));
-    }
-    let authority = validate_intent(&binding.intent)?;
-    let message = bytes(&binding.intent)?;
-    verify_quorum(&authority, &binding.controllers, message.clone())?;
-    if binding.possession.agent != binding.intent.device_key
-        || !verify_signature_raw(
-            binding.possession.agent.clone(),
-            binding.possession.signature.clone(),
-            message,
-        )?
-    {
-        return Err(refuse("device key possession not proven"));
-    }
+    check_intent_context(&binding.intent)?;
+    let authority = current_authority(binding.intent.authority.clone())?;
+    binding_proofs(binding, &authority, &mut Walk::new(Mode::Now), 0)?;
     Ok(authority)
 }
 #[hdk_extern]
 pub fn enroll_identity_device(binding: DeviceBinding) -> ExternResult<CommitmentOutput> {
     verify_binding(&binding)?;
-    notarize(
+    let out = notarize(
         &binding,
         "binds-identity",
         binding.intent.issued_at.as_micros().to_string(),
-    )
+    )?;
+    // Discovery, not proof: the person's other devices find this joining
+    // record from the identity's root and verify it themselves.
+    create_link(
+        binding.intent.identity_root.clone(),
+        out.action_hash.clone(),
+        LinkTypes::CommitmentByState,
+        LinkTag::new(format!("device|{}", binding.intent.issued_at.as_micros())),
+    )?;
+    Ok(out)
 }
 fn revocation_message(revocation: &DeviceRevocation) -> ExternResult<Vec<u8>> {
     let mut unsigned = revocation.clone();
@@ -874,7 +1428,7 @@ pub fn revoke_identity_device(revocation: DeviceRevocation) -> ExternResult<Comm
 }
 #[hdk_extern]
 pub fn verify_device_binding(input: VerifyDeviceInput) -> ExternResult<VerifiedDevice> {
-    let (entry, binding) = binding_record(input.binding.clone())?;
+    let (_, binding) = binding_record(input.binding.clone())?;
     if binding.intent.device_key != input.expected_device
         || binding.intent.content_dna != input.expected_content_dna
     {
@@ -882,17 +1436,7 @@ pub fn verify_device_binding(input: VerifyDeviceInput) -> ExternResult<VerifiedD
             "device binding does not match actual device/content DNA",
         ));
     }
-    let authority = verify_binding(&binding)?;
-    for target in lifecycle(hash_entry(&entry)?, &authority.controllers)? {
-        // A discovered lifecycle prerequisite that cannot be fetched is pending,
-        // never evidence of absence. Invalid/forged evidence confers no standing.
-        let (_, _, revocation): (_, _, DeviceRevocation) = record(target, "revokes-commitment")?;
-        let (target_entry, _) = binding_record(revocation.target.clone())?;
-        if target_entry == entry {
-            verify_revocation(&revocation, &binding)?;
-            return Err(refuse("device binding revoked"));
-        }
-    }
+    let (binding, authority) = binding_stands(input.binding.clone(), &mut Walk::new(Mode::Now), 0)?;
     Ok(VerifiedDevice {
         controllers: authority.controllers,
         human_id: authority.human_id,
@@ -912,30 +1456,21 @@ pub fn verify_device_binding(input: VerifyDeviceInput) -> ExternResult<VerifiedD
 pub fn verify_historical_device_binding(
     input: qahal_types::VerifyHistoricalDeviceInput,
 ) -> ExternResult<VerifiedDevice> {
-    let (binding_native, _, _): (_, _, DeviceBinding) =
-        record(input.device.binding.clone(), "binds-identity")?;
-    let (entry, binding) = binding_record(input.device.binding.clone())?;
-    historical_binding_proofs(&binding)?;
-    if binding_native.action().timestamp().as_micros() > input.witnessed_at
-        || binding.intent.device_key != input.device.expected_device
+    let (_, binding) = binding_record(input.device.binding.clone())?;
+    if binding.intent.device_key != input.device.expected_device
         || binding.intent.content_dna != input.device.expected_content_dna
     {
         return Err(refuse(
             "historical device context or native ordering differs",
         ));
     }
-    let authority = authority_at(binding.intent.authority.clone(), input.witnessed_at)?;
-    for target in lifecycle(hash_entry(&entry)?, &authority.controllers)? {
-        let (revocation_record, _, revocation): (_, _, DeviceRevocation) =
-            record(target, "revokes-commitment")?;
-        let (target_entry, _) = binding_record(revocation.target.clone())?;
-        if target_entry == entry {
-            verify_revocation(&revocation, &binding)?;
-            if revocation_record.action().timestamp().as_micros() <= input.witnessed_at {
-                return Err(refuse("device withdrawal preceded witnessed exercise"));
-            }
-        }
-    }
+    // Rule 4: every record on the walk, and its approvers', is read at the
+    // witnessed moment: made before it, revoked (if ever) only after it.
+    let (binding, authority) = binding_stands(
+        input.device.binding.clone(),
+        &mut Walk::new(Mode::At(input.witnessed_at)),
+        0,
+    )?;
     Ok(VerifiedDevice {
         controllers: authority.controllers,
         human_id: authority.human_id,
@@ -976,7 +1511,8 @@ pub fn affirm_identity_device(input: VerifyDeviceInput) -> ExternResult<Commitme
         observed_at,
     );
     let signature = hdk::ed25519::sign_raw(witness.clone(), bytes(&unsigned)?)?;
-    notarize(
+    let binding = device.binding_action_hash.clone();
+    let out = notarize(
         &DeviceAffirmation {
             domain: "elohim:device-affirmation:v1".into(),
             device,
@@ -987,7 +1523,16 @@ pub fn affirm_identity_device(input: VerifyDeviceInput) -> ExternResult<Commitme
         },
         "affirms-device",
         observed_at.as_micros().to_string(),
-    )
+    )?;
+    // Discovery, not proof: who has affirmed a joining record is found from
+    // the record's action (never its entry, whose links are its lifecycle).
+    create_link(
+        binding,
+        out.action_hash.clone(),
+        LinkTypes::CommitmentByState,
+        LinkTag::new(format!("affirmed|{}", observed_at.as_micros())),
+    )?;
+    Ok(out)
 }
 
 #[hdk_extern]
@@ -1239,6 +1784,127 @@ mod tests {
         assert!(serde_json::to_string(&approval)
             .unwrap()
             .contains("\"issued_at\":123,"));
+    }
+
+    fn approval(n: u8) -> Proof {
+        Proof {
+            agent: key(n),
+            signature: Signature::from([n; 64]),
+        }
+    }
+    fn via(n: u8) -> ApprovedVia {
+        ApprovedVia {
+            agent: key(n),
+            binding: action(100 + n),
+        }
+    }
+
+    #[test]
+    fn any_device_of_the_person_counts_once_and_never_for_itself() {
+        // Root controller key(1); the joining device is key(7).
+        let authority = authority_of(vec![key(1)]);
+        let i = intent();
+        assert_eq!(
+            classify_approvers(&authority, &i, &[approval(1)], &[]),
+            Ok(vec![Approver::Root])
+        );
+        // A device approver names the record it speaks through.
+        assert_eq!(
+            classify_approvers(&authority, &i, &[approval(2)], &[via(2)]),
+            Ok(vec![Approver::Device(action(102))])
+        );
+        assert!(classify_approvers(&authority, &i, &[approval(2)], &[]).is_err());
+        // Never itself, never twice, never more named than approved.
+        assert!(classify_approvers(&authority, &i, &[approval(7)], &[via(7)]).is_err());
+        assert!(
+            classify_approvers(&authority, &i, &[approval(2), approval(2)], &[via(2)]).is_err()
+        );
+        assert!(classify_approvers(&authority, &i, &[approval(1)], &[via(2), via(3)]).is_err());
+        assert!(classify_approvers(&authority, &i, &[], &[]).is_err());
+    }
+
+    #[test]
+    fn a_required_number_counts_distinct_devices_that_speak() {
+        // The person's policy asks for two: one approval is not enough, two
+        // distinct speakers are (a root and a device, or two devices).
+        let mut authority = authority_of(vec![key(1), key(2)]);
+        authority.controller_policy = ControllerPolicy {
+            kind: "recovery-quorum".into(),
+            m: Some(2),
+            n: Some(2),
+        };
+        let i = intent();
+        assert!(classify_approvers(&authority, &i, &[approval(1)], &[]).is_err());
+        assert!(classify_approvers(&authority, &i, &[approval(3)], &[via(3)]).is_err());
+        assert!(classify_approvers(&authority, &i, &[approval(1), approval(3)], &[via(3)]).is_ok());
+        assert!(classify_approvers(
+            &authority,
+            &i,
+            &[approval(3), approval(4)],
+            &[via(3), via(4)]
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn the_walk_back_is_bounded_refuses_a_cycle_and_reads_a_shared_approver_once() {
+        // Depth: a record deeper than the bound refuses.
+        let mut walk = Walk::new(Mode::Now);
+        assert!(walk.enter(&action(1), MAX_APPROVAL_DEPTH).is_ok());
+        assert!(walk.enter(&action(2), MAX_APPROVAL_DEPTH + 1).is_err());
+        // A cycle: a record met again on its own way back.
+        let mut walk = Walk::new(Mode::Now);
+        walk.enter(&action(1), 0).unwrap();
+        walk.enter(&action(2), 1).unwrap();
+        let cycle = walk.enter(&action(1), 2).unwrap_err();
+        assert!(format!("{cycle:?}").contains("cycles"), "{cycle:?}");
+        // Two approvers whose ways meet (a diamond, possible above a policy
+        // of one) is no cycle: once a record stands it leaves the path and
+        // is read from the walk, not again.
+        let mut walk = Walk::new(Mode::Now);
+        let found = (
+            DeviceBinding {
+                action: "binds-identity".into(),
+                binding_kind: "device-v1".into(),
+                intent: intent(),
+                controllers: vec![approval(1)],
+                possession: approval(7),
+                approved_via: vec![],
+            },
+            authority_of(vec![key(1)]),
+        );
+        walk.enter(&action(3), 0).unwrap();
+        walk.enter(&action(4), 1).unwrap();
+        walk.stood(action(4), &found);
+        assert!(walk.stood.contains_key(&action(4)));
+        assert!(!walk.path.contains(&action(4)));
+        // Work: at most MAX_APPROVAL_VISITS records are read on one walk.
+        let mut walk = Walk::new(Mode::Now);
+        for n in 0..MAX_APPROVAL_VISITS {
+            walk.enter(&action(n as u8), 0).unwrap();
+            walk.path.clear();
+        }
+        let bound = walk.enter(&action(200), 0).unwrap_err();
+        assert!(format!("{bound:?}").contains("work bound"), "{bound:?}");
+    }
+
+    #[test]
+    fn a_binding_approved_only_by_roots_keeps_its_exact_bytes() {
+        let binding = DeviceBinding {
+            action: "binds-identity".into(),
+            binding_kind: "device-v1".into(),
+            intent: intent(),
+            controllers: vec![approval(1)],
+            possession: approval(7),
+            approved_via: vec![],
+        };
+        let json = String::from_utf8(bytes(&binding).unwrap()).unwrap();
+        assert!(!json.contains("approved_via"));
+        let mut by_device = binding.clone();
+        by_device.approved_via = vec![via(2)];
+        assert!(String::from_utf8(bytes(&by_device).unwrap())
+            .unwrap()
+            .contains("approved_via"));
     }
 
     #[test]

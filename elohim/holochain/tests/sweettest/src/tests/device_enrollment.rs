@@ -66,6 +66,35 @@ pub struct DeviceBinding {
     pub intent: DeviceIntent,
     pub controllers: Vec<Proof>,
     pub possession: Proof,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approved_via: Vec<ApprovedVia>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ApprovedVia {
+    pub agent: AgentPubKey,
+    pub binding: ActionHash,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IdentityDevice {
+    pub device_key: AgentPubKey,
+    pub binding: ActionHash,
+    pub content_dna: DnaHash,
+    pub approved_by: Vec<AgentPubKey>,
+    pub joined_at: Timestamp,
+    pub affirmed_by: Vec<AgentPubKey>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IdentityDevices {
+    pub identity_root: ActionHash,
+    pub roots: Vec<AgentPubKey>,
+    pub devices: Vec<IdentityDevice>,
+    pub not_standing: u32,
+    pub truncated: bool,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerifyHistoricalDeviceInput {
+    pub device: VerifyDeviceInput,
+    pub witnessed_at: i64,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyDeviceInput {
@@ -155,6 +184,8 @@ pub struct DeviceConsent {
 pub struct SignedDeviceConsent {
     pub consent: DeviceConsent,
     pub proof: Proof,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<ActionHash>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeviceApproval {
@@ -165,6 +196,8 @@ pub struct DeviceApproval {
 pub struct DeviceApprovalProofs {
     pub consent: Proof,
     pub enrollment: Option<Proof>,
+    #[serde(default)]
+    pub via: Option<ActionHash>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsentStanding {
@@ -173,6 +206,10 @@ pub struct ConsentStanding {
     pub controllers: Vec<AgentPubKey>,
     pub required: usize,
     pub network_dna: DnaHash,
+    #[serde(default)]
+    pub speaks_via: Option<ActionHash>,
+    #[serde(default)]
+    pub also_speaks_for: Vec<ActionHash>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
@@ -418,6 +455,7 @@ async fn enroll(
         intent,
         controllers: vec![proof],
         possession,
+        approved_via: vec![],
     };
     let receipt = c
         .call(
@@ -428,6 +466,80 @@ async fn enroll(
         .await;
     (receipt, binding)
 }
+/// The intent a new `device` signs to join `human`'s identity.
+fn intent_for(
+    device: &SweetCell,
+    authority: &Receipt,
+    human: &ActionHash,
+    content: &DnaHash,
+    tick: i64,
+) -> DeviceIntent {
+    DeviceIntent {
+        domain: "elohim:device-enrollment:v1".into(),
+        authority: authority.action_hash.clone(),
+        identity_root: human.clone(),
+        device_key: device.agent_pubkey().clone(),
+        network_dna: device.dna_hash().clone(),
+        content_dna: content.clone(),
+        issued_at: Timestamp::from_micros(tick),
+        supersedes: None,
+    }
+}
+
+/// A new `device` joins approved by `approvers`, each a cell that speaks for
+/// the person, with the joining record it speaks through (None for a root
+/// controller). Returns the enroll result.
+async fn enroll_by(
+    c: &SweetConductor,
+    approvers: &[(&SweetCell, Option<ActionHash>)],
+    device: &SweetCell,
+    intent: DeviceIntent,
+) -> Result<(Receipt, DeviceBinding), String> {
+    let possession: Proof = c
+        .call(
+            &device.zome("mishpat"),
+            "sign_device_enrollment",
+            intent.clone(),
+        )
+        .await;
+    let mut controllers = Vec::new();
+    let mut approved_via = Vec::new();
+    for (approver, via) in approvers {
+        let proof: Proof = c
+            .call_fallible(
+                &approver.zome("mishpat"),
+                "sign_device_enrollment",
+                intent.clone(),
+            )
+            .await
+            .map_err(|e| format!("{e:?}"))?;
+        if let Some(via) = via {
+            approved_via.push(ApprovedVia {
+                agent: proof.agent.clone(),
+                binding: via.clone(),
+            });
+        }
+        controllers.push(proof);
+    }
+    let binding = DeviceBinding {
+        action: "binds-identity".into(),
+        binding_kind: "device-v1".into(),
+        intent,
+        controllers,
+        possession,
+        approved_via,
+    };
+    let receipt: Receipt = c
+        .call_fallible(
+            &device.zome("mishpat"),
+            "enroll_identity_device",
+            binding.clone(),
+        )
+        .await
+        .map_err(|e| format!("{e:?}"))?;
+    Ok((receipt, binding))
+}
+
 fn query(receipt: &Receipt, device: &SweetCell, content: &DnaHash) -> VerifyDeviceInput {
     VerifyDeviceInput {
         binding: receipt.action_hash.clone(),
@@ -699,6 +811,352 @@ async fn a_node_with_its_own_identity_joins_as_it_is(
     );
 }
 
+/// Every device a person has joined speaks for them, and any of them may
+/// approve the next: the operator (root) approves B; B alone approves C while
+/// the operator signs nothing; a fourth party verifies C from the network; the
+/// root and B approve two new devices at once and both stand without the
+/// authority moving; no device approves itself or counts twice; the person's
+/// other devices affirm, and who approved and who affirmed is readable; a
+/// revoked device cannot approve, and what it approved stops verifying now
+/// while still verifying at an authenticated earlier moment.
+async fn every_device_speaks_for_its_person(
+    c: &SweetConductor,
+    cells: &[(SweetCell, SweetCell, SweetCell)],
+    operator: &AgentPubKey,
+    authority: &Receipt,
+    human: &ActionHash,
+    content: &DnaHash,
+) {
+    let root = &cells[0].1;
+    let (bee, cee, tee, dee, eve) = (&cells[4], &cells[5], &cells[6], &cells[7], &cells[8]);
+    let bee_key = bee.1.agent_pubkey().clone();
+    let register = |cell: &SweetCell, binding: ActionHash| {
+        let cell = cell.clone();
+        let content = content.clone();
+        async move {
+            let _: VerifiedDevice = c
+                .call(
+                    &cell.zome("imagodei"),
+                    "register_device_identity",
+                    Register {
+                        binding,
+                        expected_content_dna: content,
+                    },
+                )
+                .await;
+        }
+    };
+
+    // B joins, approved by the root.
+    let (b, _) = enroll_by(
+        c,
+        &[(root, None)],
+        &bee.1,
+        intent_for(&bee.1, authority, human, content, 200),
+    )
+    .await
+    .expect("the root approves B");
+    register(&bee.0, b.action_hash.clone()).await;
+    let standing: Option<ConsentStanding> = c
+        .call(&bee.1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    let standing = standing.expect("B speaks for the person");
+    assert_eq!(&standing.identity_root, human);
+    assert_eq!(standing.authority.as_ref(), Some(&authority.action_hash));
+    assert_eq!(standing.speaks_via.as_ref(), Some(&b.action_hash));
+    assert!(standing.controllers.contains(&bee_key));
+    assert_eq!(standing.required, 1);
+    eprintln!("every-device: B joined and speaks for the person through its record");
+
+    // C joins, approved by B alone; the root signs nothing.
+    let (cc, c_binding) = enroll_by(
+        c,
+        &[(&bee.1, Some(b.action_hash.clone()))],
+        &cee.1,
+        intent_for(&cee.1, authority, human, content, 201),
+    )
+    .await
+    .expect("B alone approves C");
+    assert_eq!(c_binding.controllers.len(), 1);
+    assert_eq!(c_binding.controllers[0].agent, bee_key);
+    let verified: VerifiedDevice = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_binding",
+            query(&cc, &cee.1, content),
+        )
+        .await;
+    assert_eq!(&verified.identity_root, human);
+    eprintln!("every-device: C joined with B's approval alone; a fourth party verifies it");
+
+    // B's one-step approval names the record it speaks through, and a fourth
+    // party can check B's agreement on a consent.
+    let consent = DeviceConsent {
+        authority: authority.action_hash.clone(),
+        identity_root: human.clone(),
+        consent_cid: "bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".into(),
+    };
+    let proofs: DeviceApprovalProofs = c
+        .call(
+            &bee.1.zome("mishpat"),
+            "sign_device_approval",
+            DeviceApproval {
+                consent: consent.clone(),
+                enrollment: Some(intent_for(&eve.1, authority, human, content, 199)),
+            },
+        )
+        .await;
+    assert_eq!(proofs.via.as_ref(), Some(&b.action_hash));
+    let holds: bool = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_consent",
+            SignedDeviceConsent {
+                consent: consent.clone(),
+                proof: proofs.consent.clone(),
+                via: proofs.via.clone(),
+            },
+        )
+        .await;
+    assert!(holds);
+    let holds: bool = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_consent",
+            SignedDeviceConsent {
+                consent,
+                proof: proofs.consent,
+                via: None,
+            },
+        )
+        .await;
+    assert!(
+        !holds,
+        "a device's agreement needs the record it speaks through"
+    );
+
+    // The root and B approve two new devices at once; neither holds up the
+    // other, and the authority does not move.
+    let (t, _) = enroll_by(
+        c,
+        &[(root, None)],
+        &tee.1,
+        intent_for(&tee.1, authority, human, content, 202),
+    )
+    .await
+    .expect("the root approves T");
+    let (d, _) = enroll_by(
+        c,
+        &[(&bee.1, Some(b.action_hash.clone()))],
+        &dee.1,
+        intent_for(&dee.1, authority, human, content, 203),
+    )
+    .await
+    .expect("B approves D at the same time");
+    for (receipt, cell) in [(&t, &tee.1), (&d, &dee.1)] {
+        let _: VerifiedDevice = c
+            .call(
+                &cells[2].1.zome("mishpat"),
+                "verify_device_binding",
+                query(receipt, cell, content),
+            )
+            .await;
+    }
+    let after: Option<ConsentStanding> = c
+        .call(&root.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    assert_eq!(
+        after.unwrap().authority.as_ref(),
+        Some(&authority.action_hash)
+    );
+    eprintln!("every-device: two approvals at once both stand; the authority did not move");
+
+    // No device approves itself, counts twice, or counts without showing the
+    // record it speaks through; a device that does not speak cannot sign.
+    let e_intent = intent_for(&eve.1, authority, human, content, 204);
+    assert!(enroll_by(c, &[(&eve.1, None)], &eve.1, e_intent.clone())
+        .await
+        .is_err());
+    let possession: Proof = c
+        .call(
+            &eve.1.zome("mishpat"),
+            "sign_device_enrollment",
+            e_intent.clone(),
+        )
+        .await;
+    let bee_proof: Proof = c
+        .call(
+            &bee.1.zome("mishpat"),
+            "sign_device_enrollment",
+            e_intent.clone(),
+        )
+        .await;
+    let via = ApprovedVia {
+        agent: bee_key.clone(),
+        binding: b.action_hash.clone(),
+    };
+    for (controllers, approved_via, what) in [
+        (vec![possession.clone()], vec![], "itself"),
+        (
+            vec![bee_proof.clone(), bee_proof.clone()],
+            vec![via.clone()],
+            "twice",
+        ),
+        (vec![bee_proof.clone()], vec![], "without its record"),
+    ] {
+        let binding = DeviceBinding {
+            action: "binds-identity".into(),
+            binding_kind: "device-v1".into(),
+            intent: e_intent.clone(),
+            controllers,
+            possession: possession.clone(),
+            approved_via,
+        };
+        assert!(
+            c.call_fallible::<_, Receipt>(
+                &eve.1.zome("mishpat"),
+                "enroll_identity_device",
+                binding
+            )
+            .await
+            .is_err(),
+            "an approval {what} must not count"
+        );
+    }
+    eprintln!("every-device: self-approval, a double count and an unshown record all refuse");
+
+    // Who approved each device, and who has affirmed it since.
+    let read = || async {
+        let devices: IdentityDevices = c
+            .call(
+                &cells[2].1.zome("mishpat"),
+                "identity_devices",
+                human.clone(),
+            )
+            .await;
+        devices
+    };
+    let devices = read().await;
+    for key in [
+        &bee_key,
+        cee.1.agent_pubkey(),
+        tee.1.agent_pubkey(),
+        dee.1.agent_pubkey(),
+    ] {
+        assert!(
+            devices.devices.iter().any(|d| &d.device_key == key),
+            "{key} is listed"
+        );
+    }
+    let of_c = |devices: &IdentityDevices| {
+        devices
+            .devices
+            .iter()
+            .find(|d| d.device_key == *cee.1.agent_pubkey())
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(of_c(&devices).approved_by, vec![bee_key.clone()]);
+    assert!(of_c(&devices).affirmed_by.is_empty());
+    let _: Receipt = c
+        .call(
+            &root.zome("mishpat"),
+            "affirm_identity_device",
+            query(&cc, &cee.1, content),
+        )
+        .await;
+    let _: Receipt = c
+        .call(
+            &bee.1.zome("mishpat"),
+            "affirm_identity_device",
+            query(&cc, &cee.1, content),
+        )
+        .await;
+    let devices = read().await;
+    assert_eq!(
+        of_c(&devices).affirmed_by,
+        vec![operator.clone()],
+        "the root's affirmation counts; the approver's own adds nothing"
+    );
+    eprintln!(
+        "every-device: identity_devices lists {} devices; C approved by B, affirmed by 1 other",
+        devices.devices.len()
+    );
+
+    // Revocation: the root withdraws B.
+    let before = Timestamp::now();
+    let mut revocation = DeviceRevocation {
+        action: "revokes-commitment".into(),
+        binding_kind: "device-revocation-v1".into(),
+        target: b.action_hash.clone(),
+        authority: authority.action_hash.clone(),
+        network_dna: root.dna_hash().clone(),
+        signatures: vec![],
+    };
+    let proof: Proof = c
+        .call(
+            &root.zome("mishpat"),
+            "sign_device_revocation",
+            revocation.clone(),
+        )
+        .await;
+    revocation.signatures.push(proof);
+    let _: Receipt = c
+        .call(&root.zome("mishpat"), "revoke_identity_device", revocation)
+        .await;
+    // B no longer speaks: it cannot approve.
+    assert!(c
+        .call_fallible::<_, Proof>(
+            &bee.1.zome("mishpat"),
+            "sign_device_enrollment",
+            intent_for(&eve.1, authority, human, content, 205),
+        )
+        .await
+        .is_err());
+    // What B approved stops verifying now (rule 4) ...
+    assert!(c
+        .call_fallible::<_, VerifiedDevice>(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_binding",
+            query(&cc, &cee.1, content),
+        )
+        .await
+        .is_err());
+    // ... and verifies at an authenticated moment before the revocation, not after.
+    let _: VerifiedDevice = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_historical_device_binding",
+            VerifyHistoricalDeviceInput {
+                device: query(&cc, &cee.1, content),
+                witnessed_at: before.as_micros(),
+            },
+        )
+        .await;
+    assert!(c
+        .call_fallible::<_, VerifiedDevice>(
+            &cells[2].1.zome("mishpat"),
+            "verify_historical_device_binding",
+            VerifyHistoricalDeviceInput {
+                device: query(&cc, &cee.1, content),
+                witnessed_at: Timestamp::now().as_micros(),
+            },
+        )
+        .await
+        .is_err());
+    // What the root approved still stands.
+    let _: VerifiedDevice = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_binding",
+            query(&t, &tee.1, content),
+        )
+        .await;
+    eprintln!(
+        "every-device: revoked B cannot approve; C verifies before the revocation and not now"
+    );
+}
+
 /// What a node's own person stands on, and the one signing call an approval
 /// makes. The base case: the person's node is their identity's only controller
 /// and signs alone.
@@ -765,6 +1223,7 @@ async fn consent_ceremony_signing(
     let signed = SignedDeviceConsent {
         consent: consent.clone(),
         proof: proofs.consent.clone(),
+        via: None,
     };
     // Any holder can check the agreement; a different address does not verify.
     let holds: bool = c
@@ -840,6 +1299,12 @@ async fn device_enrollment_proof() -> Result<()> {
     let second = SweetAgents::one(c.keystore()).await;
     // A node that begins an identity of its own before it joins the operator's.
     let prior = SweetAgents::one(c.keystore()).await;
+    // The devices of the scenario where every device speaks for its person.
+    let bee = SweetAgents::one(c.keystore()).await;
+    let cee = SweetAgents::one(c.keystore()).await;
+    let tee = SweetAgents::one(c.keystore()).await;
+    let dee = SweetAgents::one(c.keystore()).await;
+    let eve = SweetAgents::one(c.keystore()).await;
     assert_ne!(che, operator);
     assert_ne!(che, second);
     let seed = network_seed("device-enrollment");
@@ -858,6 +1323,11 @@ async fn device_enrollment_proof() -> Result<()> {
         ("che", che.clone()),
         ("second", second.clone()),
         ("prior", prior.clone()),
+        ("bee", bee.clone()),
+        ("cee", cee.clone()),
+        ("tee", tee.clone()),
+        ("dee", dee.clone()),
+        ("eve", eve.clone()),
     ] {
         let app = c.setup_app_for_agent(name, agent, &roles).await?;
         let identity = app
@@ -915,6 +1385,7 @@ async fn device_enrollment_proof() -> Result<()> {
         &c, &cells, &operator, &authority, &human, &content,
     )
     .await;
+    every_device_speaks_for_its_person(&c, &cells, &operator, &authority, &human, &content).await;
     let (che_binding, signed_binding) = enroll(
         &c,
         &cells[0].1,
@@ -1561,7 +2032,12 @@ async fn device_enrollment_proof() -> Result<()> {
         )
         .await;
     attacks
-        .link(&c, &cells[0].1, authority.entry_hash.clone(), successor)
+        .link(
+            &c,
+            &cells[0].1,
+            authority.entry_hash.clone(),
+            successor.clone(),
+        )
         .await;
     assert!(c
         .call_fallible::<_, VerifiedDevice>(
@@ -1571,6 +2047,25 @@ async fn device_enrollment_proof() -> Result<()> {
         )
         .await
         .is_err());
+    // With the person's policy at two (this successor: two of two), one
+    // approval is not enough and two distinct ones are.
+    let late = &cells[8].1;
+    let mut two = intent_for(late, &authority, &human, &content, 300);
+    two.authority = successor.clone();
+    assert!(enroll_by(&c, &[(&cells[0].1, None)], late, two.clone())
+        .await
+        .is_err());
+    let (late_binding, _) = enroll_by(&c, &[(&cells[0].1, None), (&cells[2].1, None)], late, two)
+        .await
+        .expect("two distinct approvals meet a policy of two");
+    let _: VerifiedDevice = c
+        .call(
+            &cells[3].1.zome("mishpat"),
+            "verify_device_binding",
+            query(&late_binding, late, &content),
+        )
+        .await;
+    eprintln!("identity proof: under a policy of two, one approval refused and two accepted");
     let mut replay_intent = signed_binding.intent.clone();
     replay_intent.authority = replayed_root.action_hash;
     assert!(c
