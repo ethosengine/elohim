@@ -42,6 +42,8 @@ pub fn usage() -> &'static str {
     "usage:\n  epr identity begin --name <display name> [--identifier <id>] [--node <this node URL>]\n  \
      epr identity standing [--node <this node URL>]\n  \
      epr identity show --declare [--node <this node URL>]\n  \
+     epr identity secret [--identifier <sign-in word>] [--node <this node URL>]\n    \
+     (reads the secret from this terminal without echo, or from stdin; never from an argument)\n  \
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]"
 }
@@ -52,6 +54,7 @@ pub fn run_identity(args: &[String]) -> Outcome<ExitCode> {
         Some("begin") => begin(&args[1..]),
         Some("standing") => standing(&args[1..]),
         Some("show") => show(&args[1..]),
+        Some("secret") => secret(&args[1..]),
         Some("--help" | "-h" | "help") | None => {
             println!("{}", usage());
             Ok(ExitCode::SUCCESS)
@@ -286,6 +289,83 @@ struct Created {
     human: bool,
     authority: bool,
     session: bool,
+}
+
+/// Read a line from stdin with the terminal's echo off, restoring it after.
+fn read_hidden(prompt: &str) -> Outcome<String> {
+    use std::os::fd::AsRawFd;
+    let fd = std::io::stdin().as_raw_fd();
+    let mut was = std::mem::MaybeUninit::<libc::termios>::uninit();
+    // SAFETY: tcgetattr writes a termios for a valid descriptor.
+    if unsafe { libc::tcgetattr(fd, was.as_mut_ptr()) } != 0 {
+        return Err("cannot read this terminal's settings".into());
+    }
+    // SAFETY: initialised by the successful tcgetattr above.
+    let was = unsafe { was.assume_init() };
+    let mut quiet = was;
+    quiet.c_lflag &= !libc::ECHO;
+    quiet.c_lflag |= libc::ECHONL;
+    eprint!("{prompt}");
+    // SAFETY: a termios derived from the one just read.
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &quiet) };
+    let mut line = String::new();
+    let read = std::io::stdin().lock().read_line(&mut line);
+    // SAFETY: restoring the settings read above.
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &was) };
+    read.map_err(|e| e.to_string())?;
+    Ok(line.trim_end_matches(['\n', '\r']).to_string())
+}
+
+/// The secret: from this terminal without echo (asked twice), or the first
+/// line of stdin for a script. Never from an argument, where it would land in
+/// the shell's history and the process list.
+fn read_secret() -> Outcome<String> {
+    if !std::io::stdin().is_terminal() {
+        let mut line = String::new();
+        std::io::stdin()
+            .lock()
+            .read_line(&mut line)
+            .map_err(|e| e.to_string())?;
+        return Ok(line.trim_end_matches(['\n', '\r']).to_string());
+    }
+    let first = read_hidden("New sign-in secret: ")?;
+    let again = read_hidden("The same again: ")?;
+    if first != again {
+        return Err("the two did not match; nothing was changed".into());
+    }
+    Ok(first)
+}
+
+/// `epr identity secret`: set or reset the secret you sign in to this node
+/// with, from this node's own machine.
+fn secret(args: &[String]) -> Outcome<ExitCode> {
+    let opts = Options::parse(args)?;
+    let node = opts.node()?;
+    let secret = read_secret()?;
+    let mut body = serde_json::json!({ "secret": secret });
+    if let Some(id) = &opts.identifier {
+        body["identifier"] = serde_json::Value::String(id.clone());
+    }
+    let bytes = serde_json::to_vec(&body).map_err(|e| e.to_string())?;
+    let (answer, _): (serde_json::Value, String) = json_call_with(
+        "POST",
+        &format!("{node}/auth/identity/secret"),
+        Some(&bytes),
+        &[],
+    )?;
+    println!(
+        "Your sign-in secret is set. Sign in to this node as {} from another machine.",
+        answer["identifier"].as_str().unwrap_or("you")
+    );
+    let ended = answer["endedSessions"].as_u64().unwrap_or(0);
+    if ended > 0 {
+        println!(
+            "{ended} earlier sign-in{} ended; sign in again there.",
+            if ended == 1 { "" } else { "s" }
+        );
+    }
+    println!("If you lose it, set a new one here, on this node's own machine.");
+    Ok(ExitCode::SUCCESS)
 }
 
 fn begin(args: &[String]) -> Outcome<ExitCode> {
@@ -1074,6 +1154,7 @@ mod tests {
             this_node_is_controller: true,
             rests_on_this_node_alone: alone,
             identifier: None,
+            display_name: None,
         }
     }
 

@@ -460,6 +460,7 @@ dependencies = [
  "eprfs-host",
  "eprfs-meta",
  "glob",
+ "libc",
  "rand_core",
  "rusqlite",
  "rustix",
