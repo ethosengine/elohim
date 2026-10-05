@@ -282,3 +282,11 @@ DELTA 2026-10-04c (fleet, reported by the Che workspace's probe, not re-read her
 `elohim-conductor-4-927dff` runs the node's own lamad and mishpat coordinators, and a delegation it then issued carries the issuance
 hash and the device binding the current zome requires; the 2026-10-04 refusal (`legacy grant cannot authorize a new publication`)
 is gone. Eleven other hosted apps on conductor-4 are still on older lamad coordinators (the `CellMissing` set, backlog gap 3).
+DELTA 2026-10-05 (GREEN preserved; gate-proven, unmeasured on any mesh): branch `fix/coordinator-acceptance-contract`. The content_store
+coordinator states its statement contract (which head-delegation forms and acceptance domains it issues, accepts for a new act, honors in
+history) through one extern, pinned by `statement-contract.lock.json`; the legacy-grant refusal is decided from that table and reads
+`issuer-behind` with both forms. Storage sweeps the node's own app first and holds every hosted app back when it does not take the bundle
+cleanly, keeps the last applied bundle, and runs a standing pass that sweeps newly installed apps and publishes pending roles as aggregates
+(backlog gap 1 closed in code). Zome 136 tests, wasm built; `just gate elohim-storage` 4298 passed. Mesh receipt owed: preflight REFUSED
+on this workspace because the pinned fork conductor (5f4c16abe) is not built here; probe in
+genesis/data/timeline/backlog/coordinator-acceptance-tightening-contract.md.
