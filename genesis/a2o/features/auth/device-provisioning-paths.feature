@@ -21,10 +21,12 @@ Feature: A person's identity starts on one node and grows to others
   no use to them. The new node then writes a joining record to the network,
   signed by the node that approved and by itself, that any peer can check.
 
-  Joining makes a node one of Matthew's nodes: the network recognizes it as
-  his. It does not by that alone let the node speak for him. A node of his comes
-  to speak for him as well, able to approve other nodes, when Matthew says so
-  on a node that already does.
+  Joining makes a node one of Matthew's nodes, and every one of his nodes
+  speaks for him. No node is special: the network holds his identity, not any
+  one machine, and the first node is only where it began. A node's voice
+  counts among Matthew's own nodes. So any node of his can approve the next
+  one. What proves to anyone else that a node is Matthew's is the joining
+  record on the network, never the node's own say-so.
 
   One such node's approval is enough. The others that speak for him do not have to be
   reachable, and nothing waits for them. When they next see the joining record,
@@ -36,6 +38,11 @@ Feature: A person's identity starts on one node and grows to others
   same link in the portal of each node that must approve, one after another,
   and the code is shown by the last of them, once enough have approved.
 
+  Affirming is also what keeps this honest. Because any of Matthew's nodes can
+  approve the next, the others each look at what was approved and stand
+  behind it, and for every node of his Matthew can see which node approved it
+  and how many of the others have affirmed it since.
+
   Matthew may also tell a node that speaks for him, in advance, which node he
   expects to join, by writing that node's key in its settings. When that exact node
   asks, the approving node approves without asking Matthew again, because he has
@@ -45,7 +52,8 @@ Feature: A person's identity starts on one node and grows to others
   the node that asks and a node that speaks for him can see each other on a
   private network, such as the one in his home, the request and the code
   travel between them directly. When they cannot, he carries both, as
-  described above.
+  described above. This works whether or not Matthew said in advance that he
+  expected the node; the scenarios below show it for a node he expected.
 
   A doorway is a node run as a service for other people. It can hold a
   person's key for them, so they can sign in from a browser with a password,
@@ -57,11 +65,10 @@ Feature: A person's identity starts on one node and grows to others
   identity can be created, and can grow to a second node, on a network where
   no doorway exists.
 
-  Three things about a node are separate, and one person need not hold all
-  three. Whose it is: the person whose identity it speaks for. Who operates
-  it: whoever keeps the machine running and answers for what happens to it.
-  Whether it speaks for that person: whether it may approve other nodes for
-  their identity. Matthew's grandmother-in-law Gertrude needs a node of her own, and
+  Two things about a node are separate, and one person need not hold both.
+  Whose it is: the person whose identity it speaks for. Who operates it:
+  whoever keeps the machine running and answers for what happens to it.
+  Matthew's grandmother-in-law Gertrude needs a node of her own, and
   Matthew will be the one who operates it. That gives him no say over her
   identity. Where a person has nobody suitable to operate their node, the
   people on the network who look after it together, called here the
@@ -84,7 +91,9 @@ Feature: A person's identity starts on one node and grows to others
   key, and joins. If it has made things, the recommended choice is to keep
   everything: the node keeps its key and joins as it is, and what it made
   stays where it is, still tracing to the identity it began. The portal says
-  plainly that it has been left as it was.
+  plainly that it has been left as it was. What becomes of the identity the
+  node began, which it no longer acts under, is part of the larger question
+  below.
 
   When a node Matthew said to expect turns out to have an identity
   of its own, both rules apply: the approving node applies the recommended choice
@@ -138,8 +147,7 @@ Feature: A person's identity starts on one node and grows to others
 
     Scenario: Having begun on a doorway, Matthew no longer depends on it
       Given Matthew's identity began on doorway "alpha" and node "workspace" has since joined it
-      When Matthew says in the portal on doorway "alpha" that node "workspace" may speak for him
-      And doorway "alpha" becomes unreachable
+      When doorway "alpha" becomes unreachable
       Then Matthew can still approve a new node in the portal on node "workspace"
 
   Rule: An identity that began on the person's own node can later gain a doorway
@@ -177,6 +185,14 @@ Feature: A person's identity starts on one node and grows to others
       And Matthew was not asked to approve anything for that
       And node "laptop" was one of Matthew's nodes the whole time
 
+    Scenario: Matthew can see who approved a node and who has stood behind it
+      Given node "workspace" and node "home" both speak for Matthew
+      And node "laptop" joined with the approval of node "workspace" alone
+      When Matthew looks at his identity in the portal on node "workspace"
+      Then he sees that node "laptop" was approved by node "workspace" and has been affirmed by no other node yet
+      When node "home" has affirmed the joining record for node "laptop"
+      Then he sees that node "laptop" has been affirmed by one other node
+
     Scenario: Matthew chooses to require two approvals
       Given node "workspace" and node "home" both speak for Matthew
       And Matthew has chosen that a new node needs the approval of two of the nodes that speak for him
@@ -189,7 +205,7 @@ Feature: A person's identity starts on one node and grows to others
       When Matthew types the code into the terminal on node "laptop"
       Then node "laptop" is one of Matthew's nodes
 
-  Rule: A node Matthew expects joins without his being asked again, and a node comes to speak for him only when he says so
+  Rule: A node Matthew expects joins without his being asked again, and any node of his can approve the next
 
     Scenario: An expected node with no identity of its own joins without a second answer
       Given Matthew's identity began on node "workspace"
@@ -202,12 +218,27 @@ Feature: A person's identity starts on one node and grows to others
       And node "home" is one of Matthew's nodes
       And Matthew carried neither a link nor a code
 
-    Scenario: Matthew lets a node of his speak for him
+    Scenario: A node that joined approves the next one
       Given Matthew's identity began on node "workspace"
-      And node "home" is one of Matthew's nodes and does not speak for him
-      When Matthew says on node "workspace" that node "home" may speak for him
-      Then node "workspace" and node "home" both speak for Matthew
-      And Matthew can approve a new node in the portal on node "home"
+      And node "home" has joined Matthew's identity
+      And node "workspace" is switched off
+      And Jessica, another person on the same network, runs her own node, which no doorway hosts
+      When the terminal on a new node "laptop" asks to join Matthew's identity
+      And Matthew opens the link in the portal on node "home" and approves
+      And Matthew types the code into the terminal on node "laptop"
+      Then node "laptop" is one of Matthew's nodes
+      When Jessica's node checks for itself whether node "laptop" belongs to Matthew
+      Then Jessica's node answers yes from the joining records it read on the network
+
+    Scenario: Two of Matthew's nodes approve two new nodes at the same time
+      Given node "workspace" and node "home" both speak for Matthew
+      And node "workspace" and node "home" cannot reach each other
+      When Matthew approves a new node "laptop" in the portal on node "workspace"
+      And Matthew approves a new node "tablet" in the portal on node "home"
+      And node "workspace" and node "home" can reach each other again
+      Then node "laptop" is one of Matthew's nodes
+      And node "tablet" is one of Matthew's nodes
+      And neither approval undid or held up the other
 
   Rule: The person a node speaks for and the one who operates it can be different
 
