@@ -269,8 +269,13 @@ pub struct UnverifiedAnchorRow {
     pub updated_at: String,
 }
 
-/// Anchored rows with no liveness verdict (`dht_anchor_state IS NULL`), oldest
+/// Anchored rows with no liveness verdict (`dht_anchor_state IS NULL`), NEWEST
 /// `updated_at` first, strictly after the `(updated_at, id)` keyset cursor.
+/// Newest first because the rows people are reading are the recent ones, and a
+/// long-lived node's oldest unverified rows are mostly anchors its conductor
+/// can no longer resolve (alpha, 2026-10-05: matthew held 3,048 unverified rows
+/// and confirmed none of the oldest ~400 in 100 minutes while a head adopted
+/// that morning waited at the far end of the lap).
 ///
 /// bounded-work: one indexed-order scan, `limit` rows.
 pub fn list_unverified_anchored(
@@ -290,15 +295,15 @@ pub fn list_unverified_anchored(
     if let Some((updated_at, id)) = after {
         q = q.filter(
             content::updated_at
-                .gt(updated_at.to_string())
+                .lt(updated_at.to_string())
                 .or(content::updated_at
                     .eq(updated_at.to_string())
-                    .and(content::id.gt(id.to_string()))),
+                    .and(content::id.lt(id.to_string()))),
         );
     }
     let rows: Vec<(String, Option<String>, String)> = q
         .select((content::id, content::dht_anchor_hash, content::updated_at))
-        .order((content::updated_at.asc(), content::id.asc()))
+        .order((content::updated_at.desc(), content::id.desc()))
         .limit(limit)
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("list_unverified_anchored failed: {e}")))?;
@@ -6250,6 +6255,11 @@ mod tests {
 
         let first = list_unverified_anchored(&mut conn, &ctx, None, 2).unwrap();
         assert_eq!(first.len(), 2);
+        assert!(
+            (first[0].updated_at.as_str(), first[0].id.as_str())
+                > (first[1].updated_at.as_str(), first[1].id.as_str()),
+            "the page walks newest first"
+        );
         let last = first.last().unwrap();
         let rest = list_unverified_anchored(&mut conn, &ctx, Some((&last.updated_at, &last.id)), 2)
             .unwrap();

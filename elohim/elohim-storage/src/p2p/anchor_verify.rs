@@ -22,10 +22,10 @@
 //! moves belong to the heal leg, `dead` to the ghost witness.
 //!
 //! bounded-work: at most [`batch_size`] ids per reconcile tick (env
-//! `ANCHOR_VERIFY_BATCH`, default 20, clamped to [`MAX_BATCH`], 0 disables), in
+//! `ANCHOR_VERIFY_BATCH`, default 50, clamped to [`MAX_BATCH`], 0 disables), in
 //! ONE batch-extern call on the `Background` admission class under the
 //! extern's own in-wasm budget; no retry — a failed or partial call waits for
-//! the next tick. A keyset cursor walks the unverified set oldest-first so a
+//! the next tick. A keyset cursor walks the unverified set newest-first so a
 //! row the conductor cannot confirm is asked once per lap, not once per tick.
 
 use std::sync::Mutex;
@@ -35,7 +35,7 @@ use crate::db::{content_diesel, AppContext, DbPool};
 use crate::services::conductor_writes::ContentHeadWire;
 use crate::services::head_batch_resolver::HeadBatchResolver;
 
-const DEFAULT_BATCH: usize = 20;
+const DEFAULT_BATCH: usize = 50;
 /// Ceiling on the operator knob — one batch call, sized well under the heal
 /// leg's own slices.
 const MAX_BATCH: usize = 200;
@@ -263,8 +263,8 @@ mod tests {
 
     #[test]
     fn the_batch_knob_defaults_clamps_and_disables() {
-        assert_eq!(batch_size_from(None), 20);
-        assert_eq!(batch_size_from(Some("nonsense")), 20);
+        assert_eq!(batch_size_from(None), 50);
+        assert_eq!(batch_size_from(Some("nonsense")), 50);
         assert_eq!(batch_size_from(Some("0")), 0);
         assert_eq!(batch_size_from(Some(" 7 ")), 7);
         assert_eq!(batch_size_from(Some("100000")), MAX_BATCH);

@@ -1803,6 +1803,24 @@ pub(crate) fn role_errors(report: &CoordinatorSyncReport) -> Vec<String> {
         .collect()
 }
 
+/// Pure: does the node's own app already run exactly this bundle's
+/// coordinators? True only when it was swept in this pass, matched at least one
+/// role, and every role is undrifted and error-free.
+pub(crate) fn own_app_runs_bundle(
+    primary: Option<&str>,
+    reports: &[CoordinatorSyncReport],
+) -> bool {
+    let Some(primary) = primary else {
+        return false;
+    };
+    reports.iter().any(|r| {
+        r.app_id == primary
+            && !r.roles.is_empty()
+            && r.drifted_count == 0
+            && role_errors(r).is_empty()
+    })
+}
+
 /// Pure: the canary gate. `primary_report` is the own app's sweep in THIS
 /// pass, `None` when it was not swept (absent from the conductor, or skipped).
 pub(crate) fn canary_verdict(
@@ -2224,8 +2242,13 @@ pub async fn sync_coordinators_all_apps(
         None => {}
     }
 
-    // Last applied wins: the own app proved this bundle on an apply.
-    if verdict == CanaryVerdict::Healthy {
+    // Last applied wins: the own app proved this bundle on an apply — or already
+    // runs it, which a dry run shows. A node beside an external conductor has no
+    // boot bundle, and the rolling driver never applies to a peer its pre-check
+    // finds current, so without the second arm such a node keeps no bundle and
+    // its standing pass has nothing to measure a newly hosted app against
+    // (alpha, 2026-10-05: `coordinators.observed: false` on every current peer).
+    if verdict == CanaryVerdict::Healthy || own_app_runs_bundle(primary_app, &report.apps) {
         crate::coordinator_standing::record_applied_bundle(happ_path).await;
     }
     crate::coordinator_standing::fold_conductor_report(&report, &bundle.identity());
@@ -2851,6 +2874,41 @@ mod tests {
             canary_verdict(true, None, Some(&broken)),
             CanaryVerdict::NotApplicable
         );
+    }
+
+    #[test]
+    fn a_dry_run_showing_the_own_app_current_proves_the_bundle_for_later_sweeps() {
+        let old = dna_map(&[("content_store", "uhCok-old")]);
+        let new = dna_map(&[("content_store", "uhCok-new")]);
+        let current = sync_report(
+            "elohim",
+            vec![role_report("lamad", new.clone(), new.clone())],
+        );
+        let hosted_behind = sync_report(
+            "hosted-a",
+            vec![role_report("lamad", old.clone(), new.clone())],
+        );
+        // Own app current, a hosted app behind: the bundle is the own app's.
+        assert!(own_app_runs_bundle(
+            Some("elohim"),
+            &[current.clone(), hosted_behind.clone()]
+        ));
+        // Own app behind, errored, unmatched, absent, or no own app: not proven.
+        let behind = sync_report(
+            "elohim",
+            vec![role_report("lamad", old.clone(), new.clone())],
+        );
+        assert!(!own_app_runs_bundle(Some("elohim"), &[behind]));
+        let mut errored_role = role_report("lamad", new.clone(), new.clone());
+        errored_role.error = Some("get_dna_definition failed".to_string());
+        let errored = sync_report("elohim", vec![errored_role]);
+        assert!(!own_app_runs_bundle(Some("elohim"), &[errored]));
+        assert!(!own_app_runs_bundle(
+            Some("elohim"),
+            &[sync_report("elohim", vec![])]
+        ));
+        assert!(!own_app_runs_bundle(Some("elohim"), &[hosted_behind]));
+        assert!(!own_app_runs_bundle(None, &[current]));
     }
 
     #[test]
