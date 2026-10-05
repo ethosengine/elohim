@@ -393,6 +393,153 @@ pub fn bootstrap_device_identity(human_action_hash: ActionHash) -> ExternResult<
         human.timestamp.as_micros().to_string(),
     )
 }
+/// What this cell's own person stands on when they agree to a device consent:
+/// the identity they are, and the authority under which its controllers act.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsentStanding {
+    /// The Human record the identity is rooted in.
+    pub identity_root: ActionHash,
+    /// The identity's current authority record. `None` until
+    /// `bootstrap_device_identity` has run for this person.
+    pub authority: Option<ActionHash>,
+    /// Who may agree for the identity, and how many of them must.
+    pub controllers: Vec<AgentPubKey>,
+    pub required: usize,
+    /// The network the authority is kept on, which a device must name.
+    pub network_dna: DnaHash,
+}
+
+#[derive(Deserialize, Debug)]
+struct MyHuman {
+    action_hash: ActionHash,
+}
+
+fn my_human() -> ExternResult<Option<ActionHash>> {
+    match call(
+        CallTargetCell::OtherRole("imagodei".into()),
+        ZomeName::from("imagodei"),
+        "get_my_human".into(),
+        None,
+        (),
+    )? {
+        ZomeCallResponse::Ok(result) => Ok(result
+            .decode::<Option<MyHuman>>()
+            .map_err(|_| refuse("Human decode failed"))?
+            .map(|human| human.action_hash)),
+        _ => Err(refuse("Human unavailable")),
+    }
+}
+
+/// The action that bootstrapped `human`'s authority, if one exists.
+///
+/// The bootstrap entry is deterministic for its Human, so its address is
+/// computed rather than searched for. The author's own node finds it in its
+/// own store; another node asks the network. A repeated bootstrap is the same
+/// entry under another action; the earliest is taken, and every one of them
+/// resolves to the same authority.
+fn bootstrap_action(
+    human: &HumanRootEvidence,
+    network: DnaHash,
+) -> ExternResult<Option<ActionHash>> {
+    let entry = Commitment {
+        action: "binds-identity".into(),
+        payload_json: String::from_utf8(bytes(&bootstrap_payload(human, network))?)
+            .map_err(|_| refuse("identity encoding"))?,
+        signed_at: human.timestamp.as_micros().to_string(),
+    };
+    let options = if human.author == agent_info()?.agent_initial_pubkey {
+        GetOptions::local()
+    } else {
+        GetOptions::network()
+    };
+    let Some(Details::Entry(details)) = get_details(hash_entry(&entry)?, options)? else {
+        return Ok(None);
+    };
+    if details.actions.len() > MAX_LIFECYCLE {
+        return Err(refuse("identity bootstrap exceeds verification bound"));
+    }
+    Ok(details
+        .actions
+        .iter()
+        .filter(|a| {
+            a.action().author() == &human.author && matches!(a.action().data, ActionData::Create(_))
+        })
+        .min_by_key(|a| (a.action().timestamp(), a.as_hash().clone()))
+        .map(|a| a.as_hash().clone()))
+}
+
+/// Follow an authority to the successor that currently governs it.
+///
+/// Nothing creates a successor today, so this returns `start`. When controller
+/// policies can change, a person must agree under the current one; this walk
+/// finds it, and `current_authority` then checks it in full. Competing
+/// successors are refused rather than chosen between.
+fn current_successor(start: ActionHash) -> ExternResult<ActionHash> {
+    let mut current = start;
+    for _ in 0..32 {
+        let (authority, anchor) = authority_history(current.clone(), 0)?;
+        let mut next: Option<(ActionHash, EntryHash)> = None;
+        for target in lifecycle(anchor.clone(), &authority.controllers)? {
+            let (_, _, candidate): (_, _, Authority) = record(target.clone(), "binds-identity")?;
+            let Some(previous) = candidate.previous_authority else {
+                continue;
+            };
+            if authority_history(previous, 0)?.1 != anchor {
+                continue;
+            }
+            let (_, successor) = authority_history(target.clone(), 0)?;
+            match &next {
+                // The same successor published again is not a fork.
+                Some((_, seen)) if seen == &successor => {}
+                Some(_) => {
+                    return Err(refuse(
+                        "identity authority contested; resolve current controller policy",
+                    ))
+                }
+                None => next = Some((target, successor)),
+            }
+        }
+        match next {
+            Some((successor, _)) => current = successor,
+            None => return Ok(current),
+        }
+    }
+    Err(refuse("identity authority succession exceeds bound"))
+}
+
+/// What this node's person needs in order to agree to a device consent.
+///
+/// `None` when this cell's agent has no Human. A read: nothing is written to
+/// any chain, and an absent authority is reported, never created.
+#[hdk_extern]
+pub fn my_consent_standing(_: ()) -> ExternResult<Option<ConsentStanding>> {
+    let Some(identity_root) = my_human()? else {
+        return Ok(None);
+    };
+    let network_dna = dna_info()?.hash;
+    let human = human_root(identity_root.clone())?;
+    let Some(bootstrap) = bootstrap_action(&human, network_dna.clone())? else {
+        return Ok(Some(ConsentStanding {
+            identity_root,
+            authority: None,
+            controllers: Vec::new(),
+            required: 0,
+            network_dna,
+        }));
+    };
+    let current = current_successor(bootstrap)?;
+    let authority = current_authority(current.clone())?;
+    let required =
+        threshold(&authority.controller_policy, &authority.controllers).map_err(|e| refuse(&e))?;
+    Ok(Some(ConsentStanding {
+        identity_root: authority.chain_root,
+        authority: Some(current),
+        controllers: authority.controllers,
+        required,
+        network_dna,
+    }))
+}
+
 fn binding_record(hash: ActionHash) -> ExternResult<(Commitment, DeviceBinding)> {
     let (_, entry, binding): (_, _, DeviceBinding) = record(hash, "binds-identity")?;
     if entry.payload_json.as_bytes() != bytes(&binding)?
@@ -426,10 +573,18 @@ fn historical_binding_proofs(binding: &DeviceBinding) -> ExternResult<()> {
     Ok(())
 }
 fn validate_intent(intent: &DeviceIntent) -> ExternResult<Authority> {
+    check_intent_context(intent)?;
+    let authority = current_authority(intent.authority.clone())?;
+    check_intent_identity(intent, &authority)?;
+    Ok(authority)
+}
+fn check_intent_context(intent: &DeviceIntent) -> ExternResult<()> {
     if intent.domain != DOMAIN || intent.network_dna != dna_info()?.hash {
         return Err(refuse("device binding network/domain mismatch"));
     }
-    let authority = current_authority(intent.authority.clone())?;
+    Ok(())
+}
+fn check_intent_identity(intent: &DeviceIntent, authority: &Authority) -> ExternResult<()> {
     if intent.identity_root != authority.chain_root {
         return Err(refuse("device binding identity mismatch"));
     }
@@ -442,21 +597,25 @@ fn validate_intent(intent: &DeviceIntent) -> ExternResult<Authority> {
             return Err(refuse("superseded device binding has different subject"));
         }
     }
-    Ok(authority)
+    Ok(())
+}
+/// This cell's signature on an intent already checked against `authority`.
+fn enrollment_proof(intent: &DeviceIntent, authority: &Authority) -> ExternResult<Proof> {
+    let me = agent_info()?.agent_initial_pubkey;
+    if me != intent.device_key && !authority.controllers.contains(&me) {
+        return Err(refuse("caller cannot authorize this device binding"));
+    }
+    Ok(Proof {
+        signature: hdk::ed25519::sign_raw(me.clone(), bytes(intent)?)?,
+        agent: me,
+    })
 }
 /// Explicit ceremony signing only. Ordinary publication never calls this.
 #[hdk_extern]
 pub fn sign_device_enrollment(intent: DeviceIntent) -> ExternResult<Proof> {
     crate::invocation::authorize("sign_device_enrollment", &intent)?;
     let authority = validate_intent(&intent)?;
-    let me = agent_info()?.agent_initial_pubkey;
-    if me != intent.device_key && !authority.controllers.contains(&me) {
-        return Err(refuse("caller cannot authorize this device binding"));
-    }
-    Ok(Proof {
-        signature: hdk::ed25519::sign_raw(me.clone(), bytes(&intent)?)?,
-        agent: me,
-    })
+    enrollment_proof(&intent, &authority)
 }
 /// What a controller signs to put their agreement on a device consent.
 ///
@@ -519,17 +678,82 @@ fn consent_signer_stands(
     Ok(())
 }
 
+/// This cell's agreement on `consent`, under an authority already resolved.
+fn consent_proof(consent: &DeviceConsent, authority: &Authority) -> ExternResult<Proof> {
+    let message = consent_message(consent).map_err(refuse)?;
+    let me = agent_info()?.agent_initial_pubkey;
+    consent_signer_stands(authority, consent, &me).map_err(refuse)?;
+    Ok(Proof {
+        signature: hdk::ed25519::sign_raw(me.clone(), message)?,
+        agent: me,
+    })
+}
+
 /// Explicit ceremony signing only: a controller agrees to one consent record.
 #[hdk_extern]
 pub fn sign_device_consent(consent: DeviceConsent) -> ExternResult<Proof> {
     crate::invocation::authorize("sign_device_consent", &consent)?;
-    let message = consent_message(&consent).map_err(refuse)?;
+    // A malformed address is refused before anything is read from the network.
+    consent_message(&consent).map_err(refuse)?;
     let authority = current_authority(consent.authority.clone())?;
-    let me = agent_info()?.agent_initial_pubkey;
-    consent_signer_stands(&authority, &consent, &me).map_err(refuse)?;
-    Ok(Proof {
-        signature: hdk::ed25519::sign_raw(me.clone(), message)?,
-        agent: me,
+    consent_proof(&consent, &authority)
+}
+
+/// Everything a controller signs when they approve a device, asked for once.
+///
+/// Approving puts the controller's agreement on the consent record and, when
+/// enrollment was agreed, signs the enrollment the device will complete. Both
+/// are signed under one mandate, so an approval costs the controller's chain one
+/// capability grant rather than one per signature. Each signature is still over
+/// its own domain-separated bytes, so neither can stand in for the other.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DeviceApproval {
+    pub consent: DeviceConsent,
+    /// Present exactly when the person agreed to enroll the device.
+    pub enrollment: Option<DeviceIntent>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DeviceApprovalProofs {
+    pub consent: Proof,
+    pub enrollment: Option<Proof>,
+}
+
+/// An enrollment signed in an approval must be for the identity and authority
+/// the consent names, so one approval cannot carry agreement for two people.
+fn approval_coheres(approval: &DeviceApproval) -> Result<(), &'static str> {
+    match &approval.enrollment {
+        Some(intent)
+            if intent.authority != approval.consent.authority
+                || intent.identity_root != approval.consent.identity_root =>
+        {
+            Err("approval enrollment names a different identity than its consent")
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Explicit ceremony signing only: a controller approves a device in one step.
+#[hdk_extern]
+pub fn sign_device_approval(approval: DeviceApproval) -> ExternResult<DeviceApprovalProofs> {
+    crate::invocation::authorize("sign_device_approval", &approval)?;
+    approval_coheres(&approval).map_err(refuse)?;
+    consent_message(&approval.consent).map_err(refuse)?;
+    if let Some(intent) = &approval.enrollment {
+        check_intent_context(intent)?;
+    }
+    let authority = current_authority(approval.consent.authority.clone())?;
+    let consent = consent_proof(&approval.consent, &authority)?;
+    let enrollment = match &approval.enrollment {
+        Some(intent) => {
+            check_intent_identity(intent, &authority)?;
+            Some(enrollment_proof(intent, &authority)?)
+        }
+        None => None,
+    };
+    Ok(DeviceApprovalProofs {
+        consent,
+        enrollment,
     })
 }
 
@@ -934,6 +1158,89 @@ mod tests {
         assert!(authorized_signers(&authority, &[proof(1), proof(3)]).is_err());
         assert!(authorized_signers(&authority, &[proof(1), proof(2)]).is_ok());
     }
+    fn intent() -> DeviceIntent {
+        DeviceIntent {
+            domain: DOMAIN.into(),
+            authority: action(2),
+            identity_root: action(1),
+            device_key: key(7),
+            network_dna: DnaHash::from_raw_32(vec![4; 32]),
+            content_dna: DnaHash::from_raw_32(vec![5; 32]),
+            issued_at: Timestamp::from_micros(123),
+            supersedes: None,
+        }
+    }
+
+    /// The JSON keys of `json`, in the order they appear.
+    fn keys_in_order(json: &str) -> Vec<String> {
+        json.split('"')
+            .collect::<Vec<_>>()
+            .windows(2)
+            .filter(|w| w[1].starts_with(':'))
+            .map(|w| w[0].to_string())
+            .collect()
+    }
+
+    #[test]
+    fn one_approval_cannot_carry_agreement_for_two_identities() {
+        let ok = DeviceApproval {
+            consent: consent(CID),
+            enrollment: Some(intent()),
+        };
+        assert!(approval_coheres(&ok).is_ok());
+        assert!(approval_coheres(&DeviceApproval {
+            consent: consent(CID),
+            enrollment: None,
+        })
+        .is_ok());
+        let mut other = intent();
+        other.identity_root = action(9);
+        assert!(approval_coheres(&DeviceApproval {
+            consent: consent(CID),
+            enrollment: Some(other),
+        })
+        .is_err());
+        let mut other = intent();
+        other.authority = action(9);
+        assert!(approval_coheres(&DeviceApproval {
+            consent: consent(CID),
+            enrollment: Some(other),
+        })
+        .is_err());
+    }
+
+    /// A mandate carries the exact JSON of the payload it authorizes, so a
+    /// client that builds the payload must produce these keys in this order.
+    /// `elohim-storage`'s `device_consent_cell` pins the same list.
+    #[test]
+    fn the_approval_payload_keeps_its_key_order() {
+        let approval = DeviceApproval {
+            consent: consent(CID),
+            enrollment: Some(intent()),
+        };
+        assert_eq!(
+            keys_in_order(&serde_json::to_string(&approval).unwrap()),
+            [
+                "consent",
+                "authority",
+                "identity_root",
+                "consent_cid",
+                "enrollment",
+                "domain",
+                "authority",
+                "identity_root",
+                "device_key",
+                "network_dna",
+                "content_dna",
+                "issued_at",
+                "supersedes",
+            ]
+        );
+        assert!(serde_json::to_string(&approval)
+            .unwrap()
+            .contains("\"issued_at\":123,"));
+    }
+
     #[test]
     fn bootstrap_is_deterministic_and_does_not_name_a_device() {
         let human = HumanRootEvidence {

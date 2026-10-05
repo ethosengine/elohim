@@ -145,6 +145,36 @@ pub struct DeviceRevocation {
     pub signatures: Vec<Proof>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct DeviceConsent {
+    pub authority: ActionHash,
+    pub identity_root: ActionHash,
+    pub consent_cid: String,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SignedDeviceConsent {
+    pub consent: DeviceConsent,
+    pub proof: Proof,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DeviceApproval {
+    pub consent: DeviceConsent,
+    pub enrollment: Option<DeviceIntent>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DeviceApprovalProofs {
+    pub consent: Proof,
+    pub enrollment: Option<Proof>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsentStanding {
+    pub identity_root: ActionHash,
+    pub authority: Option<ActionHash>,
+    pub controllers: Vec<AgentPubKey>,
+    pub required: usize,
+    pub network_dna: DnaHash,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
 struct RawCommitment {
     action: String,
@@ -565,6 +595,121 @@ async fn device_content_admin_is_denied(
     }
 }
 
+/// What a node's own person stands on, and the one signing call an approval
+/// makes. The base case: the person's node is their identity's only controller
+/// and signs alone.
+async fn consent_ceremony_signing(
+    c: &SweetConductor,
+    cells: &[(SweetCell, SweetCell, SweetCell)],
+    operator: &AgentPubKey,
+    authority: &Receipt,
+    human: &ActionHash,
+    content: &DnaHash,
+) {
+    let mishpat_dna = cells[0].1.dna_hash().clone();
+    let standing: Option<ConsentStanding> = c
+        .call(&cells[0].1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    let standing = standing.expect("the operator has a Human");
+    assert_eq!(&standing.identity_root, human);
+    assert_eq!(standing.authority.as_ref(), Some(&authority.action_hash));
+    assert_eq!(&standing.controllers, &vec![operator.clone()]);
+    assert_eq!(standing.required, 1);
+    assert_eq!(standing.network_dna, mishpat_dna);
+
+    // A person with a Human but no authority record yet is told so, and the
+    // read creates nothing.
+    let che: Option<ConsentStanding> = c
+        .call(&cells[1].1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    assert!(
+        che.as_ref().is_none_or(|s| s.authority.is_none()),
+        "{che:?}"
+    );
+    let second: Option<ConsentStanding> = c
+        .call(&cells[2].1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    assert!(second.is_none(), "{second:?}");
+
+    let consent = DeviceConsent {
+        authority: authority.action_hash.clone(),
+        identity_root: human.clone(),
+        consent_cid: "bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".into(),
+    };
+    let intent = DeviceIntent {
+        domain: "elohim:device-enrollment:v1".into(),
+        authority: authority.action_hash.clone(),
+        identity_root: human.clone(),
+        device_key: cells[1].1.agent_pubkey().clone(),
+        network_dna: mishpat_dna.clone(),
+        content_dna: content.clone(),
+        issued_at: Timestamp::from_micros(123),
+        supersedes: None,
+    };
+    let approval = DeviceApproval {
+        consent: consent.clone(),
+        enrollment: Some(intent.clone()),
+    };
+    let proofs: DeviceApprovalProofs = c
+        .call(
+            &cells[0].1.zome("mishpat"),
+            "sign_device_approval",
+            approval.clone(),
+        )
+        .await;
+    assert_eq!(&proofs.consent.agent, operator);
+    let signed = SignedDeviceConsent {
+        consent: consent.clone(),
+        proof: proofs.consent.clone(),
+    };
+    // Any holder can check the agreement; a different address does not verify.
+    let holds: bool = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_consent",
+            signed.clone(),
+        )
+        .await;
+    assert!(holds);
+    let mut moved = signed.clone();
+    moved.consent.consent_cid = moved.consent.consent_cid.replace("bafy", "bafk");
+    let holds: bool = c
+        .call(&cells[2].1.zome("mishpat"), "verify_device_consent", moved)
+        .await;
+    assert!(!holds);
+    // The enrollment proof is the same signature the enrollment extern makes.
+    let alone: Proof = c
+        .call(
+            &cells[0].1.zome("mishpat"),
+            "sign_device_enrollment",
+            intent.clone(),
+        )
+        .await;
+    assert_eq!(proofs.enrollment.unwrap().signature, alone.signature);
+
+    // A device cannot approve itself, and one approval cannot speak for two
+    // identities.
+    assert!(c
+        .call_fallible::<_, DeviceApprovalProofs>(
+            &cells[1].1.zome("mishpat"),
+            "sign_device_approval",
+            approval.clone(),
+        )
+        .await
+        .is_err());
+    let mut split = approval;
+    split.enrollment.as_mut().unwrap().identity_root = authority.action_hash.clone();
+    assert!(c
+        .call_fallible::<_, DeviceApprovalProofs>(
+            &cells[0].1.zome("mishpat"),
+            "sign_device_approval",
+            split,
+        )
+        .await
+        .is_err());
+    eprintln!("identity proof: consent standing read and approval signed in one call");
+}
+
 #[test]
 fn independently_keyed_devices_share_one_human_and_revocation_cannot_be_erased() -> Result<()> {
     // The multi-cell proof's future exceeds libtest's default 2 MiB stack.
@@ -658,6 +803,7 @@ async fn device_enrollment_proof() -> Result<()> {
         )
         .await;
     eprintln!("identity proof: exact Human bootstrap accepted");
+    consent_ceremony_signing(&c, &cells, &operator, &authority, &human, &content).await;
     let (che_binding, signed_binding) = enroll(
         &c,
         &cells[0].1,
