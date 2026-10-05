@@ -16,7 +16,14 @@ export function safePortalReturn(value: unknown, portalBase: string): string | n
   return value.startsWith(portalBase) ? value : null;
 }
 
+/**
+ * Asks the root for its sign-in even when a session is still open — a
+ * witness asked the person to sign in again, or this browser's sign-in can
+ * no longer be confirmed.
+ */
+export const SIGN_IN_PARAM = 'sign_in';
+
 /** The portal's sign-in page, remembering `here` to come back to. */
 export function signInUrl(portalBase: string, here: string): string {
-  return `${portalBase}?${RETURN_TO_PARAM}=${encodeURIComponent(here)}`;
+  return `${portalBase}?${SIGN_IN_PARAM}=1&${RETURN_TO_PARAM}=${encodeURIComponent(here)}`;
 }

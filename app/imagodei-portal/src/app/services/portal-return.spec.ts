@@ -26,7 +26,7 @@ describe('signInUrl', () => {
   it('carries the page to come back to, encoded', () => {
     const here = '/auth/portal/consent/device?request=a&b=c';
     const url = signInUrl(BASE, here);
-    expect(url.startsWith(`${BASE}?${RETURN_TO_PARAM}=`)).toBe(true);
+    expect(url.startsWith(`${BASE}?sign_in=1&${RETURN_TO_PARAM}=`)).toBe(true);
     expect(new URLSearchParams(url.slice(url.indexOf('?'))).get(RETURN_TO_PARAM)).toBe(here);
   });
 });

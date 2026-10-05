@@ -29,6 +29,7 @@ import {
   type DeviceConsentPageState,
 } from 'elohim-imagodei/device-consent';
 import { standingLine, type IdentityPageState } from 'elohim-imagodei/identity-standing';
+import { isSessionProofRefusal } from 'elohim-imagodei/session-key';
 
 import { IdentityViewComponent } from '../identity/identity-view.component.js';
 
@@ -99,7 +100,18 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
 
         @if (elsewhere) {
           <div class="device-approval__elsewhere" data-testid="device-consent-elsewhere">
-            <p>Open this same link in a browser there, or run this in its terminal:</p>
+            <button
+              type="button"
+              class="device-approval__action"
+              data-testid="device-consent-sign-in"
+              (click)="signInAgain.emit()"
+            >
+              Sign in
+            </button>
+            <p>
+              Or, on the machine that holds your key, open this same link in a browser there, or run
+              this in its terminal:
+            </p>
             <code class="device-approval__command" data-testid="device-consent-command">
               {{ command }}
             </code>
@@ -234,6 +246,8 @@ export class DeviceApprovalViewComponent {
   @Input() personLabel?: string;
   /** What the person's identity rests on, from the shared identity controller. */
   @Input() identity?: IdentityPageState;
+  /** Say what the identity rests on under the card (off where the page already says it). */
+  @Input() showIdentityLine = true;
   /** This page's own link, for the terminal command when it is open elsewhere. */
   @Input() link = '';
   /** How long the live trail waits before showing (the dev preview pins it to 0). */
@@ -245,7 +259,7 @@ export class DeviceApprovalViewComponent {
   /** The person chose to sign in again, as a witness attending them asked. */
   @Output() readonly signInAgain = new EventEmitter<void>();
   /** The person asked to begin their identity here, with this name. */
-  @Output() readonly beginIdentity = new EventEmitter<string>();
+  @Output() readonly beginIdentity = new EventEmitter<{ displayName: string; secret?: string }>();
 
   readonly cardStrings = THIS_DEVICE_WORDS.card;
   /** The standing line says what the approval rests on; the trail need not guess. */
@@ -278,7 +292,9 @@ export class DeviceApprovalViewComponent {
 
   /** What the person's identity rests on, said while they decide. */
   get identityLine(): string | undefined {
-    return this.state.phase === 'review' && this.identity?.phase === 'standing'
+    return this.showIdentityLine &&
+      this.state.phase === 'review' &&
+      this.identity?.phase === 'standing'
       ? standingLine(
           this.identity.standing,
           { inSentence: 'this device' },
@@ -296,10 +312,15 @@ export class DeviceApprovalViewComponent {
     return this.personLabel ?? (this.identity?.standing?.identifier?.trim() || undefined);
   }
 
-  /** A witness attending the person asked them to sign in again. Not a fault. */
+  /**
+   * A witness attending the person asked them to sign in again, or this
+   * browser's sign-in can no longer be confirmed. Not a fault: a step.
+   */
   get reauthentication(): boolean {
+    const code = this.state.refusalCode;
     return (
-      this.state.phase === 'refused' && this.state.refusalCode === NODE_CODE.reauthenticationAsked
+      this.state.phase === 'refused' &&
+      (code === NODE_CODE.reauthenticationAsked || isSessionProofRefusal(code))
     );
   }
 

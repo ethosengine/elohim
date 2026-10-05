@@ -78,8 +78,10 @@ describe('AppComponent — the root, for a person on their own device', () => {
     expect(begin.textContent).toContain(
       'Until you add another device, this device alone speaks for you.'
     );
-    expect(begin.querySelectorAll('input')).toHaveLength(1);
-    expect(root.querySelector('input[type="password"]')).toBeNull();
+    // One field asked for, and an optional sign-in secret said to be optional.
+    expect(begin.querySelectorAll('input')).toHaveLength(2);
+    expect(begin.textContent).toContain('Sign-in secret (optional)');
+    expect(begin.textContent).not.toMatch(/doorway/i);
     expect(root.querySelector('elohim-imagodei-federated-resolver')).toBeNull();
     expect(header(root)?.strings?.ownNodeLabel).toBe('Your own device will make and keep your key');
   });
@@ -94,7 +96,7 @@ describe('AppComponent — the root, for a person on their own device', () => {
         created: { human: true, authority: true, session: true },
       });
     const fixture = await render();
-    await fixture.componentInstance.onIdentityBegin('Matthew');
+    await fixture.componentInstance.onIdentityBegin({ displayName: 'Matthew' });
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
 
@@ -126,15 +128,130 @@ describe('AppComponent — the root, for a person on their own device', () => {
     );
   });
 
-  it('keeps the sign-in for no one signed in, with this host’s header and no witness line', async () => {
+  it('signs in with the word and secret when a secret is set, naming no doorway', async () => {
     routes['/auth/identity/standing'] = () =>
-      json(401, { error: 'no session', code: 'consent_not_signed_in' });
+      json(401, {
+        error: 'no session',
+        code: 'consent_not_signed_in',
+        hasIdentity: true,
+        signInSecretSet: true,
+      });
     const fixture = await render();
     const root = fixture.nativeElement as HTMLElement;
-    expect(fixture.componentInstance.mode()).toBe('login');
-    expect(root.querySelector('elohim-imagodei-federated-resolver')).not.toBeNull();
+    expect(fixture.componentInstance.mode()).toBe('sign-in');
+    const form = root.querySelector('[data-testid="sign-in"]')!;
+    expect(form.textContent).toContain('Sign-in word');
+    expect(form.textContent).toContain('Sign-in secret');
+    expect(form.textContent).not.toMatch(/doorway|federated/i);
+    expect(root.querySelector('elohim-imagodei-federated-resolver')).toBeNull();
     expect(header(root)?.strings?.ownNodeLabel).toBe('Your own device holds your key');
     expect(root.querySelector('elohim-imagodei-attestor-row')).toBeNull();
+  });
+
+  it('says where a sign-in secret is set when none is, and how a forgotten one is replaced', async () => {
+    routes['/auth/identity/standing'] = () =>
+      json(401, {
+        error: 'no session',
+        code: 'consent_not_signed_in',
+        hasIdentity: true,
+        signInSecretSet: false,
+      });
+    const fixture = await render();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(fixture.componentInstance.mode()).toBe('secret-unset');
+    const panel = root.querySelector('[data-testid="sign-in-secret-unset"]')!;
+    expect(panel.textContent).toContain('Signing in from a browser needs a sign-in secret.');
+    expect(root.querySelector('[data-testid="sign-in-secret-command"]')?.textContent?.trim()).toBe(
+      'epr identity secret'
+    );
+    expect(panel.textContent).toContain('This is also how a forgotten secret is replaced.');
+  });
+
+  it('posts the sign-in to this node, then shows what the identity rests on', async () => {
+    let signedIn = false;
+    routes['/auth/identity/standing'] = () =>
+      signedIn
+        ? json(200, { ...ALONE, identifier: 'matthew' })
+        : json(401, {
+            error: 'no session',
+            code: 'consent_not_signed_in',
+            hasIdentity: true,
+            signInSecretSet: true,
+          });
+    routes['/auth/login'] = () => {
+      signedIn = true;
+      return json(200, {
+        humanId: 'h',
+        agentPubKey: 'a',
+        identifier: 'matthew',
+        expiresAt: 1,
+        isSteward: true,
+        redirect: '/auth/portal/',
+        sessionKeyBound: false,
+      });
+    };
+    const fixture = await render();
+    await fixture.componentInstance.onSignIn({ identifier: 'matthew', password: 'a-long-secret' });
+    fixture.detectChanges();
+
+    const login = calls.find(c => c.url.includes('/auth/login'))!;
+    expect(JSON.parse(login.init!.body as string)).toMatchObject({
+      identifier: 'matthew',
+      password: 'a-long-secret',
+      remember: true,
+    });
+    expect(fixture.componentInstance.mode()).toBe('identity');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="identity-standing"]')
+        ?.textContent
+    ).toContain('matthew');
+  });
+
+  it('says a slowed sign-in is a wait, and for how long', async () => {
+    routes['/auth/identity/standing'] = () =>
+      json(401, { code: 'consent_not_signed_in', hasIdentity: true, signInSecretSet: true });
+    routes['/auth/login'] = () =>
+      json(429, { error: 'slow', code: 'signin_slowed', retryAfter: 30 });
+    const fixture = await render();
+    await fixture.componentInstance.onSignIn({ identifier: 'matthew', password: 'wrong-secret' });
+    fixture.detectChanges();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="sign-in-refusal"]')
+        ?.textContent
+    ).toContain('This is a wait: try again in 30 seconds.');
+  });
+
+  it('shows the sign-in form when sent back to sign in again, though a session is open', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/auth/portal/?sign_in=1&return_to=%2Fauth%2Fportal%2Fconsent%2Fdevice'
+    );
+    routes['/auth/identity/standing'] = () => json(200, ALONE);
+    const fixture = await render();
+    expect(fixture.componentInstance.mode()).toBe('sign-in');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="sign-in"]')?.textContent
+    ).toContain('Then you’ll go straight back to where you were.');
+  });
+
+  it('signs out and returns to the sign-in', async () => {
+    let signedIn = true;
+    routes['/auth/identity/standing'] = () =>
+      signedIn
+        ? json(200, ALONE)
+        : json(401, { code: 'consent_not_signed_in', hasIdentity: true, signInSecretSet: true });
+    routes['/auth/logout'] = () => {
+      signedIn = false;
+      return json(200, {});
+    };
+    const fixture = await render();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="identity-sign-out"]')
+    ).not.toBeNull();
+    await fixture.componentInstance.onSignOut();
+    expect(calls.some(c => c.url.includes('/auth/logout'))).toBe(true);
+    expect(fixture.componentInstance.mode()).toBe('sign-in');
   });
 
   it('says nothing in the header when nothing is known, rather than “Hosted via” no one', async () => {

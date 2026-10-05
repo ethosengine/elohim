@@ -206,8 +206,10 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     expect(begin.textContent).toContain('Begin your identity on this device');
     expect(begin.textContent).toContain('Nothing is sent to any host.');
     expect(begin.textContent).toContain('Then you’ll come back here to approve “workspace”.');
-    expect(begin.querySelectorAll('input')).toHaveLength(1);
-    expect(begin.querySelector('input[type="password"]')).toBeNull();
+    // One field asked for, and an optional sign-in secret said to be optional.
+    expect(begin.querySelectorAll('input')).toHaveLength(2);
+    expect(begin.textContent).toContain('Sign-in secret (optional)');
+    expect(begin.textContent).not.toMatch(/doorway/i);
     expect(port.client.agree).not.toHaveBeenCalled();
   });
 
@@ -293,5 +295,41 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     expect(q(fixture, 'identity-standing')?.textContent).toContain('Your identity,');
     expect(q(fixture, 'identity-standing')?.textContent).toContain('matthew');
     expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('uhCAkroot');
+  });
+
+  it('when this browser’s sign-in can no longer be confirmed: says so plainly, and signs in only when asked', async () => {
+    port.client.agree.mockResolvedValue({
+      ok: false,
+      status: 401,
+      body: { error: 'proof', code: 'session_proof_invalid' },
+    });
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    fixture.detectChanges();
+    expect((q(fixture, 'device-consent-card') as Card).refusalCode).toBe('session_proof_invalid');
+    expect(port.signIn).not.toHaveBeenCalled();
+    (q(fixture, 'device-consent-sign-in-again') as HTMLButtonElement).click();
+    expect(port.signIn).toHaveBeenCalledTimes(1);
+    expect(port.client.agree).toHaveBeenCalledTimes(1);
+  });
+
+  it('a page neither signed in nor on the node’s machine: offers sign-in, and the command for that machine', async () => {
+    port.client.agree.mockResolvedValue({
+      ok: false,
+      status: 403,
+      body: { error: 'x', code: 'consent_caller_not_local' },
+    });
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    fixture.detectChanges();
+    (q(fixture, 'device-consent-sign-in') as HTMLButtonElement).click();
+    expect(port.signIn).toHaveBeenCalledTimes(1);
+    expect(q(fixture, 'device-consent-command')).not.toBeNull();
   });
 });

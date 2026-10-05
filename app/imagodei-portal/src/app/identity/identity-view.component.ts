@@ -28,6 +28,8 @@ const BEGIN_REFUSAL: Record<string, string> = {
     'This device can’t reach its signer right now, so nothing was made. This is a wait: try again in a few minutes.',
   [IDENTITY_CODE.originRefused]:
     'This device takes this only from the portal it serves itself, so nothing was made.',
+  [IDENTITY_CODE.secretTooShort]: 'A sign-in secret is at least 8 characters. Nothing was made.',
+  [IDENTITY_CODE.secretTooLong]: 'A sign-in secret is at most 1024 characters. Nothing was made.',
   [IDENTITY_CODE.callerNotLocal]:
     'This page is open on a different machine from the one that would hold your key, so nothing was made. Beginning happens on that machine: open this page in a browser there, or run this in its terminal:',
 };
@@ -50,6 +52,17 @@ const BEGIN_UNAVAILABLE =
         @if (state.created?.session) {
           <p class="identity__muted">You’re signed in on this device.</p>
         }
+        @if (canSignOut) {
+          <button
+            type="button"
+            class="identity__quiet"
+            data-testid="identity-sign-out"
+            [disabled]="signingOut"
+            (click)="signOut.emit()"
+          >
+            Sign out
+          </button>
+        }
       </section>
     } @else if (state.phase === 'begin' || state.phase === 'beginning') {
       <section class="identity" aria-labelledby="identity-begin-title" data-testid="identity-begin">
@@ -68,7 +81,10 @@ const BEGIN_UNAVAILABLE =
           <p class="identity__muted">{{ returnNote }}</p>
         }
 
-        <form class="identity__form" (submit)="onSubmit($event, nameInput.value)">
+        <form
+          class="identity__form"
+          (submit)="onSubmit($event, nameInput.value, secretInput.value)"
+        >
           <label for="identity-name">The name you want shown</label>
           <input
             #nameInput
@@ -81,6 +97,23 @@ const BEGIN_UNAVAILABLE =
             [attr.aria-describedby]="refusal ? 'identity-refusal' : null"
             [attr.aria-invalid]="state.beginRefusal === nameMalformed ? 'true' : null"
           />
+          <label for="identity-secret">Sign-in secret (optional)</label>
+          <input
+            #secretInput
+            id="identity-secret"
+            name="secret"
+            type="password"
+            autocomplete="new-password"
+            data-testid="identity-secret"
+            aria-describedby="identity-secret-what"
+            [disabled]="state.phase === 'beginning'"
+          />
+          <p id="identity-secret-what" class="identity__muted identity__hint">
+            Lets you sign in to this device from a browser later. At least 8 characters. You can
+            leave it empty, and set or replace it any time by running
+            <code>epr identity secret</code>
+            on this device.
+          </p>
           <button
             type="submit"
             data-testid="identity-begin-submit"
@@ -166,6 +199,21 @@ const BEGIN_UNAVAILABLE =
         border-radius: 6px;
       }
 
+      .identity__hint {
+        font-size: 0.875rem;
+      }
+
+      .identity__quiet {
+        justify-self: start;
+        font: inherit;
+        min-block-size: 44px;
+        padding-inline: 1rem;
+        color: ButtonText;
+        background: ButtonFace;
+        border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+        border-radius: 6px;
+      }
+
       .identity__form :disabled {
         opacity: 0.6;
         cursor: progress;
@@ -202,7 +250,13 @@ export class IdentityViewComponent {
   /** Said under the begin step when the person will be brought back afterwards. */
   @Input() returnNote?: string;
 
-  @Output() readonly begin = new EventEmitter<string>();
+  /** Offer sign-out on the standing panel (the signed-in root). */
+  @Input() canSignOut = false;
+  /** A sign-out is on its way. */
+  @Input() signingOut = false;
+
+  @Output() readonly begin = new EventEmitter<{ displayName: string; secret?: string }>();
+  @Output() readonly signOut = new EventEmitter<void>();
 
   readonly nameMalformed = IDENTITY_CODE.nameMalformed;
 
@@ -226,8 +280,8 @@ export class IdentityViewComponent {
     return beginCommand(this.state.displayName?.trim() || 'Your name');
   }
 
-  onSubmit(event: Event, name: string): void {
+  onSubmit(event: Event, displayName: string, secret: string): void {
     event.preventDefault();
-    this.begin.emit(name);
+    this.begin.emit(secret ? { displayName, secret } : { displayName });
   }
 }

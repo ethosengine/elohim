@@ -18,6 +18,7 @@ import {
   createIdentityStandingClient,
   type IdentityStandingClient,
 } from 'elohim-imagodei/identity-standing';
+import { sessionKeys } from 'elohim-imagodei/session-key';
 
 import { signInUrl } from '../services/portal-return.js';
 
@@ -39,8 +40,9 @@ export function portalBase(): string {
 export const DEVICE_APPROVAL_PORT = new InjectionToken<DeviceApprovalPort>('DEVICE_APPROVAL_PORT', {
   providedIn: 'root',
   factory: () => ({
-    client: createDeviceConsentClient(),
-    identity: createIdentityStandingClient(),
+    // Approving makes this node sign: it carries this browser's session proof.
+    client: createDeviceConsentClient({ prove: () => sessionKeys().current() }),
+    identity: createIdentityStandingClient({ prove: () => sessionKeys().current() }),
     signIn: () => {
       const { pathname, search } = globalThis.location;
       globalThis.location.assign(signInUrl(portalBase(), pathname + search));
