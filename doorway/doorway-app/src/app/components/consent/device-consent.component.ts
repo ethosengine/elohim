@@ -43,10 +43,12 @@ import { DeviceConsentViewComponent } from './device-consent-view.component';
         [code]="s.code"
         [expiresAt]="s.expiresAt"
         [refusalCode]="s.refusalCode"
+        [refusalReason]="s.refusalReason"
         [trail]="s.trail"
         [standing]="s.standing"
         (approved)="onApprove($event)"
         (declined)="onDecline()"
+        (signInAgain)="onSignInAgain()"
         (expired)="onExpired()"
       />
     }
@@ -89,6 +91,11 @@ export class DeviceConsentComponent implements OnInit {
 
   onApprove(approval: DeviceConsentApproval): void {
     void this.controller?.approve(approval);
+  }
+
+  /** The person chose to sign in again; they come straight back to this approval. */
+  onSignInAgain(): void {
+    this.controller?.signInAgain();
   }
 
   onDecline(): void {

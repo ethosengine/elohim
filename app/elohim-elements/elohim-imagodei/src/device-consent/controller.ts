@@ -28,6 +28,7 @@ import {
   keyHolderStep,
   nothingWasSigned,
   outcomeForAgreement,
+  reasonOf,
   standingFor,
   trailAfterAgreement,
   type ApprovalStanding,
@@ -63,6 +64,8 @@ export interface DeviceConsentPageState {
   expiresAt?: number;
   /** Machine code for phase `refused`. */
   refusalCode?: string;
+  /** The node's own plain reason, when its refusal gave one (asked to sign in again). */
+  refusalReason?: string;
   /** Who secured the approval: live while signing, settled once it is done. */
   trail: WitnessStep[] | null;
   /** What the approval rests on, as the node counted it. */
@@ -161,11 +164,11 @@ export class DeviceConsentController {
         return;
       }
       if (nothingWasSigned(failure.code)) {
-        // A wait or a missing set-up: nothing to witness, and coming back
-        // to this link may ask again.
+        // A wait, a missing set-up, another machine, or a request to sign in
+        // again: nothing to witness, and coming back to this link may ask again.
         this.memory.forget(this.requestParam);
         this.set({ trail: null });
-        this.refuse(failure.code, false);
+        this.refuse(failure.code, false, reasonOf(result.body));
         return;
       }
       this.set({ trail: [keyHolderStep(holder, 'failed')] });
@@ -202,11 +205,29 @@ export class DeviceConsentController {
     if (phase !== 'refused' || !refusalCode || !nothingWasSigned(refusalCode)) return;
     this.memory.forget(this.requestParam);
     if (view) {
-      this.set({ phase: 'review', refusalCode: undefined, trail: null, standing: null });
+      this.set({
+        phase: 'review',
+        refusalCode: undefined,
+        refusalReason: undefined,
+        trail: null,
+        standing: null,
+      });
       return;
     }
     this.set({ phase: 'loading', refusalCode: undefined, trail: null });
     await this.loadView();
+  }
+
+  /**
+   * The person chose to sign in again after a witness asked them to. Sends
+   * them to sign in and straight back to this link, where the approval is
+   * asked again from review; nothing is resent by itself.
+   */
+  signInAgain(): void {
+    const { phase, refusalCode } = this.current;
+    if (phase !== 'refused' || refusalCode !== NODE_CODE.reauthenticationAsked) return;
+    this.memory.forget(this.requestParam);
+    this.options.signIn();
   }
 
   /** Declining signs nothing, so nothing is sent. */
@@ -277,8 +298,8 @@ export class DeviceConsentController {
     this.options.signIn();
   }
 
-  private refuse(code: string, remember = true): void {
-    this.set({ phase: 'refused', refusalCode: code });
+  private refuse(code: string, remember = true, reason?: string): void {
+    this.set({ phase: 'refused', refusalCode: code, refusalReason: reason });
     if (remember) this.remember({ phase: 'refused', code });
   }
 

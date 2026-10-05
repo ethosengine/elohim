@@ -485,6 +485,21 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     });
   }
 
+  it('asks to sign in again as a step, with no reference code', async () => {
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <elohim-imagodei-device-consent-card
+        .request=${ENROLL_ONLY}
+        phase="refused"
+        refusal-code="consent_reauthentication_asked"
+      ></elohim-imagodei-device-consent-card>
+    `);
+    expect(q(el, '[part="heading"]')!.textContent).to.include('Sign in again to go ahead');
+    expect(q(el, '[part="message"]')!.textContent).to.include(
+      'being asked to sign in again before this approval goes ahead'
+    );
+    expect(q(el, '[part="refusal-code"]')).to.equal(null);
+  });
+
   it('heads a wait as a wait, not as a refusal', async () => {
     const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
       <elohim-imagodei-device-consent-card

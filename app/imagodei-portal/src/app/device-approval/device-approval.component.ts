@@ -51,6 +51,7 @@ import { DeviceApprovalViewComponent } from './device-approval-view.component.js
       [link]="link"
       (approved)="onApprove($event)"
       (beginIdentity)="onBegin($event)"
+      (signInAgain)="onSignInAgain()"
       (declined)="onDecline()"
       (expired)="onExpired()"
     />
@@ -105,6 +106,11 @@ export class DeviceApprovalComponent implements OnInit {
 
   onApprove(approval: DeviceConsentApproval): void {
     void this.controller.approve(approval);
+  }
+
+  /** The person chose to sign in again; they come straight back to this approval. */
+  onSignInAgain(): void {
+    this.controller.signInAgain();
   }
 
   onDecline(): void {

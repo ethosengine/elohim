@@ -64,7 +64,7 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
           signer="peer-conductor"
           [request]="cardRequest"
           [phase]="state.phase"
-          [personLabel]="personLabel"
+          [personLabel]="cardPersonLabel"
           [code]="state.code"
           [expiresAt]="state.expiresAt"
           [refusalCode]="state.refusalCode"
@@ -76,6 +76,25 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
 
         @if (identityLine; as line) {
           <p class="device-approval__standing" data-testid="identity-standing">{{ line }}</p>
+        }
+
+        @if (reauthentication) {
+          <div class="device-approval__reauth" data-testid="device-consent-reauth">
+            @if (state.refusalReason; as reason) {
+              <p class="device-approval__reason-label">The reason given:</p>
+              <p class="device-approval__reason" data-testid="device-consent-reauth-reason">
+                {{ reason }}
+              </p>
+            }
+            <button
+              type="button"
+              class="device-approval__action"
+              data-testid="device-consent-sign-in-again"
+              (click)="signInAgain.emit()"
+            >
+              Sign in again
+            </button>
+          </div>
         }
 
         @if (elsewhere) {
@@ -135,6 +154,39 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
         margin: 0;
       }
 
+      .device-approval__reauth {
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .device-approval__reauth p {
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      .device-approval__reason {
+        padding-inline-start: 0.75rem;
+        border-inline-start: 3px solid color-mix(in srgb, currentColor 30%, transparent);
+        overflow-wrap: anywhere;
+      }
+
+      .device-approval__action {
+        justify-self: end;
+        font: inherit;
+        font-weight: 600;
+        min-block-size: 44px;
+        padding-inline: 1.25rem;
+        color: ButtonText;
+        background: ButtonFace;
+        border: 1px solid ButtonText;
+        border-radius: 6px;
+      }
+
+      .device-approval__action:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }
+
       .device-approval__elsewhere {
         display: grid;
         gap: 0.5rem;
@@ -190,6 +242,8 @@ export class DeviceApprovalViewComponent {
   @Output() readonly approved = new EventEmitter<DeviceConsentApproval>();
   @Output() readonly declined = new EventEmitter<void>();
   @Output() readonly expired = new EventEmitter<void>();
+  /** The person chose to sign in again, as a witness attending them asked. */
+  @Output() readonly signInAgain = new EventEmitter<void>();
   /** The person asked to begin their identity here, with this name. */
   @Output() readonly beginIdentity = new EventEmitter<string>();
 
@@ -225,8 +279,28 @@ export class DeviceApprovalViewComponent {
   /** What the person's identity rests on, said while they decide. */
   get identityLine(): string | undefined {
     return this.state.phase === 'review' && this.identity?.phase === 'standing'
-      ? standingLine(this.identity.standing, { inSentence: 'this device' })
+      ? standingLine(
+          this.identity.standing,
+          { inSentence: 'this device' },
+          this.identity.displayName
+        )
       : undefined;
+  }
+
+  /**
+   * Who is signed in, as the card names them: the host's own label, else the
+   * sign-in word the node gave with the standing — a claim shown, never the
+   * record id.
+   */
+  get cardPersonLabel(): string | undefined {
+    return this.personLabel ?? (this.identity?.standing?.identifier?.trim() || undefined);
+  }
+
+  /** A witness attending the person asked them to sign in again. Not a fault. */
+  get reauthentication(): boolean {
+    return (
+      this.state.phase === 'refused' && this.state.refusalCode === NODE_CODE.reauthenticationAsked
+    );
   }
 
   /** The node signs only for its own machine, and this page is elsewhere. */

@@ -9,7 +9,9 @@
  *   consent_caller_not_local, consent_signing_unavailable)
  * - `name=<text>` — the name already typed
  * - `devices=<n>&required=<n>&here=0|1` — what the identity rests on (default
- *   1 of 1, this device one of them); `created=1` says a session was opened
+ *   1 of 1, this device one of them); `created=1` says a session was opened;
+ *   `identifier=<word>` is the sign-in word the node gives, `name=<text>` the
+ *   name the person asked to be shown
  *
  * AppComponent imports this only when `ngDevMode` is on, which optimized
  * (production) builds replace with `false`. Nothing here calls anything.
@@ -31,6 +33,7 @@ export function previewIdentityState(search: string): IdentityPageState {
     required: Math.max(1, Number(params.get('required') ?? 1)),
     thisNodeIsController: here,
     restsOnThisNodeAlone: here && devices === 1,
+    ...(params.get('identifier') ? { identifier: params.get('identifier')! } : {}),
   };
   if (phase === 'not-signed-in') return { phase: 'not-signed-in', standing: null };
   if (phase === 'standing') {
@@ -39,6 +42,7 @@ export function previewIdentityState(search: string): IdentityPageState {
       standing,
       created:
         params.get('created') === '1' ? { human: true, authority: true, session: true } : undefined,
+      displayName: params.get('name') ?? undefined,
     };
   }
   return {

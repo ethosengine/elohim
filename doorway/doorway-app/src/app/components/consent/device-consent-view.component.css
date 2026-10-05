@@ -63,3 +63,27 @@ elohim-imagodei-device-consent-card::part(approve) {
   font-size: 0.9375rem;
   line-height: 1.5;
 }
+
+/* Asked to sign in again: a step, not a fault — the reason as the node gave
+   it, set off quietly, and the one action. */
+.portal-reauth {
+  display: grid;
+  gap: var(--el-space-sm);
+  margin-top: var(--el-space-sm);
+}
+
+.portal-reauth p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.portal-reauth__reason {
+  padding-inline-start: 0.75rem;
+  border-inline-start: 3px solid var(--el-border);
+  color: var(--el-text);
+  overflow-wrap: anywhere;
+}
+
+.portal-reauth .btn-primary {
+  justify-self: end;
+}

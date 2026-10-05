@@ -25,6 +25,12 @@ export interface IdentityStandingView {
   thisNodeIsController: boolean;
   /** Whether the node answering is the only device that speaks for the person. */
   restsOnThisNodeAlone: boolean;
+  /**
+   * The word the person signs in with — an identity claim, shown wherever the
+   * person is named and never used to decide anything. Absent when the node
+   * has none to give; never the identity's record id.
+   */
+  identifier?: string;
 }
 
 /** Body of POST /auth/identity/begin. */

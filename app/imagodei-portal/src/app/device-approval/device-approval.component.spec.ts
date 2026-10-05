@@ -257,4 +257,41 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
     );
     expect(q(fixture, 'device-consent-witness-trail')).toBeNull();
   });
+
+  it('asked to sign in again: shows the reason, and signs in only when the person chooses', async () => {
+    port.client.agree.mockResolvedValue({
+      ok: false,
+      status: 401,
+      body: {
+        error: 'again',
+        code: 'consent_reauthentication_asked',
+        reason: 'You signed in on this device more than a day ago.',
+      },
+    });
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'] } })
+    );
+    await settle();
+    fixture.detectChanges();
+
+    expect(q(fixture, 'device-consent-reauth-reason')?.textContent?.trim()).toBe(
+      'You signed in on this device more than a day ago.'
+    );
+    expect(port.signIn).not.toHaveBeenCalled();
+    (q(fixture, 'device-consent-sign-in-again') as HTMLButtonElement).click();
+    expect(port.signIn).toHaveBeenCalledTimes(1);
+    expect(port.client.agree).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the person by their sign-in word, never by the record id', async () => {
+    port.identity.standing.mockResolvedValue(ok({ ...ALONE, identifier: 'matthew' }));
+    const fixture = await create();
+    expect((q(fixture, 'device-consent-card') as Card & { personLabel?: string }).personLabel).toBe(
+      'matthew'
+    );
+    expect(q(fixture, 'identity-standing')?.textContent).toContain('Your identity,');
+    expect(q(fixture, 'identity-standing')?.textContent).toContain('matthew');
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('uhCAkroot');
+  });
 });

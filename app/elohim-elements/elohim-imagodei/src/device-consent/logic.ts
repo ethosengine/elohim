@@ -44,6 +44,11 @@ export const NODE_CODE = {
    * on its own. Nothing was signed, and approving happens on that machine.
    */
   callerNotLocal: 'consent_caller_not_local',
+  /**
+   * A witness attending the person asked them to sign in again before the
+   * approval goes ahead. Not a fault: nothing was signed, no code issued.
+   */
+  reauthenticationAsked: 'consent_reauthentication_asked',
 } as const;
 
 /**
@@ -54,6 +59,7 @@ const NOTHING_SIGNED = new Set<string>([
   NODE_CODE.identityUnbootstrapped,
   NODE_CODE.signingUnavailable,
   NODE_CODE.callerNotLocal,
+  NODE_CODE.reauthenticationAsked,
 ]);
 
 /** True when a refusal says the node signed nothing (safe to approve again later). */
@@ -154,11 +160,28 @@ export function failureFor(
   const unavailable = { kind: 'refused', code: REFUSAL.consentUnavailable } as const;
   const { status } = result;
   const code = codeOf(result.body);
+  // Asked to sign in again is its own step, said and offered; never an automatic redirect.
+  if (code === NODE_CODE.reauthenticationAsked) return { kind: 'refused', code };
   if (status === 401 || code === NODE_CODE.notSignedIn) return { kind: 'sign-in' };
   if (status >= 500 && code === NODE_CODE.signingUnavailable) return { kind: 'refused', code };
   if (status === 0 || status === 404 || status === 501 || status >= 500) return unavailable;
   if (status >= 400) return { kind: 'refused', code: code ?? REFUSAL.requestUnreadable };
   return unavailable;
+}
+
+/** Longest reason the node gives for asking the person to sign in again. */
+export const MAX_REASON_LENGTH = 280;
+
+/**
+ * The node's own plain reason a refusal carries (`reason`), shown as given;
+ * none when it carried no text.
+ */
+// eslint-disable-next-line sonarjs/function-return-type -- a reason or none
+export function reasonOf(body: unknown): string | undefined {
+  const reason: unknown = (body as { reason?: unknown } | null)?.reason;
+  if (typeof reason !== 'string') return undefined;
+  const text = reason.trim();
+  return text ? text.slice(0, MAX_REASON_LENGTH) : undefined;
 }
 
 /** The review phase needs a view with something to ask. */

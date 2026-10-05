@@ -18,6 +18,7 @@ import {
 } from '@angular/core';
 
 import {
+  NODE_CODE,
   approvalWords,
   type ApprovalStanding,
   type ConsentViewResponse,
@@ -89,6 +90,25 @@ const EMPTY_REQUEST: ConsentViewResponse = {
             (expired)="expired.emit()"
           ></elohim-imagodei-device-consent-card>
 
+          @if (reauthentication()) {
+            <div class="portal-reauth" data-testid="device-consent-reauth">
+              @if (refusalReason(); as reason) {
+                <p class="portal-reauth__label">The reason given:</p>
+                <p class="portal-reauth__reason" data-testid="device-consent-reauth-reason">
+                  {{ reason }}
+                </p>
+              }
+              <button
+                type="button"
+                class="btn-primary"
+                data-testid="device-consent-sign-in-again"
+                (click)="signInAgain.emit()"
+              >
+                Sign in again
+              </button>
+            </div>
+          }
+
           @if (standingLine(); as line) {
             <p class="portal-standing" data-testid="device-consent-standing">{{ line }}</p>
           }
@@ -127,6 +147,8 @@ export class DeviceConsentViewComponent {
   readonly code = input<string | undefined>(undefined);
   readonly expiresAt = input<number | undefined>(undefined);
   readonly refusalCode = input<string | undefined>(undefined);
+  /** The node's own plain reason, when it gave one (asked to sign in again). */
+  readonly refusalReason = input<string | undefined>(undefined);
   /** Who secured the approval; live while signing, settled under a code. */
   readonly trail = input<WitnessStep[] | null>(null);
   /** What the approval rests on, as the node counted it. */
@@ -136,6 +158,8 @@ export class DeviceConsentViewComponent {
 
   readonly approved = output<DeviceConsentApproval>();
   readonly declined = output<void>();
+  /** The person chose to sign in again, as a witness attending them asked. */
+  readonly signInAgain = output<void>();
   readonly expired = output<void>();
 
   readonly cardStrings = DOORWAY_WORDS.card;
@@ -143,6 +167,11 @@ export class DeviceConsentViewComponent {
   readonly trailStrings = DOORWAY_WORDS.trail;
 
   readonly cardRequest = computed(() => this.request() ?? EMPTY_REQUEST);
+
+  /** A witness attending the person asked them to sign in again. Not a fault. */
+  readonly reauthentication = computed(
+    () => this.phase() === 'refused' && this.refusalCode() === NODE_CODE.reauthenticationAsked
+  );
 
   /** Shown once the approval is done (a code, or handed back), from the node's own count. */
   readonly standingLine = computed(() => {

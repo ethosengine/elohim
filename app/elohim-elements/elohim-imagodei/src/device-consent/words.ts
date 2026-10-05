@@ -12,6 +12,7 @@
 import { REFUSAL, type ApprovalStanding } from './logic.js';
 
 import type { DeviceConsentStringOverrides } from '../elohim-imagodei-device-consent-card.js';
+import type { WitnessTrailStringOverrides } from '../elohim-imagodei-witness-trail.js';
 
 /** How the person knows the node that holds their key. */
 export interface KeyHolderWords {
@@ -27,13 +28,19 @@ export interface KeyHolderWords {
   callerNotLocal?: string;
   /** Heading for the same refusal; defaults to "Approve on the machine that holds your key". */
   callerNotLocalHeading?: string;
+  /** What to say when a witness attending the person asks them to sign in again. */
+  reauthentication?: string;
+  /** Heading for the same; defaults to "Sign in again to go ahead". */
+  reauthenticationHeading?: string;
 }
 
-/** The trail's own "rests on … alone" lines, which the standing line replaces on this page. */
-export interface ApprovalTrailStrings {
-  doorwayAlone: string;
-  thisDeviceAlone: string;
-}
+/**
+ * The trail's strings on this page: its own "rests on … alone" lines are
+ * turned off (the standing line says it), and a witness the node reports
+ * without a name is said to attend the person — never "someone who knows
+ * you", which would imply a person is watching.
+ */
+export type ApprovalTrailStrings = WitnessTrailStringOverrides;
 
 export interface ApprovalWords {
   /** For `<elohim-imagodei-device-consent-card>`'s `strings`. */
@@ -48,6 +55,13 @@ export interface ApprovalWords {
 const CALLER_NOT_LOCAL =
   'This page is open on a different machine from the one that holds your key, so nothing was signed. Approving happens on that machine.';
 const CALLER_NOT_LOCAL_HEADING = 'Approve on the machine that holds your key';
+
+/** Not a fault: a step the person takes, after which they approve again themselves. */
+const REAUTHENTICATION =
+  'You’re being asked to sign in again before this approval goes ahead. Nothing was signed, and no code was issued.';
+const REAUTHENTICATION_HEADING = 'Sign in again to go ahead';
+
+const WITNESSED = 'A witness attending you signed it too';
 
 /** "Your doorway (alpha.elohim.host)" when the card has a host name, else "Your doorway". */
 const named = (name: string, host?: string): string => (host ? `${name} (${host})` : name);
@@ -69,6 +83,7 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
         consent_identity_unbootstrapped: `${name} hasn’t recorded who you are yet, so it can’t approve anything for you. Nothing is wrong with this request.`,
         consent_signing_unavailable: `${name} can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.`,
         consent_caller_not_local: holder.callerNotLocal ?? CALLER_NOT_LOCAL,
+        consent_reauthentication_asked: holder.reauthentication ?? REAUTHENTICATION,
         [REFUSAL.requestUnreadable]:
           'This link doesn’t carry a request that can be read. Start again from the terminal on your device.',
         [REFUSAL.returnPathRefused]: `${name} answered with somewhere other than this machine’s terminal to send the code, so it was not sent anywhere.`,
@@ -78,11 +93,27 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
       refusalHeading: {
         [REFUSAL.approvalInterrupted]: 'Not sent a second time',
         consent_caller_not_local: holder.callerNotLocalHeading ?? CALLER_NOT_LOCAL_HEADING,
+        consent_reauthentication_asked: holder.reauthenticationHeading ?? REAUTHENTICATION_HEADING,
       },
     },
     // The standing line says what the approval rests on, from the node's own
     // count; the trail's guess from its steps would only repeat or contradict it.
-    trail: { doorwayAlone: '', thisDeviceAlone: '' },
+    trail: {
+      doorwayAlone: '',
+      thisDeviceAlone: '',
+      sentences: {
+        'vouches-for-you': {
+          signed: ({ name }) => (name ? `${name} signed it as a witness` : WITNESSED),
+        },
+      },
+      workingSentences: {
+        'vouches-for-you': {
+          signed: ({ name }) =>
+            name ? `${name} is signing it as a witness…` : 'A witness attending you is signing it…',
+        },
+      },
+      party: { 'vouches-for-you': ({ name }) => name ?? 'a witness attending you' },
+    },
     // eslint-disable-next-line sonarjs/function-return-type -- a sentence or none: none when the node gave no count
     standing: standing => {
       switch (standing?.kind) {

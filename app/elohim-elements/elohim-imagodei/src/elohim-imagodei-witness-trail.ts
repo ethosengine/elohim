@@ -236,6 +236,32 @@ export const WITNESS_TRAIL_STRINGS_EN: WitnessTrailStrings = {
   announce: (lines, allDone) => `${lines.join('. ')}.${allDone ? ' All done.' : ''}`,
 };
 
+/**
+ * What a host may pass as `strings`: any sentence, and sentences for one
+ * relation or one act without restating the rest — the per-relation tables
+ * merge with the defaults instead of replacing them.
+ */
+export type WitnessTrailStringOverrides = Partial<
+  Omit<WitnessTrailStrings, 'sentences' | 'workingSentences' | 'party'>
+> & {
+  sentences?: Partial<Record<WitnessRelation, Partial<Record<WitnessAct, WitnessSentence>>>>;
+  workingSentences?: Partial<Record<WitnessRelation, Partial<Record<WitnessAct, WitnessSentence>>>>;
+  party?: Partial<Record<WitnessRelation, WitnessSentence>>;
+};
+
+/** One sentence table: the defaults, with the host's sentences laid over per relation and act. */
+const mergeTable = (
+  base: WitnessSentenceTable,
+  over: WitnessTrailStringOverrides['sentences']
+): WitnessSentenceTable => {
+  if (!over) return base;
+  const out = { ...base };
+  for (const relation of Object.keys(over) as WitnessRelation[]) {
+    out[relation] = { ...base[relation], ...over[relation] };
+  }
+  return out;
+};
+
 const KNOWN_ACTS = new Set<string>(['checked', 'signed', 'recorded', 'seen']);
 const KNOWN_RELATIONS = new Set<string>([
   'you',
@@ -311,7 +337,7 @@ const inRotation = (s: WitnessStep): boolean => s.state === 'working' || s.state
  * @prop {number} rotateMs - Rotation interval in ms (default 1800, minimum 1200)
  * @prop {string} heading - Replace the heading (live mode)
  * @prop {boolean} open - Settled mode: the disclosure is open
- * @prop {Partial<WitnessTrailStrings>} strings - Replace any visible sentence (property only)
+ * @prop {WitnessTrailStringOverrides} strings - Replace any visible sentence; sentence tables merge per relation and act (property only)
  *
  * @fires {CustomEvent<{stepIds: string[]}>} settled - Every given step is done (live mode); fired once per completed set, in the same update
  *
@@ -667,7 +693,7 @@ export class ElohimImagodeiWitnessTrail extends CapabilityAwareElement(LitElemen
   @property({ type: Boolean, reflect: true }) open = false;
 
   /** Replace any visible sentence; unspecified keys use the English defaults. */
-  @property({ attribute: false }) strings: Partial<WitnessTrailStrings> = {};
+  @property({ attribute: false }) strings: WitnessTrailStringOverrides = {};
 
   @state() private _revealed = false;
   @state() private _announcement = '';
@@ -689,7 +715,15 @@ export class ElohimImagodeiWitnessTrail extends CapabilityAwareElement(LitElemen
   private _motionQueries: MediaQueryList[] = [];
 
   private get _s(): WitnessTrailStrings {
-    return { ...WITNESS_TRAIL_STRINGS_EN, ...this.strings };
+    const { sentences, workingSentences, party, ...rest } = this.strings;
+    const en = WITNESS_TRAIL_STRINGS_EN;
+    return {
+      ...en,
+      ...rest,
+      sentences: mergeTable(en.sentences, sentences),
+      workingSentences: mergeTable(en.workingSentences, workingSentences),
+      party: { ...en.party, ...party },
+    };
   }
 
   /**

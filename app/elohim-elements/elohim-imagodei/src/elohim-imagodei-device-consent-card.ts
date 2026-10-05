@@ -45,7 +45,8 @@ export type KnownDeviceRefusalCode =
   | 'consent_not_signed_in'
   | 'consent_identity_unbootstrapped'
   | 'consent_signing_unavailable'
-  | 'consent_caller_not_local';
+  | 'consent_caller_not_local'
+  | 'consent_reauthentication_asked';
 
 /**
  * Every visible sentence the card speaks. Hosts may replace any subset through
@@ -164,6 +165,7 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     consent_identity_unbootstrapped: 'Not ready to approve yet',
     consent_signing_unavailable: 'Waiting on the signer',
     consent_caller_not_local: 'Approve on the machine that holds your key',
+    consent_reauthentication_asked: 'Sign in again to go ahead',
   },
   refusal: {
     request_acts_incoherent:
@@ -181,6 +183,8 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
       'The node that holds your key can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.',
     consent_caller_not_local:
       'This page is open on a different machine from the one that holds your key, so nothing was signed. Approving happens on that machine.',
+    consent_reauthentication_asked:
+      'You’re being asked to sign in again before this approval goes ahead. Nothing was signed, and no code was issued.',
   },
   refusedUnknown: 'Something stopped this request. Start again from the terminal on your device.',
   refusalCodeLabel: 'Reference',
@@ -197,6 +201,12 @@ const KNOWN_ACTS = new Set<string>(ACT_ORDER);
  * name and the sentence run in different directions.
  */
 const isolate = (value: string): string => `⁨${value}⁩`;
+
+/**
+ * Codes that are not a refusal at all — a step the person takes before the
+ * approval goes ahead. They carry no reference code, which reads as a fault.
+ */
+const NOT_A_REFUSAL = new Set<string>(['consent_reauthentication_asked']);
 const isolateOpt = (value?: string): string | undefined => (value ? isolate(value) : undefined);
 
 /** Seconds-remaining thresholds below one minute at which the live region speaks. */
@@ -972,7 +982,7 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
     return html`
       ${this._heading(heading)}
       <p part="message">${sentence}</p>
-      ${code
+      ${code && !NOT_A_REFUSAL.has(code)
         ? html`
             <p part="refusal-code">
               ${s.refusalCodeLabel}:

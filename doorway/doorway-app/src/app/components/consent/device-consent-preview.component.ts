@@ -96,6 +96,7 @@ const SAMPLE_WITNESSES: WitnessStep[] = [
           [code]="phase() === 'code' ? 'K7QF-2MXD-9PLA' : undefined"
           [expiresAt]="expiresAt"
           [refusalCode]="refusalCode()"
+          [refusalReason]="refusalReason()"
           [trail]="trail()"
           [standing]="standing()"
           [trailRevealAfterMs]="revealAfterMs()"
@@ -119,6 +120,14 @@ export class DeviceConsentPreviewComponent {
   readonly request = computed(() => (this.params()?.get('acts') === '1' ? ONE_ACT : TWO_ACTS));
 
   readonly refusalCode = computed(() => this.params()?.get('code') ?? 'consent_unavailable');
+
+  /** For `code=consent_reauthentication_asked`: the node's reason (`reason=`), or a sample. */
+  readonly refusalReason = computed(() =>
+    this.refusalCode() === 'consent_reauthentication_asked'
+      ? (this.params()?.get('reason') ??
+        'You signed in on this device more than a day ago, and this approval lets a new device act for you.')
+      : undefined
+  );
 
   readonly revealAfterMs = computed(() => (this.params()?.get('reveal') === 'now' ? 0 : 400));
 

@@ -4,6 +4,7 @@ import { expect } from '@open-wc/testing';
 
 import {
   KEY_HOLDER_SIGN_STEP,
+  MAX_REASON_LENGTH,
   MAX_REQUEST_BYTES,
   NODE_CODE,
   REFUSAL,
@@ -14,6 +15,7 @@ import {
   keyHolderStep,
   nothingWasSigned,
   outcomeForAgreement,
+  reasonOf,
   standingFor,
   trailAfterAgreement,
 } from './logic.js';
@@ -173,6 +175,21 @@ describe('failureFor — what a failed call means for the page', () => {
       expect(nothingWasSigned(code)).to.equal(true);
     }
     expect(nothingWasSigned('act_unknown')).to.equal(false);
+  });
+
+  it('reads a 401 asking to sign in again as its own step, not a sign-in redirect', () => {
+    expect(
+      failureFor(failed(401, { error: 'x', code: NODE_CODE.reauthenticationAsked, reason: 'r' }))
+    ).to.deep.equal({ kind: 'refused', code: NODE_CODE.reauthenticationAsked });
+    expect(nothingWasSigned(NODE_CODE.reauthenticationAsked)).to.equal(true);
+  });
+
+  it('shows the node’s reason as given, trimmed, at most 280 characters', () => {
+    expect(reasonOf({ reason: '  plain words  ' })).to.equal('plain words');
+    expect(reasonOf({ reason: 'x'.repeat(400) })).to.have.length(MAX_REASON_LENGTH);
+    expect(reasonOf({ reason: '   ' })).to.equal(undefined);
+    expect(reasonOf({ reason: 7 })).to.equal(undefined);
+    expect(reasonOf(null)).to.equal(undefined);
   });
 
   it('keeps a waiting signer a wait even when it comes as a server error', () => {
@@ -377,6 +394,24 @@ describe('approvalWords — the host names the key holder', () => {
   });
 
   it('turns off the trail’s own guess at what it rests on', () => {
-    expect(device.trail).to.deep.equal({ doorwayAlone: '', thisDeviceAlone: '' });
+    expect(device.trail).to.include({ doorwayAlone: '', thisDeviceAlone: '' });
+  });
+
+  it('says an unnamed witness attends the person, never that someone who knows them does', () => {
+    const signed = device.trail.sentences?.['vouches-for-you']?.signed;
+    expect(signed?.({})).to.equal('A witness attending you signed it too');
+    expect(device.trail.party?.['vouches-for-you']?.({})).to.equal('a witness attending you');
+    expect(signed?.({ name: 'Elohim' })).to.equal('Elohim signed it as a witness');
+  });
+
+  it('asks to sign in again in words a host may replace', () => {
+    expect(device.card.refusal?.['consent_reauthentication_asked']).to.include(
+      'Nothing was signed, and no code was issued.'
+    );
+    expect(device.card.refusalHeading?.['consent_reauthentication_asked']).to.equal(
+      'Sign in again to go ahead'
+    );
+    const own = approvalWords({ name: 'X', inSentence: 'x', reauthentication: 'Ours.' });
+    expect(own.card.refusal?.['consent_reauthentication_asked']).to.equal('Ours.');
   });
 });

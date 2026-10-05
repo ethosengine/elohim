@@ -84,6 +84,7 @@ export type {
   WitnessTrailLayout,
   WitnessTrailMode,
   WitnessTrailSettledDetail,
+  WitnessTrailStringOverrides,
   WitnessTrailStrings,
   WitnessWho,
 } from './elohim-imagodei-witness-trail.js';

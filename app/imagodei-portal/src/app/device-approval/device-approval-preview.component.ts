@@ -13,6 +13,9 @@
  *   (`beginning=1` for its wait, `refusal=<code>` for a refused begin)
  * - `devices=<n>&required=<n>` (with `phase=review`) — what the identity
  *   rests on, said while the person decides
+ * - `code=consent_reauthentication_asked` — a witness asks the person to sign
+ *   in again (`reason=<text>` for the node's reason; a sample by default)
+ * - `identifier=<word>` — the sign-in word the node gives with the standing
  * - `code=consent_caller_not_local` — the page open on another machine,
  *   with the terminal command for the same link
  *
@@ -61,6 +64,10 @@ const TWO_ACTS: ConsentViewResponse = {
 };
 
 const HOLDER: KeyHolderStep = { relation: 'this-device' };
+
+/** A reason of the kind an attending witness gives (plain text, at most 280 characters). */
+const SAMPLE_REASON =
+  'You signed in on this device more than a day ago, and this approval lets a new device act for you.';
 
 /** Sample `witnesses`: this device signed, and peers recorded it. */
 const SAMPLE_WITNESSES: WitnessStep[] = [
@@ -119,6 +126,7 @@ export class DeviceApprovalPreviewComponent {
         required: Math.max(1, Number(p.get('required') ?? 1)),
         thisNodeIsController: true,
         restsOnThisNodeAlone: devices === 1,
+        ...(p.get('identifier') ? { identifier: p.get('identifier')! } : {}),
       },
     };
   }
@@ -146,8 +154,17 @@ export class DeviceApprovalPreviewComponent {
         };
       case 'handed-back':
         return { ...base, trail: trailAfterAgreement(HOLDER, witnesses), standing };
-      case 'refused':
-        return { ...base, refusalCode: this.params.get('code') ?? 'consent_unavailable' };
+      case 'refused': {
+        const code = this.params.get('code') ?? 'consent_unavailable';
+        return {
+          ...base,
+          refusalCode: code,
+          refusalReason:
+            code === 'consent_reauthentication_asked'
+              ? (this.params.get('reason') ?? SAMPLE_REASON)
+              : undefined,
+        };
+      }
       default:
         return base;
     }

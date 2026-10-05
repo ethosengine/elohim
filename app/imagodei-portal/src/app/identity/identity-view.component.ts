@@ -207,7 +207,7 @@ export class IdentityViewComponent {
   readonly nameMalformed = IDENTITY_CODE.nameMalformed;
 
   get standing(): string | undefined {
-    return standingLine(this.state.standing, HERE);
+    return standingLine(this.state.standing, HERE, this.state.displayName);
   }
 
   /** The begin was refused because this page is on another machine. */

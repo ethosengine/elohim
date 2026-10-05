@@ -511,4 +511,46 @@ describe('DeviceConsentComponent', () => {
       expect(card(fixture).refusalCode).toBeUndefined();
     });
   });
+
+  describe('asked to sign in again', () => {
+    const REASON = 'You signed in on this device more than a day ago.';
+
+    it('says so with the node’s reason, offers sign-in, and sends nothing by itself', async () => {
+      consent.agree.mockResolvedValue({
+        ok: false,
+        status: 401,
+        body: { error: 'again', code: 'consent_reauthentication_asked', reason: REASON },
+      });
+      const fixture = create();
+      await ready(fixture);
+      approve(fixture, ['device.enroll']);
+      await ready(fixture);
+
+      expect(card(fixture).refusalCode).toBe('consent_reauthentication_asked');
+      const root = fixture.nativeElement as HTMLElement;
+      expect(
+        root.querySelector('[data-testid="device-consent-reauth-reason"]')?.textContent?.trim()
+      ).toBe(REASON);
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+
+      (
+        root.querySelector('[data-testid="device-consent-sign-in-again"]') as HTMLButtonElement
+      ).click();
+      expect(router.createUrlTree).toHaveBeenCalledWith(['/login'], {
+        queryParams: { returnUrl: PAGE_URL },
+      });
+      expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+      expect(consent.agree).toHaveBeenCalledTimes(1);
+    });
+
+    it('adds nothing to a page where nobody asked', async () => {
+      const fixture = create();
+      await ready(fixture);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="device-consent-reauth"]'
+        )
+      ).toBeNull();
+    });
+  });
 });

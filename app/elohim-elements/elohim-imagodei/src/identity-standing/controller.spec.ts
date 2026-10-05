@@ -5,7 +5,7 @@ import { beginCommand, shellQuote } from '../terminal.js';
 
 import { BEGIN_UNAVAILABLE, IdentityStandingController } from './controller.js';
 import { IDENTITY_CODE, identityFailureFor, isStandingView } from './logic.js';
-import { standingLine } from './words.js';
+import { personName, standingLine } from './words.js';
 import {
   IDENTITY_BEGIN_PATH,
   IDENTITY_STANDING_PATH,
@@ -227,6 +227,27 @@ describe('standingLine — a fact, never a warning', () => {
   it('several devices and a quorum the person set up', () => {
     expect(standingLine({ ...SEVERAL, required: 2 }, words)).to.equal(
       '3 of your own devices speak for you, this device among them. A new device is approved for you once 2 of them agree.'
+    );
+  });
+
+  it('leads with the sign-in word, and the name asked for beside it', () => {
+    const named = { ...ALONE, identifier: 'matthew' };
+    expect(standingLine(named, words)).to.equal(
+      'Your identity, \u2068matthew\u2069, rests on this device alone.'
+    );
+    expect(standingLine(named, words, 'Matthew')).to.equal(
+      'Your identity, \u2068matthew (Matthew)\u2069, rests on this device alone.'
+    );
+    expect(standingLine({ ...SEVERAL, identifier: 'matthew' }, words)).to.equal(
+      '3 of your own devices speak for you as \u2068matthew\u2069, this device among them. Any one of them can approve a new device for you.'
+    );
+    expect(personName(named, 'matthew')).to.equal('\u2068matthew\u2069');
+  });
+
+  it('never names the person without a sign-in word, whatever else the view carries', () => {
+    expect(personName(ALONE, 'Matthew')).to.equal(undefined);
+    expect(standingLine({ ...ALONE, identifier: '  ' }, words)).to.equal(
+      'Your identity rests on this device alone.'
     );
   });
 

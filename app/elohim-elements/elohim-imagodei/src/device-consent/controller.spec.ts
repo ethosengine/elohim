@@ -258,6 +258,43 @@ describe('DeviceConsentController — the approval page both portals mount', () 
       });
     }
 
+    it('when a witness asks the person to sign in again: says why, sends them only when they choose', async () => {
+      agreeResult = async () => ({
+        ok: false,
+        status: 401,
+        body: {
+          error: 'sign in again',
+          code: NODE_CODE.reauthenticationAsked,
+          reason: '  It has been a while since you signed in on this device.  ',
+        },
+      });
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      expect(controller.state.phase).to.equal('refused');
+      expect(controller.state.refusalCode).to.equal('consent_reauthentication_asked');
+      expect(controller.state.refusalReason).to.equal(
+        'It has been a while since you signed in on this device.'
+      );
+      expect(controller.state.trail).to.equal(null);
+      expect(calls.signIn).to.equal(0);
+      expect(memory.store.size).to.equal(0);
+
+      controller.signInAgain();
+      expect(calls.signIn).to.equal(1);
+
+      // Back from signing in: the same link asks again; nothing was resent.
+      const again = page();
+      await again.controller.start();
+      expect(again.controller.state.phase).to.equal('review');
+      expect(calls.agree).to.have.length(1);
+    });
+
+    it('offers signing in again only after a witness asked for it', async () => {
+      const { controller } = await reviewing();
+      controller.signInAgain();
+      expect(calls.signIn).to.equal(0);
+    });
+
     it('on consent_caller_not_local: says so, shows no witness, keeps nothing', async () => {
       agreeResult = async () => refused(403, NODE_CODE.callerNotLocal);
       const { controller } = await reviewing();

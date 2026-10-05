@@ -1140,3 +1140,30 @@ describe('<elohim-imagodei-witness-trail> — i18n precondition gate', () => {
     });
   }
 });
+
+describe('<elohim-imagodei-witness-trail> — host sentences merge per relation', () => {
+  const WITNESS_FIRST: WitnessStep[] = [
+    { id: 'w', act: 'signed', relation: 'vouches-for-you', state: 'done' },
+    { id: 'd', act: 'signed', relation: 'this-device', state: 'done' },
+  ];
+
+  it('rewords one relation’s act and keeps every other default', async () => {
+    const el = await trail(WITNESS_FIRST);
+    el.strings = {
+      sentences: { 'vouches-for-you': { signed: () => 'A witness attending you signed it too' } },
+    };
+    await el.updateComplete;
+    expect(sentences(el)).to.deep.equal([
+      'This device signed it',
+      'A witness attending you signed it too',
+    ]);
+  });
+
+  it('reads with this device first when a witness signed before it', async () => {
+    const el = await trail(WITNESS_FIRST);
+    expect(qa(el, '[part="step"]').map(s => s.getAttribute('data-relation'))).to.deep.equal([
+      'this-device',
+      'vouches-for-you',
+    ]);
+  });
+});
