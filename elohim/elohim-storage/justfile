@@ -146,5 +146,12 @@ migration-hygiene:
     fi
     echo "✓ no duplicate migration timestamp prefixes"
 
-# Quality gate: migration-hygiene + fmt-check + clippy + test
-gate: migration-hygiene fmt-check clippy test
+# Every include_str!/include_bytes! target outside src/ must be COPY'd into the
+# Dockerfile stage that compiles it (release code → builder, test code → check).
+# The local tree always has the file, so cargo cannot see the omission; the image
+# build then fails an hour into the pipeline (edge #1137, edge #1541).
+image-includes:
+    python3 {{justfile_directory()}}/../../scripts/ci/check-image-include-targets.py --crate {{justfile_directory()}}
+
+# Quality gate: migration-hygiene + image-includes + fmt-check + clippy + test
+gate: migration-hygiene image-includes fmt-check clippy test
