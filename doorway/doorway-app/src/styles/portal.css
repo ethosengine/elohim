@@ -341,6 +341,11 @@
   border-top: 1px solid var(--el-border);
 }
 
+/* After the line saying what the approval rests on, the trail follows it closely. */
+.portal-page .portal-standing + .portal-trail {
+  margin-top: var(--el-space-sm);
+}
+
 .portal-page .portal-trail::part(heading),
 .portal-page .portal-trail::part(summary) {
   color: var(--el-text-strong);

@@ -1,9 +1,13 @@
 import { Routes } from '@angular/router';
 
-// Both routes render AppComponent — the URL params and path drive which
-// portal mode (login vs consent) is displayed inside the portal-shell.
-// AppComponent.ngOnInit() inspects window.location.search to distinguish flows.
+// Every route renders AppComponent — the URL params and path drive which
+// portal mode (login, consent, device approval) is displayed inside the
+// portal-shell. AppComponent.ngOnInit() inspects window.location to
+// distinguish flows. `consent/device/preview` is a development-only page;
+// in an optimized build AppComponent ignores it (see devicePageFor).
 export const routes: Routes = [
   { path: '', children: [] },
   { path: 'consent', children: [] },
+  { path: 'consent/device', children: [] },
+  { path: 'consent/device/preview', children: [] },
 ];

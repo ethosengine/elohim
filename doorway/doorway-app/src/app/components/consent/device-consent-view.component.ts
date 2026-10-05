@@ -17,26 +17,23 @@ import {
   output,
 } from '@angular/core';
 
-import type { WitnessStep } from '../../models/witness-step';
-import type { ConsentViewResponse, DeviceAct } from '../../services/device-consent.service';
+import {
+  approvalWords,
+  type ApprovalStanding,
+  type ConsentViewResponse,
+  type DeviceConsentApproval,
+  type DeviceConsentPagePhase,
+} from 'elohim-imagodei/device-consent';
+import type { WitnessStep } from 'elohim-imagodei/witness-step';
 
 /** The card's phases (the element's `phase` property). */
-export type DeviceConsentPhase =
-  | 'review'
-  | 'signing'
-  | 'code'
-  | 'handed-back'
-  | 'declined'
-  | 'refused';
+export type DeviceConsentPhase = Exclude<DeviceConsentPagePhase, 'loading'>;
 
-/** Before the card can show anything, the page is checking the request. */
-export type DeviceConsentPagePhase = 'loading' | DeviceConsentPhase;
-
-/** `approve` event detail from the element. */
-export interface DeviceConsentApproval {
-  agreedActs: DeviceAct[];
-  declinedActs: DeviceAct[];
-}
+/**
+ * How this host names the node that holds a hosted person's key: their
+ * doorway, which holds it and signs as them.
+ */
+const DOORWAY_WORDS = approvalWords({ name: 'Your doorway', inSentence: 'your doorway' });
 
 const EMPTY_REQUEST: ConsentViewResponse = {
   clientId: '',
@@ -78,10 +75,15 @@ const EMPTY_REQUEST: ConsentViewResponse = {
             [code]="code()"
             [expiresAt]="expiresAt()"
             [refusalCode]="refusalCode()"
+            [strings]="cardStrings"
             (approve)="onApprove($event)"
             (decline)="declined.emit()"
             (expired)="expired.emit()"
           ></elohim-imagodei-device-consent-card>
+
+          @if (standingLine(); as line) {
+            <p class="portal-standing" data-testid="device-consent-standing">{{ line }}</p>
+          }
 
           @if (trail(); as steps) {
             @if (phase() === 'signing' || phase() === 'refused') {
@@ -119,6 +121,8 @@ export class DeviceConsentViewComponent {
   readonly refusalCode = input<string | undefined>(undefined);
   /** Who secured the approval; live while signing, settled under a code. */
   readonly trail = input<WitnessStep[] | null>(null);
+  /** What the approval rests on, as the node counted it. */
+  readonly standing = input<ApprovalStanding | null>(null);
   /** How long the live trail waits before showing (the dev preview pins it to 0). */
   readonly trailRevealAfterMs = input(400);
 
@@ -126,10 +130,19 @@ export class DeviceConsentViewComponent {
   readonly declined = output<void>();
   readonly expired = output<void>();
 
-  /** The element's default closing line says "sign-in"; this is an approval. */
-  readonly trailStrings = { doorwayAlone: 'This approval rests on your doorway alone.' };
+  readonly cardStrings = DOORWAY_WORDS.card;
+  /** The standing line below says what the approval rests on; the trail need not guess. */
+  readonly trailStrings = DOORWAY_WORDS.trail;
 
   readonly cardRequest = computed(() => this.request() ?? EMPTY_REQUEST);
+
+  /** Shown once the approval is done (a code, or handed back), from the node's own count. */
+  readonly standingLine = computed(() => {
+    const phase = this.phase();
+    return phase === 'code' || phase === 'handed-back'
+      ? DOORWAY_WORDS.standing(this.standing())
+      : undefined;
+  });
 
   onApprove(event: Event): void {
     const detail = (event as CustomEvent<Partial<DeviceConsentApproval>>).detail;

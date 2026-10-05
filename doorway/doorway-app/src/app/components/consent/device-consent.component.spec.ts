@@ -1,14 +1,14 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import type {
+  ConsentAgreeResponse,
+  ConsentViewResponse,
+  ConsentWireResult,
+} from 'elohim-imagodei/device-consent';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthStateService } from '../../services/auth-state.service';
-import {
-  DeviceConsentService,
-  type ConsentAgreeResponse,
-  type ConsentViewResponse,
-} from '../../services/device-consent.service';
+import { DEVICE_CONSENT_PORT } from '../../services/device-consent-port';
 
 import { DeviceConsentComponent } from './device-consent.component';
 
@@ -31,7 +31,24 @@ const VIEW: ConsentViewResponse = {
   askedActs: ['device.enroll', 'device.bind-root'],
 };
 
-/** Sign-in-first, the phases, and the hand-back rule of the device approval page. */
+const ok = <T>(body: T): ConsentWireResult<T> => ({ ok: true, body });
+const refusal = (status: number, code?: string): ConsentWireResult<never> => ({
+  ok: false,
+  status,
+  body: code ? { error: 'no', code } : null,
+});
+
+/** The node's answer to an approval, with its count and witnesses. */
+const agreed = (partial: Partial<ConsentAgreeResponse>): ConsentAgreeResponse => ({
+  returnTarget: { kind: 'display', value: 'K7QF' },
+  expiresAt: Date.now() + 60_000,
+  consentCid: 'bafyreiconsent',
+  controllers: { required: 1, signed: 1 },
+  witnesses: [],
+  ...partial,
+});
+
+/** The doorway's mount of the shared approval page: sign-in first, words, selectors. */
 describe('DeviceConsentComponent', () => {
   let signedIn: boolean;
   let consent: {
@@ -66,7 +83,13 @@ describe('DeviceConsentComponent', () => {
             account: () => (signedIn ? { identifier: 'matthew' } : null),
           },
         },
-        { provide: DeviceConsentService, useValue: consent },
+        {
+          provide: DEVICE_CONSENT_PORT,
+          useValue: {
+            client: { view: consent.view, agree: consent.agree },
+            handBack: consent.handBack,
+          },
+        },
       ],
     });
     const fixture = TestBed.createComponent(DeviceConsentComponent);
@@ -103,7 +126,7 @@ describe('DeviceConsentComponent', () => {
     sessionStorage.clear();
     signedIn = true;
     consent = {
-      view: vi.fn().mockResolvedValue(VIEW),
+      view: vi.fn().mockResolvedValue(ok(VIEW)),
       agree: vi.fn(),
       handBack: vi.fn(),
     };
@@ -145,13 +168,14 @@ describe('DeviceConsentComponent', () => {
       expect(el.getAttribute('signer')).toBe('doorway-host');
     });
 
-    it('goes back to sign-in when the session has run out', async () => {
-      consent.view.mockRejectedValue(new HttpErrorResponse({ status: 401 }));
+    it('goes back to sign-in when the session has run out, saying so', async () => {
+      consent.view.mockResolvedValue(refusal(401));
       const fixture = create();
       await ready(fixture);
 
       expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
-      expect(card(fixture)).toBeNull();
+      expect(card(fixture).phase).toBe('refused');
+      expect(card(fixture).refusalCode).toBe('consent_not_signed_in');
     });
   });
 
@@ -160,7 +184,7 @@ describe('DeviceConsentComponent', () => {
       ['absent', null],
       ['not base64url', '!!!'],
       ['not JSON', 'bm90IGpzb24'],
-    ])('refuses an %s request without calling the doorway', async (_label, param) => {
+    ])('refuses an %s request without calling anything', async (_label, param) => {
       const fixture = create(param);
       await ready(fixture);
 
@@ -170,12 +194,7 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('shows the runtime’s refusal code', async () => {
-      consent.view.mockRejectedValue(
-        new HttpErrorResponse({
-          status: 400,
-          error: { error: 'cannot be shown', code: 'request_acts_incoherent' },
-        })
-      );
+      consent.view.mockResolvedValue(refusal(400, 'request_acts_incoherent'));
       const fixture = create();
       await ready(fixture);
 
@@ -184,7 +203,7 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('says approvals are unavailable when this doorway lacks the endpoint', async () => {
-      consent.view.mockRejectedValue(new HttpErrorResponse({ status: 404 }));
+      consent.view.mockResolvedValue(refusal(404));
       const fixture = create();
       await ready(fixture);
 
@@ -194,16 +213,19 @@ describe('DeviceConsentComponent', () => {
 
   describe('approving', () => {
     it('signs only what was agreed and shows the code to paste', async () => {
-      const answer: ConsentAgreeResponse = {
-        returnTarget: { kind: 'display', value: 'K7QF-2MXD' },
-        expiresAt: 1_791_000_300_000,
-      };
-      consent.agree.mockResolvedValue(answer);
+      consent.agree.mockResolvedValue(
+        ok(
+          agreed({
+            returnTarget: { kind: 'display', value: 'K7QF-2MXD' },
+            expiresAt: 1_791_000_300_000,
+          })
+        )
+      );
       const fixture = create();
       await ready(fixture);
 
       approve(fixture, ['device.enroll']);
-      expect(fixture.componentInstance.phase()).toBe('signing');
+      expect(fixture.componentInstance.state()?.phase).toBe('signing');
       await ready(fixture);
 
       expect(consent.agree).toHaveBeenCalledWith({
@@ -218,7 +240,7 @@ describe('DeviceConsentComponent', () => {
 
     it('hands the code to a terminal on this machine and says so', async () => {
       const url = 'http://127.0.0.1:53682/callback?code=c0de&state=s';
-      consent.agree.mockResolvedValue({ returnTarget: { kind: 'redirect', url }, expiresAt: 1 });
+      consent.agree.mockResolvedValue(ok(agreed({ returnTarget: { kind: 'redirect', url } })));
       const fixture = create();
       await ready(fixture);
 
@@ -230,10 +252,9 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('never follows a redirect to anywhere but this machine’s terminal', async () => {
-      consent.agree.mockResolvedValue({
-        returnTarget: { kind: 'redirect', url: 'https://evil.example/collect' },
-        expiresAt: 1,
-      });
+      consent.agree.mockResolvedValue(
+        ok(agreed({ returnTarget: { kind: 'redirect', url: 'https://evil.example/collect' } }))
+      );
       const fixture = create();
       await ready(fixture);
 
@@ -246,10 +267,7 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('sends one approval even if approve fires twice', async () => {
-      consent.agree.mockResolvedValue({
-        returnTarget: { kind: 'display', value: 'K7QF' },
-        expiresAt: 1,
-      });
+      consent.agree.mockResolvedValue(ok(agreed({})));
       const fixture = create();
       await ready(fixture);
 
@@ -276,10 +294,7 @@ describe('DeviceConsentComponent', () => {
 
   describe('leaving and coming back', () => {
     it('shows the same code again without asking or approving again', async () => {
-      consent.agree.mockResolvedValue({
-        returnTarget: { kind: 'display', value: 'K7QF' },
-        expiresAt: Date.now() + 60_000,
-      });
+      consent.agree.mockResolvedValue(ok(agreed({})));
       const first = create();
       await ready(first);
       approve(first, ['device.enroll']);
@@ -331,10 +346,10 @@ describe('DeviceConsentComponent', () => {
   describe('witness trail', () => {
     const WITNESSES = [
       {
-        id: 'device-sign',
+        id: 'doorway-sign',
         act: 'signed',
-        relation: 'your-device',
-        label: 'workspace',
+        relation: 'your-doorway',
+        label: 'alpha.elohim.host',
         state: 'done',
       },
       { id: 'peers', act: 'recorded', relation: 'others', count: 3, state: 'done' },
@@ -348,7 +363,7 @@ describe('DeviceConsentComponent', () => {
 
     function doorwayStep(fixture: ComponentFixture<DeviceConsentComponent>, state: string) {
       return {
-        id: 'doorway-sign',
+        id: 'key-holder-sign',
         act: 'signed',
         relation: 'your-doorway',
         label: fixture.componentInstance.hostLabel,
@@ -362,7 +377,7 @@ describe('DeviceConsentComponent', () => {
       expect(trail(fixture)).toBeNull();
     });
 
-    it('shows the doorway signing, live, while signing', async () => {
+    it('shows the doorway signing, live, while signing — a wait, and on what', async () => {
       consent.agree.mockReturnValue(new Promise(() => undefined));
       const fixture = create();
       await ready(fixture);
@@ -373,24 +388,20 @@ describe('DeviceConsentComponent', () => {
       expect(trail(fixture)?.getAttribute('mode')).toBeNull();
     });
 
-    it('passes reported witnesses through after the doorway step, settled under the code', async () => {
-      consent.agree.mockResolvedValue({
-        returnTarget: { kind: 'display', value: 'K7QF' },
-        expiresAt: Date.now() + 60_000,
-        witnesses: WITNESSES,
-      });
+    it('shows the witnesses the node reported instead of its own step, settled under the code', async () => {
+      consent.agree.mockResolvedValue(ok(agreed({ witnesses: WITNESSES as never })));
       const fixture = create();
       await ready(fixture);
       approve(fixture, ['device.enroll']);
       await ready(fixture);
 
-      expect(trail(fixture)?.steps).toEqual([doorwayStep(fixture, 'done'), ...WITNESSES]);
+      expect(trail(fixture)?.steps).toEqual(WITNESSES);
       expect(trail(fixture)?.getAttribute('mode')).toBe('settled');
     });
 
     it('settles under handed-back too, and hands back without waiting on it', async () => {
       const url = 'http://127.0.0.1:53682/cb';
-      consent.agree.mockResolvedValue({ returnTarget: { kind: 'redirect', url }, expiresAt: 1 });
+      consent.agree.mockResolvedValue(ok(agreed({ returnTarget: { kind: 'redirect', url } })));
       const fixture = create();
       await ready(fixture);
       approve(fixture, ['device.enroll']);
@@ -402,9 +413,7 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('marks the doorway step failed on a refusal', async () => {
-      consent.agree.mockRejectedValue(
-        new HttpErrorResponse({ status: 400, error: { error: 'no', code: 'act_unknown' } })
-      );
+      consent.agree.mockResolvedValue(refusal(400, 'act_unknown'));
       const fixture = create();
       await ready(fixture);
       approve(fixture, ['device.enroll']);
@@ -415,11 +424,7 @@ describe('DeviceConsentComponent', () => {
     });
 
     it('restores the settled trail from this tab without re-running anything', async () => {
-      consent.agree.mockResolvedValue({
-        returnTarget: { kind: 'display', value: 'K7QF' },
-        expiresAt: Date.now() + 60_000,
-        witnesses: WITNESSES,
-      });
+      consent.agree.mockResolvedValue(ok(agreed({ witnesses: WITNESSES as never })));
       const first = create();
       await ready(first);
       approve(first, ['device.enroll']);
@@ -432,8 +437,63 @@ describe('DeviceConsentComponent', () => {
 
       expect(consent.view).not.toHaveBeenCalled();
       expect(consent.agree).toHaveBeenCalledTimes(1);
-      expect(trail(again)?.steps).toEqual([doorwayStep(again, 'done'), ...WITNESSES]);
+      expect(trail(again)?.steps).toEqual(WITNESSES);
       expect(trail(again)?.getAttribute('mode')).toBe('settled');
+    });
+  });
+
+  describe('what the doorway says', () => {
+    function standing(fixture: ComponentFixture<DeviceConsentComponent>) {
+      return fixture.nativeElement.querySelector(
+        '[data-testid="device-consent-standing"]'
+      ) as HTMLElement | null;
+    }
+
+    it('gives the card the doorway’s words: it holds the key and signs as the person', async () => {
+      const fixture = create();
+      await ready(fixture);
+      const strings = (
+        card(fixture) as HTMLElement & {
+          strings?: { signerHosted?: (host?: string) => string };
+        }
+      ).strings;
+      expect(strings?.signerHosted?.('alpha.elohim.host')).toBe(
+        'Your doorway (alpha.elohim.host) holds your key, and will sign this as you when you approve.'
+      );
+    });
+
+    it('says plainly that one of one is a complete approval', async () => {
+      consent.agree.mockResolvedValue(ok(agreed({})));
+      const fixture = create();
+      await ready(fixture);
+      expect(standing(fixture)).toBeNull();
+      approve(fixture, ['device.enroll']);
+      await ready(fixture);
+
+      expect(standing(fixture)?.textContent).toContain(
+        'Your doorway signed as you, and that is enough: this approval is complete.'
+      );
+    });
+
+    it('names how many more of the person’s own devices must agree, only for their quorum', async () => {
+      consent.agree.mockResolvedValue(ok(agreed({ controllers: { required: 3, signed: 1 } })));
+      const fixture = create();
+      await ready(fixture);
+      approve(fixture, ['device.enroll']);
+      await ready(fixture);
+
+      expect(card(fixture).phase).toBe('code');
+      expect(standing(fixture)?.textContent).toContain('2 more of your own devices must agree');
+    });
+
+    it('declining shows no standing line and no code', async () => {
+      const fixture = create();
+      await ready(fixture);
+      card(fixture).dispatchEvent(new CustomEvent('decline'));
+      fixture.detectChanges();
+      expect(standing(fixture)).toBeNull();
+      expect(card(fixture).code).toBeUndefined();
+      expect(card(fixture).refusalCode).toBeUndefined();
     });
   });
 });

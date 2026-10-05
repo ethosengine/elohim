@@ -4,8 +4,8 @@
  *
  * `/threshold/consent/device/preview?…`
  * - device approval: `phase=review|signing|code|handed-back|declined|refused`,
- *   `acts=1|2`, `code=<refusal code>`, `witnesses=1` (sample witnesses after
- *   the doorway step)
+ *   `acts=1|2`, `code=<refusal code>`, `witnesses=1` (sample reported
+ *   witnesses), `required=<n>&signed=<n>` (the node's count; default 1 of 1)
  * - sign-in / create account in flight: `page=login|register`,
  *   `step=working|failed`
  * - `reveal=now` pins the witness trail's reveal delay to 0 so a render shows
@@ -26,8 +26,15 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 
-import type { WitnessStep } from '../../models/witness-step';
-import type { ConsentViewResponse } from '../../services/device-consent.service';
+import {
+  keyHolderStep,
+  standingFor,
+  trailAfterAgreement,
+  type ConsentViewResponse,
+  type KeyHolderStep,
+} from 'elohim-imagodei/device-consent';
+import type { WitnessStep } from 'elohim-imagodei/witness-step';
+
 import { ThresholdLoginComponent } from '../login/threshold-login.component';
 import { ThresholdRegisterComponent } from '../register/threshold-register.component';
 
@@ -35,7 +42,6 @@ import {
   DeviceConsentViewComponent,
   type DeviceConsentPhase,
 } from './device-consent-view.component';
-import { signingTrail } from './device-consent.logic';
 
 const PHASES: readonly DeviceConsentPhase[] = [
   'review',
@@ -59,13 +65,14 @@ const TWO_ACTS: ConsentViewResponse = {
   askedActs: ['device.enroll', 'device.bind-root'],
 };
 
-/** Sample of the proposed `witnesses` field (no backend sends it yet). */
+const HOST = 'alpha.elohim.host';
+const HOLDER: KeyHolderStep = { relation: 'your-doorway', label: HOST };
+
+/** Sample `witnesses`: the parties a node reports as having signed, in order. */
 const SAMPLE_WITNESSES: WitnessStep[] = [
-  { id: 'device-sign', act: 'signed', relation: 'your-device', label: 'workspace', state: 'done' },
+  { id: 'doorway-sign', act: 'signed', relation: 'your-doorway', label: HOST, state: 'done' },
   { id: 'peers', act: 'recorded', relation: 'others', count: 3, state: 'done' },
 ];
-
-const HOST = 'alpha.elohim.host';
 
 @Component({
   selector: 'app-device-consent-preview',
@@ -90,6 +97,7 @@ const HOST = 'alpha.elohim.host';
           [expiresAt]="expiresAt"
           [refusalCode]="refusalCode()"
           [trail]="trail()"
+          [standing]="standing()"
           [trailRevealAfterMs]="revealAfterMs()"
         />
       }
@@ -119,16 +127,24 @@ export class DeviceConsentPreviewComponent {
     const witnesses = this.params()?.get('witnesses') === '1' ? SAMPLE_WITNESSES : undefined;
     switch (this.phase()) {
       case 'signing':
-        return signingTrail(HOST, 'working');
+        return [keyHolderStep(HOLDER, 'working')];
       case 'code':
       case 'handed-back':
-        return signingTrail(HOST, 'done', witnesses);
+        return trailAfterAgreement(HOLDER, witnesses);
       case 'refused':
-        return this.params()?.has('code') ? null : signingTrail(HOST, 'failed');
+        return this.params()?.has('code') ? null : [keyHolderStep(HOLDER, 'failed')];
       default:
         return null;
     }
   });
+
+  /** What the node would report about the person's own nodes agreeing. */
+  readonly standing = computed(() =>
+    standingFor({
+      required: Number(this.params()?.get('required') ?? 1),
+      signed: Number(this.params()?.get('signed') ?? 1),
+    })
+  );
 
   /** Four minutes and a bit from when the preview opened. */
   readonly expiresAt = Date.now() + 4 * 60_000 + 12_000;

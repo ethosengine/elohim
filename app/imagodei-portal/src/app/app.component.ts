@@ -5,10 +5,14 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ElementRef,
   OnInit,
+  Type,
   ViewChild,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DeviceApprovalComponent } from './device-approval/device-approval.component';
+import { portalBase } from './device-approval/device-approval-port';
+import { RETURN_TO_PARAM, safePortalReturn } from './services/portal-return';
 import { StandaloneResolver, type ConsentContext } from './services/standalone-resolver';
 import {
   readStewardHandoff,
@@ -18,18 +22,30 @@ import {
 } from './services/steward-login-controller';
 import type { AuthorityResolution } from 'elohim-imagodei';
 
-type PortalMode = 'login' | 'consent' | 'steward-login';
+type PortalMode = 'login' | 'consent' | 'steward-login' | 'device-consent';
 // 'steward-login' is the transient "Connecting to your steward portal…" step;
 // the shell only knows 'resolve' | 'login' | 'consent' | 'callback', so while
 // mode is 'steward-login' we hold the shell on 'resolve' and render our own
 // connecting / failure copy in the primary slot.
 type PortalStep = 'resolve' | 'login' | 'consent' | 'callback';
 type StewardPhase = 'connecting' | 'failed' | 'unreachable';
+type DevicePage = 'live' | 'preview';
+
+/**
+ * Which device approval page a path names, if any: `consent/device` under the
+ * portal's base, or its development-only `consent/device/preview`.
+ */
+export function devicePageFor(pathname: string): DevicePage | null {
+  const path = pathname.replace(/\/+$/, '');
+  if (path.endsWith('/consent/device')) return 'live';
+  if (path.endsWith('/consent/device/preview')) return 'preview';
+  return null;
+}
 
 @Component({
   selector: 'imagodei-portal-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DeviceApprovalComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   // OnPush-unsafe: ROOT view — an OnPush root is never marked dirty, so a global
   // ApplicationRef tick skips it and freezes change detection for the whole
@@ -84,6 +100,16 @@ type StewardPhase = 'connecting' | 'failed' | 'unreachable';
                 Return to your doorway
               </a>
             </ng-container>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="mode() === 'device-consent'">
+          <imagodei-portal-device-approval
+            *ngIf="devicePage() === 'live'"
+            slot="primary"
+          ></imagodei-portal-device-approval>
+          <div *ngIf="devicePreview() as preview" slot="primary">
+            <ng-container *ngComponentOutlet="preview"></ng-container>
           </div>
         </ng-container>
 
@@ -160,6 +186,11 @@ export class AppComponent implements OnInit, AfterViewInit {
   /** The doorway origin to offer as a "return to your doorway" action. */
   stewardReturnUrl = signal<string>('');
 
+  /** Which device approval page this is, when the path names one. */
+  devicePage = signal<DevicePage | null>(null);
+  /** The development-only preview, loaded on demand (absent from production builds). */
+  devicePreview = signal<Type<unknown> | null>(null);
+
   /** Pre-fetched authority resolution from `GET /auth/me`. Null until fetch completes. */
   authority = signal<AuthorityResolution | null>(null);
 
@@ -175,6 +206,26 @@ export class AppComponent implements OnInit, AfterViewInit {
 
     const search = window.location.search;
 
+    // 0) Device approval. The page talks only to this node; no hand-off or
+    //    OAuth consent rides on its URL.
+    const devicePage = readStewardHandoff(search) ? null : devicePageFor(window.location.pathname);
+    if (devicePage === 'live') {
+      this.mode.set('device-consent');
+      this.step.set('consent');
+      this.devicePage.set('live');
+      return;
+    }
+    if (devicePage === 'preview' && (typeof ngDevMode === 'undefined' || ngDevMode)) {
+      // Optimized builds replace ngDevMode with false: this branch, its import
+      // and the preview chunk are removed, so no sample-data page exists on a
+      // live node (the path then falls through to the ordinary flow).
+      this.mode.set('device-consent');
+      this.step.set('consent');
+      const preview = await import('./device-approval/device-approval-preview.component');
+      this.devicePreview.set(preview.DeviceApprovalPreviewComponent);
+      return;
+    }
+
     // 1) Doorway→steward handoff. The doorway redirected us here with an opaque
     //    session_token + the issuer origin. Redeem it before the normal flow.
     const handoff = readStewardHandoff(search);
@@ -188,6 +239,8 @@ export class AppComponent implements OnInit, AfterViewInit {
         this._stewardEffects()
       );
       if (outcome.status === 'authenticated') {
+        // Signed in on the way to another page of this portal: go straight back.
+        if (this._returnAfterSignIn(search)) return;
         // The session landed; refreshAuthority + consent re-check already ran in
         // the effects. If no consent was requested, fall back to the login chrome
         // (the shell now reflects the authenticated peer-conductor authority).
@@ -205,6 +258,19 @@ export class AppComponent implements OnInit, AfterViewInit {
 
     // 2) Direct OAuth consent request (no handoff).
     await this._enterConsentIfRequested(search);
+  }
+
+  /**
+   * After a sign-in here, go back to the page of this portal that sent the
+   * person (`?return_to=`), if any. Returns true when it navigated.
+   */
+  private _returnAfterSignIn(search: string): boolean {
+    const asked = new URLSearchParams(search).get(RETURN_TO_PARAM);
+    if (!asked) return false;
+    const back = safePortalReturn(asked, portalBase());
+    if (!back) return false;
+    window.location.assign(back);
+    return true;
   }
 
   /** Effects seam handed to the steward-login controller. */
@@ -310,6 +376,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       }
     } else if (out.redirect) {
       window.location.href = out.redirect;
+    } else {
+      this._returnAfterSignIn(window.location.search);
     }
   }
 

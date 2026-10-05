@@ -27,8 +27,8 @@ import { gatewayDomain } from '../../core/gateway-domain';
 import { RETURN_URL_PARAM, safeReturnUrl } from '../../core/guards/auth.guard';
 import { AuthStateService } from '../../services/auth-state.service';
 import { IDENTITY_ELEMENTS } from '../../elements/identity-elements';
-import { type WitnessStep, withStepState } from '../../models/witness-step';
-import { DEVICE_CONSENT_PATH } from '../consent/device-consent.logic';
+import { type WitnessStep, withStepState } from 'elohim-imagodei/witness-step';
+import { DEVICE_CONSENT_PATH } from '../consent/device-consent-path';
 
 /** The one thing that is true while sign-in is in flight: the doorway checks the password. */
 const DOORWAY_CHECK = 'doorway-check';

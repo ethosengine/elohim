@@ -52,3 +52,14 @@ elohim-imagodei-device-consent-card::part(copy) {
 elohim-imagodei-device-consent-card::part(approve) {
   border: 1px solid transparent;
 }
+
+/* What the approval rests on: one plain line under the card, set apart from
+   the card's last line the way the trail is. */
+.portal-standing {
+  margin: var(--el-space-md) 0 0;
+  padding-top: var(--el-space-sm);
+  border-top: 1px solid var(--el-border);
+  color: var(--el-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
