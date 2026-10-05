@@ -9,6 +9,11 @@
 //!   record signed only by the approving controller is recorded. One the device
 //!   also signed is witnessed by both parties to it. A peer may add its own.
 //!
+//! Every party signs the same short message, [`consent_message`]: a domain tag
+//! followed by the record's address. The address commits to every byte of the
+//! record, and the tag keeps a consent signature from ever reading as a
+//! signature on anything else a key signs.
+//!
 //! It is evidence that consent was given. It does not make a device recognized;
 //! the binding the controller's cell signs does that, and peers verify the
 //! binding. The record lets anyone see that the binding was asked for and
@@ -24,6 +29,18 @@ use crate::act::{self, RequestedAct};
 use crate::hash_shape;
 use crate::request::AdmittedRequest;
 use crate::GRANT_DOMAIN;
+
+/// What precedes a record's address in the message its signers sign. The
+/// mishpat zome's `sign_device_consent` signs exactly these bytes.
+pub const CONSENT_SIGNING_DOMAIN: &str = "elohim:device-consent:v1:";
+
+/// The bytes a party signs to put its name on the consent addressed `cid`.
+pub fn consent_message(cid: &str) -> Vec<u8> {
+    let mut message = Vec::with_capacity(CONSENT_SIGNING_DOMAIN.len() + cid.len());
+    message.extend_from_slice(CONSENT_SIGNING_DOMAIN.as_bytes());
+    message.extend_from_slice(cid.as_bytes());
+    message
+}
 
 /// What the controller decided about an admitted request.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,15 +174,17 @@ pub enum SignerRole {
     Witness,
 }
 
-/// One party's signature over a record's canonical bytes. Detached: it is not
-/// part of what the record's address covers.
+/// One party's signature on a record. Detached: it is not part of what the
+/// record's address covers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsentSignature {
     pub role: SignerRole,
     /// The signer's key, in the form its kind is written (an agent key).
     pub signer: String,
-    /// Base64 of the raw signature over [`ConsentRecord::canonical_bytes`].
+    /// The raw ed25519 signature over [`consent_message`] of the record's
+    /// address, in unpadded URL-safe base64. Not over the canonical bytes
+    /// themselves: the address already commits to them.
     pub signature: String,
 }
 
@@ -202,6 +221,16 @@ impl SignedConsent {
         self.signatures
             .iter()
             .any(|s| s.role == SignerRole::Controller)
+    }
+
+    /// The bytes every signer of this consent signs.
+    pub fn message(&self) -> Vec<u8> {
+        consent_message(&self.cid)
+    }
+
+    /// How many parties have signed in `role`.
+    pub fn signed_in(&self, role: SignerRole) -> usize {
+        self.signatures.iter().filter(|s| s.role == role).count()
     }
 
     /// Whether the stated address is the record's own. Signature validity is
@@ -322,6 +351,17 @@ pub(crate) mod tests {
         assert_eq!(signed.signatures.len(), 3);
         assert_eq!(signed.signatures[1].signature, "controller-again");
         assert!(signed.controller_signed());
+    }
+
+    #[test]
+    fn signers_sign_the_tagged_address_not_the_record_bytes() {
+        let signed = SignedConsent::new(peer_record()).unwrap();
+        let message = signed.message();
+        assert_eq!(
+            message,
+            format!("elohim:device-consent:v1:{}", signed.cid).into_bytes()
+        );
+        assert_ne!(message, signed.record.canonical_bytes().unwrap());
     }
 
     #[test]

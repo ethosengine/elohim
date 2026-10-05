@@ -14,8 +14,14 @@
 //!
 //! Signing happens between steps 1 and 2 and belongs to the host, because only
 //! the host can reach the controller's key. The host builds the record with
-//! [`ConsentRecord::agree`], has the controller sign its canonical bytes, and
-//! passes the result to [`issue`].
+//! [`ConsentRecord::agree`] and has the controller sign its
+//! [`consent_message`](crate::consent::consent_message) and, when enrolling was
+//! agreed, the [`EnrollmentIntent`] derived from it. It then runs the witness
+//! beat ([`crate::witness::attend`]) and passes the result to [`issue`].
+//!
+//! One controller's signature is enough to issue. An identity with several
+//! controllers may have the others affirm the device later; the ceremony never
+//! waits for them.
 //!
 //! The store is one atomic primitive, [`Taken`]: take the delivery for a code
 //! and mark it redeemed in the same step. [`MemoryStore`] does this for a
@@ -24,11 +30,14 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use serde::{Deserialize, Serialize};
+
 use crate::act::RequestedAct;
-use crate::consent::SignedConsent;
+use crate::consent::{SignedConsent, SignerRole};
 use crate::delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
+use crate::enrollment::{Enrollment, EnrollmentIntent};
 use crate::hash_shape;
 use crate::request::AdmittedRequest;
 use crate::return_path::{return_target, ReturnTarget};
@@ -36,7 +45,7 @@ use crate::return_path::{return_target, ReturnTarget};
 /// What a consent screen shows. Everything a person needs to decide, and
 /// nothing they could not check against their own terminal. This is the wire
 /// form every host returns, so one consent screen serves them all.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsentView {
     pub client_id: String,
@@ -67,6 +76,20 @@ impl ConsentView {
 pub struct Held {
     pub delivery: PendingDelivery,
     pub consent: SignedConsent,
+    /// The enrollment the consent agreed to, with its controller proofs.
+    pub enrollment: Option<Enrollment>,
+}
+
+/// What a terminal collects with its code: the signed consent and, when
+/// enrolling was agreed, the enrollment it completes on its own cell by adding
+/// its possession proof. The consent's fields sit at the top level.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Delivered {
+    #[serde(flatten)]
+    pub consent: SignedConsent,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enrollment: Option<Enrollment>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +101,9 @@ pub enum IssueRefusal {
     /// No controller has signed it. Without a controller's signature a record
     /// is not a consent, whoever else has signed.
     Unsigned,
+    /// The enrollment offered is not the one the record agreed to, is missing
+    /// although enrolling was agreed, or carries no controller proof.
+    EnrollmentMismatch,
     Delivery(DeliveryRefusal),
 }
 
@@ -87,6 +113,7 @@ impl IssueRefusal {
             Self::AddressBroken => "issue_address_broken",
             Self::RequestMismatch => "issue_request_mismatch",
             Self::Unsigned => "issue_unsigned",
+            Self::EnrollmentMismatch => "issue_enrollment_mismatch",
             Self::Delivery(d) => d.code(),
         }
     }
@@ -101,6 +128,7 @@ impl IssueRefusal {
 pub fn issue(
     admitted: &AdmittedRequest,
     consent: SignedConsent,
+    enrollment: Option<Enrollment>,
     code: &str,
     now_micros: i64,
     ttl_micros: i64,
@@ -118,10 +146,25 @@ pub fn issue(
     if !consent.controller_signed() {
         return Err(IssueRefusal::Unsigned);
     }
+    let enrollment_agreed = EnrollmentIntent::agreed_in(&consent.record).is_some();
+    let enrollment_holds = match &enrollment {
+        Some(e) => e.is_agreed_in(&consent.record),
+        None => !enrollment_agreed,
+    };
+    if !enrollment_holds {
+        return Err(IssueRefusal::EnrollmentMismatch);
+    }
     let delivery = PendingDelivery::issue(admitted, &consent.cid, code, now_micros, ttl_micros)
         .map_err(IssueRefusal::Delivery)?;
     let target = return_target(r.return_path, code, &r.state);
-    Ok((Held { delivery, consent }, target))
+    Ok((
+        Held {
+            delivery,
+            consent,
+            enrollment,
+        },
+        target,
+    ))
 }
 
 /// What a store hands back when asked to take the delivery for a code.
@@ -144,13 +187,17 @@ pub fn settle(
     taken: Taken,
     redemption: &Redemption,
     now_micros: i64,
-) -> Result<SignedConsent, RedemptionRefusal> {
+) -> Result<Delivered, RedemptionRefusal> {
     match taken {
         Taken::Unknown => Err(RedemptionRefusal::CodeUnknown),
         Taken::AlreadyRedeemed => Err(RedemptionRefusal::AlreadyRedeemed),
         Taken::Fresh(held) => {
             admit_redemption(&held.delivery, redemption, now_micros)?;
-            Ok(held.consent)
+            let held = *held;
+            Ok(Delivered {
+                consent: held.consent,
+                enrollment: held.enrollment,
+            })
         }
     }
 }
@@ -168,8 +215,14 @@ impl MemoryStore {
         Self::default()
     }
 
+    /// Hold a delivery. One request has one live delivery: anything already
+    /// held for the same request (the same PKCE challenge) is dropped, so a
+    /// person who agrees again leaves only the newest code working.
     pub fn insert(&self, held: Held) {
-        self.lock().insert(held.delivery.code_digest.clone(), held);
+        let mut map = self.lock();
+        // bounded-work: one pass over deliveries that each live minutes.
+        map.retain(|_, h| h.delivery.code_challenge != held.delivery.code_challenge);
+        map.insert(held.delivery.code_digest.clone(), held);
     }
 
     /// Take the delivery for `code` and mark it redeemed, in one step.
@@ -220,7 +273,7 @@ pub fn redeem(
     store: &MemoryStore,
     redemption: &Redemption,
     now_micros: i64,
-) -> Result<SignedConsent, RedemptionRefusal> {
+) -> Result<Delivered, RedemptionRefusal> {
     let outcome = settle(store.take(&redemption.code), redemption, now_micros);
     if let Err(refusal) = outcome {
         if refusal.burns_delivery() {
@@ -230,11 +283,127 @@ pub fn redeem(
     outcome
 }
 
+/// Where the code goes once the person has agreed, as the consent screen is
+/// told it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum ReturnTargetView {
+    /// Show `value` for the person to paste into their terminal.
+    Display { value: String },
+    /// Send the browser to `url`, the terminal's own listener.
+    Redirect { url: String },
+}
+
+impl From<ReturnTarget> for ReturnTargetView {
+    fn from(target: ReturnTarget) -> Self {
+        match target {
+            ReturnTarget::Display(value) => Self::Display { value },
+            ReturnTarget::Redirect(url) => Self::Redirect { url },
+        }
+    }
+}
+
+/// How many controllers the identity's policy asks to agree, and how many
+/// signatures this consent carries. Fewer signed than required is not a
+/// refusal: the others may affirm later.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControllerTally {
+    pub required: usize,
+    pub signed: usize,
+}
+
+/// Who a signer is to the person reading the consent screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Relation {
+    /// The node the person is using to agree.
+    ThisDevice,
+    /// Another of the person's own nodes.
+    YourDevice,
+    /// Someone else who attests to the agreement.
+    VouchesForYou,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AttendanceAct {
+    Signed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AttendanceState {
+    Done,
+}
+
+/// One party that signed the consent, as the consent screen shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attendance {
+    /// The signer's key.
+    pub id: String,
+    pub act: AttendanceAct,
+    pub relation: Relation,
+    pub state: AttendanceState,
+}
+
+/// Every party that actually signed `consent`, in the order they signed.
+/// `this_node` is the key of the node the person agreed on. Nobody who did not
+/// sign is listed.
+pub fn attendance(consent: &SignedConsent, this_node: &str) -> Vec<Attendance> {
+    consent
+        .signatures
+        .iter()
+        .map(|s| Attendance {
+            id: s.signer.clone(),
+            act: AttendanceAct::Signed,
+            relation: match s.role {
+                _ if s.signer == this_node => Relation::ThisDevice,
+                SignerRole::Controller | SignerRole::Device => Relation::YourDevice,
+                SignerRole::Witness => Relation::VouchesForYou,
+            },
+            state: AttendanceState::Done,
+        })
+        .collect()
+}
+
+/// What the consent screen is told once the person has agreed. The same wire
+/// form from every host.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgreedView {
+    pub return_target: ReturnTargetView,
+    /// When the code stops working, in epoch milliseconds.
+    pub expires_at: i64,
+    pub consent_cid: String,
+    pub controllers: ControllerTally,
+    pub witnesses: Vec<Attendance>,
+}
+
+impl AgreedView {
+    /// Describe what [`issue`] held. `required` is the identity's declared
+    /// controller policy; `this_node` the key of the node that agreed.
+    pub fn of(held: &Held, target: ReturnTarget, required: usize, this_node: &str) -> Self {
+        Self {
+            return_target: target.into(),
+            expires_at: held.delivery.expires_at_micros.div_euclid(1000),
+            consent_cid: held.consent.cid.clone(),
+            controllers: ControllerTally {
+                required,
+                signed: held.consent.signed_in(SignerRole::Controller),
+            },
+            witnesses: attendance(&held.consent, this_node),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::consent::tests::peer_record;
-    use crate::consent::{ConsentSignature, SignerRole};
+    use crate::consent::ConsentSignature;
+    use crate::enrollment::ControllerProof;
     use crate::hash_shape::sample_key;
     use crate::request::admit_request;
     use crate::request::tests::{peer_request, policy, request, VERIFIER};
@@ -258,6 +427,16 @@ mod tests {
             })
     }
 
+    fn enrollment() -> Option<Enrollment> {
+        Some(Enrollment {
+            intent: EnrollmentIntent::agreed_in(&peer_record()).unwrap(),
+            controllers: vec![ControllerProof {
+                agent: sample_key(9),
+                signature: "enrollment".into(),
+            }],
+        })
+    }
+
     fn redemption() -> Redemption {
         Redemption {
             code: CODE.into(),
@@ -269,7 +448,7 @@ mod tests {
 
     /// A store holding one issued consent, as a runtime would after approval.
     fn store() -> MemoryStore {
-        let (held, _) = issue(&admitted(), signed(), CODE, NOW, TTL).unwrap();
+        let (held, _) = issue(&admitted(), signed(), enrollment(), CODE, NOW, TTL).unwrap();
         let store = MemoryStore::new();
         store.insert(held);
         store
@@ -288,21 +467,22 @@ mod tests {
     #[test]
     fn one_runtime_runs_the_whole_ceremony() {
         let store = store();
-        let consent = redeem(&store, &redemption(), NOW + 1).unwrap();
-        assert_eq!(consent, signed());
-        assert!(consent.address_holds());
+        let delivered = redeem(&store, &redemption(), NOW + 1).unwrap();
+        assert_eq!(delivered.consent, signed());
+        assert!(delivered.consent.address_holds());
+        assert_eq!(delivered.enrollment, enrollment());
     }
 
     #[test]
     fn issuing_says_how_the_code_goes_back() {
-        let (_, target) = issue(&admitted(), signed(), CODE, NOW, TTL).unwrap();
+        let (_, target) = issue(&admitted(), signed(), enrollment(), CODE, NOW, TTL).unwrap();
         let state = "s".repeat(32);
         assert_eq!(target, ReturnTarget::Display(format!("{CODE}#{state}")));
 
         let mut local = peer_request();
         local.return_path = ReturnPath::Loopback { port: 49152 };
         let local = admit_request(&local, &policy()).unwrap();
-        let (_, target) = issue(&local, signed(), CODE, NOW, TTL).unwrap();
+        let (_, target) = issue(&local, signed(), enrollment(), CODE, NOW, TTL).unwrap();
         assert_eq!(
             target,
             ReturnTarget::Redirect(format!(
@@ -316,7 +496,7 @@ mod tests {
         use IssueRefusal as R;
         let unsigned = SignedConsent::new(peer_record()).unwrap();
         assert_eq!(
-            issue(&admitted(), unsigned.clone(), CODE, NOW, TTL),
+            issue(&admitted(), unsigned.clone(), enrollment(), CODE, NOW, TTL),
             Err(R::Unsigned)
         );
         // The device's own signature, or a witness's, is not agreement.
@@ -326,14 +506,14 @@ mod tests {
             signature: "device".into(),
         });
         assert_eq!(
-            issue(&admitted(), device_only, CODE, NOW, TTL),
+            issue(&admitted(), device_only, enrollment(), CODE, NOW, TTL),
             Err(R::Unsigned)
         );
 
         let mut tampered = signed();
         tampered.record.agreed_acts = vec![RequestedAct::EnrollDevice];
         assert_eq!(
-            issue(&admitted(), tampered, CODE, NOW, TTL),
+            issue(&admitted(), tampered, enrollment(), CODE, NOW, TTL),
             Err(R::AddressBroken)
         );
 
@@ -342,13 +522,145 @@ mod tests {
         other.code_challenge = crate::pkce::challenge(&"v".repeat(43));
         let other = admit_request(&other, &policy()).unwrap();
         assert_eq!(
-            issue(&other, signed(), CODE, NOW, TTL),
+            issue(&other, signed(), enrollment(), CODE, NOW, TTL),
             Err(R::RequestMismatch)
         );
 
         assert_eq!(
-            issue(&admitted(), signed(), "short", NOW, TTL),
+            issue(&admitted(), signed(), enrollment(), "short", NOW, TTL),
             Err(R::Delivery(DeliveryRefusal::CodeWeak))
+        );
+    }
+
+    #[test]
+    fn an_agreed_enrollment_travels_with_the_consent_and_must_match_it() {
+        use IssueRefusal as R;
+        assert_eq!(
+            issue(&admitted(), signed(), None, CODE, NOW, TTL),
+            Err(R::EnrollmentMismatch)
+        );
+        let mut foreign = enrollment().unwrap();
+        foreign.intent.device_key = sample_key(8);
+        assert_eq!(
+            issue(&admitted(), signed(), Some(foreign), CODE, NOW, TTL),
+            Err(R::EnrollmentMismatch)
+        );
+        let mut unproven = enrollment().unwrap();
+        unproven.controllers.clear();
+        assert_eq!(
+            issue(&admitted(), signed(), Some(unproven), CODE, NOW, TTL),
+            Err(R::EnrollmentMismatch)
+        );
+    }
+
+    #[test]
+    fn the_terminal_collects_the_consent_fields_and_the_enrollment() {
+        let delivered = redeem(&store(), &redemption(), NOW + 1).unwrap();
+        let json = serde_json::to_value(&delivered).unwrap();
+        for field in ["cid", "record", "signatures", "enrollment"] {
+            assert!(json.get(field).is_some(), "{field}");
+        }
+        assert_eq!(json["enrollment"]["intent"]["deviceKey"], sample_key(7));
+        assert_eq!(json["enrollment"]["controllers"][0]["agent"], sample_key(9));
+    }
+
+    #[test]
+    fn agreeing_again_replaces_the_earlier_code() {
+        let store = store();
+        const SECOND: &str = "5ec0nd5ec0nd5ec0nd5ec0nd5ec0nd5e";
+        let (held, _) = issue(&admitted(), signed(), enrollment(), SECOND, NOW, TTL).unwrap();
+        store.insert(held);
+        assert_eq!(store.len(), 1);
+        assert_eq!(
+            redeem(&store, &redemption(), NOW + 1),
+            Err(RedemptionRefusal::CodeUnknown)
+        );
+        let mut second = redemption();
+        second.code = SECOND.into();
+        assert!(redeem(&store, &second, NOW + 1).is_ok());
+
+        // Another request's delivery is left alone.
+        let mut other = peer_request();
+        other.code_challenge = crate::pkce::challenge(&"v".repeat(43));
+        let other = admit_request(&other, &policy()).unwrap();
+        let mut record = peer_record();
+        record.request_binding = other.request().code_challenge.clone();
+        let consent = SignedConsent::new(record)
+            .unwrap()
+            .with_signature(signed().signatures[0].clone());
+        let (held, _) = issue(&other, consent, enrollment(), CODE, NOW, TTL).unwrap();
+        store.insert(held);
+        assert_eq!(store.len(), 2);
+    }
+
+    #[test]
+    fn the_agreed_view_lists_only_who_signed() {
+        let (held, target) = issue(&admitted(), signed(), enrollment(), CODE, NOW, TTL).unwrap();
+        let view = AgreedView::of(&held, target, 1, &sample_key(9));
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(json["returnTarget"]["kind"], "display");
+        assert_eq!(
+            json["returnTarget"]["value"],
+            format!("{CODE}#{}", "s".repeat(32))
+        );
+        assert_eq!(json["expiresAt"], (NOW + TTL) / 1000);
+        assert_eq!(json["consentCid"], held.consent.cid);
+        assert_eq!(json["controllers"]["required"], 1);
+        assert_eq!(json["controllers"]["signed"], 1);
+        assert_eq!(
+            json["witnesses"],
+            serde_json::json!([{
+                "id": sample_key(9),
+                "act": "signed",
+                "relation": "this-device",
+                "state": "done"
+            }])
+        );
+    }
+
+    #[test]
+    fn a_policy_asking_for_more_controllers_still_issues_on_one() {
+        let (held, target) = issue(&admitted(), signed(), enrollment(), CODE, NOW, TTL).unwrap();
+        let view = AgreedView::of(&held, target, 2, &sample_key(9));
+        assert_eq!(
+            view.controllers,
+            ControllerTally {
+                required: 2,
+                signed: 1
+            }
+        );
+    }
+
+    #[test]
+    fn signers_are_named_by_their_relation_to_the_person() {
+        let consent = signed()
+            .with_signature(ConsentSignature {
+                role: SignerRole::Controller,
+                signer: sample_key(10),
+                signature: "other-node".into(),
+            })
+            .with_signature(ConsentSignature {
+                role: SignerRole::Witness,
+                signer: sample_key(5),
+                signature: "elohim".into(),
+            });
+        let relations: Vec<_> = attendance(&consent, &sample_key(9))
+            .into_iter()
+            .map(|a| a.relation)
+            .collect();
+        assert_eq!(
+            relations,
+            [
+                Relation::ThisDevice,
+                Relation::YourDevice,
+                Relation::VouchesForYou
+            ]
+        );
+        let redirect: ReturnTargetView =
+            ReturnTarget::Redirect("http://127.0.0.1:5/cb".into()).into();
+        assert_eq!(
+            serde_json::to_value(redirect).unwrap(),
+            serde_json::json!({"kind": "redirect", "url": "http://127.0.0.1:5/cb"})
         );
     }
 

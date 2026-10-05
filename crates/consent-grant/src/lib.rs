@@ -9,9 +9,10 @@
 //! terminal                     portal (controller signed in)
 //!   GrantRequest  ───────────▶ admit_request
 //!   (keeps the verifier)       consent screen ─ controller's cell signs
-//!                              ConsentRecord::agree  +  PendingDelivery::issue
+//!                              ConsentRecord::agree ─ witness beat ─ issue
 //!   ◀── loopback redirect, or the person pastes `code#state`
-//!   Redemption    ───────────▶ admit_redemption ─▶ the record and its signatures
+//!   Redemption    ───────────▶ admit_redemption ─▶ the record, its signatures
+//!                                                  and the signed enrollment
 //! ```
 //!
 //! ## What a consent is, and is not
@@ -47,22 +48,32 @@
 pub mod act;
 pub mod ceremony;
 pub mod consent;
+pub mod controller;
 pub mod delivery;
+pub mod enrollment;
 pub mod hash_shape;
 pub mod pkce;
 pub mod request;
 pub mod return_path;
+pub mod witness;
 
 pub use act::{ActRefusal, RequestedAct};
-pub use ceremony::{issue, redeem, settle, ConsentView, Held, IssueRefusal, MemoryStore, Taken};
-pub use consent::{
-    Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent, SignerRole,
+pub use ceremony::{
+    attendance, issue, redeem, settle, AgreedView, Attendance, ConsentView, ControllerTally,
+    Delivered, Held, IssueRefusal, MemoryStore, Relation, ReturnTargetView, Taken,
 };
+pub use consent::{
+    consent_message, Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent,
+    SignerRole, CONSENT_SIGNING_DOMAIN,
+};
+pub use controller::{ControllerStanding, StandingRefusal};
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
+pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
+pub use witness::{attend, Unattended, WitnessBeat};
 
 /// Version tag every request names. A portal refuses a request for a version
 /// it does not implement, so the two sides never guess at each other's rules.
