@@ -3676,6 +3676,26 @@ async fn async_main(
     // post-hoc via `P2PNode::set_extraction_cache` lower down.
     let extraction_cache = if config.extraction_cache.enabled {
         let cache_dir = config.extraction_cache_dir();
+        // The cache's index lives in memory, so nothing on disk from an earlier
+        // run can be served or counted against the budget: the first request
+        // for an app extracts it again. Clearing here is what keeps those
+        // unreachable files from accumulating across restarts.
+        // Only a cache inside this peer's own storage directory is cleared; an
+        // operator-set path elsewhere is left as it is.
+        if !cache_dir.starts_with(&config.storage_dir) {
+            info!(
+                cache_dir = %cache_dir.display(),
+                "extraction cache is outside the storage directory; not cleared at boot"
+            );
+        } else if let Err(e) = tokio::fs::remove_dir_all(&cache_dir).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                warn!(
+                    cache_dir = %cache_dir.display(),
+                    error = %e,
+                    "could not clear the extraction cache left by an earlier run"
+                );
+            }
+        }
         tokio::fs::create_dir_all(&cache_dir).await?;
 
         match elohim_cache_core::extraction::DiskBackend::new(cache_dir.clone()).await {
@@ -6462,6 +6482,25 @@ async fn async_main(
         // this peer's own carry complete.
         if let Some(sunsetter) = lineage_sunsetter {
             controller = controller.with_lineage_sunset(sunsetter);
+        }
+
+        // Release retention: the latest releases of each followed channel are
+        // kept, older ones' bytes are let go from every store that holds them.
+        if let Some(ref pool) = db_pool {
+            use elohim_storage::services::release_adoption::retention;
+            let mut sweeper = retention::RetentionSweeper::new(
+                pool.clone(),
+                blob_store.clone(),
+                staging_root.clone(),
+            );
+            if let Some(ref cache) = extraction_cache {
+                sweeper = sweeper.with_extraction_cache(Arc::clone(cache));
+            }
+            #[cfg(feature = "p2p-iroh")]
+            if let Some(iroh_blobs) = iroh_blob_store_for_http.clone() {
+                sweeper = sweeper.with_iroh_store(iroh_blobs);
+            }
+            retention::spawn(sweeper);
         }
 
         if watch::spawn(controller) {

@@ -101,6 +101,8 @@ pub enum Kind {
     Bool,
     /// A duration in whole seconds.
     Seconds,
+    /// A whole-number count of things.
+    Count,
 }
 
 impl Kind {
@@ -108,6 +110,7 @@ impl Kind {
         match self {
             Kind::Bool => "bool",
             Kind::Seconds => "seconds",
+            Kind::Count => "count",
         }
     }
 
@@ -121,21 +124,21 @@ impl Kind {
                 "0" | "false" | "no" | "off" => Some(0),
                 _ => None,
             },
-            Kind::Seconds => raw.parse::<u64>().ok(),
+            Kind::Seconds | Kind::Count => raw.parse::<u64>().ok(),
         }
     }
 
     fn render(self, value: u64) -> serde_json::Value {
         match self {
             Kind::Bool => serde_json::Value::Bool(value != 0),
-            Kind::Seconds => serde_json::Value::from(value),
+            Kind::Seconds | Kind::Count => serde_json::Value::from(value),
         }
     }
 
     fn display(self, value: u64) -> String {
         match self {
             Kind::Bool => (value != 0).to_string(),
-            Kind::Seconds => value.to_string(),
+            Kind::Seconds | Kind::Count => value.to_string(),
         }
     }
 }
@@ -204,6 +207,8 @@ pub enum Key {
     MissDormancyCapSeconds = 10,
     /// `ELOHIM_DIAGNOSTICS_WINDOW_SECONDS` — one bounded diagnostic capture window.
     DiagnosticsWindowSeconds = 11,
+    /// `ELOHIM_RELEASE_RETENTION_DEPTH` — releases this peer keeps per channel.
+    ReleaseRetentionDepth = 12,
 }
 
 impl Key {
@@ -212,7 +217,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 12] = [
+    pub const ALL: [Key; 13] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -225,8 +230,13 @@ impl Key {
         Key::MissDormancyBaseSeconds,
         Key::MissDormancyCapSeconds,
         Key::DiagnosticsWindowSeconds,
+        Key::ReleaseRetentionDepth,
     ];
 }
+
+/// The declared default for [`Key::ReleaseRetentionDepth`]: the ten latest
+/// releases of a channel, matching what the build server retains.
+pub const DEFAULT_RELEASE_RETENTION_DEPTH: u64 = 10;
 
 /// Static description of a registered setting. The mutable state lives in
 /// `Setting`; this is the part that is the same in every process.
@@ -256,7 +266,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 12] = [
+pub static SPECS: [SettingSpec; 13] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -409,6 +419,22 @@ pub static SPECS: [SettingSpec; 12] = [
         unpublished_by_design: Some(
             "no boot publisher: detailed diagnostics are default-OFF and may only be armed \
              deliberately through the watched runtime-config file",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_RELEASE_RETENTION_DEPTH",
+        kind: Kind::Count,
+        default: DEFAULT_RELEASE_RETENTION_DEPTH,
+        doc: "How many of the latest releases of each followed channel this peer keeps the \
+              bytes of. Older releases' bytes are let go, except anything this peer serves.",
+        note: Some(
+            "hot — the retention pass reads it each run. 0 is read as 1: the newest release \
+             of a channel is always kept. Lowering it releases bytes on the next pass and \
+             raising it does not bring released bytes back.",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: the declared default applies until a peer's runtime-config \
+             file states its own depth",
         ),
     },
 ];
@@ -878,6 +904,12 @@ pub fn get_bool(key: Key) -> bool {
 /// The effective value of a [`Kind::Seconds`] setting.
 pub fn get_secs(key: Key) -> u64 {
     GLOBAL.get(key)
+}
+
+/// How many of a channel's latest releases this peer keeps the bytes of.
+/// Never below 1: the newest release is always kept.
+pub fn release_retention_depth() -> usize {
+    GLOBAL.get(Key::ReleaseRetentionDepth).max(1) as usize
 }
 
 /// Requested duration for one bounded diagnostic capture window.
@@ -1513,7 +1545,7 @@ not a pair
             // silently not move and quietly weaken the count.
             let raw = match spec.kind {
                 Kind::Bool => if spec.default == 0 { "true" } else { "false" }.to_string(),
-                Kind::Seconds => "77".to_string(),
+                Kind::Seconds | Kind::Count => "77".to_string(),
             };
             text.push_str(&format!("{} = \"{}\"\n", spec.name, raw));
         }
@@ -1527,7 +1559,7 @@ not a pair
             let spec = &SPECS[key.index()];
             let want = match spec.kind {
                 Kind::Bool => 1 - spec.default,
-                Kind::Seconds => 77,
+                Kind::Seconds | Kind::Count => 77,
             };
             assert_eq!(reg.get(key), want, "{} did not round-trip", spec.name);
             assert_eq!(reg.provenance(key), Provenance::RuntimeConfig);

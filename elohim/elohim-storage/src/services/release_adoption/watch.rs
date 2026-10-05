@@ -626,6 +626,9 @@ pub struct AdoptionController {
     sunsetter: Option<Arc<dyn super::sunset::LineageSunsetter>>,
     staging_root: PathBuf,
     cached_reality: tokio::sync::Mutex<Option<(i64, Answer<InstalledReality>)>>,
+    /// `channel|releaseCid` pairs already written to the release ledger by
+    /// this process, so a head that stands for hours costs one write.
+    ledger_recorded: std::sync::Mutex<std::collections::HashSet<String>>,
 }
 
 impl AdoptionController {
@@ -642,6 +645,58 @@ impl AdoptionController {
             sunsetter: None,
             staging_root: staging_root.into(),
             cached_reality: tokio::sync::Mutex::new(None),
+            ledger_recorded: std::sync::Mutex::new(std::collections::HashSet::new()),
+        }
+    }
+
+    /// Record a release in the ledger the retention pass reads, once every
+    /// artifact's bytes are here and prove out. A release whose bytes did not
+    /// all arrive is not recorded: the ledger names only what this peer holds.
+    fn record_in_ledger(
+        &self,
+        channel_id: &str,
+        release_cid: &str,
+        manifest: &super::ReleaseManifest,
+        fetched: &[FetchedArtifact],
+    ) {
+        let Some(pool) = self.db.as_ref() else {
+            return;
+        };
+        let complete = fetched.len() == manifest.artifacts.len()
+            && manifest
+                .artifacts
+                .iter()
+                .zip(fetched)
+                .all(|(declared, got)| declared.sha256.eq_ignore_ascii_case(&got.sha256));
+        if !complete {
+            return;
+        }
+        let key = format!("{channel_id}|{release_cid}");
+        if self.ledger_recorded.lock().unwrap().contains(&key) {
+            return;
+        }
+        let written = pool
+            .get()
+            .map_err(|e| crate::error::StorageError::Database(e.to_string()))
+            .and_then(|mut conn| {
+                crate::db::release_ledger::record_release(
+                    &mut conn,
+                    channel_id,
+                    release_cid,
+                    manifest.artifact_class.label(),
+                    &super::retention::ledger_artifacts(manifest),
+                )
+            });
+        match written {
+            Ok(_) => {
+                self.ledger_recorded.lock().unwrap().insert(key);
+            }
+            Err(e) => tracing::warn!(
+                channel = %channel_id,
+                release_cid = %release_cid,
+                error = %e,
+                "release-adoption: release not recorded in the retention ledger; retrying next sweep"
+            ),
         }
     }
 
@@ -1632,6 +1687,8 @@ impl AdoptionController {
             }
         }
 
+        self.record_in_ledger(&channel.channel_id, &release_cid, &manifest, &fetched);
+
         // What the staged bytes WOULD install, and what integrity line they
         // CARRY — both read from ONE unpack of the artifact, because a manifest
         // declares only what it SUPERSEDES and (alpha 2026-09-06) what it
@@ -1963,7 +2020,7 @@ fn decide_post_verify_action(
 /// Make a release CID safe as one path segment. Base64 action hashes carry `/`
 /// and `+`; a staging directory named from unsanitized wire input is a path
 /// traversal waiting to be found.
-fn sanitize_segment(raw: &str) -> String {
+pub(super) fn sanitize_segment(raw: &str) -> String {
     raw.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '-' || c == '_' {

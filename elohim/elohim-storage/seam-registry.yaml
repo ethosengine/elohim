@@ -5307,3 +5307,31 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: issuer_behind_refusal_names_both_forms, kind: unit }
       - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: a_refusal_without_the_issuer_behind_code_is_not_one, kind: unit }
       - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: a_malformed_issuer_behind_keeps_the_code_and_drops_what_it_cannot_read, kind: unit }
+  - name: release_retention_window_and_hold
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/release_adoption/retention.rs
+      modulePath: services::release_adoption::retention::{split_window, blob_hold}
+      line: 76
+    summary: >
+      Which recorded releases of a channel are past this peer's retention depth, and whether a
+      blob of a past-window release may be let go. A release is kept when it is among its
+      channel's newest `depth` (never fewer than one), when the adoption controller names it as
+      resolved or applied, or when its class is not app-bundle. A past-window blob is held when
+      a kept release names it, a content row names it, or a live custody commitment names it.
+    concernIds:
+      - { id: C0, status: answered, justification: "Peer-local bytes and a peer-local Category C ledger; nothing notarized moves and no other peer is told to delete anything." }
+      - { id: C2, status: n-a, justification: "Decides what a peer stops holding, never which head is canonical." }
+      - { id: C4, status: answered, justification: "A failed in-use read keeps the blob; a ledger row whose artifacts cannot be read names no bytes; bytes the ledger does not name are never touched." }
+      - { id: C6a, status: answered, justification: "One pass per 300 s, at most MAX_PAST_WINDOW_PER_PASS releases examined, rotating so unfinished ones do not starve the rest." }
+      - { id: C6b, status: answered, justification: "Files are deleted before rows, so a repeated or interrupted pass finishes the same release and deletes nothing further." }
+      - { id: C7, status: partial, justification: "The inventory snapshot drops a deleted file on its next tick and the self-custody row is removed, but a shard assignment already registered on the DHT is not retracted: no retract call exists." }
+      - { id: C8, status: answered, justification: "elohim_release_retention_* gauges and counters per channel and per hold reason, and the retention section of GET /admin/adoption." }
+      - { id: C12, status: partial, justification: "The depth is the peer's own runtime setting with the declared default of ten. A window declared by the channel or the holon with standing does not exist yet." }
+      - { id: C14, status: partial, justification: "A blob can be re-named by a new release between the in-use read and the delete; the window is one pass's read-then-delete per blob and the bytes would then be healed from a peer or re-published." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: the_window_keeps_the_newest_of_each_channel_and_counts_channels_apart, kind: unit }
+      - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_release_in_use_is_kept_however_old_and_does_not_shrink_the_window, kind: unit }
+      - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_is_let_go_only_when_nothing_holds_it, kind: unit }
+      - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_this_peer_serves_is_kept_past_the_window_and_let_go_once_it_is_not, kind: unit }
+      - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: releases_past_the_window_leave_every_store_and_the_window_stays_whole, kind: unit }

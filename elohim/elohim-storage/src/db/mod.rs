@@ -184,6 +184,10 @@ pub mod acquisition_pins;
 // Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
 pub mod mishpat_commitments;
 
+// Release ledger — the releases this peer's adoption controller has verified,
+// in first-seen order (Category C, local). Read by the release retention pass.
+pub mod release_ledger;
+
 // Lens projection — `author-lens` Mishpat::Commitment cache (Category A DHT projection).
 // Source of truth: Holochain DHT (mishpat DNA Commitment entry, action='author-lens').
 // Populated from create_commitment post-commit signal (plan S3). NULL dht_anchor_hash

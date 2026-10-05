@@ -45,7 +45,14 @@
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +67,7 @@ import {
   visitInBrowser,
   type FixtureBundle,
 } from '../dataplane/epr-app-deliverability.helpers.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -128,11 +136,17 @@ const run: {
   broken?: Release;
   /** Per peer, every sampled (appA-new, appB-new) pair while station 2 waited. */
   samples: Record<PeerName, [boolean, boolean][]>;
+  /** The retention story's three releases, in the order they were published. */
+  kept: Release[];
+  /** Peers whose retention depth this run set, to be put back afterwards. */
+  retentionSet: Set<PeerName>;
 } = {
   workDir: mkdtempSync(path.join(tmpdir(), `a2o-app-bundle-${RUN_STAMP}-`)),
   appsAuthored: false,
   following: new Set<PeerName>(),
   samples: { matthew: [], jessica: [], james: [] },
+  kept: [],
+  retentionSet: new Set<PeerName>(),
 };
 
 // ---------------------------------------------------------------------------
@@ -960,6 +974,211 @@ Then("no peer's record for either app moved", { timeout: 60_000 }, async functio
 // ---------------------------------------------------------------------------
 // Teardown — this run's follow entries come off every peer
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Release retention (features/delivery/release-retention.feature)
+// ---------------------------------------------------------------------------
+
+const RETENTION_KEY = 'ELOHIM_RELEASE_RETENTION_DEPTH';
+const RETENTION_BUDGET_MS = 15 * 60_000;
+
+/**
+ * Set (or, with `null`, clear) one peer's retention depth: rewrite the key in
+ * the runtime-config file the peer watches, then ask the peer to re-read it.
+ * Every other line of the file is left as it was.
+ */
+async function setRetentionDepth(peer: PeerName, depth: number | null): Promise<void> {
+  const file = path.join(householdMeshDir(), peer, 'runtime-config.toml');
+  const kept = existsSync(file)
+    ? readFileSync(file, 'utf8')
+        .split('\n')
+        .filter(line => !line.trimStart().startsWith(RETENTION_KEY))
+    : [];
+  while (kept.length > 0 && kept[kept.length - 1] === '') kept.pop();
+  if (depth !== null) kept.push(`${RETENTION_KEY} = ${depth}`);
+  writeFileSync(file, `${kept.join('\n')}\n`);
+  const reloaded = await postRaw(`${storageUrl(peer)}/admin/runtime-config/reload`);
+  assert.equal(reloaded.status, 200, `${peer} did not reload its settings: ${reloaded.text}`);
+}
+
+/** The depth a peer is running with right now, read from the peer itself. */
+async function retentionDepth(peer: PeerName): Promise<unknown> {
+  const { status, text } = await getRaw(`${storageUrl(peer)}/admin/runtime-config`, {
+    timeoutMs: 10_000,
+  });
+  assert.equal(status, 200, `${peer} /admin/runtime-config answered ${status}`);
+  const body = JSON.parse(text) as { settings?: { name: string; effectiveValue: unknown }[] };
+  return (body.settings ?? []).find(setting => setting.name === RETENTION_KEY)?.effectiveValue;
+}
+
+interface RetentionChannel {
+  held: string[];
+  released: string[];
+  pastWindowHeld: number;
+}
+
+/** What a peer's last retention pass says about this run's channel. */
+async function retentionReport(peer: PeerName): Promise<{
+  channel?: RetentionChannel;
+  blobsHeld?: Record<string, number>;
+}> {
+  const { status, text } = await getRaw(`${storageUrl(peer)}${ADOPTION_PATH}`, {
+    timeoutMs: 10_000,
+  });
+  if (status !== 200) return {};
+  const body = JSON.parse(text) as {
+    retention?: {
+      channels?: Record<string, RetentionChannel>;
+      blobsHeld?: Record<string, number>;
+    } | null;
+  };
+  return {
+    channel: body.retention?.channels?.[CHANNEL_ID],
+    blobsHeld: body.retention?.blobsHeld,
+  };
+}
+
+/** Where a peer's blob store keeps one bundle, read straight off its disk. */
+function bundleFile(peer: PeerName, hash: string): string {
+  const hex = hash.replace(/^sha256-/, '');
+  return path.join(householdMeshDir(), peer, 'blobs', 'blobs', hex.slice(0, 4), `sha256-${hex}`);
+}
+
+function bundleHashes(release: Release): string[] {
+  return APPS.flatMap(app => [release.builds[app].browserHash, release.builds[app].serverHash]);
+}
+
+Given(
+  "matthew's peer is set to keep the two latest releases of each channel",
+  { timeout: 30_000 },
+  async function () {
+    await setRetentionDepth('matthew', 2);
+    run.retentionSet.add('matthew');
+    assert.equal(await retentionDepth('matthew'), 2);
+  }
+);
+
+Given("jessica's peer keeps the default of ten", { timeout: 30_000 }, async function () {
+  assert.equal(await retentionDepth('jessica'), 10);
+});
+
+When(
+  'matthew publishes three releases of both apps, one after another, and every peer takes each up before the next is published',
+  { timeout: 1_200_000 },
+  async function (this: E2EWorld) {
+    await ensureAppsAuthored();
+    await ensureFollowing();
+    while (run.kept.length < 3) {
+      const label = ['first', 'second', 'third'][run.kept.length];
+      const builds = buildApps(`kept-${label}`);
+      // A release names the one before it on the channel; the first names none.
+      const parent = run.kept.length === 0 ? null : run.kept[run.kept.length - 1].cid;
+      const { manifestPath, packagerLog } = packageRelease(
+        this,
+        `kept-${label}`,
+        builds,
+        parent,
+        ATTESTATION_THRESHOLD
+      );
+      const published = publishStaging(this, manifestPath);
+      const release: Release = {
+        label,
+        manifestPath,
+        cid: String(published['releaseCid']),
+        builds,
+        packagerLog,
+        ceremonyOutput: published,
+      };
+      await waitForRecords(release);
+      run.kept.push(release);
+    }
+  }
+);
+
+Then(
+  "within 15 minutes matthew's peer's own account of the channel lists the second and third releases as kept and no longer lists the first",
+  { timeout: RETENTION_BUDGET_MS + 60_000 },
+  async function () {
+    const [first, second, third] = run.kept;
+    const settled = await pollUntil(
+      async () => {
+        const { channel } = await retentionReport('matthew');
+        return channel !== undefined && !channel.held.includes(first.cid);
+      },
+      RETENTION_BUDGET_MS,
+      10_000
+    );
+    const report = await retentionReport('matthew');
+    assert.notEqual(
+      settled,
+      null,
+      `matthew's peer still keeps the first release ${first.cid} after 15 minutes: ` +
+        JSON.stringify(report)
+    );
+    assert.deepEqual(
+      report.channel?.held,
+      [third.cid, second.cid],
+      `matthew's peer should keep exactly the third and second releases, newest first: ` +
+        JSON.stringify(report)
+    );
+  }
+);
+
+Then("the first release's bundle files, for both apps, are gone from matthew's peer", function () {
+  for (const hash of bundleHashes(run.kept[0])) {
+    const file = bundleFile('matthew', hash);
+    assert.ok(!existsSync(file), `matthew's peer still holds ${file}`);
+  }
+});
+
+Then("the second and third releases' bundle files, for both apps, are still on matthew's peer", function () {
+  for (const release of [run.kept[1], run.kept[2]]) {
+    for (const hash of bundleHashes(release)) {
+      const file = bundleFile('matthew', hash);
+      assert.ok(existsSync(file), `matthew's peer let go of ${release.label}'s ${file}`);
+    }
+  }
+});
+
+Then("the first release's bundle files, for both apps, are still on jessica's peer", function () {
+  for (const hash of bundleHashes(run.kept[0])) {
+    const file = bundleFile('jessica', hash);
+    assert.ok(existsSync(file), `jessica's peer no longer holds ${file}`);
+  }
+});
+
+Then(
+  "doorway {string} still serves the third release's build of each app",
+  { timeout: 120_000 },
+  async function (this: E2EWorld, doorway: string) {
+    const third = run.kept[2];
+    const base = doorwayUrl(this, doorway);
+    for (const app of APPS) {
+      const entry = third.builds[app].browser.entryScript;
+      const served = await pollUntil(
+        async () => {
+          const { status, text } = await getRaw(`${base}/apps/${app}/index.html`, {
+            timeoutMs: 10_000,
+          });
+          return status === 200 && text.includes(entry);
+        },
+        SERVE_BUDGET_MS,
+        3_000
+      );
+      assert.notEqual(served, null, `doorway ${doorway} is not serving ${app} naming ${entry}`);
+    }
+  }
+);
+
+AfterAll({ timeout: 60_000 }, async function () {
+  for (const peer of run.retentionSet) {
+    try {
+      await setRetentionDepth(peer, null);
+    } catch {
+      // Best effort: the key is this run's own and a later run sets it again.
+    }
+  }
+});
 
 AfterAll({ timeout: 60_000 }, async function () {
   for (const peer of run.following) {

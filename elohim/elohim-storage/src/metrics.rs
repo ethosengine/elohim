@@ -896,6 +896,57 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Releases the ledger names per followed channel, split by whether they
+    /// are inside the retention window (`kept`) or past it and still held for
+    /// a reason (`past_window_held`).
+    pub static ref RELEASE_RETENTION_RELEASES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_release_retention_releases",
+            "Releases this peer's ledger names per channel, by standing (kept | past_window_held).",
+        ),
+        &["channel", "standing"],
+    )
+    .unwrap();
+
+    /// Releases whose bytes the retention pass let go, per channel.
+    pub static ref RELEASE_RETENTION_RELEASED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_release_retention_released_total",
+            "Releases past the retention window whose bytes this peer let go.",
+        ),
+        &["channel"],
+    )
+    .unwrap();
+
+    /// Bytes the retention pass removed, by where they were (`blobs` |
+    /// `staging`). The iroh store and the extraction cache are not counted
+    /// here; their footprint gauges show them.
+    pub static ref RELEASE_RETENTION_BYTES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_release_retention_bytes_released_total",
+            "Bytes removed by the release retention pass, by store (blobs | staging).",
+        ),
+        &["store"],
+    )
+    .unwrap();
+
+    /// Blobs of past-window releases still held after the last pass, by reason.
+    pub static ref RELEASE_RETENTION_BLOBS_HELD: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_release_retention_blobs_held",
+            "Blobs of releases past the window still held after the last pass, by reason (kept_release | served | pledged).",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Steps of the retention pass that failed and will be tried again.
+    pub static ref RELEASE_RETENTION_FAILURES: IntCounter = IntCounter::new(
+        "elohim_release_retention_failures_total",
+        "Release retention steps that failed and are retried on the next pass.",
+    )
+    .unwrap();
+
     /// Examined custody pledges that did NOT rotate, by
     /// [`CustodyRotationSkip`]. Every label combination is pre-touched at
     /// registration (see `register_all`) so each series reads as a measured zero
@@ -3001,6 +3052,21 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
+        let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_RELEASES.clone()));
+        let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_RELEASED.clone()));
+        let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_BLOBS_HELD.clone()));
+        let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_FAILURES.clone()));
+        for store in ["blobs", "staging"] {
+            RELEASE_RETENTION_BYTES
+                .with_label_values(&[store])
+                .inc_by(0);
+        }
+        for hold in crate::services::release_adoption::retention::BlobHold::ALL {
+            RELEASE_RETENTION_BLOBS_HELD
+                .with_label_values(&[hold.label()])
+                .set(0);
+        }
         let _ = REGISTRY.register(Box::new(NODE_STORE_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_STORE_FILES.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_KNOWN_HOLDERS.clone()));
@@ -4188,6 +4254,38 @@ pub fn set_store_footprint(
             .set(t.files as i64);
         previous.insert(k.clone());
     }
+}
+
+/// One channel's standing after a release retention pass.
+pub fn set_release_retention_channel(channel: &str, kept: usize, past_window_held: usize) {
+    RELEASE_RETENTION_RELEASES
+        .with_label_values(&[channel, "kept"])
+        .set(kept as i64);
+    RELEASE_RETENTION_RELEASES
+        .with_label_values(&[channel, "past_window_held"])
+        .set(past_window_held as i64);
+}
+
+pub fn add_release_retention_released(channel: &str, releases: usize) {
+    RELEASE_RETENTION_RELEASED
+        .with_label_values(&[channel])
+        .inc_by(releases as u64);
+}
+
+pub fn add_release_retention_bytes(store: &str, bytes: u64) {
+    RELEASE_RETENTION_BYTES
+        .with_label_values(&[store])
+        .inc_by(bytes);
+}
+
+pub fn set_release_retention_blobs_held(reason: &str, blobs: usize) {
+    RELEASE_RETENTION_BLOBS_HELD
+        .with_label_values(&[reason])
+        .set(blobs as i64);
+}
+
+pub fn add_release_retention_failures(failures: usize) {
+    RELEASE_RETENTION_FAILURES.inc_by(failures as u64);
 }
 
 /// Set the node corpus size for an app scope (content rows held).
