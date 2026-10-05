@@ -60,6 +60,7 @@ pub mod pending;
 pub mod pkce;
 pub mod request;
 pub mod return_path;
+pub mod signin;
 pub mod verify;
 pub mod witness;
 
@@ -92,6 +93,10 @@ pub use pending::{
 };
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
+pub use signin::{
+    attend_sign_in, channel, may_make_node_sign, sign_in_channel_verdict, AttemptLimiter, Channel,
+    SignInClaims, SignInRefusal, PLAIN_SIGN_IN_ALLOWED, SESSION_LIFE_MICROS,
+};
 pub use verify::{check_delivered, DeliveredRefusal};
 pub use witness::{
     attend, AuthorizationClaims, MomentKind, Paused, Unattended, WitnessBeat, WitnessedMoment,

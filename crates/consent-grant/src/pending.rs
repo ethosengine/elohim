@@ -232,6 +232,9 @@ pub enum Dropped {
     SpeaksForNobody,
     /// This node's standing is not known recently enough to list anything.
     StandingUnknown,
+    /// This very ask (its state token) was decided here already; the device
+    /// asked again before its code reached it.
+    AlreadyDecided,
     /// Not a request a portal would show a person.
     Malformed(RequestRefusal),
     /// Addressed to another approving node.
@@ -247,6 +250,7 @@ impl Dropped {
         match self {
             Self::SpeaksForNobody => "ask_node_speaks_for_nobody",
             Self::StandingUnknown => "ask_node_standing_unknown",
+            Self::AlreadyDecided => "ask_already_decided",
             Self::Malformed(r) => r.code(),
             Self::NotForThisApprover => "ask_for_another_approver",
             Self::Full => "ask_list_full",
@@ -273,7 +277,13 @@ pub struct PendingAsks {
 struct Inner {
     next: u32,
     asks: BTreeMap<u32, PendingAsk>,
+    /// The state tokens of asks already decided, with when, so the same ask
+    /// arriving again while its code travels back is not listed anew.
+    decided: std::collections::VecDeque<(String, i64)>,
 }
+
+/// How many decided asks are remembered.
+pub const MAX_DECIDED: usize = 4 * MAX_PENDING;
 
 impl PendingAsks {
     pub fn new() -> Self {
@@ -304,6 +314,20 @@ impl PendingAsks {
             Speaks::Unknown => return Err(Dropped::StandingUnknown),
         }
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
+        {
+            let mut inner = self.lock();
+            // bounded-work: at most MAX_DECIDED entries, each an ask's life.
+            inner
+                .decided
+                .retain(|(_, at)| now_micros < at.saturating_add(ASK_LIFE_MICROS));
+            if inner
+                .decided
+                .iter()
+                .any(|(state, _)| *state == ask.request.state)
+            {
+                return Err(Dropped::AlreadyDecided);
+            }
+        }
         if let Some(wanted) = &ask.for_approver {
             if me != Some(wanted.as_str()) {
                 return Err(Dropped::NotForThisApprover);
@@ -370,6 +394,20 @@ impl PendingAsks {
     /// Take a decided ask off the list.
     pub fn remove(&self, number: u32) -> Option<PendingAsk> {
         self.lock().asks.remove(&number)
+    }
+
+    /// Take a decided ask off the list, and remember it was decided until its
+    /// life ends, so the same ask is not listed again while its code travels.
+    pub fn decided(&self, number: u32, now_micros: i64) -> Option<PendingAsk> {
+        let mut inner = self.lock();
+        let taken = inner.asks.remove(&number)?;
+        if inner.decided.len() >= MAX_DECIDED {
+            inner.decided.pop_front();
+        }
+        inner
+            .decided
+            .push_back((taken.ask.request.state.clone(), now_micros));
+        Some(taken)
     }
 
     pub fn len(&self) -> usize {
@@ -734,5 +772,35 @@ pub(crate) mod tests {
         );
         let back: Speaks = serde_json::from_value(wire).unwrap();
         assert_eq!(back, speaks());
+    }
+
+    #[test]
+    fn a_decided_ask_is_not_listed_again_while_its_code_travels() {
+        let list = PendingAsks::new();
+        list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW)
+            .unwrap();
+        assert!(list.decided(1, NOW).is_some());
+        assert_eq!(
+            list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW + 1),
+            Err(Dropped::AlreadyDecided)
+        );
+        assert_eq!(Dropped::AlreadyDecided.code(), "ask_already_decided");
+        // A new ask from the same device (a new state token) is listed.
+        let mut fresh = ask(1);
+        fresh.request.state = "t".repeat(32);
+        assert!(list
+            .admit(fresh, "peer-a", None, &speaks(), &policy(), NOW + 1)
+            .is_ok());
+        // Once the decided ask's life is over it is forgotten.
+        assert!(list
+            .admit(
+                ask(1),
+                "peer-a",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + ASK_LIFE_MICROS
+            )
+            .is_ok());
     }
 }

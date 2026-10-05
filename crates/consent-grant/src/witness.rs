@@ -44,6 +44,8 @@ pub const MAX_PAUSE_REASON: usize = 280;
 pub enum MomentKind {
     /// A person's node authorizing a device to act for them.
     DeviceAuthorization,
+    /// A person signing in to their own node ([`crate::signin`]).
+    SignIn,
 }
 
 /// What an attending witness returns from a moment. `S` is the moment's
@@ -100,6 +102,22 @@ pub struct Paused {
     pub reason: String,
 }
 
+/// A pause reason made plain: control characters dropped, at most
+/// [`MAX_PAUSE_REASON`] characters, never empty.
+pub(crate) fn plain_reason(reason: &str) -> String {
+    let plain: String = reason
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_PAUSE_REASON)
+        .collect();
+    let plain = plain.trim();
+    if plain.is_empty() {
+        "a witness asked for the person to sign in again".to_string()
+    } else {
+        plain.to_string()
+    }
+}
+
 /// Run the device-authorization moment. Keep only the witness signatures the
 /// beat adds, on the same record; a signature in any other role is discarded,
 /// so a beat that misbehaves costs the consent nothing. A pause comes back as
@@ -117,18 +135,8 @@ pub fn attend(
         Witnessing::Proceed => Vec::new(),
         Witnessing::ProceedWithSignatures(signatures) => signatures,
         Witnessing::PauseForReauthentication { reason } => {
-            let plain: String = reason
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(MAX_PAUSE_REASON)
-                .collect();
-            let plain = plain.trim();
             return Err(Paused {
-                reason: if plain.is_empty() {
-                    "a witness asked for the person to sign in again".to_string()
-                } else {
-                    plain.to_string()
-                },
+                reason: plain_reason(&reason),
             });
         }
     };

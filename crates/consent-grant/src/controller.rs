@@ -51,6 +51,9 @@ pub struct StandingView {
     /// ([`crate::declaration::identifier_claim`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identifier: Option<String>,
+    /// The person's name as given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
 }
 
 impl StandingView {
@@ -66,12 +69,19 @@ impl StandingView {
             this_node_is_controller,
             rests_on_this_node_alone: this_node_is_controller && standing.controllers.len() == 1,
             identifier: None,
+            display_name: None,
         }
     }
 
     /// The same view, naming the person by their sign-in word.
     pub fn with_identifier(mut self, identifier: Option<String>) -> Self {
         self.identifier = identifier;
+        self
+    }
+
+    /// The same view, with the person's name as given.
+    pub fn with_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
         self
     }
 }
