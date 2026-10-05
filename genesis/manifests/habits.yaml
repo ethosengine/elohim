@@ -913,6 +913,15 @@ habits:
       `adopted`. Owed: the fleet read (leg 2's 75 s budget is the acceptance, run from Che); the a2o household story (dev-intent ledger);
       `live` after an update lags the head by ~30 s because the courier and election-obey stamps do not carry the witness
       (genesis/data/timeline/backlog/conductor-verified-head-moves-read-unverified.md). Receipts: genesis/local-dev/event-driven-head-delivery/receipts/.
+      DELTA 2026-10-05b (RED preserved; the delivery path is ON the fleet, its timing there is unmeasured): edge #1541 and #1542 failed at
+      Build Storage (the built-in peer policy's compile-time include was missing from the image's release stage; 9bd467440), edge #1543
+      rolled all seven alpha peers to 9bd46744, and its validate-only sibling #1544 passed Dataplane Validation. Prometheus, ~100 min after
+      the roll: `elohim_announce_row_fetch_total{outcome="enqueued"}` 1–6 per peer, `row_stored_enqueued` 2–3, `adopted` 0–2; the
+      anchor-verify pass took jessica, james, gertrude and eve to 0 unverified rows (53–82 confirmed each), susan to 18, and left adam at
+      3,270 and matthew at 3,048 with 14 and 0 confirmed — it walked oldest first at 20 a tick, so the leg 2 root on the doorways' storage
+      still read `unverified`. The pass now walks newest first at 50 (5cc1115d4; household probe 1.5 s, lanes green). No storage restart,
+      panic or OOM on any peer. Owed: the fleet read after 5cc1115d4 rolls (matthew's newest rows `live`); leg 2 from Che for the 75 s
+      budget; gertrude's and eve's conductors are CPU-throttled at 0.94 and 1.00, as before the roll.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -4763,6 +4772,16 @@ habits:
       `primary_not_healthy`, 21 blocking errors, nothing changed, the kept bundle unchanged. (5) james's storage restarted with no policy
       file logged the built-in policy warning and registered all four signal subscribers. Not taken: the `issuer-behind` refusal (unit
       tests only). Receipts: genesis/local-dev/coordinator-acceptance-contract/receipts/.
+      DELTA 2026-10-05d (fleet, first read of the acceptance contract; green NOT re-earned): edge #1543 rolled alpha to 9bd46744 and
+      conductor diagnostics carries `coordinators` on both doorways, but `observed: false` and `elohim_coordinator_last_pass_timestamp_seconds`
+      0 on all seven peers 100 minutes on: storage beside an external conductor has no boot bundle, and a bundle was recorded only after an
+      apply, which the driver never sends to a peer its pre-check finds current. A sweep showing the own app already runs the bundle now
+      records it (5cc1115d4; household: matthew's kept bundle removed, a dry run alone re-recorded it). The 32 `CellMissing` hosted apps did
+      not trip `primary_not_healthy` (no such line on any peer). DNA #1484–#1486 ended `COORDSWAP: INCOMPLETE` short of eve — rc 141 from
+      `printf | head -n1` under pipefail on a report larger than a pipe buffer, then an empty reply from susan; with 3f73f504e DNA #1487
+      reached all seven: adam, matthew, jessica current; james 5, gertrude 31, susan 21, eve 51 roles `UNHEALED`, all `CellMissing`
+      (backlog gap 3, unchanged). Owed: the read after 5cc1115d4 rolls and the next driver run (`observed: true`, a bundle kept on every
+      peer); why susan answered an empty reply at ~12:40Z (storage logged `database is locked` and a closed conductor websocket at 12:26Z).
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md (§5 verify floors, §10 receipt chain)"
       - "arc: genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (cycle-time table)"

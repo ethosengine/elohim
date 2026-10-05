@@ -877,3 +877,12 @@ path: `elohim_announce_row_fetch_total{outcome="enqueued"}` → `elohim_head_ado
 `adopted`. Owed: the fleet read (leg 2's 75 s budget is the acceptance, run from Che); the a2o household story (dev-intent ledger);
 `live` after an update lags the head by ~30 s because the courier and election-obey stamps do not carry the witness
 (genesis/data/timeline/backlog/conductor-verified-head-moves-read-unverified.md). Receipts: genesis/local-dev/event-driven-head-delivery/receipts/.
+DELTA 2026-10-05b (RED preserved; the delivery path is ON the fleet, its timing there is unmeasured): edge #1541 and #1542 failed at
+Build Storage (the built-in peer policy's compile-time include was missing from the image's release stage; 9bd467440), edge #1543
+rolled all seven alpha peers to 9bd46744, and its validate-only sibling #1544 passed Dataplane Validation. Prometheus, ~100 min after
+the roll: `elohim_announce_row_fetch_total{outcome="enqueued"}` 1–6 per peer, `row_stored_enqueued` 2–3, `adopted` 0–2; the
+anchor-verify pass took jessica, james, gertrude and eve to 0 unverified rows (53–82 confirmed each), susan to 18, and left adam at
+3,270 and matthew at 3,048 with 14 and 0 confirmed — it walked oldest first at 20 a tick, so the leg 2 root on the doorways' storage
+still read `unverified`. The pass now walks newest first at 50 (5cc1115d4; household probe 1.5 s, lanes green). No storage restart,
+panic or OOM on any peer. Owed: the fleet read after 5cc1115d4 rolls (matthew's newest rows `live`); leg 2 from Che for the 75 s
+budget; gertrude's and eve's conductors are CPU-throttled at 0.94 and 1.00, as before the roll.

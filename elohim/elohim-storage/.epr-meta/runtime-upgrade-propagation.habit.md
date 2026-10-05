@@ -305,3 +305,13 @@ lineage applied to matthew: the own app refused `dnaHashMismatch`, `primaryHealt
 `primary_not_healthy`, 21 blocking errors, nothing changed, the kept bundle unchanged. (5) james's storage restarted with no policy
 file logged the built-in policy warning and registered all four signal subscribers. Not taken: the `issuer-behind` refusal (unit
 tests only). Receipts: genesis/local-dev/coordinator-acceptance-contract/receipts/.
+DELTA 2026-10-05d (fleet, first read of the acceptance contract; green NOT re-earned): edge #1543 rolled alpha to 9bd46744 and
+conductor diagnostics carries `coordinators` on both doorways, but `observed: false` and `elohim_coordinator_last_pass_timestamp_seconds`
+0 on all seven peers 100 minutes on: storage beside an external conductor has no boot bundle, and a bundle was recorded only after an
+apply, which the driver never sends to a peer its pre-check finds current. A sweep showing the own app already runs the bundle now
+records it (5cc1115d4; household: matthew's kept bundle removed, a dry run alone re-recorded it). The 32 `CellMissing` hosted apps did
+not trip `primary_not_healthy` (no such line on any peer). DNA #1484–#1486 ended `COORDSWAP: INCOMPLETE` short of eve — rc 141 from
+`printf | head -n1` under pipefail on a report larger than a pipe buffer, then an empty reply from susan; with 3f73f504e DNA #1487
+reached all seven: adam, matthew, jessica current; james 5, gertrude 31, susan 21, eve 51 roles `UNHEALED`, all `CellMissing`
+(backlog gap 3, unchanged). Owed: the read after 5cc1115d4 rolls and the next driver run (`observed: true`, a bundle kept on every
+peer); why susan answered an empty reply at ~12:40Z (storage logged `database is locked` and a closed conductor websocket at 12:26Z).
