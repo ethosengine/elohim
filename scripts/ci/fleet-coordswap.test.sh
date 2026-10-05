@@ -191,5 +191,23 @@ set -e
 jq -e '.[0].verdict == "failed-apply" and (.[0].note | contains("elohim/lamad")) and (.[0].note | contains("hosted-x") | not)' "$ROOT/all-apps-own-failed.json" >/dev/null \
   || fail "the peer's own failure was not the stated reason"
 
-echo 'fleet-coordswap: role-error refusal, first-peer stop, clean apply, all-apps, and stranded hosted apps passed'
+# A report larger than a pipe buffer must not end the roll (fleet 2026-10-05: rc 141 at
+# the last peer). 400 long hosted errors is about 120 KB.
+big_errors="$(for i in $(seq 1 400); do printf '"hosted-%s/lamad: update_coordinators failed: CellMissing %s",' "$i" "$(printf 'x%.0s' $(seq 1 250))"; done)"
+big_applied="{\"apply\":true,\"apps\":[],\"primaryAppId\":\"elohim\",\"driftedCount\":400,\"appliedCount\":1,\"pendingCount\":400,\"blockingErrors\":[${big_errors%,}]}"
+for engine_path in "$PATH" "$ROOT/python-path"; do
+  : > "$CALLS"
+  printf '%s' '{"apply":false,"apps":[],"primaryAppId":"elohim","driftedCount":400,"appliedCount":0,"pendingCount":400,"blockingErrors":[]}' > "$ROOT/one-false.json"
+  printf '%s' "$big_applied" > "$ROOT/one-true.json"
+  printf '%s' '{"apply":false,"apps":[],"primaryAppId":"elohim","driftedCount":400,"appliedCount":0,"pendingCount":400,"blockingErrors":[]}' > "$ROOT/one-false-after.json"
+  printf '%s' "$all_clean" > "$ROOT/two-false.json"
+  set +e
+  PATH="$engine_path" bash "$DRIVER" --happ "$HAPP" --peers one=http://one,two=http://two --apply --all-apps --json > "$ROOT/big.json" 2> "$ROOT/big.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 5 ] || { tail -5 "$ROOT/big.err" >&2; fail "a report larger than a pipe buffer returned $rc, expected 5"; }
+  [ "$(tail -1 "$CALLS")" = 'two false' ] || fail "a large report kept the roll from the next peer"
+done
+
+echo 'fleet-coordswap: large report, role-error refusal, first-peer stop, clean apply, all-apps, and stranded hosted apps passed'
 

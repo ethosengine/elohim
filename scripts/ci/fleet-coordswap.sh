@@ -344,8 +344,11 @@ LAST_BODY=""
 call_sync() {
   local base_url="$1" apply_flag="$2" out
   out="$(post_sync "${base_url}" "${apply_flag}")"
-  LAST_HTTP_CODE="$(printf '%s' "${out}" | head -n1)"
-  LAST_BODY="$(printf '%s' "${out}" | tail -n +2)"
+  # Split in the shell, not through `head`: a report larger than the pipe buffer
+  # (eve, 2026-10-05: 50 unhealed roles) made `printf | head -n1` die of SIGPIPE
+  # under pipefail and ended the roll with rc 141 before the last peer.
+  LAST_HTTP_CODE="${out%%$'\n'*}"
+  if [ "${out}" = "${LAST_HTTP_CODE}" ]; then LAST_BODY=""; else LAST_BODY="${out#*$'\n'}"; fi
 }
 
 # An all-apps report carries `pendingCount` — roles a hot-swap can still heal.
