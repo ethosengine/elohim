@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::ExitCode};
 
 use elohim_epr_cli::{
-    actor, canon_lift, check, doctor,
+    actor, canon_lift, check, device, doctor,
     error::{Error, Result},
     explain, flow, git,
     git::{ChangeKind, ChangedPath},
@@ -42,6 +42,17 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr actor: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
+    // `device` is a person's own act on the device that asks to be recognized:
+    // it talks to nodes and renders its own lines, not a Report.
+    if raw.first().map(String::as_str) == Some("device") {
+        return match device::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr device: {error}");
                 ExitCode::from(2)
             }
         };
@@ -256,5 +267,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]>"
+    "usage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|flow ...|actor <claim --as agent:<role>@<model> --session ID|current --session ID>|canon-lift [--check|--write]|device <ask|redeem> ...>"
 }

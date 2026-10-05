@@ -35,6 +35,10 @@ elohim-epr-index = { path = "../../epr-index" }
 # elohim-storage consume it, so a device's did:key here and a did:key those services resolve can
 # never be two encodings. Default features keep did:web's HTTP client out.
 did-bridge = { path = "../../../bridges/did/did-bridge" }
+# The device consent ceremony's rules, shared with the portals that approve: the terminal builds
+# its request, checks what it collects and refuses what a portal would refuse, by the same code.
+elohim-consent-grant = { path = "../../../crates/consent-grant" }
+base64 = "0.22"
 # OS entropy for the device key's first generation (`AgentKeypair::generate(&mut OsRng)`).
 rand_core = { version = "0.6", features = ["getrandom"] }
 chrono = "0.4"

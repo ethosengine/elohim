@@ -413,6 +413,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-consent-grant"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "elohim-epr",
+ "serde",
+ "serde_ipld_dagcbor",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "elohim-epr"
 version = "0.1.0"
 dependencies = [
@@ -435,9 +446,11 @@ dependencies = [
 name = "elohim-epr-cli"
 version = "0.1.2"
 dependencies = [
+ "base64",
  "chrono",
  "cid",
  "did-bridge",
+ "elohim-consent-grant",
  "elohim-epr",
  "elohim-epr-index",
  "elohim-epr-rea",
