@@ -38,9 +38,7 @@ Feature: A person's identity starts on one node and grows to others
   Matthew may also tell a steward in advance which node he expects to join,
   by writing that node's key in the steward's settings. When that exact node
   asks, the steward approves without asking Matthew again, because he has
-  already answered, and shows the code as it would after an approval. For a node that already has an identity of its own, the
-  steward applies the recommended choice without asking Matthew again, and the
-  node must still confirm it.
+  already answered, and shows the code as it would after an approval.
 
   A doorway is a node run as a service for other people. It can hold a
   person's key for them, so they can sign in from a browser with a password,
@@ -51,6 +49,16 @@ Feature: A person's identity starts on one node and grows to others
   doorway is one kind of steward a person may have. It is never required: an
   identity can be created, and can grow to a second node, on a network where
   no doorway exists.
+
+  Three things about a node are separate, and one person need not hold all
+  three. Whose it is: the person whose identity it speaks for. Who operates
+  it: whoever keeps the machine running and answers for what happens to it.
+  Whether it is a steward: whether it may approve other nodes for that
+  identity. Matthew's grandmother-in-law Gertrude needs a node of her own, and
+  Matthew will be the one who operates it. That gives him no say over her
+  identity. Where a person has nobody suitable to operate their node, the
+  people on the network who look after it together, called here the
+  community, provide a caretaker to do it, on the same terms.
 
   A node may have begun an identity of its own before anyone told it whose it
   is. When such a node asks to join, each side is told what is about to happen
@@ -69,6 +77,10 @@ Feature: A person's identity starts on one node and grows to others
   everything: the node keeps its key and joins as it is, and what it made
   stays where it is, still tracing to the identity it began. The portal says
   plainly that it has been left as it was.
+
+  When a node Matthew told a steward to expect turns out to have an identity
+  of its own, both rules apply: the steward applies the recommended choice
+  without asking Matthew again, and the node must still confirm it.
 
   Both of those are small decisions. There is a third, for when a lot rests on
   what the node made: going through that earlier work and settling what
@@ -181,6 +193,28 @@ Feature: A person's identity starts on one node and grows to others
       When Matthew says on node "workspace" that node "home" is a steward of his identity
       Then node "workspace" and node "home" are both stewards of Matthew's identity
       And Matthew can approve a new node in the portal on node "home"
+
+  Rule: The person a node speaks for and the one who operates it can be different
+
+    Scenario: Gertrude's identity begins on a node Matthew operates
+      Given a node "cottage" that Matthew operates for Gertrude
+      When Gertrude's identity is created on node "cottage"
+      Then node "cottage" is the only steward of Gertrude's identity
+      And Matthew is the operator of node "cottage"
+      And node "cottage" is not one of Matthew's nodes
+
+    Scenario: Operating a node gives no say over the identity it speaks for
+      Given Gertrude's identity began on node "cottage", which Matthew operates
+      When the terminal on a new node "tablet" asks to join Gertrude's identity
+      Then the portal on node "cottage" asks for Gertrude's approval, not Matthew's
+      And an approval given in Matthew's name is refused
+
+    Scenario: The community's caretaker operates a node when nobody else can
+      Given Gertrude's identity began on node "cottage", which Matthew operates
+      When Matthew stops operating node "cottage" and the community's caretaker takes it on
+      Then the community's caretaker is the operator of node "cottage"
+      And node "cottage" is still the only steward of Gertrude's identity
+      And Gertrude's identity is unchanged
 
   Rule: A node that already began an identity joins with a recommended choice, and confirms what will happen to it
 
