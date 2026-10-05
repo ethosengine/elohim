@@ -1129,12 +1129,15 @@ async fn process_trigger(
                 "head-adoption trigger: no local content row for a peer-named id — \
                  terminal; no conductor call, no ladder"
             );
-            // The row often arrives seconds later (the sweep projects it), and
-            // the author's NEXT publish must not be swallowed by this claim
-            // (2026-09-26 household: B arrived 55 s after A had found no row).
-            // A later change may take the claim over; for an id that never
-            // gets a row that costs one row read per change and no conductor
-            // call, which is the bound this arm exists to keep.
+            // The row is on its way: the announce arm that raised this trigger
+            // also asked the announcer for the record
+            // (`p2p::announce_fetch`), and `store_acquired_record` re-offers
+            // the id the moment the row is stored. Marking the claim sleeping
+            // is what lets that re-offer — or the author's NEXT publish
+            // (2026-09-26 household: B arrived 55 s after A had found no row)
+            // — take it over instead of being deduped. For an id that never
+            // gets a row a takeover costs one row read and no conductor call,
+            // which is the bound this arm exists to keep.
             gate.set_sleeping(id, true);
         }
         return;
@@ -1698,6 +1701,49 @@ mod tests {
             EnqueueDecision::Deduped,
             "one takeover per rung: the new trigger is queued"
         );
+    }
+
+    /// The announce found no row (`NoLocalRow` leaves the claim sleeping); the
+    /// record then lands through the acquisition ingest. That store's offer
+    /// must take the claim over — otherwise the head waits out the cooldown
+    /// and then the 300 s heal leg, which is the fleet lag of 2026-10-05.
+    #[cfg(feature = "p2p")]
+    #[test]
+    fn a_stored_rows_offer_takes_over_the_claim_a_missing_row_left_sleeping() {
+        use crate::p2p::announce_fetch::reoffer_stored_row;
+        use crate::services::custody_standing::Requester;
+
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        // The announce's own offer, drained by the worker…
+        assert_eq!(
+            gate.claim_and_send("late-row", "peerA", Instant::now()),
+            EnqueueDecision::Enqueued
+        );
+        let _ = rx.try_recv();
+        // …which found no row: terminal, claim kept and marked sleeping.
+        assert_eq!(decide(None, Some("uhCkk-head")), TriggerAction::NoLocalRow);
+        gate.set_sleeping("late-row", true);
+
+        // Seconds later the row is stored: a NEW trigger, well inside the
+        // cooldown, attributed to the peer that served the record.
+        let sender = Requester::iroh("iroh-node-that-served-it");
+        assert_eq!(
+            reoffer_stored_row(Some(&gate), "late-row", &sender),
+            Some(EnqueueDecision::Enqueued)
+        );
+        let trigger = rx.try_recv().expect("the stored row re-raised the trigger");
+        assert_eq!(trigger.content_id, "late-row");
+        assert_eq!(trigger.peer, "iroh-node-that-served-it");
+        assert_eq!(trigger.attempt, 0, "a fresh ladder, not a resumed rung");
+        // With the row present the same pure gate now reaches the conductor arm.
+        assert_eq!(
+            decide(Some((None, false)), Some("uhCkk-head")),
+            TriggerAction::Probe
+        );
+
+        // A WITHOUT-a-row id is still never probed, however often it is offered.
+        assert_eq!(decide(None, Some("uhCkk-head")), TriggerAction::NoLocalRow);
+        assert_eq!(gate.claim_count(), 1, "the takeover reused the claim");
     }
 
     #[test]

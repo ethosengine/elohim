@@ -31,6 +31,7 @@
 pub mod acquisition;
 pub mod acquisition_dispatch; // pull-leg dispatch planning across libp2p + iroh (row 13)
 pub mod adapters;
+pub mod announce_fetch; // event-driven row delivery: fetch the row on a doc announce, re-offer the trigger on store
 pub mod attention_tending;
 pub mod behaviour;
 pub mod binding_cross_signature;
@@ -3747,6 +3748,23 @@ impl P2PNode {
                     .max(1),
             ),
         );
+
+        // Dual mode: this node owns the replication trackers, so it answers a
+        // doc the IROH sync plane applied with no local row (the libp2p plane's
+        // own applies go through `fetch_announced_row`). All builders have run
+        // by now, so the ingest context snapshot is final. Never called on a
+        // libp2p-only node — nothing applies docs over iroh there.
+        #[cfg(feature = "p2p-iroh")]
+        {
+            let ctx = self.acquisition_ingest_ctx();
+            crate::p2p_iroh::register_announce_row_fetch(
+                crate::p2p_iroh::IrohAnnounceRowFetch::new(
+                    move || ctx.clone(),
+                    Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                    crate::p2p_iroh::pull_core::MAX_REPLICATION_INFLIGHT,
+                ),
+            );
+        }
 
         // Initial status snapshot after start
         self.refresh_status().await;
@@ -8700,11 +8718,58 @@ impl P2PNode {
                 // heal-pointer-bytes-ordering-blocking-serve).
                 self.heal_blob_bytes_if_absent(doc_id).await;
             }
-            Ok(false) => {}
+            // `Ok(false)` covers an unchanged pointer, a doc naming no blob,
+            // AND an absent row. Only the last is a gap, so presence is read
+            // explicitly before anything is asked of the announcer.
+            Ok(false) => self.fetch_announced_row(h_app_id, doc_id, peer).await,
             Err(e) => {
                 warn!(doc_id = %doc_id, error = %e, "content heal: reverse-projection failed")
             }
         }
+    }
+
+    /// An applied content doc names an id this node holds no row for: ask the
+    /// peer that announced it for the record NOW, through the replication gap
+    /// queue, instead of waiting for the next 60 s inventory walk to notice.
+    /// Decision and bounds: [`announce_fetch`].
+    ///
+    /// bounded-work: one `GetContent` per id, to the announcing peer.
+    /// `ReplicationState::discover` refuses an id already local, pending,
+    /// completed or retry-exhausted; `drain_gap_queue` holds the dispatch to
+    /// `MAX_REPLICATION_INFLIGHT`, and an id it cannot dispatch now stays at
+    /// the head of the queue for the 5 s tick.
+    async fn fetch_announced_row(&self, h_app_id: &str, doc_id: &str, peer: &str) {
+        use announce_fetch::AnnounceFetch;
+        let Some(pool) = self.db_pool.as_ref() else {
+            return;
+        };
+        let content_id = match announce_fetch::absent_row_for(pool, h_app_id, doc_id) {
+            Ok(id) => id.to_string(),
+            Err(decision) => return decision.record(),
+        };
+        let Ok(announcer) = peer.parse::<PeerId>() else {
+            return AnnounceFetch::NoRoute.record();
+        };
+        if self
+            .replication_state
+            .discover(vec![content_id.clone()])
+            .await
+            .is_empty()
+        {
+            return AnnounceFetch::AlreadyTracked.record();
+        }
+        // FRONT of the queue: this id has a doc waiting on it and a peer known
+        // to hold it, so it must not sit behind an inventory backlog.
+        self.gap_queue
+            .lock()
+            .await
+            .push_front((content_id.clone(), announcer));
+        AnnounceFetch::Enqueued.record();
+        info!(
+            content_id = %content_id, peer = %announcer,
+            "announced content doc has no local row — fetching the record from the announcer"
+        );
+        self.drain_gap_queue().await;
     }
 
     /// Eagerly fetch the bytes behind a just-healed content pointer when the
@@ -10139,6 +10204,7 @@ impl P2PNode {
             self_cid: self.config.self_cid.clone().unwrap_or_default(),
             write_gate: self.acquisition_write_gate.clone(),
             custody_standing: self.shard_service.custody_standing(),
+            head_adoption: self.head_adoption_trigger.clone(),
         }
     }
 
@@ -10823,6 +10889,10 @@ pub(crate) struct AcquisitionIngestCtx {
     /// (reach-gating not wired) fails CLOSED for a `private` record.
     pub(crate) custody_standing:
         Option<Arc<dyn crate::services::custody_standing::CustodyStanding>>,
+    /// The head-adoption trigger gate a STORED row is offered to
+    /// ([`announce_fetch::reoffer_stored_row`]). `None` (no conductor registry,
+    /// or no content pool) leaves head adoption sweep-bound, as before.
+    pub(crate) head_adoption: Option<Arc<crate::services::head_adoption_trigger::TriggerGate>>,
 }
 
 pub(crate) enum StoredRecord {
@@ -10924,6 +10994,15 @@ pub(crate) async fn store_acquired_record(
                 ctx.replication_state.mark_completed(&content_id).await;
                 ctx.acquisition.mark_completed(&content_id).await;
                 crate::metrics::inc_acquisition_outcome("fetched");
+                // The row is here. An announce that found none left its trigger
+                // terminal (`NoLocalRow`); nothing else re-raises it before the
+                // 300 s heal leg. Offer the id now — the worker reads the stored
+                // doc's head hint and asks the OWN conductor, as for any trigger.
+                announce_fetch::reoffer_stored_row(
+                    ctx.head_adoption.as_deref(),
+                    &content_id,
+                    &sender,
+                );
                 StoredRecord::Stored {
                     content_id,
                     blob_hash: blob_hash_opt,

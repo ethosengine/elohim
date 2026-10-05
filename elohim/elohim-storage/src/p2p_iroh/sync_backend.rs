@@ -77,10 +77,6 @@ impl SyncManagerBackend {
         self.head_adoption.set(gate).is_ok()
     }
 
-    fn head_adoption_for(&self, peer: Option<NodeId>) -> Option<(&TriggerGate, NodeId)> {
-        self.head_adoption.get().map(Arc::as_ref).zip(peer)
-    }
-
     /// Give the announce arm a way to dial back at an announcer.
     ///
     /// Called once, after the iroh node and peer book exist. Returns `false` if
@@ -188,7 +184,8 @@ impl SyncManagerBackend {
                         &self.sync_manager,
                         pb.db_pool.as_ref(),
                         &doc_id,
-                        self.head_adoption_for(peer),
+                        peer,
+                        self.head_adoption.get().map(Arc::as_ref),
                     )
                     .await
                     {
@@ -339,8 +336,15 @@ async fn pull_announced_doc(
         Ok(_) => {
             crate::metrics::add_iroh_sync_changes_applied(count);
             info!(peer = %peer_id, doc_id = %doc_id, changes = count, "iroh announce pull applied changes");
-            let adoption = head_adoption.map(|gate| (gate, peer_id));
-            if super::sync_driver::reverse_project(sync_manager, db_pool, doc_id, adoption).await {
+            if super::sync_driver::reverse_project(
+                sync_manager,
+                db_pool,
+                doc_id,
+                Some(peer_id),
+                head_adoption,
+            )
+            .await
+            {
                 crate::metrics::observe_sync_projected_apply_staleness("iroh", origin_timestamps);
             }
         }

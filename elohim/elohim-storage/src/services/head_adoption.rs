@@ -2194,17 +2194,39 @@ fn adopt_local(
         }
     }
 
-    match content_diesel::stamp_declared_head_mode(
-        &mut conn,
-        ctx,
-        id,
-        head.head_action_hash.as_str(),
-        Some(head.declared_at),
-        verified_patch,
-        StampMode::HealCanonical,
-        // The DHT election behind this answer — what the guard actually compares.
-        head.canonical_ordering(),
-    ) {
+    // `head` is THIS node's own conductor's answer (every `LocalResolve` that
+    // carries one is an own-conductor read — the trigger's probe, the heal
+    // leg's batch resolve, the backfill's `Probe`; a peer's hint travels in
+    // `AdoptContext` and reaches `adopt_peer`, never here). When that answer is
+    // canonical it is the liveness observation `dht_anchor_state = live`
+    // names, for exactly the hash this stamp writes — so the verdict rides the
+    // same transaction (`stamp_own_conductor_canonical_head`), on a fill, a
+    // move and a same-head refresh alike. A fallback answer keeps the plain
+    // stamp and claims nothing.
+    let stamped = if head.canonical {
+        content_diesel::stamp_own_conductor_canonical_head(
+            &mut conn,
+            ctx,
+            id,
+            head.head_action_hash.as_str(),
+            Some(head.declared_at),
+            verified_patch,
+            // The DHT election behind this answer — what the guard actually compares.
+            head.canonical_ordering(),
+        )
+    } else {
+        content_diesel::stamp_declared_head_mode(
+            &mut conn,
+            ctx,
+            id,
+            head.head_action_hash.as_str(),
+            Some(head.declared_at),
+            verified_patch,
+            StampMode::HealCanonical,
+            head.canonical_ordering(),
+        )
+    };
+    match stamped {
         Ok(StampOutcome::Stamped) => {
             crate::metrics::inc_content_head_adopted();
             tracing::warn!(
@@ -4313,6 +4335,82 @@ mod tests {
             Some("## Psalm 13\n\nHow long, O LORD?\n"),
             "an older canonical answer cannot put an old body back"
         );
+    }
+
+    fn anchor_state(pool: &DbPool, id: &str) -> content_diesel::AnchorState {
+        let mut conn = pool.get().expect("connection");
+        let row = content_diesel::get_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            id,
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read content")
+        .expect("content exists");
+        content_diesel::AnchorState::from_column(row.dht_anchor_state.as_deref())
+    }
+
+    /// A head this node's OWN conductor resolved as canonical makes the adopted
+    /// row `live` in the adopt stamp itself — the witness `AnchorState::Live`
+    /// names. A stamp whose head arrived any other way (here, the plain
+    /// `HealCanonical` stamp the courier path writes through) claims nothing,
+    /// and neither does a fallback answer. The same-head refresh then heals the
+    /// row that was stamped without the verdict — the fleet's standing state.
+    #[test]
+    fn an_own_conductor_canonical_adoption_marks_the_row_live_and_a_peer_sourced_stamp_does_not() {
+        use content_diesel::AnchorState;
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+
+        // (1) own-conductor canonical FILL → live.
+        seed_adoption_content(&pool, "own", "{}");
+        let mut head = wire(true);
+        head.content.id = "own".to_string();
+        assert_eq!(anchor_state(&pool, "own"), AnchorState::Unverified);
+        assert_eq!(
+            adopt_local(&pool, &ctx, "own", &head, None),
+            AdoptOutcome::Adopted
+        );
+        assert_eq!(anchor_state(&pool, "own"), AnchorState::Live);
+
+        // (2) the same head stamped WITHOUT an own-conductor read stays unverified…
+        seed_adoption_content(&pool, "peer", "{}");
+        let head_hash = head.head_action_hash.to_string();
+        {
+            let mut conn = pool.get().expect("connection");
+            assert_eq!(
+                content_diesel::stamp_declared_head_mode(
+                    &mut conn,
+                    &ctx,
+                    "peer",
+                    &head_hash,
+                    Some(head.declared_at),
+                    None,
+                    StampMode::HealCanonical,
+                    head.canonical_ordering(),
+                )
+                .expect("peer-sourced stamp"),
+                StampOutcome::Stamped
+            );
+        }
+        assert_eq!(anchor_state(&pool, "peer"), AnchorState::Unverified);
+
+        // …a FALLBACK own-conductor answer for it claims nothing either…
+        let mut fallback = head.clone();
+        fallback.content.id = "peer".to_string();
+        fallback.canonical = false;
+        adopt_local(&pool, &ctx, "peer", &fallback, Some(&head_hash));
+        assert_eq!(anchor_state(&pool, "peer"), AnchorState::Unverified);
+
+        // …and the own conductor CONFIRMING that exact head (a same-head
+        // refresh: `Held`, nothing moved) is what makes it live.
+        let mut confirmed = head.clone();
+        confirmed.content.id = "peer".to_string();
+        assert_eq!(
+            adopt_local(&pool, &ctx, "peer", &confirmed, Some(&head_hash)),
+            AdoptOutcome::Held
+        );
+        assert_eq!(anchor_state(&pool, "peer"), AnchorState::Live);
     }
 
     /// F16 / F17: a CANONICAL adoption carries the rest of the version — the

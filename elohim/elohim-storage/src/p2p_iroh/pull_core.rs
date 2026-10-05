@@ -32,7 +32,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use iroh::{NodeAddr, NodeId};
@@ -42,10 +42,12 @@ use tracing::{debug, info, warn};
 use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 use crate::p2p::acquisition::{self, AcquisitionState, PullStatusInfo};
+use crate::p2p::announce_fetch::AnnounceFetch;
 use crate::p2p::replication::{ReplicationState, ReplicationStatus};
 use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
 use crate::p2p::{acquire_over_iroh, AcquisitionIngestCtx, PullKind};
 use crate::p2p_iroh::{iroh_fetch_leg, IrohShardClient};
+use crate::services::head_adoption_trigger::TriggerGate;
 
 /// Same cap as the libp2p `drain_gap_queue`.
 pub const MAX_REPLICATION_INFLIGHT: usize = 50;
@@ -81,6 +83,10 @@ pub struct IrohPullCore {
     // MAX_ACQUISITION_INFLIGHT; nothing here retries an uncancellable conductor call.
     list_backoff: Mutex<HashMap<NodeId, Instant>>,
     status_tx: watch::Sender<IrohPullStatus>,
+    /// Late-bound: the trigger worker is built after this core. Read into every
+    /// dispatched ingest context ([`Self::ingest_ctx`]) so a stored row is
+    /// offered to the head-adoption trigger, as the libp2p ingest does.
+    head_adoption: OnceLock<Arc<TriggerGate>>,
 }
 
 impl IrohPullCore {
@@ -119,6 +125,8 @@ impl IrohPullCore {
                 self_cid,
                 write_gate: Arc::new(Mutex::new(())),
                 custody_standing,
+                // Filled per dispatch from the late-bound slot — see `ingest_ctx`.
+                head_adoption: None,
             },
             gap_queue: Mutex::new(VecDeque::new()),
             acquisition_queue: Mutex::new(VecDeque::new()),
@@ -127,7 +135,34 @@ impl IrohPullCore {
             rotation: AtomicUsize::new(0),
             list_backoff: Mutex::new(HashMap::new()),
             status_tx,
+            head_adoption: OnceLock::new(),
         })
+    }
+
+    /// Wire the head-adoption trigger gate a stored row is offered to. Set
+    /// once; `false` if already set.
+    pub fn set_head_adoption_trigger(&self, gate: Arc<TriggerGate>) -> bool {
+        self.head_adoption.set(gate).is_ok()
+    }
+
+    /// The ingest context for ONE dispatch, carrying whatever trigger gate has
+    /// been wired by now. Cheap (Arc/handle clones).
+    fn ingest_ctx(&self) -> AcquisitionIngestCtx {
+        let mut ctx = self.ctx.clone();
+        ctx.head_adoption = self.head_adoption.get().cloned();
+        ctx
+    }
+
+    /// The fetch-on-announce leg over this core's trackers: the same
+    /// `ReplicationState` (so an id is asked for once across the announce and
+    /// the inventory walk) and the same gap in-flight budget `drain_gaps` spends.
+    pub fn announce_row_fetch(self: &Arc<Self>) -> IrohAnnounceRowFetch {
+        let core = Arc::clone(self);
+        IrohAnnounceRowFetch::new(
+            move || core.ingest_ctx(),
+            self.gap_in_flight.clone(),
+            MAX_REPLICATION_INFLIGHT,
+        )
     }
 
     pub fn status(&self) -> IrohPullStatus {
@@ -142,6 +177,9 @@ impl IrohPullCore {
     /// reconcile every `reconcile_every`, status refresh after each. Returns
     /// when the task is dropped (process exit).
     pub fn spawn(self: Arc<Self>, list_every: Duration, reconcile_every: Duration) {
+        // Pure-iroh mode: this core owns the replication trackers, so it is the
+        // one that answers an announced doc with no local row.
+        register_announce_row_fetch(self.announce_row_fetch());
         tokio::spawn(async move {
             self.hydrate_local_ids().await;
             let mut list_iv = tokio::time::interval(list_every);
@@ -343,7 +381,7 @@ impl IrohPullCore {
         for (i, id) in to_dispatch.into_iter().enumerate() {
             let (label, addr) = peers[(rotation.wrapping_add(i)) % peers.len()].clone();
             crate::metrics::inc_acquisition_dispatch("iroh");
-            let ctx = self.ctx.clone();
+            let ctx = self.ingest_ctx();
             let counter = self.gap_in_flight.clone();
             counter.fetch_add(1, Ordering::Relaxed);
             tokio::spawn(async move {
@@ -379,7 +417,7 @@ impl IrohPullCore {
             }
             let (label, addr) = peers[(rotation.wrapping_add(i)) % peers.len()].clone();
             crate::metrics::inc_acquisition_dispatch("iroh");
-            let ctx = self.ctx.clone();
+            let ctx = self.ingest_ctx();
             let counter = self.pin_in_flight.clone();
             counter.fetch_add(1, Ordering::Relaxed);
             tokio::spawn(async move {
@@ -501,6 +539,109 @@ impl IrohPullCore {
     }
 }
 
+/// Fetch-the-row-on-announce over the iroh shard ALPN — the iroh twin of
+/// `P2PNode::fetch_announced_row`. Decision and rationale:
+/// [`crate::p2p::announce_fetch`].
+///
+/// One shape for both modes that run an iroh sync plane: in pure-iroh mode it
+/// is built over [`IrohPullCore`]'s trackers, in `dual` mode over the libp2p
+/// node's (`P2PNode::iroh_announce_row_fetch`) — whichever owns the
+/// `ReplicationState`, so the announce and the inventory walk never both ask
+/// for one id. The record lands through the shared `acquire_over_iroh` →
+/// `store_acquired_record`, with every receive-side check that path carries.
+///
+/// bounded-work: at most `cap` pulls in flight (a reservation taken BEFORE the
+/// tracker is touched, so a refused fetch leaves nothing pending); one
+/// `GetContent` per id, to the announcing peer, under `acquire_over_iroh`'s own
+/// timeouts; `ReplicationState::discover` refuses an id already local, pending,
+/// completed or retry-exhausted. No queue and no retry of its own — a dropped
+/// fetch is the next inventory walk's.
+pub struct IrohAnnounceRowFetch {
+    ctx: Box<dyn Fn() -> AcquisitionIngestCtx + Send + Sync>,
+    in_flight: Arc<AtomicUsize>,
+    cap: usize,
+}
+
+impl IrohAnnounceRowFetch {
+    pub(crate) fn new(
+        ctx: impl Fn() -> AcquisitionIngestCtx + Send + Sync + 'static,
+        in_flight: Arc<AtomicUsize>,
+        cap: usize,
+    ) -> Self {
+        Self {
+            ctx: Box::new(ctx),
+            in_flight,
+            cap,
+        }
+    }
+
+    /// Reserve one in-flight slot, or refuse. Reserve-then-verify, the same
+    /// idiom `TriggerGate::plan_retry` uses.
+    fn reserve(&self) -> bool {
+        if self.in_flight.fetch_add(1, Ordering::AcqRel) >= self.cap {
+            self.in_flight.fetch_sub(1, Ordering::AcqRel);
+            return false;
+        }
+        true
+    }
+
+    /// Ask `peer` — the node whose doc apply named `content_id` — for the
+    /// record. The caller has already established that no local row exists.
+    /// Never blocks and never fails the sync apply: the pull is a detached task.
+    pub(crate) fn fetch(&self, content_id: &str, peer: NodeId) {
+        if !self.reserve() {
+            return AnnounceFetch::Saturated.record();
+        }
+        let ctx = (self.ctx)();
+        let in_flight = self.in_flight.clone();
+        let content_id = content_id.to_string();
+        tokio::spawn(async move {
+            if ctx
+                .replication_state
+                .discover(vec![content_id.clone()])
+                .await
+                .is_empty()
+            {
+                AnnounceFetch::AlreadyTracked.record();
+            } else {
+                // The book is the verified dial target; a bare NodeId is only
+                // reachable when discovery can resolve it — never wrong, just
+                // possibly unreachable (the same fallback the announce pull takes).
+                let entry = iroh_fetch_leg().and_then(|leg| leg.book().get(&peer));
+                let label = entry
+                    .as_ref()
+                    .and_then(|e| e.libp2p_peer_id.clone().or(e.agent_cid.clone()))
+                    .unwrap_or_else(|| peer.to_string());
+                let addr = entry.map(|e| e.addr).unwrap_or_else(|| NodeAddr::new(peer));
+                AnnounceFetch::Enqueued.record();
+                crate::metrics::inc_acquisition_dispatch("iroh");
+                info!(
+                    target: "elohim_storage::iroh_pull",
+                    content_id = %content_id, peer = %label,
+                    "announced content doc has no local row — fetching the record from the announcer"
+                );
+                acquire_over_iroh(ctx, content_id, label, addr, PullKind::Gap).await;
+            }
+            in_flight.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+static ANNOUNCE_ROW_FETCH: OnceLock<IrohAnnounceRowFetch> = OnceLock::new();
+
+/// Publish the process's fetch-on-announce leg. First registration wins (one
+/// owner of the replication trackers per process: the libp2p node in `dual`
+/// mode, [`IrohPullCore`] in pure-iroh mode); returns `false` otherwise.
+pub fn register_announce_row_fetch(fetch: IrohAnnounceRowFetch) -> bool {
+    ANNOUNCE_ROW_FETCH.set(fetch).is_ok()
+}
+
+/// The registered fetch-on-announce leg, or `None` when no tracker owner has
+/// started (the iroh sync plane then leaves an absent row to the inventory walk).
+pub(crate) fn announce_row_fetch() -> Option<&'static IrohAnnounceRowFetch> {
+    ANNOUNCE_ROW_FETCH.get()
+}
+
 /// Mirror of `P2PNode::readmit_cooled_down_pins`.
 fn readmit_cooled_down_pins(conn: &mut diesel::SqliteConnection) {
     let retired = match crate::db::acquisition_pins::list_pins_by_status(
@@ -519,5 +660,82 @@ fn readmit_cooled_down_pins(conn: &mut diesel::SqliteConnection) {
             continue;
         }
         let _ = crate::db::acquisition_pins::set_pin_status(conn, pin.id, "active");
+    }
+}
+
+#[cfg(test)]
+mod announce_fetch_tests {
+    use super::*;
+
+    async fn fixture(cap: usize) -> (IrohAnnounceRowFetch, ReplicationState, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = AcquisitionIngestCtx {
+            db_pool: None,
+            replication_state: ReplicationState::new(),
+            acquisition: AcquisitionState::new(),
+            blob_store: Arc::new(BlobStore::new(dir.path()).await.unwrap()),
+            self_cid: String::new(),
+            write_gate: Arc::new(Mutex::new(())),
+            custody_standing: None,
+            head_adoption: None,
+        };
+        let state = ctx.replication_state.clone();
+        (
+            IrohAnnounceRowFetch::new(move || ctx.clone(), Arc::new(AtomicUsize::new(0)), cap),
+            state,
+            dir,
+        )
+    }
+
+    fn a_peer() -> NodeId {
+        iroh::SecretKey::generate(&mut rand::rngs::OsRng).public()
+    }
+
+    /// The in-flight reservation is taken BEFORE the tracker is touched: a
+    /// saturated fetch leaves the id unknown to `ReplicationState`, so the next
+    /// inventory walk still discovers it (a pending id nobody dispatches would
+    /// hold `caught_up` false forever).
+    #[tokio::test]
+    async fn a_saturated_fetch_leaves_the_tracker_untouched() {
+        let (fetch, state, _dir) = fixture(0).await;
+        fetch.fetch("wanted", a_peer());
+        tokio::task::yield_now().await;
+        assert_eq!(state.status().await.pending, 0);
+        assert_eq!(state.discover(vec!["wanted".into()]).await, vec!["wanted"]);
+        assert_eq!(fetch.in_flight.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn the_reservation_is_capped_and_returned() {
+        let fetch = IrohAnnounceRowFetch::new(
+            || unreachable!("reserve never builds a context"),
+            Arc::new(AtomicUsize::new(0)),
+            2,
+        );
+        assert!(fetch.reserve());
+        assert!(fetch.reserve());
+        assert!(!fetch.reserve(), "the third pull is refused at a cap of 2");
+        assert_eq!(fetch.in_flight.load(Ordering::Acquire), 2);
+    }
+
+    /// An id the tracker already holds (pending from the inventory walk, or
+    /// already local) is not asked for again, and the slot is given back.
+    #[tokio::test]
+    async fn an_id_already_tracked_is_not_fetched_twice() {
+        let (fetch, state, _dir) = fixture(4).await;
+        assert_eq!(state.discover(vec!["queued".into()]).await.len(), 1);
+        fetch.fetch("queued", a_peer());
+        for _ in 0..50 {
+            if fetch.in_flight.load(Ordering::Acquire) == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(fetch.in_flight.load(Ordering::Acquire), 0);
+        assert_eq!(
+            state.status().await.pending,
+            1,
+            "still the one pending entry the inventory walk made"
+        );
     }
 }

@@ -51,6 +51,11 @@ fn delivered_record() -> ContentRecord {
 }
 
 async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
+    let sender_transport_id = match &sender.transport {
+        crate::services::custody_standing::TransportId::Libp2p(id)
+        | crate::services::custody_standing::TransportId::Iroh(id) => id.clone(),
+        crate::services::custody_standing::TransportId::Local => String::new(),
+    };
     let directory = tempfile::tempdir().expect("isolated byte store");
     let blob_store = Arc::new(BlobStore::new(directory.path()).await.expect("blob store"));
     let pool = test_pool();
@@ -58,6 +63,9 @@ async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
     standing
         .bind(&Requester::local(), RECEIVER)
         .bind(&sender, WARD);
+    let (gate, mut triggers) = crate::services::head_adoption_trigger::TriggerGate::new(
+        crate::services::head_adoption_trigger::DEFAULT_TRIGGER_COOLDOWN,
+    );
     let ctx = AcquisitionIngestCtx {
         db_pool: Some(pool.clone()),
         replication_state: ReplicationState::new(),
@@ -66,6 +74,7 @@ async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
         self_cid: "fixture-transport-not-agent".to_string(),
         write_gate: Arc::new(tokio::sync::Mutex::new(())),
         custody_standing: Some(standing.clone()),
+        head_adoption: Some(gate),
     };
     assert_eq!(
         ctx.replication_state
@@ -93,6 +102,10 @@ async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
     let status = ctx.replication_state.status().await;
     assert_eq!(status.pending, 0);
     assert_eq!(status.completed, 0);
+    assert!(
+        triggers.try_recv().is_err(),
+        "a refused record stored no row, so it must raise no head-adoption trigger"
+    );
 
     // Same handler, DB, sender and record; only actual fixture standing changes.
     standing.blob_custody(RECEIVER, DIGEST);
@@ -109,6 +122,15 @@ async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
     assert_eq!(row.id, CID);
     assert_eq!(row.reach, "private");
     assert_eq!(ctx.replication_state.status().await.completed, 1);
+    // The stored row is offered to the head-adoption trigger exactly once,
+    // attributed to the transport id the record arrived from — the event that
+    // replaces waiting for the 300 s heal leg after an announce found no row.
+    let trigger = triggers
+        .try_recv()
+        .expect("a stored row raises a head-adoption trigger");
+    assert_eq!(trigger.content_id, CID);
+    assert_eq!(trigger.peer, sender_transport_id);
+    assert!(triggers.try_recv().is_err());
 }
 
 #[tokio::test]

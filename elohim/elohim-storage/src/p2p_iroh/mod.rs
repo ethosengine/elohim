@@ -81,7 +81,9 @@ pub use node::{
     IrohBlobFetchError, IrohFetchLeg, IrohNode,
 };
 pub use peer_book::{IrohPeerBook, IrohPeerEntry};
-pub use pull_core::{IrohPullCore, IrohPullStatus};
+pub use pull_core::{
+    register_announce_row_fetch, IrohAnnounceRowFetch, IrohPullCore, IrohPullStatus,
+};
 pub use reconcile_peers::IrohReconcilePeers;
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use shard_backend::ShardServiceBackend;

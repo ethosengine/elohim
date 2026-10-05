@@ -4198,6 +4198,10 @@ async fn async_main(
         {
             backend.set_head_adoption_trigger(gate);
         }
+        // A row the pure-iroh pull leg stores is offered to the same gate.
+        if let (Some(core), Some(gate)) = (iroh_pull_core.as_ref(), iroh_head_adoption.clone()) {
+            core.set_head_adoption_trigger(gate);
+        }
         if let Some(sync_mgr) = iroh_sync_manager.as_ref() {
             elohim_storage::p2p_iroh::spawn_iroh_sync_driver(
                 iroh_n.endpoint().clone(),

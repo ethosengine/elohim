@@ -193,6 +193,34 @@ pub fn mark_anchor_state(
     .map_err(|e| StorageError::Internal(format!("mark_anchor_state failed: {e}")))
 }
 
+/// Record `live` for ONE row, only while its anchor is exactly the action hash
+/// the own conductor just resolved. The hash filter is the witness made
+/// literal: the verdict is about that action, so a row anchored to any other
+/// hash is not touched. Private — the only caller is the own-conductor stamp
+/// ([`stamp_own_conductor_canonical_head`]), inside its transaction.
+fn mark_anchor_live_for_resolved_head(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    resolved_action_hash: &str,
+) -> Result<usize, StorageError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::Text;
+
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .filter(content::dht_anchor_hash.eq(resolved_action_hash)),
+    )
+    .set((
+        content::dht_anchor_state.eq(AnchorState::Live.as_column()),
+        content::dht_anchor_checked_at.eq(sql::<Text>("CURRENT_TIMESTAMP").nullable()),
+    ))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("mark anchor live for resolved head: {e}")))
+}
+
 /// Heal candidates for the DEAD-anchor class — the second arm
 /// `reanchor_backfill` was missing.
 ///
@@ -2193,9 +2221,98 @@ pub fn stamp_declared_head_mode(
     mode: StampMode,
     canonical_ordering: Option<CanonicalOrdering>,
 ) -> Result<StampOutcome, StorageError> {
+    stamp_declared_head_witnessed(
+        conn,
+        ctx,
+        id,
+        head_action_hash,
+        declared_at,
+        patch,
+        mode,
+        canonical_ordering,
+        AnchorWitness::None,
+    )
+}
+
+/// Who, if anyone, stands behind the action hash a stamp is about to write —
+/// the one thing that decides whether the stamp may also record
+/// `dht_anchor_state = live`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnchorWitness {
+    /// The stamp carries no liveness observation of its own (a courier's
+    /// evidence, a signal, a declare route). `dht_anchor_state` is untouched.
+    None,
+    /// THIS node's own conductor resolved exactly this action hash as the id's
+    /// canonical head, in the call that produced the stamp's arguments.
+    OwnConductorCanonical,
+}
+
+/// [`stamp_declared_head_mode`] in [`StampMode::HealCanonical`], for a head
+/// THIS node's own conductor just resolved as canonical — and, in the SAME
+/// transaction, the liveness verdict that resolve is.
+///
+/// [`AnchorState::Live`] means "the local conductor resolved this id — the
+/// anchor is backed" ([`classify_anchor_state`]: anchored + `Present`). A
+/// canonical `resolve_content_head` answer naming `head_action_hash` is that
+/// observation for exactly the hash the stamp writes into `dht_anchor_hash`,
+/// so a `Stamped` or `Refreshed` outcome records it. Before this, only
+/// [`upsert_with_anchor`] ever wrote `live`: a row a peer authored and this
+/// node ADOPTED carried a conductor-confirmed anchor and still read
+/// `unverified` forever (fleet 2026-10-05).
+///
+/// `Refreshed` is included on purpose: it is the own conductor answering with
+/// the head the row already holds, which is what heals rows stamped before
+/// this function existed the next time any own-conductor path revisits them.
+/// A refusal (`SkippedStale`, `SkippedDeclared`, `NoRow`) writes nothing, the
+/// verdict included — the row's anchor is then NOT the hash that was resolved.
+///
+/// The mode is fixed rather than a parameter: the liveness claim is only true
+/// of a canonical answer, and a canonical answer from a heal path stamps
+/// `HealCanonical` (rule `heal-fills-never-moves`). Callers holding a fallback
+/// answer, or a head that arrived as peer input (a courier's record, a doc
+/// hint, a gossiped declaration), MUST use [`stamp_declared_head_mode`], which
+/// never touches `dht_anchor_state`.
+///
+/// Contract tests: `own_conductor_canonical_stamp_marks_the_anchor_live`,
+/// `a_stamp_without_the_own_conductor_witness_leaves_anchor_state_alone`,
+/// `own_conductor_stamp_refused_as_stale_does_not_mark_live`.
+pub fn stamp_own_conductor_canonical_head(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    declared_at: Option<i64>,
+    patch: Option<ContentProjectionPatch>,
+    canonical_ordering: Option<CanonicalOrdering>,
+) -> Result<StampOutcome, StorageError> {
+    stamp_declared_head_witnessed(
+        conn,
+        ctx,
+        id,
+        head_action_hash,
+        declared_at,
+        patch,
+        StampMode::HealCanonical,
+        canonical_ordering,
+        AnchorWitness::OwnConductorCanonical,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stamp_declared_head_witnessed(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    declared_at: Option<i64>,
+    patch: Option<ContentProjectionPatch>,
+    mode: StampMode,
+    canonical_ordering: Option<CanonicalOrdering>,
+    witness: AnchorWitness,
+) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
     let (outcome, widened) = conn.transaction(|conn| {
-        stamp_declared_head_mode_transaction(
+        let stamped = stamp_declared_head_mode_transaction(
             conn,
             ctx,
             id,
@@ -2204,7 +2321,13 @@ pub fn stamp_declared_head_mode(
             patch,
             mode,
             canonical_ordering,
-        )
+        )?;
+        if witness == AnchorWitness::OwnConductorCanonical
+            && matches!(stamped.0, StampOutcome::Stamped | StampOutcome::Refreshed)
+        {
+            mark_anchor_live_for_resolved_head(conn, ctx, id, head_action_hash)?;
+        }
+        Ok::<_, StorageError>(stamped)
     })?;
     let moved =
         outcome == StampOutcome::Stamped || (outcome == StampOutcome::Refreshed && carries_pointer);
@@ -5669,6 +5792,157 @@ mod tests {
             stamp_declared_head(&mut conn, &ctx, "cid-present", "uhCkk-head-9", None, None)
                 .unwrap();
         assert!(restamped, "idempotent re-stamp returns Ok(true)");
+    }
+
+    /// A head THIS node's own conductor resolved as canonical is the liveness
+    /// observation `AnchorState::Live` names, so the adopt stamp records it —
+    /// on the fill, and again on the same-head refresh that heals a row
+    /// stamped before the verdict was carried (fleet 2026-10-05: an adopted
+    /// row read `unverified` forever).
+    #[test]
+    fn own_conductor_canonical_stamp_marks_the_anchor_live() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("adopted")).unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "adopted"),
+            AnchorState::Unverified
+        );
+
+        let filled = stamp_own_conductor_canonical_head(
+            &mut conn,
+            &ctx,
+            "adopted",
+            "uhCkk-head",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(filled, StampOutcome::Stamped);
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "adopted"),
+            AnchorState::Live
+        );
+
+        // A row stamped WITHOUT the witness (the pre-fix fleet state) is healed
+        // by the next own-conductor answer for the head it already holds.
+        create_content(&mut conn, &ctx, mk_plain("stamped-before")).unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "stamped-before",
+            "uhCkk-old-stamp",
+            None,
+            None,
+            StampMode::HealCanonical,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "stamped-before"),
+            AnchorState::Unverified
+        );
+        let refreshed = stamp_own_conductor_canonical_head(
+            &mut conn,
+            &ctx,
+            "stamped-before",
+            "uhCkk-old-stamp",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(refreshed, StampOutcome::Refreshed);
+        assert_eq!(
+            anchor_state_of(&mut conn, &ctx, "stamped-before"),
+            AnchorState::Live
+        );
+    }
+
+    /// The plain stamp carries no liveness observation — it is what a courier's
+    /// evidence, a signal or a declare route writes through — so it must leave
+    /// `dht_anchor_state` exactly as it found it, in every mode.
+    #[test]
+    fn a_stamp_without_the_own_conductor_witness_leaves_anchor_state_alone() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        for (id, mode) in [
+            ("peer-heal", StampMode::HealCanonical),
+            ("peer-gapfill", StampMode::GapFill),
+            ("peer-declare", StampMode::Declare),
+        ] {
+            create_content(&mut conn, &ctx, mk_plain(id)).unwrap();
+            let outcome = stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                id,
+                "uhCkk-peer-named",
+                None,
+                None,
+                mode,
+                None,
+            )
+            .unwrap();
+            assert_eq!(outcome, StampOutcome::Stamped, "{id}");
+            assert_eq!(
+                anchor_state_of(&mut conn, &ctx, id),
+                AnchorState::Unverified,
+                "{id}: a stamp with no own-conductor witness must not claim liveness"
+            );
+        }
+    }
+
+    /// A refused move writes nothing — the verdict included. The row's anchor
+    /// is then NOT the hash the conductor resolved, so calling it live would be
+    /// a claim about a different action.
+    #[test]
+    fn own_conductor_stamp_refused_as_stale_does_not_mark_live() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("held")).unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "held",
+            "uhCkk-current",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+
+        // A different head with no ordering on either side: `HealCanonical`
+        // refuses the move rather than guessing.
+        let refused = stamp_own_conductor_canonical_head(
+            &mut conn,
+            &ctx,
+            "held",
+            "uhCkk-unordered-other",
+            None,
+            Some(ContentProjectionPatch::default()),
+            None,
+        )
+        .unwrap();
+        assert_eq!(refused, StampOutcome::SkippedStale);
+        let row = get_content(&mut conn, &ctx, "held", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-current"));
+        assert_eq!(
+            AnchorState::from_column(row.dht_anchor_state.as_deref()),
+            AnchorState::Unverified
+        );
+
+        // No row at all: nothing is fabricated and nothing is marked.
+        assert_eq!(
+            stamp_own_conductor_canonical_head(
+                &mut conn, &ctx, "absent", "uhCkk-x", None, None, None
+            )
+            .unwrap(),
+            StampOutcome::NoRow
+        );
     }
 
     /// HEAD-election (iv) — the boot-resurrection guard (2026-07-11 20:42:40

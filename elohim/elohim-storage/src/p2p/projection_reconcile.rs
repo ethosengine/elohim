@@ -6653,11 +6653,31 @@ pub(crate) fn project_authenticated_content_head(
     // elohim-host-landing). A FALLBACK answer (cold conductor, root-author
     // election) may only FILL an undeclared row — never resurrect a
     // superseded head over an adopted canonical one.
-    let mode = if head.canonical {
-        crate::db::content_diesel::StampMode::HealCanonical
-    } else {
-        crate::db::content_diesel::StampMode::GapFill
-    };
+    if head.canonical {
+        // The own conductor resolved this exact action as the id's canonical
+        // head (every caller hands this function its OWN conductor's answer —
+        // see the doc above), which is the observation `dht_anchor_state =
+        // live` records. The verdict rides the stamp's transaction, on a fill,
+        // a forward move and a same-head refresh alike — the last is what
+        // retires `unverified` from rows adopted before the verdict was carried.
+        return crate::db::content_diesel::stamp_own_conductor_canonical_head(
+            &mut conn,
+            app_ctx,
+            &c.id,
+            head.head_action_hash.as_str(),
+            Some(head.declared_at),
+            Some(patch),
+            // The DHT ELECTION behind a canonical answer — the winning declaration
+            // link's notarized timestamp and tier, which `canonical_move_verdict`
+            // arbitrates on. `None` for a fallback answer (no election ran) and from
+            // a pre-cure coordinator, which the guard reads as "carries no
+            // election". This is what makes an elected head CONSUMABLE by an
+            // already-declared row; without it the guard compared head-ACTION
+            // timestamps and refused every move the DHT had already decided.
+            head.canonical_ordering(),
+        );
+    }
+    // A fallback answer carries no election; `canonical_ordering()` is `None`.
     crate::db::content_diesel::stamp_declared_head_mode(
         &mut conn,
         app_ctx,
@@ -6665,14 +6685,7 @@ pub(crate) fn project_authenticated_content_head(
         head.head_action_hash.as_str(),
         Some(head.declared_at),
         Some(patch),
-        mode,
-        // The DHT ELECTION behind a canonical answer — the winning declaration
-        // link's notarized timestamp and tier, which `canonical_move_verdict`
-        // arbitrates on. `None` for a fallback answer (no election ran) and from
-        // a pre-cure coordinator, which the guard reads as "carries no
-        // election". This is what makes an elected head CONSUMABLE by an
-        // already-declared row; without it the guard compared head-ACTION
-        // timestamps and refused every move the DHT had already decided.
+        crate::db::content_diesel::StampMode::GapFill,
         head.canonical_ordering(),
     )
 }

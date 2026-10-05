@@ -246,8 +246,15 @@ async fn sync_document(
             Ok(applied_heads) => {
                 crate::metrics::add_iroh_sync_changes_applied(change_count);
                 local_heads = applied_heads;
-                let adoption = head_adoption.map(|gate| (gate, peer.node_id));
-                if reverse_project(sync_manager, db_pool, &remote.doc_id, adoption).await {
+                if reverse_project(
+                    sync_manager,
+                    db_pool,
+                    &remote.doc_id,
+                    Some(peer.node_id),
+                    head_adoption,
+                )
+                .await
+                {
                     crate::metrics::observe_sync_projected_apply_staleness(
                         "iroh",
                         origin_timestamps,
@@ -297,19 +304,24 @@ async fn request(
 /// (`super::sync_backend`) owes the same heal a pulled change gets — a doorbell
 /// that converges the DocStore but leaves the serving row stale is half a cure.
 ///
-/// `head_adoption` is the gate and the peer whose apply this was. When the
-/// projection completes, the id is offered to the head-adoption trigger exactly
-/// as the libp2p heal leg offers it (`P2PNode::heal_content_row`): after the
+/// `peer` is the node whose apply this was and `head_adoption` the trigger
+/// gate. When the projection completes, the id is offered to the
+/// head-adoption trigger exactly where the libp2p heal leg offers it: after the
 /// pool guard, only for a doc this node has a projection home for, and never
 /// for one it could not read. Without it an iroh-only peer's head stayed
 /// sweep-bound (47–59 s or never) while a libp2p peer adopted in about a
 /// second. The peer is the iroh node id — the courier route the iroh
 /// reconcile leg resolves.
+///
+/// The same peer is who gets asked for the RECORD when the doc names an id
+/// with no local row (`crate::p2p::announce_fetch`), independently of whether
+/// a trigger gate is wired.
 pub(crate) async fn reverse_project(
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
     doc_id: &str,
-    head_adoption: Option<(&TriggerGate, iroh::NodeId)>,
+    peer: Option<iroh::NodeId>,
+    head_adoption: Option<&TriggerGate>,
 ) -> bool {
     if !doc_id.starts_with("node:") {
         return false;
@@ -317,23 +329,38 @@ pub(crate) async fn reverse_project(
     let Some(pool) = db_pool else {
         return false;
     };
-    let projected =
+    // `Ok(false)` covers an unchanged pointer, a doc naming no blob, AND an
+    // absent row — only the last is a gap, so it is not read as one here.
+    let (projected, healed) =
         match crate::sync::projector::reverse_project_content_doc(sync_manager, pool, doc_id).await
         {
             Ok(true) => {
                 debug!(doc_id = %doc_id, "iroh sync reverse-projected content pointer");
-                true
+                (true, true)
             }
-            Ok(false) => true,
+            Ok(false) => (true, false),
             Err(error) => {
                 warn!(doc_id = %doc_id, error = %error, "iroh sync reverse projection failed");
-                false
+                (false, false)
             }
         };
     if projected {
-        if let Some((gate, peer)) = head_adoption {
+        if let Some((gate, peer)) = head_adoption.zip(peer) {
             let decision = gate.offer(PROJECTION_NAMESPACE, doc_id, &peer.to_string());
             crate::metrics::inc_head_adoption_trigger(decision.label());
+        }
+    }
+    // FETCH THE ROW ON THE ANNOUNCE — the libp2p `fetch_announced_row` twin. A
+    // doc that healed nothing may name an id this node holds no row for; ask
+    // the peer whose apply this was, now, instead of waiting for the next
+    // inventory walk. Presence is read explicitly (see above), and only when a
+    // fetch leg and a peer exist to act on the answer.
+    if projected && !healed {
+        if let Some((fetch, peer)) = super::pull_core::announce_row_fetch().zip(peer) {
+            match crate::p2p::announce_fetch::absent_row_for(pool, PROJECTION_NAMESPACE, doc_id) {
+                Ok(content_id) => fetch.fetch(content_id, peer),
+                Err(decision) => decision.record(),
+            }
         }
     }
     projected
@@ -374,7 +401,16 @@ mod tests {
         let (gate, mut rx) = TriggerGate::new(DEFAULT_TRIGGER_COOLDOWN);
         let peer = a_peer();
 
-        assert!(reverse_project(&sync, Some(&pool), "node:iroh-head", Some((&gate, peer))).await);
+        assert!(
+            reverse_project(
+                &sync,
+                Some(&pool),
+                "node:iroh-head",
+                Some(peer),
+                Some(&gate)
+            )
+            .await
+        );
         let trigger = rx.try_recv().expect("the apply raised the trigger");
         assert_eq!(trigger.content_id, "iroh-head");
         assert_eq!(
@@ -384,8 +420,8 @@ mod tests {
         );
 
         // Nothing is offered for a doc with no projection home, or with no pool.
-        assert!(!reverse_project(&sync, Some(&pool), "manifest:x", Some((&gate, peer))).await);
-        assert!(!reverse_project(&sync, None, "node:no-pool", Some((&gate, peer))).await);
+        assert!(!reverse_project(&sync, Some(&pool), "manifest:x", Some(peer), Some(&gate)).await);
+        assert!(!reverse_project(&sync, None, "node:no-pool", Some(peer), Some(&gate)).await);
         assert!(rx.try_recv().is_err());
         assert_eq!(gate.claim_count(), 1);
     }

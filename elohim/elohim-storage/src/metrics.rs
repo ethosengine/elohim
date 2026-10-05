@@ -1574,10 +1574,39 @@ lazy_static! {
     ///   version it holds and the next rung adopts once they arrive;
     /// - `adopt_pointer_absent` — the adoptable head names no blob while this
     ///   row serves one; adopting would leave the old bytes under the new head.
+    /// - `row_stored_*` — the offer raised when the acquisition ingest STORES a
+    ///   row (`p2p::announce_fetch::reoffer_stored_row`), kept apart from the
+    ///   sync-apply offer's bare labels so the two raising events are separately
+    ///   legible: `row_stored_enqueued` (a trigger was queued — including the
+    ///   takeover of a claim an earlier `no_local_row` left sleeping),
+    ///   `row_stored_deduped`, `row_stored_dropped_full`, `row_stored_claims_full`.
     pub static ref HEAD_ADOPTION_TRIGGER: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_head_adoption_trigger_total",
             "Event-driven head-adoption trigger outcomes, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// Fetch-the-row-on-announce decisions (`p2p::announce_fetch::AnnounceFetch`),
+    /// one per applied content-node doc whose reverse projection healed nothing.
+    ///
+    /// `outcome` is a closed vocabulary:
+    /// - `enqueued` — the id has no local row; a `GetContent` for it was queued
+    ///   at the announcing peer and dispatch kicked. THE line that says the
+    ///   event-driven row path fired;
+    /// - `row_present` — the ordinary case, nothing to fetch;
+    /// - `already_tracked` — the replication tracker already holds the id
+    ///   (pending, completed, or retry-exhausted);
+    /// - `saturated` — the in-flight budget was spent; the inventory walk covers it;
+    /// - `no_route` — the announcer could not be addressed on this plane;
+    /// - `row_unreadable` — the presence read failed (never treated as absence);
+    /// - `not_content_doc` — not a `node:<id>` doc under the projection namespace.
+    pub static ref ANNOUNCE_ROW_FETCH: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_announce_row_fetch_total",
+            "Fetch-the-row-on-announce decisions for applied content docs, by outcome.",
         ),
         &["outcome"],
     )
@@ -3331,6 +3360,7 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(HEAD_ADOPTION_TRIGGER.clone()));
+        let _ = REGISTRY.register(Box::new(ANNOUNCE_ROW_FETCH.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         // Pre-touch the always-live combination so the series renders before
@@ -4257,6 +4287,12 @@ fn observe_sync_projected_apply_staleness_at(
 /// [`HEAD_ADOPTION_TRIGGER`] for the closed `outcome` vocabulary.
 pub fn inc_head_adoption_trigger(outcome: &str) {
     HEAD_ADOPTION_TRIGGER.with_label_values(&[outcome]).inc();
+}
+
+/// Record one fetch-the-row-on-announce decision. See [`ANNOUNCE_ROW_FETCH`]
+/// for the closed `outcome` vocabulary.
+pub fn inc_announce_row_fetch(outcome: &str) {
+    ANNOUNCE_ROW_FETCH.with_label_values(&[outcome]).inc();
 }
 
 /// Record document entries received in one `DocumentList` answer — the round's
