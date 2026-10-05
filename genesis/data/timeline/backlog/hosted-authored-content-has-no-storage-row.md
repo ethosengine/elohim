@@ -127,6 +127,24 @@ missing is delivery inside the budget: the doorways' storages acquire the row on
 cadence, not on the declaration. Not established here: whether the fleet peers received Che's
 iroh announce at all, and why the served rows stay unverified.
 
+## Reading and fix, 2026-10-05: why round 1 was late
+
+Traced in the code the same day (not on the fleet). The declaring node announces the content doc
+change at once; a receiver with no row stores the doc and drops the event
+(`sync/projector.rs::reverse_project_content_doc` returns on an absent row; the head-adoption
+trigger ends `no_local_row`). The row then rides the 60 s replication cycle and arrives with no
+head; the head rides the 300 s projection reconcile (`PROJECTION_RECONCILE_SECS`). That is the
+body-at-70-s, head-at-five-minutes shape above. The rows stayed `unverified` because only a node's
+own conductor write marked a row `live`.
+
+Fixed in storage (`421fa55ea`, `cfaf868ed`): fetch the row from the announcing peer on the
+announce, re-offer the id to the trigger when the row is stored, mark `live` on an own-conductor
+confirmation, and verify standing rows in a bounded pass. Household: a new root's exact head on the
+other peers 50.7 s → 1.2–1.6 s. The DELTA is in `dataplane-convergence.habit.md`. Still not
+established: whether alpha and apex receive Che's iroh announce at all. If they do not, the fetch
+fires when the doc arrives on the 60 s sync round instead, which is inside leg 2's 75 s budget
+only by a margin. `elohim_announce_row_fetch_total` on those peers answers it after the roll.
+
 ## Before designing a fix
 
 This is not the coordinator sweep's walk reused. That sweep makes admin calls per cell; projecting
