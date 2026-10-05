@@ -61,7 +61,14 @@ conductor, each with its own storage process:
   way. Carried over libp2p local discovery; absent in iroh-only mode.
 - One approval is enough; nothing waits on other nodes. A witness beat and a decider seam exist as
   named places where an attending elohim will act; today both pass through.
-- Signing as the person is accepted only from the node's own machine.
+- A person signs in to their own node (`POST /auth/login`, a sign-in word and a secret set only on
+  the node's machine with `epr identity secret`). The node signs for a caller on its own machine or
+  for a session proven by sign-in. The node's other session routes answer only its own machine.
+- A session is bound to a key the browser holds (RFC 9449 proofs, plus a body hash): a copied
+  cookie cannot make the node sign. The node's verifier accepts the portal's proof byte for byte
+  (a pinned test). On plain http from another machine the session may be unbound; allowed today.
+- A witness has a beat at sign-in and at device authorization and may pause for re-authentication;
+  the default never pauses. Declining a pending ask is an act the asking device is told about.
 
 Not proven: two conductors over a real network; the pinned fork conductor; Che with a deployed
 conductor (needs the coordinator zome on alpha, which needs a push); the portal pages against a
@@ -84,10 +91,16 @@ live node; discovery across separate hosts; iroh-only and dual modes.
 `security-node-session-routes-unauthenticated.md` on the grant branch hold these in mintable
 shape. The ones that change what a person can do today:
 
-- The node's session routes take no proof of the person and are reachable from the network. Only
-  the signing routes are closed (this-machine-only). So a browser on another machine cannot
-  approve, and the native portal's sign-in form does not work on a person's own node.
-- The node cannot tell the person from whoever operates the machine.
+- REQUIRED before floor readiness: a sign-in secret and session cookie must not cross a network
+  in the clear. Plain-http sign-in is deliberately allowed today (operator, 2026-10-05); see row 13
+  of `arch-confidentiality-plane-backlog.md`.
+- A stolen cookie can still read (who you are, what your identity rests on, which devices are
+  asking); proofs on reads are not built. Replay protection is in memory.
+- Passkey sign-in (the path to biometrics), a local-only channel for same-machine acts, and one
+  unlock for keystore and sign-in are recorded and unbuilt. Operator preference: security
+  primitives as close to the machine as possible.
+- The two branches have only been tested against a shared contract, never against each other: the
+  portal has not been driven in a browser against a live node.
 - Nothing writes a second node that speaks for a person, so "held between two" and a required
   number of approvals cannot be exercised. Later affirmation is not built.
 - `device.bind-root` is recorded in the consent and binds nothing. A revoked device cannot
