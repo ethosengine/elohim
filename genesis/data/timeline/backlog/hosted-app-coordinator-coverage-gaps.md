@@ -43,6 +43,13 @@ on its conductor.
 Probe: provision a hosted person on the household after an all-apps apply of a variant bundle,
 then dry-run the route for that app id. `drifted: true` is this gap.
 
+**Closed in code 2026-10-04 (storage side, unit-proven; not yet measured on a mesh).** Storage keeps
+the last bundle it applied at `<storage_dir>/coordinators/last-applied.happ` and a standing pass
+(`coordinator_standing::spawn`, default 300 s) makes one `list_apps` call and sweeps app ids it has
+not read against that bundle, eight per pass, the node's own app first. Storage owns it; the doorway
+is unchanged. The probe above still stands as the mesh receipt. Design:
+`coordinator-acceptance-tightening-contract.md`.
+
 ## 2. Release adoption exits before it reaches hosted apps
 
 `verify::already_runs_target` (`elohim/elohim-storage/src/services/release_adoption/verify.rs`)

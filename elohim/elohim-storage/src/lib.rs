@@ -63,6 +63,7 @@ pub mod conductor_admission; // Capacity contract over the conductor's DB read p
 pub mod conductor_bridge_health; // Observed liveness of the zome path (is the bridge actually alive?)
 pub mod conductor_client; // Legacy: kept for backward compatibility during migration
 pub mod config;
+pub mod coordinator_standing; // Coordinator staleness as a standing reading + the last applied bundle
 pub mod dag_store;
 pub mod db; // SQLite content storage
 pub mod epr_atom_service;

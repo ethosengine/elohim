@@ -5662,7 +5662,15 @@ impl HttpServer {
     ///
     /// `allApps=true` sweeps every installed app on the bundle's DNA lineage
     /// (a hosted person's app is one more installed app) and returns one report
-    /// per app; without it the sweep covers the one app `appId` names.
+    /// per app; without it the sweep covers the one app `appId` names. The
+    /// node's own app is swept first as the canary: on an apply where it does
+    /// not take the bundle cleanly, every other eligible app is reported
+    /// `primary_not_healthy` (blocking) and left untouched. The report then
+    /// carries `primaryHealthy` and the own app's `statementContract` (or a
+    /// named `statementContractError`, never blocking). An apply the own app
+    /// takes cleanly records the posted bundle as this conductor's last applied
+    /// bundle, the one a later sweep of newly provisioned apps is measured
+    /// against.
     ///
     /// Runs the SAME per-role coordinator-drift sweep the boot path runs
     /// (`happ_manager::sync_coordinators_report`), against the posted bundle
@@ -5830,17 +5838,29 @@ impl HttpServer {
             "POST /admin/coordinators/sync — running coordinator drift sweep"
         );
 
+        let own_app = self
+            .happ_app_id
+            .clone()
+            .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
         if all_apps {
-            let own_app = self
-                .happ_app_id
-                .clone()
-                .unwrap_or_else(|| crate::happ_manager::APP_ID.to_string());
+            // The node's own app is the canary (swept first; on an apply a
+            // failure there holds every hosted app back) and its content-store
+            // cell is asked once for the statement contract, through the
+            // app-interface client bound to the own app.
+            let reader = self
+                .hc_registry
+                .as_ref()
+                .and_then(|r| r.lamad_client())
+                .map(crate::coordinator_standing::HcStatementContractReader::new);
             let outcome = crate::happ_manager::sync_coordinators_all_apps(
                 &admin_ws,
                 &temp.0,
                 apply,
                 None,
                 Some(&own_app),
+                reader
+                    .as_ref()
+                    .map(|r| r as &dyn crate::coordinator_standing::StatementContractReader),
             )
             .await;
             drop(temp);
@@ -5852,6 +5872,14 @@ impl HttpServer {
 
         let outcome =
             crate::happ_manager::sync_coordinators_report(&admin_ws, &app_id, &temp.0, apply).await;
+        // Last applied wins: an apply the node's own app took cleanly makes the
+        // posted bundle the one later sweeps measure against (recorded before
+        // the temp file is unlinked).
+        if let Ok(report) = &outcome {
+            if apply && app_id == own_app && crate::happ_manager::role_errors(report).is_empty() {
+                crate::coordinator_standing::record_applied_bundle(&temp.0).await;
+            }
+        }
         drop(temp);
 
         match outcome {
@@ -8388,9 +8416,14 @@ impl HttpServer {
             Err(e) => serde_json::json!({ "error": e.to_string() }),
         };
 
+        // The coordinator standing reading, AGGREGATE ONLY: this route is
+        // doorway-projected (build_manifest), and which people a conductor
+        // hosts must not become readable from outside the node. Per-app detail
+        // stays on the node-local `POST /admin/coordinators/sync` report.
         let mut body = serde_json::json!({
             "transportStats": transport_stats,
             "cells": cells_block,
+            "coordinators": crate::coordinator_standing::summary(),
         });
         match agent_read {
             Ok(agent_infos) => {
@@ -9509,7 +9542,18 @@ impl HttpServer {
                     || msg.contains("head delegation")
                     || msg.contains("restricted to the")
                 {
-                    return Ok(response::forbidden(&serde_json::json!({ "error": msg })));
+                    // `issuer-behind`: the delegation was issued by an app on
+                    // an older coordinator. The answer names both forms so
+                    // the cure (re-issue from a current app) is legible.
+                    let mut body = serde_json::json!({ "error": msg });
+                    if let Some(behind) =
+                        crate::services::conductor_writes::parse_issuer_behind(&msg)
+                    {
+                        body["reasonCode"] = serde_json::json!("issuerBehind");
+                        body["presented"] = serde_json::json!(behind.presented);
+                        body["lowestAccepted"] = serde_json::json!(behind.lowest_accepted);
+                    }
+                    return Ok(response::forbidden(&body));
                 } else if msg.contains("not in the version chain") {
                     return Ok(response::bad_request(&msg));
                 } else {

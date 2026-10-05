@@ -902,6 +902,10 @@ async fn async_main(
     // the in-memory `LineageRoles` map forgot). A fence armed after the first
     // connect would be a fence that misses the write it exists to stop.
     elohim_storage::closed_chain_fence::init(&config.storage_dir);
+    // Arm the last-applied coordinator bundle store (gap 1 of
+    // hosted-app-coordinator-coverage-gaps) BEFORE the embedded conductor's
+    // boot sweep, which is the first path that can record into it.
+    elohim_storage::coordinator_standing::init(&config.storage_dir);
 
     // Provide-loop / re-anchor observability holder. Created here in the
     // composition root so the boot path (self_cid derive + loop spawn) and the
@@ -6397,6 +6401,43 @@ async fn async_main(
                 "release-adoption controller spawned"
             );
         }
+    }
+
+    // Coordinator staleness as a standing reading (coordinator-acceptance-
+    // tightening-contract items 5-6; hosted-app-coordinator-coverage-gaps gap
+    // 1). A slow pass of ONE `list_apps` call that reads only apps it has not
+    // seen against the last applied bundle — so a person provisioned after a
+    // coordinator-only release is brought to it — and publishes aggregate
+    // gauges. Off the readiness path; its first pass waits one interval. The
+    // boot bundle is this node's only on an embedded conductor; an external-
+    // conductor peer measures against a persisted bundle once one is applied.
+    {
+        use elohim_storage::coordinator_standing::{
+            self as standing, HcStatementContractReader, StatementContractReader,
+        };
+        let embedded_admin = agent_info_admin_ws.clone();
+        let admin_registry = hc_registry_for_http.clone();
+        let reader_registry = hc_registry_for_http.clone();
+        standing::spawn(standing::StandingInputs {
+            own_app: args.app_id.clone(),
+            boot_happ_path: args.embedded_conductor.then(|| args.happ_path.clone()),
+            admin: Arc::new(move || {
+                embedded_admin.as_deref().cloned().or_else(|| {
+                    admin_registry
+                        .as_ref()
+                        .and_then(|r| r.any_admin_websocket())
+                })
+            }),
+            reader: Arc::new(move || {
+                reader_registry
+                    .as_ref()
+                    .and_then(|r| r.lamad_client())
+                    .map(|hc| {
+                        Arc::new(HcStatementContractReader::new(hc))
+                            as Arc<dyn StatementContractReader>
+                    })
+            }),
+        });
     }
 
     // Durable correction discovery runs independently of direct notifications.

@@ -2808,6 +2808,79 @@ pub fn set_conductor_app_enabled(role: &str, enabled: bool) {
         .set(i64::from(enabled));
 }
 
+lazy_static! {
+    // ── Coordinator standing reading (coordinator_standing) ─────────────────
+    //
+    // AGGREGATES ONLY. A conductor that hosts people carries one app per
+    // person; an app-id label would publish who it hosts. The per-app detail
+    // stays on the node-local `POST /admin/coordinators/sync` report.
+
+    /// Roles a coordinator hot-swap can still heal: drifted, not applied, not
+    /// refused for DNA lineage — across every app on the bundle's lineage.
+    pub static ref COORDINATOR_PENDING_ROLES: IntGauge = IntGauge::new(
+        "elohim_coordinator_pending_roles",
+        "Roles across this conductor's apps still on older coordinators that a hot-swap can heal.",
+    )
+    .unwrap();
+
+    /// Roles refused a hot-swap because their cell is on another DNA lineage.
+    pub static ref COORDINATOR_LINEAGE_REFUSED_ROLES: IntGauge = IntGauge::new(
+        "elohim_coordinator_lineage_refused_roles",
+        "Roles across this conductor's apps refused a coordinator hot-swap for DNA lineage.",
+    )
+    .unwrap();
+
+    /// Distinct installed coordinator sets per role across apps; 1 = uniform.
+    /// label: role (the hApp's fixed role roster).
+    pub static ref COORDINATOR_DISTINCT_SETS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_coordinator_distinct_sets",
+            "Distinct installed coordinator wasm sets per role across this conductor's apps (1 = every app runs the same).",
+        ),
+        &["role"],
+    )
+    .unwrap();
+
+    /// Apps with at least one role on the measured bundle's DNA lineage.
+    pub static ref COORDINATOR_APPS_ON_LINEAGE: IntGauge = IntGauge::new(
+        "elohim_coordinator_apps_on_lineage",
+        "Installed apps with at least one role on the measured bundle's DNA lineage.",
+    )
+    .unwrap();
+
+    /// Unix time of the last completed coordinator reading (0 = none yet).
+    pub static ref COORDINATOR_LAST_PASS_TIMESTAMP_SECONDS: IntGauge = IntGauge::new(
+        "elohim_coordinator_last_pass_timestamp_seconds",
+        "Unix time the coordinator standing reading last completed a pass (0 = never since start).",
+    )
+    .unwrap();
+}
+
+/// Publish the coordinator standing reading. Aggregates only — see the
+/// statics above. Roles absent from `distinct_sets` read 0.
+pub fn set_coordinator_reading(
+    pending_roles: usize,
+    lineage_refused_roles: usize,
+    apps_on_lineage: usize,
+    distinct_sets: &std::collections::BTreeMap<String, usize>,
+    last_pass_unix: Option<u64>,
+) {
+    let as_i64 = |n: usize| i64::try_from(n).unwrap_or(i64::MAX);
+    COORDINATOR_PENDING_ROLES.set(as_i64(pending_roles));
+    COORDINATOR_LINEAGE_REFUSED_ROLES.set(as_i64(lineage_refused_roles));
+    COORDINATOR_APPS_ON_LINEAGE.set(as_i64(apps_on_lineage));
+    for role in crate::happ_manager::EXPECTED_ROLES.iter().copied() {
+        COORDINATOR_DISTINCT_SETS.with_label_values(&[role]).set(0);
+    }
+    for (role, n) in distinct_sets {
+        COORDINATOR_DISTINCT_SETS
+            .with_label_values(&[role.as_str()])
+            .set(as_i64(*n));
+    }
+    COORDINATOR_LAST_PASS_TIMESTAMP_SECONDS
+        .set(i64::try_from(last_pass_unix.unwrap_or(0)).unwrap_or(i64::MAX));
+}
+
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
 /// `Once`), so calling it more than once at boot is safe. Call exactly once early
 /// in storage startup; `/metrics` reads the registry thereafter.
@@ -3402,6 +3475,17 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(HTTP_REQUEST_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(HTTP_REQUESTS_IN_FLIGHT.clone()));
+        // Coordinator standing reading. Pre-touched at 0 so a node that has not
+        // completed a pass publishes a series, not an absence; the last-pass
+        // timestamp of 0 is what says "never read".
+        let _ = REGISTRY.register(Box::new(COORDINATOR_PENDING_ROLES.clone()));
+        let _ = REGISTRY.register(Box::new(COORDINATOR_LINEAGE_REFUSED_ROLES.clone()));
+        let _ = REGISTRY.register(Box::new(COORDINATOR_DISTINCT_SETS.clone()));
+        let _ = REGISTRY.register(Box::new(COORDINATOR_APPS_ON_LINEAGE.clone()));
+        let _ = REGISTRY.register(Box::new(COORDINATOR_LAST_PASS_TIMESTAMP_SECONDS.clone()));
+        for role in crate::happ_manager::EXPECTED_ROLES.iter().copied() {
+            COORDINATOR_DISTINCT_SETS.with_label_values(&[role]).set(0);
+        }
     });
 }
 

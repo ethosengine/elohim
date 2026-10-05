@@ -1260,6 +1260,13 @@ impl HcClient {
         &self.cell_id
     }
 
+    /// The installed app this client's cells belong to. A conductor that hosts
+    /// people carries one app per person, so a caller that means "the node's
+    /// own app" checks this rather than assuming it.
+    pub fn app_id(&self) -> &str {
+        &self.config.app_id
+    }
+
     /// The `CellId` this client can reach for `role` — its own configured role,
     /// or one of the two cross-cell roles it resolved from `app_info` at connect
     /// time.

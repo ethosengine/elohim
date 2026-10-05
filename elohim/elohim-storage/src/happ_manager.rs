@@ -745,7 +745,19 @@ pub async fn ensure_happ_installed(
             // conductor's update_coordinators hot-swap — agent key, cells, and
             // DHT state all preserved, so it is safe wherever a deploy is.
             let allow_coordinator_update = coordinator_update_allowed();
-            match sync_coordinators(admin_ws, app_info, happ_path, allow_coordinator_update).await {
+            let outcome =
+                sync_coordinators(admin_ws, app_info, happ_path, allow_coordinator_update).await;
+            // Last applied wins: an apply the node's own app took cleanly makes
+            // this bundle the one a later sweep (a hosted person provisioned
+            // after this boot) is measured against. Recorded HERE, before the
+            // hosted-app sweep, so the standing reading can never sweep against
+            // an older persisted bundle than the one the own app now runs.
+            if let Ok(report) = &outcome {
+                if allow_coordinator_update && role_errors(report).is_empty() {
+                    crate::coordinator_standing::record_applied_bundle(happ_path).await;
+                }
+            }
+            match outcome {
                 Ok(report) if report.drifted_count == 0 => info!(
                     app_id = app_id,
                     roles_evaluated = report.roles.len(),
@@ -1508,7 +1520,7 @@ async fn sync_coordinators_for_app_info(
 /// The per-role sweep of ONE app against an already-resolved bundle. Split from
 /// [`sync_coordinators_for_app_info`] so the conductor-wide sweep
 /// ([`sync_coordinators_all_apps`]) unpacks the bundle once, not once per app.
-async fn sweep_app_roles(
+pub(crate) async fn sweep_app_roles(
     admin_ws: &AdminWebsocket,
     app_info: &holochain_client::AppInfo,
     role_dnas: &std::collections::BTreeMap<String, DnaFile>,
@@ -1704,6 +1716,13 @@ pub(crate) enum AppSweepSkip {
     /// `AppStatus::Unrecoverable` is terminal by the conductor's own
     /// definition; hot-swapping onto it is unsafe auto-remediation.
     Unrecoverable,
+    /// The app is on the bundle's lineage and WOULD have been swept, but this
+    /// is an apply and the node's own app — the canary, always swept first —
+    /// did not prove the bundle (a role errored, or the own app was not swept
+    /// at all). A bundle the node's own app refuses never reaches the people it
+    /// hosts in the same pass. Never applied by [`app_sweep_skip`]: the sweep
+    /// assigns it after the canary's verdict, and it is BLOCKING.
+    PrimaryNotHealthy,
 }
 
 impl AppSweepSkip {
@@ -1713,7 +1732,104 @@ impl AppSweepSkip {
             AppSweepSkip::NoRoleInBundle => "no_role_in_bundle",
             AppSweepSkip::NoRoleOnBundleLineage => "no_role_on_bundle_lineage",
             AppSweepSkip::Unrecoverable => "unrecoverable",
+            AppSweepSkip::PrimaryNotHealthy => "primary_not_healthy",
         }
+    }
+
+    /// Does a skip row with this reason say anything about the app's
+    /// coordinators? `AlreadySwept` and `PrimaryNotHealthy` mean "not read in
+    /// this pass" — the app's previous reading stands. The others mean the app
+    /// is not on the bundle's lineage (or cannot be touched), so it carries no
+    /// coordinator reading at all.
+    pub(crate) fn leaves_reading_unchanged(label: &str) -> bool {
+        label == AppSweepSkip::AlreadySwept.label()
+            || label == AppSweepSkip::PrimaryNotHealthy.label()
+    }
+}
+
+/// Pure: an apply the node's own app did not prove is blocking even when it
+/// held no hosted app back and the own app left no role error (it was not on
+/// the bundle's lineage, or was not listed). Without this an apply on a peer
+/// with no hosted apps would read as a clean rollout.
+pub(crate) fn with_unproven_primary(
+    mut blocking: Vec<String>,
+    primary: &str,
+    why: &str,
+) -> Vec<String> {
+    if blocking.is_empty() {
+        blocking.push(format!(
+            "{primary}: {} — {why}",
+            AppSweepSkip::PrimaryNotHealthy.label()
+        ));
+    }
+    blocking
+}
+
+/// The node's own app is swept FIRST, whatever order `list_apps` returned.
+///
+/// Pure: the order (indexes into `app_ids`) a conductor-wide sweep visits the
+/// eligible apps in. Stable for every other app, so the hosted apps keep the
+/// conductor's own order behind the canary.
+pub(crate) fn primary_first_order(app_ids: &[&str], primary: Option<&str>) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..app_ids.len()).collect();
+    if let Some(p) = primary {
+        if let Some(pos) = app_ids.iter().position(|id| *id == p) {
+            order.remove(pos);
+            order.insert(0, pos);
+        }
+    }
+    order
+}
+
+/// What the node's own app, swept first, says about the rest of an apply.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CanaryVerdict {
+    /// A dry run (nothing was swapped), or the caller named no own app: the
+    /// gate does not apply and every eligible app is swept.
+    NotApplicable,
+    /// The own app was swept and none of its roles errored.
+    Healthy,
+    /// The own app was not swept, or a role errored. The detail names why.
+    NotHealthy(String),
+}
+
+/// `role: error` for every role of `report` that ended with an error. A role
+/// with nothing to do carries no error and is never listed.
+pub(crate) fn role_errors(report: &CoordinatorSyncReport) -> Vec<String> {
+    report
+        .roles
+        .iter()
+        .filter_map(|r| r.error.as_deref().map(|e| format!("{}: {e}", r.role)))
+        .collect()
+}
+
+/// Pure: the canary gate. `primary_report` is the own app's sweep in THIS
+/// pass, `None` when it was not swept (absent from the conductor, or skipped).
+pub(crate) fn canary_verdict(
+    apply: bool,
+    primary: Option<&str>,
+    primary_report: Option<&CoordinatorSyncReport>,
+) -> CanaryVerdict {
+    let Some(primary) = primary else {
+        return CanaryVerdict::NotApplicable;
+    };
+    if !apply {
+        return CanaryVerdict::NotApplicable;
+    }
+    let Some(report) = primary_report else {
+        return CanaryVerdict::NotHealthy(format!(
+            "the node's own app '{primary}' was not swept in this pass, so nothing proved the \
+             bundle before it would reach the hosted apps"
+        ));
+    };
+    let errors = role_errors(report);
+    if errors.is_empty() {
+        CanaryVerdict::Healthy
+    } else {
+        CanaryVerdict::NotHealthy(format!(
+            "the node's own app '{primary}' did not take the bundle cleanly: {}",
+            errors.join("; ")
+        ))
     }
 }
 
@@ -1757,6 +1873,10 @@ pub struct CoordinatorAppSkip {
     pub reason: String,
     /// role → installed DNA hash, so a lineage skip names what it compared.
     pub installed_dna: BTreeMap<String, String>,
+    /// Why, in words, when the reason alone does not say it
+    /// (`primary_not_healthy` names what the own app refused).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 /// Whole-conductor outcome: one [`CoordinatorSyncReport`] per swept app, so
@@ -1784,11 +1904,32 @@ pub struct CoordinatorConductorReport {
     pub pending_count: usize,
     /// `app/role: error` for every error that must halt a rollout. A
     /// `dnaHashMismatch` on an app OTHER than the node's own is not one: that
-    /// cell is on another lineage and is reported, not failed.
+    /// cell is on another lineage and is reported, not failed. An app held
+    /// back by the canary (`primary_not_healthy`) IS one.
     pub blocking_errors: Vec<String>,
+    /// role → zome → coordinator wasm hash the bundle carries: with
+    /// `bundleDna`, the identity of the bundle this report measured against.
+    #[serde(default)]
+    pub bundle_coordinators: BTreeMap<String, BTreeMap<String, String>>,
+    /// The canary's verdict on an apply that named the node's own app: `true`
+    /// = it took the bundle cleanly and the hosted apps followed; `false` = it
+    /// did not, and every other eligible app was held back. Absent on a dry
+    /// run and when no own app was named.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_healthy: Option<bool>,
+    /// The statement contract the node's own app's content-store coordinator
+    /// declares (one bounded call of a constant extern, after the own app's
+    /// sweep). Absent when it could not be read — see `statementContractError`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statement_contract: Option<crate::coordinator_standing::StatementContract>,
+    /// Why the contract was not read, as `<label>: <detail>` (labels:
+    /// [`crate::coordinator_standing::ContractReadFailure`]). NOT blocking: a
+    /// coordinator older than the extern simply does not declare one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub statement_contract_error: Option<String>,
 }
 
-fn is_lineage_refusal(role: &CoordinatorRoleReport) -> bool {
+pub(crate) fn is_lineage_refusal(role: &CoordinatorRoleReport) -> bool {
     role.error
         .as_deref()
         .is_some_and(|e| e.starts_with("dnaHashMismatch:"))
@@ -1824,6 +1965,19 @@ impl CoordinatorConductorReport {
                 }
             }
         }
+        // An app the canary held back was never attempted: it is a person
+        // still on the old coordinators because the node's own app refused the
+        // bundle, and a rolling driver must stop on it.
+        for skip in &skipped_apps {
+            if skip.reason == AppSweepSkip::PrimaryNotHealthy.label() {
+                blocking_errors.push(format!(
+                    "{}: {} — {}",
+                    skip.app_id,
+                    skip.reason,
+                    skip.detail.as_deref().unwrap_or("not attempted")
+                ));
+            }
+        }
         Self {
             apply,
             apps_installed,
@@ -1836,6 +1990,10 @@ impl CoordinatorConductorReport {
             primary_app_id: primary_app.map(str::to_string),
             pending_count,
             blocking_errors,
+            bundle_coordinators: BTreeMap::new(),
+            primary_healthy: None,
+            statement_contract: None,
+            statement_contract_error: None,
         }
     }
 
@@ -1857,7 +2015,7 @@ impl CoordinatorConductorReport {
 }
 
 /// role → DNA hash for every role of the app that has a provisioned cell.
-fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, String> {
+pub(crate) fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, String> {
     app_info
         .cell_info
         .iter()
@@ -1870,6 +2028,41 @@ fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, 
             })
         })
         .collect()
+}
+
+/// A bundle unpacked once for a sweep: the per-role DNA files and the identity
+/// a reading is measured against.
+pub(crate) struct LoadedBundle {
+    pub(crate) role_dnas: BTreeMap<String, DnaFile>,
+    /// role → bundle DNA hash.
+    pub(crate) bundle_dna: BTreeMap<String, String>,
+    /// role → zome → bundled coordinator wasm hash.
+    pub(crate) bundle_coordinators: BTreeMap<String, BTreeMap<String, String>>,
+}
+
+impl LoadedBundle {
+    /// The bundle's identity: its lineage plus its coordinators.
+    pub(crate) fn identity(&self) -> String {
+        crate::coordinator_standing::bundle_identity(&self.bundle_dna, &self.bundle_coordinators)
+    }
+}
+
+/// Unpack `happ_path` once. CPU only — no conductor call.
+pub(crate) async fn load_bundle(happ_path: &Path) -> anyhow::Result<LoadedBundle> {
+    let role_dnas = bundle_role_dna_files(happ_path).await?;
+    let bundle_dna = role_dnas
+        .iter()
+        .map(|(role, dna)| (role.clone(), dna.dna_hash().to_string()))
+        .collect();
+    let bundle_coordinators = role_dnas
+        .iter()
+        .map(|(role, dna)| (role.clone(), coordinator_wasm_hashes(dna.dna_def())))
+        .collect();
+    Ok(LoadedBundle {
+        role_dnas,
+        bundle_dna,
+        bundle_coordinators,
+    })
 }
 
 /// Sweep EVERY installed app on this conductor whose cells are on the bundle's
@@ -1885,29 +2078,43 @@ fn installed_role_dna(app_info: &holochain_client::AppInfo) -> BTreeMap<String, 
 /// The work is bounded before each call, because a conductor call cannot be
 /// cancelled: apps are swept strictly one at a time, one admin request in
 /// flight, and eligibility is decided from `list_apps` alone so an app on
-/// another lineage costs no call at all. `skip_app` names an app the caller
-/// already swept; `primary_app` names the node's own app when it is part of
-/// this sweep (it is then never skipped for lineage, and its lineage refusals
-/// are blocking).
+/// another lineage costs no call at all. Only one conductor-wide sweep runs at
+/// a time on this node ([`crate::coordinator_standing::sweep_lock`]).
+/// `skip_app` names an app the caller already swept; `primary_app` names the
+/// node's own app when it is part of this sweep (it is then never skipped for
+/// lineage, and its lineage refusals are blocking).
+///
+/// **The own app is the canary.** When `primary_app` is named it is swept
+/// FIRST, whatever order `list_apps` returned. On an apply, if it is not swept
+/// or any of its roles errors, no other app is attempted in this pass: each is
+/// reported skipped as `primary_not_healthy`, which is blocking. A dry run
+/// keeps the ordering but not the gate — nothing was swapped. After the own
+/// app's sweep, ONE call of the constant `statement_contract` extern on its
+/// content-store cell (through `contract_reader`, the app-interface client
+/// bound to the own app) puts the contract on the report; an absent extern
+/// is reported by name and is never blocking.
+///
+/// Side effects beyond the conductor: an apply whose canary is healthy
+/// persists the bundle as the conductor's last-applied bundle, and every
+/// report refreshes the standing coordinator reading.
 pub async fn sync_coordinators_all_apps(
     admin_ws: &AdminWebsocket,
     happ_path: &Path,
     apply: bool,
     skip_app: Option<&str>,
     primary_app: Option<&str>,
+    contract_reader: Option<&dyn crate::coordinator_standing::StatementContractReader>,
 ) -> anyhow::Result<CoordinatorConductorReport> {
-    let role_dnas = bundle_role_dna_files(happ_path).await?;
-    let bundle_dna: BTreeMap<String, String> = role_dnas
-        .iter()
-        .map(|(role, dna)| (role.clone(), dna.dna_hash().to_string()))
-        .collect();
+    let _one_sweep = crate::coordinator_standing::sweep_lock().lock().await;
+    let bundle = load_bundle(happ_path).await?;
     let apps = admin_ws
         .list_apps(None)
         .await
         .map_err(|e| anyhow::anyhow!("list_apps failed: {e}"))?;
 
-    let mut reports: Vec<CoordinatorSyncReport> = Vec::new();
+    // Eligibility from `list_apps` alone — no conductor call.
     let mut skipped_apps: Vec<CoordinatorAppSkip> = Vec::new();
+    let mut eligible: Vec<&holochain_client::AppInfo> = Vec::new();
     for app_info in &apps {
         let installed_dna = installed_role_dna(app_info);
         let unrecoverable = matches!(app_info.status, AppStatus::Unrecoverable(..));
@@ -1915,7 +2122,7 @@ pub async fn sync_coordinators_all_apps(
         let primary = primary_app == Some(app_info.installed_app_id.as_str());
         if let Some(skip) = app_sweep_skip(
             &installed_dna,
-            &bundle_dna,
+            &bundle.bundle_dna,
             unrecoverable,
             already_swept,
             primary,
@@ -1930,21 +2137,99 @@ pub async fn sync_coordinators_all_apps(
                 app_id: app_info.installed_app_id.clone(),
                 reason: skip.label().to_string(),
                 installed_dna,
+                detail: None,
             });
             continue;
         }
-        reports.push(sweep_app_roles(admin_ws, app_info, &role_dnas, apply).await);
-        tokio::task::yield_now().await;
+        eligible.push(app_info);
     }
 
-    let report = CoordinatorConductorReport::build(
+    let ids: Vec<&str> = eligible
+        .iter()
+        .map(|a| a.installed_app_id.as_str())
+        .collect();
+    let order = primary_first_order(&ids, primary_app);
+    let primary_eligible = primary_app.is_some_and(|p| ids.contains(&p));
+
+    let mut reports: Vec<CoordinatorSyncReport> = Vec::new();
+    let mut verdict = CanaryVerdict::NotApplicable;
+    // An own app that is not even eligible proves nothing: on an apply the
+    // canary fails before any hosted app is touched.
+    if !primary_eligible {
+        verdict = canary_verdict(apply, primary_app, None);
+    }
+    let mut held_from = None;
+    for (n, &idx) in order.iter().enumerate() {
+        if matches!(verdict, CanaryVerdict::NotHealthy(_)) {
+            held_from = Some(n);
+            break;
+        }
+        let app_info = eligible[idx];
+        let report = sweep_app_roles(admin_ws, app_info, &bundle.role_dnas, apply).await;
+        if primary_app == Some(app_info.installed_app_id.as_str()) {
+            verdict = canary_verdict(apply, primary_app, Some(&report));
+        }
+        reports.push(report);
+        tokio::task::yield_now().await;
+    }
+    if let (Some(n), CanaryVerdict::NotHealthy(why)) = (held_from, &verdict) {
+        error!(
+            primary_app = primary_app.unwrap_or("-"),
+            held_apps = order.len() - n,
+            reason = why.as_str(),
+            "coordinator sweep: the node's own app did not prove the bundle — NO hosted app is \
+             attempted in this pass"
+        );
+        for &idx in &order[n..] {
+            let app_info = eligible[idx];
+            skipped_apps.push(CoordinatorAppSkip {
+                app_id: app_info.installed_app_id.clone(),
+                reason: AppSweepSkip::PrimaryNotHealthy.label().to_string(),
+                installed_dna: installed_role_dna(app_info),
+                detail: Some(why.clone()),
+            });
+        }
+    }
+
+    // The contract read: one call of a constant extern, after the own app's
+    // sweep, only when the own app was swept in this pass.
+    let primary_swept = primary_app.is_some_and(|p| reports.iter().any(|r| r.app_id == p));
+    let contract = match (primary_app, primary_swept) {
+        (Some(p), true) => {
+            Some(crate::coordinator_standing::read_statement_contract(contract_reader, p).await)
+        }
+        _ => None,
+    };
+
+    let mut report = CoordinatorConductorReport::build(
         apply,
         apps.len(),
         reports,
         skipped_apps,
-        bundle_dna,
+        bundle.bundle_dna.clone(),
         primary_app,
     );
+    report.bundle_coordinators = bundle.bundle_coordinators.clone();
+    report.primary_healthy = match &verdict {
+        CanaryVerdict::NotApplicable => None,
+        CanaryVerdict::Healthy => Some(true),
+        CanaryVerdict::NotHealthy(_) => Some(false),
+    };
+    if let (CanaryVerdict::NotHealthy(why), Some(own)) = (&verdict, primary_app) {
+        report.blocking_errors = with_unproven_primary(report.blocking_errors, own, why);
+    }
+    match contract {
+        Some(Ok(c)) => report.statement_contract = Some(c),
+        Some(Err(e)) => report.statement_contract_error = Some(e),
+        None => {}
+    }
+
+    // Last applied wins: the own app proved this bundle on an apply.
+    if verdict == CanaryVerdict::Healthy {
+        crate::coordinator_standing::record_applied_bundle(happ_path).await;
+    }
+    crate::coordinator_standing::fold_conductor_report(&report, &bundle.identity());
+
     info!(
         apply,
         apps_installed = report.apps_installed,
@@ -1953,6 +2238,8 @@ pub async fn sync_coordinators_all_apps(
         drifted_count = report.drifted_count,
         applied_count = report.applied_count,
         pending_count = report.pending_count,
+        primary_healthy = ?report.primary_healthy,
+        statement_contract_error = report.statement_contract_error.as_deref().unwrap_or("-"),
         unhealed = ?report.unhealed,
         blocking_errors = ?report.blocking_errors,
         "coordinator sweep complete for every app on this conductor"
@@ -1961,16 +2248,21 @@ pub async fn sync_coordinators_all_apps(
 }
 
 /// The boot path's second half: after the node's own app is swept and the node
-/// is ready, sweep every other app on the conductor. Runs off the readiness
-/// path — a conductor carrying dozens of hosted apps must not hold the node's
-/// own readiness behind them.
+/// is ready, sweep every app on the conductor, the own app first as the canary
+/// (its second read is a no-op when the readiness-path sweep healed it, and it
+/// is what lets a failed own app hold the hosted apps back). Runs off the
+/// readiness path — a conductor carrying dozens of hosted apps must not hold
+/// the node's own readiness behind them. No app-interface client exists yet at
+/// this point of boot, so the statement contract is read by the standing
+/// reading's first pass, not here.
 pub async fn sweep_other_apps_at_boot(admin_ws: &AdminWebsocket, happ_path: &Path, own_app: &str) {
     let apply = coordinator_update_allowed();
-    match sync_coordinators_all_apps(admin_ws, happ_path, apply, Some(own_app), None).await {
-        Ok(report) if report.apps.is_empty() => info!(
+    match sync_coordinators_all_apps(admin_ws, happ_path, apply, None, Some(own_app), None).await {
+        Ok(report) if report.apps.iter().all(|a| a.app_id == own_app) => info!(
             own_app,
             apps_installed = report.apps_installed,
-            "No other app on this conductor is on the bundle's DNA lineage"
+            primary_healthy = ?report.primary_healthy,
+            "No other app on this conductor was swept against the bundle's DNA lineage"
         ),
         Ok(report) => info!(
             own_app,
@@ -1978,8 +2270,9 @@ pub async fn sweep_other_apps_at_boot(admin_ws: &AdminWebsocket, happ_path: &Pat
             drifted_roles = report.drifted_count,
             applied_roles = report.applied_count,
             gate_allows_apply = apply,
+            primary_healthy = ?report.primary_healthy,
             unhealed = ?report.unhealed,
-            "Coordinator-zome drift handled for the other apps on this conductor"
+            "Coordinator-zome drift handled for every app on this conductor"
         ),
         Err(e) => error!(
             own_app,
@@ -2195,6 +2488,16 @@ mod tests {
 
     /// The drift verdict itself, isolated from the conductor and the bundle:
     /// equal coordinator-hash maps → clean, any difference → drifted.
+    #[test]
+    fn an_unproven_own_app_blocks_even_with_nothing_held_back() {
+        let out = with_unproven_primary(Vec::new(), "elohim", "not swept in this pass");
+        assert_eq!(out.len(), 1);
+        assert!(out[0].starts_with("elohim: primary_not_healthy"));
+        // An existing blocking error already halts the driver; none is added.
+        let kept = with_unproven_primary(vec!["elohim/lamad: x".into()], "elohim", "y");
+        assert_eq!(kept, vec!["elohim/lamad: x".to_string()]);
+    }
+
     #[test]
     fn role_report_flags_drift_only_on_hash_difference() {
         let a: std::collections::BTreeMap<String, String> =
@@ -2448,6 +2751,7 @@ mod tests {
                 app_id: "other".to_string(),
                 reason: AppSweepSkip::NoRoleInBundle.label().to_string(),
                 installed_dna: BTreeMap::new(),
+                detail: None,
             }],
             dna_map(&[("lamad", "uhC0k-A")]),
             Some("elohim"),
@@ -2476,6 +2780,119 @@ mod tests {
         assert_eq!(v["skippedApps"][0]["reason"], "no_role_in_bundle");
         assert_eq!(v["bundleDna"]["lamad"], "uhC0k-A");
         assert!(v.get("skipped_apps").is_none());
+    }
+
+    #[test]
+    fn the_own_app_is_swept_first_whatever_order_list_apps_returned() {
+        let ids = ["hosted-a", "hosted-b", "elohim", "hosted-c"];
+        assert_eq!(primary_first_order(&ids, Some("elohim")), vec![2, 0, 1, 3]);
+        // Already first: unchanged. Absent or unnamed: the conductor's order.
+        assert_eq!(
+            primary_first_order(&["elohim", "h"], Some("elohim")),
+            vec![0, 1]
+        );
+        assert_eq!(primary_first_order(&ids, Some("absent")), vec![0, 1, 2, 3]);
+        assert_eq!(primary_first_order(&ids, None), vec![0, 1, 2, 3]);
+        assert!(primary_first_order(&[], Some("elohim")).is_empty());
+    }
+
+    fn sync_report(app_id: &str, roles: Vec<CoordinatorRoleReport>) -> CoordinatorSyncReport {
+        CoordinatorSyncReport {
+            app_id: app_id.to_string(),
+            apply: true,
+            drifted_count: roles.iter().filter(|r| r.drifted).count(),
+            applied_count: roles.iter().filter(|r| r.applied).count(),
+            roles,
+        }
+    }
+
+    #[test]
+    fn the_canary_gates_an_apply_on_the_own_app_and_never_a_dry_run() {
+        let old = dna_map(&[("content_store", "uhCok-old")]);
+        let new = dna_map(&[("content_store", "uhCok-new")]);
+        let mut healed = role_report("lamad", old.clone(), new.clone());
+        healed.applied = true;
+        let clean = sync_report(
+            "elohim",
+            vec![healed, role_report("imagodei", new.clone(), new.clone())],
+        );
+        let mut failed = role_report("lamad", old.clone(), new.clone());
+        failed.error = Some("update_coordinators failed: boom".to_string());
+        let broken = sync_report("elohim", vec![failed]);
+        let mut foreign = role_report("lamad", old, new);
+        foreign.error = lineage_mismatch_error("uhC0k-OLD", "uhC0k-A");
+        let wrong_bundle = sync_report("elohim", vec![foreign]);
+
+        assert_eq!(
+            canary_verdict(true, Some("elohim"), Some(&clean)),
+            CanaryVerdict::Healthy
+        );
+        assert!(matches!(
+            canary_verdict(true, Some("elohim"), Some(&broken)),
+            CanaryVerdict::NotHealthy(why) if why.contains("lamad: update_coordinators failed")
+        ));
+        // A bundle the own app refuses for lineage is the wrong bundle for
+        // this peer: it reaches nobody else either.
+        assert!(matches!(
+            canary_verdict(true, Some("elohim"), Some(&wrong_bundle)),
+            CanaryVerdict::NotHealthy(_)
+        ));
+        // An own app that was not swept proves nothing.
+        assert!(matches!(
+            canary_verdict(true, Some("elohim"), None),
+            CanaryVerdict::NotHealthy(why) if why.contains("was not swept")
+        ));
+        // A dry run swaps nothing, and a sweep with no own app has no canary.
+        assert_eq!(
+            canary_verdict(false, Some("elohim"), Some(&broken)),
+            CanaryVerdict::NotApplicable
+        );
+        assert_eq!(
+            canary_verdict(true, None, Some(&broken)),
+            CanaryVerdict::NotApplicable
+        );
+    }
+
+    #[test]
+    fn apps_held_back_by_the_canary_are_skipped_by_name_and_block_the_rollout() {
+        let mut failed = role_report(
+            "lamad",
+            dna_map(&[("content_store", "uhCok-old")]),
+            dna_map(&[("content_store", "uhCok-new")]),
+        );
+        failed.error = Some("update_coordinators failed: boom".to_string());
+        let held = |id: &str| CoordinatorAppSkip {
+            app_id: id.to_string(),
+            reason: AppSweepSkip::PrimaryNotHealthy.label().to_string(),
+            installed_dna: dna_map(&[("lamad", "uhC0k-A")]),
+            detail: Some("the node's own app 'elohim' did not take the bundle cleanly".to_string()),
+        };
+        let report = CoordinatorConductorReport::build(
+            true,
+            3,
+            vec![sync_report("elohim", vec![failed])],
+            vec![held("hosted-a"), held("hosted-b")],
+            dna_map(&[("lamad", "uhC0k-A")]),
+            Some("elohim"),
+        );
+        assert_eq!(report.blocking_errors.len(), 3);
+        assert!(report.blocking_errors[0].starts_with("elohim/lamad: update_coordinators"));
+        assert!(report.blocking_errors[1]
+            .starts_with("hosted-a: primary_not_healthy — the node's own app"));
+        assert!(report.blocking_errors[2].starts_with("hosted-b: primary_not_healthy"));
+        // Held apps were never read: they are not counted as pending.
+        assert_eq!(report.pending_count, 1);
+        assert!(AppSweepSkip::leaves_reading_unchanged(
+            "primary_not_healthy"
+        ));
+        assert!(!AppSweepSkip::leaves_reading_unchanged("no_role_in_bundle"));
+
+        let v = serde_json::to_value(&report).expect("report serializes");
+        assert_eq!(v["skippedApps"][0]["reason"], "primary_not_healthy");
+        assert!(v["skippedApps"][0]["detail"].is_string());
+        // Optional fields are absent until the sweep sets them.
+        assert!(v.get("statementContract").is_none());
+        assert!(v.get("primaryHealthy").is_none());
     }
 
     /// snake_case never leaves the Rust boundary — the wire shape is camelCase.

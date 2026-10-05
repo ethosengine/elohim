@@ -628,11 +628,19 @@ impl CoordinatorBundleVehicle {
         // takes the same coordinators, or a hosted person keeps the ones their
         // app was provisioned with. A cell on another lineage is reported and
         // left alone; a same-lineage role left behind is a mixture.
+        // The node's own app proved the release above (a partial apply was
+        // refused): record it as the conductor's last applied bundle BEFORE the
+        // hosted-app sweep, so a person provisioned from here on is measured
+        // against it. The own app's sweep is folded into the standing reading
+        // after the conductor-wide sweep, which re-bases the reading on this
+        // bundle.
+        crate::coordinator_standing::record_applied_bundle(bundle).await;
         let others = crate::happ_manager::sync_coordinators_all_apps(
             &self.admin,
             bundle,
             true,
             Some(&self.app_id),
+            None,
             None,
         )
         .await
@@ -642,6 +650,7 @@ impl CoordinatorBundleVehicle {
                 format!("sync_coordinators_all_apps failed after the node's own app swapped: {e}"),
             )
         })?;
+        crate::coordinator_standing::fold_app_report(&report);
         let left_behind = others.unhealed_on_lineage();
         if !left_behind.is_empty() {
             tracing::error!(

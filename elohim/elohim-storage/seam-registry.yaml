@@ -5160,3 +5160,150 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/courier_obey.rs, testName: a_proven_version_carries_its_body, kind: unit }
       - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_edge_list_never_names_a_restricted_atom, kind: integration }
       - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_graph_walk_prunes_and_never_walks_through_a_restricted_atom, kind: integration }
+
+  - name: canary_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/happ_manager.rs
+      modulePath: happ_manager::canary_verdict
+    summary: >
+      The node's own app is the canary of a conductor-wide coordinator apply: it is swept first
+      (primary_first_order), and only when it was swept and none of its roles errored do the
+      hosted apps on the same conductor follow in the same pass. Otherwise every remaining
+      eligible app is reported skipped as primary_not_healthy, which is blocking. A dry run and a
+      sweep that names no own app are NotApplicable: nothing is swapped, so nothing is gated.
+    concernIds:
+      - { id: C0, status: n-a, justification: "No truth is written; the verdict only orders and gates update_coordinators calls." }
+      - { id: C4, status: answered, justification: "An own app that was not swept proves nothing and yields NotHealthy, never a default pass." }
+      - { id: C6a, status: answered, justification: "bounded-work — the gate stops a pass before any hosted app's admin call; apps stay one at a time under the sweep lock." }
+      - { id: C8, status: answered, justification: "The held apps are named on the report with the canary's reason; the report carries primaryHealthy." }
+      - { id: C12, status: n-a, justification: "No permission or consent boundary is read or changed." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: the_canary_gates_an_apply_on_the_own_app_and_never_a_dry_run, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: apps_held_back_by_the_canary_are_skipped_by_name_and_block_the_rollout, kind: unit }
+
+  - name: primary_first_order
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/happ_manager.rs
+      modulePath: happ_manager::primary_first_order
+    summary: >
+      The order a conductor-wide coordinator sweep visits eligible apps in: the node's own app
+      first whatever order list_apps returned, every other app in the conductor's own order.
+    concernIds:
+      - { id: C6a, status: answered, justification: "Pure index permutation; no I/O." }
+      - { id: C12, status: n-a, justification: "No permission boundary." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: the_own_app_is_swept_first_whatever_order_list_apps_returned, kind: unit }
+
+  - name: AppSweepSkip
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/happ_manager.rs
+      modulePath: happ_manager::AppSweepSkip
+    summary: >
+      Why an installed app takes no part in a conductor-wide coordinator sweep: already_swept,
+      no_role_in_bundle, no_role_on_bundle_lineage, unrecoverable, and primary_not_healthy (held
+      back by the canary; assigned after the own app's verdict, never by app_sweep_skip, and
+      blocking). leaves_reading_unchanged separates the two that mean "not read in this pass"
+      from the ones that mean "carries no coordinator reading".
+    concernIds:
+      - { id: C4, status: answered, justification: "Every skip is a named row on the report; a skipped app never reads as clean." }
+      - { id: C8, status: answered, justification: "Each skip is logged at INFO with its label; the canary hold is logged at ERROR." }
+      - { id: C12, status: n-a, justification: "No permission boundary." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: an_app_on_another_lineage_or_another_happ_is_left_alone, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: an_unrecoverable_or_already_swept_app_is_skipped_even_on_the_lineage, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: apps_held_back_by_the_canary_are_skipped_by_name_and_block_the_rollout, kind: unit }
+
+  - name: CoordinatorReading::fold_conductor_report
+    kind: state-transition
+    sourceLocation:
+      file: src/coordinator_standing.rs
+      modulePath: coordinator_standing::CoordinatorReading::fold_conductor_report
+    summary: >
+      Folds a conductor-wide sweep report into the conductor's standing coordinator reading.
+      Converge-not-accrete: the reading is re-based (emptied) when the measured bundle's identity
+      changes, apps absent from the report's full app list are dropped, apps held back by the
+      canary keep their previous reading, and an app a dry run found drifted on a node that applies
+      is left unsettled for the standing pass to heal. The published summary carries aggregates
+      only — no app id.
+    concernIds:
+      - { id: C0, status: answered, justification: "In-memory projection rebuilt from the conductor on every pass; never persisted, never a truth source." }
+      - { id: C6b, status: answered, justification: "Re-folding the same report under the same bundle converges to the same reading; uninstalled apps are pruned rather than accreting." }
+      - { id: C8, status: answered, justification: "Published as aggregate gauges (elohim_coordinator_*) and in the projected conductor diagnostics." }
+      - { id: C12, status: answered, justification: "Which people a conductor hosts never leaves the node: the summary and gauges carry no app id." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: the_reading_folds_a_report_into_aggregates_with_no_app_id, kind: unit }
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: a_new_bundle_drops_the_old_reading_and_an_uninstalled_app_leaves_it, kind: unit }
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: a_dry_run_that_finds_drift_on_an_applying_node_leaves_the_app_for_the_standing_pass, kind: unit }
+
+  - name: select_apps_for_pass
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/coordinator_standing.rs
+      modulePath: coordinator_standing::select_apps_for_pass
+    summary: >
+      Which apps one standing coordinator pass reads: only apps not yet seen against the current
+      bundle, the node's own app first, at most MAX_APPS_PER_PASS; nothing when the pass applies
+      and the own app is known not to have taken the bundle cleanly (the canary, standing form).
+    concernIds:
+      - { id: C6a, status: answered, justification: "bounded-work — the per-pass cap bounds admin calls before any is made; a conductor that gained dozens of apps spreads them over passes." }
+      - { id: C6b, status: answered, justification: "A seen app is not read again until the bundle changes or the process restarts; storage is the only coordinator writer on its conductor." }
+      - { id: C12, status: n-a, justification: "No permission boundary." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: a_standing_pass_reads_unseen_apps_own_first_and_at_most_the_cap, kind: unit }
+
+  - name: choose_bundle_path
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/coordinator_standing.rs
+      modulePath: coordinator_standing::choose_bundle_path
+    summary: >
+      The bundle a later coordinator sweep is measured against: the last applied bundle persisted
+      under <storage_dir>/coordinators/last-applied.happ when present, else the boot --happ-path
+      (embedded conductor only), else none. Last applied wins, whichever path applied it.
+    concernIds:
+      - { id: C2, status: partial, justification: "Last-applied-wins is recency within one node; it is recorded only after the node's own app took the bundle cleanly, but a boot from an older image bundle re-records that older bundle." }
+      - { id: C4, status: answered, justification: "No bundle is an explicit None, and the standing pass reads nothing rather than guessing one." }
+      - { id: C12, status: n-a, justification: "No permission boundary." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: the_sweep_bundle_is_the_persisted_one_when_present_else_the_boot_one, kind: unit }
+
+  - name: ContractReadFailure
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/coordinator_standing.rs
+      modulePath: coordinator_standing::ContractReadFailure
+    summary: >
+      Why a coordinator's statement_contract was not read: no_app_client, reader_app_mismatch,
+      extern_absent (an older coordinator; expected, never blocking), call_failed, decode_failed.
+      Only extern_absent and decode_failed speak for the coordinator and are held until its wasm
+      hash changes; the rest are asked again on the next pass.
+    concernIds:
+      - { id: C4, status: answered, justification: "Every failure is a named statementContractError; absence of the extern is not read as an empty contract." }
+      - { id: C6a, status: answered, justification: "One call of a constant extern per distinct own-app content-store coordinator hash, Background admission class." }
+      - { id: C10, status: answered, justification: "An older coordinator without the extern is the named extern_absent outcome, not a failure of the sweep." }
+      - { id: C12, status: n-a, justification: "No permission boundary." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: contract_failures_are_classified_by_name, kind: unit }
+      - { path: elohim/elohim-storage/src/coordinator_standing.rs, testName: a_contract_is_read_once_per_coordinator_and_a_path_failure_is_not_cached, kind: unit }
+
+  - name: parse_issuer_behind
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/conductor_writes.rs
+      modulePath: services::conductor_writes::parse_issuer_behind
+    summary: >
+      Reads the content-store coordinator's issuer-behind head-delegation refusal so the HTTP
+      answer carries reasonCode issuerBehind plus the presented and lowest-accepted statement
+      forms beside the coordinator's own words. Status codes are unchanged; a malformed tail keeps
+      the reason code and drops the form it cannot read.
+    concernIds:
+      - { id: C4, status: answered, justification: "A refusal without the code is not classified; an unreadable form is null, never guessed." }
+      - { id: C8, status: answered, justification: "The person-facing refusal names which side is behind and the cure." }
+      - { id: C12, status: n-a, justification: "The delegation check itself is unchanged and lives in the coordinator." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: issuer_behind_refusal_names_both_forms, kind: unit }
+      - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: a_refusal_without_the_issuer_behind_code_is_not_one, kind: unit }
+      - { path: elohim/elohim-storage/src/services/conductor_writes.rs, testName: a_malformed_issuer_behind_keeps_the_code_and_drops_what_it_cannot_read, kind: unit }

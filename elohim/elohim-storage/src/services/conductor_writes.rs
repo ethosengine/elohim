@@ -1138,6 +1138,76 @@ pub async fn call_is_bootstrap_steward(hc: &Arc<HcClient>) -> Result<bool, Stora
     })
 }
 
+/// Read the statement contract the running content-store coordinator declares
+/// (`content_store::statement_contract`, unit input).
+///
+/// Bounded BEFORE the call by what is called, not by a caller timeout: the
+/// extern returns one constant table and touches neither the source chain nor
+/// the DHT, so its wasm body has no work to grow. Callers make it once per
+/// distinct coordinator wasm hash (see `coordinator_standing`), never once per
+/// app. A coordinator older than the extern answers
+/// [`is_unknown_function_error`]; the caller names that outcome rather than
+/// failing on it. Background class: no person waits on this read.
+pub async fn call_statement_contract(
+    hc: &Arc<HcClient>,
+) -> Result<crate::coordinator_standing::StatementContract, StorageError> {
+    let payload = rmp_serde::to_vec_named(&()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode statement_contract input: {e}"
+        ))
+    })?;
+    let (bytes, _timing) = hc
+        .call_zome_timed(
+            ZOME_NAME,
+            "statement_contract",
+            payload,
+            AdmissionClass::Background,
+        )
+        .await?;
+    rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!("conductor_writes: decode statement_contract: {e}"))
+    })
+}
+
+/// The `issuer-behind` refusal the content-store coordinator returns when a
+/// head delegation was issued in a statement form older than the lowest form
+/// this coordinator accepts for a new act:
+///
+/// `head delegation: issuer-behind: presented=<form> lowest-accepted=<form>; <sentence>`
+///
+/// Parsed so the HTTP answer can carry a stable `reasonCode` and both forms
+/// beside the coordinator's own words: the cure (re-issue from an app that
+/// runs a current coordinator) needs to know which side is behind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssuerBehind {
+    /// The form the presented delegation was issued in, when the text names it.
+    pub presented: Option<String>,
+    /// The lowest form this coordinator accepts for a new act, when named.
+    pub lowest_accepted: Option<String>,
+}
+
+/// Pure: `Some` whenever the conductor's text carries the `issuer-behind:`
+/// reason code, with each form parsed where the text is well formed (a
+/// malformed tail still yields the reason code, with the unreadable form
+/// `None`). `None` when the refusal is any other kind.
+pub fn parse_issuer_behind(msg: &str) -> Option<IssuerBehind> {
+    const CODE: &str = "issuer-behind:";
+    let tail = &msg[msg.find(CODE)? + CODE.len()..];
+    // The coordinator's sentence follows the first `;`; the forms precede it.
+    let head = tail.split(';').next().unwrap_or("");
+    let field = |key: &str| -> Option<String> {
+        head.split_whitespace()
+            .find_map(|tok| tok.strip_prefix(key))
+            .map(|v| v.trim_matches(|c: char| matches!(c, '"' | '\'' | '\\' | ')' | ',')))
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    Some(IssuerBehind {
+        presented: field("presented="),
+        lowest_accepted: field("lowest-accepted="),
+    })
+}
+
 /// Caller-input wire shape for the `content_store::get_record_for_action`
 /// coordinator — the SOURCE half of declare-carries-Record.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -2098,6 +2168,63 @@ mod collective_cid_tests {
 
 #[cfg(test)]
 mod tests {
+    use super::{parse_issuer_behind, IssuerBehind};
+
+    #[test]
+    fn issuer_behind_refusal_names_both_forms() {
+        // The coordinator's text as it reaches storage: wrapped by the
+        // conductor's error rendering, with the human sentence after `;`.
+        let msg = "zome call failed: Guest(\"head delegation: issuer-behind: \
+                   presented=elohim:accepted-content-head:v2 \
+                   lowest-accepted=elohim:accepted-content-head:v4; the issuing app runs an \
+                   older version — re-issue the grant from a current app\")";
+        assert_eq!(
+            parse_issuer_behind(msg),
+            Some(IssuerBehind {
+                presented: Some("elohim:accepted-content-head:v2".to_string()),
+                lowest_accepted: Some("elohim:accepted-content-head:v4".to_string()),
+            })
+        );
+    }
+
+    #[test]
+    fn a_refusal_without_the_issuer_behind_code_is_not_one() {
+        assert_eq!(
+            parse_issuer_behind("head delegation: legacy grant cannot authorize a new publication"),
+            None
+        );
+        assert_eq!(parse_issuer_behind("not the author"), None);
+        assert_eq!(parse_issuer_behind(""), None);
+    }
+
+    #[test]
+    fn a_malformed_issuer_behind_keeps_the_code_and_drops_what_it_cannot_read() {
+        // The code is present, so the reason code is stable even when the forms
+        // are not: a reader still learns WHO is behind.
+        assert_eq!(
+            parse_issuer_behind("head delegation: issuer-behind: something odd happened"),
+            Some(IssuerBehind {
+                presented: None,
+                lowest_accepted: None,
+            })
+        );
+        assert_eq!(
+            parse_issuer_behind("head delegation: issuer-behind: presented=v2 lowest-accepted=; x"),
+            Some(IssuerBehind {
+                presented: Some("v2".to_string()),
+                lowest_accepted: None,
+            })
+        );
+        // A form token in the human sentence after `;` is never read as a form.
+        assert_eq!(
+            parse_issuer_behind("head delegation: issuer-behind: presented=v1; lowest-accepted=v9"),
+            Some(IssuerBehind {
+                presented: Some("v1".to_string()),
+                lowest_accepted: None,
+            })
+        );
+    }
+
     #[test]
     fn accepted_head_delegation_preserves_all_signed_fields_at_http_boundary() {
         use base64::Engine as _;
