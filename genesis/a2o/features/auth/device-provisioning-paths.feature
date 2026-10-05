@@ -20,6 +20,11 @@ Feature: A person's identity starts on one node and grows to others
   no use to them. The new node then writes a joining record to the network,
   signed by the steward that approved and by itself, that any peer can check.
 
+  Joining makes a node one of Matthew's nodes: the network recognizes it as
+  his. It does not by that alone make the node a steward. A node of his becomes
+  a steward as well, able to approve other nodes, when Matthew says so on a
+  node that already is one.
+
   One steward's approval is enough. Matthew's other stewards do not have to be
   reachable, and nothing waits for them. When they next see the joining record,
   each adds its own signature to it. This is called affirming. A joining record
@@ -29,6 +34,13 @@ Feature: A person's identity starts on one node and grows to others
   That is his choice and is off unless he makes it. When it is on, he opens the
   same link in the portal of each steward that must approve, one after another,
   and the code is shown by the last of them, once enough have approved.
+
+  Matthew may also tell a steward in advance which node he expects to join,
+  by writing that node's key in the steward's settings. When that exact node
+  asks, the steward approves without asking Matthew again, because he has
+  already answered, and shows the code as it would after an approval. For a node that already has an identity of its own, the
+  steward applies the recommended choice without asking Matthew again, and the
+  node must still confirm it.
 
   A doorway is a node run as a service for other people. It can hold a
   person's key for them, so they can sign in from a browser with a password,
@@ -40,9 +52,32 @@ Feature: A person's identity starts on one node and grows to others
   identity can be created, and can grow to a second node, on a network where
   no doorway exists.
 
+  A node may have begun an identity of its own before anyone told it whose it
+  is. When such a node asks to join, each side is told what is about to happen
+  before it happens. The steward shows a recommended choice, which Matthew can
+  accept in one step. The node that is joining is shown the same choice and
+  must confirm it, because the change is being made to it. That confirmation
+  is given by whoever operates the node, from its own terminal or its own
+  portal. In this story Matthew runs both nodes, so he answers twice: once as
+  the person the steward speaks for, and once as the operator of the node that
+  is joining.
+
+  Which choice is recommended depends on whether the node has made anything
+  under the identity it began. If it has made nothing, the recommended choice
+  is a clean start: the node gives up that identity and its key, makes a new
+  key, and joins. If it has made things, the recommended choice is to keep
+  everything: the node keeps its key and joins as it is, and what it made
+  stays where it is, still tracing to the identity it began. The portal says
+  plainly that it has been left as it was.
+
+  Both of those are small decisions. There is a third, for when a lot rests on
+  what the node made: going through that earlier work and settling what
+  becomes Matthew's and on what terms. That is a larger undertaking and this
+  story does not cover it.
+
   There are three ways an identity can begin and grow, and each must work:
-  - It begins on a doorway, which holds Matthew's key, and grows to a node of his own.
   - It begins on a node of his own and grows to a second node of his own.
+  - It begins on a doorway, which holds Matthew's key, and grows to a node of his own.
   - It begins on a node of his own and later gains a doorway.
 
   Background:
@@ -127,3 +162,86 @@ Feature: A person's identity starts on one node and grows to others
       Then the portal on node "home" shows the code
       When Matthew types the code into the terminal on node "laptop"
       Then node "laptop" is one of Matthew's nodes
+
+  Rule: A node Matthew expects joins without his being asked again, and a node becomes a steward only when he says so
+
+    Scenario: An expected node with no identity of its own joins without a second answer
+      Given Matthew's identity began on node "workspace"
+      And Matthew has told node "workspace" that he expects node "home" to join
+      And node "home" has no identity of its own
+      When the terminal on node "home" asks to join Matthew's identity
+      Then node "workspace" approves without asking Matthew
+      And node "workspace" shows the code
+      When Matthew types the code into the terminal on node "home"
+      Then node "home" is one of Matthew's nodes
+
+    Scenario: Matthew makes a node of his a steward
+      Given Matthew's identity began on node "workspace"
+      And node "home" is one of Matthew's nodes and is not a steward
+      When Matthew says on node "workspace" that node "home" is a steward of his identity
+      Then node "workspace" and node "home" are both stewards of Matthew's identity
+      And Matthew can approve a new node in the portal on node "home"
+
+  Rule: A node that already began an identity joins with a recommended choice, and confirms what will happen to it
+
+    Scenario: A node that made nothing gets a clean start
+      Given Matthew's identity began on node "workspace"
+      And node "home" began an identity of its own and has made nothing under it
+      When the terminal on node "home" asks to join Matthew's identity
+      Then the portal on node "workspace" tells Matthew that node "home" already has an identity of its own
+      And the portal on node "workspace" recommends a clean start
+      When Matthew accepts the recommended choice
+      Then node "home" tells its operator that it will give up the identity it began and its key, and make a new key
+      And node "home" has changed nothing yet
+      When the operator of node "home" confirms
+      And Matthew types the code into the terminal on node "home"
+      Then node "home" is one of Matthew's nodes
+      And node "home" has a new key
+
+    Scenario: A node that made things keeps everything
+      Given Matthew's identity began on node "workspace"
+      And node "home" began an identity of its own
+      And node "home" published the content "sensor-log" under that identity
+      When the terminal on node "home" asks to join Matthew's identity
+      Then the portal on node "workspace" recommends keeping everything
+      And the portal on node "workspace" tells Matthew that what node "home" made will be left as it was
+      When Matthew accepts the recommended choice
+      Then node "home" tells its operator that it will keep its key and what it made, and join as it is
+      When the operator of node "home" confirms
+      And Matthew types the code into the terminal on node "home"
+      Then node "home" is one of Matthew's nodes
+      And node "home" has the same key it had before
+      And the content "sensor-log" still traces to the identity node "home" began
+
+    Scenario: Choosing a clean start for a node that made things names what will be lost
+      Given Matthew's identity began on node "workspace"
+      And node "home" began an identity of its own
+      And node "home" published the content "sensor-log" under that identity
+      When the terminal on node "home" asks to join Matthew's identity
+      And Matthew chooses a clean start in the portal on node "workspace"
+      Then node "home" tells its operator that it will give up its key, and that the content "sensor-log" will no longer be its own to change
+      And node "home" has changed nothing yet
+
+    Scenario: The node's operator says no, and nothing changes
+      Given Matthew's identity began on node "workspace"
+      And node "home" began an identity of its own and has made nothing under it
+      When the terminal on node "home" asks to join Matthew's identity
+      And Matthew accepts the recommended choice in the portal on node "workspace"
+      And the operator of node "home" does not confirm
+      Then node "home" has the same key it had before
+      And node "home" is not one of Matthew's nodes
+      And the portal on node "workspace" shows that node "home" did not confirm
+
+    Scenario: An expected node that already has an identity still confirms
+      Given Matthew's identity began on node "workspace"
+      And Matthew has told node "workspace" that he expects node "home" to join
+      And node "home" began an identity of its own and has made nothing under it
+      When the terminal on node "home" asks to join Matthew's identity
+      Then node "workspace" applies the recommended choice without asking Matthew
+      And node "home" tells its operator that it will give up the identity it began and its key, and make a new key
+      And node "home" has changed nothing yet
+      When the operator of node "home" confirms
+      Then node "workspace" shows the code
+      When Matthew types the code into the terminal on node "home"
+      Then node "home" is one of Matthew's nodes
+      And Matthew was not asked to approve anything on node "workspace"
