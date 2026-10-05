@@ -45,7 +45,8 @@ pub fn usage() -> &'static str {
      epr identity secret [--identifier <sign-in word>] [--node <this node URL>]\n    \
      (reads the secret from this terminal without echo, or from stdin; never from an argument)\n  \
      epr device pending [--node <this node URL>]\n  \
-     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]"
+     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
+     epr device approve <number | key fingerprint> --decline   (says no: nothing is signed)"
 }
 
 /// `epr identity …`.
@@ -70,6 +71,7 @@ struct Options {
     identifier: Option<String>,
     only: Vec<String>,
     yes: bool,
+    decline: bool,
     declare: bool,
     positional: Vec<String>,
 }
@@ -90,6 +92,7 @@ impl Options {
                 "--identifier" => o.identifier = Some(value()?),
                 "--only" => o.only.push(value()?),
                 "--yes" => o.yes = true,
+                "--decline" => o.decline = true,
                 "--declare" => o.declare = true,
                 other if other.starts_with("--") => {
                     return Err(format!("unknown argument `{other}`\n{}", usage()))
@@ -716,6 +719,14 @@ fn approve_pending(opts: &Options, node: &str, which: &str) -> Outcome<ExitCode>
         }
         serde_json::to_vec(&body).unwrap_or_default()
     };
+    // Declining is an answer that agrees to nothing: it signs nothing, the
+    // ask leaves the list and the asking device is told.
+    if opts.decline {
+        if opts.yes || !opts.only.is_empty() {
+            return Err("--decline cannot be given with --yes or --only".into());
+        }
+        return print_decided(&answer_pending(&url, &headers, &ask_body(Some(&[])))?);
+    }
     // An answer given on the command line is the answer. Otherwise the node's
     // deciders go first, and the person is asked only when they defer.
     let decided = if !opts.only.is_empty() || opts.yes {
@@ -788,7 +799,10 @@ fn print_decided(bytes: &[u8]) -> Outcome<ExitCode> {
         serde_json::from_slice(bytes).map_err(|e| format!("unreadable answer: {e}"))?;
     let by = decided["decidedBy"].as_str().unwrap_or("?");
     if decided["declined"] == true {
-        println!("Declined. No code was made and the device is not approved.");
+        println!("Declined. Nothing was signed and the device is not approved.");
+        if decided["handedBack"]["taken"] == true {
+            println!("The asking device was told over the private network; it stops waiting.");
+        }
         return Ok(ExitCode::SUCCESS);
     }
     match by {
@@ -835,6 +849,13 @@ pub fn approve(args: &[String]) -> Outcome<ExitCode> {
     };
     if names_pending(text) {
         return approve_pending(&opts, &node, text.trim());
+    }
+    if opts.decline {
+        return Err(
+            "--decline answers a waiting ask by its number or key; to say no to a link, do not \
+             approve it"
+                .into(),
+        );
     }
     let request = decode_request(text)?;
     // The code can only reach a terminal waiting on loopback through a browser

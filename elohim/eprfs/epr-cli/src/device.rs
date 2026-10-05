@@ -55,7 +55,8 @@ pub fn usage() -> &'static str {
      (with no portal named or declared, the device announces on its private network)\n  \
      epr device redeem '<code#state>' [--node <this node URL>]\n  \
      epr device pending [--node <this node URL>]\n  \
-     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]"
+     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
+     epr device approve <number | key fingerprint> --decline"
 }
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
@@ -354,6 +355,14 @@ struct AnnounceStatus {
     listed_by: Vec<ListedBy>,
     #[serde(default)]
     code: Option<String>,
+    #[serde(default)]
+    declined_by: Option<DeclinedBy>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeclinedBy {
+    approver_fingerprint: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -417,6 +426,18 @@ fn announce(pending: Pending, approver_key: Option<String>, node: &str) -> Outco
         }
         match (status.status.as_str(), status.code) {
             ("code", Some(code)) => break code,
+            ("declined", _) => {
+                pending.forget();
+                let by = status
+                    .declined_by
+                    .and_then(|d| d.approver_fingerprint)
+                    .map(|fp| format!(" (node {fp})"))
+                    .unwrap_or_default();
+                return Err(format!(
+                    "the request was declined by a node that speaks for you{by}; nothing was \
+                     approved and this device is not enrolled"
+                ));
+            }
             ("none", _) => {
                 pending.forget();
                 return Err("the ask ended without an approval; ask again".into());
