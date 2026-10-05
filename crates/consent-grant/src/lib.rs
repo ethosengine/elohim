@@ -1,8 +1,11 @@
 //! # `elohim-consent-grant` — a controller's consent, asked for from a terminal
 //!
 //! A device cannot recognize itself as someone's device. It asks; one of the
-//! person's controllers approves in a portal; the approval comes back as a
-//! single-use code. This crate holds the rules of that exchange so the hosted
+//! person's devices approves in a portal; the approval comes back as a
+//! single-use code. Every device the person has joined speaks for them, so any
+//! of them may approve the next (the mishpat coordinator's
+//! `device_enrollment` states the rule that verifies it); the crate and its
+//! wire keep the word "controller" for any device that speaks. This crate holds the rules of that exchange so the hosted
 //! portal, the native portal and the asking terminal apply the same ones.
 //!
 //! ```text
@@ -75,7 +78,9 @@ pub use consent::{
     consent_message, Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent,
     SignerRole, CONSENT_SIGNING_DOMAIN,
 };
-pub use controller::{ControllerStanding, StandingRefusal, StandingView};
+pub use controller::{
+    ControllerStanding, DevicesRead, StandingDevice, StandingRefusal, StandingView,
+};
 pub use decide::{
     decide, ByAnswer, ByDeclaration, DecidedBy, Decider, Decision, NoElohimAttending,
     OWN_IDENTITY_REASON,
@@ -92,7 +97,9 @@ pub use dpop::{
     verifier, AlgVerifier, BoundKey, Proof, ProofFacts, ProofRefusal, ReplaySet, SessionKey,
     IAT_WINDOW_SECS,
 };
-pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
+pub use enrollment::{
+    ApprovedVia, ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN,
+};
 pub use pending::{
     Ask, Dropped, Listed, Made, NodeState, PendingAsk, PendingAsks, PendingView, Speaks, SpeaksFor,
     ASK_LIFE_MICROS,
@@ -106,8 +113,8 @@ pub use signin::{
 };
 pub use verify::{check_delivered, DeliveredRefusal};
 pub use witness::{
-    attend, AuthorizationClaims, MomentKind, Paused, Unattended, WitnessBeat, WitnessedMoment,
-    Witnessing, MAX_PAUSE_REASON,
+    attend, AuthorizationClaims, AuthorizationContext, MomentKind, Paused, SpeakerContext,
+    Unattended, WitnessBeat, WitnessedMoment, Witnessing, MAX_PAUSE_REASON,
 };
 
 /// Version tag every request names. A portal refuses a request for a version

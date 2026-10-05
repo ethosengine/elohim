@@ -803,3 +803,38 @@ decisionPoints:
       - path: crates/consent-grant/src/signin.rs
         testName: over_tls_a_sign_in_binds_a_key_and_in_the_clear_it_may_not
         kind: unit
+  - name: DevicesRead::to_affirm
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/controller.rs
+      modulePath: consent_grant::controller::DevicesRead::to_affirm
+    summary: >
+      Which of the person's devices this node affirms on one automatic pass: devices that speak
+      for the person that this node did not approve, has not affirmed, and is not, oldest joining
+      first, at most the cap. Affirming is not approving: it adds no voice and changes no verdict.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A node never affirms itself or a device it approved, so an affirmation is always a second
+          device's word; the zome's count (`identity_devices`) excludes the same two.
+      - id: C6a
+        status: answered
+        justification: >
+          At most the cap per pass (storage: 4 per 30 minutes); a node away catches up oldest first
+          on later passes.
+      - id: C6b
+        status: answered
+        justification: >
+          A device this node already affirmed is skipped, so repeated passes do not affirm twice
+          once the read shows the first.
+      - id: C13
+        status: n-a
+        justification: Affirmation is evidence only; no authority tier is conferred.
+    contractTests:
+      - path: crates/consent-grant/src/controller.rs
+        testName: standing_counts_every_device_that_speaks_once_and_names_this_one
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_affirmation.rs
+        testName: a_pass_affirms_a_few_others_oldest_first_and_a_later_pass_catches_up
+        kind: unit

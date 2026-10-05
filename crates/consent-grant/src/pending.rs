@@ -67,12 +67,20 @@ impl NodeState {
     /// Classify a node from what its own cell says.
     ///
     /// - no Human: unassigned;
-    /// - a Human whose authority names this node among its controllers, or a
-    ///   Human with no authority yet: an identity of its own;
-    /// - an authority that does not name this node: joined to someone else's.
-    pub fn of(has_human: bool, controllers: Option<&[String]>, me: &str, made: Made) -> Self {
+    /// - a Human whose authority names this node among its root controllers,
+    ///   or a Human with no authority yet: an identity of its own;
+    /// - a node that speaks through a joining record (`joined`), or whose
+    ///   identity's authority does not name it: one of someone's devices.
+    pub fn of(
+        has_human: bool,
+        controllers: Option<&[String]>,
+        joined: bool,
+        me: &str,
+        made: Made,
+    ) -> Self {
         match (has_human, controllers) {
             (false, _) => Self::Unassigned,
+            (true, _) if joined => Self::Joined,
             (true, Some(c)) if !c.iter().any(|k| k == me) => Self::Joined,
             (true, _) => Self::OwnIdentity { made },
         }
@@ -110,14 +118,22 @@ pub struct SpeaksFor {
     /// The Human record the identity is rooted in.
     pub identity_root: String,
     pub identity_fingerprint: String,
+    /// Fingerprints of other identities this device also speaks for. An
+    /// approval here is never for those.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also_speaks_for: Vec<String>,
 }
 
 /// Whether this node may approve devices for anyone, and for whom.
 ///
-/// A node lists asks only when it speaks for a person. A joined device that is
-/// not a controller, or a node with no identity, speaks for nobody. A node that
-/// joined someone's identity as it is still speaks for the identity it began,
-/// and only for that one, which is why the identity is shown with every ask.
+/// A node lists asks only when it speaks for a person: as one of the root
+/// controllers its identity's authority names, or as a device whose joining
+/// record stands (every device a person has joined speaks for them, and any
+/// of them may approve the next). A node with no identity, or whose joining
+/// record no longer stands, speaks for nobody. A node that joined someone's
+/// identity as it is speaks for two identities: approvals here are for the
+/// one its key resolves to (the one it began), and the other is named with
+/// every ask so the person is never left to guess which.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "kind")]
 pub enum Speaks {
@@ -131,8 +147,9 @@ pub enum Speaks {
 impl Speaks {
     /// From what this node's own cell says. `standing` is the authority of the
     /// identity the cell's agent resolves to, when it has one; `person` is the
-    /// cell's own Human record. Only an authority that names `me` as a
-    /// controller makes this node speak for anyone. `identifier` is the
+    /// cell's own Human record. Only a standing that counts `me` among those
+    /// that speak (a root controller, or this device through its standing
+    /// joining record) makes this node speak for anyone. `identifier` is the
     /// person's sign-in word, shown and never compared.
     pub fn of(
         standing: Option<&ControllerStanding>,
@@ -147,6 +164,7 @@ impl Speaks {
                 display_name: person.map(|p| p.display_name.clone()),
                 identity_root: s.identity_root.clone(),
                 identity_fingerprint: fingerprint(&s.identity_root),
+                also_speaks_for: s.also_speaks_for.iter().map(|r| fingerprint(r)).collect(),
             }),
             _ => Self::Nobody,
         }
@@ -172,10 +190,18 @@ impl Speaks {
                     // Never the record id: a person reads this.
                     (None, None, _) => "a person".to_string(),
                 };
-                format!(
+                let mut words = format!(
                     "An approval here is for {who}, identity {}.",
                     p.identity_fingerprint
-                )
+                );
+                if !p.also_speaks_for.is_empty() {
+                    words.push_str(&format!(
+                        " This device also speaks for identity {}; to approve for that one, \
+                         use another of its devices.",
+                        p.also_speaks_for.join(", ")
+                    ));
+                }
+                words
             }
             Self::Nobody => {
                 "This device does not speak for anyone, so it lists no requests.".to_string()
@@ -485,6 +511,8 @@ pub(crate) mod tests {
             network_dna: NETWORK.into(),
             controllers: controllers.to_vec(),
             required: 1,
+            speaks_via: None,
+            also_speaks_for: vec![],
         }
     }
 
@@ -626,21 +654,39 @@ pub(crate) mod tests {
     fn a_node_says_what_it_is_and_unknown_is_never_nothing() {
         let me = sample_key(1);
         assert_eq!(
-            NodeState::of(false, None, &me, Made::Unknown),
+            NodeState::of(false, None, false, &me, Made::Unknown),
             NodeState::Unassigned
         );
         assert_eq!(
-            NodeState::of(true, None, &me, Made::Unknown),
+            NodeState::of(true, None, false, &me, Made::Unknown),
             NodeState::OwnIdentity {
                 made: Made::Unknown
             }
         );
         assert_eq!(
-            NodeState::of(true, Some(std::slice::from_ref(&me)), &me, Made::Things),
+            NodeState::of(
+                true,
+                Some(std::slice::from_ref(&me)),
+                false,
+                &me,
+                Made::Things
+            ),
             NodeState::OwnIdentity { made: Made::Things }
         );
         assert_eq!(
-            NodeState::of(true, Some(&[sample_key(2)]), &me, Made::Unknown),
+            NodeState::of(true, Some(&[sample_key(2)]), false, &me, Made::Unknown),
+            NodeState::Joined
+        );
+        // A joined device is counted among those that speak, and is still a
+        // device of someone's, not the beginning of an identity.
+        assert_eq!(
+            NodeState::of(
+                true,
+                Some(&[sample_key(2), me.clone()]),
+                true,
+                &me,
+                Made::Unknown
+            ),
             NodeState::Joined
         );
         let json = serde_json::to_value(NodeState::OwnIdentity {
@@ -735,12 +781,19 @@ pub(crate) mod tests {
         assert!(bare
             .words()
             .starts_with("An approval here is for a person,"));
-        // A joined device: its key resolves to the person's identity, whose
-        // authority does not name it.
+        // A key whose standing does not count it among those that speak (a
+        // device whose joining record no longer stands).
         assert_eq!(
             Speaks::of(Some(&standing(&[sample_key(3)])), &me, None, None),
             Speaks::Nobody
         );
+        // A joined device whose record stands speaks for the person.
+        let mut joined = standing(&[sample_key(3), me.clone()]);
+        joined.speaks_via = Some(sample_action(4));
+        assert!(matches!(
+            Speaks::of(Some(&joined), &me, None, None),
+            Speaks::Person(_)
+        ));
         // No identity at all.
         assert_eq!(Speaks::of(None, &me, None, None), Speaks::Nobody);
         assert!(Speaks::Nobody.words().contains("does not speak for anyone"));

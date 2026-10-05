@@ -437,6 +437,7 @@ mod tests {
                 agent: sample_key(9),
                 signature: "enrollment".into(),
             }],
+            approved_via: vec![],
         })
     }
 

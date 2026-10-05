@@ -126,6 +126,20 @@ pub struct ControllerProof {
 pub struct Enrollment {
     pub intent: EnrollmentIntent,
     pub controllers: Vec<ControllerProof>,
+    /// For each approver that is a joined device rather than a root
+    /// controller, the joining record it speaks through: the device names it
+    /// in its own joining record so any peer can walk it back. Absent when
+    /// every approver is a root controller.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approved_via: Vec<ApprovedVia>,
+}
+
+/// A device approver and the joining record it speaks through.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovedVia {
+    pub agent: String,
+    pub binding: String,
 }
 
 impl Enrollment {
@@ -175,6 +189,7 @@ mod tests {
         let enrollment = Enrollment {
             intent: EnrollmentIntent::agreed_in(&record).unwrap(),
             controllers: vec![proof],
+            approved_via: vec![],
         };
         assert!(enrollment.is_agreed_in(&record));
 

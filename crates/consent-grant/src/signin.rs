@@ -289,6 +289,11 @@ impl AttemptLimiter {
 pub struct SignInClaims {
     pub identifier: String,
     pub channel: Channel,
+    /// What is known about this node as a device that speaks for the person
+    /// (how long it has, how many of their other devices affirmed it, how
+    /// many speak): data for a witness, never a threshold. `None` when the
+    /// node speaks for nobody or could not read its standing.
+    pub speaker: Option<crate::witness::SpeakerContext>,
 }
 
 /// Run the sign-in witnessed moment. The default witness proceeds; a pause
@@ -465,6 +470,7 @@ mod tests {
         let claims = SignInClaims {
             identifier: "matthew".into(),
             channel: Channel::Tls,
+            speaker: None,
         };
         assert_eq!(attend_sign_in(&crate::witness::Unattended, &claims), Ok(()));
         assert_eq!(

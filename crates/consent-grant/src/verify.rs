@@ -184,6 +184,7 @@ pub(crate) mod tests {
                     agent: signer,
                     signature: URL_SAFE_NO_PAD.encode(proof),
                 }],
+                approved_via: vec![],
             }),
         }
     }
