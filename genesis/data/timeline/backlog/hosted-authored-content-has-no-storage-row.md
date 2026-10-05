@@ -106,6 +106,27 @@ is up, leaves no row and nothing retries it. A seed that does not depend on a fr
 boot or on the sweep, for heads this node's own cell holds as earned canonical with no row) is
 the same decision as "acquisition by id" below.
 
+## Receipt, 2026-10-05: leg 2 round 1 on the fleet is correct and late
+
+Run `leg2-20261005-pass2` (fresh operator login, owner credential, delegation and Che writer
+credential; the Act I scope gate held `pass1`, and the operator chose the per-capability override
+`ELOHIM_CAP_OWNED_SUBSTRATE_STATUS=available` for this one scenario, whose steps only publish and
+read). Round 1, times UTC:
+
+- 03:58:08 round starts. Stage, provisional approval, controller witness and acceptance complete.
+- 03:58:18 Adam, reading its own cell, observes the head, elects it and verifies its lineage.
+- 03:59:18 apex (`elohim.host`) serves the body, with no anchor.
+- 03:59:23 the 75 s deadline passes; the scenario fails with
+  `same-head publication did not close within the shared deadline`. Round 2 did not run.
+- about 04:02 alpha (`doorway-alpha`) serves the row; about 04:03 apex shows the exact head.
+  Both remain `dhtAnchorState: unverified` at 04:06.
+
+So a device publishes to the operator's hosted root with no pipeline, a separate peer elects it in
+about ten seconds, and both doorways converge on the exact head in four to five minutes. What is
+missing is delivery inside the budget: the doorways' storages acquire the row on the reconcile
+cadence, not on the declaration. Not established here: whether the fleet peers received Che's
+iroh announce at all, and why the served rows stay unverified.
+
 ## Before designing a fix
 
 This is not the coordinator sweep's walk reused. That sweep makes admin calls per cell; projecting
