@@ -595,6 +595,110 @@ async fn device_content_admin_is_denied(
     }
 }
 
+/// The "join as it is" case: a node that is the sole controller of an identity
+/// it began itself is bound as a device under another person's identity,
+/// keeping its key. Records what the zomes do; asserts only what they must.
+async fn a_node_with_its_own_identity_joins_as_it_is(
+    c: &SweetConductor,
+    cells: &[(SweetCell, SweetCell, SweetCell)],
+    operator: &AgentPubKey,
+    authority: &Receipt,
+    human: &ActionHash,
+    content: &DnaHash,
+) {
+    let node = &cells[3];
+    let own_human: ActionHash = c
+        .call(
+            &node.0.zome("imagodei"),
+            "create_human",
+            serde_json::json!({
+                "id": "prior-node-own-identity", "display_name": "Prior node", "bio": null,
+                "affinities": [], "profile_reach": "private", "location": null
+            }),
+        )
+        .await;
+    let own_authority: Receipt = c
+        .call(
+            &node.1.zome("mishpat"),
+            "bootstrap_device_identity",
+            own_human.clone(),
+        )
+        .await;
+    let own: Option<ConsentStanding> = c
+        .call(&node.1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    let own = own.expect("the node stands on its own identity");
+    assert_eq!(own.identity_root, own_human);
+    assert_eq!(own.controllers, vec![node.1.agent_pubkey().clone()]);
+    eprintln!("as-it-is: the node is the sole controller of its own identity");
+
+    // Bind it, keeping its key, under the operator's identity.
+    let (binding, _) = enroll(c, &cells[0].1, &node.1, authority, human, content, 125).await;
+    eprintln!("as-it-is: enroll_identity_device accepted the binding");
+    let verified: VerifiedDevice = c
+        .call(
+            &cells[2].1.zome("mishpat"),
+            "verify_device_binding",
+            query(&binding, &node.1, content),
+        )
+        .await;
+    assert_eq!(&verified.human_action_hash, human);
+    assert_eq!(verified.controllers, vec![operator.clone()]);
+    eprintln!("as-it-is: another agent verifies the node as the operator's device");
+
+    // What the node now says about itself: its own identity is left as it was.
+    let after: Option<ConsentStanding> = c
+        .call(&node.1.zome("mishpat"), "my_consent_standing", ())
+        .await;
+    let after = after.expect("the node still has a Human");
+    eprintln!(
+        "as-it-is: my_consent_standing after joining names identity_root {} (own {}, operator {}), authority {:?} (own {})",
+        after.identity_root, own_human, human, after.authority, own_authority.action_hash
+    );
+    let resolved: Option<HumanOutput> = c
+        .call(
+            &node.0.zome("imagodei"),
+            "get_human_by_agent_key",
+            node.0.agent_pubkey().clone(),
+        )
+        .await;
+    eprintln!(
+        "as-it-is: get_human_by_agent_key(node) resolves {:?}",
+        resolved.map(|h| h.action_hash)
+    );
+    // Registering the binding is a separate imagodei step; see what it does
+    // for a node that already has a Human of its own.
+    let registered = c
+        .call_fallible::<_, VerifiedDevice>(
+            &node.0.zome("imagodei"),
+            "register_device_identity",
+            Register {
+                binding: binding.action_hash.clone(),
+                expected_content_dna: content.clone(),
+            },
+        )
+        .await;
+    eprintln!(
+        "as-it-is: register_device_identity -> {}",
+        match &registered {
+            Ok(v) => format!("ok, human {}", v.human_action_hash),
+            Err(e) => format!("refused: {e}"),
+        }
+    );
+    let resolved: Option<HumanOutput> = c
+        .call_fallible(
+            &node.0.zome("imagodei"),
+            "get_human_by_agent_key",
+            node.0.agent_pubkey().clone(),
+        )
+        .await
+        .unwrap_or(None);
+    eprintln!(
+        "as-it-is: after registering, get_human_by_agent_key(node) resolves {:?}",
+        resolved.map(|h| h.action_hash)
+    );
+}
+
 /// What a node's own person stands on, and the one signing call an approval
 /// makes. The base case: the person's node is their identity's only controller
 /// and signs alone.
@@ -734,6 +838,8 @@ async fn device_enrollment_proof() -> Result<()> {
     let (mut c, operator) = single_agent_conductor().await?;
     let che = SweetAgents::one(c.keystore()).await;
     let second = SweetAgents::one(c.keystore()).await;
+    // A node that begins an identity of its own before it joins the operator's.
+    let prior = SweetAgents::one(c.keystore()).await;
     assert_ne!(che, operator);
     assert_ne!(che, second);
     let seed = network_seed("device-enrollment");
@@ -751,6 +857,7 @@ async fn device_enrollment_proof() -> Result<()> {
         ("operator", operator.clone()),
         ("che", che.clone()),
         ("second", second.clone()),
+        ("prior", prior.clone()),
     ] {
         let app = c.setup_app_for_agent(name, agent, &roles).await?;
         let identity = app
@@ -804,6 +911,10 @@ async fn device_enrollment_proof() -> Result<()> {
         .await;
     eprintln!("identity proof: exact Human bootstrap accepted");
     consent_ceremony_signing(&c, &cells, &operator, &authority, &human, &content).await;
+    a_node_with_its_own_identity_joins_as_it_is(
+        &c, &cells, &operator, &authority, &human, &content,
+    )
+    .await;
     let (che_binding, signed_binding) = enroll(
         &c,
         &cells[0].1,
