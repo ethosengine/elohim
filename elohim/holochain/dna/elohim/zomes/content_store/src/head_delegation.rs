@@ -97,6 +97,43 @@ fn refused(reason: &str) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(format!("head delegation: {reason}")))
 }
 
+/// The grant's form in the statement contract, by field presence. A grant with
+/// no issuance anchor is legacy whatever else it carries: the missing anchor is
+/// what makes it unbindable to a revocable issuance.
+fn grant_form(p: &HeadDelegationPayload) -> &'static str {
+    use crate::statement_contract::{GRANT_DEVICE_BOUND, GRANT_ISSUED, GRANT_LEGACY};
+    match (&p.issuance_action_hash, &p.device_binding) {
+        (None, _) => GRANT_LEGACY,
+        (Some(_), Some(_)) => GRANT_DEVICE_BOUND,
+        (Some(_), None) => GRANT_ISSUED,
+    }
+}
+
+/// Machine-splittable refusal: the token `issuer-behind:` then `presented=<form>`
+/// and `lowest-accepted=<form>`, both read from the statement contract.
+fn issuer_behind(presented: &str) -> String {
+    let lowest =
+        crate::statement_contract::lowest_accepted_new(crate::statement_contract::HEAD_DELEGATION)
+            .unwrap_or("none");
+    format!(
+        "issuer-behind: presented={presented} lowest-accepted={lowest}; the app that issued this grant runs an older coordinator — re-issue it from an app on the current coordinator"
+    )
+}
+
+/// Whether this grant may authorize a NEW act, decided by the statement
+/// contract. Returns the issuance anchor the new-act path verifies next.
+fn new_act_issuance(p: &HeadDelegationPayload) -> Result<&ActionHash, String> {
+    let form = grant_form(p);
+    if !crate::statement_contract::accepts_new(crate::statement_contract::HEAD_DELEGATION, form) {
+        return Err(issuer_behind(form));
+    }
+    // Every form the contract accepts for a new act carries an issuance anchor;
+    // the test `contract_accepted_grant_forms_carry_an_issuance_anchor` pins it.
+    p.issuance_action_hash
+        .as_ref()
+        .ok_or_else(|| format!("grant form {form} is accepted but carries no issuance anchor"))
+}
+
 #[hdk_extern]
 pub fn grant_head_delegation(input: GrantHeadDelegationInput) -> ExternResult<HeadDelegation> {
     let mandate = crate::invocation::authorize(
@@ -355,11 +392,7 @@ pub(crate) fn verify_head_delegation(
         root.action_address(),
         GetStrategy::Network,
     )?;
-    let issuance_hash = grant
-        .payload
-        .issuance_action_hash
-        .as_ref()
-        .ok_or_else(|| refused("legacy grant cannot authorize a new publication"))?;
+    let issuance_hash = new_act_issuance(&grant.payload).map_err(|why| refused(&why))?;
     let issuance = budget
         .record(issuance_hash.clone(), GetStrategy::Network)?
         .ok_or_else(|| refused("grant issuance action not retrievable — PENDING"))?;
@@ -1598,5 +1631,116 @@ mod tests {
             winner.target,
             select_canonical_winner(vec![replay, next]).unwrap().target
         );
+    }
+
+    /// Every field-presence combination of a grant, oldest form first.
+    fn grant_shapes() -> Vec<(&'static str, HeadDelegationPayload)> {
+        let issuance = Some(ActionHash::from_raw_36(vec![10; 36]));
+        let binding = Some(ActionHash::from_raw_36(vec![11; 36]));
+        let base = grant().payload;
+        let shape = |issuance: &Option<ActionHash>, binding: &Option<ActionHash>| {
+            let mut p = base.clone();
+            p.issuance_action_hash = issuance.clone();
+            p.device_binding = binding.clone();
+            p
+        };
+        vec![
+            ("legacy", shape(&None, &None)),
+            // Never issued by any coordinator (device binding postdates the
+            // issuance anchor), but presentable: it must stay refused.
+            ("legacy+binding", shape(&None, &binding)),
+            ("issued", shape(&issuance, &None)),
+            ("device-bound", shape(&issuance, &binding)),
+        ]
+    }
+
+    #[test]
+    fn new_act_verdict_is_unchanged_by_the_statement_contract() {
+        // Before the contract, the new-act rule was exactly "an issuance
+        // anchor is present". Every grant shape keeps that verdict.
+        for (name, p) in grant_shapes() {
+            assert_eq!(
+                new_act_issuance(&p).ok(),
+                p.issuance_action_hash.as_ref(),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_refusal_names_who_is_behind_from_the_contract() {
+        let (_, legacy) = grant_shapes().remove(0);
+        let reason = new_act_issuance(&legacy).unwrap_err();
+        let message = match refused(&reason) {
+            WasmError {
+                error: WasmErrorInner::Guest(m),
+                ..
+            } => m,
+            other => panic!("unexpected error {other:?}"),
+        };
+        assert_eq!(
+            message,
+            "head delegation: issuer-behind: presented=legacy lowest-accepted=issued; \
+             the app that issued this grant runs an older coordinator — re-issue it from \
+             an app on the current coordinator"
+        );
+        // The shape the storage agent parses.
+        let body = message.split_once("issuer-behind: ").unwrap().1;
+        let (fields, _) = body.split_once(';').unwrap();
+        let mut parts = fields.split(' ');
+        let presented = parts.next().unwrap().strip_prefix("presented=").unwrap();
+        let lowest = parts
+            .next()
+            .unwrap()
+            .strip_prefix("lowest-accepted=")
+            .unwrap();
+        assert_eq!(presented, grant_form(&legacy));
+        assert_eq!(
+            Some(lowest),
+            crate::statement_contract::lowest_accepted_new(
+                crate::statement_contract::HEAD_DELEGATION
+            )
+        );
+    }
+
+    #[test]
+    fn contract_accepted_grant_forms_carry_an_issuance_anchor() {
+        use crate::statement_contract::{accepts_new, HEAD_DELEGATION, STATEMENT_CONTRACT};
+        for (name, p) in grant_shapes() {
+            let form = grant_form(&p);
+            assert!(
+                STATEMENT_CONTRACT
+                    .iter()
+                    .any(|r| r.statement == HEAD_DELEGATION && r.form == form),
+                "{name}: form {form} missing from the contract"
+            );
+            if accepts_new(HEAD_DELEGATION, form) {
+                assert!(p.issuance_action_hash.is_some(), "{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn acceptance_domains_are_contract_rows() {
+        use crate::statement_contract::{ACCEPTED_CONTENT_HEAD, STATEMENT_CONTRACT};
+        let mut seen = Vec::new();
+        for (name, p) in grant_shapes() {
+            let mut g = grant();
+            g.payload = p;
+            let domain = statement(&g, g.acceptance.as_ref().unwrap()).domain;
+            let form = domain
+                .strip_prefix("elohim:accepted-content-head:")
+                .unwrap_or_else(|| panic!("{name}: unexpected domain {domain}"));
+            assert!(
+                STATEMENT_CONTRACT
+                    .iter()
+                    .any(|r| r.statement == ACCEPTED_CONTENT_HEAD && r.form == form),
+                "{name}: domain {domain} is not a contract row"
+            );
+            seen.push(form);
+        }
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen, ["v2", "v3", "v4"]);
     }
 }

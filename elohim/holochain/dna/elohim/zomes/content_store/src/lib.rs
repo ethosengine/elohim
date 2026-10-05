@@ -4184,6 +4184,7 @@ fn authorize_canonical_head_declarer(_declarer: &AgentPubKey) -> ExternResult<()
 
 mod head_delegation;
 mod invocation;
+pub mod statement_contract;
 pub use head_delegation::*;
 
 /// Read-only authorization before a publisher writes blobs or changes its projection.

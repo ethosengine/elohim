@@ -1,0 +1,53 @@
+{
+  "note": "Snapshot of STATEMENT_CONTRACT in src/statement_contract.rs, pinned by its test lockfile_pins_the_table. A form leaving accepts_new needs a tightening line here: mode staged (expand-before-contract, the default) or immediate (one step, with a reason). The reviewed line is the approval.",
+  "contract_version": 1,
+  "statements": [
+    {
+      "statement": "head-delegation",
+      "form": "legacy",
+      "issues": false,
+      "accepts_new": false,
+      "honors_historical": true,
+      "tightening": {
+        "mode": "immediate",
+        "reason": "A legacy grant carries no on-chain issuance record, so it cannot be bound to a revocable issuance. Shipped 2026-10-01 in one step (commit 4f39d48cc); recorded after the fact.",
+        "contractVersion": 1
+      }
+    },
+    {
+      "statement": "head-delegation",
+      "form": "issued",
+      "issues": true,
+      "accepts_new": true,
+      "honors_historical": true
+    },
+    {
+      "statement": "head-delegation",
+      "form": "device-bound",
+      "issues": true,
+      "accepts_new": true,
+      "honors_historical": true
+    },
+    {
+      "statement": "accepted-content-head",
+      "form": "v2",
+      "issues": true,
+      "accepts_new": true,
+      "honors_historical": true
+    },
+    {
+      "statement": "accepted-content-head",
+      "form": "v3",
+      "issues": true,
+      "accepts_new": true,
+      "honors_historical": true
+    },
+    {
+      "statement": "accepted-content-head",
+      "form": "v4",
+      "issues": true,
+      "accepts_new": true,
+      "honors_historical": true
+    }
+  ]
+}

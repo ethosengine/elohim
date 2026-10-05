@@ -1165,3 +1165,41 @@ decisionPoints:
       kind: sweettest
     gapNote: Receiver rollout and foreign-owner scoped invocation remain to be measured. Single-controller bootstrap
       only; rotation and quorum remain refused.
+
+  - name: new_act_issuance
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/head_delegation.rs
+      modulePath: content_store::head_delegation::new_act_issuance
+      line: 125
+    summary: >
+      Decides whether a head-delegation grant may authorize a NEW act, by classifying the
+      grant's form from field presence and consulting the statement contract
+      (src/statement_contract.rs, STATEMENT_CONTRACT) rather than a local rule. A refused form
+      returns the reason issuer-behind with the form presented and the lowest form accepted,
+      both read from the table. The table is pinned to statement-contract.lock.json, where a
+      form leaving accepts_new needs a tightening line (staged or immediate, with a reason).
+      Historical reads do not pass through this predicate. Coordinator-only: no integrity
+      entity, link type or identity is added, and the verdict for every grant shape is the
+      one the earlier inline rule gave.
+    concernIds:
+      - { id: C0, status: answered, justification: "A coordinator rule is the verifier's own diligence, in force where this wasm runs; a rule that must bind every peer belongs in the integrity zome. Stated in the module doc and the backlog ruling." }
+      - { id: C1, status: n-a, justification: "The predicate confers nothing on the caller; signature, issuance record, revocation and device checks follow it unchanged." }
+      - { id: C2, status: n-a, justification: "No head moves here; ordering stays with acceptance time and election." }
+      - { id: C3, status: answered, justification: "Pure function of the payload and a constant table; no host call, cannot block." }
+      - { id: C4, status: answered, justification: "A form absent from the table is not accepted for a new act (accepts_new fails closed); an accepted form with no issuance anchor is an error, never a pass." }
+      - { id: C5, status: answered, justification: "The form is derived from the presented payload's own fields; the issuer's claim about its version is never read." }
+      - { id: C6a, status: answered, justification: "Constant-size table scan, no I/O." }
+      - { id: C6b, status: n-a, justification: "Writes nothing." }
+      - { id: C7, status: answered, justification: "The statement_contract extern advertises the same table the predicate consults; there is no second copy to disagree." }
+      - { id: C8, status: partial, justification: "The refusal carries a stable reason code and both forms; no typed metric counts refusals by reason." }
+      - { id: C9, status: n-a, justification: "No identity or lineage is resolved here." }
+      - { id: C10, status: answered, justification: "The lockfile test fails on any undeclared row change, and a tightening must carry a mode and a reason; the first row was recorded after the fact and says so." }
+      - { id: C11, status: n-a, justification: "No queue, retry or admission." }
+      - { id: C12, status: answered, justification: "Refuses before any authorization is derived; no path grants on a refused form." }
+      - { id: C13, status: n-a, justification: "No standing or tier is read." }
+      - { id: C14, status: partial, justification: "The refusal reaches the caller as a zome error with the cure named; no distributed residual record of issuer staleness is written." }
+    contractTests:
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/head_delegation.rs, testName: new_act_verdict_is_unchanged_by_the_statement_contract, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/head_delegation.rs, testName: legacy_refusal_names_who_is_behind_from_the_contract, kind: unit }
+      - { path: elohim/holochain/dna/elohim/zomes/content_store/src/statement_contract.rs, testName: lockfile_pins_the_table, kind: unit }

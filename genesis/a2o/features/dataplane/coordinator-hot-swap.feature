@@ -35,6 +35,14 @@ Feature: Coordinator logic rolls across peers without anyone restarting
   format, peers on the fix refuse. So the fix has to reach every app on the
   peer, and the peer has to say which apps and which roles it reached.
 
+  One thing a person writes is a signed permission: a statement they sign so
+  that another of their devices may act for them, such as publishing a new
+  version of their work. Coordinator code decides which permissions it will
+  act on. A permission has a form, meaning the set of facts the statement
+  carries; a newer form carries more (for example, a pointer to the record of
+  when it was issued). A fix may decide that an older form no longer permits
+  anything new, while what was done under it in the past still stands.
+
   Background:
     Given a mesh whose conductor-hosted cells run the installed hApp bundle
     And a steward has rebuilt the bundle with a coordinator-only fix
@@ -78,3 +86,39 @@ Feature: Coordinator logic rolls across peers without anyone restarting
     And what a hosted person writes after the rollout is accepted by peers on the fix
     And each hosted person keeps the same agent key and the same data as before
     And any app or role whose DNA hash differs from the bundle's is named in the report and left unchanged
+
+  # Found 2026-10-04 on the alpha fleet. A coordinator fix had stopped
+  # accepting an older form of a signed permission, and nothing said so: not
+  # the release, not the refusal, not the peer still hosting apps on the old
+  # code. Backlog: coordinator-acceptance-tightening-contract.md
+  @wip @concern:coordinator-hot-swap
+  Scenario: a person whose permission was signed by an app on old code is told which side is behind
+    Given a peer on the fix that no longer accepts the older form of a signed permission for new work
+    And a hosted person's app that still runs the old coordinator code
+    When that person signs a permission for their own device and the device presents it to the peer on the fix
+    Then the peer refuses, and the refusal names the form presented and the oldest form it accepts
+    And the person is told the app that signed the permission runs older code, and that signing again from an updated app is the cure
+    And a permission in the older form that was honoured before the fix is still honoured when its history is read
+
+  @wip @concern:coordinator-hot-swap
+  Scenario: a fix that stops accepting an older form says so before it ships
+    Given a steward has changed the coordinator code so that it refuses a form of signed permission it used to accept
+    When the steward builds the coordinator without recording that change and the reason for it
+    Then the build fails and names the form whose acceptance changed
+    And once the change and its reason are recorded, the build passes
+    And any peer running the fix, when asked, lists for each form whether it signs it, accepts it for new work, and honours it in history
+
+  @wip @concern:coordinator-hot-swap
+  Scenario: a peer proves a fix on its own app before the people it hosts receive it
+    Given a peer that also hosts several people, each with their own app on that peer
+    When the steward applies a bundle whose coordinator code fails on the peer's own app
+    Then no hosted person's app is changed
+    And the peer reports each hosted app as not attempted, and why
+
+  @wip @concern:coordinator-hot-swap
+  Scenario: a person who joins a peer after a fix starts on the fix
+    Given every app on a peer runs a coordinator fix that was applied without restarting the peer
+    When a new person is hosted on that peer
+    Then the peer's own scheduled check, which runs on a timer without the steward, brings their app onto the fix
+    And between rollouts the peer keeps a single number, readable on the peer, of app roles still waiting for the fix
+    And that number does not reveal which people the peer hosts
