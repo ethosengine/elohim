@@ -376,7 +376,7 @@ describe('approvalWords — the host names the key holder', () => {
       'open on a different machine from the one that holds your key'
     );
     expect(device.card.refusalHeading?.['consent_caller_not_local']).to.equal(
-      'Approve on the machine that holds your key'
+      'Sign in, or approve on the machine that holds your key'
     );
     expect(nothingWasSigned('consent_caller_not_local')).to.equal(true);
     const own = approvalWords({

@@ -289,6 +289,33 @@ describe('DeviceConsentController — the approval page both portals mount', () 
       expect(calls.agree).to.have.length(1);
     });
 
+    for (const code of [
+      'session_proof_missing',
+      'session_proof_invalid',
+      'session_proof_stale',
+      'session_proof_replayed',
+    ]) {
+      it(`on ${code}: one plain refusal, nothing signed, sign-in offered and never sent by itself`, async () => {
+        agreeResult = async () => refused(401, code);
+        const { controller } = await reviewing();
+        await controller.approve({ agreedActs: ['device.enroll'] });
+        expect(controller.state.refusalCode).to.equal(code);
+        expect(controller.state.trail).to.equal(null);
+        expect(calls.signIn).to.equal(0);
+        expect(memory.store.size).to.equal(0);
+        controller.signInAgain();
+        expect(calls.signIn).to.equal(1);
+      });
+    }
+
+    it('offers sign-in for a page neither signed in nor on the node’s machine', async () => {
+      agreeResult = async () => refused(403, NODE_CODE.callerNotLocal);
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+      controller.signInAgain();
+      expect(calls.signIn).to.equal(1);
+    });
+
     it('offers signing in again only after a witness asked for it', async () => {
       const { controller } = await reviewing();
       controller.signInAgain();

@@ -15,6 +15,7 @@
 import { IDENTITY_CODE, identityFailureFor, isStandingView } from './logic.js';
 
 import type {
+  SignedOutStanding,
   IdentityBeginResponse,
   IdentityStandingClient,
   IdentityStandingView,
@@ -48,6 +49,12 @@ export interface IdentityPageState {
   displayName?: string;
   /** What the last begin made (identity, authority, session). */
   created?: IdentityBeginResponse['created'];
+  /**
+   * When no one is signed in: whether this node holds an identity, and
+   * whether a browser may sign in to it (a sign-in secret is set). Absent
+   * when the node did not say.
+   */
+  signedOut?: { hasIdentity?: boolean; signInSecretSet?: boolean };
 }
 
 export interface IdentityStandingControllerOptions {
@@ -85,7 +92,22 @@ export class IdentityStandingController {
       case 'unbootstrapped':
         this.set({ phase: 'begin' });
         return;
-      case 'not-signed-in':
+      case 'not-signed-in': {
+        const body = (result.body ?? {}) as Partial<SignedOutStanding>;
+        const signedOut = {
+          ...(typeof body.hasIdentity === 'boolean' ? { hasIdentity: body.hasIdentity } : {}),
+          ...(typeof body.signInSecretSet === 'boolean'
+            ? { signInSecretSet: body.signInSecretSet }
+            : {}),
+        };
+        // No identity here at all: nothing to sign in to, so the person may begin one.
+        this.set(
+          signedOut.hasIdentity === false
+            ? { phase: 'begin', signedOut }
+            : { phase: 'not-signed-in', signedOut }
+        );
+        return;
+      }
       case 'unavailable':
         this.set({ phase: failure.kind });
         return;
@@ -105,7 +127,7 @@ export class IdentityStandingController {
    * Resolves true once the node has answered with what the identity rests
    * on. A second call while one is on its way sends nothing.
    */
-  async begin(displayName: string): Promise<boolean> {
+  async begin(displayName: string, secret?: string): Promise<boolean> {
     if (this.current.phase === 'beginning' || this.current.phase === 'standing') return false;
     const name = displayName.trim();
     if (!name) {
@@ -115,7 +137,8 @@ export class IdentityStandingController {
     }
     this.set({ phase: 'beginning', beginRefusal: undefined, displayName: name });
 
-    const result = await this.options.client.begin({ displayName: name }).catch(() => NO_ANSWER);
+    const body = secret ? { displayName: name, secret } : { displayName: name };
+    const result = await this.options.client.begin(body).catch(() => NO_ANSWER);
     if (result.ok && isStandingView(result.body?.standing)) {
       this.set({
         phase: 'standing',

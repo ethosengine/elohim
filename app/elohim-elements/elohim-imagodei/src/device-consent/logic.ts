@@ -7,6 +7,8 @@
  * /auth/consent/*; the portal never judges a request's content.
  */
 
+import { isSessionProofRefusal } from '../session-key/index.js';
+
 import type { WitnessStep, WitnessStepState } from '../witness-step.js';
 import type {
   ConsentAgreeResponse,
@@ -62,9 +64,22 @@ const NOTHING_SIGNED = new Set<string>([
   NODE_CODE.reauthenticationAsked,
 ]);
 
+/**
+ * Codes after which the person may sign in and come straight back: a
+ * witness asked them to, this browser's sign-in can no longer be confirmed,
+ * or the page is neither signed in nor on the node's own machine.
+ */
+export function signInMayHelp(code: string | undefined): boolean {
+  return (
+    code === NODE_CODE.reauthenticationAsked ||
+    code === NODE_CODE.callerNotLocal ||
+    isSessionProofRefusal(code)
+  );
+}
+
 /** True when a refusal says the node signed nothing (safe to approve again later). */
 export function nothingWasSigned(code: string): boolean {
-  return NOTHING_SIGNED.has(code);
+  return NOTHING_SIGNED.has(code) || isSessionProofRefusal(code);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +177,9 @@ export function failureFor(
   const code = codeOf(result.body);
   // Asked to sign in again is its own step, said and offered; never an automatic redirect.
   if (code === NODE_CODE.reauthenticationAsked) return { kind: 'refused', code };
+  // So is a proof this browser's sign-in can no longer back (stale is
+  // retried once, fresh, by the POST helper before it reaches here).
+  if (isSessionProofRefusal(code)) return { kind: 'refused', code: code! };
   if (status === 401 || code === NODE_CODE.notSignedIn) return { kind: 'sign-in' };
   if (status >= 500 && code === NODE_CODE.signingUnavailable) return { kind: 'refused', code };
   if (status === 0 || status === 404 || status === 501 || status >= 500) return unavailable;
@@ -287,10 +305,12 @@ export function standingFor(controllers: unknown): ApprovalStanding | null {
 
 export type AgreementOutcome =
   | { phase: 'code'; code: string; expiresAt: number }
-  | { phase: 'handed-back'; url: string }
+  /** Handed to a terminal on this machine at `url`, or delivered by the node itself (no url). */
+  | { phase: 'handed-back'; url?: string }
   | { phase: 'refused'; code: string };
 
 export function outcomeForAgreement(response: ConsentAgreeResponse | null): AgreementOutcome {
+  if (response?.delivered === true) return { phase: 'handed-back' };
   const target = response?.returnTarget;
   if (target?.kind === 'display') {
     return typeof target.value === 'string' &&

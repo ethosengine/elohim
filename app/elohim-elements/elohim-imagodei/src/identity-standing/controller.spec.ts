@@ -92,6 +92,38 @@ describe('IdentityStandingController — what an identity rests on, and beginnin
     expect(c.state.phase).to.equal('not-signed-in');
   });
 
+  it('reads a signed-out answer: no identity here is a begin; else whether a browser may sign in', async () => {
+    standingResult = async () =>
+      ({
+        ok: false,
+        status: 401,
+        body: { code: 'consent_not_signed_in', hasIdentity: false, signInSecretSet: false },
+      }) as never;
+    let c = screen();
+    await c.read();
+    expect(c.state.phase).to.equal('begin');
+
+    standingResult = async () =>
+      ({
+        ok: false,
+        status: 401,
+        body: { code: 'consent_not_signed_in', hasIdentity: true, signInSecretSet: false },
+      }) as never;
+    c = screen();
+    await c.read();
+    expect(c.state).to.deep.include({
+      phase: 'not-signed-in',
+      signedOut: { hasIdentity: true, signInSecretSet: false },
+    });
+  });
+
+  it('sends a sign-in secret with begin only when one is given', async () => {
+    const c = screen();
+    c.offerBegin();
+    await c.begin('Matthew', 'a-long-enough-secret');
+    expect(begins[0]).to.deep.equal({ displayName: 'Matthew', secret: 'a-long-enough-secret' });
+  });
+
   it('says nothing when the host does not answer these routes', async () => {
     for (const r of [
       { ok: false as const, status: 404, body: null },

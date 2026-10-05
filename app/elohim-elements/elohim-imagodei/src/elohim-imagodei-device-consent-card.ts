@@ -46,7 +46,11 @@ export type KnownDeviceRefusalCode =
   | 'consent_identity_unbootstrapped'
   | 'consent_signing_unavailable'
   | 'consent_caller_not_local'
-  | 'consent_reauthentication_asked';
+  | 'consent_reauthentication_asked'
+  | 'session_proof_missing'
+  | 'session_proof_invalid'
+  | 'session_proof_stale'
+  | 'session_proof_replayed';
 
 /**
  * Every visible sentence the card speaks. Hosts may replace any subset through
@@ -112,6 +116,12 @@ export type DeviceConsentStringOverrides = Partial<
   refusalHeading?: Partial<Record<string, string>>;
 };
 
+const SIGN_IN_AGAIN = 'Sign in again to go ahead';
+
+/** This browser's sign-in can no longer be confirmed (any session-proof refusal). */
+const SESSION_UNCONFIRMED =
+  'This browser’s sign-in can no longer be confirmed, so nothing was signed. Sign in again, and you’ll come straight back here.';
+
 const named = (host: string | undefined, fallback: string): string =>
   host ? `${fallback} (${host})` : fallback;
 
@@ -164,8 +174,12 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     consent_not_signed_in: 'Sign in first',
     consent_identity_unbootstrapped: 'Not ready to approve yet',
     consent_signing_unavailable: 'Waiting on the signer',
-    consent_caller_not_local: 'Approve on the machine that holds your key',
-    consent_reauthentication_asked: 'Sign in again to go ahead',
+    consent_caller_not_local: 'Sign in, or approve on the machine that holds your key',
+    consent_reauthentication_asked: SIGN_IN_AGAIN,
+    session_proof_missing: SIGN_IN_AGAIN,
+    session_proof_invalid: SIGN_IN_AGAIN,
+    session_proof_stale: SIGN_IN_AGAIN,
+    session_proof_replayed: SIGN_IN_AGAIN,
   },
   refusal: {
     request_acts_incoherent:
@@ -182,9 +196,13 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
     consent_signing_unavailable:
       'The node that holds your key can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.',
     consent_caller_not_local:
-      'This page is open on a different machine from the one that holds your key, so nothing was signed. Approving happens on that machine.',
+      'Nothing was signed: this page isn’t signed in, and it is open on a different machine from the one that holds your key. Sign in here, or approve on that machine.',
     consent_reauthentication_asked:
       'You’re being asked to sign in again before this approval goes ahead. Nothing was signed, and no code was issued.',
+    session_proof_missing: SESSION_UNCONFIRMED,
+    session_proof_invalid: SESSION_UNCONFIRMED,
+    session_proof_stale: SESSION_UNCONFIRMED,
+    session_proof_replayed: SESSION_UNCONFIRMED,
   },
   refusedUnknown: 'Something stopped this request. Start again from the terminal on your device.',
   refusalCodeLabel: 'Reference',
@@ -206,7 +224,13 @@ const isolate = (value: string): string => `⁨${value}⁩`;
  * Codes that are not a refusal at all — a step the person takes before the
  * approval goes ahead. They carry no reference code, which reads as a fault.
  */
-const NOT_A_REFUSAL = new Set<string>(['consent_reauthentication_asked']);
+const NOT_A_REFUSAL = new Set<string>([
+  'consent_reauthentication_asked',
+  'session_proof_missing',
+  'session_proof_invalid',
+  'session_proof_stale',
+  'session_proof_replayed',
+]);
 const isolateOpt = (value?: string): string | undefined => (value ? isolate(value) : undefined);
 
 /** Seconds-remaining thresholds below one minute at which the live region speaks. */

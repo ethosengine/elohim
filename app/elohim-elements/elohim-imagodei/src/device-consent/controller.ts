@@ -29,6 +29,7 @@ import {
   nothingWasSigned,
   outcomeForAgreement,
   reasonOf,
+  signInMayHelp,
   standingFor,
   trailAfterAgreement,
   type ApprovalStanding,
@@ -188,7 +189,7 @@ export class DeviceConsentController {
     } else if (outcome.phase === HANDED_BACK) {
       this.set({ phase: HANDED_BACK });
       this.remember({ phase: HANDED_BACK });
-      this.options.handBack(outcome.url);
+      if (outcome.url) this.options.handBack(outcome.url);
     } else {
       this.refuse(outcome.code);
     }
@@ -219,13 +220,14 @@ export class DeviceConsentController {
   }
 
   /**
-   * The person chose to sign in again after a witness asked them to. Sends
-   * them to sign in and straight back to this link, where the approval is
-   * asked again from review; nothing is resent by itself.
+   * The person chose to sign in (again) — a witness asked them to, this
+   * browser's sign-in could no longer be confirmed, or the page was not
+   * signed in. Sends them to sign in and straight back to this link, where
+   * the approval is asked again from review; nothing is resent by itself.
    */
   signInAgain(): void {
     const { phase, refusalCode } = this.current;
-    if (phase !== 'refused' || refusalCode !== NODE_CODE.reauthenticationAsked) return;
+    if (phase !== 'refused' || !signInMayHelp(refusalCode)) return;
     this.memory.forget(this.requestParam);
     this.options.signIn();
   }

@@ -21,6 +21,10 @@ export const IDENTITY_CODE = {
   callerNotLocal: 'consent_caller_not_local',
   /** The name is not plain text of a fitting length. */
   nameMalformed: 'identity_name_malformed',
+  /** A sign-in secret given with begin is shorter than the node allows. */
+  secretTooShort: 'secret_too_short',
+  /** A sign-in secret given with begin is longer than the node allows. */
+  secretTooLong: 'secret_too_long',
 } as const;
 
 /** What a failed identity call means for the screen. */

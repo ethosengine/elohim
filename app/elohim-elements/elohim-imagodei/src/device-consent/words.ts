@@ -53,8 +53,18 @@ export interface ApprovalWords {
 
 /** Not a retry: the approval belongs on the machine that holds the key. */
 const CALLER_NOT_LOCAL =
-  'This page is open on a different machine from the one that holds your key, so nothing was signed. Approving happens on that machine.';
-const CALLER_NOT_LOCAL_HEADING = 'Approve on the machine that holds your key';
+  'Nothing was signed: this page isn’t signed in, and it is open on a different machine from the one that holds your key. Sign in here, or approve on that machine.';
+const CALLER_NOT_LOCAL_HEADING = 'Sign in, or approve on the machine that holds your key';
+
+/** All four session-proof refusals: one sentence, no jargon. */
+const SESSION_UNCONFIRMED =
+  'This browser’s sign-in can no longer be confirmed, so nothing was signed. Sign in again, and you’ll come straight back here.';
+const SESSION_PROOF_CODES = [
+  'session_proof_missing',
+  'session_proof_invalid',
+  'session_proof_stale',
+  'session_proof_replayed',
+];
 
 /** Not a fault: a step the person takes, after which they approve again themselves. */
 const REAUTHENTICATION =
@@ -84,6 +94,7 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
         consent_signing_unavailable: `${name} can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.`,
         consent_caller_not_local: holder.callerNotLocal ?? CALLER_NOT_LOCAL,
         consent_reauthentication_asked: holder.reauthentication ?? REAUTHENTICATION,
+        ...Object.fromEntries(SESSION_PROOF_CODES.map(code => [code, SESSION_UNCONFIRMED])),
         [REFUSAL.requestUnreadable]:
           'This link doesn’t carry a request that can be read. Start again from the terminal on your device.',
         [REFUSAL.returnPathRefused]: `${name} answered with somewhere other than this machine’s terminal to send the code, so it was not sent anywhere.`,
@@ -94,6 +105,7 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
         [REFUSAL.approvalInterrupted]: 'Not sent a second time',
         consent_caller_not_local: holder.callerNotLocalHeading ?? CALLER_NOT_LOCAL_HEADING,
         consent_reauthentication_asked: holder.reauthenticationHeading ?? REAUTHENTICATION_HEADING,
+        ...Object.fromEntries(SESSION_PROOF_CODES.map(code => [code, REAUTHENTICATION_HEADING])),
       },
     },
     // The standing line says what the approval rests on, from the node's own

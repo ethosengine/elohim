@@ -60,6 +60,12 @@ export interface ConsentAgreeResponse {
   controllers: ConsentControllers;
   /** Only the parties that actually signed, in the order they signed. */
   witnesses: WitnessStep[];
+  /**
+   * Computed by a host adapter, never on the wire: the node already handed
+   * the code back to the asking device itself (an ask over a private
+   * network), so there is nothing to show or hand back here.
+   */
+  delivered?: boolean;
 }
 
 /** 4xx body from either call. */
@@ -81,13 +87,17 @@ export interface DeviceConsentClient {
 
 export type DeviceConsentClientOptions = SameOriginOptions;
 
-/** Same-origin client for `/auth/consent/*`. */
+/**
+ * Same-origin client for `/auth/consent/*`. Only `agree` makes the node
+ * sign, so only it carries the session proof (`options.prove`).
+ */
 export function createDeviceConsentClient(
   options: DeviceConsentClientOptions = {}
 ): DeviceConsentClient {
+  const reading = { ...options, prove: undefined };
   return {
     view: async request =>
-      sameOriginJson<ConsentViewResponse>(options, 'POST', CONSENT_VIEW_PATH, request),
+      sameOriginJson<ConsentViewResponse>(reading, 'POST', CONSENT_VIEW_PATH, request),
     agree: async body =>
       sameOriginJson<ConsentAgreeResponse>(options, 'POST', CONSENT_AGREE_PATH, body),
   };
