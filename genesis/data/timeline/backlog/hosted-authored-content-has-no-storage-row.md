@@ -81,6 +81,31 @@ Still open below: a node whose cell has NOT declared the head (the hosting node 
 third peer) holds no row, so the root is still invisible there until the adopter's row is
 advertised and acquired. Not proven on a household or the fleet; the a2o story is owed.
 
+## Receipt, 2026-10-05: the adopter's row is seeded on Che
+
+Che's storage (build 52727b6d1, iroh) held no row after two declarations. Cause, read from its log
+and `main.rs`: every conductor signal subscriber sat inside the `Ok` arm of the peer-policy load,
+and Che's storage, launched by hand with no `./config/peer-policy.toml`, logged only
+`PeerStatus heartbeat disabled: policy config load failed`. Neither run logged
+`ReaProjectionSignal subscriber registered`, so the declaration signal had no reader. The zome was
+not the cause: `declare_canonical_head_inner` writes a new link and emits `ContentHeadDeclared`
+with its ordering on every call, including a repeat.
+
+With a policy file in place and storage restarted (same binary, same environment), all four
+subscribers registered. Che then repeated the declaration with the acceptance already on disk and
+its own copy of the root record (`fleet/redeclare-root-on-che.mts`; no new grant, no operator-cell
+connection). Storage logged `row seeded from the conductor-verified head` at 01:57:58Z and
+`GET :8095/db/content/fct-leg2-operator-root` returns 200. An accepted head survives its
+delegation's expiry for that exact version, as `verify_accepted_publication` states.
+
+The trap is closed in code on `fix/coordinator-acceptance-contract`: a missing or malformed policy
+file now runs the node under the built-in policy and the subscribers always register.
+
+Still owed from this incident: a declaration made while storage is down, or before its subscriber
+is up, leaves no row and nothing retries it. A seed that does not depend on a fresh signal (at
+boot or on the sweep, for heads this node's own cell holds as earned canonical with no row) is
+the same decision as "acquisition by id" below.
+
 ## Before designing a fix
 
 This is not the coordinator sweep's walk reused. That sweep makes admin calls per cell; projecting

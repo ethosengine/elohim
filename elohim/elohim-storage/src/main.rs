@@ -1521,8 +1521,17 @@ async fn async_main(
         // Stash the registry in shared state for HTTP handlers.
         hc_registry_for_http = Some(registry.clone());
 
-        match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
-            Ok(policy_cfg) => {
+        // A missing or unreadable policy file must not take the conductor
+        // signal subscribers down with it: everything below (heartbeat,
+        // genesis self-heal, every projection subscriber) used to sit in the
+        // `Ok` arm of this load, so a hand-launched node with no
+        // `./config/peer-policy.toml` projected nothing its own cell signalled
+        // and said only "PeerStatus heartbeat disabled" (mesh 2026-08-16, Che
+        // 2026-10-05). The built-in policy exposes nothing externally.
+        {
+            let policy_cfg =
+                elohim_storage::policy::PolicyConfig::load_or_builtin(&peer_policy_path);
+            {
                 // Peer-Stewarded Availability — conditionally spawn the
                 // conductor forwarder so remote peers can reach this node's
                 // internal conductor port. Failure to bind is non-fatal,
@@ -2936,13 +2945,6 @@ async fn async_main(
                 // the `hc_registry_for_http` stash were already done above,
                 // unconditionally on admin_url, before this policy-load
                 // branch even runs.
-            }
-            Err(e) => {
-                warn!(
-                    policy_path = %peer_policy_path.display(),
-                    "PeerStatus heartbeat disabled: policy config load failed: {}",
-                    e
-                );
             }
         }
     } else {

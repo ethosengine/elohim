@@ -106,11 +106,57 @@ impl PolicyConfig {
         let contents = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&contents)?)
     }
+
+    /// The policy a node runs under when it has no usable policy file: the
+    /// shipped example, which exposes nothing externally.
+    pub fn builtin() -> Self {
+        toml::from_str(include_str!("../../config/peer-policy.example.toml"))
+            .expect("the shipped example policy parses (pinned by parses_example_config)")
+    }
+
+    /// Load the policy at `path`, or run under [`Self::builtin`] and say so.
+    /// A missing file is a WARN (a hand-launched node); a file that is present
+    /// but does not parse is an ERROR, because the operator's stated policy is
+    /// NOT the one in force.
+    pub fn load_or_builtin(path: &std::path::Path) -> Self {
+        match Self::load(path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                let missing = e
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|io| io.kind() == std::io::ErrorKind::NotFound);
+                if missing {
+                    tracing::warn!(
+                        policy_path = %path.display(),
+                        "no peer policy file — running under the built-in policy (nothing exposed externally)"
+                    );
+                } else {
+                    tracing::error!(
+                        policy_path = %path.display(),
+                        error = %e,
+                        "peer policy file did not load — the operator's policy is NOT in force; running under the built-in policy"
+                    );
+                }
+                Self::builtin()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_or_malformed_policy_file_runs_under_the_builtin_policy() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = PolicyConfig::load_or_builtin(&dir.path().join("absent.toml"));
+        assert!(!missing.network.expose_conductor_externally);
+        let bad = dir.path().join("bad.toml");
+        std::fs::write(&bad, "[pool]\nmin_free_storage_pct = \"not a number\"").unwrap();
+        let malformed = PolicyConfig::load_or_builtin(&bad);
+        assert_eq!(malformed.pool.min_free_storage_pct, 20);
+    }
 
     #[test]
     fn parses_example_config() {
