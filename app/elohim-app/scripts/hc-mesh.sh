@@ -5211,6 +5211,14 @@ start_portal() {
     echo "portal SKIPPED: no node_modules for doorway-app — run pnpm install (set MESH_PORTAL=0 to silence)" >&2
     return 1
   fi
+  # The portal imports the shared identity elements from their built dist
+  # (`pnpm start` builds them through `prestart`; `ng serve` below does not).
+  # Without this a host that never built them gets a portal that fails to
+  # compile, which reads as "portal not painting" a few minutes later.
+  if ! ( cd "$REPO_ROOT/doorway/doorway-app" && pnpm run elements > "$LOGDIR/portal-elements.log" 2>&1 ); then
+    echo "portal SKIPPED: the identity elements did not build — see $LOGDIR/portal-elements.log (set MESH_PORTAL=0 to silence)" >&2
+    return 1
+  fi
   ( cd "$REPO_ROOT/doorway/doorway-app" && \
     # --live-reload=false: the doorway PROXIES /threshold/* to this server, and
     # a hot-reload WebSocket cannot traverse that proxy — it fails the

@@ -1,0 +1,54 @@
+/* Bind the brand to the card through its published custom properties and
+   parts only — the element itself stays theme-agnostic. */
+
+elohim-imagodei-device-consent-card {
+  display: block;
+  color: var(--el-text);
+  line-height: 1.55;
+
+  --elohim-device-consent-gap: 1.25rem;
+  --elohim-device-consent-radius: var(--el-radius-md);
+  /* Muted lines keep full strength: the brand's muted text colour already
+     carries the hierarchy, and dimming it would drop below AA on linen. */
+  --elohim-device-consent-muted-opacity: 1;
+  --elohim-device-consent-key-bg: var(--el-surface-2);
+  --elohim-device-consent-act-row-bg: transparent;
+  --elohim-device-consent-act-row-border: 1px solid var(--el-field-border);
+  --elohim-device-consent-toggle-accent: var(--el-action);
+  --elohim-device-consent-note-border: 3px solid var(--el-amber);
+  --elohim-device-consent-approve-bg: var(--el-action);
+  --elohim-device-consent-approve-fg: var(--el-on-action);
+  --elohim-device-consent-decline-bg: transparent;
+  --elohim-device-consent-decline-fg: var(--el-text-strong);
+  --elohim-device-consent-code-bg: var(--el-surface-2);
+  --elohim-device-consent-code-font: var(--el-font-mono);
+  --elohim-device-consent-focus-ring: 2px solid var(--el-focus);
+}
+
+elohim-imagodei-device-consent-card::part(heading) {
+  font-family: var(--el-font-display);
+  font-weight: 560;
+  font-size: 1.375rem;
+  color: var(--el-text-strong);
+}
+
+elohim-imagodei-device-consent-card::part(fingerprint),
+elohim-imagodei-device-consent-card::part(code) {
+  color: var(--el-text-strong);
+}
+
+elohim-imagodei-device-consent-card::part(approve),
+elohim-imagodei-device-consent-card::part(decline),
+elohim-imagodei-device-consent-card::part(copy) {
+  min-height: 44px;
+  font-weight: 600;
+}
+
+elohim-imagodei-device-consent-card::part(decline),
+elohim-imagodei-device-consent-card::part(copy) {
+  border: 1px solid var(--el-field-border);
+}
+
+elohim-imagodei-device-consent-card::part(approve) {
+  border: 1px solid transparent;
+}

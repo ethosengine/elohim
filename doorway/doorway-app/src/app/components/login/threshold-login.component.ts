@@ -11,7 +11,7 @@
  * can be an identity provider for elohim-app.
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CUSTOM_ELEMENTS_SCHEMA, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -23,7 +23,15 @@ import { firstValueFrom } from 'rxjs';
 // duplicates, e.g. `expiresAt: string`, were retired).
 import type { AuthResponse } from '../../generated/auth-response';
 import type { SessionTokenResponse } from '../../generated/session-token-response';
+import { gatewayDomain } from '../../core/gateway-domain';
+import { RETURN_URL_PARAM, safeReturnUrl } from '../../core/guards/auth.guard';
 import { AuthStateService } from '../../services/auth-state.service';
+import { IDENTITY_ELEMENTS } from '../../elements/identity-elements';
+import { type WitnessStep, withStepState } from '../../models/witness-step';
+import { DEVICE_CONSENT_PATH } from '../consent/device-consent.logic';
+
+/** The one thing that is true while sign-in is in flight: the doorway checks the password. */
+const DOORWAY_CHECK = 'doorway-check';
 
 /** OAuth params from query string */
 interface OAuthParams {
@@ -48,32 +56,34 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
   selector: 'app-threshold-login',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <div class="login-container">
-      <div class="login-card">
-        <!-- Doorway branding -->
-        <div class="branding">
-          <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
-          <h1>Sign In</h1>
-          <p class="doorway-name">{{ doorwayName() }}</p>
+    <div class="portal-page">
+      <section class="portal-card" aria-labelledby="threshold-login-title">
+        <span class="portal-mark" role="img" aria-label="Elohim"></span>
+        <div class="portal-heading">
+          <h1 id="threshold-login-title">Sign in</h1>
+          <p>Welcome back.</p>
         </div>
 
-        <!-- OAuth info -->
         @if (oauthParams()) {
-          <div class="oauth-info">
-            <span class="app-name">{{ clientDisplayName() }}</span>
-            <span class="oauth-action">wants to access your account</span>
-          </div>
+          <!-- prettier-ignore -->
+          <p class="portal-context oauth-info">
+            Sign in to continue to <strong class="app-name">{{ clientDisplayName() }}</strong>.
+          </p>
+        } @else if (returningToDeviceConsent()) {
+          <p class="portal-context" data-testid="threshold-device-consent-context">
+            Sign in to review a device that is asking to act for you.
+          </p>
         }
 
-        <!-- Error message -->
         @if (error()) {
-          <div class="error-banner" data-testid="threshold-error">
-            <span>{{ error() }}</span>
+          <div class="error-banner" role="alert" data-testid="threshold-error">
+            <span id="threshold-error-text">{{ error() }}</span>
             <button
               class="dismiss"
               type="button"
-              aria-label="Dismiss error"
+              aria-label="Dismiss this message"
               (click)="clearError()"
               data-testid="threshold-error-dismiss"
             >
@@ -82,12 +92,16 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
           </div>
         }
 
-        <!-- Login form -->
-        @if (state() === 'form') {
-          <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
-            <div class="form-group">
+        @if (state() === 'form' || state() === 'authenticating') {
+          <form
+            class="portal-form"
+            (ngSubmit)="onSubmit(loginForm.valid)"
+            #loginForm="ngForm"
+            [attr.aria-busy]="busy() ? 'true' : null"
+          >
+            <div class="portal-field">
               <label for="identifier">Username</label>
-              <div class="identifier-wrapper">
+              <div class="identifier-wrapper" [class.is-invalid]="identifierError()">
                 <input
                   type="text"
                   id="identifier"
@@ -95,28 +109,40 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   data-testid="threshold-identifier"
                   [ngModel]="form.identifier"
                   (ngModelChange)="onIdentifierChange($event)"
+                  #identifierModel="ngModel"
                   required
                   autocomplete="username"
-                  placeholder="username"
+                  autocapitalize="none"
+                  spellcheck="false"
                   pattern="[^@\\s]+"
                   inputmode="text"
                   class="identifier-input"
+                  [readonly]="busy()"
+                  [attr.aria-invalid]="identifierError() ? 'true' : null"
+                  [attr.aria-describedby]="
+                    identifierError() ? 'identifier-error identifier-hint' : 'identifier-hint'
+                  "
                 />
-                <span class="domain-suffix" data-testid="threshold-domain-suffix">
+                <span
+                  class="domain-suffix"
+                  data-testid="threshold-domain-suffix"
+                  aria-hidden="true"
+                >
                   &#64;{{ gatewayDomain() }}
                 </span>
               </div>
-              <p class="input-hint">
-                Logging in at
-                <strong>{{ gatewayDomain() }}</strong>
-                .
-                <a [href]="federatedLoginUrl()" data-testid="threshold-different-doorway-hint">
-                  Use a different doorway
-                </a>
+              @if (identifierError(); as message) {
+                <p class="field-error" id="identifier-error">{{ message }}</p>
+              }
+              <!-- prettier-ignore -->
+              <p class="input-hint" id="identifier-hint">
+                Your account lives at <strong>{{ gatewayDomain() }}</strong>, so type only the part before the &#64;.
+                Account somewhere else?
+                <a class="portal-link" [href]="federatedLoginUrl()" data-testid="threshold-different-doorway-hint">Use a different doorway</a>
               </p>
             </div>
 
-            <div class="form-group">
+            <div class="portal-field">
               <label for="password">Password</label>
               <input
                 type="password"
@@ -126,18 +152,37 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                 [(ngModel)]="form.password"
                 required
                 autocomplete="current-password"
-                placeholder="••••••••"
+                [readonly]="busy()"
+                [attr.aria-invalid]="passwordError() ? 'true' : null"
+                [attr.aria-describedby]="passwordError() ? 'password-error' : null"
               />
+              @if (passwordError(); as message) {
+                <p class="field-error" id="password-error">{{ message }}</p>
+              }
             </div>
 
             <button
               type="submit"
               class="btn-primary"
               data-testid="threshold-submit"
-              [disabled]="!loginForm.valid"
+              [attr.aria-disabled]="busy() ? 'true' : null"
             >
-              Sign In
+              {{ busy() ? 'Signing in…' : 'Sign in' }}
             </button>
+
+            <!-- Only after a submit, and only once the element has loaded while
+                 the request is still in flight. It never delays navigation. -->
+            @if (trailSteps(); as steps) {
+              @if (trailElementReady()) {
+                <elohim-imagodei-witness-trail
+                  class="portal-trail"
+                  data-testid="threshold-witness-trail"
+                  layout="list"
+                  [steps]="steps"
+                  [attr.reveal-after-ms]="trailRevealAfterMs()"
+                ></elohim-imagodei-witness-trail>
+              }
+            }
 
             @if (oauthParams()) {
               <div class="federated-section">
@@ -147,25 +192,21 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   class="federated-link"
                   data-testid="threshold-federated-login"
                 >
-                  Login with a different doorway
+                  Sign in with a different doorway
                 </a>
               </div>
             }
           </form>
         }
 
-        <!-- Loading states -->
-        @if (state() === 'authenticating') {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Verifying your credentials...</p>
-          </div>
-        }
-
         @if (state() === 'authorizing') {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Authorizing {{ clientDisplayName() }}...</p>
+          <div class="loading-state" role="status">
+            <div class="trace" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p>Taking you to {{ clientDisplayName() }}…</p>
           </div>
         }
 
@@ -177,19 +218,20 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
               data-testid="threshold-retry"
               (click)="retry()"
             >
-              Try Again
+              Try again
             </button>
           </div>
         }
 
-        <!-- Footer -->
-        <div class="footer">
+        <div class="portal-footer">
           <p>
-            Don't have an account?
-            <a [href]="registerUrl()" data-testid="threshold-register-link">Register here</a>
+            New here?
+            <a class="portal-link" [href]="registerUrl()" data-testid="threshold-register-link">
+              Create an account
+            </a>
           </p>
         </div>
-      </div>
+      </section>
     </div>
   `,
   styleUrl: './threshold-login.component.css',
@@ -199,11 +241,24 @@ export class ThresholdLoginComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly authState = inject(AuthStateService);
+  private readonly loadElements = inject(IDENTITY_ELEMENTS);
 
   // State
   readonly state = signal<LoginState>('form');
   readonly error = signal<string>('');
   readonly oauthParams = signal<OAuthParams | null>(null);
+  /** In-app page to return to after signing in (set by authGuard), if any. */
+  readonly returnUrl = signal<string | null>(null);
+  /** True once the person has tried to submit — field messages show from then on. */
+  readonly attempted = signal(false);
+  /** The request is in flight: the button says so and the form holds still. */
+  readonly busy = computed(() => this.state() === 'authenticating');
+  /** What the witness trail shows; null until the person submits. */
+  readonly trailSteps = signal<WitnessStep[] | null>(null);
+  /** The trail element registered while a request was in flight. */
+  readonly trailElementReady = signal(false);
+  /** How long the live trail waits before showing (the dev preview pins it to 0). */
+  readonly trailRevealAfterMs = signal(400);
 
   // Form model
   form: LoginForm = {
@@ -212,15 +267,13 @@ export class ThresholdLoginComponent implements OnInit {
   };
 
   // Computed values
-  readonly doorwayName = computed(() => {
-    return window.location.hostname;
-  });
+  /** doorway-alpha.elohim.host --> alpha.elohim.host */
+  readonly gatewayDomain = computed(() => gatewayDomain(window.location.hostname));
 
-  readonly gatewayDomain = computed(() => {
-    const hostname = window.location.hostname;
-    // doorway-alpha.elohim.host --> alpha.elohim.host
-    return hostname.startsWith('doorway-') ? hostname.replace(/^doorway-/, '') : hostname;
-  });
+  /** Coming here on the way to approving a device: say so above the form. */
+  readonly returningToDeviceConsent = computed(
+    () => this.returnUrl()?.startsWith(DEVICE_CONSENT_PATH) ?? false
+  );
 
   readonly clientDisplayName = computed(() => {
     const params = this.oauthParams();
@@ -300,6 +353,21 @@ export class ThresholdLoginComponent implements OnInit {
     if (loginHint) {
       this.form.identifier = loginHint;
     }
+
+    this.returnUrl.set(safeReturnUrl(params[RETURN_URL_PARAM]));
+  }
+
+  /** Message for the username field, once a submit has been tried. */
+  identifierError(): string | null {
+    if (!this.attempted()) return null;
+    if (!this.form.identifier) return 'Enter your username.';
+    if (/\s/.test(this.form.identifier)) return 'A username can’t contain spaces.';
+    return null;
+  }
+
+  /** Message for the password field, once a submit has been tried. */
+  passwordError(): string | null {
+    return this.attempted() && !this.form.password ? 'Enter your password.' : null;
   }
 
   /**
@@ -312,13 +380,20 @@ export class ThresholdLoginComponent implements OnInit {
     this.form.identifier = atIndex === -1 ? value : value.slice(0, atIndex);
   }
 
-  async onSubmit(): Promise<void> {
-    if (!this.form.identifier || !this.form.password) {
+  /**
+   * @param formValid the template form's validity; the button is never
+   *   disabled, so an incomplete form explains itself instead of looking dead.
+   */
+  async onSubmit(formValid: boolean | null = true): Promise<void> {
+    if (this.state() !== 'form') return; // already in flight
+    this.attempted.set(true);
+    if (formValid === false || !this.form.identifier || !this.form.password) {
       return;
     }
 
     this.state.set('authenticating');
     this.error.set('');
+    this.startTrail();
 
     try {
       const authResult = await this.authenticate();
@@ -326,6 +401,7 @@ export class ThresholdLoginComponent implements OnInit {
       if (!authResult) {
         throw new Error('Authentication failed');
       }
+      this.markTrail('done');
 
       // Steward handoff — doorway never owns a steward's login portal.
       // When the auth response carries a reachable portalHostUrl, the human
@@ -370,9 +446,15 @@ export class ThresholdLoginComponent implements OnInit {
         await this.authorizeOAuth(authResult.token, params);
       } else {
         await this.authState.refresh();
-        this.router.navigate(['/dashboard']);
+        const back = this.returnUrl();
+        if (back) {
+          this.router.navigateByUrl(back);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       }
     } catch (err) {
+      this.markTrail('failed');
       this.state.set('form');
       if (err instanceof HttpErrorResponse) {
         this.error.set(err.error?.error ?? 'Authentication failed');
@@ -444,6 +526,32 @@ export class ThresholdLoginComponent implements OnInit {
     } else {
       throw new Error('Authorization failed');
     }
+  }
+
+  /**
+   * Replace the waiting indicator with the witness trail: one step, the
+   * doorway checking the password. The element loads on demand; if it is not
+   * registered before the request finishes, nothing is shown.
+   */
+  private startTrail(): void {
+    this.trailSteps.set([
+      {
+        id: DOORWAY_CHECK,
+        act: 'checked',
+        relation: 'your-doorway',
+        label: this.gatewayDomain(),
+        state: 'working',
+      },
+    ]);
+    if (this.trailElementReady()) return;
+    void this.loadElements().then(loaded => {
+      if (loaded && this.busy()) this.trailElementReady.set(true);
+    });
+  }
+
+  private markTrail(state: WitnessStep['state']): void {
+    const steps = this.trailSteps();
+    if (steps) this.trailSteps.set(withStepState(steps, DOORWAY_CHECK, state));
   }
 
   clearError(): void {
