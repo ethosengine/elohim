@@ -197,6 +197,23 @@ impl ExtractionCache {
         Ok(())
     }
 
+    /// Evict every extraction made from `blob_hash`, whatever key it was
+    /// cached under. Returns how many were evicted.
+    pub async fn evict_blob(&self, blob_hash: &str) -> Result<usize, CacheError> {
+        let app_ids: Vec<String> = {
+            let index = self.index.read().await;
+            index
+                .iter()
+                .filter(|(_, entry)| entry.blob_hash == blob_hash)
+                .map(|(app_id, _)| app_id.clone())
+                .collect()
+        };
+        for app_id in &app_ids {
+            self.evict_app(app_id).await?;
+        }
+        Ok(app_ids.len())
+    }
+
     /// Get cache statistics.
     pub async fn stats(&self) -> ExtractionCacheStats {
         let index = self.index.read().await;

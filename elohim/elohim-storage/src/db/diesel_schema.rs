@@ -1587,6 +1587,19 @@ diesel::table! {
     }
 }
 
+// Category C — releases this peer's adoption controller has verified, in
+// first-seen order. Read by the release retention pass.
+diesel::table! {
+    release_ledger (seq) {
+        seq -> Integer,
+        channel_id -> Text,
+        release_cid -> Text,
+        artifact_class -> Text,
+        artifacts_json -> Text,
+        first_seen_at -> Text,
+    }
+}
+
 // Category C — a generation's aggregate while it is still `building`.
 diesel::table! {
     standing_generation_aggregate (generation_id, evaluator_pubkey, subject_pubkey) {
@@ -2086,6 +2099,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     key_rotations,
     recovery_flows,
     rea_commitments,
+    release_ledger,
     recovery_requests,
     recovery_witnesses,
     relationships,

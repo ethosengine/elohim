@@ -985,6 +985,9 @@ pub fn report_json() -> serde_json::Value {
         // It is the ONLY place the close/open hashes surface outside a
         // conductor.
         "sunsets": sunsets(),
+        // What the last release retention pass kept and let go, per channel.
+        // `null` until the first pass (one interval after boot).
+        "retention": super::retention::report_json(),
     })
 }
 

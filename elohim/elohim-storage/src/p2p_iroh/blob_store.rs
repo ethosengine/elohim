@@ -11,10 +11,21 @@
 //! lands here, not in callers.
 
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::Result;
 use bytes::Bytes;
-use iroh_blobs::{store::fs::FsStore, Hash};
+use futures::StreamExt;
+use iroh_blobs::{
+    store::fs::{
+        options::{GcConfig, Options},
+        FsStore,
+    },
+    Hash,
+};
+
+/// How often the store collects blobs no tag names.
+const GC_INTERVAL: Duration = Duration::from_secs(600);
 
 /// Phase 2 wrapper around the iroh-blobs filesystem store.
 #[derive(Debug, Clone)]
@@ -30,8 +41,43 @@ impl IrohBlobStore {
         if !blobs_dir.exists() {
             tokio::fs::create_dir_all(blobs_dir).await?;
         }
-        let inner = FsStore::load(blobs_dir).await?;
+        Self::load_with_gc_interval(blobs_dir, GC_INTERVAL).await
+    }
+
+    /// [`Self::load`] with an explicit collection interval.
+    pub async fn load_with_gc_interval(blobs_dir: &Path, interval: Duration) -> Result<Self> {
+        if !blobs_dir.exists() {
+            tokio::fs::create_dir_all(blobs_dir).await?;
+        }
+        let mut options = Options::new(blobs_dir);
+        // Collection removes only blobs no tag names. Every blob this wrapper
+        // adds is tagged, so nothing leaves until [`Self::forget`] drops its
+        // tags; without collection, a forgotten blob's bytes would stay.
+        options.gc = Some(GcConfig {
+            interval,
+            add_protected: None,
+        });
+        let inner = FsStore::load_with_opts(blobs_dir.join("blobs.db"), options).await?;
         Ok(Self { inner })
+    }
+
+    /// Stop holding `hash`: drop every tag that names it. The bytes leave on
+    /// the store's next collection run. Returns how many tags were dropped; 0
+    /// means the store was not holding it.
+    pub async fn forget(&self, hash: Hash) -> Result<usize> {
+        let tags = self.inner.tags();
+        let mut listed = std::pin::pin!(tags.list().await?);
+        let mut names = Vec::new();
+        while let Some(info) = listed.next().await {
+            let info = info?;
+            if info.hash == hash {
+                names.push(info.name);
+            }
+        }
+        for name in &names {
+            tags.delete(name).await?;
+        }
+        Ok(names.len())
     }
 
     /// Add bytes to the store; returns the BLAKE3 hash. iroh-blobs creates
@@ -66,6 +112,40 @@ impl IrohBlobStore {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn a_forgotten_blob_leaves_on_the_next_collection_and_a_kept_one_stays() {
+        let dir = tempdir().unwrap();
+        let store = IrohBlobStore::load_with_gc_interval(
+            &dir.path().join("blobs_iroh"),
+            Duration::from_millis(200),
+        )
+        .await
+        .unwrap();
+        // Larger than the inline threshold, so each blob is a file on disk.
+        let old = store.add_bytes(vec![1u8; 64 * 1024]).await.unwrap();
+        // Added twice: two tags name one blob, and both must go.
+        store.add_bytes(vec![1u8; 64 * 1024]).await.unwrap();
+        let kept = store.add_bytes(vec![2u8; 64 * 1024]).await.unwrap();
+
+        assert_eq!(store.forget(old).await.unwrap(), 2);
+        assert_eq!(store.forget(old).await.unwrap(), 0, "nothing left to drop");
+
+        let mut gone = false;
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            if !store.has(old).await.unwrap() {
+                gone = true;
+                break;
+            }
+        }
+        assert!(gone, "the forgotten blob is still held after collection");
+        assert!(
+            store.has(kept).await.unwrap(),
+            "a tagged blob was collected"
+        );
+        assert_eq!(store.get_bytes(kept).await.unwrap().len(), 64 * 1024);
+    }
 
     #[tokio::test]
     async fn add_then_get_round_trips() {

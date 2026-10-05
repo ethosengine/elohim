@@ -133,6 +133,7 @@ pub mod path_evidence;
 /// The `readopt_from` wire mirror + cursor fold — the storage side of Station
 /// 7's "the window-time v2 facts come home" (Task 13c).
 pub mod readopt;
+pub mod retention;
 pub mod revert;
 pub mod state;
 /// The seal ceremony and its trigger — Station 8's one irreversible act
