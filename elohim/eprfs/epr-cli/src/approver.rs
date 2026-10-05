@@ -262,6 +262,20 @@ pub(crate) fn standing_words(s: &StandingView) -> Vec<String> {
             s.required
         )
     });
+    if !s.devices.is_empty() {
+        lines.push("The devices that speak for you:".to_string());
+        for d in &s.devices {
+            let this = if d.this_device { " (this node)" } else { "" };
+            lines.push(format!("  {}{this}: {}.", d.device_fingerprint, d.words()));
+        }
+    }
+    for other in &s.also_speaks_for {
+        lines.push(format!(
+            "This node also speaks for identity {}; approvals here are for the identity above, \
+             and for that one you approve from another of its devices.",
+            consent_grant::hash_shape::fingerprint(other)
+        ));
+    }
     if s.identifier.is_none() {
         lines.push(format!(
             "Identity {}, authority {}.",
@@ -1068,6 +1082,7 @@ mod tests {
             display_name: Some("Matthew".into()),
             identity_root: "uhCkkzY_ZvJaVbaFzi46J_LbGgFEUEQVMlWN5rpSdxGYdOG_3sQYp".into(),
             identity_fingerprint: "uhCkkzY_Z…_3sQYp".into(),
+            also_speaks_for: vec![],
         });
         assert_eq!(
             pending_lines(&joined)[3],
@@ -1174,6 +1189,8 @@ mod tests {
             required,
             this_node_is_controller: true,
             rests_on_this_node_alone: alone,
+            devices: vec![],
+            also_speaks_for: vec![],
             identifier: None,
             display_name: None,
         }
@@ -1225,6 +1242,33 @@ mod tests {
             "matthew: identity uhCkkRrEN…kkM39j, authority uhCkkN_k9…WHA5_-."
         );
         assert_eq!(named.len(), 3);
+        // Each device that speaks is told: who approved it, and how many of
+        // the person's other devices have affirmed it.
+        let mut devices = view(false, 2, 1);
+        devices.devices = vec![consent_grant::StandingDevice {
+            device_key: "uhCAkdevice".into(),
+            device_fingerprint: "uhCAkdev…ice".into(),
+            binding: "b".into(),
+            content_dna: "c".into(),
+            joined_at: 0,
+            approved_by: vec!["uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl".into()],
+            affirmed_by: vec![],
+            affirmed_count: 0,
+            this_device: true,
+        }];
+        devices.also_speaks_for =
+            vec!["uhCkkRrENFlI2RlXCelrj6C6ttNq8qTI_wSh0fFmsrSvBgdkkM39j".into()];
+        let lines = standing_words(&devices);
+        assert!(lines.contains(&"The devices that speak for you:".to_string()));
+        assert!(
+            lines.iter().any(|l| l
+                .starts_with("  uhCAkdev…ice (this node): approved by device uhCAkiqcz")
+                && l.ends_with("affirmed by no other device yet.")),
+            "{lines:?}"
+        );
+        assert!(lines
+            .iter()
+            .any(|l| l.starts_with("This node also speaks for identity uhCkkRrEN")));
     }
 
     #[test]
