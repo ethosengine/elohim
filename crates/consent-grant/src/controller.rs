@@ -38,14 +38,14 @@ pub struct StandingView {
     pub identity_root: String,
     pub authority: String,
     pub network_dna: String,
-    /// Every steward (controller) the authority names.
+    /// Every controller the authority names.
     pub controllers: Vec<String>,
     pub controller_count: usize,
     /// How many of them the person's declared policy asks to approve a device.
     pub required: usize,
-    /// Whether the node answering is one of the stewards.
+    /// Whether the node answering is one of the nodes that speak for the person.
     pub this_node_is_controller: bool,
-    /// Whether the node answering is the only steward.
+    /// Whether the node answering is the only controller.
     pub rests_on_this_node_alone: bool,
 }
 

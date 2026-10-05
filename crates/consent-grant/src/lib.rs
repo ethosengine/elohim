@@ -46,13 +46,16 @@
 //! over plain data. Callers supply the time, the signing and the transport.
 
 pub mod act;
+pub mod carrier;
 pub mod ceremony;
 pub mod consent;
 pub mod controller;
+pub mod decide;
 pub mod declaration;
 pub mod delivery;
 pub mod enrollment;
 pub mod hash_shape;
+pub mod pending;
 pub mod pkce;
 pub mod request;
 pub mod return_path;
@@ -60,6 +63,7 @@ pub mod verify;
 pub mod witness;
 
 pub use act::{ActRefusal, RequestedAct};
+pub use carrier::{CarryRequest, CarryResponse};
 pub use ceremony::{
     attendance, issue, redeem, settle, AgreedView, Attendance, ConsentView, ControllerTally,
     Delivered, Held, IssueRefusal, MemoryStore, Relation, ReturnTargetView, Taken,
@@ -69,6 +73,10 @@ pub use consent::{
     SignerRole, CONSENT_SIGNING_DOMAIN,
 };
 pub use controller::{ControllerStanding, StandingRefusal, StandingView};
+pub use decide::{
+    decide, ByAnswer, ByDeclaration, DecidedBy, Decider, Decision, NoElohimAttending,
+    OWN_IDENTITY_REASON,
+};
 pub use declaration::{
     Declaration, DeclarationConflict, DeclaredAsking, DeclaredDevice, DeclaredIdentity,
     ExistingIdentity,
@@ -77,6 +85,9 @@ pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
 pub use enrollment::{ControllerProof, Enrollment, EnrollmentIntent, ENROLLMENT_DOMAIN};
+pub use pending::{
+    Ask, Dropped, Listed, Made, NodeState, PendingAsk, PendingAsks, PendingView, ASK_LIFE_MICROS,
+};
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
 pub use verify::{check_delivered, DeliveredRefusal};

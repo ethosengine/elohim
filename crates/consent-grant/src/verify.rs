@@ -1,6 +1,6 @@
 //! What a terminal checks before it uses what it collected.
 //!
-//! A terminal redeems its code at a steward it may never have spoken to before.
+//! A terminal redeems its code at an approving node it may never have spoken to before.
 //! Before it signs anything of its own over what came back, it checks that the
 //! consent is the one it asked for and that every signature on it is real:
 //!
@@ -160,7 +160,7 @@ pub(crate) mod tests {
         AgentKeypair::from_secret(&[9; 32]).unwrap()
     }
 
-    /// What an honest steward hands back for `peer_request`.
+    /// What an honest approving node hands back for `peer_request`.
     fn delivered() -> Delivered {
         let admitted = admit_request(&peer_request(), &policy()).unwrap();
         let acts = admitted.request().acts.clone();

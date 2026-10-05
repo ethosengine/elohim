@@ -46,7 +46,8 @@ pub struct DeclaredIdentity {
     pub identifier: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile_reach: Option<String>,
-    /// How many of the person's stewards an approval needs. Absent means one.
+    /// How many of the nodes that speak for the person must approve a new device.
+    /// Absent means one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approvals_needed: Option<usize>,
 }
@@ -60,15 +61,23 @@ pub struct DeclaredDevice {
     pub acts: Vec<RequestedAct>,
 }
 
-/// On an asking node: where its steward is, and what this node is called.
+/// On an asking node: where its approving node is, and what this node is called.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeclaredAsking {
     pub label: String,
-    pub portal: String,
-    /// The steward node's own address; the portal's when absent.
+    /// The approving node's portal, for the link-and-paste path. Absent means the
+    /// device announces on its private network instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub steward: Option<String>,
+    pub portal: Option<String>,
+    /// The approving node node's own address; the portal's when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approver: Option<String>,
+    /// The approving node's agent key. When present, an announced ask is addressed
+    /// to that node alone; when absent, to whichever approving node on the private
+    /// network lists it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approver_key: Option<String>,
 }
 
 /// The identity that exists on a node, as far as a declaration can disagree
@@ -114,7 +123,7 @@ impl DeclaredIdentity {
         self.profile_reach.as_deref().unwrap_or("private")
     }
 
-    /// How many stewards an approval needs: one when unsaid.
+    /// How many approving nodes an approval needs: one when unsaid.
     pub fn approvals(&self) -> usize {
         self.approvals_needed.unwrap_or(1)
     }

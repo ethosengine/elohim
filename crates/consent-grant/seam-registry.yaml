@@ -347,3 +347,140 @@ decisionPoints:
       - path: crates/consent-grant/src/ceremony.rs
         testName: one_runtime_runs_the_whole_ceremony
         kind: unit
+
+  - name: PendingAsks::admit
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::PendingAsks::admit
+      line: 189
+    summary: >
+      Decides whether an ask that arrived over the private network is put on the approving
+      node's list: it must be an admissible request, addressed to this node or to none, and fit
+      the bounds (32 asks, four per source, five minutes each). The same device asking again
+      replaces its earlier ask. Over a bound it is dropped, never queued. Listing causes no
+      signature; it only makes the ask visible to the deciders.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral and node-local: nothing is notarized, linked or persisted. The list is lost on
+          restart by design; a device that still wants to ask asks again.
+      - id: C1
+        status: answered
+        justification: >
+          Admission confers nothing. Only the agree path, on the approving node's own machine,
+          signs; a listed ask can at most be shown.
+      - id: C3
+        status: answered
+        justification: Every ask leaves by decision, by replacement, or by its five-minute life.
+      - id: C4
+        status: answered
+        justification: >
+          Each drop is a distinct `Dropped` with a stable code (`ask_for_another_approver`,
+          `ask_list_full`, `ask_source_over_limit`, or the request's own refusal), and is logged.
+      - id: C5
+        status: answered
+        justification: >
+          The transport id that carried the ask is recorded as its source and used only for the
+          per-source bound and for sending the code back. It is never compared to the device key,
+          and an ask is never picked by its source.
+      - id: C6a
+        status: answered
+        justification: The count, per-source and life bounds cap memory and work per peer.
+      - id: C8
+        status: answered
+        justification: Listed, replaced and dropped outcomes are each logged with their reason.
+      - id: C11
+        status: answered
+        justification: The per-source bound is the rate limit; over it is dropped.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: the_list_is_bounded_by_count_source_and_life
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_is_listed_and_the_same_device_replaces_its_own
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_for_another_approver_or_a_malformed_one_is_dropped
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_is_picked_by_number_key_or_fingerprint_and_never_by_its_source
+        kind: unit
+
+  - name: decide
+    kind: verdict-fn
+    sourceLocation:
+      file: src/decide.rs
+      modulePath: consent_grant::decide::decide
+      line: 133
+    summary: >
+      Decides a listed ask for the person through interchangeable deciders, in order: an elohim
+      attending them (`NoElohimAttending` by default, which always defers), the person's
+      declaration (`ByDeclaration`, which agrees only for an unassigned node whose key and acts
+      the person declared), and an answer given at the approving node (`ByAnswer`, taken as the
+      person's). The first decider that does not defer decides; if all defer, the reasons are
+      returned so the caller can ask. Nothing in the seam assumes a person answers.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A decision is input to the shared agree path, which alone signs and only for a caller on
+          the node's own machine. No decider can agree to more than was asked.
+      - id: C4
+        status: answered
+        justification: >
+          Agree, decline and defer are distinct; every deferral carries its reason, and an empty
+          answer declines rather than agreeing to nothing.
+      - id: C12
+        status: answered
+        justification: >
+          A node with an identity of its own is never agreed by declaration; it defers to whoever
+          answers, who may only join it as it is.
+      - id: C13
+        status: partial
+        justification: >
+          The answer is taken as the person's. The node cannot tell the person from whoever
+          operates the machine; that missing node is row 6 of the device-recognition cluster.
+      - id: C14
+        status: answered
+        justification: When every decider defers, the residual is returned, never guessed.
+    contractTests:
+      - path: crates/consent-grant/src/decide.rs
+        testName: by_default_no_elohim_attends_and_the_others_decide
+        kind: unit
+      - path: crates/consent-grant/src/decide.rs
+        testName: a_node_with_an_identity_of_its_own_goes_to_whoever_answers
+        kind: unit
+      - path: crates/consent-grant/src/decide.rs
+        testName: an_undeclared_device_waits_for_an_answer_and_an_empty_answer_declines
+        kind: unit
+
+  - name: NodeState::of
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::NodeState::of
+      line: 71
+    summary: >
+      Classifies what an asking node is, honestly: unassigned, an identity of its own with
+      nothing made, an identity of its own having made things, or joined to someone. What it has
+      made is `Things` only on positive evidence and otherwise `Unknown`, never "nothing".
+    concernIds:
+      - id: C4
+        status: answered
+        justification: The four states are distinct, and unknown is its own value.
+      - id: C5
+        status: answered
+        justification: >
+          The state is the asking node's own claim, shown to the person and used only to withhold
+          declaration-agreement. It confers nothing.
+      - id: C12
+        status: answered
+        justification: >
+          A node with an identity of its own is shown as such, so the person decides knowing it;
+          joining as it is is the only offered path. No delete, reset or re-key.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_says_what_it_is_and_unknown_is_never_nothing
+        kind: unit

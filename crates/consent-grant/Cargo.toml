@@ -25,8 +25,10 @@ base64 = "0.22"
 # dag-cbor, CIDv1. `elohim-epr` owns that codec; it is not restated here.
 elohim-epr = { path = "../../elohim/epr" }
 serde = { version = "1.0", features = ["derive"] }
+# The carrier's messages travel as JSON inside whatever the transport frames
+# them in, so optional fields keep their meaning under a positional encoding.
+serde_json = "1.0"
 serde_ipld_dagcbor = "0.6"
 sha2 = "0.10"
 
 [dev-dependencies]
-serde_json = "1.0"
