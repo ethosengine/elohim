@@ -54,7 +54,7 @@ state`.
 | 3 | A device's root key is bound to the person | Recorded in the consent only |
 | 4 | A revoked device re-enrolls | `supersedes` always None |
 | 5 | A declared approvals count above one is enforced | Read and reported; not enforceable |
-| 6 | Who is on the node's own machine when it is asked to sign | The machine is trusted; the person is not told apart from whoever operates it |
+| 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. What remains is row 1 |
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
 | 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
 
@@ -166,20 +166,35 @@ and is never acted on by itself.
 - **Chain:** device consent / the signing rule.
 - **Between:** "someone on the node's own machine asks it to sign" → "the node signs as its
   person".
-- **Missing node:** who that someone is. Three roles are distinct: whose node it is (the person it
-  speaks for); who operates it (whoever runs the machine and answers for what happens to it: the
-  person, a relative, an elohim or the commons); and whether it may approve other nodes (one of
-  the controllers the person's authority names; joining does not make a node one). Operating a
-  node confers no say over the identity it speaks for. The loopback rule trusts the machine, so
-  it cannot tell the person from whoever operates the machine. The assertion: an act for the
-  identity is taken only from the person (or an elohim attending them), and a confirmation about
-  the machine only from its operator.
-- **Probe:** an operator who is not the person, at the node's own machine, is refused an approval
-  for the person's identity and can still confirm what happens to the machine.
-- **Current state:** every caller on the node's own machine can approve for its person. Approval
-  answers are taken as the person's (`consent_grant::ByAnswer`), and the code says the gap is open.
-  **"Operator of record" for a node is its own record, on the standing side, and is not
-  designed.**
+- **Reframed (operator ruling 2026-10-05, the OAuth model).** Three roles stay distinct: whose
+  node it is (the person it speaks for); who operates it (whoever runs the machine and answers for
+  what happens to it: the person, a relative, an elohim or the commons); and whether it may
+  approve other nodes (one of the controllers the person's authority names; joining does not make
+  a node one). Operating a node confers no say over the identity it speaks for. But "the node
+  cannot tell the person from whoever is at the machine" is **not** a gap to close by asking the
+  person for proof on each act. A signed-in device acts with the person's authority, as in OAuth.
+  Noticing that something is off and asking for re-authentication is the witness's job, at the
+  witnessed moment (`consent_grant::witness`: an attending witness may pause and the agree path
+  answers 401 `consent_reauthentication_asked`; nobody attends by default, so nothing pauses
+  today). No added load for the person.
+- **What remains real, recorded elsewhere:** the session routes that mint a session with no
+  sign-in at all ([security-node-session-routes-unauthenticated](epr:security-node-session-routes-unauthenticated));
+  and remote approval needing a real sign-in (row 1).
+- **"Operator of record"** for a node is its own record, on the standing side, and is not
+  designed.
+- **The witnessed moment is one of many.** The device-authorization moment is one witnessed
+  validation moment at the sign-in and authorization floor; a reach gate is another. A shared home
+  for witnessed moments (the kind, the claims handed over, the outcomes proceed / proceed with a
+  signature / pause for re-authentication) is not designed; the shape lives in
+  `crates/consent-grant/src/witness.rs` until it is.
+- **The sign-in word is a claim with no identity-side home.** It is shown wherever the person is
+  named (`identifier` on `speaksFor`, `forIdentity` and the standing view), and never used to
+  decide or join. It is not on the Human record (no field, and the record is public on the DHT,
+  where a sign-in word that is an address would leak). The node reads it back from the newest
+  session it recorded for its own identity, else from its identity declaration. Missing node:
+  between "the person gives a sign-in word at begin" and "the node names the person by it": a
+  durable, private home for the word on the identity side; probe: after every session is deleted
+  and with no declaration, `epr identity standing` still names the person by their word.
 
 ## Row 7 — a node with an identity of its own knows whose device it is
 
@@ -223,8 +238,8 @@ and is never acted on by itself.
   shows it; `GET /auth/consent/pending` and `epr device pending` say it speaks for nobody. Every
   listed ask names whose identity an approval would be for (`forIdentity`). Live re-run: the
   joined device no longer appears as a lister. **What remains:** a node that joined as it is still
-  speaks for the identity it began and lists asks for it, named but not otherwise guarded; the
-  node cannot tell the person from its operator (row 6); a controller removed by another node's
+  speaks for the identity it began and lists asks for it, named but not otherwise guarded; a
+  controller removed by another node's
   successor authority keeps listing for up to the 30 s refresh (lists only; the agree path
   re-checks the authority).
 - **Signed in means the no-cookie fallback.** `epr device approve` on the approving node carried
@@ -240,6 +255,6 @@ and is never acted on by itself.
 ```
 Pick the highest row that a single slice can close end to end on an isolated stack: row 1's
 session-surface half (loopback-only session routes) first, then row 4 (supersedes), then design
-rows 3, 5, 6 and 7 through the p2p-design-gate before any zome change. Each row closes with its
+rows 3, 5 and 7 through the p2p-design-gate before any zome change. Each row closes with its
 probe passing live and a one-line delta here.
 ```

@@ -157,6 +157,34 @@ impl DeclaredIdentity {
     }
 }
 
+/// The word the person signs in with, for the identity this node holds, as
+/// a claim: what this node recorded when the identity was begun here
+/// (`recorded`), else the declaration's word when the declaration agrees with
+/// the identity. A word that is only the Human record's id is no word of the
+/// person's and is not returned.
+///
+/// It is shown wherever the person is named, and never used for a decision,
+/// a join or a comparison across namespaces. It lives on neither the Human
+/// record nor the DHT: a sign-in word may be an address, and the record is
+/// public.
+pub fn identifier_claim(
+    recorded: Option<&str>,
+    declared: Option<&DeclaredIdentity>,
+    existing: &ExistingIdentity,
+) -> Option<String> {
+    let plain = |w: &str| {
+        let w = w.trim();
+        (!w.is_empty() && w != existing.human_id && !w.chars().any(char::is_control))
+            .then(|| w.to_string())
+    };
+    recorded.and_then(plain).or_else(|| {
+        declared
+            .filter(|d| d.agrees_with(existing).is_ok())
+            .and_then(|d| d.identifier.as_deref())
+            .and_then(plain)
+    })
+}
+
 impl Declaration {
     /// The acts already agreed for `request` by declaration: the request's own
     /// acts, when it comes from a declared device's key and asks for no more
@@ -268,5 +296,28 @@ mod tests {
         assert_eq!(d.devices[0].acts, [RequestedAct::EnrollDevice]);
         let unknown = serde_json::json!({"identity": {"displayName": "M", "password": "x"}});
         assert!(serde_json::from_value::<Declaration>(unknown).is_err());
+    }
+
+    #[test]
+    fn the_sign_in_word_is_a_claim_read_back_from_what_the_node_recorded() {
+        let mut declared = identity();
+        declared.identifier = Some("matthew".into());
+        // What the node recorded at begin comes first.
+        assert_eq!(
+            identifier_claim(Some("mdowell"), Some(&declared), &existing()),
+            Some("mdowell".into())
+        );
+        // Else the declaration's word, when it agrees with the identity.
+        assert_eq!(
+            identifier_claim(None, Some(&declared), &existing()),
+            Some("matthew".into())
+        );
+        let mut other = declared.clone();
+        other.display_name = "Someone else".into();
+        assert_eq!(identifier_claim(None, Some(&other), &existing()), None);
+        // The Human record's id is no word of the person's.
+        assert_eq!(identifier_claim(Some("h-1"), None, &existing()), None);
+        assert_eq!(identifier_claim(Some("  "), None, &existing()), None);
+        assert_eq!(identifier_claim(None, None, &existing()), None);
     }
 }

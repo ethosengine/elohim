@@ -310,7 +310,7 @@ use hyper::body::Bytes;
 use hyper::{Response, StatusCode};
 use serde::Deserialize;
 
-use super::device_consent::{agree_request, refusal, ControllerCell, Refused};
+use super::device_consent::{agree_request, refusal, ControllerCell, IdentifierSource, Refused};
 use super::response;
 
 /// How the carrier reaches peers. The libp2p handle in production; a fake in
@@ -366,16 +366,20 @@ pub fn pending_list(link: Option<&dyn CarrierLink>, speaks: &Speaks) -> Response
 
 /// Read whom this node speaks for from its own cell into the carrier. A cell
 /// that cannot answer leaves the last read to age into unknown.
-pub async fn refresh_speaks(cell: &dyn ControllerCell) {
-    if let Some(speaks) = read_speaks(cell).await {
+pub async fn refresh_speaks(cell: &dyn ControllerCell, names: &dyn IdentifierSource) {
+    if let Some(speaks) = read_speaks(cell, names).await {
         carrier().set_speaks(speaks, now_micros());
     }
 }
 
 /// Whom this node speaks for, from its own cell: one standing read, and one
-/// read of its Human only when it is a controller. `None` when the cell
-/// cannot answer.
-pub async fn read_speaks(cell: &dyn ControllerCell) -> Option<Speaks> {
+/// read of its Human only when it is a controller, which `names` names by the
+/// person's sign-in word (a claim, shown only). `None` when the cell cannot
+/// answer.
+pub async fn read_speaks(
+    cell: &dyn ControllerCell,
+    names: &dyn IdentifierSource,
+) -> Option<Speaks> {
     use super::device_consent::CellStanding;
     let me = cell.agent();
     Some(match cell.standing().await {
@@ -385,7 +389,10 @@ pub async fn read_speaks(cell: &dyn ControllerCell) -> Option<Speaks> {
             } else {
                 None
             };
-            Speaks::of(Some(&standing), &me, person.as_ref())
+            let identifier = person
+                .as_ref()
+                .and_then(|p| super::device_consent::identifier_of(names, p, &me));
+            Speaks::of(Some(&standing), &me, person.as_ref(), identifier)
         }
         Ok(CellStanding::NoPerson | CellStanding::Unbootstrapped { .. }) => Speaks::Nobody,
         Err(why) => {
@@ -812,6 +819,7 @@ mod tests {
             Some(&standing),
             crate::services::device_consent::tests::CONTROLLER,
             None,
+            None,
         )
     }
 
@@ -875,12 +883,41 @@ mod tests {
         ));
     }
 
+    /// What a node recorded when its identity was begun: `matthew`.
+    struct Names;
+    impl IdentifierSource for Names {
+        fn recorded(&self, human_id: &str, _: &str) -> Option<String> {
+            (human_id == "h-1").then(|| "matthew".to_string())
+        }
+        fn declared(&self) -> Option<consent_grant::DeclaredIdentity> {
+            None
+        }
+    }
+
     #[tokio::test]
     async fn whom_a_node_speaks_for_is_read_from_its_own_cell() {
         use crate::services::device_consent::tests::{CONTROLLER, IDENTITY};
         let ready_cell = FakeCell::new(Ok(ready()));
-        let read = read_speaks(&ready_cell).await.unwrap();
+        // No Human to name: nobody's word is read.
+        let read = read_speaks(&ready_cell, &Names).await.unwrap();
         assert_eq!(read.person().unwrap().identity_root, IDENTITY);
+        assert_eq!(read.person().unwrap().identifier, None);
+        // With the node's own Human, the word it recorded names the person.
+        ready_cell
+            .humans
+            .lock()
+            .unwrap()
+            .push(crate::services::device_consent::NewHuman {
+                id: "h-1".into(),
+                display_name: "Matthew".into(),
+                profile_reach: "private".into(),
+            });
+        let named = read_speaks(&ready_cell, &Names).await.unwrap();
+        let person = named.person().unwrap();
+        assert_eq!(person.identifier.as_deref(), Some("matthew"));
+        assert!(named
+            .words()
+            .starts_with("An approval here is for matthew (Matthew),"));
         // The cell's key resolves to an identity whose authority does not name it.
         let joined = FakeCell::new(Ok(ConsentStanding::Ready(
             consent_grant::ControllerStanding {
@@ -892,13 +929,13 @@ mod tests {
             },
         )));
         assert_ne!(key(61), CONTROLLER);
-        assert_eq!(read_speaks(&joined).await, Some(Speaks::Nobody));
+        assert_eq!(read_speaks(&joined, &Names).await, Some(Speaks::Nobody));
         let none = FakeCell::new(Ok(ConsentStanding::NoPerson));
-        assert_eq!(read_speaks(&none).await, Some(Speaks::Nobody));
+        assert_eq!(read_speaks(&none, &Names).await, Some(Speaks::Nobody));
         let down = FakeCell::new(Err(
             crate::services::device_consent::CellFailure::Unavailable("down".into()),
         ));
-        assert_eq!(read_speaks(&down).await, None);
+        assert_eq!(read_speaks(&down, &Names).await, None);
     }
 
     #[tokio::test]

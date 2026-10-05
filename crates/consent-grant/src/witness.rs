@@ -1,70 +1,154 @@
-//! The witness beat: the one moment in the ceremony where someone other than
-//! the person and the device may attend.
+//! Witnessed moments, and the one this crate holds: authorizing a device.
 //!
-//! It falls after the controller has signed and before the code is issued. A
-//! peer attending the person (an elohim) will one day pause here, look at what
-//! is being agreed, add what it knows to the record's provenance and sign as a
-//! witness. Today nobody attends and the ceremony passes straight through.
+//! A witnessed moment is a point in a protocol flow where someone other than
+//! the parties may attend: an elohim attending the person, say. Such moments
+//! exist all over the protocol (a reach gate is another); this crate sets the
+//! default one at the sign-in and authorization floor. Every moment has the
+//! same shape:
 //!
-//! A witness strengthens a consent and never gates it. So the beat cannot
-//! fail the ceremony, cannot change what was agreed, and cannot remove or
-//! replace anyone else's signature: [`attend`] keeps only the witness
-//! signatures a beat adds.
+//! - it says what kind of moment it is ([`MomentKind`]);
+//! - it hands the attending witness the claims in front of it;
+//! - it takes back one outcome ([`Witnessing`]): proceed, proceed with the
+//!   witness's signatures, or pause for re-authentication.
+//!
+//! [`WitnessedMoment`] and [`Witnessing`] carry no consent types, so another
+//! moment can implement the same shape with its own claims and signature
+//! type. A shared home for witnessed moments is not designed; until it is,
+//! the shape lives here.
+//!
+//! The device-authorization moment falls after the person has agreed and
+//! before the controller signs, so it costs nothing when it stops the
+//! ceremony: no signature is made, no mandate grant is written and no code is
+//! issued. Its claims are the admitted request and the agreed consent
+//! ([`AuthorizationClaims`]).
+//!
+//! A witness never has to be present and adds no step for the person. A
+//! signed-in device acts with the person's authority, as in OAuth. What an
+//! attending witness may do is notice that something does not feel right and
+//! pause until the person signs in again; the host then refuses with a plain
+//! reason, and the person signs in and approves again. Otherwise a witness
+//! only strengthens a consent: it cannot change what was agreed and cannot
+//! remove or replace anyone else's signature, because [`attend`] keeps only
+//! the witness signatures it adds. Today nobody attends ([`Unattended`]), and
+//! the ceremony passes straight through.
 
-use crate::consent::{SignedConsent, SignerRole};
+use crate::consent::{ConsentSignature, SignedConsent, SignerRole};
 use crate::request::AdmittedRequest;
 
-/// Something that may witness a consent as it is given.
-///
-/// Implementations receive the admitted request and the controller-signed
-/// consent, and return the consent with any [`SignerRole::Witness`] signatures
-/// they add. They must not block the person: a witness that cannot attend
-/// returns the consent as it came.
-pub trait WitnessBeat: Send + Sync {
-    fn attend(&self, admitted: &AdmittedRequest, consent: SignedConsent) -> SignedConsent;
+/// The longest pause reason kept; a longer one is cut.
+pub const MAX_PAUSE_REASON: usize = 280;
+
+/// What kind of witnessed moment is attended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MomentKind {
+    /// A person's node authorizing a device to act for them.
+    DeviceAuthorization,
 }
 
-/// Nobody attends. The consent passes through unchanged, at once.
+/// What an attending witness returns from a moment. `S` is the moment's
+/// signature type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Witnessing<S> {
+    /// Go on, adding nothing.
+    Proceed,
+    /// Go on, with these signatures added as the witness's.
+    ProceedWithSignatures(Vec<S>),
+    /// Something does not feel right: pause until the person signs in again.
+    /// The reason is plain words for the person and the log.
+    PauseForReauthentication { reason: String },
+}
+
+/// Someone who may attend a witnessed moment whose claims are `C` and whose
+/// signatures are `S`. An implementation must not block the person: a
+/// witness that cannot attend returns [`Witnessing::Proceed`].
+pub trait WitnessedMoment<C: ?Sized, S>: Send + Sync {
+    fn attend(&self, kind: MomentKind, claims: &C) -> Witnessing<S>;
+}
+
+/// Nobody attends, at any moment: every moment proceeds at once and is never
+/// paused.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Unattended;
 
-impl WitnessBeat for Unattended {
-    fn attend(&self, _admitted: &AdmittedRequest, consent: SignedConsent) -> SignedConsent {
-        consent
+impl<C: ?Sized, S> WitnessedMoment<C, S> for Unattended {
+    fn attend(&self, _kind: MomentKind, _claims: &C) -> Witnessing<S> {
+        Witnessing::Proceed
     }
 }
 
-/// Run the beat, keeping from what it returns only new witness signatures on
-/// the same record. Anything else it returned is discarded, so a beat that
-/// misbehaves costs the consent nothing.
+/// The claims in front of the witness when a device is authorized: what the
+/// device asked, and what the person agreed, before the controller signs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorizationClaims {
+    pub admitted: AdmittedRequest,
+    pub consent: SignedConsent,
+}
+
+/// A witness of the device-authorization moment. Anything that implements
+/// [`WitnessedMoment`] for [`AuthorizationClaims`] and [`ConsentSignature`] is
+/// one.
+pub trait WitnessBeat: WitnessedMoment<AuthorizationClaims, ConsentSignature> {}
+
+impl<T: WitnessedMoment<AuthorizationClaims, ConsentSignature>> WitnessBeat for T {}
+
+/// The moment paused: the person is asked to sign in again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Paused {
+    /// Plain words: control characters dropped, at most [`MAX_PAUSE_REASON`]
+    /// characters, never empty.
+    pub reason: String,
+}
+
+/// Run the device-authorization moment. Keep only the witness signatures the
+/// beat adds, on the same record; a signature in any other role is discarded,
+/// so a beat that misbehaves costs the consent nothing. A pause comes back as
+/// [`Paused`], before anything is signed or issued.
 pub fn attend(
     beat: &dyn WitnessBeat,
     admitted: &AdmittedRequest,
     consent: SignedConsent,
-) -> SignedConsent {
-    let returned = beat.attend(admitted, consent.clone());
-    if returned.cid != consent.cid || returned.record != consent.record {
-        return consent;
-    }
-    let added: Vec<_> = returned
-        .signatures
+) -> Result<SignedConsent, Paused> {
+    let claims = AuthorizationClaims {
+        admitted: admitted.clone(),
+        consent,
+    };
+    let added = match beat.attend(MomentKind::DeviceAuthorization, &claims) {
+        Witnessing::Proceed => Vec::new(),
+        Witnessing::ProceedWithSignatures(signatures) => signatures,
+        Witnessing::PauseForReauthentication { reason } => {
+            let plain: String = reason
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(MAX_PAUSE_REASON)
+                .collect();
+            let plain = plain.trim();
+            return Err(Paused {
+                reason: if plain.is_empty() {
+                    "a witness asked for the person to sign in again".to_string()
+                } else {
+                    plain.to_string()
+                },
+            });
+        }
+    };
+    let consent = claims.consent;
+    let added: Vec<_> = added
         .into_iter()
         .filter(|s| s.role == SignerRole::Witness && !consent.signatures.contains(s))
         .collect();
-    added
+    Ok(added
         .into_iter()
-        .fold(consent, SignedConsent::with_signature)
+        .fold(consent, SignedConsent::with_signature))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::consent::tests::peer_record;
-    use crate::consent::ConsentSignature;
     use crate::hash_shape::sample_key;
     use crate::request::admit_request;
     use crate::request::tests::{peer_request, policy};
-    use crate::RequestedAct;
 
     fn admitted() -> AdmittedRequest {
         admit_request(&peer_request(), &policy()).unwrap()
@@ -78,49 +162,83 @@ mod tests {
         }
     }
 
-    fn signed() -> SignedConsent {
-        SignedConsent::new(peer_record())
-            .unwrap()
-            .with_signature(signature(SignerRole::Controller, 9))
+    /// The agreed consent, as the beat sees it: before the controller signs.
+    fn agreed() -> SignedConsent {
+        SignedConsent::new(peer_record()).unwrap()
     }
 
-    struct Beat<F: Fn(SignedConsent) -> SignedConsent + Send + Sync>(F);
-    impl<F: Fn(SignedConsent) -> SignedConsent + Send + Sync> WitnessBeat for Beat<F> {
-        fn attend(&self, _: &AdmittedRequest, consent: SignedConsent) -> SignedConsent {
-            (self.0)(consent)
+    struct Answers(Witnessing<ConsentSignature>);
+    impl WitnessedMoment<AuthorizationClaims, ConsentSignature> for Answers {
+        fn attend(
+            &self,
+            kind: MomentKind,
+            claims: &AuthorizationClaims,
+        ) -> Witnessing<ConsentSignature> {
+            assert_eq!(kind, MomentKind::DeviceAuthorization);
+            assert_eq!(claims.consent.cid, agreed().cid);
+            self.0.clone()
         }
     }
 
-    #[test]
-    fn by_default_nobody_attends_and_nothing_is_added() {
-        let out = attend(&Unattended, &admitted(), signed());
-        assert_eq!(out, signed());
-        assert_eq!(out.signed_in(SignerRole::Witness), 0);
+    fn pauses(reason: &str) -> Answers {
+        Answers(Witnessing::PauseForReauthentication {
+            reason: reason.to_string(),
+        })
     }
 
     #[test]
-    fn a_witness_adds_its_signature_after_the_controllers() {
-        let beat = Beat(|c: SignedConsent| c.with_signature(signature(SignerRole::Witness, 5)));
-        let out = attend(&beat, &admitted(), signed());
-        assert_eq!(out.signatures.len(), 2);
-        assert_eq!(out.signatures[0].role, SignerRole::Controller);
-        assert_eq!(out.signatures[1], signature(SignerRole::Witness, 5));
+    fn by_default_nobody_attends_nothing_is_added_and_nothing_pauses() {
+        let out = attend(&Unattended, &admitted(), agreed()).unwrap();
+        assert_eq!(out, agreed());
+        assert_eq!(out.signed_in(SignerRole::Witness), 0);
+        // The default attends any moment, with any claims, the same way.
+        let other: Witnessing<u8> = WitnessedMoment::<str, u8>::attend(
+            &Unattended,
+            MomentKind::DeviceAuthorization,
+            "any claims",
+        );
+        assert_eq!(other, Witnessing::Proceed);
+    }
+
+    #[test]
+    fn a_witness_adds_only_its_own_signatures() {
+        let beat = Answers(Witnessing::ProceedWithSignatures(vec![
+            signature(SignerRole::Witness, 5),
+            signature(SignerRole::Controller, 6),
+            signature(SignerRole::Device, 7),
+        ]));
+        let out = attend(&beat, &admitted(), agreed()).unwrap();
+        assert_eq!(out.signatures, vec![signature(SignerRole::Witness, 5)]);
+        assert_eq!(out.record, agreed().record);
         assert!(out.address_holds());
     }
 
     #[test]
-    fn a_beat_cannot_change_the_record_or_anyone_elses_signature() {
-        let rewrites = Beat(|mut c: SignedConsent| {
-            c.record.agreed_acts = vec![RequestedAct::EnrollDevice];
-            c.with_signature(signature(SignerRole::Witness, 5))
-        });
-        assert_eq!(attend(&rewrites, &admitted(), signed()), signed());
-
-        let strips = Beat(|mut c: SignedConsent| {
-            c.signatures.clear();
-            c.with_signature(signature(SignerRole::Controller, 6))
-                .with_signature(signature(SignerRole::Device, 7))
-        });
-        assert_eq!(attend(&strips, &admitted(), signed()), signed());
+    fn an_attending_witness_may_pause_with_a_plain_reason() {
+        assert_eq!(
+            attend(
+                &pauses("this is not how they usually sign in"),
+                &admitted(),
+                agreed()
+            ),
+            Err(Paused {
+                reason: "this is not how they usually sign in".into()
+            })
+        );
+        assert_eq!(
+            attend(&pauses("\u{7}  "), &admitted(), agreed())
+                .unwrap_err()
+                .reason,
+            "a witness asked for the person to sign in again"
+        );
+        let long = "x".repeat(MAX_PAUSE_REASON + 50);
+        assert_eq!(
+            attend(&pauses(&long), &admitted(), agreed())
+                .unwrap_err()
+                .reason
+                .chars()
+                .count(),
+            MAX_PAUSE_REASON
+        );
     }
 }

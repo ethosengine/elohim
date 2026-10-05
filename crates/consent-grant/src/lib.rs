@@ -8,8 +8,9 @@
 //! ```text
 //! terminal                     portal (controller signed in)
 //!   GrantRequest  ───────────▶ admit_request
-//!   (keeps the verifier)       consent screen ─ controller's cell signs
-//!                              ConsentRecord::agree ─ witness beat ─ issue
+//!   (keeps the verifier)       consent screen
+//!                              ConsentRecord::agree ─ witness beat
+//!                              (may pause) ─ controller's cell signs ─ issue
 //!   ◀── loopback redirect, or the person pastes `code#state`
 //!   Redemption    ───────────▶ admit_redemption ─▶ the record, its signatures
 //!                                                  and the signed enrollment
@@ -78,8 +79,8 @@ pub use decide::{
     OWN_IDENTITY_REASON,
 };
 pub use declaration::{
-    Declaration, DeclarationConflict, DeclaredAsking, DeclaredDevice, DeclaredIdentity,
-    ExistingIdentity,
+    identifier_claim, Declaration, DeclarationConflict, DeclaredAsking, DeclaredDevice,
+    DeclaredIdentity, ExistingIdentity,
 };
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
@@ -92,7 +93,10 @@ pub use pending::{
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
 pub use verify::{check_delivered, DeliveredRefusal};
-pub use witness::{attend, Unattended, WitnessBeat};
+pub use witness::{
+    attend, AuthorizationClaims, MomentKind, Paused, Unattended, WitnessBeat, WitnessedMoment,
+    Witnessing, MAX_PAUSE_REASON,
+};
 
 /// Version tag every request names. A portal refuses a request for a version
 /// it does not implement, so the two sides never guess at each other's rules.

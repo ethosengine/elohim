@@ -15,9 +15,10 @@
 //! Three routes:
 //!
 //! - `view`: what the consent screen shows. Reads nothing.
-//! - `agree`: the person, signed in on this node, agrees. This node's own cell
-//!   signs as the controller ([`ControllerCell`]), the witness beat runs, and a
-//!   one-time code is held for the terminal.
+//! - `agree`: the person, signed in on this node, agrees. The witness beat
+//!   runs (an attending witness may pause and ask the person to sign in
+//!   again), this node's own cell signs as the controller ([`ControllerCell`]),
+//!   and a one-time code is held for the terminal.
 //! - `redeem`: the terminal collects the signed consent and the signed
 //!   enrollment it completes on its own cell.
 //!
@@ -259,6 +260,57 @@ pub trait ControllerCell: Send + Sync {
     async fn my_human(&self) -> Result<Option<consent_grant::ExistingIdentity>, CellFailure>;
 }
 
+/// Where this node reads back the word its person signs in with, for
+/// [`consent_grant::identifier_claim`]. The word is not on the Human record
+/// (a sign-in word may be an address, and the record is public), so the node
+/// reads what it recorded itself when the identity was begun here, and the
+/// identity declaration on its disk.
+pub trait IdentifierSource: Send + Sync {
+    /// The word this node recorded when `human_id`'s identity was begun on it
+    /// under `agent`.
+    fn recorded(&self, human_id: &str, agent: &str) -> Option<String>;
+    /// The identity this node's declaration names, if any.
+    fn declared(&self) -> Option<consent_grant::DeclaredIdentity>;
+}
+
+/// No source: the person is named without a sign-in word.
+pub struct NoIdentifier;
+
+impl IdentifierSource for NoIdentifier {
+    fn recorded(&self, _: &str, _: &str) -> Option<String> {
+        None
+    }
+    fn declared(&self) -> Option<consent_grant::DeclaredIdentity> {
+        None
+    }
+}
+
+/// The person's sign-in word, as a claim to show.
+pub fn identifier_of(
+    names: &dyn IdentifierSource,
+    human: &consent_grant::ExistingIdentity,
+    agent: &str,
+) -> Option<String> {
+    consent_grant::identifier_claim(
+        names.recorded(&human.human_id, agent).as_deref(),
+        names.declared().as_ref(),
+        human,
+    )
+}
+
+/// `view` naming the person by their sign-in word, when one can be read.
+async fn named(
+    view: StandingView,
+    cell: &dyn ControllerCell,
+    names: &dyn IdentifierSource,
+) -> StandingView {
+    let identifier = match cell.my_human().await {
+        Ok(Some(human)) => identifier_of(names, &human, &cell.agent()),
+        _ => None,
+    };
+    view.with_identifier(identifier)
+}
+
 /// What a person supplies to begin their identity: the minimum the imagodei
 /// `create_human` extern requires.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -362,8 +414,8 @@ fn not_signed_in_to_approve() -> Response<Full<Bytes>> {
 }
 
 /// The agree step for a request already read: admit it, check this node may
-/// agree for its person, record the agreement, have the cell sign, let the
-/// witness beat attend, and hold the code. Shared by the agree route and by
+/// agree for its person, record the agreement, let the witness beat attend,
+/// have the cell sign, and hold the code. Shared by the agree route and by
 /// deciding a pending ask, so both go through exactly one path.
 pub async fn agree_request(
     store: &MemoryStore,
@@ -451,6 +503,7 @@ fn not_signed_in() -> Response<Full<Bytes>> {
 /// What the signed-in person's identity rests on. Reads only.
 pub async fn identity_standing(
     cell: Option<&dyn ControllerCell>,
+    names: &dyn IdentifierSource,
     signed_in: bool,
 ) -> Response<Full<Bytes>> {
     if !signed_in {
@@ -460,7 +513,9 @@ pub async fn identity_standing(
         return unavailable("no conductor client");
     };
     match ready_standing(cell).await {
-        Ok(standing) => response::ok(&StandingView::of(&standing, &cell.agent())),
+        Ok(standing) => {
+            response::ok(&named(StandingView::of(&standing, &cell.agent()), cell, names).await)
+        }
         Err(refused) => *refused,
     }
 }
@@ -474,6 +529,7 @@ pub async fn identity_standing(
 /// cell's chain) and the new standing is returned.
 pub async fn bootstrap_identity(
     cell: Option<&dyn ControllerCell>,
+    names: &dyn IdentifierSource,
     signed_in: bool,
 ) -> Response<Full<Bytes>> {
     if !signed_in {
@@ -484,7 +540,9 @@ pub async fn bootstrap_identity(
     };
     let identity_root = match cell.standing().await {
         Ok(CellStanding::Ready(standing)) => {
-            return response::ok(&StandingView::of(&standing, &cell.agent()))
+            return response::ok(
+                &named(StandingView::of(&standing, &cell.agent()), cell, names).await,
+            )
         }
         Ok(CellStanding::NoPerson) => return no_person(),
         Ok(CellStanding::Unbootstrapped { identity_root }) => identity_root,
@@ -496,7 +554,7 @@ pub async fn bootstrap_identity(
     match ready_standing(cell).await {
         Ok(standing) => response::json_response(
             StatusCode::CREATED,
-            &StandingView::of(&standing, &cell.agent()),
+            &named(StandingView::of(&standing, &cell.agent()), cell, names).await,
         ),
         Err(refused) => *refused,
     }
@@ -609,8 +667,10 @@ pub async fn begin_with(
         authority_created = true;
     }
     let ready = ready_standing(cell).await?;
+    // The word given here, as the claim it is: not the record's id.
+    let word = (identifier != id).then(|| identifier.clone());
     Ok(Begun {
-        standing: StandingView::of(&ready, &cell.agent()),
+        standing: StandingView::of(&ready, &cell.agent()).with_identifier(word),
         human_id: id,
         identifier,
         display_name: name,
@@ -729,7 +789,27 @@ pub async fn device_enroll(cell: Option<&dyn DeviceCell>, body: &[u8]) -> Respon
     }
 }
 
-/// Have the controller sign, let the witness beat attend, and hold the result.
+/// The refusal when a witness beat pauses: the person is asked to sign in
+/// again. Nothing was signed and no code was issued.
+pub(crate) fn reauthentication_asked(reason: &str) -> Response<Full<Bytes>> {
+    response::json_response(
+        StatusCode::UNAUTHORIZED,
+        &serde_json::json!({
+            "error": "a witness attending you asked you to sign in again; sign in, then approve \
+                      again. Nothing was signed and no code was issued.",
+            "code": "consent_reauthentication_asked",
+            "reason": reason,
+        }),
+    )
+}
+
+/// Let the witness beat attend, have the controller sign, and hold the
+/// result.
+///
+/// The beat runs first, on the agreed record: a witness looks at what is
+/// agreed, which needs no signature, so a pause costs nothing. When it
+/// pauses, the controller has not signed, no mandate grant was written to the
+/// chain, and no code is issued or held.
 async fn sign_and_issue(
     store: &MemoryStore,
     cell: &dyn ControllerCell,
@@ -739,6 +819,17 @@ async fn sign_and_issue(
     signer: &str,
     now_micros: i64,
 ) -> Result<(consent_grant::Held, consent_grant::ReturnTarget), Refused> {
+    let consent = match attend(beat, admitted, consent) {
+        Ok(consent) => consent,
+        Err(consent_grant::Paused { reason }) => {
+            warn!(
+                device = %admitted.device_fingerprint(),
+                reason,
+                "device consent: the witness beat paused; the person is asked to sign in again"
+            );
+            return Err(Box::new(reauthentication_asked(&reason)));
+        }
+    };
     let intent = EnrollmentIntent::agreed_in(&consent.record);
     let approval = ApprovalRequest {
         consent_cid: consent.cid.clone(),
@@ -764,7 +855,6 @@ async fn sign_and_issue(
         intent,
         controllers: proofs.enrollment.into_iter().collect(),
     });
-    let consent = attend(beat, admitted, consent);
     let code = draw_code().map_err(|e| Box::new(response::internal_error(&e.to_string())))?;
     // bounded-work: see `redeem_code`.
     store.sweep(now_micros);
@@ -1035,11 +1125,12 @@ pub(crate) mod tests {
         let cell = FakeCell::new(Ok(CellStanding::Unbootstrapped {
             identity_root: IDENTITY.into(),
         }));
-        let (status, refused) = json(identity_standing(Some(&cell), true).await).await;
+        let (status, refused) =
+            json(identity_standing(Some(&cell), &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(refused["code"], "consent_identity_unbootstrapped");
 
-        let (status, view) = json(bootstrap_identity(Some(&cell), true).await).await;
+        let (status, view) = json(bootstrap_identity(Some(&cell), &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::CREATED, "{view}");
         assert_eq!(view["identityRoot"], IDENTITY);
         assert_eq!(view["authority"], AUTHORITY);
@@ -1048,12 +1139,13 @@ pub(crate) mod tests {
         assert_eq!(view["restsOnThisNodeAlone"], true);
         assert_eq!(cell.bootstraps.lock().unwrap().as_slice(), [IDENTITY]);
 
-        let (status, again) = json(bootstrap_identity(Some(&cell), true).await).await;
+        let (status, again) =
+            json(bootstrap_identity(Some(&cell), &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(again, view);
         assert_eq!(cell.bootstraps.lock().unwrap().len(), 1);
 
-        let (status, read) = json(identity_standing(Some(&cell), true).await).await;
+        let (status, read) = json(identity_standing(Some(&cell), &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(read, view);
     }
@@ -1118,20 +1210,21 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn an_identity_cannot_begin_for_nobody_or_for_a_stranger() {
         let cell = FakeCell::new(Ok(CellStanding::NoPerson));
-        let (status, refused) = json(bootstrap_identity(Some(&cell), true).await).await;
+        let (status, refused) =
+            json(bootstrap_identity(Some(&cell), &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(refused["code"], "consent_identity_unbootstrapped");
         assert!(cell.bootstraps.lock().unwrap().is_empty());
 
         for response in [
-            bootstrap_identity(Some(&cell), false).await,
-            identity_standing(Some(&cell), false).await,
+            bootstrap_identity(Some(&cell), &NoIdentifier, false).await,
+            identity_standing(Some(&cell), &NoIdentifier, false).await,
         ] {
             let (status, refused) = json(response).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED);
             assert_eq!(refused["code"], "consent_not_signed_in");
         }
-        let (status, refused) = json(identity_standing(None, true).await).await;
+        let (status, refused) = json(identity_standing(None, &NoIdentifier, true).await).await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(refused["code"], "consent_signing_unavailable");
     }
@@ -1330,6 +1423,46 @@ pub(crate) mod tests {
             "enrollment-sig"
         );
         assert_eq!(delivered["enrollment"]["intent"]["identityRoot"], IDENTITY);
+    }
+
+    /// A witness that notices something is off.
+    struct Pauses;
+    impl consent_grant::WitnessedMoment<consent_grant::AuthorizationClaims, ConsentSignature>
+        for Pauses
+    {
+        fn attend(
+            &self,
+            _: consent_grant::MomentKind,
+            _: &consent_grant::AuthorizationClaims,
+        ) -> consent_grant::Witnessing<ConsentSignature> {
+            consent_grant::Witnessing::PauseForReauthentication {
+                reason: "this is not how they usually approve a device".into(),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_pausing_witness_asks_for_sign_in_before_anything_is_signed_or_issued() {
+        let store = MemoryStore::new();
+        let cell = FakeCell::new(Ok(ready()));
+        let body = agree_body(&request(), &["device.enroll"]);
+        let (status, refused) =
+            json(agree(&store, Some(&cell), &Pauses, true, &body, NOW).await).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{refused}");
+        assert_eq!(refused["code"], "consent_reauthentication_asked");
+        assert_eq!(
+            refused["reason"],
+            "this is not how they usually approve a device"
+        );
+        assert!(refused["error"].as_str().unwrap().contains("sign in"));
+        // No code is held, and the controller was never asked to sign (so no
+        // mandate grant was written either).
+        assert!(store.is_empty());
+        assert!(cell.asked.lock().unwrap().is_empty());
+        // The default never pauses.
+        let (status, _) = agree_with(&store, &cell, &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(store.len(), 1);
     }
 
     #[tokio::test]

@@ -14,10 +14,11 @@
 //!   for a node with no identity of its own whose key the person declared,
 //!   asking no more than the declared acts.
 //! - [`ByAnswer`]: an answer given at the approving node, from its terminal or
-//!   its portal, taken as the person's. The node cannot tell whether whoever
-//!   answers on its own machine is that person or whoever operates the
-//!   machine; that gap is recorded in the device-recognition backlog cluster
-//!   and is not settled here.
+//!   its portal, taken as the person's. A signed-in device acts with the
+//!   person's authority, as in OAuth; the person is not asked for proof on
+//!   each act. Noticing that something is off, and asking the person to sign
+//!   in again, is a witness's job at the witnessed moment
+//!   ([`crate::witness`]).
 //!
 //! A decision is not a signature. Agreeing still happens on the deciding
 //! node's own machine, through the agree path and its rules.

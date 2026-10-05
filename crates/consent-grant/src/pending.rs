@@ -98,6 +98,10 @@ impl NodeState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpeaksFor {
+    /// The word the person signs in with: a claim, shown only, never used to
+    /// decide or join ([`crate::declaration::identifier_claim`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
     /// The id of the person's Human record, when it can be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_id: Option<String>,
@@ -128,14 +132,17 @@ impl Speaks {
     /// From what this node's own cell says. `standing` is the authority of the
     /// identity the cell's agent resolves to, when it has one; `person` is the
     /// cell's own Human record. Only an authority that names `me` as a
-    /// controller makes this node speak for anyone.
+    /// controller makes this node speak for anyone. `identifier` is the
+    /// person's sign-in word, shown and never compared.
     pub fn of(
         standing: Option<&ControllerStanding>,
         me: &str,
         person: Option<&ExistingIdentity>,
+        identifier: Option<String>,
     ) -> Self {
         match standing {
             Some(s) if s.controllers.iter().any(|k| k == me) => Self::Person(SpeaksFor {
+                identifier,
                 human_id: person.map(|p| p.human_id.clone()),
                 display_name: person.map(|p| p.display_name.clone()),
                 identity_root: s.identity_root.clone(),
@@ -156,11 +163,14 @@ impl Speaks {
     pub fn words(&self) -> String {
         match self {
             Self::Person(p) => {
-                let who = match (&p.display_name, &p.human_id) {
-                    (Some(name), Some(id)) => format!("{name} ({id})"),
-                    (Some(name), None) => name.clone(),
-                    (None, Some(id)) => id.clone(),
-                    (None, None) => "a person".to_string(),
+                // The sign-in word leads; the record id only when nothing
+                // else names the person.
+                let who = match (&p.identifier, &p.display_name, &p.human_id) {
+                    (Some(word), Some(name), _) if word != name => format!("{word} ({name})"),
+                    (Some(word), _, _) => word.clone(),
+                    (None, Some(name), _) => name.clone(),
+                    (None, None, Some(id)) => id.clone(),
+                    (None, None, None) => "a person".to_string(),
                 };
                 format!(
                     "An approval here is for {who}, identity {}.",
@@ -426,6 +436,7 @@ pub(crate) mod tests {
             Some(&standing(&[sample_key(9)])),
             &sample_key(9),
             Some(&person()),
+            Some("matthew".into()),
         )
     }
 
@@ -441,7 +452,7 @@ pub(crate) mod tests {
 
     fn person() -> ExistingIdentity {
         ExistingIdentity {
-            human_id: "matthew".into(),
+            human_id: "h-4c1d".into(),
             display_name: "Matthew".into(),
             profile_reach: "private".into(),
         }
@@ -657,20 +668,43 @@ pub(crate) mod tests {
             Some(&standing(std::slice::from_ref(&me))),
             &me,
             Some(&person()),
+            Some("matthew".into()),
         );
         let p = mine.person().expect("speaks for a person");
         assert_eq!(p.identity_root, sample_action(1));
         assert_eq!(p.identity_fingerprint, fingerprint(&sample_action(1)));
-        assert_eq!(p.human_id.as_deref(), Some("matthew"));
-        assert!(mine.words().contains("Matthew (matthew)"));
+        assert_eq!(p.human_id.as_deref(), Some("h-4c1d"));
+        // The sign-in word leads, the name follows, the record id stays out.
+        assert_eq!(
+            mine.words(),
+            format!(
+                "An approval here is for matthew (Matthew), identity {}.",
+                fingerprint(&sample_action(1))
+            )
+        );
+        assert!(!mine.words().contains("h-4c1d"));
+        // No word recorded: the name alone. No name either: the record id.
+        let unnamed = Speaks::of(
+            Some(&standing(std::slice::from_ref(&me))),
+            &me,
+            Some(&person()),
+            None,
+        );
+        assert!(unnamed
+            .words()
+            .starts_with("An approval here is for Matthew,"));
+        let bare = Speaks::of(Some(&standing(std::slice::from_ref(&me))), &me, None, None);
+        assert!(bare
+            .words()
+            .starts_with("An approval here is for a person,"));
         // A joined device: its key resolves to the person's identity, whose
         // authority does not name it.
         assert_eq!(
-            Speaks::of(Some(&standing(&[sample_key(3)])), &me, None),
+            Speaks::of(Some(&standing(&[sample_key(3)])), &me, None, None),
             Speaks::Nobody
         );
         // No identity at all.
-        assert_eq!(Speaks::of(None, &me, None), Speaks::Nobody);
+        assert_eq!(Speaks::of(None, &me, None, None), Speaks::Nobody);
         assert!(Speaks::Nobody.words().contains("speaks for nobody"));
     }
 
@@ -684,7 +718,8 @@ pub(crate) mod tests {
         assert_eq!(
             json["forIdentity"],
             serde_json::json!({
-                "humanId": "matthew",
+                "identifier": "matthew",
+                "humanId": "h-4c1d",
                 "displayName": "Matthew",
                 "identityRoot": sample_action(1),
                 "identityFingerprint": fingerprint(&sample_action(1)),

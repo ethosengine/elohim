@@ -14,10 +14,13 @@
 //!
 //! Signing happens between steps 1 and 2 and belongs to the host, because only
 //! the host can reach the controller's key. The host builds the record with
-//! [`ConsentRecord::agree`] and has the controller sign its
-//! [`consent_message`](crate::consent::consent_message) and, when enrolling was
-//! agreed, the [`EnrollmentIntent`] derived from it. It then runs the witness
-//! beat ([`crate::witness::attend`]) and passes the result to [`issue`].
+//! [`ConsentRecord::agree`] and runs the witness beat
+//! ([`crate::witness::attend`]) on it first: a beat that pauses stops the
+//! ceremony there, before anything is signed or issued, and the person is
+//! asked to sign in again. Otherwise the host has the controller sign the
+//! record's [`consent_message`](crate::consent::consent_message) and, when
+//! enrolling was agreed, the [`EnrollmentIntent`] derived from it, and passes
+//! the result to [`issue`].
 //!
 //! One controller's signature is enough to issue. An identity with several
 //! controllers may have the others affirm the device later; the ceremony never

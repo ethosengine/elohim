@@ -353,7 +353,7 @@ decisionPoints:
     sourceLocation:
       file: src/pending.rs
       modulePath: consent_grant::pending::PendingAsks::admit
-      line: 282
+      line: 292
     summary: >
       Decides whether an ask that arrived over the private network is put on the approving
       node's list: this node must speak for a person (`Speaks::Person`; a node that speaks for
@@ -419,7 +419,7 @@ decisionPoints:
     sourceLocation:
       file: src/decide.rs
       modulePath: consent_grant::decide::decide
-      line: 133
+      line: 134
     summary: >
       Decides a listed ask for the person through interchangeable deciders, in order: an elohim
       attending them (`NoElohimAttending` by default, which always defers), the person's
@@ -444,10 +444,12 @@ decisionPoints:
           A node with an identity of its own is never agreed by declaration; it defers to whoever
           answers, who may only join it as it is.
       - id: C13
-        status: partial
+        status: answered
         justification: >
-          The answer is taken as the person's. The node cannot tell the person from whoever
-          operates the machine; that missing node is row 6 of the device-recognition cluster.
+          The answer is taken as the person's: a signed-in device acts with the person's
+          authority, as in OAuth. Noticing that something is off is the witness's job at the
+          witnessed moment (`attend`), which may pause for re-authentication; the person is not
+          asked for proof on each act.
       - id: C14
         status: answered
         justification: When every decider defers, the residual is returned, never guessed.
@@ -496,7 +498,7 @@ decisionPoints:
     sourceLocation:
       file: src/pending.rs
       modulePath: consent_grant::pending::Speaks::of
-      line: 132
+      line: 137
     summary: >
       Decides whether this node may approve devices for anyone, and for whom: only when the
       authority of the identity its cell resolves to names this node among its controllers. A
@@ -524,14 +526,88 @@ decisionPoints:
           Whom an approval would be for is shown with every ask, by the person's Human id, name
           and identity fingerprint.
       - id: C13
-        status: partial
+        status: answered
         justification: >
-          The roles stay apart (whose, who operates, whether it may approve), but the node still
-          cannot tell the person from its operator; backlog row 6.
+          The roles stay apart (whose, who operates, whether it may approve). The person is named
+          by their sign-in word, a claim shown and never compared.
     contractTests:
       - path: crates/consent-grant/src/pending.rs
         testName: a_node_speaks_only_for_the_identity_whose_authority_names_it
         kind: unit
       - path: crates/consent-grant/src/pending.rs
         testName: the_view_names_whose_identity_an_approval_is_for
+        kind: unit
+
+  - name: attend
+    kind: verdict-fn
+    sourceLocation:
+      file: src/witness.rs
+      modulePath: consent_grant::witness::attend
+      line: 107
+    summary: >
+      The device-authorization witnessed moment, one witnessed moment among many (a reach gate is
+      another; a shared home for them is not designed). It names its kind
+      (`MomentKind::DeviceAuthorization`), hands the attending witness the claims in front of it
+      (`AuthorizationClaims`: the admitted request and the agreed consent), and takes back one
+      outcome (`Witnessing`: proceed, proceed with witness signatures, or pause for
+      re-authentication with a plain reason). It runs after the person agreed and before the
+      controller signs, so a pause costs no signature, no mandate grant and no code.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A witness never has to be present and adds no step for the person; nobody attends by
+          default (`Unattended` always proceeds). It cannot change what was agreed: only witness
+          signatures it returns are kept.
+      - id: C4
+        status: answered
+        justification: >
+          Proceed, proceed with signatures and pause are distinct; a pause's reason is made
+          plain (no control characters, bounded, never empty) and the host refuses 401
+          consent_reauthentication_asked.
+      - id: C6a
+        status: answered
+        justification: The pause reason is cut to MAX_PAUSE_REASON characters.
+      - id: C13
+        status: answered
+        justification: >
+          A signed-in device acts with the person's authority, as in OAuth; noticing something
+          off is the witness's job here, by pausing until the person signs in again.
+    contractTests:
+      - path: crates/consent-grant/src/witness.rs
+        testName: by_default_nobody_attends_nothing_is_added_and_nothing_pauses
+        kind: unit
+      - path: crates/consent-grant/src/witness.rs
+        testName: a_witness_adds_only_its_own_signatures
+        kind: unit
+      - path: crates/consent-grant/src/witness.rs
+        testName: an_attending_witness_may_pause_with_a_plain_reason
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_consent.rs
+        testName: a_pausing_witness_asks_for_sign_in_before_anything_is_signed_or_issued
+        kind: unit
+
+  - name: identifier_claim
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/declaration.rs
+      modulePath: consent_grant::declaration::identifier_claim
+      line: 170
+    summary: >
+      The person's sign-in word, as a claim to show: what this node recorded when the identity
+      was begun here, else the identity declaration's word when it agrees with the identity. A
+      word that is only the Human record's id is not returned. Shown wherever the person is
+      named; never used for a decision, a join or a comparison across namespaces.
+    concernIds:
+      - id: C5
+        status: partial
+        justification: >
+          A claim, read back from what the node itself recorded (its session) or declared; it has
+          no durable home on the identity side yet (backlog row 6, "the sign-in word").
+      - id: C12
+        status: answered
+        justification: The person is named by the word they chose, never by a record id when a word exists.
+    contractTests:
+      - path: crates/consent-grant/src/declaration.rs
+        testName: the_sign_in_word_is_a_claim_read_back_from_what_the_node_recorded
         kind: unit

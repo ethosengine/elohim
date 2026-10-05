@@ -11,11 +11,11 @@
 //! Three roles stay apart here. Whose node it is: the person it speaks for.
 //! Who operates it: whoever runs the machine. Whether it may approve other
 //! nodes: it is one of the controllers the person's authority names. Approving
-//! a device is an act for the person's identity, so it is the person's. This
-//! terminal cannot tell whether the one typing is that person or whoever
-//! operates the machine: the loopback rule trusts the machine, not a person.
-//! That gap is recorded in the device-recognition backlog cluster, not
-//! papered over here.
+//! a device is an act for the person's identity, so it is the person's. A
+//! signed-in node acts with the person's authority, as in OAuth: this
+//! terminal does not ask the person for proof on each act. A witness
+//! attending the person may notice that something is off and pause until they
+//! sign in again; the node then says so.
 //!
 //! The rules are the node's and `consent_grant`'s. This module shows what is
 //! asked, asks for the answer, and reports what the node answered.
@@ -225,6 +225,14 @@ pub(crate) fn declared_approvals_words(declared: usize, required: usize) -> Opti
 /// What an identity rests on, in plain words.
 pub(crate) fn standing_words(s: &StandingView) -> Vec<String> {
     let mut lines = Vec::new();
+    // The sign-in word is a claim about who this is, and leads.
+    if let Some(word) = &s.identifier {
+        lines.push(format!(
+            "{word}: identity {}, authority {}.",
+            consent_grant::hash_shape::fingerprint(&s.identity_root),
+            consent_grant::hash_shape::fingerprint(&s.authority)
+        ));
+    }
     if s.rests_on_this_node_alone {
         lines.push("Your identity rests on this node alone.".to_string());
     } else {
@@ -248,11 +256,13 @@ pub(crate) fn standing_words(s: &StandingView) -> Vec<String> {
             s.required
         )
     });
-    lines.push(format!(
-        "Identity {}, authority {}.",
-        consent_grant::hash_shape::fingerprint(&s.identity_root),
-        consent_grant::hash_shape::fingerprint(&s.authority)
-    ));
+    if s.identifier.is_none() {
+        lines.push(format!(
+            "Identity {}, authority {}.",
+            consent_grant::hash_shape::fingerprint(&s.identity_root),
+            consent_grant::hash_shape::fingerprint(&s.authority)
+        ));
+    }
     lines
 }
 
@@ -952,15 +962,17 @@ mod tests {
         assert_eq!(lines.len(), 3);
         let mut joined = view.clone();
         joined.for_identity = Some(consent_grant::SpeaksFor {
-            human_id: Some("matthew".into()),
+            identifier: Some("matthew".into()),
+            human_id: Some("88989d47-8a64-4357-ace2-e7f251f437e4".into()),
             display_name: Some("Matthew".into()),
             identity_root: "uhCkkzY_ZvJaVbaFzi46J_LbGgFEUEQVMlWN5rpSdxGYdOG_3sQYp".into(),
             identity_fingerprint: "uhCkkzY_Z…_3sQYp".into(),
         });
         assert_eq!(
             pending_lines(&joined)[3],
-            "     An approval here is for Matthew (matthew), identity uhCkkzY_Z…_3sQYp."
+            "     An approval here is for matthew (Matthew), identity uhCkkzY_Z…_3sQYp."
         );
+        assert!(!pending_lines(&joined)[3].contains("88989d47"));
     }
 
     #[test]
@@ -1061,6 +1073,7 @@ mod tests {
             required,
             this_node_is_controller: true,
             rests_on_this_node_alone: alone,
+            identifier: None,
         }
     }
 
@@ -1102,6 +1115,14 @@ mod tests {
             shared[1],
             "Approving a new device needs 2 of the nodes that speak for you."
         );
+        assert!(alone[2].starts_with("Identity uhCkkRrEN"));
+        // A sign-in word leads, as the claim it is.
+        let named = standing_words(&view(true, 1, 1).with_identifier(Some("matthew".into())));
+        assert_eq!(
+            named[0],
+            "matthew: identity uhCkkRrEN…kkM39j, authority uhCkkN_k9…WHA5_-."
+        );
+        assert_eq!(named.len(), 3);
     }
 
     #[test]

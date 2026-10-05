@@ -47,6 +47,10 @@ pub struct StandingView {
     pub this_node_is_controller: bool,
     /// Whether the node answering is the only controller.
     pub rests_on_this_node_alone: bool,
+    /// The word the person signs in with: a claim, shown only
+    /// ([`crate::declaration::identifier_claim`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
 }
 
 impl StandingView {
@@ -61,7 +65,14 @@ impl StandingView {
             required: standing.required,
             this_node_is_controller,
             rests_on_this_node_alone: this_node_is_controller && standing.controllers.len() == 1,
+            identifier: None,
         }
+    }
+
+    /// The same view, naming the person by their sign-in word.
+    pub fn with_identifier(mut self, identifier: Option<String>) -> Self {
+        self.identifier = identifier;
+        self
     }
 }
 
@@ -151,6 +162,12 @@ mod tests {
         assert!(shared.this_node_is_controller && !shared.rests_on_this_node_alone);
         let elsewhere = StandingView::of(&alone, &sample_key(3));
         assert!(!elsewhere.this_node_is_controller && !elsewhere.rests_on_this_node_alone);
+        assert_eq!(serde_json::to_value(&view).unwrap().get("identifier"), None);
+        let named = view.clone().with_identifier(Some("matthew".into()));
+        assert_eq!(
+            serde_json::to_value(&named).unwrap()["identifier"],
+            "matthew"
+        );
         let json = serde_json::to_value(&view).unwrap();
         for field in [
             "identityRoot",

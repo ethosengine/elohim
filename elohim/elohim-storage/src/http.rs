@@ -1132,6 +1132,38 @@ fn verify_shards_against_manifest(
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CallerAddr(pub std::net::SocketAddr);
 
+/// Where this node reads back the word its person signs in with: the newest
+/// session this node recorded for the person's Human under its own key (begin
+/// and the declaration both record one), else the identity declaration on its
+/// disk. A claim, shown only (`consent_grant::identifier_claim`).
+pub(crate) struct NodeIdentifierSource {
+    pool: Option<DbPool>,
+}
+
+impl crate::services::device_consent::IdentifierSource for NodeIdentifierSource {
+    fn recorded(&self, human_id: &str, agent: &str) -> Option<String> {
+        use crate::db::diesel_schema::local_sessions::dsl as s;
+        use diesel::prelude::*;
+        let mut conn = self.pool.as_ref()?.get().ok()?;
+        s::local_sessions
+            .filter(s::human_id.eq(human_id))
+            .filter(s::agent_pub_key.eq(agent))
+            .order(s::updated_at.desc())
+            .select(s::identifier)
+            .first::<String>(&mut conn)
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    fn declared(&self) -> Option<consent_grant::DeclaredIdentity> {
+        crate::services::identity_declaration::path()
+            .filter(|p| p.exists())
+            .and_then(|p| crate::services::identity_declaration::read(&p).ok())
+            .and_then(|d| d.identity)
+    }
+}
+
 /// Whether a request came from this machine. A request with no recorded
 /// address (one that did not arrive through `serve`) is not.
 fn caller_is_local<B>(req: &Request<B>) -> bool {
@@ -1937,10 +1969,11 @@ impl HttpServer {
                 // this node is a controller) per SPEAKS_REFRESH_SECS, or
                 // sooner when this node's identity may have changed; never
                 // per incoming ask.
+                let names = server.identifier_source();
                 loop {
                     if let Some(cell) = server.own_controller_cell() {
                         carrier::carrier().set_self_key(cell.agent());
-                        carrier::refresh_speaks(&cell).await;
+                        carrier::refresh_speaks(&cell, &names).await;
                     }
                     carrier::until_speaks_refresh().await;
                 }
@@ -13483,11 +13516,19 @@ impl HttpServer {
         let signed_in = self.person_signed_in(req.headers())?;
         let cell = self.own_controller_cell();
         let cell = cell.as_ref().map(|c| c as &dyn ControllerCell);
+        let names = self.identifier_source();
         Ok(if bootstrap {
-            bootstrap_identity(cell, signed_in).await
+            bootstrap_identity(cell, &names, signed_in).await
         } else {
-            identity_standing(cell, signed_in).await
+            identity_standing(cell, &names, signed_in).await
         })
+    }
+
+    /// Where this node reads back its person's sign-in word.
+    fn identifier_source(&self) -> NodeIdentifierSource {
+        NodeIdentifierSource {
+            pool: self.db_pool.clone(),
+        }
     }
 
     /// POST /auth/identity/begin — a person on this node's machine begins their
