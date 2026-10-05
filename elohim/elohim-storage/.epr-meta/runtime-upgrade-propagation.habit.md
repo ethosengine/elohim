@@ -294,3 +294,14 @@ DELTA 2026-10-05b (GREEN preserved; landed on dev WITHOUT the household receipt,
 refused on a stale storage binary and lamad wasm and the rebuilds were not run, so none of the handoff's five household steps was
 taken. The first fleet read after the roll is therefore the first measurement: own app first in each peer's report, `pendingRoles`
 on conductor diagnostics, and the 32 `CellMissing` hosted apps not tripping `primary_not_healthy`.
+DELTA 2026-10-05c (GREEN preserved; household receipt taken on shem, replaces 05b's "without the receipt"; unmeasured on the fleet):
+fork 5f4c16abe, storage built from 71917d34c, household launched on the pre-branch bundle so every app started behind. (1) Dry run of
+the branch bundle, all apps: 20/2/1 apps drifted on matthew/jessica/james, `primaryHealthy` absent, the contract read reports
+`extern_absent` against the old coordinator. (2) The driver with `--all-apps` applied 20/2/1 in 3m36s; re-check drift 0, `pendingCount`
+0, the own app first, `statementContract` six rows; conductor diagnostics shows `coordinators.pendingRoles: 0` and no app id.
+(3) A person hosted after the apply was provisioned on the old lamad coordinator (`drifted` on lamad); the next standing pass, 300 s,
+swept it with the kept bundle and the dry run reads drift 0 — backlog gap 1's probe passes. (4) Canary, a bundle on another lamad
+lineage applied to matthew: the own app refused `dnaHashMismatch`, `primaryHealthy: false`, all 20 hosted apps skipped
+`primary_not_healthy`, 21 blocking errors, nothing changed, the kept bundle unchanged. (5) james's storage restarted with no policy
+file logged the built-in policy warning and registered all four signal subscribers. Not taken: the `issuer-behind` refusal (unit
+tests only). Receipts: genesis/local-dev/coordinator-acceptance-contract/receipts/.
