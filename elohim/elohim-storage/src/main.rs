@@ -1414,6 +1414,52 @@ async fn async_main(
         });
     }
 
+    // Persisted-footprint sampler: what this node holds on disk, by file class.
+    // The conductor directory is read only where it is mounted (the conductor
+    // pod, or a co-located conductor); a storage-only peer reports storage alone.
+    {
+        use elohim_storage::services::store_footprint as fp;
+        let storage_dir = config.storage_dir.clone();
+        let conductor_dir = args.conductor_data_dir.clone();
+        let holder_pool = db_pool.clone();
+        tokio::spawn(async move {
+            let mut seen_storage = std::collections::BTreeSet::new();
+            let mut seen_conductor = std::collections::BTreeSet::new();
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                tick.tick().await;
+                let (s, c) = (storage_dir.clone(), conductor_dir.clone());
+                let pool = holder_pool.clone();
+                let walked = tokio::task::spawn_blocking(move || {
+                    let holders = pool
+                        .and_then(|p| p.get().ok())
+                        .and_then(|mut conn| fp::known_holder_distribution(&mut conn).ok());
+                    (
+                        fp::walk(&s, fp::classify_storage),
+                        fp::walk(&c, fp::classify_conductor),
+                        holders,
+                    )
+                })
+                .await;
+                if let Ok((storage, conductor, holders)) = walked {
+                    if let Some(h) = holders {
+                        elohim_storage::metrics::set_shard_known_holders(&h);
+                    }
+                    elohim_storage::metrics::set_store_footprint(
+                        "storage",
+                        &storage,
+                        &mut seen_storage,
+                    );
+                    elohim_storage::metrics::set_store_footprint(
+                        "conductor",
+                        &conductor,
+                        &mut seen_conductor,
+                    );
+                }
+            }
+        });
+    }
+
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
     // The head-adoption trigger's courier (see `services::courier_obey`): the

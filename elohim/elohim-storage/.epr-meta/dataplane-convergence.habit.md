@@ -886,3 +886,12 @@ anchor-verify pass took jessica, james, gertrude and eve to 0 unverified rows (5
 still read `unverified`. The pass now walks newest first at 50 (5cc1115d4; household probe 1.5 s, lanes green). No storage restart,
 panic or OOM on any peer. Owed: the fleet read after 5cc1115d4 rolls (matthew's newest rows `live`); leg 2 from Che for the 75 s
 budget; gertrude's and eve's conductors are CPU-throttled at 0.94 and 1.00, as before the roll.
+
+DELTA 2026-10-05c (RED preserved; anchor state read on the fleet, the 75 s budget still unmeasured): edge #1545 rolled `cb12675`
+to the fleet (Deploy Alpha SUCCESS) and validate-only #1546 passed Dataplane Validation. Four doorway reads over 24 minutes
+(`genesis/local-dev/event-driven-head-delivery/receipts/fleet-read-after-5cc1115d4.txt`): the leg 2 root reads `live` on both doorways;
+alpha went from 42 of 49 rows unverified to 49 of 49 `live`, apex from 38 of 45 to 45 of 45; one row created during the read window sat
+`unverified` on alpha for at least 8 minutes. The older backlog drains slowly: adam 3,270 to 3,163 and matthew 3,048 to 2,924 unverified
+at 16:49 UTC. `coordinators.observed` is still false on both doorways: no sweep has touched a peer since the roll, so the standing
+coordinator pass is unproven on the fleet until the next DNA build. Owed: leg 2 from Che for the 75 s budget; the coordinator read after
+the next DNA build.

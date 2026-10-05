@@ -230,6 +230,42 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Persisted bytes by what they are. labels: scope = "conductor"|"storage";
+    /// store = the file class (conductor: code|dht|cache|authored|peer_meta|…,
+    /// storage: blobs|content_db|cache|…); part = main|wal|shm|file; dna = short
+    /// DNA hash for per-DNA conductor databases; measure = "apparent" (file
+    /// length) | "allocated" (blocks on disk). Splits heads from installed code,
+    /// and bytes held from disk taken. Set by `services::store_footprint`.
+    pub static ref NODE_STORE_BYTES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_store_bytes",
+            "Persisted bytes by file class, apparent and allocated.",
+        ),
+        &["scope", "store", "part", "dna", "measure"],
+    )
+    .unwrap();
+
+    /// Shards by how many peers this node KNOWS hold them. label: holders =
+    /// "1"|"2"|"3"|"4"|"5+". The node's knowledge, not the network's truth.
+    pub static ref SHARD_KNOWN_HOLDERS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_shard_known_holders",
+            "Shards by the number of peers this node knows hold them.",
+        ),
+        &["holders"],
+    )
+    .unwrap();
+
+    /// File count behind each `elohim_node_store_bytes` class.
+    pub static ref NODE_STORE_FILES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_store_files",
+            "Persisted file count by file class.",
+        ),
+        &["scope", "store", "part", "dna"],
+    )
+    .unwrap();
+
     /// Node corpus size — content rows held, by app scope. label: app =
     /// "lamad" | "elohim". Pairs with the conductor RSS gauges to confirm
     /// (durably) that the heap leak is NOT corpus-proportional (RCA §4.5).
@@ -2965,6 +3001,9 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_STORE_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_STORE_FILES.clone()));
+        let _ = REGISTRY.register(Box::new(SHARD_KNOWN_HOLDERS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_APP_ENABLED.clone()));
         // Pre-touch every supervised role at 1, so a pod that has never probed
         // publishes a series rather than an absence. Absence is unalertable;
@@ -4102,6 +4141,52 @@ pub fn set_conductor_anon_buckets(buckets: &[(&str, u64, u64)]) {
         NODE_CONDUCTOR_ANON_BUCKET_BYTES
             .with_label_values(&[label])
             .set(*bytes as i64);
+    }
+}
+
+/// Set the known-holder distribution (see `services::store_footprint`).
+pub fn set_shard_known_holders(buckets: &[u64; 5]) {
+    for (label, n) in crate::services::store_footprint::HOLDER_BUCKETS
+        .iter()
+        .zip(buckets)
+    {
+        SHARD_KNOWN_HOLDERS
+            .with_label_values(&[label])
+            .set(*n as i64);
+    }
+}
+
+/// Replace one scope's persisted-footprint reading. A class that no longer
+/// exists on disk reads 0, not its last value.
+pub fn set_store_footprint(
+    scope: &str,
+    classes: &std::collections::BTreeMap<
+        crate::services::store_footprint::StoreClass,
+        crate::services::store_footprint::StoreTotals,
+    >,
+    previous: &mut std::collections::BTreeSet<crate::services::store_footprint::StoreClass>,
+) {
+    for gone in previous.iter().filter(|k| !classes.contains_key(*k)) {
+        for measure in ["apparent", "allocated"] {
+            NODE_STORE_BYTES
+                .with_label_values(&[scope, &gone.store, gone.part, &gone.dna, measure])
+                .set(0);
+        }
+        NODE_STORE_FILES
+            .with_label_values(&[scope, &gone.store, gone.part, &gone.dna])
+            .set(0);
+    }
+    for (k, t) in classes {
+        NODE_STORE_BYTES
+            .with_label_values(&[scope, &k.store, k.part, &k.dna, "apparent"])
+            .set(t.apparent_bytes as i64);
+        NODE_STORE_BYTES
+            .with_label_values(&[scope, &k.store, k.part, &k.dna, "allocated"])
+            .set(t.allocated_bytes as i64);
+        NODE_STORE_FILES
+            .with_label_values(&[scope, &k.store, k.part, &k.dna])
+            .set(t.files as i64);
+        previous.insert(k.clone());
     }
 }
 

@@ -195,6 +195,9 @@ pub mod serve_routing;
 pub mod attestation_projector;
 pub mod tally_projector;
 
+// Persisted bytes by file class (heads vs installed code; held vs allocated)
+pub mod store_footprint;
+
 // Recovery Protocol Phase 2 (M4) — recovery_flows / key_revocations projection
 pub mod recovery_flow_projector;
 
