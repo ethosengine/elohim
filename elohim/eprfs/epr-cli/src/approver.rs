@@ -1,15 +1,24 @@
-//! The steward's side, from the person's own terminal on the node that holds
-//! their key: `epr identity begin`, `epr identity standing`, and
-//! `epr device approve`.
+//! The approving node's side, from a terminal on the node that speaks for a
+//! person: `epr identity begin`, `epr identity standing`, `epr identity show`,
+//! `epr device pending` and `epr device approve`.
 //!
 //! A node signs as its person only for a caller on its own machine. A headless
-//! node (a workspace, a deployed conductor) has no browser there, so the
-//! person's terminal is how they begin their identity and approve a device.
-//! Every call goes to this machine's node over loopback; a node elsewhere is
-//! refused before anything is sent.
+//! node (a workspace, a deployed conductor) has no browser there, so a
+//! terminal on it is how an identity begins there and how a device is
+//! approved. Every call goes to this machine's node over loopback; a node
+//! elsewhere is refused before anything is sent.
 //!
-//! The rules are the node's and `consent_grant`'s. This module shows the
-//! person what is asked, asks them, and reports what the node answered.
+//! Three roles stay apart here. Whose node it is: the person it speaks for.
+//! Who operates it: whoever runs the machine. Whether it may approve other
+//! nodes: it is one of the controllers the person's authority names. Approving
+//! a device is an act for the person's identity, so it is the person's. This
+//! terminal cannot tell whether the one typing is that person or whoever
+//! operates the machine: the loopback rule trusts the machine, not a person.
+//! That gap is recorded in the device-recognition backlog cluster, not
+//! papered over here.
+//!
+//! The rules are the node's and `consent_grant`'s. This module shows what is
+//! asked, asks for the answer, and reports what the node answered.
 
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, IsTerminal, Write};
@@ -18,7 +27,8 @@ use std::process::ExitCode;
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use consent_grant::{
-    AgreedView, ConsentView, Declaration, GrantRequest, RequestedAct, ReturnPath, StandingView,
+    AgreedView, ConsentView, Declaration, GrantRequest, PendingView, RequestedAct, ReturnPath,
+    StandingView,
 };
 
 use crate::device::{http_with, json_call_with, refusal_text};
@@ -32,7 +42,8 @@ pub fn usage() -> &'static str {
     "usage:\n  epr identity begin --name <display name> [--identifier <id>] [--node <this node URL>]\n  \
      epr identity standing [--node <this node URL>]\n  \
      epr identity show --declare [--node <this node URL>]\n  \
-     epr device approve '<link or request>' [--only <act>]... [--yes] [--node <this node URL>]"
+     epr device pending [--node <this node URL>]\n  \
+     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]"
 }
 
 /// `epr identity …`.
@@ -120,7 +131,7 @@ fn session_path() -> Outcome<PathBuf> {
     Ok(key
         .parent()
         .ok_or("the device key has no directory")?
-        .join("steward-session"))
+        .join("node-session"))
 }
 
 fn keep_session(id: &str) -> Outcome<()> {
@@ -204,9 +215,9 @@ pub(crate) fn node_declaration(node: &str) -> DeclarationAnswer {
 pub(crate) fn declared_approvals_words(declared: usize, required: usize) -> Option<String> {
     (declared > required).then(|| {
         format!(
-            "You declared that {declared} stewards must approve a new device. This node cannot \
-             hold to that yet: your identity's authority names how many approve ({required}), \
-             and nothing yet writes a new authority with more stewards."
+            "You declared that {declared} of the nodes that speak for you must approve a new \
+             device. This node cannot hold to that yet: your identity's authority names how many \
+             approve ({required}), and nothing yet writes a new authority that asks for more."
         )
     })
 }
@@ -217,25 +228,25 @@ pub(crate) fn standing_words(s: &StandingView) -> Vec<String> {
     if s.rests_on_this_node_alone {
         lines.push("Your identity rests on this node alone.".to_string());
     } else {
-        let these = if s.controller_count == 1 {
-            "steward"
+        let nodes = if s.controller_count == 1 {
+            "1 node speaks for you".to_string()
         } else {
-            "stewards"
+            format!("{} nodes speak for you", s.controller_count)
         };
         let this = if s.this_node_is_controller {
             "this node is one of them"
         } else {
             "this node is not one of them"
         };
-        lines.push(format!(
-            "Your identity has {} {these}; {this}.",
-            s.controller_count
-        ));
+        lines.push(format!("{nodes}; {this}."));
     }
     lines.push(if s.required <= 1 {
-        "Approving a new device needs one steward.".to_string()
+        "Approving a new device needs one node that speaks for you.".to_string()
     } else {
-        format!("Approving a new device needs {} stewards.", s.required)
+        format!(
+            "Approving a new device needs {} of the nodes that speak for you.",
+            s.required
+        )
     });
     lines.push(format!(
         "Identity {}, authority {}.",
@@ -290,7 +301,7 @@ fn begin(args: &[String]) -> Outcome<ExitCode> {
         (begun.created.human, "your person record"),
         (
             begun.created.authority,
-            "your identity's authority, with this node as its first steward",
+            "your identity's authority, with this node as the first node that speaks for you",
         ),
         (begun.created.session, "a session on this node"),
     ]
@@ -395,9 +406,14 @@ pub(crate) fn declaration_text(
     if let Some(a) = declared.and_then(|d| d.asking.as_ref()) {
         out.push_str("\n[asking]\n");
         out.push_str(&format!("label = {}\n", quoted(&a.label)));
-        out.push_str(&format!("portal = {}\n", quoted(&a.portal)));
-        if let Some(s) = &a.steward {
-            out.push_str(&format!("steward = {}\n", quoted(s)));
+        if let Some(p) = &a.portal {
+            out.push_str(&format!("portal = {}\n", quoted(p)));
+        }
+        if let Some(s) = &a.approver {
+            out.push_str(&format!("approver = {}\n", quoted(s)));
+        }
+        if let Some(k) = &a.approver_key {
+            out.push_str(&format!("approverKey = {}\n", quoted(k)));
         }
     }
     out
@@ -512,16 +528,207 @@ fn ask_at_terminal(act: RequestedAct) -> Outcome<bool> {
     Ok(matches!(line.trim(), "y" | "Y" | "yes" | "Yes"))
 }
 
-/// `epr device approve '<link or request>'`.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PendingAnswer {
+    carrier: String,
+    approver: Option<String>,
+    asks: Vec<PendingView>,
+}
+
+/// What a waiting ask looks like to the person, a few lines each.
+pub(crate) fn pending_lines(view: &PendingView) -> Vec<String> {
+    let mut lines = vec![format!(
+        "{:>3}  {}  key {}  {}:{:02} left",
+        view.number,
+        view.label,
+        view.device_fingerprint,
+        view.seconds_left / 60,
+        view.seconds_left % 60
+    )];
+    if let Some(root) = &view.device_root_fingerprint {
+        lines.push(format!("     root key {root}"));
+    }
+    for act in &view.asked_acts {
+        lines.push(format!("     asks to {} ({act})", act_words(*act)));
+    }
+    lines.push(format!("     this node {}", view.state_words));
+    lines
+}
+
+/// `epr device pending`: what is asking this node over its private network.
+pub fn pending(args: &[String]) -> Outcome<ExitCode> {
+    let opts = Options::parse(args)?;
+    let node = opts.node()?;
+    let (answer, _): (PendingAnswer, String) =
+        json_call_with("GET", &format!("{node}/auth/consent/pending"), None, &[])?;
+    if answer.carrier == "absent" {
+        println!(
+            "This node has no local discovery in its transport mode, so nothing can ask it over \
+             the private network."
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    if let Some(me) = &answer.approver {
+        println!(
+            "This node is {}.",
+            consent_grant::hash_shape::fingerprint(me)
+        );
+    }
+    if answer.asks.is_empty() {
+        println!("Nothing is asking.");
+    }
+    for view in &answer.asks {
+        for line in pending_lines(view) {
+            println!("{line}");
+        }
+    }
+    if !answer.asks.is_empty() {
+        println!("Approve one with: epr device approve <number>");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Whether `text` names a waiting ask (its number, a device key, or a key
+/// fingerprint) rather than a link or request.
+pub(crate) fn names_pending(text: &str) -> bool {
+    let t = text.trim();
+    (!t.is_empty() && t.len() <= 9 && t.bytes().all(|b| b.is_ascii_digit()))
+        || (t.starts_with("uhCAk") && !t.contains("request="))
+}
+
+/// Decide a waiting ask on this node, answering when the node needs it.
+fn approve_pending(opts: &Options, node: &str, which: &str) -> Outcome<ExitCode> {
+    let cookie = session_cookie();
+    let headers = cookie_headers(&cookie);
+    let url = format!("{node}/auth/consent/pending/decide");
+    let ask_body = |answer: Option<&[RequestedAct]>| {
+        let mut body = serde_json::json!({ "ask": which });
+        if let Some(acts) = answer {
+            body["answer"] = serde_json::json!({ "agreedActs": acts });
+        }
+        serde_json::to_vec(&body).unwrap_or_default()
+    };
+    // An answer given on the command line is the answer. Otherwise the node's
+    // deciders go first, and the person is asked only when they defer.
+    let decided = if !opts.only.is_empty() || opts.yes {
+        let (list, _): (PendingAnswer, String) =
+            json_call_with("GET", &format!("{node}/auth/consent/pending"), None, &[])?;
+        let view = list
+            .asks
+            .into_iter()
+            .find(|v| {
+                v.number.to_string() == which
+                    || v.device_key == which
+                    || v.device_fingerprint == which
+            })
+            .ok_or("pending_unknown: nothing is asking under that number or key")?;
+        println!("A device asks to act for you.");
+        for line in pending_lines(&view) {
+            println!("{line}");
+        }
+        let answer = if !opts.only.is_empty() {
+            Answer::Only(&opts.only)
+        } else {
+            Answer::All
+        };
+        let agreed = choose(&view.asked_acts, answer, false, ask_at_terminal)?;
+        answer_pending(&url, &headers, &ask_body(Some(&agreed)))?
+    } else {
+        let (status, _, bytes) = http_with("POST", &url, Some(&ask_body(None)), &headers)?;
+        if (200..300).contains(&status) {
+            bytes
+        } else if status == 409 {
+            let needs: serde_json::Value =
+                serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            if needs["code"] != "pending_needs_answer" {
+                return Err(refusal_text(409, &bytes));
+            }
+            let view: PendingView = serde_json::from_value(needs["ask"].clone())
+                .map_err(|e| format!("unreadable answer: {e}"))?;
+            println!("A device asks to act for you.");
+            for line in pending_lines(&view) {
+                println!("{line}");
+            }
+            if let Some(reason) = needs["reasons"].as_array().and_then(|r| r.last()) {
+                println!("  {}", reason.as_str().unwrap_or_default());
+            }
+            let agreed = choose(
+                &view.asked_acts,
+                Answer::Ask,
+                std::io::stdin().is_terminal(),
+                ask_at_terminal,
+            )?;
+            answer_pending(&url, &headers, &ask_body(Some(&agreed)))?
+        } else {
+            return Err(refusal_text(status, &bytes));
+        }
+    };
+    print_decided(&decided)
+}
+
+fn answer_pending(url: &str, headers: &[(&str, &str)], body: &[u8]) -> Outcome<Vec<u8>> {
+    let (status, _, bytes) = http_with("POST", url, Some(body), headers)?;
+    if (200..300).contains(&status) {
+        Ok(bytes)
+    } else {
+        Err(refusal_text(status, &bytes))
+    }
+}
+
+fn print_decided(bytes: &[u8]) -> Outcome<ExitCode> {
+    let decided: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|e| format!("unreadable answer: {e}"))?;
+    let by = decided["decidedBy"].as_str().unwrap_or("?");
+    if decided["declined"] == true {
+        println!("Declined. No code was made and the device is not approved.");
+        return Ok(ExitCode::SUCCESS);
+    }
+    match by {
+        "declaration" => {
+            println!("  Agreed by declaration: you declared this device for what it asks.")
+        }
+        "answer" => println!("  Agreed by your answer."),
+        other => println!("  Agreed (decided by {other})."),
+    }
+    let view: AgreedView = serde_json::from_value(decided["agreed"].clone())
+        .map_err(|e| format!("unreadable answer: {e}"))?;
+    let lines = agreed_lines(&view, now_millis());
+    for line in lines
+        .iter()
+        .filter(|l| l.starts_with("Signed by") || l.starts_with("  signed:"))
+    {
+        println!("{line}");
+    }
+    if decided["handedBack"]["taken"] == true {
+        println!(
+            "The code went back to the device over the private network; it enrolls itself now."
+        );
+    } else {
+        println!(
+            "The code did not reach the device over the private network ({}). Give it the code instead:",
+            decided["handedBack"]
+        );
+        for line in lines.iter().take_while(|l| !l.starts_with("Signed by")) {
+            println!("{line}");
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr device approve '<link or request>'`, or a waiting ask by number or key.
 pub fn approve(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
     let node = opts.node()?;
     let [text] = opts.positional.as_slice() else {
         return Err(format!(
-            "approve needs the link the device printed\n{}",
+            "approve needs the link the device printed, or a waiting ask's number\n{}",
             usage()
         ));
     };
+    if names_pending(text) {
+        return approve_pending(&opts, &node, text.trim());
+    }
     let request = decode_request(text)?;
     // The code can only reach a terminal waiting on loopback through a browser
     // on that terminal's own machine; from here it could not be handed back.
@@ -628,10 +835,11 @@ pub(crate) fn agreed_lines(view: &AgreedView, now_millis: i64) -> Vec<String> {
     ));
     let c = view.controllers;
     lines.push(format!(
-        "Signed by {} of the {} steward{} your identity asks to approve.",
+        "Signed by {} node{} that speak{} for you; your identity asks for {}.",
         c.signed,
-        c.required,
-        if c.required == 1 { "" } else { "s" }
+        if c.signed == 1 { "" } else { "s" },
+        if c.signed == 1 { "s" } else { "" },
+        c.required
     ));
     for w in &view.witnesses {
         let who = match w.relation {
@@ -683,6 +891,46 @@ mod tests {
         assert!(decode_request("request=!!!")
             .unwrap_err()
             .starts_with("request_unreadable"));
+    }
+
+    #[test]
+    fn a_waiting_ask_is_named_by_number_or_key_and_a_link_is_not() {
+        for yes in [
+            "1",
+            "12",
+            "uhCAkiqcz…TGMzzl",
+            "uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl",
+        ] {
+            assert!(names_pending(yes), "{yes}");
+        }
+        for no in [
+            "http://127.0.0.1:8191/consent/device?request=eyJ",
+            "{\"domain\":1}",
+            "eyJkb21h",
+            "",
+        ] {
+            assert!(!names_pending(no), "{no}");
+        }
+    }
+
+    #[test]
+    fn a_waiting_ask_is_shown_with_its_key_acts_time_and_state() {
+        let view = PendingView {
+            number: 2,
+            label: "home".into(),
+            device_key: "uhCAkiqczpYdyymsibsOjupr1Fx31_cPHLgzxqwv9-3FOtATGMzzl".into(),
+            device_fingerprint: "uhCAkiqcz…TGMzzl".into(),
+            device_root_fingerprint: None,
+            asked_acts: vec![RequestedAct::EnrollDevice],
+            seconds_left: 241,
+            state: consent_grant::NodeState::Unassigned,
+            state_words: "has no identity of its own".into(),
+            addressed_here: false,
+        };
+        let lines = pending_lines(&view);
+        assert_eq!(lines[0], "  2  home  key uhCAkiqcz…TGMzzl  4:01 left");
+        assert!(lines[1].contains("recognize this device as one of yours"));
+        assert_eq!(lines[2], "     this node has no identity of its own");
     }
 
     #[test]
@@ -811,13 +1059,19 @@ mod tests {
     fn standing_is_told_in_plain_words() {
         let alone = standing_words(&view(true, 1, 1));
         assert_eq!(alone[0], "Your identity rests on this node alone.");
-        assert_eq!(alone[1], "Approving a new device needs one steward.");
+        assert_eq!(
+            alone[1],
+            "Approving a new device needs one node that speaks for you."
+        );
         let shared = standing_words(&view(false, 3, 2));
         assert_eq!(
             shared[0],
-            "Your identity has 3 stewards; this node is one of them."
+            "3 nodes speak for you; this node is one of them."
         );
-        assert_eq!(shared[1], "Approving a new device needs 2 stewards.");
+        assert_eq!(
+            shared[1],
+            "Approving a new device needs 2 of the nodes that speak for you."
+        );
     }
 
     #[test]
@@ -834,8 +1088,9 @@ mod tests {
         let lines = agreed_lines(&view, 0);
         assert!(lines.contains(&"  c0de#st8".to_string()));
         assert!(lines.contains(&"It is good for 5 minutes.".to_string()));
-        assert!(lines
-            .contains(&"Signed by 1 of the 1 steward your identity asks to approve.".to_string()));
+        assert!(lines.contains(
+            &"Signed by 1 node that speaks for you; your identity asks for 1.".to_string()
+        ));
         assert!(lines
             .iter()
             .any(|l| l.starts_with("  signed: this node (uhCAkiqcz")));

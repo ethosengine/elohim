@@ -5,6 +5,7 @@
 //! finding as relevant to a requested reach event.
 
 pub mod actor;
+pub mod approver;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;
@@ -22,7 +23,6 @@ pub mod ready;
 pub mod report;
 pub mod repository_validators;
 pub mod setup;
-pub mod steward;
 
 pub use error::{Error, Result};
 pub use report::{Finding, FindingStatus, Report};

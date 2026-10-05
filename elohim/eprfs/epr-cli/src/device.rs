@@ -1,19 +1,24 @@
-//! `epr device` — this device asks its person's steward to recognize it.
+//! `epr device` — this device asks a node that speaks for a person to
+//! recognize it as one of theirs.
 //!
-//! A device cannot recognize itself as someone's device. From a terminal on the
-//! device, the person runs `ask`: it builds the request for this device's own
-//! node, keeps the PKCE verifier and state privately on disk, and prints a link
-//! to a steward's portal. The person approves there, and `redeem` takes the
-//! one-time code back: it collects the signed consent from the steward, checks
+//! A device cannot recognize itself as someone's device. Whoever operates the
+//! device runs `ask` from a terminal on it: it builds the request for this
+//! device's own node and keeps the PKCE verifier and state privately on disk.
+//! Then either it prints a link to an approving node's portal, or, with no
+//! portal named or declared, it announces the ask on the private network and
+//! waits for a node that speaks for the person to approve. Approving is the
+//! person's act, done on the approving node. `redeem` (or the announce, when
+//! the code comes back over the network) collects the signed consent, checks
 //! it before using it, and has this device's own node enroll itself with it.
 //!
-//! The steward is named by the person, never assumed: the portal base is a
-//! required argument, and no doorway is involved unless the person names one.
+//! The approving node is never assumed: it is named by a portal, declared, or
+//! found on the private network by local discovery. No doorway is involved
+//! unless one is named.
 //!
 //! The rules are `consent_grant`'s; this module only asks, keeps, checks and
 //! reports. The device's key never leaves its node: the node signs possession
 //! and notarizes the joining record itself, asked over node-local HTTP
-//! (`/auth/device/self`, `/auth/device/enroll`).
+//! (`/auth/device/self`, `/auth/device/enroll`, `/auth/device/announce`).
 
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -32,11 +37,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::device_key::{self, DeviceKey};
 
-/// The relying party this terminal is, as the steward's policy names it.
+/// The relying party this terminal is, as the approving node's policy names it.
 const CLIENT_ID: &str = "epr-cli";
 /// Where a terminal on this machine reaches its own node unless told otherwise.
 const DEFAULT_NODE: &str = "http://127.0.0.1:8090";
-/// How long a code waits, matching the steward's five-minute window.
+/// How long a code waits, matching the approving node's five-minute window.
 const WINDOW: Duration = Duration::from_secs(5 * 60);
 /// How long one call to a node may take: a node's answer can wait on the network.
 const CALL_TIMEOUT: Duration = Duration::from_secs(180);
@@ -44,17 +49,20 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(180);
 type Outcome<T> = Result<T, String>;
 
 pub fn usage() -> &'static str {
-    "usage:\n  epr device ask --portal <steward portal URL> --label <name> \
-     [--act device.enroll] [--act device.bind-root] [--loopback] \
-     [--steward <steward node URL>] [--node <this node URL>]\n  \
+    "usage:\n  epr device ask [--portal <approving node's portal URL>] --label <name> \
+     [--act device.enroll] [--act device.bind-root] [--loopback | --announce] \
+     [--approver <approving node URL>] [--node <this node URL>]\n    \
+     (with no portal named or declared, the device announces on its private network)\n  \
      epr device redeem '<code#state>' [--node <this node URL>]\n  \
-     epr device approve '<link or request>' [--only <act>]... [--yes] [--node <this node URL>]"
+     epr device pending [--node <this node URL>]\n  \
+     epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]"
 }
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
         Some("ask") => ask(&args[1..]),
-        Some("approve") => crate::steward::approve(&args[1..]),
+        Some("approve") => crate::approver::approve(&args[1..]),
+        Some("pending") => crate::approver::pending(&args[1..]),
         Some("redeem") => {
             let (pasted, opts) = match args.get(1) {
                 Some(p) if !p.starts_with("--") => (p.clone(), Options::parse(&args[2..])?),
@@ -77,11 +85,12 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
 #[derive(Default)]
 struct Options {
     portal: Option<String>,
-    steward: Option<String>,
+    approver: Option<String>,
     node: Option<String>,
     label: Option<String>,
     acts: Vec<String>,
     loopback: bool,
+    announce: bool,
 }
 
 impl Options {
@@ -96,11 +105,12 @@ impl Options {
             };
             match flag {
                 "--portal" => o.portal = Some(value()?),
-                "--steward" => o.steward = Some(value()?),
+                "--approver" => o.approver = Some(value()?),
                 "--node" => o.node = Some(value()?),
                 "--label" => o.label = Some(value()?),
                 "--act" => o.acts.push(value()?),
                 "--loopback" => o.loopback = true,
+                "--announce" => o.announce = true,
                 other => return Err(format!("unknown argument `{other}`\n{}", usage())),
             }
             i += 1;
@@ -116,7 +126,7 @@ impl Options {
 struct Pending {
     request: GrantRequest,
     code_verifier: String,
-    steward: String,
+    approver: String,
     node: String,
     asked_at_unix: u64,
 }
@@ -218,7 +228,7 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
     let node = opts.node.clone().unwrap_or_else(|| DEFAULT_NODE.into());
     // What this node declares about asking fills what the flags leave out.
     let declared = if opts.portal.is_none() || opts.label.is_none() {
-        crate::steward::node_declaration(node.trim_end_matches('/'))
+        crate::approver::node_declaration(node.trim_end_matches('/'))
             .declared
             .and_then(|d| d.asking)
     } else {
@@ -227,17 +237,24 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
     let portal = opts
         .portal
         .clone()
-        .or_else(|| declared.as_ref().map(|a| a.portal.clone()))
-        .ok_or("ask needs --portal: the portal of the steward who will approve (or declare it in [asking])")?;
+        .or_else(|| declared.as_ref().and_then(|a| a.portal.clone()));
+    let approver_key = declared.as_ref().and_then(|a| a.approver_key.clone());
     let label = opts
         .label
         .clone()
         .or_else(|| declared.as_ref().map(|a| a.label.clone()))
         .ok_or("ask needs --label: what to call this device (or declare it in [asking])")?;
-    let steward = opts
-        .steward
+    // With no portal named or declared, or when asked to, the device announces
+    // on its private network instead of printing a link.
+    let announcing = opts.announce || portal.is_none();
+    if announcing && opts.loopback {
+        return Err("--loopback hands the code back through a browser; an announced ask takes it back over the private network".into());
+    }
+    let portal = portal.unwrap_or_default();
+    let approver = opts
+        .approver
         .clone()
-        .or_else(|| declared.as_ref().and_then(|a| a.steward.clone()))
+        .or_else(|| declared.as_ref().and_then(|a| a.approver.clone()))
         .unwrap_or_else(|| portal.clone());
 
     let me: DeviceSelf = json_call("GET", &format!("{node}/auth/device/self"), None)
@@ -285,18 +302,21 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
     let pending = Pending {
         request: request.clone(),
         code_verifier: verifier,
-        steward,
+        approver,
         node: node.clone(),
         asked_at_unix: now_unix(),
     };
     pending.save()?;
+    if announcing {
+        return announce(pending, approver_key, &node);
+    }
 
     let encoded = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&request).map_err(|e| e.to_string())?);
     let link = format!(
         "{}/consent/device?request={encoded}",
         portal.trim_end_matches('/')
     );
-    println!("Open this link in your steward's portal and approve this device:\n\n  {link}\n");
+    println!("Open this link in the portal of a node that speaks for you, and approve this device:\n\n  {link}\n");
     println!(
         "This device is {} on network {}.",
         consent_grant::hash_shape::fingerprint(&request.device_key),
@@ -315,6 +335,121 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
         return Err("the code that arrived was not for this request".into());
     }
     redeem(pending, &code, &node)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Announced {
+    state: consent_grant::NodeState,
+    peers: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnnounceStatus {
+    status: String,
+    #[serde(default)]
+    seconds_left: i64,
+    #[serde(default)]
+    listed_by: Vec<ListedBy>,
+    #[serde(default)]
+    code: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListedBy {
+    approver_fingerprint: Option<String>,
+    number: u32,
+}
+
+/// Offer the ask to whichever approving node on the private network lists it, wait
+/// for one to approve, and enroll with the code it hands back.
+fn announce(pending: Pending, approver_key: Option<String>, node: &str) -> Outcome<ExitCode> {
+    let node = node.trim_end_matches('/');
+    let body = serde_json::to_vec(&serde_json::json!({
+        "request": pending.request,
+        "approverKey": approver_key,
+    }))
+    .map_err(|e| e.to_string())?;
+    let announced: Announced =
+        match json_call("POST", &format!("{node}/auth/device/announce"), Some(&body)) {
+            Ok(a) => a,
+            Err(e) => {
+                pending.forget();
+                return Err(format!(
+                    "{e}\nAsk with --portal <approving node's portal> to print a link instead."
+                ));
+            }
+        };
+    let fp = consent_grant::hash_shape::fingerprint(&pending.request.device_key);
+    println!(
+        "Announcing on this private network ({} peer{} in reach). This device is {fp}; it {}.",
+        announced.peers,
+        if announced.peers == 1 { "" } else { "s" },
+        announced.state.words()
+    );
+    match &approver_key {
+        Some(k) => println!(
+            "Waiting for node {} to approve.",
+            consent_grant::hash_shape::fingerprint(k)
+        ),
+        None => println!("Waiting for an approving node to approve."),
+    }
+    let mut told: Vec<u32> = Vec::new();
+    let deadline = Instant::now() + WINDOW + Duration::from_secs(10);
+    let code = loop {
+        if Instant::now() > deadline {
+            pending.forget();
+            return Err("no approving node approved within five minutes; ask again".into());
+        }
+        let status: AnnounceStatus =
+            json_call("GET", &format!("{node}/auth/device/announce"), None)?;
+        for listed in &status.listed_by {
+            if !told.contains(&listed.number) {
+                told.push(listed.number);
+                println!(
+                    "Node {} lists this ask as number {}. Check it shows this device as {fp}; waiting for it to approve.",
+                    listed.approver_fingerprint.as_deref().unwrap_or("(key not yet known)"),
+                    listed.number
+                );
+            }
+        }
+        match (status.status.as_str(), status.code) {
+            ("code", Some(code)) => break code,
+            ("none", _) => {
+                pending.forget();
+                return Err("the ask ended without an approval; ask again".into());
+            }
+            _ => {}
+        }
+        let _ = status.seconds_left;
+        std::thread::sleep(Duration::from_secs(2));
+    };
+    let (code, state) = parse_pasted(&code).ok_or("the approving node's code was malformed")?;
+    if state != pending.request.state {
+        pending.forget();
+        return Err("the code that arrived was not for this request".into());
+    }
+    println!("The approving node approved; collecting the consent over the private network.");
+    let body = serde_json::to_vec(&serde_json::json!({
+        "redemption": redemption_for(&pending, code),
+    }))
+    .map_err(|e| e.to_string())?;
+    let delivered: Delivered = match json_call(
+        "POST",
+        &format!("{node}/auth/device/announce/redeem"),
+        Some(&body),
+    ) {
+        Ok(d) => d,
+        Err(e) => {
+            pending.forget();
+            return Err(format!(
+                "the approving node did not hand over the consent: {e}"
+            ));
+        }
+    };
+    finish(pending, delivered, node)
 }
 
 /// Take one `GET /callback?code=…&state=…` on the terminal's listener.
@@ -377,31 +512,42 @@ struct BindingReceipt {
     binding_action: String,
 }
 
-fn redeem(pending: Pending, code: &str, node: &str) -> Outcome<ExitCode> {
+fn redemption_for(pending: &Pending, code: &str) -> consent_grant::Redemption {
     let request = &pending.request;
-    let redemption = consent_grant::Redemption {
+    consent_grant::Redemption {
         code: code.into(),
         code_verifier: pending.code_verifier.clone(),
         client_id: request.client_id.clone(),
         device_key: request.device_key.clone(),
-    };
-    let body = serde_json::to_vec(&redemption).map_err(|e| e.to_string())?;
+    }
+}
+
+fn redeem(pending: Pending, code: &str, node: &str) -> Outcome<ExitCode> {
+    let body = serde_json::to_vec(&redemption_for(&pending, code)).map_err(|e| e.to_string())?;
     let url = format!(
         "{}/auth/consent/redeem",
-        pending.steward.trim_end_matches('/')
+        pending.approver.trim_end_matches('/')
     );
     let delivered: Delivered = match json_call("POST", &url, Some(&body)) {
         Ok(d) => d,
         Err(e) => {
-            // Any refusal leaves the code spent at the steward; a new request is needed.
+            // Any refusal leaves the code spent at the approving node; a new request is needed.
             pending.forget();
-            return Err(format!("the steward did not hand over the consent: {e}"));
+            return Err(format!(
+                "the approving node did not hand over the consent: {e}"
+            ));
         }
     };
+    finish(pending, delivered, node)
+}
+
+/// Check what was collected, have this node enroll with it, and report.
+fn finish(pending: Pending, delivered: Delivered, node: &str) -> Outcome<ExitCode> {
+    let request = &pending.request;
     if let Err(r) = check_delivered(&delivered, request) {
         pending.forget();
         return Err(format!(
-            "{}: what the steward handed over is not a valid consent for this request; nothing was signed",
+            "{}: what the approving node handed over is not a valid consent for this request; nothing was signed",
             r.code()
         ));
     }
@@ -487,7 +633,7 @@ pub(crate) fn refusal_text(status: u16, bytes: &[u8]) -> String {
     }
 }
 
-/// A minimal HTTP/1.1 client for `http://` nodes. A steward or device node is
+/// A minimal HTTP/1.1 client for `http://` nodes. An approving node or device node is
 /// reached on this machine or the person's own network; TLS is not spoken here.
 #[cfg(test)]
 fn http(method: &str, url: &str, body: Option<&[u8]>) -> Outcome<(u16, Vec<u8>)> {
@@ -620,8 +766,9 @@ mod tests {
     }
 
     #[test]
-    fn the_steward_is_never_assumed() {
-        // Port 1 never answers, so no declaration can supply a portal either.
+    fn with_no_portal_the_device_announces_and_never_assumes_an_approver() {
+        // Port 1 never answers: with no portal the terminal asks its own node
+        // to announce, and prints no link to anyone.
         let refused = ask(&[
             "--label".into(),
             "workspace".into(),
@@ -629,7 +776,15 @@ mod tests {
             "http://127.0.0.1:1".into(),
         ])
         .unwrap_err();
-        assert!(refused.contains("--portal"), "{refused}");
+        assert!(refused.contains("node did not answer"), "{refused}");
+        let refused = ask(&[
+            "--label".into(),
+            "workspace".into(),
+            "--announce".into(),
+            "--loopback".into(),
+        ])
+        .unwrap_err();
+        assert!(refused.contains("--loopback"), "{refused}");
     }
 
     #[test]
@@ -647,7 +802,7 @@ mod tests {
     #[test]
     fn only_plain_http_nodes_are_reached() {
         assert!(
-            http("GET", "https://steward.example/auth/consent/redeem", None)
+            http("GET", "https://approver.example/auth/consent/redeem", None)
                 .unwrap_err()
                 .contains("only http://")
         );

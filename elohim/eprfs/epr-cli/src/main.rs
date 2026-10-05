@@ -59,7 +59,7 @@ fn main() -> ExitCode {
     }
     // `identity` is the steward's own act on the node that holds their key.
     if raw.first().map(String::as_str) == Some("identity") {
-        return match elohim_epr_cli::steward::run_identity(&raw[1..]) {
+        return match elohim_epr_cli::approver::run_identity(&raw[1..]) {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr identity: {error}");
