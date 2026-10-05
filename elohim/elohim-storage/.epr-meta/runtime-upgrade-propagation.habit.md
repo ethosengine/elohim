@@ -290,3 +290,7 @@ cleanly, keeps the last applied bundle, and runs a standing pass that sweeps new
 (backlog gap 1 closed in code). Zome 136 tests, wasm built; `just gate elohim-storage` 4298 passed. Mesh receipt owed: preflight REFUSED
 on this workspace because the pinned fork conductor (5f4c16abe) is not built here; probe in
 genesis/data/timeline/backlog/coordinator-acceptance-tightening-contract.md.
+DELTA 2026-10-05b (GREEN preserved; landed on dev WITHOUT the household receipt, at the operator's direction): shem's preflight
+refused on a stale storage binary and lamad wasm and the rebuilds were not run, so none of the handoff's five household steps was
+taken. The first fleet read after the roll is therefore the first measurement: own app first in each peer's report, `pendingRoles`
+on conductor diagnostics, and the 32 `CellMissing` hosted apps not tripping `primary_not_healthy`.
