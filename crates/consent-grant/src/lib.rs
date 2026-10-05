@@ -49,6 +49,7 @@ pub mod act;
 pub mod ceremony;
 pub mod consent;
 pub mod controller;
+pub mod declaration;
 pub mod delivery;
 pub mod enrollment;
 pub mod hash_shape;
@@ -68,6 +69,10 @@ pub use consent::{
     SignerRole, CONSENT_SIGNING_DOMAIN,
 };
 pub use controller::{ControllerStanding, StandingRefusal, StandingView};
+pub use declaration::{
+    Declaration, DeclarationConflict, DeclaredAsking, DeclaredDevice, DeclaredIdentity,
+    ExistingIdentity,
+};
 pub use delivery::{
     admit_redemption, code_digest, DeliveryRefusal, PendingDelivery, Redemption, RedemptionRefusal,
 };
