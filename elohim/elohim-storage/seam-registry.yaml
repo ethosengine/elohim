@@ -5160,3 +5160,30 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/courier_obey.rs, testName: a_proven_version_carries_its_body, kind: unit }
       - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_edge_list_never_names_a_restricted_atom, kind: integration }
       - { path: elohim/elohim-storage/tests/api/content_read_reach_gate.rs, testName: anonymous_graph_walk_prunes_and_never_walks_through_a_restricted_atom, kind: integration }
+
+  - name: carrier_on_code
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/device_carrier.rs
+      modulePath: services::device_carrier::Carrier::on_code
+      line: 215
+    summary: >
+      The asking device's side of the private-network carrier (consent_grant::CarryRequest over
+      the EPR request/response protocol, local discovery only). A code is taken only while this
+      node is announcing, only for the ask's own state token, and only from a peer that listed
+      the ask; anything else is refused with its own code and logged. Taking a code signs
+      nothing: the device still redeems it with its PKCE verifier and checks what it collects.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral and in memory only; nothing is notarized, linked or persisted, and no zome is touched by the carrier." }
+      - { id: C1, status: answered, justification: "A carrier never causes a signature; the approving node signs only through the shared agree path for a caller on its own machine." }
+      - { id: C4, status: answered, justification: "carry_no_announce, carry_not_this_ask and carry_from_unlisting_peer are distinct refusals." }
+      - { id: C5, status: answered, justification: "The transport id is used only to require that the code come from a peer that listed the ask and to send redemption back; it is never compared to the agent key." }
+      - { id: C7, status: answered, justification: "No new network-reachable route: the carrier rides the existing EPR protocol; the HTTP list/decide/announce routes answer only callers on this machine." }
+      - { id: C8, status: answered, justification: "Every received, dropped, listed, refused or decided ask and code is logged with its reason." }
+      - { id: C10, status: partial, justification: "Additive EprRequest/EprResponse variant; a peer that predates it fails to decode and answers an error, so it is simply not an approving node. The inner JSON is not versioned beyond its tagged kind." }
+      - { id: C14, status: partial, justification: "iroh-only mode has no local discovery, so the carrier is absent there and says so (carrier_absent); the link-and-paste path remains." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_device_takes_a_code_only_for_its_ask_from_a_node_that_listed_it, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: an_approving_node_lists_an_ask_and_says_which_it_is, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: with_no_local_discovery_the_carrier_is_absent_and_says_so, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_declared_unassigned_device_is_agreed_by_declaration_and_its_code_goes_back, kind: unit }

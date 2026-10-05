@@ -512,6 +512,7 @@ pub const CRATE_WRITE_FNS: &[&str] = &[
     "create_commitment_state_link",
     "bootstrap_device_identity", // → notarize: one binds-identity Commitment
     "enroll_identity_device",    // → notarize: one binds-identity Commitment
+    "register_device_identity",  // → one AgentKeyToHuman link
     // --- node-registry -----------------------------------------------------
     "carry_from", // → carry_page
     "create_shard_assignment",

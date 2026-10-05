@@ -25,7 +25,7 @@
 //!
 //! - `identity standing`: what the signed-in person's identity rests on.
 //! - `identity bootstrap`: begin the identity here, with this node as its
-//!   first steward. Asking again when it exists writes nothing.
+//!   first node that speaks for the person. Asking again when it exists writes nothing.
 //!
 //! And two for the asking device's own node, answered only to a terminal on
 //! the same machine: what this node is (`device self`), and enrolling it with
@@ -54,7 +54,7 @@ use super::response;
 /// CLI is the terminal a device asks from.
 const KNOWN_CLIENTS: [&str; 1] = ["epr-cli"];
 
-fn policy() -> GrantPolicy {
+pub(crate) fn policy() -> GrantPolicy {
     GrantPolicy::for_clients(KNOWN_CLIENTS)
 }
 
@@ -63,9 +63,9 @@ const CODE_TTL_MICROS: i64 = 5 * 60 * 1_000_000;
 
 /// A refusal on its way out, boxed because a response is large to carry in an
 /// error.
-type Refused = Box<Response<Full<Bytes>>>;
+pub type Refused = Box<Response<Full<Bytes>>>;
 
-fn refusal(status: StatusCode, error: &str, code: &str) -> Response<Full<Bytes>> {
+pub(crate) fn refusal(status: StatusCode, error: &str, code: &str) -> Response<Full<Bytes>> {
     response::json_response(status, &serde_json::json!({ "error": error, "code": code }))
 }
 
@@ -332,33 +332,58 @@ pub async fn agree(
     now_micros: i64,
 ) -> Response<Full<Bytes>> {
     if !signed_in {
-        return refusal(
-            StatusCode::UNAUTHORIZED,
-            "sign in on this node before approving a device",
-            "consent_not_signed_in",
-        );
+        return not_signed_in_to_approve();
     }
     let input: AgreeInput = match parse(body) {
         Ok(input) => input,
         Err(refused) => return *refused,
     };
-    let admitted = match admit_request(&input.request, &policy()) {
-        Ok(admitted) => admitted,
-        Err(r) => {
-            return refusal(
-                StatusCode::BAD_REQUEST,
-                "the request cannot be agreed to",
-                r.code(),
-            )
-        }
-    };
+    match agree_request(
+        store,
+        cell,
+        beat,
+        &input.request,
+        input.agreed_acts,
+        now_micros,
+    )
+    .await
+    {
+        Ok(view) => response::ok(&view),
+        Err(refused) => *refused,
+    }
+}
+
+fn not_signed_in_to_approve() -> Response<Full<Bytes>> {
+    refusal(
+        StatusCode::UNAUTHORIZED,
+        "sign in on this node before approving a device",
+        "consent_not_signed_in",
+    )
+}
+
+/// The agree step for a request already read: admit it, check this node may
+/// agree for its person, record the agreement, have the cell sign, let the
+/// witness beat attend, and hold the code. Shared by the agree route and by
+/// deciding a pending ask, so both go through exactly one path.
+pub async fn agree_request(
+    store: &MemoryStore,
+    cell: Option<&dyn ControllerCell>,
+    beat: &dyn WitnessBeat,
+    request: &GrantRequest,
+    agreed_acts: Vec<RequestedAct>,
+    now_micros: i64,
+) -> Result<AgreedView, Refused> {
+    let admitted = admit_request(request, &policy()).map_err(|r| {
+        Box::new(refusal(
+            StatusCode::BAD_REQUEST,
+            "the request cannot be agreed to",
+            r.code(),
+        ))
+    })?;
     let Some(cell) = cell else {
-        return unavailable("no conductor client");
+        return Err(Box::new(unavailable("no conductor client")));
     };
-    let standing = match ready_standing(cell).await {
-        Ok(standing) => standing,
-        Err(refused) => return *refused,
-    };
+    let standing = ready_standing(cell).await?;
     let signer = cell.agent();
     if let Err(r) = standing.admits(&admitted, &signer) {
         let (status, error) = match r {
@@ -371,29 +396,20 @@ pub async fn agree(
                 "this node's key is not one of your identity's controllers",
             ),
         };
-        return refusal(status, error, r.code());
+        return Err(Box::new(refusal(status, error, r.code())));
     }
-    let record =
-        match ConsentRecord::agree(&admitted, standing.agreement(input.agreed_acts, now_micros)) {
-            Ok(record) => record,
-            Err(r) => {
-                return refusal(
-                    StatusCode::BAD_REQUEST,
-                    "what was agreed does not fit the request",
-                    r.code(),
-                )
-            }
-        };
-    let consent = match SignedConsent::new(record) {
-        Ok(consent) => consent,
-        Err(r) => return response::internal_error(r.code()),
-    };
-    let held =
-        match sign_and_issue(store, cell, beat, &admitted, consent, &signer, now_micros).await {
-            Ok(held) => held,
-            Err(refused) => return *refused,
-        };
-    response::ok(&AgreedView::of(&held.0, held.1, standing.required, &signer))
+    let record = ConsentRecord::agree(&admitted, standing.agreement(agreed_acts, now_micros))
+        .map_err(|r| {
+            Box::new(refusal(
+                StatusCode::BAD_REQUEST,
+                "what was agreed does not fit the request",
+                r.code(),
+            ))
+        })?;
+    let consent =
+        SignedConsent::new(record).map_err(|r| Box::new(response::internal_error(r.code())))?;
+    let held = sign_and_issue(store, cell, beat, &admitted, consent, &signer, now_micros).await?;
+    Ok(AgreedView::of(&held.0, held.1, standing.required, &signer))
 }
 
 fn no_person() -> Response<Full<Bytes>> {
@@ -450,7 +466,7 @@ pub async fn identity_standing(
 }
 
 /// Begin the signed-in person's identity on this node: record its authority,
-/// with this node as its first steward.
+/// with this node as its first node that speaks for the person.
 ///
 /// From the person's side this can be asked any number of times. When the
 /// authority already exists it is returned and nothing is written; otherwise
@@ -942,7 +958,7 @@ pub(crate) mod tests {
         pub(crate) humans: Mutex<Vec<NewHuman>>,
     }
 
-    fn ready() -> CellStanding {
+    pub(crate) fn ready() -> CellStanding {
         CellStanding::Ready(ControllerStanding {
             identity_root: IDENTITY.into(),
             authority: AUTHORITY.into(),
@@ -1142,10 +1158,10 @@ pub(crate) mod tests {
             .to_string()
     }
 
-    /// What an honest steward delivers for `request()`, signed by a real key.
+    /// What an honest approving node delivers for `request()`, signed by a real key.
     fn honestly_delivered() -> Delivered {
         let key = AgentKeypair::from_secret(&[9; 32]).unwrap();
-        let steward = agent_of(&key);
+        let approver = agent_of(&key);
         let admitted = admit_request(&request(), &policy()).unwrap();
         let record = ConsentRecord::agree(
             &admitted,
@@ -1164,13 +1180,13 @@ pub(crate) mod tests {
         Delivered {
             consent: consent.with_signature(ConsentSignature {
                 role: SignerRole::Controller,
-                signer: steward.clone(),
+                signer: approver.clone(),
                 signature,
             }),
             enrollment: Some(Enrollment {
                 intent,
                 controllers: vec![ControllerProof {
-                    agent: steward,
+                    agent: approver,
                     signature: proof,
                 }],
             }),

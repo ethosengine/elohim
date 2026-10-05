@@ -133,6 +133,11 @@ impl EprService {
                 Some(self.handle_query_delivery(blob_hash).await)
             }
             EprRequest::Announce { .. } => None,
+            // The device-consent carrier is answered by the libp2p event loop,
+            // which knows the asking peer; it is not an EPR read.
+            EprRequest::DeviceCarry(_) => {
+                Some(EprResponse::Error("device carry is not an EPR read".into()))
+            }
         }
     }
 

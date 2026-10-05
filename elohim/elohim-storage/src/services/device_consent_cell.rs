@@ -98,6 +98,13 @@ struct CreateHumanWire<'a> {
     location: Option<String>,
 }
 
+/// The imagodei coordinator's `RegisterDeviceIdentityInput`.
+#[derive(Serialize, Debug)]
+struct RegisterWire {
+    binding: ActionHash,
+    expected_content_dna: DnaHash,
+}
+
 /// The imagodei coordinator's `HumanOutput`, as far as a declaration compares.
 #[derive(Deserialize, Debug)]
 struct HumanOutputWire {
@@ -389,6 +396,25 @@ impl DeviceCell for ConductorDeviceCell {
     }
 
     async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure> {
+        // Whether this node has a Human of its own. One that does joins as it
+        // is: its binding is notarized but not registered as its identity, so
+        // its key keeps resolving to the Human it began and what it made keeps
+        // tracing there (registering would switch that resolution to the
+        // person it joined; the device_enrollment sweettest shows both).
+        let has_own_human = {
+            let payload = ExternIO::encode(())
+                .map_err(|e| CellFailure::Unavailable(e.to_string()))?
+                .into_vec();
+            let answer = self
+                .hc
+                .call_zome_imagodei("imagodei", "get_my_human", payload)
+                .await
+                .map_err(failure)?;
+            let human: Option<HumanOutputWire> = ExternIO::from(answer)
+                .decode()
+                .map_err(|e| CellFailure::Unavailable(format!("human decode: {e}")))?;
+            human.is_some()
+        };
         let intent = intent_wire(&enrollment.intent)?;
         let json = serde_json::to_string(&intent)
             .map_err(|e| CellFailure::Unavailable(format!("intent encoding: {e}")))?;
@@ -438,6 +464,20 @@ impl DeviceCell for ConductorDeviceCell {
         let receipt: CommitmentOutputWire = ExternIO::from(answer)
             .decode()
             .map_err(|e| CellFailure::Unavailable(format!("receipt decode: {e}")))?;
+        if !has_own_human {
+            // A node with no identity of its own now knows whose it is: its key
+            // resolves to the person it joined (one AgentKeyToHuman link).
+            let payload = ExternIO::encode(RegisterWire {
+                binding: receipt.action_hash.clone(),
+                expected_content_dna: self.hc.cell_id().dna_hash().clone(),
+            })
+            .map_err(|e| CellFailure::Unavailable(format!("register encoding: {e}")))?
+            .into_vec();
+            self.hc
+                .call_zome_imagodei("imagodei", "register_device_identity", payload)
+                .await
+                .map_err(failure)?;
+        }
         Ok(BindingReceipt {
             binding_action: receipt.action_hash.to_string(),
             binding_entry: receipt.entry_hash.to_string(),

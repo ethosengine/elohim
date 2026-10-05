@@ -2,7 +2,7 @@
 //!
 //! `ELOHIM_IDENTITY_DECLARATION_PATH` names a TOML file holding a
 //! [`consent_grant::Declaration`]: the person this node begins an identity for,
-//! the devices that person expects, and, on an asking node, its steward. It
+//! the devices that person expects, and, on an asking node, the node that approves it. It
 //! sits beside the runtime config (`ELOHIM_RUNTIME_CONFIG_PATH`) and follows its
 //! convention: a path named by the environment, read on the same ten-second
 //! cadence, re-read when its (mtime, length) changes, nothing at all when unset.

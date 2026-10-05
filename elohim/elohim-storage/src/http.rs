@@ -1363,7 +1363,11 @@ impl HttpServer {
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
-            consent_deliveries: Arc::new(consent_grant::MemoryStore::new()),
+            // One store with the carrier, so a code redeemed over the private
+            // network and one redeemed at /auth/consent/redeem are the same.
+            consent_deliveries: crate::services::device_carrier::carrier()
+                .deliveries
+                .clone(),
             identity_declaration_status: Arc::new(std::sync::Mutex::new(None)),
             conductor_manager: None,
             reconcile_kick: None,
@@ -1920,6 +1924,26 @@ impl HttpServer {
             max_concurrent = MAX_CONCURRENT_REQUESTS,
             "HTTP server listening"
         );
+        // The carrier names this node by its agent key once the cell
+        // is reachable.
+        {
+            let server = self.clone();
+            tokio::spawn(async move {
+                use crate::services::device_consent::ControllerCell;
+                // bounded-work: one cheap lookup per POLL_INTERVAL_SECS until
+                // the key is known, then the task ends.
+                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+                    crate::runtime_config::POLL_INTERVAL_SECS,
+                ));
+                loop {
+                    ticker.tick().await;
+                    if let Some(cell) = server.own_controller_cell() {
+                        crate::services::device_carrier::carrier().set_self_key(cell.agent());
+                        return;
+                    }
+                }
+            });
+        }
         if let Some(path) = crate::services::identity_declaration::path() {
             info!(path = %path.display(), "identity declaration: watching");
             tokio::spawn(self.clone().watch_identity_declaration(path));
@@ -2939,6 +2963,18 @@ impl HttpServer {
             // only to callers on this machine.
             (Method::GET, "/auth/device/self") | (Method::POST, "/auth/device/enroll") => {
                 Box::pin(self.handle_device_step(req)).await
+            }
+
+            // The first carrier (`services::device_carrier`): asks that came
+            // over the private network, deciding one, and this node's own
+            // announce. All this machine only.
+            (Method::GET, "/auth/consent/pending")
+            | (Method::POST, "/auth/consent/pending/decide")
+            | (Method::GET, "/auth/device/announce")
+            | (Method::POST, "/auth/device/announce")
+            | (Method::DELETE, "/auth/device/announce")
+            | (Method::POST, "/auth/device/announce/redeem") => {
+                Box::pin(self.handle_carrier(req)).await
             }
 
             // Device consent ceremony: the asking terminal redeems its code for
@@ -13679,6 +13715,152 @@ impl HttpServer {
             "lastReconcile": last,
             "current": current,
         })))
+    }
+
+    /// The carrier, when this node runs one: the libp2p transport, whose mDNS
+    /// is its local discovery. Absent in iroh-only mode.
+    fn carrier_link(
+        &self,
+    ) -> Option<std::sync::Arc<dyn crate::services::device_carrier::CarrierLink>> {
+        self.p2p_handle.clone().map(|h| {
+            std::sync::Arc::new(h)
+                as std::sync::Arc<dyn crate::services::device_carrier::CarrierLink>
+        })
+    }
+
+    /// What this node says about itself when it asks: read-only.
+    ///
+    /// "Made things" is known only from positive evidence: a content row this
+    /// node's storage holds whose `created_by` is this node's key or person.
+    /// No row is not proof of nothing (content authored on the cell directly
+    /// never becomes a row), so the answer is then `unknown`.
+    async fn node_state(&self) -> consent_grant::NodeState {
+        use crate::services::device_consent::{CellStanding, ControllerCell};
+        use consent_grant::{Made, NodeState};
+        let Some(cell) = self.own_controller_cell() else {
+            return NodeState::Unassigned;
+        };
+        let me = cell.agent();
+        let (has_human, controllers) = match cell.standing().await {
+            Ok(CellStanding::NoPerson) => (false, None),
+            Ok(CellStanding::Unbootstrapped { .. }) => (true, None),
+            Ok(CellStanding::Ready(s)) => (true, Some(s.controllers)),
+            // Cannot tell: report an identity of its own, made unknown, rather
+            // than claim the node is unassigned.
+            Err(_) => (true, None),
+        };
+        let human_id = cell.my_human().await.ok().flatten().map(|h| h.human_id);
+        let made = match (&self.db_pool, has_human) {
+            (Some(pool), true) => {
+                use crate::db::diesel_schema::content::dsl as c;
+                use diesel::prelude::*;
+                let mut owners = vec![me.clone()];
+                owners.extend(human_id);
+                let count: i64 = pool
+                    .get()
+                    .ok()
+                    .and_then(|mut conn| {
+                        c::content
+                            .filter(c::created_by.eq_any(&owners))
+                            .count()
+                            .get_result(&mut conn)
+                            .ok()
+                    })
+                    .unwrap_or(0);
+                if count > 0 {
+                    Made::Things
+                } else {
+                    Made::Unknown
+                }
+            }
+            _ => Made::Unknown,
+        };
+        NodeState::of(has_human, controllers.as_deref(), &me, made)
+    }
+
+    /// The carrier's this-machine-only routes.
+    async fn handle_carrier(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_carrier as carrier;
+        use crate::services::device_consent::{
+            cross_site_refusal, foreign_origin_refusal, remote_caller_refusal,
+            signing_caller_refusal, ControllerCell,
+        };
+        let method = req.method().clone();
+        let path = req.uri().path().to_string();
+        let local = caller_is_local(&req);
+        let deciding = path == "/auth/consent/pending/decide";
+        let refused = if deciding {
+            signing_caller_refusal(local)
+        } else {
+            remote_caller_refusal(local)
+        }
+        .or_else(|| {
+            if method == Method::GET {
+                foreign_origin_refusal(req.headers())
+            } else if method == Method::DELETE {
+                None
+            } else {
+                cross_site_refusal(req.headers())
+            }
+        });
+        if let Some(refused) = refused {
+            return Ok(refused);
+        }
+        let signed_in = if deciding {
+            self.person_signed_in(req.headers())?
+        } else {
+            false
+        };
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        let link = self.carrier_link();
+        let link_ref = link.as_deref();
+        Ok(match (method, path.as_str()) {
+            (Method::GET, "/auth/consent/pending") => carrier::pending_list(link_ref),
+            (Method::POST, "/auth/consent/pending/decide") => {
+                let declaration = crate::services::identity_declaration::path()
+                    .filter(|p| p.exists())
+                    .and_then(|p| crate::services::identity_declaration::read(&p).ok())
+                    .unwrap_or_default();
+                let cell = self.own_controller_cell();
+                carrier::decide_pending(
+                    &self.consent_deliveries,
+                    cell.as_ref().map(|c| c as &dyn ControllerCell),
+                    &consent_grant::Unattended,
+                    link_ref,
+                    &declaration,
+                    signed_in,
+                    &body,
+                )
+                .await
+            }
+            (Method::GET, "/auth/device/announce") => carrier::announce_status(),
+            (Method::DELETE, "/auth/device/announce") => {
+                carrier::carrier().stop_announce();
+                response::ok(&serde_json::json!({ "status": "none" }))
+            }
+            (Method::POST, "/auth/device/announce/redeem") => {
+                carrier::announce_redeem(link_ref, &body).await
+            }
+            _ => {
+                let state = self.node_state().await;
+                match carrier::start_announce(link_ref, state, &body) {
+                    Ok((answer, _)) => {
+                        if let Some(link) = link {
+                            tokio::spawn(carrier::run_announce(link));
+                        }
+                        answer
+                    }
+                    Err(refused) => *refused,
+                }
+            }
+        })
     }
 
     /// GET /auth/device/self, POST /auth/device/enroll.
