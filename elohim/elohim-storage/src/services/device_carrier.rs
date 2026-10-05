@@ -75,6 +75,8 @@ pub struct Announce {
     pub listed_by: Vec<(String, Option<String>, u32)>,
     /// The code an approving node that listed it handed back, and from where.
     pub code: Option<(String, String)>,
+    /// The approving node that declined it (its key, when known), if one did.
+    pub declined_by: Option<Option<String>>,
 }
 
 impl Announce {
@@ -184,6 +186,9 @@ impl Carrier {
         Some(match request {
             CarryRequest::Ask { ask } => return self.on_ask(source, ask),
             CarryRequest::Code { state, code, .. } => self.on_code(source, &state, code),
+            CarryRequest::Declined { state, approver } => {
+                self.on_declined(source, &state, approver)
+            }
             CarryRequest::Redeem { redemption } => {
                 // bounded-work: one sweep over deliveries that each live minutes.
                 self.deliveries.sweep(now_micros());
@@ -295,6 +300,28 @@ impl Carrier {
         );
         a.code = Some((code, source.to_string()));
         CarryResponse::CodeTaken
+    }
+
+    /// A decline for this node's own ask, taken only from an approving node
+    /// that listed it, like a code. The announce stops; nothing was signed.
+    fn on_declined(&self, source: &str, state: &str, approver: Option<String>) -> CarryResponse {
+        let mut slot = self.announce_lock();
+        let refused = |code: &str| CarryResponse::Refused { code: code.into() };
+        let Some(a) = slot.as_mut() else {
+            return refused("carry_no_announce");
+        };
+        if a.request.state != state {
+            return refused("carry_not_this_ask");
+        }
+        if !a.listed_by.iter().any(|(s, _, _)| s == source) {
+            return refused("carry_from_unlisting_peer");
+        }
+        info!(
+            source,
+            "device carrier: the approving node declined the ask"
+        );
+        a.declined_by = Some(approver);
+        CarryResponse::DeclineTaken
     }
 }
 
@@ -529,10 +556,31 @@ async fn decide_inner(
     };
     let (acts, by) = match decision {
         Decision::Decline { by } => {
+            // Nothing is signed. The ask leaves the list and is remembered,
+            // and the asking device is told, so its terminal stops waiting.
             carrier().pending.decided(pending.number, now);
             info!(number = pending.number, ?by, "device carrier: ask declined");
+            let told = match link {
+                Some(link) => {
+                    link.send(
+                        &pending.source,
+                        CarryRequest::Declined {
+                            state: pending.ask.request.state.clone(),
+                            approver: carrier().self_key().map(str::to_string),
+                        },
+                    )
+                    .await
+                }
+                None => Err("this node has no carrier".into()),
+            };
+            let told = match told {
+                Ok(CarryResponse::DeclineTaken) => serde_json::json!({ "taken": true }),
+                Ok(other) => serde_json::json!({ "taken": false, "answer": other }),
+                Err(why) => serde_json::json!({ "taken": false, "error": why }),
+            };
+            info!(number = pending.number, told = %told, "device carrier: decline handed back");
             return Ok(response::ok(&serde_json::json!({
-                "number": pending.number, "decidedBy": by, "declined": true,
+                "number": pending.number, "decidedBy": by, "declined": true, "handedBack": told,
             })));
         }
         Decision::Agree { acts, by } => (acts, by),
@@ -630,6 +678,7 @@ pub fn start_announce(
         started_at_micros: now_micros(),
         listed_by: Vec::new(),
         code: None,
+        declined_by: None,
     });
     Ok((
         response::json_response(
@@ -668,7 +717,7 @@ async fn announce_rounds(link: std::sync::Arc<dyn CarrierLink>) {
         let Some(announce) = carrier().announce() else {
             return;
         };
-        if announce.code.is_some() {
+        if announce.code.is_some() || announce.declined_by.is_some() {
             return;
         }
         for peer in link.peers().into_iter().take(MAX_PEERS_PER_ROUND) {
@@ -711,17 +760,25 @@ pub fn announce_status() -> Response<Full<Bytes>> {
             })
         })
         .collect();
-    let status = match (&a.code, a.listed_by.is_empty()) {
-        (Some(_), _) => "code",
-        (None, false) => "listed",
-        (None, true) => "announcing",
+    let status = match (&a.code, &a.declined_by, a.listed_by.is_empty()) {
+        (Some(_), _, _) => "code",
+        (None, Some(_), _) => "declined",
+        (None, None, false) => "listed",
+        (None, None, true) => "announcing",
     };
+    let declined_by = a.declined_by.as_ref().map(|approver| {
+        serde_json::json!({
+            "approver": approver,
+            "approverFingerprint": approver.as_deref().map(consent_grant::hash_shape::fingerprint),
+        })
+    });
     response::ok(&serde_json::json!({
         "status": status,
         "secondsLeft": left,
         "state": a.state,
         "listedBy": listed_by,
         "code": a.code.as_ref().map(|(c, _)| format!("{c}#{}", a.request.state)),
+        "declinedBy": declined_by,
     }))
 }
 
@@ -953,7 +1010,7 @@ mod tests {
         assert!(nobody["speaksForWords"]
             .as_str()
             .unwrap()
-            .contains("speaks for nobody"));
+            .contains("does not speak for anyone"));
         let person = bytes(pending_list(None, &speaking())).await;
         assert_eq!(person["speaksFor"]["kind"], "person");
         let asks = person["asks"].as_array().unwrap();
@@ -988,6 +1045,45 @@ mod tests {
     }
 
     #[test]
+    fn a_device_takes_a_decline_only_for_its_ask_from_a_node_that_listed_it() {
+        let c = fresh();
+        let decline = |source: &str, state: &str| {
+            c.on_request(
+                source,
+                CarryRequest::Declined {
+                    state: state.into(),
+                    approver: Some("uhCAkApprover".into()),
+                },
+            )
+            .unwrap()
+        };
+        c.start_announce(Announce {
+            request: request(),
+            state: NodeState::Unassigned,
+            for_approver: None,
+            started_at_micros: now_micros(),
+            listed_by: vec![],
+            code: None,
+            declined_by: None,
+        });
+        assert_eq!(
+            decline("peer-a", &"s".repeat(32)),
+            CarryResponse::Refused {
+                code: "carry_from_unlisting_peer".into()
+            }
+        );
+        c.note_listed("peer-a", Some("uhCAkApprover".into()), 1);
+        assert_eq!(
+            decline("peer-a", &"s".repeat(32)),
+            CarryResponse::DeclineTaken
+        );
+        assert_eq!(
+            c.announce().unwrap().declined_by,
+            Some(Some("uhCAkApprover".into()))
+        );
+    }
+
+    #[test]
     fn a_device_takes_a_code_only_for_its_ask_from_a_node_that_listed_it() {
         let c = fresh();
         let code = |source: &str, state: &str| {
@@ -1014,6 +1110,7 @@ mod tests {
             started_at_micros: now_micros(),
             listed_by: vec![],
             code: None,
+            declined_by: None,
         });
         assert_eq!(
             code("peer-a", &"s".repeat(32)),
@@ -1181,7 +1278,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_empty_answer_declines_and_sends_nothing() {
+    async fn an_empty_answer_declines_signs_nothing_and_tells_the_device() {
         let device = listed(44, NodeState::Unassigned);
         let link = FakeLink(Default::default());
         let (status, answer) = decided(
@@ -1192,7 +1289,12 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(answer["declined"], true);
-        assert!(link.0.lock().unwrap().is_empty());
+        // Nothing signed; the asking device is told it was declined.
+        let sent = link.0.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1);
+        assert!(
+            matches!(&sent[0].1, CarryRequest::Declined { state, .. } if *state == state_of(44))
+        );
         assert!(carrier().pending.pick(&device, now_micros()).is_none());
     }
 

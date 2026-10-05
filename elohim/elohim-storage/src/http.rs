@@ -13575,17 +13575,86 @@ impl HttpServer {
         )
     }
 
-    /// Who may make this node sign as its person: a caller on this machine,
-    /// or one carrying a session proven by sign-in. The refusal, or `None`.
-    fn signing_refusal(
+    /// A request read whole: its head (for headers and the caller's address)
+    /// and its exact body bytes, which a session proof signs.
+    async fn read_whole(req: Request<Incoming>) -> Result<(Request<()>, Bytes), StorageError> {
+        let (parts, body) = req.into_parts();
+        let body = body
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok((Request::from_parts(parts, ()), body))
+    }
+
+    /// Who may make this node sign as its person
+    /// (`consent_grant::may_make_node_sign`): a caller on this machine, or a
+    /// request carrying a session proven by sign-in, with a valid proof from
+    /// its key when the session is bound to one
+    /// (`services::node_account::signing_verdict`). `Ok(proven)` lets it go
+    /// on; otherwise the refusal. Asked once per request: a proof is single
+    /// use. Routes ask this and never read the cookie or the proof themselves.
+    fn signing_caller<B>(
         &self,
-        req: &Request<Incoming>,
-    ) -> Result<Option<Response<Full<Bytes>>>, StorageError> {
+        req: &Request<B>,
+        body: &[u8],
+    ) -> Result<Result<bool, Response<Full<Bytes>>>, StorageError> {
+        use crate::services::node_account::{signing_verdict, RequestFacts, SigningVerdict};
         let local = caller_is_local(req);
-        let proven = !local && self.signed_in_by_proof(req)?;
-        Ok(crate::services::device_consent::signing_caller_refusal(
-            local, proven,
-        ))
+        if local {
+            // This-machine acts need no session at all.
+            return Ok(Ok(false));
+        }
+        let verdict = match &self.db_pool {
+            None => SigningVerdict::NoSession,
+            Some(pool) => {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+                signing_verdict(
+                    &mut conn,
+                    &RequestFacts {
+                        headers: req.headers(),
+                        method: req.method().as_str(),
+                        path: req.uri().path(),
+                        body,
+                    },
+                    chrono::Utc::now().timestamp_micros(),
+                )?
+            }
+        };
+        let proven = verdict == SigningVerdict::Proven;
+        if let SigningVerdict::ProofRefused(r) = verdict {
+            let why = match &r {
+                consent_grant::ProofRefusal::Invalid { why } => *why,
+                _ => "",
+            };
+            warn!(
+                path = req.uri().path(),
+                code = r.code(),
+                why,
+                "session proof refused"
+            );
+            return Ok(Err(response::json_response(
+                StatusCode::UNAUTHORIZED,
+                &serde_json::json!({ "error": r.words(), "code": r.code() }),
+            )));
+        }
+        Ok(
+            match crate::services::device_consent::signing_caller_refusal(local, proven) {
+                Some(refused) => Err(refused),
+                None => Ok(proven),
+            },
+        )
+    }
+
+    /// Whether the person is signed in, for a caller [`Self::signing_caller`]
+    /// let through: proven by sign-in, or on this machine with its session.
+    fn caller_signed_in<B>(&self, req: &Request<B>, proven: bool) -> Result<bool, StorageError> {
+        if proven {
+            return Ok(true);
+        }
+        self.person_signed_in(req)
     }
 
     /// This node's own mishpat cell, as the person's controller.
@@ -13608,16 +13677,22 @@ impl HttpServer {
             bootstrap_identity, cross_site_refusal, foreign_origin_refusal, identity_standing,
             ControllerCell,
         };
-        let refused = if bootstrap {
-            self.signing_refusal(&req)?
-                .or_else(|| cross_site_refusal(req.headers()))
+        let (req, body) = Self::read_whole(req).await?;
+        let signed_in = if bootstrap {
+            let proven = match self.signing_caller(&req, &body)? {
+                Ok(proven) => proven,
+                Err(refused) => return Ok(refused),
+            };
+            if let Some(refused) = cross_site_refusal(req.headers()) {
+                return Ok(refused);
+            }
+            self.caller_signed_in(&req, proven)?
         } else {
-            foreign_origin_refusal(req.headers())
+            if let Some(refused) = foreign_origin_refusal(req.headers()) {
+                return Ok(refused);
+            }
+            self.person_signed_in(&req)?
         };
-        if let Some(refused) = refused {
-            return Ok(refused);
-        }
-        let signed_in = self.person_signed_in(&req)?;
         if !signed_in && !bootstrap {
             return Ok(self.signed_out_standing());
         }
@@ -13648,20 +13723,16 @@ impl HttpServer {
         // A caller from elsewhere needs a session proven by sign-in, which
         // only an identity that already exists can have: beginning one is
         // this machine's alone.
-        if let Some(refused) = self
-            .signing_refusal(&req)?
-            .or_else(|| cross_site_refusal(req.headers()))
-        {
+        let (req, body) = Self::read_whole(req).await?;
+        if let Err(refused) = self.signing_caller(&req, &body)? {
+            return Ok(refused);
+        }
+        if let Some(refused) = cross_site_refusal(req.headers()) {
             return Ok(refused);
         }
         let Some(pool) = self.db_pool.clone() else {
             return Ok(response::service_unavailable("Database not enabled"));
         };
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
-            .to_bytes();
         // A secret given with begin is checked before anything is written.
         let secret = serde_json::from_slice::<crate::services::device_consent::BeginInput>(&body)
             .ok()
@@ -14046,6 +14117,7 @@ impl HttpServer {
         let refuse = |r: SignInRefusal| {
             let status = match &r {
                 SignInRefusal::NeedsSecureChannel => StatusCode::FORBIDDEN,
+                SignInRefusal::NeedsSessionKey => StatusCode::BAD_REQUEST,
                 SignInRefusal::Slowed { .. } => StatusCode::TOO_MANY_REQUESTS,
                 SignInRefusal::SecretUnset => StatusCode::CONFLICT,
                 SignInRefusal::InvalidCredentials | SignInRefusal::Paused { .. } => {
@@ -14056,6 +14128,11 @@ impl HttpServer {
             let mut builder = Response::builder()
                 .status(status)
                 .header(header::CONTENT_TYPE, "application/json");
+            // The witness's own words travel as their own field; the portal
+            // shows them and never parses the sentence.
+            if let SignInRefusal::Paused { reason } = &r {
+                body["reason"] = reason.clone().into();
+            }
             if let SignInRefusal::Slowed { retry_after_secs } = r {
                 body["retryAfter"] = retry_after_secs.into();
                 builder = builder.header(header::RETRY_AFTER, retry_after_secs.to_string());
@@ -14108,15 +14185,14 @@ impl HttpServer {
             remember: bool,
             #[serde(default)]
             return_to: Option<String>,
+            /// The key the browser binds the session to (RFC 9449 DPoP).
+            #[serde(default)]
+            session_key: Option<consent_grant::SessionKey>,
         }
         fn remember_by_default() -> bool {
             true
         }
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
-            .to_bytes();
+        let (req, body) = Self::read_whole(req).await?;
         let input: LoginInput = match serde_json::from_slice(&body) {
             Ok(input) => input,
             Err(e) => {
@@ -14132,6 +14208,46 @@ impl HttpServer {
                 &serde_json::json!({ "error": "Missing required fields: identifier, password" }),
             ));
         }
+        // Over TLS a sign-in binds its session to a key; in the clear it may
+        // not (`consent_grant::sign_in_key_rule`).
+        let unbound_in_the_clear =
+            match consent_grant::sign_in_key_rule(channel, input.session_key.is_some()) {
+                Ok(unbound) => unbound,
+                Err(r) => {
+                    warn!(source, code = r.code(), "sign-in refused: no session key");
+                    return Ok(refuse(r));
+                }
+            };
+        // Possession of the offered key is proven at binding: the sign-in
+        // request itself carries a proof made with it. Checked before the
+        // secret, so a bad proof costs no hashing.
+        let bound = match &input.session_key {
+            None => None,
+            Some(offered) => match consent_grant::bind_session_key(
+                offered,
+                req.headers().get("dpop").and_then(|v| v.to_str().ok()),
+                &consent_grant::ProofFacts {
+                    method: req.method().as_str(),
+                    path: req.uri().path(),
+                    body: &body,
+                    now_secs: now / 1_000_000,
+                },
+                node_account::replay_set(),
+            ) {
+                Ok(key) => Some(key),
+                Err(r) => {
+                    warn!(
+                        source,
+                        code = r.code(),
+                        "sign-in refused: the session key's proof"
+                    );
+                    return Ok(response::json_response(
+                        StatusCode::UNAUTHORIZED,
+                        &serde_json::json!({ "error": r.words(), "code": r.code() }),
+                    ));
+                }
+            },
+        };
         let account = {
             let mut conn = pool
                 .get()
@@ -14179,13 +14295,20 @@ impl HttpServer {
             let mut conn = pool
                 .get()
                 .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
-            node_account::open_session(&mut conn, &source, now)?
+            node_account::open_session(&mut conn, &source, bound.as_ref(), now)?
         };
         info!(
             source,
             ?channel,
+            bound_key = bound.as_ref().map(|k| k.thumbprint.as_str()),
             "sign-in: a session proven by sign-in was opened"
         );
+        if unbound_in_the_clear {
+            warn!(
+                source,
+                "sign-in: the session is bound to no key (plain http); a copied cookie can act as it"
+            );
+        }
         let redirect = input
             .return_to
             .filter(|p| p.starts_with('/') && !p.starts_with("//") && !p.contains('\\'))
@@ -14199,6 +14322,7 @@ impl HttpServer {
             "expiresAt": expires_at,
             "isSteward": true,
             "redirect": redirect,
+            "sessionKeyBound": bound.is_some(),
         });
         Ok(Response::builder()
             .status(StatusCode::OK)
@@ -14222,7 +14346,18 @@ impl HttpServer {
         {
             return Ok(refused);
         }
+        let (req, body) = Self::read_whole(req).await?;
         let (channel, source) = Self::sign_in_channel(&req);
+        // A session bound to a key is ended only with a proof from it, so a
+        // copied cookie cannot sign the person out either.
+        if !caller_is_local(&req) {
+            if let Err(refused) = self.signing_caller(&req, &body)? {
+                let no_session = refused.status() == StatusCode::FORBIDDEN;
+                if !no_session {
+                    return Ok(refused);
+                }
+            }
+        }
         if let (Some(pool), Some(token)) = (
             &self.db_pool,
             crate::services::node_account::session_token(req.headers()),
@@ -14406,16 +14541,27 @@ impl HttpServer {
         use crate::services::device_consent::{
             cross_site_refusal, foreign_origin_refusal, remote_caller_refusal, ControllerCell,
         };
+        let (req, body) = Self::read_whole(req).await?;
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let local = caller_is_local(&req);
         let deciding = path == "/auth/consent/pending/decide";
-        // Deciding signs, and the list is what a signed-in person decides
-        // from: both answer a caller on this machine or one proven by sign-in.
-        // This node's own announce stays this machine's.
-        let for_the_person = deciding || path == "/auth/consent/pending";
-        let refused = if for_the_person {
-            self.signing_refusal(&req)?
+        // Deciding signs: a caller on this machine, or a session proven by
+        // sign-in with its key's proof when bound. The list is what a
+        // signed-in person decides from: a read, so the session alone. This
+        // node's own announce stays this machine's.
+        let mut proven = false;
+        let refused = if deciding {
+            match self.signing_caller(&req, &body)? {
+                Ok(p) => {
+                    proven = p;
+                    None
+                }
+                Err(refused) => Some(refused),
+            }
+        } else if path == "/auth/consent/pending" {
+            let read_proven = !local && self.signed_in_by_proof(&req)?;
+            crate::services::device_consent::signing_caller_refusal(local, read_proven)
         } else {
             remote_caller_refusal(local)
         }
@@ -14432,15 +14578,10 @@ impl HttpServer {
             return Ok(refused);
         }
         let signed_in = if deciding {
-            self.person_signed_in(&req)?
+            self.caller_signed_in(&req, proven)?
         } else {
             false
         };
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
-            .to_bytes();
         let link = self.carrier_link();
         let link_ref = link.as_deref();
         Ok(match (method, path.as_str()) {
@@ -14534,18 +14675,15 @@ impl HttpServer {
         req: Request<Incoming>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         use crate::services::device_consent::{agree, cross_site_refusal, ControllerCell};
-        if let Some(refused) = self
-            .signing_refusal(&req)?
-            .or_else(|| cross_site_refusal(req.headers()))
-        {
+        let (req, body) = Self::read_whole(req).await?;
+        let proven = match self.signing_caller(&req, &body)? {
+            Ok(proven) => proven,
+            Err(refused) => return Ok(refused),
+        };
+        if let Some(refused) = cross_site_refusal(req.headers()) {
             return Ok(refused);
         }
-        let signed_in = self.person_signed_in(&req)?;
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
-            .to_bytes();
+        let signed_in = self.caller_signed_in(&req, proven)?;
         let cell = self.own_controller_cell();
         Ok(agree(
             &self.consent_deliveries,

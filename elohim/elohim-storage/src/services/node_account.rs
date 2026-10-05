@@ -22,6 +22,7 @@ use argon2::Argon2;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use consent_grant::{SignInRefusal, SESSION_LIFE_MICROS};
 use diesel::prelude::*;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
@@ -271,6 +272,7 @@ pub fn sign_in_verdict(
 pub fn open_session(
     conn: &mut SqliteConnection,
     source: &str,
+    bound: Option<&consent_grant::BoundKey>,
     now_micros: i64,
 ) -> Result<String, StorageError> {
     use node_signin_sessions::dsl as s;
@@ -288,7 +290,9 @@ pub fn open_session(
             s::expires_at_micros.eq(now_micros.saturating_add(SESSION_LIFE_MICROS)),
             s::source.eq(source),
             s::proven_by.eq(PROVEN_BY_PASSWORD),
-            s::bound_key.eq(None::<String>),
+            s::bound_key.eq(bound.map(|k| Value::Object(k.jwk.clone()).to_string())),
+            s::bound_key_alg.eq(bound.map(|k| k.alg.clone())),
+            s::bound_key_thumbprint.eq(bound.map(|k| k.thumbprint.clone())),
         ))
         .execute(conn)
         .map_err(db)?;
@@ -306,10 +310,28 @@ pub struct ProvenSession {
     pub source: String,
     /// How the person proved themselves: `password` today.
     pub proven_by: String,
-    /// A public key the session is bound to. Always `None` today; when a
-    /// later step binds one, each signing request must also carry a
-    /// signature from it, checked in [`request_proven`].
+    /// The public JWK the session is bound to, when the browser offered one
+    /// at sign-in (`consent_grant::dpop`). Then each request to a route that
+    /// makes the node sign must carry a proof from it ([`signing_verdict`]).
     pub bound_key: Option<String>,
+    pub bound_key_alg: Option<String>,
+    pub bound_key_thumbprint: Option<String>,
+}
+
+impl ProvenSession {
+    /// The key the session is bound to, if any. A stored key that no longer
+    /// reads as one is treated as bound to nothing anyone holds.
+    pub fn bound(&self) -> Option<Result<consent_grant::BoundKey, ()>> {
+        let jwk = self.bound_key.as_deref()?;
+        Some(
+            serde_json::from_str::<Value>(jwk)
+                .ok()
+                .zip(self.bound_key_alg.as_deref())
+                .and_then(|(jwk, alg)| consent_grant::BoundKey::new(alg, &jwk).ok())
+                .filter(|k| Some(k.thumbprint.as_str()) == self.bound_key_thumbprint.as_deref())
+                .ok_or(()),
+        )
+    }
 }
 
 /// The live session proven by sign-in that `token` names, if any.
@@ -350,12 +372,9 @@ pub fn session_token(headers: &hyper::HeaderMap) -> Option<String> {
     })
 }
 
-/// THE question every signing route asks: does this request carry a session
-/// proven by sign-in for this node's own person? Today the cookie's session
-/// is the whole proof. A session bound to a key (`bound_key`) would also need
-/// the request signed by that key; this is where that check goes, so no
-/// route changes when it does. No such session exists today, so a bound one
-/// is refused here rather than accepted on its cookie alone.
+/// Whether a request carries a live session proven by sign-in, for reads
+/// (`/auth/me`, standing, the pending list). No proof is asked of a bound
+/// session here: a copied cookie can still read what these answer.
 pub fn request_proven(
     conn: &mut SqliteConnection,
     headers: &hyper::HeaderMap,
@@ -364,10 +383,79 @@ pub fn request_proven(
     let Some(token) = session_token(headers) else {
         return Ok(false);
     };
-    Ok(match proven_session(conn, &token, now_micros)? {
-        Some(session) => session.bound_key.is_none(),
-        None => false,
-    })
+    Ok(proven_session(conn, &token, now_micros)?.is_some())
+}
+
+/// The facts of one request a session proof is checked against.
+pub struct RequestFacts<'a> {
+    pub headers: &'a hyper::HeaderMap,
+    pub method: &'a str,
+    pub path: &'a str,
+    pub body: &'a [u8],
+}
+
+/// How a request to a route that makes the node sign stands on its session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SigningVerdict {
+    /// No live session proven by sign-in.
+    NoSession,
+    /// A session proven by sign-in, and its key's proof when it is bound.
+    Proven,
+    /// A bound session whose proof failed.
+    ProofRefused(consent_grant::ProofRefusal),
+}
+
+/// Proofs already used, for this process.
+pub fn replay_set() -> &'static consent_grant::ReplaySet {
+    static SEEN: std::sync::OnceLock<consent_grant::ReplaySet> = std::sync::OnceLock::new();
+    SEEN.get_or_init(consent_grant::ReplaySet::new)
+}
+
+/// THE question every route that makes the node sign (and sign-out) asks:
+/// does this request carry a session proven by sign-in for this node's own
+/// person, with a valid proof from its key when the session is bound to one
+/// (`consent_grant::session_proof_verdict`). Asked once per request: a proof
+/// is single use. No route reads the cookie or the `DPoP` header itself.
+pub fn signing_verdict(
+    conn: &mut SqliteConnection,
+    facts: &RequestFacts<'_>,
+    now_micros: i64,
+) -> Result<SigningVerdict, StorageError> {
+    let Some(token) = session_token(facts.headers) else {
+        return Ok(SigningVerdict::NoSession);
+    };
+    let Some(session) = proven_session(conn, &token, now_micros)? else {
+        return Ok(SigningVerdict::NoSession);
+    };
+    let bound = match session.bound() {
+        None => None,
+        Some(Ok(key)) => Some(key),
+        Some(Err(())) => {
+            return Ok(SigningVerdict::ProofRefused(
+                consent_grant::ProofRefusal::Invalid {
+                    why: "the session's stored key does not read",
+                },
+            ))
+        }
+    };
+    let proof = facts.headers.get("dpop").and_then(|v| v.to_str().ok());
+    let proof_facts = consent_grant::ProofFacts {
+        method: facts.method,
+        path: facts.path,
+        body: facts.body,
+        now_secs: now_micros / 1_000_000,
+    };
+    Ok(
+        match consent_grant::session_proof_verdict(
+            bound.as_ref(),
+            proof,
+            &proof_facts,
+            replay_set(),
+        ) {
+            Ok(()) => SigningVerdict::Proven,
+            Err(r) => SigningVerdict::ProofRefused(r),
+        },
+    )
 }
 
 /// End the session `token` names. Whether one was ended.
@@ -484,7 +572,7 @@ mod tests {
         let mut c = conn();
         with_secret(&mut c, "correct horse");
         let now = 1_000_000;
-        let token = open_session(&mut c, "10.0.0.9", now).unwrap();
+        let token = open_session(&mut c, "10.0.0.9", None, now).unwrap();
         assert!(token.len() >= 43);
         assert!(session_proven(&mut c, &token, now + 1).unwrap());
         let found = proven_session(&mut c, &token, now + 1).unwrap().unwrap();
@@ -505,7 +593,7 @@ mod tests {
         assert!(!session_proven(&mut c, "guess", now).unwrap());
         assert!(end_session(&mut c, &token).unwrap());
         assert!(!session_proven(&mut c, &token, now + 1).unwrap());
-        let again = open_session(&mut c, "10.0.0.9", now).unwrap();
+        let again = open_session(&mut c, "10.0.0.9", None, now).unwrap();
         assert_eq!(
             set_verifier(&mut c, &hash_secret("new secret!").unwrap()),
             Ok(1)
@@ -523,5 +611,116 @@ mod tests {
         assert!(cleared_cookie(false).contains("Max-Age=0"));
         assert_eq!(secret_fits("short"), Err(SecretRefusal::TooShort));
         assert_eq!(secret_fits("long enough"), Ok(()));
+    }
+
+    fn proof(
+        key: &ed25519_dalek::SigningKey,
+        method: &str,
+        path: &str,
+        body: &[u8],
+        iat: i64,
+        jti: &str,
+    ) -> String {
+        use ed25519_dalek::Signer as _;
+        let jwk = serde_json::json!({
+            "kty": "OKP", "crv": "Ed25519",
+            "x": URL_SAFE_NO_PAD.encode(key.verifying_key().as_bytes()),
+        });
+        let h = URL_SAFE_NO_PAD
+            .encode(serde_json::json!({"typ": "dpop+jwt", "alg": "EdDSA", "jwk": jwk}).to_string());
+        let c = URL_SAFE_NO_PAD.encode(
+            serde_json::json!({
+                "jti": jti, "htm": method, "htu": path, "iat": iat,
+                "bsh": consent_grant::body_hash(body),
+            })
+            .to_string(),
+        );
+        let sig = key.sign(format!("{h}.{c}").as_bytes()).to_bytes();
+        format!("{h}.{c}.{}", URL_SAFE_NO_PAD.encode(sig))
+    }
+
+    #[test]
+    fn a_bound_session_signs_only_with_its_keys_proof() {
+        let mut c = conn();
+        with_secret(&mut c, "correct horse");
+        let now = 1_759_700_000_000_000;
+        let key = ed25519_dalek::SigningKey::from_bytes(&[9; 32]);
+        let jwk = serde_json::json!({
+            "kty": "OKP", "crv": "Ed25519",
+            "x": URL_SAFE_NO_PAD.encode(key.verifying_key().as_bytes()),
+        });
+        let bound = consent_grant::BoundKey::new("EdDSA", &jwk).unwrap();
+        let token = open_session(&mut c, "10.0.0.9", Some(&bound), now).unwrap();
+        let stored = proven_session(&mut c, &token, now).unwrap().unwrap();
+        assert_eq!(stored.bound(), Some(Ok(bound.clone())));
+        let verdict = |c: &mut SqliteConnection, proof: Option<String>, body: &[u8]| {
+            let mut headers = hyper::HeaderMap::new();
+            headers.insert(
+                hyper::header::COOKIE,
+                format!("{SESSION_COOKIE}={token}").parse().unwrap(),
+            );
+            if let Some(p) = proof {
+                headers.insert("dpop", p.parse().unwrap());
+            }
+            signing_verdict(
+                c,
+                &RequestFacts {
+                    headers: &headers,
+                    method: "POST",
+                    path: "/auth/consent/agree",
+                    body,
+                },
+                now,
+            )
+            .unwrap()
+        };
+        let secs = now / 1_000_000;
+        assert_eq!(
+            verdict(&mut c, None, b"{}"),
+            SigningVerdict::ProofRefused(consent_grant::ProofRefusal::Missing)
+        );
+        let good = proof(&key, "POST", "/auth/consent/agree", b"{}", secs, "one");
+        assert_eq!(
+            verdict(&mut c, Some(good.clone()), b"{}"),
+            SigningVerdict::Proven
+        );
+        assert_eq!(
+            verdict(&mut c, Some(good), b"{}"),
+            SigningVerdict::ProofRefused(consent_grant::ProofRefusal::Replayed)
+        );
+        let other = ed25519_dalek::SigningKey::from_bytes(&[8; 32]);
+        let theirs = proof(&other, "POST", "/auth/consent/agree", b"{}", secs, "two");
+        assert!(matches!(
+            verdict(&mut c, Some(theirs), b"{}"),
+            SigningVerdict::ProofRefused(consent_grant::ProofRefusal::Invalid { .. })
+        ));
+        // Reads ask only for the session.
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            hyper::header::COOKIE,
+            format!("{SESSION_COOKIE}={token}").parse().unwrap(),
+        );
+        assert!(request_proven(&mut c, &headers, now).unwrap());
+        // An unbound session needs no proof.
+        let open = open_session(&mut c, "10.0.0.9", None, now).unwrap();
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            hyper::header::COOKIE,
+            format!("{SESSION_COOKIE}={open}").parse().unwrap(),
+        );
+        assert_eq!(
+            signing_verdict(
+                &mut c,
+                &RequestFacts {
+                    headers: &headers,
+                    method: "POST",
+                    path: "/x",
+                    body: b""
+                },
+                now,
+            )
+            .unwrap(),
+            SigningVerdict::Proven
+        );
     }
 }

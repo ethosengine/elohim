@@ -5222,7 +5222,7 @@ decisionPoints:
     sourceLocation:
       file: src/services/node_account.rs
       modulePath: services::node_account::sign_in_verdict
-      line: 240
+      line: 241
     summary: >
       Whether a sign-in word and secret prove this node's own person. The word is compared in
       constant time as SHA-256 digests; the secret is always checked with Argon2id (the argon2
@@ -5239,20 +5239,23 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_wrong_word_and_a_wrong_secret_answer_the_same, kind: unit }
       - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
 
-  - name: request_proven
-    kind: pure-decision-predicate
+  - name: signing_verdict
+    kind: verdict-fn
     sourceLocation:
       file: src/services/node_account.rs
-      modulePath: services::node_account::request_proven
-      line: 359
+      modulePath: services::node_account::signing_verdict
+      line: 419
     summary: >
-      The one question every signing route asks: does this request carry a session proven by
-      sign-in for this node's own person. Today the cookie's session is the whole proof. Sessions
-      carry `proven_by` (password) and an always-empty `bound_key`; a session bound to a key is
-      refused here until per-request signatures are checked here, so no route changes then.
+      The one question every route that makes the node sign (agree, bootstrap, begin, pending
+      decide) and sign-out asks of a caller from another machine: a live session proven by sign-in,
+      with a valid DPoP proof from its key when the session is bound (consent_grant::
+      session_proof_verdict). Asked once per request (a proof is single use) through
+      HttpServer::signing_caller; no route reads the cookie or the DPoP header itself. Reads
+      (`/auth/me`, standing, the pending list) ask request_proven: the session alone.
     concernIds:
-      - { id: C1, status: answered, justification: "Only a live (unexpired, not signed out, not superseded by a new secret) sign-in session counts." }
-      - { id: C5, status: partial, justification: "The cookie is a bearer token; key binding is the named next step." }
+      - { id: C1, status: answered, justification: "A bound session's cookie alone cannot make the node sign; its key must sign each request." }
+      - { id: C4, status: answered, justification: "No session (403), and missing, invalid, stale and replayed proofs (401), each by name." }
+      - { id: C5, status: partial, justification: "Reads still accept a bound cookie without a proof; device-recognition row 9." }
     contractTests:
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_bound_session_signs_only_with_its_keys_proof, kind: unit }
       - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
-      - { path: elohim/elohim-storage/src/http.rs, testName: auth_me_from_another_machine_without_a_cookie_is_nobody, kind: unit }

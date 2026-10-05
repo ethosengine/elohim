@@ -264,6 +264,8 @@ diesel::table! {
         source -> Text,
         proven_by -> Text,
         bound_key -> Nullable<Text>,
+        bound_key_alg -> Nullable<Text>,
+        bound_key_thumbprint -> Nullable<Text>,
     }
 }
 
