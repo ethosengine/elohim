@@ -67,6 +67,19 @@ conductor, each with its own storage process:
 - A session is bound to a key the browser holds (RFC 9449 proofs, plus a body hash): a copied
   cookie cannot make the node sign. The node's verifier accepts the portal's proof byte for byte
   (a pinned test). On plain http from another machine the session may be unbound; allowed today.
+- Every authorized device speaks for its person and any may approve the next (the network holds
+  the root, no device is special); joining records stand alone and are verified by walking the
+  approver's record back to the authority; other devices affirm automatically; revocation is by the
+  root and cascades on current reads. Adversarially reviewed 2026-10-06: two critical findings
+  (a revoked record republished with a changed field; "loopback is the person" with no Host check)
+  and three high findings (rogue LAN approver, ask hijack, raw signing oracles) — the bug-class
+  fixes landed; the rest are recorded as dials in `arch-device-recognition-backlog.md` row 19
+  ("Dialing up"), each with its attack, fix and cost to the person. Operator: keep the bar low for
+  now.
+- The two branches were run against each other in a real browser (loopback and a self-signed TLS
+  origin); eleven defects found and fixed. A node does not serve its own portal (cluster row 11).
+- A dev portal on another localhost port is no longer same-origin to the node: serve it through a
+  same-origin front (`genesis/local-dev/device-consent/front.mjs` is the pattern).
 - A witness has a beat at sign-in and at device authorization and may pause for re-authentication;
   the default never pauses. Declining a pending ask is an act the asking device is told about.
 
