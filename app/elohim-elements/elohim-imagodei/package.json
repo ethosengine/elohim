@@ -29,6 +29,30 @@
       "import": "./dist/federated-identifier.js",
       "types": "./dist/federated-identifier.d.ts"
     },
+    "./witness-step": {
+      "import": "./dist/witness-step.js",
+      "types": "./dist/witness-step.d.ts"
+    },
+    "./device-consent": {
+      "import": "./dist/device-consent.js",
+      "types": "./dist/device-consent/index.d.ts"
+    },
+    "./identity-standing": {
+      "import": "./dist/identity-standing.js",
+      "types": "./dist/identity-standing/index.d.ts"
+    },
+    "./session-key": {
+      "import": "./dist/session-key.js",
+      "types": "./dist/session-key/index.d.ts"
+    },
+    "./node-sign-in": {
+      "import": "./dist/node-sign-in.js",
+      "types": "./dist/node-sign-in/index.d.ts"
+    },
+    "./pending-asks": {
+      "import": "./dist/pending-asks.js",
+      "types": "./dist/pending-asks/index.d.ts"
+    },
     "./tokens.scss": "./tokens.scss"
   },
   "files": [

@@ -19,7 +19,8 @@
           "bridges/did/did-types/**",
           "elohim/Cargo.toml",
           "elohim/epr-index/**",
-          "elohim/sdk/domains/elohim-agent/adapter/**"
+          "elohim/sdk/domains/elohim-agent/adapter/**",
+          "crates/consent-grant/**"
         ],
         "buildProcess": []
       },

@@ -27,3 +27,5 @@ compose` v2 syntax if the image ships the plugin) in ci-builder; (b) gate the le
 tool presence with an explicit SKIPPED banner so absence is visible; (c) retire the leg
 if the sweettest/a2o layers supersede it. Decide against what simulate.sh actually
 proves today.
+
+**SEEN AGAIN 2026-10-06:** edge #1551, #1553 and #1555 each mark `P2P Simulation Test` UNSTABLE within 1 to 4 s; on #1553 the step is `./simulate.sh test`, `script returned exit code 127`. It contributes an UNSTABLE mark to every edge build, which hides other reasons a build is unstable.

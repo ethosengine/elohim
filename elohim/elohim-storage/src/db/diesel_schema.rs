@@ -243,6 +243,33 @@ diesel::table! {
 }
 
 diesel::table! {
+    node_account (id) {
+        id -> Integer,
+        identifier -> Text,
+        display_name -> Nullable<Text>,
+        human_id -> Text,
+        agent_pub_key -> Text,
+        verifier -> Nullable<Text>,
+        secret_set_at -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    node_signin_sessions (token_digest) {
+        token_digest -> Text,
+        created_at_micros -> BigInt,
+        expires_at_micros -> BigInt,
+        source -> Text,
+        proven_by -> Text,
+        bound_key -> Nullable<Text>,
+        bound_key_alg -> Nullable<Text>,
+        bound_key_thumbprint -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     local_sessions (id) {
         id -> Text,
         human_id -> Text,
@@ -2071,6 +2098,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     mechanism_selection,
     mishpat_commitments,
     mutuality_audit_log,
+    node_account,
+    node_signin_sessions,
     node_stewardship,
     audit_observations,
     observation_entries,

@@ -82,6 +82,11 @@ impl EprBackend for EprServiceBackend {
                     },
                 }
             }
+            // The device-consent carrier rides the libp2p event loop, which
+            // knows the asking peer; this backend does not carry it.
+            EprRequest::DeviceCarry(_) => {
+                EprResponse::Error("device carry is not carried over iroh".into())
+            }
         }
     }
 }

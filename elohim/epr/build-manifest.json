@@ -76,6 +76,18 @@
           "recipe": "_gate-seam-contracts",
           "cargo": { "workspace": "crates/seam-contracts", "profile": "dev", "rustflags": "" }
         }
+      },
+      "consent-grant": {
+        "dir": "crates/consent-grant",
+        "inputs": {
+          "sources": ["crates/consent-grant/**", "elohim/epr/**", "elohim/Cargo.toml"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-consent-grant",
+          "cargo": { "workspace": "crates/consent-grant", "profile": "dev", "rustflags": "" }
+        }
       }
     }
   },

@@ -224,14 +224,133 @@ decisionPoints:
   contractTests: null
   gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication and independent
     receiver verification remain unproven; unit and WASM checks are not those proofs.
+- name: binding_stands
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::binding_stands
+  summary: Whether a device's joining record stands for its person (the module header's four-sentence rule).
+    Every device a person has joined speaks for them and any may approve the next; the authority record is
+    never rewritten by a join. The record is verified by walking each device approver's own joining record
+    back to the authority, now (revocation cascades) or at an authenticated earlier moment (a later
+    revocation does not count), or for structure alone.
+  concernIds:
+  - id: C1
+    status: answered
+    justification: Anti-self-election. A device never approves its own joining (classify_approvers), and a
+      device approver counts only through its own joining record, which must stand by the same rule for the
+      same identity and the same approver key; the walk ends only at the authority's root controllers, so no
+      set of devices can approve itself into standing without a root at the bottom of every way back.
+  - id: C4
+    status: answered
+    justification: Every refusal is named (depth bound, cycle, work bound, revoked, joining postdates the
+      witnessed moment, approver's record for another device or identity, noncanonical envelope). A
+      lifecycle record found but not fetchable refuses as pending, never as absence of revocation.
+  - id: C5
+    status: answered
+    justification: Each approval and the possession proof are verified against the exact intent bytes; a
+      named approver record is unsigned evidence and is checked to name that approver and that identity.
+  - id: C6a
+    status: answered
+    justification: Bounded work. The walk goes at most MAX_APPROVAL_DEPTH (8) records deep and reads at most
+      MAX_APPROVAL_VISITS (24) records; a record reached by two approvers' ways is read once; each lifecycle
+      read is capped at 64 and authority ancestry at 32. Host network waits stay conductor-bounded.
+  - id: C6b
+    status: answered
+    justification: A read; nothing is written, so replay has no effect.
+  - id: C9
+    status: partial
+    justification: Device key, approver key, identity root and authority stay distinct and are compared
+      exactly; key rotation of a device is not followed (a rotated key is a new device).
+  - id: C12
+    status: partial
+    justification: Read now, a revoked approver withdraws what it approved; read at an authenticated moment,
+      it counts until its revocation. The ruling's "what a revoked device approved earlier still stands at
+      the current read" is not built, because a joining record's time is author-chosen (a stolen revoked key
+      could backdate); the sound anchor (a pre-revocation affirmation by an independent device) is recorded
+      in arch-device-recognition-backlog row 12. Who may revoke stays root controllers only (row 13).
+      Revocations are found on the device's anchor (identity_root, device_key), so a record
+      republished with other unsigned parts, or a second record of the same key, is revoked too
+      (adversarial review 2026-10-06, row 16); approved_via must be exactly the device approvers and
+      a record stands only if its device published it.
+  - id: C13
+    status: partial
+    justification: Graduated authority. A joined device speaks with the same voice as a root for approving
+      the next device and counts once toward the policy; it cannot revoke, and it never enters the authority
+      record. Affirmations are graduated evidence that adds no voice. A policy above one is verified but no
+      write sets one yet (backlog row 5).
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs
+    testName: the_walk_back_is_bounded_refuses_a_cycle_and_reads_a_shared_approver_once
+    kind: unit
+  - path: elohim/holochain/tests/sweettest/src/tests/device_enrollment.rs
+    testName: independently_keyed_devices_share_one_human_and_revocation_cannot_be_erased
+    kind: sweettest
+- name: sign_carrier_statement
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::sign_carrier_statement
+  summary: Signs one device-carrier statement (ask, listed, code, declined; state, transport id,
+    challenge) with this cell's key under the carrier's own domain, so a node on the private network
+    proves which key speaks from which transport id. Mandate-gated; commits nothing.
+  concernIds:
+  - id: C1
+    status: answered
+    justification: The statement names the speaker's own transport id; a receiver checks it against
+      the id the message arrived from, so one node's proof cannot stand for another's.
+  - id: C5
+    status: partial
+    justification: Fixed kinds, bounded single-line fields and a domain of its own; sign_for_agent and
+      create_lineage_commitment can still sign the same bytes with the same key (a recorded dial,
+      arch-device-recognition-backlog row 19, dial 4).
+  - id: C6a
+    status: answered
+    justification: One signature per call; one mandate grant.
+  - id: C6b
+    status: answered
+    justification: Nothing written but the mandate grant; deterministic bytes.
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs
+    testName: a_carrier_statement_signs_only_its_own_shape
+    kind: unit
+- name: classify_approvers
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::classify_approvers
+  summary: The pure part of the approval rule. Who signed a joining record, that each signer counts once,
+    that the joining device did not approve itself, that each device approver names the joining record it
+    speaks through, and that at least the policy's required number of distinct speakers signed.
+  concernIds:
+  - id: C1
+    status: answered
+    justification: Anti-self-election. The joining device's own signature is refused as an approval, and one
+      key signing twice is refused rather than counted twice.
+  - id: C4
+    status: answered
+    justification: Each refusal is a distinct reason string returned to the caller.
+  - id: C6a
+    status: answered
+    justification: Linear in the approvals carried; it reads nothing.
+  - id: C13
+    status: answered
+    justification: Required counts distinct speakers, roots and devices alike; the default policy needs one.
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs
+    testName: any_device_of_the_person_counts_once_and_never_for_itself
+    kind: unit
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs
+    testName: a_required_number_counts_distinct_devices_that_speak
+    kind: unit
 - name: verify_historical_device_binding
   kind: verdict-fn
   sourceLocation:
     file: src/device_enrollment.rs
     modulePath: device_enrollment::verify_historical_device_binding
   summary: Reads the immutable device binding, verifies native ordering, controller ancestry, policy supersession
-    and discovered withdrawals as of an already authenticated witness. Discovery alone does not establish complete
-    history.
+    and discovered withdrawals as of an already authenticated witness, walking each device approver's own joining
+    record at that same moment (binding_stands). Discovery alone does not establish complete history.
   concernIds:
   - id: C0
     status: partial

@@ -254,3 +254,7 @@ desired set; `initialized=0` plus the reconcile outcome series identifies the
 exact pre-census stop.
 
 **RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): no wedge mechanism in code; the status-honesty follow-up is cured in code, with no fleet scrape recorded. `elohim-storage/src/p2p/acquisition.rs:383,487,505-507`; `p2p/mod.rs:10232`; `metrics.rs:1848,1859,1867`. Same mechanism as: residue belongs to content-gap-limit-cycle-blocks-convergence and alpha-a-projector-chronic-catchup-flap. Confirming measurement: household `GET /p2p/status` reads `pull: null` before the first reconcile and `elohim_acquisition_reconcile_initialized 1` after; adam's pin count needs the fleet.
+
+**SEEN AGAIN 2026-10-06** (elohim-genesis #1624, about 57 minutes after adam's rollout in edge #1553): `projection.adam.streams — replication=true pull=false projection_reconcile=true after 3 attempt(s)`; matthew read `pull=true`, jessica `pull=idle`. One reading, not re-measured after the second roll (edge #1555); not attributed to the device-consent landing, which did not touch pull.
+
+**AND 2026-10-06, second reading** (elohim-genesis #1625, minutes after the second roll in edge #1555): the red moved — `projection.matthew.streams pull=false`, adam `pull=true`, jessica `pull=idle`. Two builds, two different peers, each read soon after its own rollout: this looks like the pull stream not yet up when genesis probes after a roll, not adam in particular. Not measured again once the fleet had settled.

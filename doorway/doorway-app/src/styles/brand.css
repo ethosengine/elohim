@@ -1,0 +1,133 @@
+/* ============================================================================
+   Elohim brand tokens — the doorway sign-in portal's copy
+   ============================================================================
+   Source: app/graphos/elohim-protocol-design-spec.md §4 Color, §5 Type, §14
+   Token Summary. Same token NAMES and primitive VALUES as the two other homes
+   that bind them today: app/elohim-app/src/styles/brand.css (the app shell)
+   and the inline EL_TOKENS bag in the graphos designed imagodei stories (the
+   native portal's family). Neither is a package doorway-app can consume:
+   elohim-app's file sits in another workspace's private src (a bundle seam,
+   app/CLAUDE.md), and the designed stories inline theirs. So this is the ONE
+   place doorway-app declares them; components read the semantic layer below.
+
+   Theme authority: ThemeService writes body[data-theme='light'|'dark'|'device'],
+   so the semantic layer keys on body, not :root. Dark is the default
+   (constellation mode); a light device preference applies unless the person
+   chose dark.
+
+   Rules carried from the spec: no pure black or white; darks carry a green
+   undertone; warnings are terracotta, never alarm red. Every text pairing
+   below meets WCAG AA (4.5:1) on both its card and ground; field borders and
+   focus rings meet 3:1.
+   ============================================================================ */
+
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/dm-sans/index.css';
+
+:root {
+  /* Primary palette (spec §4) */
+  --el-green-deep: #2d5f3b; /* Vineyard */
+  --el-green-light: #7fb069; /* New Growth */
+  --el-amber: #d4a03e; /* Harvest Gold */
+  --el-clay: #b8664f; /* Terracotta */
+  --el-cream: #f5f0e8; /* Linen */
+  --el-stone: #6b6157; /* Hearthstone */
+
+  /* Secondary palette (spec §4) */
+  --el-sky: #7bafcb; /* Morning */
+  --el-plum: #6e4b6b; /* Sabbath */
+  --el-starlight: #e8e4d9; /* Starlight */
+  --el-night: #0f1a12; /* Deep Sky */
+  --el-night-alt: #1a1a2e; /* Indigo Night */
+  --el-ink: #26302a; /* headline dark with a green undertone (never #000) */
+
+  /* Faces (fontsource-variable family names; spec §5 fallbacks) */
+  --el-font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --el-font-ui: 'DM Sans Variable', 'DM Sans', system-ui, sans-serif;
+  --el-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Spacing (8px base), radii, motion (spec §14) */
+  --el-space-xs: 8px;
+  --el-space-sm: 16px;
+  --el-space-md: 24px;
+  --el-space-lg: 32px;
+  --el-space-xl: 48px;
+  --el-radius-sm: 4px;
+  --el-radius-md: 8px;
+  --el-radius-lg: 16px;
+  --el-ease-default: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --el-duration-fast: 150ms;
+  --el-duration-normal: 250ms;
+
+  /* Semantic layer — DARK default (constellation mode: starlight on deep sky) */
+  color-scheme: dark;
+  --el-ground: var(--el-night);
+  --el-glow: rgba(212, 160, 62, 0.1);
+  --el-surface: #162019; /* the native portal's dark panel */
+  --el-surface-2: rgba(232, 228, 217, 0.06);
+  --el-border: rgba(232, 228, 217, 0.16);
+  --el-text: var(--el-starlight);
+  --el-text-strong: #f3efe6;
+  --el-text-muted: #b4b1a6;
+  --el-action: var(--el-amber);
+  --el-action-hover: #e0b25a;
+  --el-on-action: var(--el-night);
+  --el-link: var(--el-amber);
+  --el-mark: var(--el-starlight);
+  --el-field-bg: var(--el-night);
+  --el-field-border: #7a786f;
+  --el-focus: var(--el-amber);
+  --el-warm: #d98a72; /* terracotta lifted for the dark ground */
+  --el-warm-bg: rgba(217, 138, 114, 0.12);
+  --el-shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Light — linen ground, paper card, hearthstone text. Duplicated in two blocks on
+   purpose (device preference, explicit choice) so each reads complete. */
+@media (prefers-color-scheme: light) {
+  body:not([data-theme='dark']) {
+    color-scheme: light;
+    --el-ground: var(--el-cream);
+    --el-glow: rgba(212, 160, 62, 0.14);
+    --el-surface: #faf6ee;
+    --el-surface-2: rgba(107, 97, 87, 0.06);
+    --el-border: rgba(107, 97, 87, 0.18);
+    --el-text: var(--el-stone);
+    --el-text-strong: var(--el-ink);
+    --el-text-muted: var(--el-stone);
+    --el-action: var(--el-green-deep);
+    --el-action-hover: #244d30;
+    --el-on-action: var(--el-cream);
+    --el-link: var(--el-green-deep);
+    --el-mark: var(--el-green-deep);
+    --el-field-bg: #fffcf5;
+    --el-field-border: #8c8176;
+    --el-focus: var(--el-green-deep);
+    --el-warm: #8f4a36; /* terracotta deepened for the linen ground */
+    --el-warm-bg: rgba(184, 102, 79, 0.1);
+    --el-shadow-card: 0 4px 16px rgba(107, 97, 87, 0.12);
+  }
+}
+
+body[data-theme='light'] {
+  color-scheme: light;
+  --el-ground: var(--el-cream);
+  --el-glow: rgba(212, 160, 62, 0.14);
+  --el-surface: #faf6ee;
+  --el-surface-2: rgba(107, 97, 87, 0.06);
+  --el-border: rgba(107, 97, 87, 0.18);
+  --el-text: var(--el-stone);
+  --el-text-strong: var(--el-ink);
+  --el-text-muted: var(--el-stone);
+  --el-action: var(--el-green-deep);
+  --el-action-hover: #244d30;
+  --el-on-action: var(--el-cream);
+  --el-link: var(--el-green-deep);
+  --el-mark: var(--el-green-deep);
+  --el-field-bg: #fffcf5;
+  --el-field-border: #8c8176;
+  --el-focus: var(--el-green-deep);
+  --el-warm: #8f4a36;
+  --el-warm-bg: rgba(184, 102, 79, 0.1);
+  --el-shadow-card: 0 4px 16px rgba(107, 97, 87, 0.12);
+}

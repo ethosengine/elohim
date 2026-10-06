@@ -655,6 +655,9 @@ pub fn init_ssr_render_client() -> Arc<reqwest::Client> {
             // The whole point: never hand a connection back to a pool that
             // another runtime could later check out. See above.
             .pool_max_idle_per_host(0)
+            // Pool-free means a fresh name lookup per render fetch; time it so
+            // a slow one is named (target `doorway::ssr::dns`).
+            .dns_resolver(Arc::new(crate::ssr::TimedDnsResolver))
             .build()
             .unwrap_or_default(),
     )

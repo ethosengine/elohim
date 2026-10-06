@@ -1,5 +1,11 @@
 # Document Lifecycle & Storage Backends
 
+> **What is in code (checked 2026-10-04).** `elohim-storage` keeps documents in a sled `DocStore`
+> (`src/sync/doc_store.rs`), not SQLite. The browser keeps no Automerge document across a reload and
+> there is no `OfflineOperationQueueService`. The sections marked "design sketch" below describe an
+> intended shape. The contract for keeping a person's unfinished changes is the working-version standard
+> (`genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md`).
+
 ## Creating Content
 
 ```rust
@@ -55,7 +61,7 @@ stream.push(SyncEvent {
 
 ---
 
-## Storage Backend: Native (SQLite)
+## Storage Backend: Native (SQLite) — design sketch, not in code
 
 ```sql
 CREATE TABLE documents (
@@ -75,7 +81,7 @@ CREATE TABLE events (
 CREATE INDEX idx_events_doc ON events(doc_id);
 ```
 
-## Storage Backend: Browser (IndexedDB)
+## Storage Backend: Browser (IndexedDB) — design sketch, not in code
 
 ```typescript
 interface DocStore {
@@ -98,7 +104,7 @@ interface DocStore {
 
 ## Browser-Side Integration
 
-### OfflineOperationQueueService
+### OfflineOperationQueueService — design sketch, not in code
 
 Queues operations while offline, replays when connected:
 
@@ -116,7 +122,7 @@ offlineQueue.flush(async (op) => {
 });
 ```
 
-### IndexedDB for Persistence
+### IndexedDB for Persistence — design sketch, not in code
 
 Browser stores Automerge docs in IndexedDB for offline access:
 

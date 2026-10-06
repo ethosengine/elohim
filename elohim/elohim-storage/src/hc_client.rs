@@ -228,6 +228,17 @@ async fn authorize_signing_credentials_fenced(
 /// zome-call cost.
 const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
 
+/// What an exact-payload mandate's `CapGrant` tag begins with, and the most it
+/// may hold. Mirrors `qahal_types::invocation_mandate`, which the mishpat zome
+/// parses the tag with.
+const MANDATE_TAG: &str = "elohim:invocation-mandate:v1:";
+const MANDATE_MAX_TAG_BYTES: usize = 32768;
+/// The policy a mandate minted by [`HcClient::call_zome_mandated`] names.
+const MANDATE_POLICY: &str = "node-local-identity-ceremony-v1";
+/// The name the closed-chain fence is asked about before a mandate is granted:
+/// a `CapGrant` is a chain write, so a closed chain refuses it.
+const MANDATE_GRANT: &str = "grant_zome_call_capability";
+
 const CAP_GRANT_REJECTION_MARKERS: &[&str] = &[
     "unauthorized",
     "capability",
@@ -1286,6 +1297,170 @@ impl HcClient {
             IMAGODEI_ROLE => self.imagodei_cell_id.as_ref(),
             _ => None,
         }
+    }
+
+    /// Call one identity-ceremony extern on `cell_id` under a mandate minted
+    /// for this call alone, and return its encoded answer.
+    ///
+    /// The mishpat identity-signing externs refuse this node's ordinary signing
+    /// credentials (`mishpat::invocation::authorize`): a person's key signs an
+    /// identity act only for a call whose capability names that exact payload.
+    /// So the cell's admin grants a capability to a key drawn for this call,
+    /// tagged with an `InvocationMandate` naming the one function, the exact
+    /// payload JSON (`payload_json`, which must be the extern's own
+    /// `serde_json::to_string` of the payload) and a short expiry, and the call
+    /// is signed with that key over a socket opened for it.
+    ///
+    /// **One chain write per call for the mandate: the `CapGrant`**, plus
+    /// whatever the extern itself writes (none for the signing externs, one
+    /// authority record for `bootstrap_device_identity`). The grant is not
+    /// revoked. A
+    /// revocation is a second write, and on this conductor line it does not
+    /// take the grant out of the per-call scan (`valid_cap_grants` still loads
+    /// every assigned grant and then checks it for deletion); the mandate's
+    /// expiry already makes it inert, and its key is dropped when this returns.
+    /// The grant takes the cell's chain-write lock and is refused by name on a
+    /// closed chain, like every other write.
+    ///
+    /// `cell_id` is any cell on this conductor, which is what lets a host sign
+    /// for a cell it hosts as readily as for its own.
+    pub async fn call_zome_mandated(
+        &self,
+        cell_id: &CellId,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+        payload_json: String,
+        valid_for: Duration,
+    ) -> Result<Vec<u8>, StorageError> {
+        use holochain_types::prelude::{
+            CapAccess, CapSecret, FunctionName, GrantZomeCallCapabilityPayload, GrantedFunctions,
+            ZomeCallCapGrant, ZomeName,
+        };
+        refuse_write_on_closed_chain(cell_id, zome_name, MANDATE_GRANT)?;
+        refuse_write_on_closed_chain(cell_id, zome_name, fn_name)?;
+
+        let draw = |buf: &mut [u8]| {
+            getrandom::fill(buf)
+                .map_err(|e| StorageError::Internal(format!("mandate randomness: {e}")))
+        };
+        let mut seed = [0u8; 32];
+        draw(&mut seed)?;
+        let keypair = ed25519_dalek::SigningKey::from_bytes(&seed);
+        let requester =
+            holochain_client::AgentPubKey::from_raw_32(keypair.verifying_key().as_bytes().to_vec());
+        let mut secret = [0u8; 64];
+        draw(&mut secret)?;
+
+        let valid_until = chrono::Utc::now()
+            .timestamp_micros()
+            .saturating_add(i64::try_from(valid_for.as_micros()).unwrap_or(i64::MAX));
+        let mandate = serde_json::json!({
+            "issuer": cell_id.agent_pubkey().to_string(),
+            "requester": requester.to_string(),
+            "dna": cell_id.dna_hash().to_string(),
+            "delegate": null,
+            "subjects": [],
+            "operations": [fn_name],
+            "valid_until": valid_until,
+            "binding": null,
+            "policy": MANDATE_POLICY,
+            "exact_payload_json": payload_json,
+        });
+        let tag = format!("{MANDATE_TAG}{mandate}");
+        if tag.len() > MANDATE_MAX_TAG_BYTES {
+            return Err(StorageError::InvalidInput(
+                "identity ceremony payload exceeds the mandate bound".into(),
+            ));
+        }
+        let grant = GrantZomeCallCapabilityPayload {
+            cell_id: cell_id.clone(),
+            cap_grant: ZomeCallCapGrant {
+                tag,
+                access: CapAccess::Assigned {
+                    secret: CapSecret::from(secret),
+                    assignees: std::collections::BTreeSet::from([requester.clone()]),
+                },
+                functions: GrantedFunctions::Listed(std::collections::HashSet::from([(
+                    ZomeName::from(zome_name),
+                    FunctionName::from(fn_name),
+                )])),
+            },
+        };
+        let admin_ws = self.connection().admin_ws;
+        crate::chain_write_gate::grant_capability_serialized(cell_id, || {
+            let admin_ws = admin_ws.clone();
+            crate::chain_write_gate::finish_offered_call(async move {
+                admin_ws
+                    .grant_zome_call_capability(grant)
+                    .await
+                    .map_err(|e| StorageError::Conductor(format!("mandate grant failed: {e}")))
+            })
+        })
+        .await?;
+
+        let signer = ClientAgentSigner::default();
+        signer.add_credentials(
+            cell_id.clone(),
+            holochain_client::SigningCredentials {
+                signing_agent_key: requester,
+                keypair,
+                cap_secret: CapSecret::from(secret),
+            },
+        );
+        let token = admin_ws
+            .issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
+                installed_app_id: self.config.app_id.clone(),
+                expiry_seconds: MINT_AND_CONSUME_EXPIRY_SECS,
+                single_use: true,
+            })
+            .await
+            .map_err(|e| StorageError::Connection(format!("issue_app_auth_token failed: {e}")))?;
+        let app_ws = AppWebsocket::connect(
+            &Self::to_socket_addr(&self.config.app_url),
+            token.token,
+            Arc::new(signer),
+            None,
+        )
+        .await
+        .map_err(|e| StorageError::Connection(format!("App connect failed: {e}")))?;
+
+        // The extern itself may write (bootstrap_device_identity does), so it
+        // goes through the same per-chain gate as every other zome call: reads
+        // straight through, writes under the cell's chain lock.
+        let chain_key = crate::chain_write_gate::chain_key_of(cell_id);
+        let (result, _rtt) =
+            crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
+                let payload = payload.clone();
+                let target = cell_id.clone();
+                let app_ws = app_ws.clone();
+                let offered_zome = zome_name.to_owned();
+                let offered_fn = fn_name.to_owned();
+                async move {
+                    let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
+                    crate::chain_write_gate::finish_offered_call(async move {
+                        let result = observe_conductor_attempt(
+                            &offered_zome,
+                            &offered_fn,
+                            AdmissionClass::Interactive.label(),
+                            app_ws.call_zome(
+                                ZomeCallTarget::CellId(target),
+                                offered_zome.clone().into(),
+                                offered_fn.clone().into(),
+                                ExternIO::from(payload),
+                            ),
+                        )
+                        .await;
+                        drop(_permit);
+                        result
+                            .map(|io| io.into_vec())
+                            .map_err(|e| StorageError::Conductor(format!("Zome call failed: {e}")))
+                    })
+                    .await
+                }
+            })
+            .await?;
+        Ok(result)
     }
 
     /// A handle to this client's conductor ADMIN websocket.

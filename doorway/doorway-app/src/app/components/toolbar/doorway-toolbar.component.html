@@ -3,7 +3,7 @@
     <!-- LEFT: Brand + Nav -->
     <div class="toolbar-left">
       <a routerLink="/" class="toolbar-brand">
-        <img src="/threshold/images/elohim_logo_light.png" alt="" class="brand-logo" />
+        <span class="brand-logo" aria-hidden="true"></span>
         <span class="brand-name">Doorway</span>
       </a>
       @if (authState.isAuthenticated()) {
@@ -77,15 +77,15 @@
               (click)="onLogout()"
               data-testid="toolbar-logout"
             >
-              Sign Out
+              Sign out
             </button>
           </div>
         }
       } @else {
         <!-- Anonymous -->
         <app-theme-toggle [inline]="true" />
-        <a routerLink="/login" class="btn-ghost">Sign In</a>
-        <a routerLink="/register" class="btn-primary-sm">Register</a>
+        <a routerLink="/login" class="btn-ghost">Sign in</a>
+        <a routerLink="/register" class="btn-primary-sm">Create account</a>
       }
     </div>
   </div>

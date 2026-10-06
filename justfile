@@ -654,6 +654,11 @@ _gate-seam-contracts:
     cd crates/seam-contracts && cargo fmt --check
     cd crates/seam-contracts && cargo build --target wasm32-unknown-unknown --no-default-features
 
+_gate-consent-grant:
+    cd crates/consent-grant && cargo test
+    cd crates/consent-grant && cargo clippy --all-targets -- -D warnings
+    cd crates/consent-grant && cargo fmt --check
+
 _gate-hc-dbtool:
     cd elohim/holochain/tools/hc-dbtool && cargo test
     cd elohim/holochain/tools/hc-dbtool && cargo clippy --all-targets -- -D warnings

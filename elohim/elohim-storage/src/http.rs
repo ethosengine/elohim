@@ -590,6 +590,13 @@ pub struct HttpServer {
     /// Registry of per-cell HcClient instances for zome forwarding (Phase 11).
     /// Wired at startup via `with_hc_registry`. None = conductor bridge unavailable.
     hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
+    /// Signed device consents waiting for the terminal that asked. In memory
+    /// by design: a delivery lives minutes, needs no database, and is recovered
+    /// by asking again after a restart (`services::device_consent`).
+    consent_deliveries: Arc<consent_grant::MemoryStore>,
+    /// What the identity declaration's last reconcile did, for
+    /// `GET /auth/identity/declaration` (`services::identity_declaration`).
+    identity_declaration_status: Arc<std::sync::Mutex<Option<serde_json::Value>>>,
     /// Embedded conductor manager — wired at startup (embedded mode only) so the
     /// authority-arc actuation endpoint can rewrite the conductor-config and
     /// RESTART the conductor (the only way to apply target_arc_factor — spec §2).
@@ -1121,6 +1128,132 @@ fn verify_shards_against_manifest(
 /// absent, unparseable, or carries no `elohim_session` pair. Used by
 /// `GET /auth/me` to project the cookie-named session (GAP-2b multi-session
 /// browser path) in preference to the single active session.
+/// The address a request's connection came from, recorded by `serve`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CallerAddr(pub std::net::SocketAddr);
+
+/// Where this node reads back the word its person signs in with: this node's
+/// account (`services::node_account`), its lasting home; else the newest
+/// session this node recorded for the person's Human under its own key; else
+/// the identity declaration on its disk. A claim, shown only (`consent_grant::identifier_claim`).
+pub(crate) struct NodeIdentifierSource {
+    pool: Option<DbPool>,
+}
+
+impl crate::services::device_consent::IdentifierSource for NodeIdentifierSource {
+    fn recorded(&self, human_id: &str, agent: &str) -> Option<String> {
+        use crate::db::diesel_schema::local_sessions::dsl as s;
+        use diesel::prelude::*;
+        let mut conn = self.pool.as_ref()?.get().ok()?;
+        // The account is the word's lasting home; a session only remembers it.
+        if let Some(account) = crate::services::node_account::account(&mut conn)
+            .ok()
+            .flatten()
+            .filter(|a| a.human_id == human_id && a.agent_pub_key == agent)
+        {
+            return Some(account.identifier);
+        }
+        s::local_sessions
+            .filter(s::human_id.eq(human_id))
+            .filter(s::agent_pub_key.eq(agent))
+            .order(s::updated_at.desc())
+            .select(s::identifier)
+            .first::<String>(&mut conn)
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    fn display_name(&self, human_id: &str, agent: &str) -> Option<String> {
+        let mut conn = self.pool.as_ref()?.get().ok()?;
+        crate::services::node_account::account(&mut conn)
+            .ok()
+            .flatten()
+            .filter(|a| a.human_id == human_id && a.agent_pub_key == agent)
+            .and_then(|a| a.display_name)
+    }
+
+    fn declared(&self) -> Option<consent_grant::DeclaredIdentity> {
+        crate::services::identity_declaration::path()
+            .filter(|p| p.exists())
+            .and_then(|p| crate::services::identity_declaration::read(&p).ok())
+            .and_then(|d| d.identity)
+    }
+}
+
+/// Whether a request came from this machine (`consent_grant::network_local`):
+/// a loopback peer that is no trusted proxy, with no forwarding header (a
+/// proxy on the machine forwards requests from anywhere). A request with no
+/// recorded address (one that did not arrive through `serve`) is not. Being
+/// on loopback is still all a this-machine act asks: the install-token dial
+/// that would ask more is recorded, not built
+/// (arch-device-recognition-backlog, "Dialing up").
+fn caller_is_local<B>(req: &Request<B>) -> bool {
+    let forwarded = FORWARDING_HEADERS
+        .iter()
+        .any(|name| req.headers().contains_key(*name));
+    consent_grant::network_local(
+        req.extensions().get::<CallerAddr>().map(|a| a.0.ip()),
+        HttpServer::trusted_proxies(),
+        forwarded,
+    )
+}
+
+/// The headers a proxy adds: a loopback request carrying any of them came
+/// from wherever the proxy was reached.
+const FORWARDING_HEADERS: [&str; 5] = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-proto",
+    "x-forwarded-host",
+    "x-real-ip",
+];
+
+/// The routes that act for or read about the node's person: identity,
+/// consent, device, sign-in and local sessions. `GET /auth/me` is the one
+/// left out: it is declared for the doorway to proxy (`build_manifest`), which
+/// reaches this node under its upstream name, and it reads only the session a
+/// cookie names, or, for this machine's token, the active one; it acts for
+/// nobody.
+fn is_identity_route(path: &str) -> bool {
+    (path == "/session" || path.starts_with("/session/") || path.starts_with("/auth/"))
+        && path != "/auth/me"
+}
+
+/// The names this node answers its identity routes on besides the loopback
+/// ones: `ELOHIM_ALLOWED_HOSTS`, comma-separated, read once (a node reached by
+/// name through a proxy, for sign-in from elsewhere).
+fn allowed_hosts() -> &'static [String] {
+    static HOSTS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    HOSTS.get_or_init(|| {
+        std::env::var("ELOHIM_ALLOWED_HOSTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty())
+            .collect()
+    })
+}
+
+/// The refusal for an identity route asked under a name that is not this
+/// node's (`consent_grant::host_allowed`): what a page that rebinds its own
+/// name to 127.0.0.1 sends.
+fn host_refusal<B>(req: &Request<B>) -> Option<Response<Full<Bytes>>> {
+    let host = req
+        .headers()
+        .get(header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| req.uri().authority().map(|a| a.as_str()));
+    (!consent_grant::host_allowed(host, allowed_hosts())).then(|| {
+        crate::services::device_consent::refusal(
+            StatusCode::MISDIRECTED_REQUEST,
+            "this node answers its identity routes only under its own names (localhost, \
+             127.0.0.1, [::1], or ELOHIM_ALLOWED_HOSTS)",
+            "host_not_this_node",
+        )
+    })
+}
+
 fn extract_session_cookie(headers: &hyper::HeaderMap) -> Option<String> {
     let cookie_header = headers.get(header::COOKIE)?.to_str().ok()?;
     for pair in cookie_header.split(';') {
@@ -1344,6 +1477,12 @@ impl HttpServer {
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
+            // One store with the carrier, so a code redeemed over the private
+            // network and one redeemed at /auth/consent/redeem are the same.
+            consent_deliveries: crate::services::device_carrier::carrier()
+                .deliveries
+                .clone(),
+            identity_declaration_status: Arc::new(std::sync::Mutex::new(None)),
             conductor_manager: None,
             reconcile_kick: None,
             admin_websocket: None,
@@ -1899,6 +2038,70 @@ impl HttpServer {
             max_concurrent = MAX_CONCURRENT_REQUESTS,
             "HTTP server listening"
         );
+        // The carrier names this node by its agent key once the cell is
+        // reachable, and knows whom this node speaks for (only a node that
+        // speaks for a person lists asks). Only a node that runs a carrier
+        // reads it.
+        if self.p2p_handle.is_some() {
+            let server = self.clone();
+            tokio::spawn(async move {
+                use crate::services::device_carrier as carrier;
+                use crate::services::device_consent::ControllerCell;
+                // bounded-work: one standing read (and one Human read when
+                // this node is a controller) per SPEAKS_REFRESH_SECS, or
+                // sooner when this node's identity may have changed; never
+                // per incoming ask.
+                let names = server.identifier_source();
+                loop {
+                    if let Some(cell) = server.own_controller_cell() {
+                        carrier::carrier().set_self_key(cell.agent());
+                        carrier::refresh_speaks(&cell, &names).await;
+                        // bounded-work: one mandated signature per key and
+                        // transport id for the process's life.
+                        if let Some(link) = server.carrier_link() {
+                            carrier::ensure_listed_proof(&cell, link.as_ref()).await;
+                        }
+                    }
+                    carrier::until_speaks_refresh().await;
+                }
+            });
+        }
+        // Each device of the person affirms the others it saw join.
+        // bounded-work: one standing read and one devices read a pass, at most
+        // AFFIRM_PER_PASS affirmations, a pass FIRST_PASS_AFTER_SECS after
+        // start and then every AFFIRM_EVERY_SECS (device_affirmation).
+        if self.hc_registry.is_some() {
+            let server = self.clone();
+            tokio::spawn(async move {
+                use crate::services::device_affirmation as affirmation;
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    affirmation::FIRST_PASS_AFTER_SECS,
+                ))
+                .await;
+                loop {
+                    if let Some(cell) = server.own_controller_cell() {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis() as i64)
+                            .unwrap_or(0);
+                        affirmation::pass(&cell, now).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        affirmation::AFFIRM_EVERY_SECS,
+                    ))
+                    .await;
+                }
+            });
+        }
+        // Make the sign-in decoy now, so a wrong word never costs more than a
+        // wrong secret (`node_account::sign_in_verdict`).
+        tokio::task::spawn_blocking(|| {
+            crate::services::node_account::decoy_verifier();
+        });
+        if let Some(path) = crate::services::identity_declaration::path() {
+            info!(path = %path.display(), "identity declaration: watching");
+            tokio::spawn(self.clone().watch_identity_declaration(path));
+        }
 
         loop {
             let (stream, remote_addr) = listener.accept().await?;
@@ -1909,8 +2112,11 @@ impl HttpServer {
                 // Admission moved from per-CONNECTION (acquire().await, which queued
                 // under burst and wedged /health) to per-REQUEST (try_acquire shed)
                 // in handle_request — see the Pillar 2 admission gate there.
-                let service = service_fn(move |req| {
+                let service = service_fn(move |mut req: Request<Incoming>| {
                     let server = server.clone();
+                    // The caller's address, for the few routes that answer only
+                    // this machine (`caller_is_local`).
+                    req.extensions_mut().insert(CallerAddr(remote_addr));
                     async move { server.handle_request(req).await }
                 });
 
@@ -2015,6 +2221,15 @@ impl HttpServer {
                 }
             }
         };
+
+        // The identity routes answer only under this node's own names, so a
+        // page that rebinds its name to 127.0.0.1 reaches none of them.
+        if is_identity_route(&path) && method != Method::OPTIONS {
+            if let Some(refused) = host_refusal(&req) {
+                __req_metrics.finish(StatusCode::MISDIRECTED_REQUEST.as_u16());
+                return Ok(refused.map(Either::Left));
+            }
+        }
 
         let result = match (method, path.as_str()) {
             // CORS preflight for all routes
@@ -2823,7 +3038,22 @@ impl HttpServer {
                 }
             }
 
-            // Session API: Local session management for Tauri native handoff
+            // Session API: local session management for the Tauri shell and
+            // the CLI, both on this machine. A session made here is no sign-in
+            // proof; these answer only callers on this machine, so no one
+            // elsewhere can mint one, read its id or end it.
+            (Method::GET | Method::POST | Method::DELETE, "/session")
+            | (Method::GET, "/session/all")
+            | (Method::POST, "/session/intent")
+                if !caller_is_local(&req) =>
+            {
+                Ok(crate::services::device_consent::refusal(
+                    StatusCode::FORBIDDEN,
+                    "local sessions are kept for this machine's own shell and terminal; from \
+                     another machine, sign in instead (POST /auth/login)",
+                    "session_caller_not_local",
+                ))
+            }
             (Method::GET, "/session") => {
                 if let Some(ref pool) = self.db_pool {
                     self.handle_get_session(pool.clone()).await
@@ -2876,6 +3106,79 @@ impl HttpServer {
                 }
             }
 
+            // Device consent ceremony (recognition): what the consent screen
+            // shows for a terminal's request. Pure admission, no state, no
+            // approver. Node-local like /session/exchange, so not declared in
+            // build_manifest().
+            (Method::POST, "/auth/consent/view") => self.handle_consent_view(req).await,
+
+            // Device consent ceremony: the person, signed in on this node,
+            // agrees, and this node's own cell signs as their controller.
+            // Node-local; refuses cross-site callers before anything else.
+            // Boxed so this branch does not grow every request's future.
+            (Method::POST, "/auth/consent/agree") => Box::pin(self.handle_consent_agree(req)).await,
+
+            // The signed-in person's identity on this node: what it rests on,
+            // and beginning it here with this node as its first steward.
+            // Node-local; same session and cross-site defence as agree.
+            (Method::GET, "/auth/identity/standing") => {
+                Box::pin(self.handle_identity(req, false)).await
+            }
+            (Method::POST, "/auth/identity/bootstrap") => {
+                let answer = Box::pin(self.handle_identity(req, true)).await;
+                self.refresh_speaks_now().await;
+                answer
+            }
+            // Begin a person's identity on this node with no doorway: their
+            // Human, its authority and a session. This machine only.
+            (Method::POST, "/auth/identity/begin") => {
+                let answer = Box::pin(self.handle_identity_begin(req)).await;
+                self.refresh_speaks_now().await;
+                answer
+            }
+            (Method::GET, "/auth/identity/declaration") => {
+                Box::pin(self.handle_identity_declaration(req)).await
+            }
+            // The node's own person's sign-in secret: set or reset here, on
+            // this machine only (the deterministic floor for a lost secret).
+            (Method::POST, "/auth/identity/secret") => {
+                Box::pin(self.handle_identity_secret(req)).await
+            }
+            // Sign in to this node as its own person, and sign out. The only
+            // routes here a caller from another machine may reach without a
+            // session (a sign-in from elsewhere needs TLS).
+            (Method::POST, "/auth/login") => Box::pin(self.handle_login(req)).await,
+            (Method::POST, "/auth/logout") => Box::pin(self.handle_logout(req)).await,
+
+            // The asking device's own node, for its terminal: what this node
+            // is, and enrolling it with what the terminal collected. Answered
+            // only to callers on this machine.
+            (Method::GET, "/auth/device/self") | (Method::POST, "/auth/device/enroll") => {
+                let enrolling = req.method() == Method::POST;
+                let answer = Box::pin(self.handle_device_step(req)).await;
+                if enrolling {
+                    self.refresh_speaks_now().await;
+                }
+                answer
+            }
+
+            // The first carrier (`services::device_carrier`): asks that came
+            // over the private network, deciding one, and this node's own
+            // announce. All this machine only.
+            (Method::GET, "/auth/consent/pending")
+            | (Method::POST, "/auth/consent/pending/decide")
+            | (Method::GET, "/auth/device/announce")
+            | (Method::POST, "/auth/device/announce")
+            | (Method::DELETE, "/auth/device/announce")
+            | (Method::POST, "/auth/device/announce/redeem") => {
+                Box::pin(self.handle_carrier(req)).await
+            }
+
+            // Device consent ceremony: the asking terminal redeems its code for
+            // the signed consent, once. Guarded by the terminal's own verifier
+            // and device key, so it needs no session.
+            (Method::POST, "/auth/consent/redeem") => self.handle_consent_redeem(req).await,
+
             // Auth identity endpoint: same wire shape as doorway's /auth/me so
             // the standalone peer OAuth portal bundle can consume either source
             // without knowing which transport is in play (spec §3.2 Transport β).
@@ -2887,7 +3190,15 @@ impl HttpServer {
             (Method::GET, "/auth/me") => {
                 if let Some(ref pool) = self.db_pool {
                     let cookie_session_id = extract_session_cookie(req.headers());
-                    self.handle_auth_me(pool.clone(), cookie_session_id).await
+                    // Unreadable counts as not proven: fail closed.
+                    let proven = self.signed_in_by_proof(&req).unwrap_or(false);
+                    self.handle_auth_me(
+                        pool.clone(),
+                        cookie_session_id,
+                        caller_is_local(&req),
+                        proven,
+                    )
+                    .await
                 } else {
                     Ok(response::service_unavailable("Database not enabled"))
                 }
@@ -13369,6 +13680,1301 @@ impl HttpServer {
     /// TTL, issuer-side truth — never persisted here). The conductor's
     /// `/auth/me` remains authority over doorway claims; this exchange only
     /// SEEDS a LocalSession.
+    /// POST /auth/consent/view — what the consent screen shows for a request.
+    async fn handle_consent_view(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(crate::services::device_consent::consent_view(&body))
+    }
+
+    /// The local session a request speaks for, resolved one way for every
+    /// route that asks: the session an `elohim_session` cookie names, when it
+    /// exists and is active; otherwise, for a caller on this machine only, the
+    /// single active session (the Tauri-native path, which carries no
+    /// cookie). A caller from elsewhere with no such cookie speaks for nobody.
+    fn resolve_local_session(
+        conn: &mut diesel::SqliteConnection,
+        cookie_session_id: Option<String>,
+        caller_is_local: bool,
+    ) -> Result<Option<crate::db::models::LocalSession>, StorageError> {
+        if let Some(id) = cookie_session_id {
+            match db::local_sessions::get_session_by_id(conn, &id)? {
+                Some(s) if s.is_active == 1 => return Ok(Some(s)),
+                // Cookie names a missing or deactivated session — ignore it and
+                // fall back to the active-session behavior.
+                _ => {}
+            }
+        }
+        if !caller_is_local {
+            return Ok(None);
+        }
+        db::local_sessions::get_active_session(conn)
+    }
+
+    /// Whether the request carries a session proven by sign-in for this
+    /// node's own person (`services::node_account::request_proven`). Only such
+    /// a session makes a caller from another machine anybody. Every signing
+    /// route asks this and nothing else; none reads the cookie itself, so a
+    /// per-request proof (a session bound to a key) changes only this.
+    fn signed_in_by_proof<B>(&self, req: &Request<B>) -> Result<bool, StorageError> {
+        let headers = req.headers();
+        let Some(pool) = &self.db_pool else {
+            return Ok(false);
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        crate::services::node_account::request_proven(
+            &mut conn,
+            headers,
+            chrono::Utc::now().timestamp_micros(),
+        )
+    }
+
+    /// Whether the request speaks for a person signed in on this node: a
+    /// session proven by sign-in, or, for a caller on this machine, the
+    /// session `/auth/me` resolves.
+    fn person_signed_in<B>(&self, req: &Request<B>) -> Result<bool, StorageError> {
+        if self.signed_in_by_proof(req)? {
+            return Ok(true);
+        }
+        let headers = req.headers();
+        if !caller_is_local(req) {
+            return Ok(false);
+        }
+        let Some(pool) = &self.db_pool else {
+            // No session store, so nobody can be signed in here.
+            return Ok(false);
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        Ok(
+            Self::resolve_local_session(&mut conn, extract_session_cookie(headers), true)?
+                .is_some(),
+        )
+    }
+
+    /// A request read whole: its head (for headers and the caller's address)
+    /// and its exact body bytes, which a session proof signs.
+    async fn read_whole(req: Request<Incoming>) -> Result<(Request<()>, Bytes), StorageError> {
+        let (parts, body) = req.into_parts();
+        let body = body
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok((Request::from_parts(parts, ()), body))
+    }
+
+    /// Who may make this node sign as its person
+    /// (`consent_grant::may_make_node_sign`): a caller on this machine, or a
+    /// request carrying a session proven by sign-in, with a valid proof from
+    /// its key when the session is bound to one
+    /// (`services::node_account::signing_verdict`). `Ok(proven)` lets it go
+    /// on; otherwise the refusal. Asked once per request: a proof is single
+    /// use. Routes ask this and never read the cookie or the proof themselves.
+    fn signing_caller<B>(
+        &self,
+        req: &Request<B>,
+        body: &[u8],
+    ) -> Result<Result<bool, Response<Full<Bytes>>>, StorageError> {
+        use crate::services::node_account::{signing_verdict, RequestFacts, SigningVerdict};
+        let local = caller_is_local(req);
+        if local {
+            // This-machine acts need no session at all.
+            return Ok(Ok(false));
+        }
+        let verdict = match &self.db_pool {
+            None => SigningVerdict::NoSession,
+            Some(pool) => {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+                signing_verdict(
+                    &mut conn,
+                    &RequestFacts {
+                        headers: req.headers(),
+                        method: req.method().as_str(),
+                        path: req.uri().path(),
+                        body,
+                    },
+                    chrono::Utc::now().timestamp_micros(),
+                )?
+            }
+        };
+        let proven = verdict == SigningVerdict::Proven;
+        if let SigningVerdict::ProofRefused(r) = verdict {
+            let why = match &r {
+                consent_grant::ProofRefusal::Invalid { why } => *why,
+                _ => "",
+            };
+            warn!(
+                path = req.uri().path(),
+                code = r.code(),
+                why,
+                "session proof refused"
+            );
+            return Ok(Err(response::json_response(
+                StatusCode::UNAUTHORIZED,
+                &serde_json::json!({ "error": r.words(), "code": r.code() }),
+            )));
+        }
+        Ok(
+            match crate::services::device_consent::signing_caller_refusal(local, proven) {
+                Some(refused) => Err(refused),
+                None => Ok(proven),
+            },
+        )
+    }
+
+    /// Whether the person is signed in, for a caller [`Self::signing_caller`]
+    /// let through: proven by sign-in, or on this machine with its session.
+    fn caller_signed_in<B>(&self, req: &Request<B>, proven: bool) -> Result<bool, StorageError> {
+        if proven {
+            return Ok(true);
+        }
+        self.person_signed_in(req)
+    }
+
+    /// This node's own mishpat cell, as the person's controller.
+    fn own_controller_cell(
+        &self,
+    ) -> Option<crate::services::device_consent_cell::ConductorControllerCell> {
+        self.hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .and_then(crate::services::device_consent_cell::ConductorControllerCell::own)
+    }
+
+    /// GET /auth/identity/standing, POST /auth/identity/bootstrap.
+    async fn handle_identity(
+        &self,
+        req: Request<Incoming>,
+        bootstrap: bool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            bootstrap_identity, cross_site_refusal, foreign_origin_refusal, identity_standing,
+            ControllerCell,
+        };
+        let (req, body) = Self::read_whole(req).await?;
+        let signed_in = if bootstrap {
+            let proven = match self.signing_caller(&req, &body)? {
+                Ok(proven) => proven,
+                Err(refused) => return Ok(refused),
+            };
+            if let Some(refused) = cross_site_refusal(req.headers()) {
+                return Ok(refused);
+            }
+            self.caller_signed_in(&req, proven)?
+        } else {
+            if let Some(refused) = foreign_origin_refusal(req.headers()) {
+                return Ok(refused);
+            }
+            self.person_signed_in(&req)?
+        };
+        if !signed_in && !bootstrap {
+            return Ok(self.signed_out_standing());
+        }
+        let cell = self.own_controller_cell();
+        let cell = cell.as_ref().map(|c| c as &dyn ControllerCell);
+        let names = self.identifier_source();
+        Ok(if bootstrap {
+            bootstrap_identity(cell, &names, signed_in).await
+        } else {
+            identity_standing(cell, &names, signed_in).await
+        })
+    }
+
+    /// Read whom this node speaks for now, before answering, so the next
+    /// request (the portal's pending list right after begin) sees it. Found
+    /// in the browser run: the list said "does not speak for anyone" for the
+    /// seconds the background refresh took.
+    async fn refresh_speaks_now(&self) {
+        if self.p2p_handle.is_none() {
+            return;
+        }
+        if let Some(cell) = self.own_controller_cell() {
+            crate::services::device_carrier::refresh_speaks(&cell, &self.identifier_source()).await;
+        }
+    }
+
+    /// Where this node reads back its person's sign-in word.
+    fn identifier_source(&self) -> NodeIdentifierSource {
+        NodeIdentifierSource {
+            pool: self.db_pool.clone(),
+        }
+    }
+
+    /// POST /auth/identity/begin — a person on this node's machine begins their
+    /// identity here: Human, authority and a session, with no doorway field.
+    async fn handle_identity_begin(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{begin_identity, cross_site_refusal, ControllerCell};
+        // A caller from elsewhere needs a session proven by sign-in, which
+        // only an identity that already exists can have: beginning one is
+        // this machine's alone.
+        let (req, body) = Self::read_whole(req).await?;
+        if let Err(refused) = self.signing_caller(&req, &body)? {
+            return Ok(refused);
+        }
+        if let Some(refused) = cross_site_refusal(req.headers()) {
+            return Ok(refused);
+        }
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(response::service_unavailable("Database not enabled"));
+        };
+        // A secret given with begin is checked before anything is written.
+        let secret = serde_json::from_slice::<crate::services::device_consent::BeginInput>(&body)
+            .ok()
+            .and_then(|input| input.secret);
+        if let Some(secret) = &secret {
+            if let Err(r) = crate::services::node_account::secret_fits(secret) {
+                return Ok(crate::services::device_consent::refusal(
+                    StatusCode::BAD_REQUEST,
+                    &r.words(),
+                    r.code(),
+                ));
+            }
+        }
+        let cell = self.own_controller_cell();
+        let begun =
+            match begin_identity(cell.as_ref().map(|c| c as &dyn ControllerCell), &body).await {
+                Ok(begun) => begun,
+                Err(refused) => return Ok(*refused),
+            };
+        let agent = cell
+            .as_ref()
+            .map(|c| c.agent())
+            .ok_or_else(|| StorageError::Internal("controller cell vanished".into()))?;
+        let (session, session_created) = Self::open_person_session(&pool, &begun, agent)?;
+        let secret_set = match secret {
+            Some(secret) => {
+                self.set_sign_in_secret(&pool, &secret).await?;
+                true
+            }
+            None => false,
+        };
+        let created = begun.human_created || begun.authority_created || session_created;
+        let body = serde_json::json!({
+            "standing": begun.standing,
+            "session": { "id": session.id, "humanId": session.human_id, "identifier": session.identifier },
+            "created": {
+                "human": begun.human_created,
+                "authority": begun.authority_created,
+                "session": session_created,
+            },
+            "signInSecretSet": secret_set,
+        });
+        let status = if created {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        };
+        Ok(Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(
+                header::SET_COOKIE,
+                format!(
+                    "elohim_session={}; HttpOnly; SameSite=Lax; Path=/",
+                    session.id
+                ),
+            )
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap())
+    }
+
+    /// The person's session on this node: their active one, or a new one.
+    /// No doorway authenticated it, so its doorway field is left empty, which
+    /// never allowlists a doorway for `/session/exchange`.
+    fn open_person_session(
+        pool: &DbPool,
+        begun: &crate::services::device_consent::Begun,
+        agent: String,
+    ) -> Result<(crate::db::models::LocalSession, bool), StorageError> {
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        // The account is the lasting home of the word the person signs in
+        // with; the session below is not.
+        crate::services::node_account::record_identity(
+            &mut conn,
+            &begun.identifier,
+            Some(&begun.display_name),
+            &begun.human_id,
+            &agent,
+        )?;
+        Ok(match db::local_sessions::get_active_session(&mut conn)? {
+            Some(s) if s.agent_pub_key == agent => (s, false),
+            _ => (
+                db::local_sessions::create_session(
+                    &mut conn,
+                    db::local_sessions::CreateLocalSessionInput {
+                        id: None,
+                        human_id: begun.human_id.clone(),
+                        agent_pub_key: agent,
+                        doorway_url: String::new(),
+                        doorway_id: None,
+                        identifier: begun.identifier.clone(),
+                        display_name: Some(begun.display_name.clone()),
+                        profile_image_hash: None,
+                        bootstrap_url: None,
+                    },
+                )?,
+                true,
+            ),
+        })
+    }
+
+    /// Apply the identity declaration (`services::identity_declaration`) at
+    /// start and whenever its file changes.
+    ///
+    /// The file is on this node's own disk, so applying it is a this-machine
+    /// act, the same authority as `epr identity begin` typed here. It begins
+    /// an identity only when the node has none, never changes one that exists,
+    /// and opens the person's session as begin does.
+    async fn watch_identity_declaration(self: Arc<Self>, path: std::path::PathBuf) {
+        use crate::services::device_consent::ControllerCell;
+        use crate::services::identity_declaration::{read, reconcile, Reconciled};
+        // bounded-work: one stat(2) per POLL_INTERVAL_SECS tick; a read and
+        // one reconcile (a handful of zome calls) only when the file's
+        // (mtime, length) changed or the last attempt could not reach the
+        // node. Skip-missed-ticks: a stall coalesces, never bursts.
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+            crate::runtime_config::POLL_INTERVAL_SECS,
+        ));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut settled: Option<(Option<std::time::SystemTime>, u64)> = None;
+        loop {
+            ticker.tick().await;
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+            let signature = (meta.modified().ok(), meta.len());
+            if settled == Some(signature) {
+                continue;
+            }
+            let at = chrono::Utc::now().to_rfc3339();
+            let declaration = match read(&path) {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!(error = %e, "identity declaration: unreadable; nothing applied");
+                    self.note_declaration(serde_json::json!({
+                        "at": at, "code": "identity_declaration_unreadable", "detail": e,
+                    }));
+                    settled = Some(signature);
+                    continue;
+                }
+            };
+            let Some(cell) = self.own_controller_cell() else {
+                self.note_declaration(serde_json::json!({
+                    "at": at, "code": "identity_reconcile_failed",
+                    "detail": "the node's conductor is not reachable yet",
+                }));
+                continue;
+            };
+            let outcome = reconcile(&cell, &declaration).await;
+            let mut detail = String::new();
+            match &outcome {
+                Reconciled::Applied(begun) => {
+                    self.refresh_speaks_now().await;
+                    let session = self
+                        .db_pool
+                        .as_ref()
+                        .map(|pool| Self::open_person_session(pool, begun, cell.agent()));
+                    if let Some(Err(e)) = session {
+                        detail = format!("identity applied; session not opened: {e}");
+                    }
+                    info!(
+                        code = outcome.code(),
+                        human_created = begun.human_created,
+                        authority_created = begun.authority_created,
+                        "identity declaration applied"
+                    );
+                }
+                Reconciled::Disagrees(conflict) => {
+                    detail = conflict.to_string();
+                    warn!(
+                        code = outcome.code(),
+                        "identity declaration refused: {conflict}"
+                    );
+                }
+                Reconciled::Failed(why) => {
+                    detail = why.clone();
+                    warn!(
+                        code = outcome.code(),
+                        "identity declaration not applied yet: {why}"
+                    );
+                }
+                Reconciled::Undeclared => {}
+            }
+            if !outcome.retry() {
+                settled = Some(signature);
+            }
+            self.note_declaration(serde_json::json!({
+                "at": at, "code": outcome.code(), "detail": detail,
+            }));
+        }
+    }
+
+    fn note_declaration(&self, status: serde_json::Value) {
+        *self
+            .identity_declaration_status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(status);
+    }
+
+    /// Hash `secret` off the request path and keep it as the account's
+    /// verifier. Every session the old secret proved ends.
+    async fn set_sign_in_secret(&self, pool: &DbPool, secret: &str) -> Result<usize, StorageError> {
+        let secret = secret.to_string();
+        let verifier = tokio::task::spawn_blocking(move || {
+            crate::services::node_account::hash_secret(&secret)
+        })
+        .await
+        .map_err(|e| StorageError::Internal(format!("hashing task: {e}")))??;
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+        crate::services::node_account::set_verifier(&mut conn, &verifier)
+            .map_err(|r| StorageError::Internal(r.words()))
+    }
+
+    /// POST /auth/identity/secret — set or reset this node's person's sign-in
+    /// secret. This machine only: whoever is at the node's own machine can set
+    /// a new one, which is how a lost secret is recovered (the deterministic
+    /// floor). Body `{secret, identifier?}`; the word, when given, becomes the
+    /// sign-in word.
+    async fn handle_identity_secret(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            cross_site_refusal, identifier_of, refusal, signing_caller_refusal, ControllerCell,
+        };
+        use crate::services::node_account;
+        if let Some(refused) = signing_caller_refusal(caller_is_local(&req), false)
+            .or_else(|| cross_site_refusal(req.headers()))
+        {
+            return Ok(refused);
+        }
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(response::service_unavailable("Database not enabled"));
+        };
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct SecretInput {
+            secret: String,
+            #[serde(default)]
+            identifier: Option<String>,
+        }
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        let input: SecretInput = match serde_json::from_slice(&body) {
+            Ok(input) => input,
+            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
+        };
+        if let Err(r) = node_account::secret_fits(&input.secret) {
+            return Ok(refusal(StatusCode::BAD_REQUEST, &r.words(), r.code()));
+        }
+        let given = input
+            .identifier
+            .as_deref()
+            .map(str::trim)
+            .filter(|w| {
+                !w.is_empty() && w.chars().count() <= 128 && !w.chars().any(char::is_control)
+            })
+            .map(str::to_string);
+        if input.identifier.is_some() && given.is_none() {
+            return Ok(refusal(
+                StatusCode::BAD_REQUEST,
+                "a sign-in word is plain text of at most 128 characters",
+                "secret_identifier_malformed",
+            ));
+        }
+        let existing = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            node_account::account(&mut conn)?
+        };
+        // The account names the identity this node's own cell holds.
+        let Some(cell) = self.own_controller_cell() else {
+            return Ok(response::service_unavailable("no conductor client"));
+        };
+        let agent = cell.agent();
+        let human = match cell.my_human().await {
+            Ok(Some(h)) => h,
+            Ok(None) => {
+                let r = node_account::SecretRefusal::NoAccount;
+                return Ok(refusal(StatusCode::CONFLICT, &r.words(), r.code()));
+            }
+            Err(_) => {
+                return Ok(response::service_unavailable(
+                    "the node's cell is not reachable",
+                ))
+            }
+        };
+        let identifier = given
+            .or_else(|| {
+                existing
+                    .as_ref()
+                    .filter(|a| a.human_id == human.human_id && a.agent_pub_key == agent)
+                    .map(|a| a.identifier.clone())
+            })
+            .or_else(|| identifier_of(&self.identifier_source(), &human, &agent));
+        let Some(identifier) = identifier else {
+            return Ok(refusal(
+                StatusCode::CONFLICT,
+                "this node does not know the word you sign in with; name it: \
+                 epr identity secret --identifier <word>",
+                "secret_needs_identifier",
+            ));
+        };
+        {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            node_account::record_identity(
+                &mut conn,
+                &identifier,
+                Some(&human.display_name),
+                &human.human_id,
+                &agent,
+            )?;
+        }
+        let ended = self.set_sign_in_secret(&pool, &input.secret).await?;
+        info!(
+            ended_sessions = ended,
+            "sign-in: the secret was set on this node's own machine"
+        );
+        Ok(response::ok(&serde_json::json!({
+            "identifier": identifier,
+            "signInSecretSet": true,
+            "endedSessions": ended,
+        })))
+    }
+
+    /// The proxies this node trusts to say a request reached them over TLS:
+    /// `ELOHIM_TRUSTED_PROXIES`, comma-separated IP addresses, read once.
+    /// None by default: then only this machine may sign in.
+    fn trusted_proxies() -> &'static [std::net::IpAddr] {
+        static PROXIES: std::sync::OnceLock<Vec<std::net::IpAddr>> = std::sync::OnceLock::new();
+        PROXIES.get_or_init(|| {
+            std::env::var("ELOHIM_TRUSTED_PROXIES")
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|p| p.trim().parse().ok())
+                .collect()
+        })
+    }
+
+    /// How a request reached this node (`consent_grant::channel`), and the
+    /// source sign-in attempts are counted against: the client the trusted
+    /// proxy names, or the peer itself.
+    fn sign_in_channel<B>(req: &Request<B>) -> (consent_grant::Channel, String) {
+        let Some(peer) = req.extensions().get::<CallerAddr>().map(|a| a.0.ip()) else {
+            return (consent_grant::Channel::Plain, "unknown".into());
+        };
+        let header = |name: &str| req.headers().get(name).and_then(|v| v.to_str().ok());
+        let forwarded = FORWARDING_HEADERS
+            .iter()
+            .any(|name| req.headers().contains_key(*name));
+        let channel = consent_grant::channel(
+            peer,
+            header("x-forwarded-proto"),
+            forwarded,
+            Self::trusted_proxies(),
+        );
+        let source = match channel {
+            consent_grant::Channel::Tls => header("x-forwarded-for")
+                .and_then(|v| v.rsplit(',').next())
+                .and_then(|v| v.trim().parse::<std::net::IpAddr>().ok())
+                .unwrap_or(peer),
+            _ => peer,
+        };
+        (channel, source.to_string())
+    }
+
+    /// POST /auth/login — sign in to this node as its own person, with the
+    /// doorway's login request shape (`{identifier, password}`, plus the
+    /// portal's `remember`). A session proven by sign-in is opened and set as
+    /// an HttpOnly, SameSite=Strict cookie (`Secure` over TLS).
+    async fn handle_login(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::cross_site_refusal;
+        use crate::services::node_account;
+        use consent_grant::{Channel, SignInRefusal};
+        let (channel, source) = Self::sign_in_channel(&req);
+        let refuse = |r: SignInRefusal| {
+            let status = match &r {
+                SignInRefusal::NeedsSecureChannel => StatusCode::FORBIDDEN,
+                SignInRefusal::NeedsSessionKey => StatusCode::BAD_REQUEST,
+                SignInRefusal::Slowed { .. } => StatusCode::TOO_MANY_REQUESTS,
+                SignInRefusal::SecretUnset => StatusCode::CONFLICT,
+                SignInRefusal::InvalidCredentials | SignInRefusal::Paused { .. } => {
+                    StatusCode::UNAUTHORIZED
+                }
+            };
+            let mut body = serde_json::json!({ "error": r.words(), "code": r.code() });
+            let mut builder = Response::builder()
+                .status(status)
+                .header(header::CONTENT_TYPE, "application/json");
+            // The witness's own words travel as their own field; the portal
+            // shows them and never parses the sentence.
+            if let SignInRefusal::Paused { reason } = &r {
+                body["reason"] = reason.clone().into();
+            }
+            if let SignInRefusal::Slowed { retry_after_secs } = r {
+                body["retryAfter"] = retry_after_secs.into();
+                builder = builder.header(header::RETRY_AFTER, retry_after_secs.to_string());
+            }
+            builder
+                .body(Full::new(Bytes::from(body.to_string())))
+                .unwrap()
+        };
+        // The secure-channel decision (`consent_grant::sign_in_channel_verdict`):
+        // open to a plain channel today, by operator ruling; warned once per
+        // sign-in whose secret crossed a network in the clear.
+        let in_the_clear = match consent_grant::sign_in_channel_verdict(channel) {
+            Ok(in_the_clear) => in_the_clear,
+            Err(r) => {
+                warn!(
+                    source,
+                    code = r.code(),
+                    "sign-in refused: not over a secure channel"
+                );
+                return Ok(refuse(r));
+            }
+        };
+        if in_the_clear {
+            warn!(
+                source,
+                "sign-in: a sign-in secret crossed a network in the clear (no TLS); its \
+                 session cookie will too"
+            );
+        }
+        if let Some(refused) = cross_site_refusal(req.headers()) {
+            return Ok(refused);
+        }
+        let now = chrono::Utc::now().timestamp_micros();
+        let limiter = node_account::limiter();
+        if let Err(r) = limiter.check(&source, now) {
+            warn!(source, code = r.code(), "sign-in refused: slowed");
+            return Ok(refuse(r));
+        }
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(response::service_unavailable("Database not enabled"));
+        };
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct LoginInput {
+            #[serde(default)]
+            identifier: String,
+            #[serde(default)]
+            password: String,
+            #[serde(default = "remember_by_default")]
+            remember: bool,
+            #[serde(default)]
+            return_to: Option<String>,
+            /// The key the browser binds the session to (RFC 9449 DPoP).
+            #[serde(default)]
+            session_key: Option<consent_grant::SessionKey>,
+        }
+        fn remember_by_default() -> bool {
+            true
+        }
+        let (req, body) = Self::read_whole(req).await?;
+        let input: LoginInput = match serde_json::from_slice(&body) {
+            Ok(input) => input,
+            Err(e) => {
+                return Ok(response::json_response(
+                    StatusCode::BAD_REQUEST,
+                    &serde_json::json!({ "error": format!("Invalid JSON body: {e}") }),
+                ))
+            }
+        };
+        if input.identifier.trim().is_empty() || input.password.is_empty() {
+            return Ok(response::json_response(
+                StatusCode::BAD_REQUEST,
+                &serde_json::json!({ "error": "Missing required fields: identifier, password" }),
+            ));
+        }
+        // Over TLS a sign-in binds its session to a key; in the clear it may
+        // not (`consent_grant::sign_in_key_rule`).
+        let unbound_in_the_clear =
+            match consent_grant::sign_in_key_rule(channel, input.session_key.is_some()) {
+                Ok(unbound) => unbound,
+                Err(r) => {
+                    warn!(source, code = r.code(), "sign-in refused: no session key");
+                    return Ok(refuse(r));
+                }
+            };
+        // Possession of the offered key is proven at binding: the sign-in
+        // request itself carries a proof made with it. Checked before the
+        // secret, so a bad proof costs no hashing.
+        let bound = match &input.session_key {
+            None => None,
+            Some(offered) => match consent_grant::bind_session_key(
+                offered,
+                req.headers().get("dpop").and_then(|v| v.to_str().ok()),
+                &consent_grant::ProofFacts {
+                    method: req.method().as_str(),
+                    path: req.uri().path(),
+                    body: &body,
+                    now_secs: now / 1_000_000,
+                },
+                node_account::replay_set(),
+            ) {
+                Ok(key) => Some(key),
+                Err(r) => {
+                    warn!(
+                        source,
+                        code = r.code(),
+                        "sign-in refused: the session key's proof"
+                    );
+                    return Ok(response::json_response(
+                        StatusCode::UNAUTHORIZED,
+                        &serde_json::json!({ "error": r.words(), "code": r.code() }),
+                    ));
+                }
+            },
+        };
+        let account = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            node_account::account(&mut conn)?
+        };
+        // bounded-work: at most VERIFY_PERMITS hashes at once, each bounded
+        // by MAX_SECRET_LEN; a sign-in that finds none free is slowed.
+        let Ok(permit) = node_account::verify_permits().try_acquire() else {
+            return Ok(refuse(SignInRefusal::Slowed {
+                retry_after_secs: 1,
+            }));
+        };
+        let (identifier, password) = (input.identifier.clone(), input.password.clone());
+        let checked = account.clone();
+        let verdict = tokio::task::spawn_blocking(move || {
+            node_account::sign_in_verdict(checked.as_ref(), &identifier, &password)
+        })
+        .await
+        .map_err(|e| StorageError::Internal(format!("verifying task: {e}")))?;
+        drop(permit);
+        if let Err(r) = verdict {
+            if r == SignInRefusal::InvalidCredentials {
+                limiter.failed(&source, now);
+            }
+            warn!(source, code = r.code(), "sign-in refused");
+            return Ok(refuse(r));
+        }
+        limiter.succeeded(&source);
+        let Some(account) = account else {
+            return Ok(refuse(SignInRefusal::SecretUnset));
+        };
+        // A sign-in is a witnessed moment; nobody attends by default. What
+        // the witness is shown about this node as a speaker comes from the
+        // last read kept, never a network read at the moment.
+        let speaker = match self.own_controller_cell() {
+            Some(cell) => {
+                use crate::services::device_consent::{CellStanding, ControllerCell};
+                let me = cell.agent();
+                match cell.standing().await {
+                    Ok(CellStanding::Ready(s)) if s.controllers.contains(&me) => {
+                        Some(crate::services::device_consent::speaker_context(&s, &me))
+                    }
+                    _ => None,
+                }
+            }
+            None => None,
+        };
+        if let Err(r) = consent_grant::attend_sign_in(
+            &consent_grant::Unattended,
+            &consent_grant::SignInClaims {
+                identifier: account.identifier.clone(),
+                channel,
+                speaker,
+            },
+        ) {
+            warn!(source, code = r.code(), "sign-in paused by a witness");
+            return Ok(refuse(r));
+        }
+        let token = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            node_account::open_session(&mut conn, &source, bound.as_ref(), now)?
+        };
+        info!(
+            source,
+            ?channel,
+            bound_key = bound.as_ref().map(|k| k.thumbprint.as_str()),
+            "sign-in: a session proven by sign-in was opened"
+        );
+        if unbound_in_the_clear {
+            warn!(
+                source,
+                "sign-in: the session is bound to no key (plain http); a copied cookie can act as it"
+            );
+        }
+        let redirect = input
+            .return_to
+            .filter(|p| p.starts_with('/') && !p.starts_with("//") && !p.contains('\\'))
+            .unwrap_or_else(|| "/auth/portal".to_string());
+        let expires_at = (now + consent_grant::SESSION_LIFE_MICROS) / 1_000_000;
+        let body = serde_json::json!({
+            "humanId": account.human_id,
+            "agentPubKey": account.agent_pub_key,
+            "identifier": account.identifier,
+            "displayName": account.display_name,
+            "expiresAt": expires_at,
+            "isSteward": true,
+            "redirect": redirect,
+            "sessionKeyBound": bound.is_some(),
+        });
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(
+                header::SET_COOKIE,
+                node_account::session_cookie(&token, channel == Channel::Tls, input.remember),
+            )
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap())
+    }
+
+    /// POST /auth/logout — end the session this request's cookie names, with
+    /// the doorway's logout answer.
+    async fn handle_logout(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Some(refused) =
+            crate::services::device_consent::foreign_origin_refusal(req.headers())
+        {
+            return Ok(refused);
+        }
+        let (req, body) = Self::read_whole(req).await?;
+        let (channel, source) = Self::sign_in_channel(&req);
+        // A session bound to a key is ended only with a proof from it, so a
+        // copied cookie cannot sign the person out either.
+        if !caller_is_local(&req) {
+            if let Err(refused) = self.signing_caller(&req, &body)? {
+                let no_session = refused.status() == StatusCode::FORBIDDEN;
+                if !no_session {
+                    return Ok(refused);
+                }
+            }
+        }
+        if let (Some(pool), Some(token)) = (
+            &self.db_pool,
+            crate::services::node_account::session_token(req.headers()),
+        ) {
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+            if crate::services::node_account::end_session(&mut conn, &token)? {
+                info!(source, "sign-in: a session was ended by sign-out");
+            }
+            // On this machine the cookie may name the local session begin
+            // opened, which the single-active-session fallback would keep
+            // standing on: sign-out ends it too, or signing out here would do
+            // nothing a person can see (found in the browser run).
+            if caller_is_local(&req)
+                && db::local_sessions::get_session_by_id(&mut conn, &token)?.is_some()
+                && db::local_sessions::deactivate_session(&mut conn, &token)?
+            {
+                info!(
+                    source,
+                    "sign-in: this machine's local session was ended by sign-out"
+                );
+            }
+        }
+        // A caller on this machine with no session cookie stands on the single
+        // active session (the fallback), so signing out ends that one. A
+        // browser that closed loses begin's session cookie, and its sign-out
+        // would otherwise end nothing.
+        if caller_is_local(&req) && extract_session_cookie(req.headers()).is_none() {
+            if let Some(pool) = &self.db_pool {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| StorageError::Internal(format!("Pool error: {e}")))?;
+                if let Some(active) = db::local_sessions::get_active_session(&mut conn)? {
+                    if db::local_sessions::deactivate_session(&mut conn, &active.id)? {
+                        info!(
+                            source,
+                            "sign-in: this machine's active session was ended by sign-out"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(
+                header::SET_COOKIE,
+                crate::services::node_account::cleared_cookie(
+                    channel == consent_grant::Channel::Tls,
+                ),
+            )
+            .body(Full::new(Bytes::from(
+                r#"{"success":true,"message":"Logged out successfully"}"#,
+            )))
+            .unwrap())
+    }
+
+    /// What `GET /auth/identity/standing` tells a caller who is not signed
+    /// in: whether this node has an identity and whether a sign-in secret is
+    /// set, so a portal can offer "sign in" or "begin". Nothing else: no keys,
+    /// no identity root, no names. Read without a zome call.
+    fn signed_out_standing(&self) -> Response<Full<Bytes>> {
+        use crate::services::device_consent::ControllerCell;
+        let account = self.db_pool.as_ref().and_then(|pool| {
+            let mut conn = pool.get().ok()?;
+            crate::services::node_account::account(&mut conn)
+                .ok()
+                .flatten()
+        });
+        let speaks = crate::services::device_carrier::carrier()
+            .speaks(chrono::Utc::now().timestamp_micros())
+            .person()
+            .is_some();
+        let has_session = self.own_controller_cell().is_some_and(|cell| {
+            let agent = cell.agent();
+            self.db_pool.as_ref().is_some_and(|pool| {
+                pool.get().ok().is_some_and(|mut conn| {
+                    use crate::db::diesel_schema::local_sessions::dsl as s;
+                    use diesel::prelude::*;
+                    s::local_sessions
+                        .filter(s::agent_pub_key.eq(&agent))
+                        .count()
+                        .get_result::<i64>(&mut conn)
+                        .is_ok_and(|n| n > 0)
+                })
+            })
+        });
+        response::json_response(
+            StatusCode::UNAUTHORIZED,
+            &serde_json::json!({
+                "error": "sign in on this node first",
+                "code": "consent_not_signed_in",
+                "hasIdentity": account.is_some() || speaks || has_session,
+                "signInSecretSet": account.is_some_and(|a| a.secret_set()),
+            }),
+        )
+    }
+
+    /// GET /auth/identity/declaration — the declaration this node reads, what
+    /// its last reconcile did, and the identity as it is, for this machine's
+    /// terminal. Reads only.
+    async fn handle_identity_declaration(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            foreign_origin_refusal, remote_caller_refusal, ControllerCell,
+        };
+        if let Some(refused) = remote_caller_refusal(caller_is_local(&req))
+            .or_else(|| foreign_origin_refusal(req.headers()))
+        {
+            return Ok(refused);
+        }
+        let path = crate::services::identity_declaration::path();
+        let (declared, read_error) = match &path {
+            Some(p) if p.exists() => match crate::services::identity_declaration::read(p) {
+                Ok(d) => (Some(d), None),
+                Err(e) => (None, Some(e)),
+            },
+            _ => (None, None),
+        };
+        let current = match self.own_controller_cell() {
+            Some(cell) => cell.my_human().await.ok().flatten().map(|h| {
+                serde_json::json!({
+                    "humanId": h.human_id, "displayName": h.display_name,
+                    "profileReach": h.profile_reach,
+                })
+            }),
+            None => None,
+        };
+        let last = self
+            .identity_declaration_status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        Ok(response::ok(&serde_json::json!({
+            "path": path.map(|p| p.display().to_string()),
+            "declared": declared,
+            "readError": read_error,
+            "lastReconcile": last,
+            "current": current,
+        })))
+    }
+
+    /// The carrier, when this node runs one: the libp2p transport, whose mDNS
+    /// is its local discovery. Absent in iroh-only mode.
+    fn carrier_link(
+        &self,
+    ) -> Option<std::sync::Arc<dyn crate::services::device_carrier::CarrierLink>> {
+        self.p2p_handle.clone().map(|h| {
+            std::sync::Arc::new(h)
+                as std::sync::Arc<dyn crate::services::device_carrier::CarrierLink>
+        })
+    }
+
+    /// What this node says about itself when it asks: read-only.
+    ///
+    /// "Made things" is known only from positive evidence: a content row this
+    /// node's storage holds whose `created_by` is this node's key or person.
+    /// No row is not proof of nothing (content authored on the cell directly
+    /// never becomes a row), so the answer is then `unknown`.
+    async fn node_state(&self) -> consent_grant::NodeState {
+        use crate::services::device_consent::{CellStanding, ControllerCell};
+        use consent_grant::{Made, NodeState};
+        let Some(cell) = self.own_controller_cell() else {
+            return NodeState::Unassigned;
+        };
+        let me = cell.agent();
+        let (has_human, controllers, joined) = match cell.standing().await {
+            Ok(CellStanding::NoPerson) => (false, None, false),
+            Ok(CellStanding::Unbootstrapped { .. }) => (true, None, false),
+            Ok(CellStanding::Ready(s)) => (true, Some(s.controllers), s.speaks_via.is_some()),
+            // Cannot tell: report an identity of its own, made unknown, rather
+            // than claim the node is unassigned.
+            Err(_) => (true, None, false),
+        };
+        let human_id = cell.my_human().await.ok().flatten().map(|h| h.human_id);
+        let made = match (&self.db_pool, has_human) {
+            (Some(pool), true) => {
+                use crate::db::diesel_schema::content::dsl as c;
+                use diesel::prelude::*;
+                let mut owners = vec![me.clone()];
+                owners.extend(human_id);
+                let count: i64 = pool
+                    .get()
+                    .ok()
+                    .and_then(|mut conn| {
+                        c::content
+                            .filter(c::created_by.eq_any(&owners))
+                            .count()
+                            .get_result(&mut conn)
+                            .ok()
+                    })
+                    .unwrap_or(0);
+                if count > 0 {
+                    Made::Things
+                } else {
+                    Made::Unknown
+                }
+            }
+            _ => Made::Unknown,
+        };
+        NodeState::of(has_human, controllers.as_deref(), joined, &me, made)
+    }
+
+    /// The carrier's this-machine-only routes.
+    async fn handle_carrier(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_carrier as carrier;
+        use crate::services::device_consent::{
+            cross_site_refusal, foreign_origin_refusal, remote_caller_refusal, ControllerCell,
+        };
+        let (req, body) = Self::read_whole(req).await?;
+        let method = req.method().clone();
+        let path = req.uri().path().to_string();
+        let local = caller_is_local(&req);
+        let deciding = path == "/auth/consent/pending/decide";
+        // Deciding signs: a caller on this machine, or a session proven by
+        // sign-in with its key's proof when bound. The list is what a
+        // signed-in person decides from: a read, so the session alone. This
+        // node's own announce stays this machine's.
+        let mut proven = false;
+        let refused = if deciding {
+            match self.signing_caller(&req, &body)? {
+                Ok(p) => {
+                    proven = p;
+                    None
+                }
+                Err(refused) => Some(refused),
+            }
+        } else if path == "/auth/consent/pending" {
+            let read_proven = !local && self.signed_in_by_proof(&req)?;
+            crate::services::device_consent::signing_caller_refusal(local, read_proven)
+        } else {
+            remote_caller_refusal(local)
+        }
+        .or_else(|| {
+            if method == Method::GET {
+                foreign_origin_refusal(req.headers())
+            } else if method == Method::DELETE {
+                None
+            } else {
+                cross_site_refusal(req.headers())
+            }
+        });
+        if let Some(refused) = refused {
+            return Ok(refused);
+        }
+        let signed_in = if deciding {
+            self.caller_signed_in(&req, proven)?
+        } else {
+            false
+        };
+        let link = self.carrier_link();
+        let link_ref = link.as_deref();
+        Ok(match (method, path.as_str()) {
+            (Method::GET, "/auth/consent/pending") => carrier::pending_list(
+                link_ref,
+                &carrier::carrier().speaks(chrono::Utc::now().timestamp_micros()),
+            ),
+            (Method::POST, "/auth/consent/pending/decide") => {
+                let declaration = crate::services::identity_declaration::path()
+                    .filter(|p| p.exists())
+                    .and_then(|p| crate::services::identity_declaration::read(&p).ok())
+                    .unwrap_or_default();
+                let cell = self.own_controller_cell();
+                carrier::decide_pending(
+                    &self.consent_deliveries,
+                    cell.as_ref().map(|c| c as &dyn ControllerCell),
+                    &consent_grant::Unattended,
+                    link_ref,
+                    &declaration,
+                    &carrier::carrier().speaks(chrono::Utc::now().timestamp_micros()),
+                    signed_in,
+                    &body,
+                )
+                .await
+            }
+            (Method::GET, "/auth/device/announce") => carrier::announce_status(),
+            (Method::DELETE, "/auth/device/announce") => {
+                carrier::carrier().stop_announce();
+                response::ok(&serde_json::json!({ "status": "none" }))
+            }
+            (Method::POST, "/auth/device/announce/redeem") => {
+                carrier::announce_redeem(link_ref, &body).await
+            }
+            _ => {
+                let state = self.node_state().await;
+                let device = self
+                    .hc_registry
+                    .as_ref()
+                    .and_then(|r| r.lamad_client())
+                    .and_then(crate::services::device_consent_cell::ConductorDeviceCell::own);
+                let device = device
+                    .as_ref()
+                    .map(|c| c as &dyn crate::services::device_consent::DeviceCell);
+                match carrier::start_announce(link_ref, device, state, &body).await {
+                    Ok((answer, _)) => {
+                        if let Some(link) = link {
+                            tokio::spawn(carrier::run_announce(link));
+                        }
+                        answer
+                    }
+                    Err(refused) => *refused,
+                }
+            }
+        })
+    }
+
+    /// GET /auth/device/self, POST /auth/device/enroll.
+    async fn handle_device_step(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{
+            cross_site_refusal, device_enroll, device_self, foreign_origin_refusal,
+            remote_caller_refusal, DeviceCell,
+        };
+        if let Some(refused) = remote_caller_refusal(caller_is_local(&req)) {
+            return Ok(refused);
+        }
+        let enroll = req.method() == Method::POST;
+        let refused = if enroll {
+            cross_site_refusal(req.headers())
+        } else {
+            foreign_origin_refusal(req.headers())
+        };
+        if let Some(refused) = refused {
+            return Ok(refused);
+        }
+        let cell = self
+            .hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .and_then(crate::services::device_consent_cell::ConductorDeviceCell::own);
+        let cell = cell.as_ref().map(|c| c as &dyn DeviceCell);
+        if !enroll {
+            return Ok(device_self(cell).await);
+        }
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(device_enroll(cell, &body).await)
+    }
+
+    /// POST /auth/consent/agree — the signed-in person agrees, and this node's
+    /// own cell signs as their controller.
+    async fn handle_consent_agree(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::services::device_consent::{agree, cross_site_refusal, ControllerCell};
+        let (req, body) = Self::read_whole(req).await?;
+        let proven = match self.signing_caller(&req, &body)? {
+            Ok(proven) => proven,
+            Err(refused) => return Ok(refused),
+        };
+        if let Some(refused) = cross_site_refusal(req.headers()) {
+            return Ok(refused);
+        }
+        let signed_in = self.caller_signed_in(&req, proven)?;
+        let cell = self.own_controller_cell();
+        Ok(agree(
+            &self.consent_deliveries,
+            cell.as_ref().map(|c| c as &dyn ControllerCell),
+            &consent_grant::Unattended,
+            signed_in,
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await)
+    }
+
+    /// POST /auth/consent/redeem — the asking terminal collects its consent.
+    async fn handle_consent_redeem(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(crate::services::device_consent::redeem_code(
+            &self.consent_deliveries,
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        ))
+    }
+
     async fn handle_session_exchange(
         &self,
         req: Request<Incoming>,
@@ -13554,6 +15160,8 @@ impl HttpServer {
         &self,
         pool: DbPool,
         cookie_session_id: Option<String>,
+        caller_is_local: bool,
+        proven_by_signin: bool,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         #[derive(Debug, serde::Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -13572,6 +15180,9 @@ impl HttpServer {
             human_id: String,
             agent_pub_key: String,
             identifier: String,
+            /// The person's name as given, from this node's account.
+            #[serde(skip_serializing_if = "Option::is_none")]
+            display_name: Option<String>,
             permission_level: String,
             #[serde(skip_serializing_if = "Option::is_none")]
             doorway_id: Option<String>,
@@ -13593,28 +15204,37 @@ impl HttpServer {
         // request carries one AND that session exists and is active (multi-
         // session browser path, GAP-2b). Otherwise fall through to the single
         // active session — Tauri-native compat must not change.
-        let cookie_session = match cookie_session_id {
-            Some(id) => match db::local_sessions::get_session_by_id(&mut conn, &id)? {
-                Some(s) if s.is_active == 1 => Some(s),
-                // Cookie names a missing or deactivated session — ignore it and
-                // fall back to the active-session behavior.
-                _ => None,
-            },
-            None => None,
+        // A session proven by sign-in names this node's own person, read
+        // from its account; any other session names whom it was made for.
+        let account = crate::services::node_account::account(&mut conn)?;
+        let session = if proven_by_signin {
+            account.as_ref().map(|a| {
+                (
+                    a.human_id.clone(),
+                    a.agent_pub_key.clone(),
+                    a.identifier.clone(),
+                    a.display_name.clone(),
+                )
+            })
+        } else {
+            Self::resolve_local_session(&mut conn, cookie_session_id, caller_is_local)?.map(|s| {
+                let from_account = account
+                    .as_ref()
+                    .filter(|a| a.human_id == s.human_id && a.agent_pub_key == s.agent_pub_key);
+                (
+                    s.human_id,
+                    s.agent_pub_key,
+                    from_account.map_or(s.identifier, |a| a.identifier.clone()),
+                    from_account.map_or(s.display_name, |a| a.display_name.clone()),
+                )
+            })
         };
-
-        let session = match cookie_session {
-            Some(s) => s,
-            None => {
-                let Some(active) = db::local_sessions::get_active_session(&mut conn)? else {
-                    return Ok(Response::builder()
-                        .status(StatusCode::UNAUTHORIZED)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
-                        .unwrap());
-                };
-                active
-            }
+        let Some((human_id, agent_pub_key, identifier, display_name)) = session else {
+            return Ok(Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"no active session"}"#)))
+                .unwrap());
         };
 
         // Derive a human-readable conductor label from what we know about this
@@ -13625,7 +15245,8 @@ impl HttpServer {
             self.self_peer_id.clone()
         } else {
             let addr = self.bind_addr;
-            if addr.ip().is_loopback() {
+            // A wildcard bind address names no place a person knows.
+            if addr.ip().is_loopback() || addr.ip().is_unspecified() {
                 "your conductor on this device".to_string()
             } else {
                 addr.to_string()
@@ -13633,9 +15254,10 @@ impl HttpServer {
         };
 
         let resp = StorageMeResponse {
-            human_id: session.human_id,
-            agent_pub_key: session.agent_pub_key,
-            identifier: session.identifier,
+            human_id,
+            agent_pub_key,
+            identifier,
+            display_name,
             // LocalSession has no permission_level field; default to "standard"
             // — the same default doorway uses when the JWT claim is absent.
             permission_level: "standard".to_string(),
@@ -21014,7 +22636,7 @@ mod session_exchange_tests {
 
         // Cookie names the active (second) session.
         let resp = server
-            .handle_auth_me(pool.clone(), Some(second.id.clone()))
+            .handle_auth_me(pool.clone(), Some(second.id.clone()), true, false)
             .await
             .unwrap();
         assert_eq!(status_of(&resp), StatusCode::OK);
@@ -21024,7 +22646,7 @@ mod session_exchange_tests {
         // Cookie naming the DEACTIVATED first session must be ignored — falls
         // back to the active session (matthew), never projecting a dead session.
         let resp2 = server
-            .handle_auth_me(pool.clone(), Some(first.id.clone()))
+            .handle_auth_me(pool.clone(), Some(first.id.clone()), true, false)
             .await
             .unwrap();
         assert_eq!(status_of(&resp2), StatusCode::OK);
@@ -21043,7 +22665,7 @@ mod session_exchange_tests {
         seed_session(&pool, "matthew", "https://alpha.elohim.host");
 
         let resp = server
-            .handle_auth_me(pool.clone(), Some("no-such-session".into()))
+            .handle_auth_me(pool.clone(), Some("no-such-session".into()), true, false)
             .await
             .unwrap();
         assert_eq!(status_of(&resp), StatusCode::OK);
@@ -21058,11 +22680,38 @@ mod session_exchange_tests {
         let pool = server.db_pool.clone().unwrap();
         seed_session(&pool, "matthew", "https://alpha.elohim.host");
 
-        let resp = server.handle_auth_me(pool.clone(), None).await.unwrap();
+        let resp = server
+            .handle_auth_me(pool.clone(), None, true, false)
+            .await
+            .unwrap();
         assert_eq!(status_of(&resp), StatusCode::OK);
         let json = body_json(resp).await;
         assert_eq!(json["humanId"], "matthew");
         assert_eq!(json["trustMode"], "peer-conductor");
+    }
+
+    // A caller from another machine with no cookie stands on nobody's session.
+    #[tokio::test]
+    async fn auth_me_from_another_machine_without_a_cookie_is_nobody() {
+        let server = test_server().await;
+        let pool = server.db_pool.clone().unwrap();
+        seed_session(&pool, "matthew", "https://alpha.elohim.host");
+        let resp = server
+            .handle_auth_me(pool.clone(), None, false, false)
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::UNAUTHORIZED);
+        // A session made by POST /session or the exchange still answers to its
+        // own cookie, from anywhere.
+        let mut conn = pool.get().unwrap();
+        let active = db::local_sessions::get_active_session(&mut conn)
+            .unwrap()
+            .unwrap();
+        let resp = server
+            .handle_auth_me(pool.clone(), Some(active.id), false, false)
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::OK);
     }
 
     // /auth/me with no sessions at all and no cookie → 401 (unchanged contract).
@@ -21070,11 +22719,73 @@ mod session_exchange_tests {
     async fn auth_me_no_session_returns_401() {
         let server = test_server().await;
         let pool = server.db_pool.clone().unwrap();
-        let resp = server.handle_auth_me(pool.clone(), None).await.unwrap();
+        let resp = server
+            .handle_auth_me(pool.clone(), None, true, false)
+            .await
+            .unwrap();
         assert_eq!(status_of(&resp), StatusCode::UNAUTHORIZED);
     }
 
     // Cookie-extraction helper unit coverage.
+    #[test]
+    fn only_a_loopback_connection_counts_as_this_machine() {
+        let with = |addr: Option<&str>, headers: &[(&str, &str)]| {
+            let mut req = Request::builder().uri("/").body(()).unwrap();
+            if let Some(a) = addr {
+                req.extensions_mut().insert(CallerAddr(a.parse().unwrap()));
+            }
+            for (name, value) in headers {
+                req.headers_mut().insert(
+                    hyper::header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                    value.parse().unwrap(),
+                );
+            }
+            caller_is_local(&req)
+        };
+        assert!(with(Some("127.0.0.1:5000"), &[]));
+        assert!(with(Some("[::1]:5000"), &[]));
+        assert!(!with(Some("10.1.19.170:5000"), &[]));
+        assert!(!with(Some("192.168.1.20:5000"), &[]));
+        // A request that did not come through `serve` carries no address.
+        assert!(!with(None, &[]));
+        // Adversarial review, critical 2: a proxy on the machine passes
+        // requests from anywhere, so a forwarded loopback request is not local.
+        for forwarded in [
+            "forwarded",
+            "x-forwarded-for",
+            "x-forwarded-proto",
+            "x-real-ip",
+        ] {
+            assert!(
+                !with(Some("127.0.0.1:5000"), &[(forwarded, "198.51.100.7")]),
+                "{forwarded}"
+            );
+        }
+    }
+
+    #[test]
+    fn identity_routes_answer_only_this_nodes_names() {
+        let host = |path: &str, host: Option<&str>| {
+            let mut req = Request::builder().uri(path).body(()).unwrap();
+            if let Some(h) = host {
+                req.headers_mut()
+                    .insert(hyper::header::HOST, h.parse().unwrap());
+            }
+            is_identity_route(path) && host_refusal(&req).is_some()
+        };
+        // A page that rebinds its name to 127.0.0.1 still sends its name.
+        assert!(host("/auth/identity/secret", Some("evil.example:8191")));
+        assert!(host("/auth/consent/agree", Some("evil.example")));
+        assert!(host("/session", Some("evil.example")));
+        assert!(host("/auth/device/announce", None));
+        assert!(!host("/auth/identity/secret", Some("127.0.0.1:8191")));
+        assert!(!host("/auth/identity/standing", Some("localhost:8191")));
+        // The doorway proxies /auth/me under its upstream name; it reads, never acts.
+        assert!(!host("/auth/me", Some("elohim-storage:8090")));
+        // Content routes are not identity routes.
+        assert!(!host("/db/content/x", Some("evil.example")));
+    }
+
     #[test]
     fn extract_session_cookie_parses_pairs() {
         let mut headers = hyper::HeaderMap::new();

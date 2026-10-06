@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "elements": "pnpm --filter elohim-core --filter elohim-imagodei run build",
+    "prestart": "pnpm run elements",
     "start": "ng serve",
+    "prebuild": "pnpm run elements",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "vitest run --config vite.config.ts",
@@ -24,6 +27,9 @@
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "elohim-imagodei": "workspace:*",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.16.0"

@@ -53,6 +53,34 @@ describe('<elohim-imagodei-trust-indicator>', () => {
     expect(text).to.include('your conductor on this device');
   });
 
+  it('keeps its own mode words when the host supplies none', async () => {
+    const hosted = await fixture<ElohimImagodeiTrustIndicator>(html`
+      <elohim-imagodei-trust-indicator trust-mode="doorway-host"></elohim-imagodei-trust-indicator>
+    `);
+    expect(hosted.shadowRoot!.querySelector('strong')?.textContent).to.equal('Hosted via');
+    const own = await fixture<ElohimImagodeiTrustIndicator>(html`
+      <elohim-imagodei-trust-indicator
+        trust-mode="peer-conductor"
+      ></elohim-imagodei-trust-indicator>
+    `);
+    expect(own.shadowRoot!.querySelector('strong')?.textContent).to.equal('Your conductor —');
+  });
+
+  it('says what the host supplies for its mode, and nothing empty', async () => {
+    const el = await fixture<ElohimImagodeiTrustIndicator>(html`
+      <elohim-imagodei-trust-indicator
+        trust-mode="peer-conductor"
+        .strings=${{ ownNodeLabel: 'Your own device holds your key' }}
+      ></elohim-imagodei-trust-indicator>
+    `);
+    expect(el.shadowRoot!.querySelector('strong')?.textContent).to.equal(
+      'Your own device holds your key'
+    );
+    expect(el.shadowRoot!.querySelector('[part="mode"]')?.getAttribute('aria-label')).to.equal(
+      'Your own device holds your key'
+    );
+  });
+
   it('surfaces flywheel hint only when flywheelHint is true', async () => {
     const elNoHint = await fixture<ElohimImagodeiTrustIndicator>(html`
       <elohim-imagodei-trust-indicator

@@ -9,7 +9,7 @@ tier: architecture
 stewardship-frame: adversary
 cites:
   - "elohim-protocol-manifesto | The human purpose this reimplementation must make ordinary: dignity, shared understanding, care, and agency amid present epistemic collapse. | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
-  - "values-forward | The limits on automated authority, enclosure, purchased standing, and the conversion of human participation into extraction. | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "values-forward | The limits on automated authority, enclosure, purchased standing, and the conversion of human participation into extraction. | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "hardware-spec | The envisioned device spectrum against which the plan must measure actual convenience and operating cost. | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "hardware-providence-commons | The existing household repair, bounded operation, and practical substitution promises translated into executable acceptance boundaries. | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
   - "resilience-protocol-spec | The ordinary-person reliability requirement governing recovery and infrastructure convenience. | sha256:5d5f1f85fe7dcfe2 | path: genesis/docs/content/elohim-protocol/resilience/README.md"

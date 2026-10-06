@@ -48,6 +48,10 @@ pub enum EprRequest {
     /// Query a peer's delivery capability for a specific blob.
     /// No reach authorization needed — asking "can you serve this?" not "give me this."
     QueryDelivery { blob_hash: String },
+    /// The device-consent carrier (`services::device_carrier`): a
+    /// `consent_grant::CarryRequest` as JSON. Additive; a peer that predates
+    /// it fails to decode the request and is simply not an approving node here.
+    DeviceCarry(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 /// EPR response types
@@ -71,6 +75,9 @@ pub enum EprResponse {
     },
     /// Error
     Error(String),
+    /// The device-consent carrier's answer: a `consent_grant::CarryResponse`
+    /// as JSON.
+    DeviceCarry(#[serde(with = "serde_bytes")] Vec<u8>),
     /// Delivery capability info for a specific blob
     DeliveryInfo {
         serves_extracted: bool,
@@ -100,6 +107,7 @@ impl EprResponse {
                 reason,
             } => format!("AccessDenied(required_reach={required_reach}, reason={reason})"),
             Self::Error(msg) => format!("Error({msg})"),
+            Self::DeviceCarry(bytes) => format!("DeviceCarry({} bytes)", bytes.len()),
             Self::DeliveryInfo {
                 serves_extracted,
                 serves_compressed,

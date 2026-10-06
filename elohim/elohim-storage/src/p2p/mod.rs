@@ -1251,8 +1251,51 @@ pub use binding_proof_wire::{
     binding_admissible_for_attribution, binding_admissible_for_attribution_proof,
 };
 
+/// How long one device-consent carrier message may wait for its answer.
+pub const DEVICE_CARRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+type DeviceCarryReply = oneshot::Sender<Result<consent_grant::CarryResponse, String>>;
+
+/// Carrier messages in flight, by request id. Bounded by the carrier itself:
+/// an announce sends at most one message per private-network peer per round,
+/// and every entry is removed by its response or its outbound failure.
+fn device_carry_pending() -> &'static std::sync::Mutex<
+    std::collections::HashMap<request_response::OutboundRequestId, DeviceCarryReply>,
+> {
+    static PENDING: std::sync::OnceLock<
+        std::sync::Mutex<
+            std::collections::HashMap<request_response::OutboundRequestId, DeviceCarryReply>,
+        >,
+    > = std::sync::OnceLock::new();
+    PENDING.get_or_init(Default::default)
+}
+
+/// Answer a carrier message from `peer`. The transport id is passed to the
+/// carrier only to answer that peer; it is never taken for the device's key.
+/// `None` is silence: the response channel is dropped and the peer is told
+/// nothing (a node that speaks for nobody, `services::device_carrier`).
+fn device_carry_answer(peer: &PeerId, bytes: &[u8]) -> Option<Vec<u8>> {
+    let answer = match consent_grant::CarryRequest::from_bytes(bytes) {
+        Ok(request) => {
+            crate::services::device_carrier::carrier().on_request(&peer.to_string(), request)?
+        }
+        Err(code) => {
+            warn!(peer = %peer, "device carrier: unreadable message");
+            consent_grant::CarryResponse::Refused { code }
+        }
+    };
+    Some(answer.to_bytes())
+}
+
 /// Commands sent from HTTP handlers to the P2P event loop.
 pub enum P2PCommand {
+    /// One device-consent carrier message to a peer found by local discovery
+    /// (`services::device_carrier`).
+    DeviceCarry {
+        peer: PeerId,
+        request: consent_grant::CarryRequest,
+        reply: oneshot::Sender<Result<consent_grant::CarryResponse, String>>,
+    },
     /// Publish an EPR Head to Kademlia DHT.
     ///
     /// Currently unused: the drain loop (`drain_publish_queue`) is the sole
@@ -1637,6 +1680,9 @@ impl P2PHandle {
                     P2PCommand::PushShard { reply, .. } => {
                         let _ = reply.send(Err("stub: no P2P swarm in test".to_string()));
                     }
+                    P2PCommand::DeviceCarry { reply, .. } => {
+                        let _ = reply.send(Err("stub: no P2P swarm in test".to_string()));
+                    }
                     P2PCommand::FetchShard { reply, .. } => {
                         let _ = reply.send(None);
                     }
@@ -1797,6 +1843,42 @@ impl P2PHandle {
             .iter()
             .map(|entry| entry.value().clone())
             .collect()
+    }
+
+    /// The peers local discovery (mDNS) found on the private network: the
+    /// only peers the device-consent carrier speaks to.
+    pub fn private_network_peers(&self) -> Vec<String> {
+        self.delivery_peers
+            .iter()
+            .filter(|entry| entry.value().network == "lan")
+            .map(|entry| entry.key().clone())
+            .collect()
+    }
+
+    /// Send one device-consent carrier message to `peer` and wait for its
+    /// answer, at most `DEVICE_CARRY_TIMEOUT`.
+    pub async fn device_carry(
+        &self,
+        peer: &str,
+        request: consent_grant::CarryRequest,
+    ) -> Result<consent_grant::CarryResponse, String> {
+        let peer: PeerId = peer
+            .parse()
+            .map_err(|e| format!("not a transport id: {e}"))?;
+        let (reply, answer) = oneshot::channel();
+        self.command_tx
+            .send(P2PCommand::DeviceCarry {
+                peer,
+                request,
+                reply,
+            })
+            .await
+            .map_err(|_| "the transport is not running".to_string())?;
+        match tokio::time::timeout(DEVICE_CARRY_TIMEOUT, answer).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err("the transport dropped the request".into()),
+            Err(_) => Err("no answer in time".into()),
+        }
     }
 
     /// Return the most recently gossiped inventory snapshot hashes, or `None`
@@ -4747,6 +4829,20 @@ impl P2PNode {
                     }
                 }
             }
+            P2PCommand::DeviceCarry {
+                peer,
+                request,
+                reply,
+            } => {
+                let req_id = swarm
+                    .behaviour_mut()
+                    .epr_protocol
+                    .send_request(&peer, EprRequest::DeviceCarry(request.to_bytes()));
+                device_carry_pending()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(req_id, reply);
+            }
             P2PCommand::FetchShard { hash, reply } => {
                 let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
                 if let Some(peer_id) = peers.first() {
@@ -6777,7 +6873,19 @@ impl P2PNode {
                     request, channel, ..
                 } => {
                     debug!(peer = %peer, request = ?request, "Received EPR request");
-                    let response = self.handle_epr_request(request).await;
+                    let response = match request {
+                        // The carrier needs the asking peer, which the EPR
+                        // handlers never see; it is answered here. Silence
+                        // drops the channel, so the peer hears nothing.
+                        EprRequest::DeviceCarry(bytes) => {
+                            device_carry_answer(&peer, &bytes).map(EprResponse::DeviceCarry)
+                        }
+                        request => Some(self.handle_epr_request(request).await),
+                    };
+                    let Some(response) = response else {
+                        drop(channel);
+                        return;
+                    };
                     let mut swarm = self.swarm.write().await;
                     if let Err(e) = swarm
                         .behaviour_mut()
@@ -6792,7 +6900,24 @@ impl P2PNode {
                     request_id,
                     response,
                 } => {
-                    self.handle_epr_response(peer, request_id, response).await;
+                    let waiting = device_carry_pending()
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .remove(&request_id);
+                    match (waiting, response) {
+                        (Some(reply), EprResponse::DeviceCarry(bytes)) => {
+                            let _ = reply.send(consent_grant::CarryResponse::from_bytes(&bytes));
+                        }
+                        (Some(reply), other) => {
+                            let _ = reply.send(Err(format!(
+                                "the peer answered without the carrier: {}",
+                                other.summary()
+                            )));
+                        }
+                        (None, response) => {
+                            self.handle_epr_response(peer, request_id, response).await;
+                        }
+                    }
                 }
             },
             behaviour::ElohimStorageBehaviourEvent::EprProtocol(
@@ -6812,6 +6937,13 @@ impl P2PNode {
                 if let Some((_, reply)) = self.pending_epr_resolves.lock().await.remove(&request_id)
                 {
                     let _ = reply.send(None);
+                }
+                if let Some(reply) = device_carry_pending()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&request_id)
+                {
+                    let _ = reply.send(Err(format!("the peer could not be reached: {error}")));
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::EprProtocol(

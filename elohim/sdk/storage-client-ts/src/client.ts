@@ -35,7 +35,7 @@ import type { PeerStatusView } from './generated/PeerStatusView';
  * const { heads } = await client.getHeads('graph:my-doc');
  *
  * // Get changes since known heads
- * const { changes, new_heads } = await client.getChangesSince('graph:my-doc', knownHeads);
+ * const { changes, newHeads } = await client.getChangesSince('graph:my-doc', knownHeads);
  *
  * // Apply changes
  * await client.applyChanges('graph:my-doc', changesBytes);

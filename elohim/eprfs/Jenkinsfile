@@ -107,7 +107,10 @@ spec:
                 export RUSTC_WRAPPER=""
                 cargo --version
                 cargo fmt --check
-                cargo clippy --workspace --all-targets -- -D warnings
+                # async_trait marks its generated futures must_use; clippy 1.99 reports
+                # that as doubled on trait methods returning Result. Allowed here, not in
+                # the crates: their published sources are immutable per version.
+                cargo clippy --workspace --all-targets -- -D warnings -A clippy::double_must_use
               '
             '''
           }

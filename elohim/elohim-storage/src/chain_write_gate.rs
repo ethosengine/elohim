@@ -402,6 +402,7 @@ const CRATE_READ_FNS: &[&str] = &[
     // verifies controller proofs across imagodei and mishpat; none of these
     // read paths register a device, repair links, or author a commitment.
     "get_human_by_agent_key",
+    "get_my_human", // → get_human_by_agent_key for the calling agent
     "get_human_root_evidence",
     "resolve_device_identity",
     "get_membership_by_action",
@@ -416,6 +417,20 @@ const CRATE_READ_FNS: &[&str] = &[
     "get_commitment_record",
     "get_commitment_state_links",
     "get_lineage_successors",
+    // The device consent ceremony. `my_consent_standing` reads the Human (a
+    // bridge read through `get_my_human`), the deterministic bootstrap entry and
+    // its authority history; `sign_device_approval` signs with `sign_raw` and
+    // commits nothing. The CapGrant that authorizes it is a separate admin-socket
+    // write, serialized by `grant_capability_serialized`.
+    "my_consent_standing",
+    "sign_device_approval",
+    // Signs possession of an enrollment intent with `sign_raw`; commits nothing.
+    "sign_device_enrollment",
+    // Reads the devices that speak for a person (links, verifying walks).
+    "identity_devices",
+    // Signs one carrier statement with `sign_raw`, under the carrier's own
+    // domain; commits nothing.
+    "sign_carrier_statement",
     // --- infrastructure ----------------------------------------------------
     "find_publishers",
     "get_latest_peer_status_for_agent",
@@ -491,6 +506,7 @@ pub const CRATE_WRITE_FNS: &[&str] = &[
     "create_agent_peer_binding",
     "create_collab_agreement",
     "create_collective",
+    "create_human",           // Human entry + IdToHuman + AgentKeyToHuman links
     "create_self_revocation", // cross-DNA bridge → elohim chain
     "issue_attestation",
     "remove_portal_host",
@@ -499,6 +515,11 @@ pub const CRATE_WRITE_FNS: &[&str] = &[
     // --- mishpat -----------------------------------------------------------
     "create_commitment",
     "create_commitment_state_link",
+    "bootstrap_device_identity", // → notarize: one binds-identity Commitment
+    "enroll_identity_device",    // → notarize: one binds-identity Commitment
+    "affirm_identity_device",    // → notarize: one affirms-device Commitment + its link
+    "revoke_identity_device",    // → notarize: one revokes-commitment Commitment + its links
+    "register_device_identity",  // → one AgentKeyToHuman link
     // --- node-registry -----------------------------------------------------
     "carry_from", // → carry_page
     "create_shard_assignment",

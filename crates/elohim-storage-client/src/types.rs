@@ -28,6 +28,7 @@ impl Default for StorageConfig {
 
 /// Document metadata from list operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentInfo {
     /// Document ID
     pub doc_id: String,
@@ -43,8 +44,10 @@ pub struct DocumentInfo {
 
 /// Response from list documents endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListDocumentsResponse {
     /// Application ID
+    #[serde(rename = "hAppId")]
     pub app_id: String,
     /// List of documents
     pub documents: Vec<DocumentInfo>,
@@ -58,8 +61,10 @@ pub struct ListDocumentsResponse {
 
 /// Response from get document endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetDocumentResponse {
     /// Application ID
+    #[serde(rename = "hAppId")]
     pub app_id: String,
     /// Document ID
     pub doc_id: String,
@@ -69,8 +74,10 @@ pub struct GetDocumentResponse {
 
 /// Response from get heads endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetHeadsResponse {
     /// Application ID
+    #[serde(rename = "hAppId")]
     pub app_id: String,
     /// Document ID
     pub doc_id: String,
@@ -80,8 +87,10 @@ pub struct GetHeadsResponse {
 
 /// Response from get changes endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetChangesResponse {
     /// Application ID
+    #[serde(rename = "hAppId")]
     pub app_id: String,
     /// Document ID
     pub doc_id: String,
@@ -93,8 +102,10 @@ pub struct GetChangesResponse {
 
 /// Response from apply changes endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplyChangesResponse {
     /// Application ID
+    #[serde(rename = "hAppId")]
     pub app_id: String,
     /// Document ID
     pub doc_id: String,
@@ -417,4 +428,35 @@ pub struct DbStats {
     pub path_count: u64,
     pub step_count: u64,
     pub unique_tags: u64,
+}
+
+#[cfg(test)]
+mod wire_shape_tests {
+    use super::*;
+
+    // The shapes below are what elohim-storage's /sync/v1 handlers send (camelCase,
+    // with the app id as `hAppId`). A snake_case field here fails to parse the reply.
+    #[test]
+    fn changes_response_parses_the_server_shape() {
+        let body = r#"{"hAppId":"elohim","docId":"node:a","changes":["AA=="],"newHeads":["h1"]}"#;
+        let parsed: GetChangesResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.app_id, "elohim");
+        assert_eq!(parsed.doc_id, "node:a");
+        assert_eq!(parsed.new_heads, vec!["h1".to_string()]);
+    }
+
+    #[test]
+    fn apply_response_parses_the_server_shape() {
+        let body = r#"{"hAppId":"elohim","docId":"node:a","newHeads":["h2"]}"#;
+        let parsed: ApplyChangesResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.new_heads, vec!["h2".to_string()]);
+    }
+
+    #[test]
+    fn list_response_parses_the_server_shape() {
+        let body = r#"{"hAppId":"elohim","documents":[{"docId":"node:a","docType":"node","changeCount":3,"lastModified":7,"heads":["h1"]}],"total":1,"offset":0,"limit":50}"#;
+        let parsed: ListDocumentsResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.documents[0].change_count, 3);
+        assert_eq!(parsed.documents[0].doc_type, "node");
+    }
 }

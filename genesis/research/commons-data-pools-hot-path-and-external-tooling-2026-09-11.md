@@ -3,6 +3,8 @@ title: "Commons Data Pools — what we have, what we must build, how external to
 status: Capture (co-authored; three horizon ledgers appended verbatim with reconciliation notes)
 date: 2026-09-11
 serves: recall-reaches-authority
+realized-by:
+  - genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md (decides §3 row 2 and §8 Q3 — the pool primitive; the rest of this capture stands and is cited from there)
 realizes:
   - genesis/docs/content/elohim-protocol/search/epic.md (the search epic — pools are its "index is a pool" and "hot path" sections made practical)
 informed-by:

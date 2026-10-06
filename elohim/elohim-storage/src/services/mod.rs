@@ -55,7 +55,11 @@ pub mod custody_facing; // custody-observation loader for the typed custody fold
 pub mod custody_rotation; // author a successor custody pledge when the content's blob rotates under it
 pub mod custody_standing; // station 3b — resolves the custody facts the private-reach gate decides on
 pub mod demand_autopin; // self-healing opportunity map row 15 — auto-pin on a local content read-miss
-pub mod device_capacity; // Phase 4 T7 — available bytes helper
+pub mod device_affirmation; // each device of a person affirms the others it saw join: bounded, logged, not approving
+pub mod device_capacity;
+pub mod device_carrier; // the first device-consent carrier: asks over local discovery, decided on the approving node
+pub mod device_consent; // device recognition ceremony, node-local mount of `consent_grant` // Phase 4 T7 — available bytes helper
+pub mod device_consent_cell; // the controller cell the consent ceremony signs with, over this node's conductor
 pub mod did_identity_store; // did:elohim assembly store — implements the did-bridge ElohimIdentityStore contract (spec §3.4)
 pub mod disposition_service;
 pub mod distribution;
@@ -93,6 +97,7 @@ pub mod household_identity; // cid↔slug household vocabulary bridge — the CO
 pub mod household_resilience;
 pub mod hub_capacity_service;
 pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)
+pub mod identity_declaration; // the node's identity, declared in a file, and the reconcile that applies it
 pub mod identity_fill; // Periodic NULL agent_pub_key fill + create-missing from DHT membership truth (fills-never-moves)
 pub mod imagodei_lookup; // Phase 4 T5 — display name resolver
 pub mod inference_engine;
@@ -109,6 +114,7 @@ pub mod membership_identity_reconcile; // membership-truth agent-key supersede +
 pub mod mishpat_commitment_facing;
 pub mod mishpat_mirror_backfill; // level-triggered heal: re-file/insert replicates-* mirrors into the canonical projection namespace
 pub mod mutuality_audit_service;
+pub mod node_account; // the node's own person's sign-in account and the sessions sign-in proves
 pub mod observation_kinds; // manifest-declared observation kinds + payload validation (attention-witnessed-privately A1)
 pub mod operation_authorization; // Che op-gate Slice 1 §14 — core op-gate gate over mishpat_commitments
 pub mod operational_weave_facing;

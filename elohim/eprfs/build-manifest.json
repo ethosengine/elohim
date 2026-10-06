@@ -24,7 +24,8 @@
           "bridges/did/did-types/**",
           "scripts/ci/cargo-publish-eprfs.sh",
           "scripts/ci/publish_eprfs.py",
-          "scripts/ci/test_publish_eprfs.py"
+          "scripts/ci/test_publish_eprfs.py",
+          "crates/consent-grant/**"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]
       },
