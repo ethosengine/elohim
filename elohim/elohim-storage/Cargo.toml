@@ -28,6 +28,11 @@ elohim-epr-rea = { path = "../epr-rea", default-features = false }
 # See genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md
 elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts" }
 
+# The consent ceremony a portal performs (device recognition): request admission,
+# the addressed consent record, single-use delivery. The peer runtime mounts it so
+# one device can run the whole ceremony alone; the doorway mounts the same steps.
+elohim-consent-grant = { version = "0.1.0", path = "../../crates/consent-grant" }
+
 # SDK boundary types — View types migrate here incrementally from views.rs
 elohim-sdk = { path = "../../crates/elohim-sdk" }
 
@@ -171,6 +176,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 # Content-addressed storage
 sha2 = "0.10"
+# The node's own person's sign-in secret is kept only as an Argon2id verifier
+# (services::node_account); the same crate and defaults the doorway uses for
+# its accounts. No `rand` feature: the salt is drawn with getrandom.
+argon2 = { version = "0.5", default-features = false, features = ["alloc", "password-hash"] }
 subtle = "2.6"
 hex = "0.4"
 # Shamir Secret Sharing over GF(256) — Recovery M4 T21 share-reconstruction primitive.

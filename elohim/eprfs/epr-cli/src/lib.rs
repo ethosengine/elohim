@@ -5,9 +5,11 @@
 //! finding as relevant to a requested reach event.
 
 pub mod actor;
+pub mod approver;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;
+pub mod device;
 pub mod device_key;
 pub mod doctor;
 pub mod error;

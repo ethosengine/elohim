@@ -207,6 +207,26 @@ where
             .map_err(|e| DoorwayError::Database(format!("Update failed: {e}")))
     }
 
+    /// Atomically update the one document matching `filter` and return it as it
+    /// was BEFORE the update, or `None` when nothing matched.
+    ///
+    /// This is the compare-and-set a single-use record needs: put the unused
+    /// condition in the filter and the consuming write in the update, and only
+    /// one of any number of concurrent callers receives the document.
+    pub async fn take_one(
+        &self,
+        filter: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> Result<Option<T>, DoorwayError> {
+        let mut full_filter = filter;
+        full_filter.insert("metadata.is_deleted", doc! { "$ne": true });
+
+        self.inner
+            .find_one_and_update(full_filter, update.into())
+            .await
+            .map_err(|e| DoorwayError::Database(format!("Take failed: {e}")))
+    }
+
     /// Soft delete a document
     pub async fn soft_delete(&self, filter: Document) -> Result<UpdateResult, DoorwayError> {
         let update = doc! {

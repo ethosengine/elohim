@@ -1,0 +1,899 @@
+# crates/consent-grant/seam-registry.yaml
+#
+# Conforms to elohim/sdk/schemas/v1/manifest/seam-registry.schema.json.
+# Every symbol below was read at authoring time (2026-10-04).
+
+seamRegistryVersion: 1
+crate: elohim-consent-grant
+crateRoot: crates/consent-grant
+seamLocus: >
+  The rules of asking a controller's consent from a terminal: the terminal asks to be
+  recognized as a person's device, a controller agrees in a portal, a single-use code returns by
+  loopback or by paste, and the terminal redeems it. Plain-data predicates only, so the hosted
+  portal (doorway), the native portal (elohim-storage) and the asking terminal apply one set of
+  rules. Recognition plane only: nothing here confers authority over content. The consent
+  record is content-addressed evidence; the binding the controller's cell signs is what peers
+  verify.
+
+decisionPoints:
+  - name: admit_request
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/request.rs
+      modulePath: consent_grant::request::admit_request
+      line: 123
+    summary: >
+      Decides whether a terminal's request is fit to put in front of a person: known domain and
+      client, well-formed device key and network, plain bounded label, a non-empty set of
+      coherent recognised acts, a device root exactly when binding it is asked, a PKCE S256
+      challenge, an opaque state, an unprivileged loopback port. Returns an `AdmittedRequest`,
+      the only type an agreement can be recorded against.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Consent is a federation-plane exchange; the authority it leads to lives on the notary
+          plane (the mishpat device binding, the content head delegation). This predicate holds
+          no authority and stores nothing.
+      - id: C1
+        status: answered
+        justification: >
+          A device cannot approve itself. Admission only qualifies a request for display; the
+          approval is a controller's signature the enrollment zome checks against the person's
+          controller quorum.
+      - id: C2
+        status: n-a
+        justification: No competing candidates are ordered here.
+      - id: C3
+        status: n-a
+        justification: A single stateless verdict; there is no state to stall in.
+      - id: C4
+        status: answered
+        justification: >
+          Every refusal is a distinct `RequestRefusal`; an unrecognised act is refused
+          (`act_unknown`) rather than dropped, so consent is never given to less than was shown.
+      - id: C5
+        status: answered
+        justification: >
+          The device key in a request is treated as a claim. Its shape is checked here and its
+          possession is proven only at the zome, which refuses a binding the key did not sign.
+      - id: C6a
+        status: answered
+        justification: >
+          Work is bounded by `GrantPolicy` (label length), a closed two-act vocabulary and
+          fixed token lengths; nothing iterates over caller-controlled unbounded input.
+      - id: C6b
+        status: n-a
+        justification: Pure; no effect to repeat.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable snake_case code for the wire and the log.
+      - id: C9
+        status: n-a
+        justification: >
+          Identity lineage (re-key, supersession) is the enrollment zome's `supersedes` field,
+          not this request.
+      - id: C10
+        status: answered
+        justification: >
+          `GRANT_DOMAIN` versions the contract; a request naming another version is refused
+          (`request_domain_unsupported`) instead of being interpreted under these rules.
+      - id: C11
+        status: partial
+        justification: >
+          Size bounds are here; rate limiting of unauthenticated requests belongs to the serving
+          portal and is not yet built.
+      - id: C12
+        status: answered
+        justification: >
+          This is the consent seam: the request names exactly the acts a person will be shown,
+          and only a known client may ask.
+      - id: C13
+        status: n-a
+        justification: Authority is not graded here; acts are named and individually consented.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified; there is no residual branch.
+    contractTests:
+      - path: crates/consent-grant/src/request.rs
+        testName: each_malformation_has_its_own_refusal
+        kind: unit
+      - path: crates/consent-grant/src/request.rs
+        testName: a_label_is_plain_bounded_text
+        kind: unit
+      - path: crates/consent-grant/src/act.rs
+        testName: an_unknown_act_is_refused_not_ignored
+        kind: unit
+
+  - name: admit_redemption
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/delivery.rs
+      modulePath: consent_grant::delivery::admit_redemption
+      line: 140
+    summary: >
+      Decides whether a terminal may collect an approved grant: the code's digest matches, the
+      grant is unredeemed and unexpired, the client and device key are the ones that asked, and
+      the PKCE verifier matches the stored challenge. Refusals that show a code was seen by
+      someone else (`burns_grant`) tell the portal to discard the grant.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Federation-plane exchange; the returned act's authority is on-chain.
+      - id: C1
+        status: answered
+        justification: >
+          The redeemer must hold the verifier the asking terminal generated and name the device
+          key that was approved; neither is the portal's to supply.
+      - id: C2
+        status: n-a
+        justification: No ordering among candidates.
+      - id: C3
+        status: answered
+        justification: >
+          Every grant leaves the store: redeemed, expired, or burned. No state waits on a human
+          indefinitely.
+      - id: C4
+        status: answered
+        justification: >
+          An unknown code, an expired grant and a redeemed grant are three distinct refusals,
+          never one generic failure.
+      - id: C5
+        status: answered
+        justification: >
+          Possession of a code is evidence, not authority; redemption also requires the
+          verifier and the device key.
+      - id: C6a
+        status: answered
+        justification: Constant work per call; inputs are length-bounded tokens.
+      - id: C6b
+        status: partial
+        justification: >
+          The predicate reports `AlreadyRedeemed` for a redeemed grant, but single redemption
+          under concurrency depends on the store's atomic take; see `settle`.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C9
+        status: n-a
+        justification: No identity lineage here.
+      - id: C10
+        status: answered
+        justification: Grants are issued only from requests admitted under `GRANT_DOMAIN`.
+      - id: C11
+        status: partial
+        justification: Redemption attempt rate limiting belongs to the serving portal.
+      - id: C12
+        status: answered
+        justification: >
+          Only the address of the record the controller agreed to is held and released.
+      - id: C13
+        status: n-a
+        justification: Not graded.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified.
+    contractTests:
+      - path: crates/consent-grant/src/delivery.rs
+        testName: a_code_alone_redeems_nothing
+        kind: unit
+      - path: crates/consent-grant/src/delivery.rs
+        testName: a_delivery_redeems_once_and_within_its_window
+        kind: unit
+      - path: crates/consent-grant/src/delivery.rs
+        testName: signs_of_a_seen_code_burn_the_delivery
+        kind: unit
+      - path: crates/consent-grant/src/delivery.rs
+        testName: the_store_never_holds_the_code
+        kind: unit
+
+  - name: ConsentRecord::agree
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/consent.rs
+      modulePath: consent_grant::consent::ConsentRecord::agree
+      line: 91
+    summary: >
+      Records a controller's agreement to an admitted request as a content-addressed statement:
+      what was asked, what was agreed, the identity and authority it is under, the device key
+      and, only when its binding was agreed, the device root. Refuses an agreement that is
+      empty, wider than the request, or incoherent by itself. The address excludes signatures,
+      the device label and all delivery state.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Recognition plane. The record is evidence held locally; it is not a notarized
+          authority and confers nothing over any content.
+      - id: C1
+        status: answered
+        justification: >
+          The identity and authority are supplied by the agreeing controller, never by the
+          asking terminal, and the agreed acts cannot exceed what the terminal asked.
+      - id: C2
+        status: n-a
+        justification: No ordering among candidates.
+      - id: C3
+        status: n-a
+        justification: A single stateless verdict.
+      - id: C4
+        status: answered
+        justification: >
+          What was declined is recoverable from the record (`declined_acts`); an agreement to
+          nothing is refused rather than recorded as an empty consent.
+      - id: C5
+        status: answered
+        justification: >
+          The record is evidence that consent was given. Its signatures are detached and are
+          verified by whoever holds the signers' keys; a record alone authorizes nothing.
+      - id: C6a
+        status: answered
+        justification: Closed act vocabulary and fixed-shape fields.
+      - id: C6b
+        status: answered
+        justification: >
+          The address is a pure function of the record, so recording the same agreement twice
+          yields the same address, and adding or replacing a signature never moves it.
+      - id: C7
+        status: n-a
+        justification: Nothing is advertised.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C9
+        status: partial
+        justification: >
+          The record names the identity root and the authority it was agreed under. It does not
+          follow a later change of authority; a re-keyed identity needs a new consent.
+      - id: C10
+        status: answered
+        justification: >
+          The record carries `GRANT_DOMAIN` and refuses unknown fields on decode, so a record
+          from another version is not read under these rules.
+      - id: C11
+        status: n-a
+        justification: Reached only from an authenticated consent step.
+      - id: C12
+        status: answered
+        justification: This is the record of the consent itself, including what was declined.
+      - id: C13
+        status: n-a
+        justification: Not graded.
+      - id: C14
+        status: n-a
+        justification: Every outcome is classified.
+    contractTests:
+      - path: crates/consent-grant/src/consent.rs
+        testName: a_person_may_agree_to_less_never_more
+        kind: unit
+      - path: crates/consent-grant/src/consent.rs
+        testName: signing_again_never_moves_the_address
+        kind: unit
+      - path: crates/consent-grant/src/consent.rs
+        testName: the_record_carries_no_label_and_no_delivery_state
+        kind: unit
+
+  - name: issue
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/ceremony.rs
+      modulePath: consent_grant::ceremony::issue
+      line: 97
+    summary: >
+      Decides whether a signed consent may be held for the asking terminal: its address must
+      be its own, it must have been made for this request (challenge, device key, client), and
+      at least one party must have signed it. Returns what to hold and how the code returns.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A record made for another terminal's request, or one nobody signed, cannot be issued;
+          the host cannot substitute a different agreement for the one the person gave.
+      - id: C5
+        status: partial
+        justification: >
+          Presence of a signature is required here; its validity is the host's to verify
+          against the controller's key before calling. No key material reaches this crate.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+      - id: C12
+        status: answered
+        justification: Only the record the controller agreed to and signed is released.
+    contractTests:
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: only_a_signed_record_made_for_this_request_is_issued
+        kind: unit
+
+  - name: settle
+    kind: verdict-fn
+    sourceLocation:
+      file: src/ceremony.rs
+      modulePath: consent_grant::ceremony::settle
+      line: 139
+    summary: >
+      Decides what a terminal receives for a presented code, given what the store's atomic take
+      returned. A fresh take is checked by `admit_redemption`; an earlier take or an unknown
+      code is refused. The delivery is already consumed when this runs.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: Every delivery ends redeemed, burned or swept; none waits indefinitely.
+      - id: C4
+        status: answered
+        justification: Unknown, already-redeemed and each mismatch are distinct refusals.
+      - id: C6b
+        status: answered
+        justification: >
+          Single redemption rests on the store's take being atomic. `MemoryStore::take` does it
+          under one lock, proven by `concurrent_redemptions_of_one_code_yield_one_consent`. A
+          host with another store must supply the same take.
+      - id: C8
+        status: answered
+        justification: Each refusal carries a stable code.
+    contractTests:
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: concurrent_redemptions_of_one_code_yield_one_consent
+        kind: unit
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: a_stranger_with_the_code_gets_nothing_and_spoils_it_for_everyone
+        kind: unit
+      - path: crates/consent-grant/src/ceremony.rs
+        testName: one_runtime_runs_the_whole_ceremony
+        kind: unit
+
+  - name: PendingAsks::admit
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::PendingAsks::admit
+      line: 302
+    summary: >
+      Decides whether an ask that arrived over the private network is put on the approving
+      node's list: this node must speak for a person (`Speaks::Person`; a node that speaks for
+      nobody, or cannot yet say, lists nothing), and it must be an admissible request, addressed
+      to this node or to none, and fit
+      the bounds (32 asks, four per source, five minutes each). The same device asking again
+      replaces its earlier ask. Over a bound it is dropped, never queued. Listing causes no
+      signature; it only makes the ask visible to the deciders.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral and node-local: nothing is notarized, linked or persisted. The list is lost on
+          restart by design; a device that still wants to ask asks again.
+      - id: C1
+        status: answered
+        justification: >
+          Admission confers nothing. Only the agree path, on the approving node's own machine,
+          signs; a listed ask can at most be shown.
+      - id: C3
+        status: answered
+        justification: Every ask leaves by decision, by replacement, or by its five-minute life.
+      - id: C4
+        status: answered
+        justification: >
+          Each drop is a distinct `Dropped` with a stable code (`ask_node_speaks_for_nobody`,
+          `ask_node_standing_unknown`, `ask_for_another_approver`, `ask_list_full`,
+          `ask_source_over_limit`, or the request's own refusal), and is logged.
+      - id: C5
+        status: answered
+        justification: >
+          The transport id that carried the ask is recorded as its source and used only for the
+          per-source bound and for sending the code back. It is never compared to the device key,
+          and an ask is never picked by its source.
+      - id: C6a
+        status: answered
+        justification: The count, per-source and life bounds cap memory and work per peer.
+      - id: C8
+        status: answered
+        justification: Listed, replaced and dropped outcomes are each logged with their reason.
+      - id: C11
+        status: answered
+        justification: The per-source bound is the rate limit; over it is dropped.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: the_list_is_bounded_by_count_source_and_life
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_is_listed_and_the_same_device_replaces_its_own
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_for_another_approver_or_a_malformed_one_is_dropped
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: an_ask_is_picked_by_number_key_or_fingerprint_and_never_by_its_source
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_lists_only_when_it_speaks_for_a_person
+        kind: unit
+
+  - name: decide
+    kind: verdict-fn
+    sourceLocation:
+      file: src/decide.rs
+      modulePath: consent_grant::decide::decide
+      line: 134
+    summary: >
+      Decides a listed ask for the person through interchangeable deciders, in order: an elohim
+      attending them (`NoElohimAttending` by default, which always defers), the person's
+      declaration (`ByDeclaration`, which agrees only for an unassigned node whose key and acts
+      the person declared), and an answer given at the approving node (`ByAnswer`, taken as the
+      person's). The first decider that does not defer decides; if all defer, the reasons are
+      returned so the caller can ask. Nothing in the seam assumes a person answers.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A decision is input to the shared agree path, which alone signs and only for a caller on
+          the node's own machine. No decider can agree to more than was asked.
+      - id: C4
+        status: answered
+        justification: >
+          Agree, decline and defer are distinct; every deferral carries its reason, and an empty
+          answer declines rather than agreeing to nothing.
+      - id: C12
+        status: answered
+        justification: >
+          A node with an identity of its own is never agreed by declaration; it defers to whoever
+          answers, who may only join it as it is.
+      - id: C13
+        status: answered
+        justification: >
+          The answer is taken as the person's: a signed-in device acts with the person's
+          authority, as in OAuth. Noticing that something is off is the witness's job at the
+          witnessed moment (`attend`), which may pause for re-authentication; the person is not
+          asked for proof on each act.
+      - id: C14
+        status: answered
+        justification: When every decider defers, the residual is returned, never guessed.
+    contractTests:
+      - path: crates/consent-grant/src/decide.rs
+        testName: by_default_no_elohim_attends_and_the_others_decide
+        kind: unit
+      - path: crates/consent-grant/src/decide.rs
+        testName: a_node_with_an_identity_of_its_own_goes_to_whoever_answers
+        kind: unit
+      - path: crates/consent-grant/src/decide.rs
+        testName: an_undeclared_device_waits_for_an_answer_and_an_empty_answer_declines
+        kind: unit
+
+  - name: NodeState::of
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::NodeState::of
+      line: 73
+    summary: >
+      Classifies what an asking node is, honestly: unassigned, an identity of its own with
+      nothing made, an identity of its own having made things, or joined to someone. What it has
+      made is `Things` only on positive evidence and otherwise `Unknown`, never "nothing".
+    concernIds:
+      - id: C4
+        status: answered
+        justification: The four states are distinct, and unknown is its own value.
+      - id: C5
+        status: answered
+        justification: >
+          The state is the asking node's own claim, shown to the person and used only to withhold
+          declaration-agreement. It confers nothing.
+      - id: C12
+        status: answered
+        justification: >
+          A node with an identity of its own is shown as such, so the person decides knowing it;
+          joining as it is is the only offered path. No delete, reset or re-key.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_says_what_it_is_and_unknown_is_never_nothing
+        kind: unit
+
+  - name: Speaks::of
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/pending.rs
+      modulePath: consent_grant::pending::Speaks::of
+      line: 137
+    summary: >
+      Decides whether this node may approve devices for anyone, and for whom: only when the
+      authority of the identity its cell resolves to names this node among its controllers. A
+      joined device that is not a controller, or a node with no identity, speaks for nobody. A
+      node that joined someone's identity as it is speaks only for the identity it began, which
+      every listed ask then names (`PendingView.forIdentity`) so nobody approves a device into
+      the wrong identity.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Speaking for a person here only lets the node list asks; signing is still the agree
+          path, which checks the same authority at sign time.
+      - id: C4
+        status: answered
+        justification: Person, nobody and unknown are distinct; unknown lists nothing.
+      - id: C5
+        status: answered
+        justification: >
+          Read from this node's own cell (standing, then its Human only when it is a controller),
+          never from anything a peer says.
+      - id: C12
+        status: answered
+        justification: >
+          Whom an approval would be for is shown with every ask, by the person's Human id, name
+          and identity fingerprint.
+      - id: C13
+        status: answered
+        justification: >
+          The roles stay apart (whose, who operates, whether it may approve). The person is named
+          by their sign-in word, a claim shown and never compared.
+    contractTests:
+      - path: crates/consent-grant/src/pending.rs
+        testName: a_node_speaks_only_for_the_identity_whose_authority_names_it
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: the_view_names_whose_identity_an_approval_is_for
+        kind: unit
+
+  - name: attend
+    kind: verdict-fn
+    sourceLocation:
+      file: src/witness.rs
+      modulePath: consent_grant::witness::attend
+      line: 125
+    summary: >
+      The device-authorization witnessed moment, one witnessed moment among many (a reach gate is
+      another; a shared home for them is not designed). It names its kind
+      (`MomentKind::DeviceAuthorization`), hands the attending witness the claims in front of it
+      (`AuthorizationClaims`: the admitted request and the agreed consent), and takes back one
+      outcome (`Witnessing`: proceed, proceed with witness signatures, or pause for
+      re-authentication with a plain reason). It runs after the person agreed and before the
+      controller signs, so a pause costs no signature, no mandate grant and no code.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A witness never has to be present and adds no step for the person; nobody attends by
+          default (`Unattended` always proceeds). It cannot change what was agreed: only witness
+          signatures it returns are kept.
+      - id: C4
+        status: answered
+        justification: >
+          Proceed, proceed with signatures and pause are distinct; a pause's reason is made
+          plain (no control characters, bounded, never empty) and the host refuses 401
+          consent_reauthentication_asked.
+      - id: C6a
+        status: answered
+        justification: The pause reason is cut to MAX_PAUSE_REASON characters.
+      - id: C13
+        status: answered
+        justification: >
+          A signed-in device acts with the person's authority, as in OAuth; noticing something
+          off is the witness's job here, by pausing until the person signs in again.
+    contractTests:
+      - path: crates/consent-grant/src/witness.rs
+        testName: by_default_nobody_attends_nothing_is_added_and_nothing_pauses
+        kind: unit
+      - path: crates/consent-grant/src/witness.rs
+        testName: a_witness_adds_only_its_own_signatures
+        kind: unit
+      - path: crates/consent-grant/src/witness.rs
+        testName: an_attending_witness_may_pause_with_a_plain_reason
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_consent.rs
+        testName: a_pausing_witness_asks_for_sign_in_before_anything_is_signed_or_issued
+        kind: unit
+
+  - name: identifier_claim
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/declaration.rs
+      modulePath: consent_grant::declaration::identifier_claim
+      line: 170
+    summary: >
+      The person's sign-in word, as a claim to show: what this node recorded when the identity
+      was begun here, else the identity declaration's word when it agrees with the identity. A
+      word that is only the Human record's id is not returned. Shown wherever the person is
+      named; never used for a decision, a join or a comparison across namespaces.
+    concernIds:
+      - id: C5
+        status: partial
+        justification: >
+          A claim, read back from what the node itself recorded (its session) or declared; it has
+          no durable home on the identity side yet (backlog row 6, "the sign-in word").
+      - id: C12
+        status: answered
+        justification: The person is named by the word they chose, never by a record id when a word exists.
+    contractTests:
+      - path: crates/consent-grant/src/declaration.rs
+        testName: the_sign_in_word_is_a_claim_read_back_from_what_the_node_recorded
+        kind: unit
+
+  - name: may_make_node_sign
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::may_make_node_sign
+      line: 38
+    summary: >
+      The caller rule: who may make the node sign as its person. A caller on this machine, or a
+      request carrying a session proven by sign-in for this node's own person. Nothing else; a
+      session minted by POST /session or /session/exchange proves nobody to another machine.
+      The host asks it through one function (storage `HttpServer::signed_in_by_proof`), so a
+      per-request proof later changes only that function.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          Only the person's own sign-in, or presence at the node's machine, makes the node sign;
+          a signed-in device then acts with the person's authority (the OAuth model).
+      - id: C5
+        status: partial
+        justification: >
+          "This machine" is the loopback peer, so a proxy on the node's own machine makes what it
+          forwards look local; the doorway forwards none of the signing routes.
+      - id: C13
+        status: answered
+        justification: Proof is asked once, at sign-in; no per-act proof, no added load.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: only_this_machine_or_a_proven_sign_in_makes_the_node_sign
+        kind: unit
+
+  - name: sign_in_channel_verdict
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::sign_in_channel_verdict
+      line: 89
+    summary: >
+      The secure-channel test and its verdict. `channel` classifies a request as loopback, TLS
+      (a peer named in the operator's trusted-proxy list that appended X-Forwarded-Proto: https;
+      the node terminates no TLS itself) or plain. The verdict is deliberately open to plain today
+      (`PLAIN_SIGN_IN_ALLOWED`, operator ruling 2026-10-05) and says when a secret crossed a
+      network in the clear, which the host logs at warn. Closing it is one line; it is a
+      must-have before floor readiness.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Loopback, TLS and plain are distinct; plain is flagged even while allowed.
+      - id: C5
+        status: partial
+        justification: >
+          A forwarded header from any peer not named is ignored. A caller on the same network can
+          send one only to its own harm: it exposes the secret it sends itself.
+      - id: C12
+        status: unbound
+        justification: >
+          A sign-in secret and session cookie may cross a network in the clear today; required
+          closed before floor readiness (confidentiality-plane row 13).
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: tls_is_known_only_from_a_trusted_proxy_that_says_so
+        kind: unit
+      - path: crates/consent-grant/src/signin.rs
+        testName: plain_sign_in_is_allowed_today_and_flagged_as_in_the_clear
+        kind: unit
+      - path: crates/consent-grant/src/signin.rs
+        testName: closing_the_plain_channel_refuses_it_by_name
+        kind: unit
+
+  - name: AttemptLimiter::check
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::AttemptLimiter::check
+      line: 232
+    summary: >
+      How often a sign-in may be tried: three free failures per source and ten for the node's one
+      account, then a delay that doubles with each failure up to fifteen minutes; a quiet spell
+      or a success forgives. In memory, at most 1024 sources.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: The source map is capped and stale entries are swept; the delay has a ceiling.
+      - id: C11
+        status: answered
+        justification: Per-source and per-account limits; checking counts nothing.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: failures_slow_a_source_then_the_account_with_a_growing_delay
+        kind: unit
+      - path: crates/consent-grant/src/signin.rs
+        testName: the_delay_never_exceeds_its_ceiling_and_sources_stay_bounded
+        kind: unit
+
+  - name: session_proof_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/dpop.rs
+      modulePath: consent_grant::dpop::session_proof_verdict
+      line: 437
+    summary: >
+      RFC 9449 (DPoP) adapted to a cookie-carried session: a session bound to a key must present,
+      on each request to a route that makes the node sign and on sign-out, a compact JWS (typ
+      dpop+jwt, alg ES256 or EdDSA, the public jwk) whose key's RFC 7638 thumbprint is the
+      session's, signing claims jti, htm (the method), htu (compared on its path alone: scheme,
+      host, query and fragment ignored, since the node may sit behind a proxy), iat within 60
+      seconds either way, and bsh (base64url SHA-256 of the exact body bytes; not in the RFC). An
+      unbound session needs none. bind_session_key applies the same check at sign-in with the
+      offered key. Verification sits behind AlgVerifier, keyed by alg: a platform-held key under
+      another algorithm is an addition, not a change. Parsing is strict: three segments, no crit,
+      no other alg, never none, no private key members.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: A copied cookie cannot make the node sign; only the bound key's signature over this request can.
+      - id: C4
+        status: answered
+        justification: Missing, invalid, stale and replayed are distinct refusals; each asks only for a fresh sign-in.
+      - id: C5
+        status: answered
+        justification: >
+          The key in the proof is compared by thumbprint to the one bound at sign-in, whose
+          possession was proven then; the signature covers method, path and body.
+      - id: C6a
+        status: answered
+        justification: Proofs are cut at 4096 bytes and jti at 128 characters; parsing is three fixed segments.
+    contractTests:
+      - path: crates/consent-grant/src/dpop.rs
+        testName: the_worked_example_verifies_byte_for_byte
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: both_algorithms_verify_and_are_compared_by_thumbprint
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: each_way_a_proof_fails_is_refused_by_name
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: only_two_algorithms_and_only_public_keys_are_accepted
+        kind: unit
+      - path: crates/consent-grant/src/dpop.rs
+        testName: an_unbound_session_needs_no_proof_and_a_bound_one_does
+        kind: unit
+
+  - name: ReplaySet::first_use
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/dpop.rs
+      modulePath: consent_grant::dpop::ReplaySet::first_use
+      line: 372
+    summary: >
+      A proof is single use: keyed by key thumbprint and jti, each kept 120 seconds (twice the iat
+      window, beyond which a proof is stale anyway). In memory, at most 4096 entries, swept by age;
+      when still full the proof is refused, and the set never grows.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: Capped and swept by age; over the cap refuses instead of growing.
+      - id: C6b
+        status: answered
+        justification: A replayed proof is refused; the same jti under another key is another proof.
+      - id: C3
+        status: partial
+        justification: >
+          In memory: a restart forgets the set, so a proof captured in its last 60 seconds could be
+          replayed once after a restart within its iat window.
+    contractTests:
+      - path: crates/consent-grant/src/dpop.rs
+        testName: the_replay_set_is_bounded_and_forgets_by_age
+        kind: unit
+
+  - name: sign_in_key_rule
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::sign_in_key_rule
+      line: 108
+    summary: >
+      Over TLS a sign-in must bind its session to a key (signin_needs_session_key, 400); over plain
+      http from another machine it may be unbound and is logged once as such; on this machine
+      either.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: Each channel and key combination has its answer.
+      - id: C12
+        status: partial
+        justification: Plain http stays unbound by necessity; the floor-readiness must-have covers it.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: over_tls_a_sign_in_binds_a_key_and_in_the_clear_it_may_not
+        kind: unit
+  - name: DevicesRead::to_affirm
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/controller.rs
+      modulePath: consent_grant::controller::DevicesRead::to_affirm
+    summary: >
+      Which of the person's devices this node affirms on one automatic pass: devices that speak
+      for the person that this node did not approve, has not affirmed, and is not, oldest joining
+      first, at most the cap. Affirming is not approving: it adds no voice and changes no verdict.
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          A node never affirms itself or a device it approved, so an affirmation is always a second
+          device's word; the zome's count (`identity_devices`) excludes the same two.
+      - id: C6a
+        status: answered
+        justification: >
+          At most the cap per pass (storage: 4 per 30 minutes); a node away catches up oldest first
+          on later passes.
+      - id: C6b
+        status: answered
+        justification: >
+          A device this node already affirmed is skipped, so repeated passes do not affirm twice
+          once the read shows the first.
+      - id: C13
+        status: n-a
+        justification: Affirmation is evidence only; no authority tier is conferred.
+    contractTests:
+      - path: crates/consent-grant/src/controller.rs
+        testName: standing_counts_every_device_that_speaks_once_and_names_this_one
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_affirmation.rs
+        testName: a_pass_affirms_a_few_others_oldest_first_and_a_later_pass_catches_up
+        kind: unit
+  - name: network_local
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::network_local
+    summary: >
+      Whether the network shows a request as from this machine: a loopback peer that is no trusted
+      proxy and carries no forwarding header. With `host_allowed` (the names the identity routes
+      answer under) the cheap part of the 2026-10-06 review's critical 2; the install token that
+      would make loopback alone not enough is a recorded dial.
+    concernIds:
+      - id: C1
+        status: partial
+        justification: >
+          A proxy on the machine or a page that rebinds a name no longer acts as the person; a
+          local process or a page that reaches loopback under a loopback name still does (dial 1).
+      - id: C5
+        status: answered
+        justification: >
+          Locality is the transport's fact; a forwarding header from loopback refuses it rather
+          than vouching for anyone.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: a_forwarded_or_proxied_loopback_request_is_not_local
+        kind: unit
+      - path: crates/consent-grant/src/signin.rs
+        testName: only_this_nodes_names_are_hosts_it_answers
+        kind: unit
+  - name: proof_holds
+    kind: verdict-fn
+    sourceLocation:
+      file: src/carrier.rs
+      modulePath: consent_grant::carrier::proof_holds
+    summary: >
+      Whether a carrier message's proof is the claimed key's signature over (kind, state, the
+      sender's transport id, challenge). Gates listing an ask, a listing, a code and a decline
+      (adversarial review 2026-10-06, high 3 and 4).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          No node lists, replaces, hands back or declines in another key's name; a proof replayed
+          from another transport id fails.
+      - id: C5
+        status: answered
+        justification: The transport id is the transport's authenticated fact; the key is proven.
+      - id: C6a
+        status: answered
+        justification: One ed25519 verification per message.
+    contractTests:
+      - path: crates/consent-grant/src/carrier.rs
+        testName: a_proof_holds_only_for_its_own_signer_kind_state_and_transport
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: no_one_lists_or_replaces_an_ask_in_a_devices_name
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_carrier.rs
+        testName: a_rogue_node_on_the_network_cannot_capture_the_asking_device
+        kind: unit

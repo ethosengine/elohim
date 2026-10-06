@@ -23,6 +23,7 @@
           "vendor/**",
           "crates/doorway-client/**",
           "crates/seam-contracts/**",
+          "crates/consent-grant/**",
           "elohim/elohim-render/**",
           "crates/elohim-views/**",
           "elohim/elohim-cache-core/**",
@@ -127,6 +128,7 @@
           "crates/elohim-storage-client/**",
           "crates/doorway-client/**",
           "crates/seam-contracts/**",
+          "crates/consent-grant/**",
           "crates/elohim-views/**",
           "scripts/ci/elohim-sdk-feature-matrix.sh"
         ],
@@ -345,6 +347,7 @@
             "crates/elohim-sdk/**",
             "crates/elohim-storage-client/**",
             "crates/seam-contracts/**",
+            "crates/consent-grant/**",
             "bridges/did/Cargo.toml",
             "bridges/did/did-bridge/**",
             "bridges/did/did-types/**",

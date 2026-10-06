@@ -357,7 +357,7 @@ seams:
       participant — it never swarms libp2p or iroh. Bootstrap and signal consolidate here too.
     tracks: [T4]
     reach_tier: public
-    registry_crates: [doorway]
+    registry_crates: [doorway, elohim-consent-grant]
     habits: [doorway-failover, reach-enforced-everywhere]
     n_a_concerns: []
 

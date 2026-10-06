@@ -4733,16 +4733,27 @@ async fn handle_token(
         }
     };
 
-    // Find the session by code
-    let session = match collection.find_one(doc! { "code": &token_req.code }).await {
+    // Consume the code in the same write that reads it. The unused condition
+    // is in the filter, so of any number of concurrent exchanges exactly one
+    // receives the session; the rest see "not found". A read followed by a
+    // separate write let two exchanges of one code both succeed.
+    let session = match collection
+        .take_one(
+            doc! { "code": &token_req.code, "used": false },
+            doc! { "$set": { "used": true } },
+        )
+        .await
+    {
         Ok(Some(s)) => s,
         Ok(None) => {
-            warn!("OAuth token exchange: code not found");
+            warn!("OAuth token exchange: code not found or already used");
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &OAuthErrorResponse {
                     error: "invalid_grant".to_string(),
-                    error_description: Some("Authorization code not found or expired".to_string()),
+                    error_description: Some(
+                        "Authorization code not found, expired or already used".to_string(),
+                    ),
                     state: None,
                 },
             );
@@ -4759,14 +4770,16 @@ async fn handle_token(
         }
     };
 
-    // Validate session
+    // The code is now consumed. Every refusal below leaves it consumed: a code
+    // presented with the wrong redirect or client has been seen by someone it
+    // was not issued to, and must not be usable afterwards.
     if !session.is_valid() {
-        warn!("OAuth token exchange: code expired or already used");
+        warn!("OAuth token exchange: code expired");
         return json_response(
             StatusCode::BAD_REQUEST,
             &OAuthErrorResponse {
                 error: "invalid_grant".to_string(),
-                error_description: Some("Authorization code expired or already used".to_string()),
+                error_description: Some("Authorization code expired".to_string()),
                 state: None,
             },
         );
@@ -4796,17 +4809,6 @@ async fn handle_token(
                 state: None,
             },
         );
-    }
-
-    // Mark code as used
-    if let Err(e) = collection
-        .update_one(
-            doc! { "code": &token_req.code },
-            doc! { "$set": { "used": true } },
-        )
-        .await
-    {
-        warn!("Failed to mark OAuth code as used: {}", e);
     }
 
     info!("OAuth token exchange successful: {}", session.identifier);

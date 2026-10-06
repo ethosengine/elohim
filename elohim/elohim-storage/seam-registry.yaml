@@ -5335,3 +5335,102 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_is_let_go_only_when_nothing_holds_it, kind: unit }
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_this_peer_serves_is_kept_past_the_window_and_let_go_once_it_is_not, kind: unit }
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: releases_past_the_window_leave_every_store_and_the_window_stays_whole, kind: unit }
+
+  - name: carrier_on_code
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/device_carrier.rs
+      modulePath: services::device_carrier::Carrier::on_code
+      line: 274
+    summary: >
+      The asking device's side of the private-network carrier (consent_grant::CarryRequest over
+      the EPR request/response protocol, local discovery only). A code is taken only while this
+      node is announcing, only for the ask's own state token, and only from a peer that listed
+      the ask; anything else is refused with its own code and logged. Taking a code signs
+      nothing: the device still redeems it with its PKCE verifier and checks what it collects.
+    concernIds:
+      - { id: C0, status: answered, justification: "Ephemeral and in memory only; nothing is notarized, linked or persisted, and no zome is touched by the carrier." }
+      - { id: C1, status: answered, justification: "A carrier never causes a signature; the approving node signs only through the shared agree path for a caller on its own machine." }
+      - { id: C4, status: answered, justification: "carry_no_announce, carry_not_this_ask and carry_from_unlisting_peer are distinct refusals." }
+      - { id: C5, status: answered, justification: "The transport id is used only to require that the code come from a peer that listed the ask and to send redemption back; it is never compared to the agent key." }
+      - { id: C7, status: answered, justification: "No new network-reachable route: the carrier rides the existing EPR protocol; the HTTP list/decide/announce routes answer only callers on this machine." }
+      - { id: C8, status: answered, justification: "Every received, dropped, listed, refused or decided ask and code is logged with its reason." }
+      - { id: C10, status: partial, justification: "Additive EprRequest/EprResponse variant; a peer that predates it fails to decode and answers an error, so it is simply not an approving node. The inner JSON is not versioned beyond its tagged kind." }
+      - { id: C14, status: partial, justification: "iroh-only mode has no local discovery, so the carrier is absent there and says so (carrier_absent); the link-and-paste path remains." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_device_takes_a_code_only_for_its_ask_from_a_node_that_listed_it, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: an_approving_node_lists_an_ask_and_says_which_it_is, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: with_no_local_discovery_the_carrier_is_absent_and_says_so, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_declared_unassigned_device_is_agreed_by_declaration_and_its_code_goes_back, kind: unit }
+
+  - name: carrier_on_ask
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/device_carrier.rs
+      modulePath: services::device_carrier::Carrier::on_ask
+      line: 215
+    summary: >
+      The approving node's side of the private-network carrier. An ask is admitted through
+      consent_grant::PendingAsks::admit with whom this node speaks for, read from memory
+      (Carrier::speaks), never by a zome call per ask. A node that speaks for nobody, or whose
+      read is missing or older than SPEAKS_MAX_AGE_MICROS (120 s), drops the ask with its
+      logged reason and answers nothing: the response channel is dropped, so the asking device
+      never shows it as a node that lists the ask. One refresher reads the standing every
+      SPEAKS_REFRESH_SECS (30 s), and at once after begin, bootstrap, enroll or an applied
+      declaration.
+    concernIds:
+      - { id: C0, status: answered, justification: "Memory only: whom the node speaks for is a cached read of its own cell, never stored or announced." }
+      - { id: C1, status: answered, justification: "Listing confers nothing; the agree path still checks the authority at sign time." }
+      - { id: C3, status: answered, justification: "A read that stops refreshing ages into unknown after 120 s, and unknown lists nothing (fail closed)." }
+      - { id: C4, status: answered, justification: "ask_node_speaks_for_nobody and ask_node_standing_unknown are logged distinctly; GET /auth/consent/pending names speaksFor and says it in words." }
+      - { id: C6a, status: answered, justification: "At most one standing read and one Human read per 30 s per node running a carrier, independent of how many asks arrive." }
+      - { id: C7, status: answered, justification: "Silence tells a peer nothing about whether this node speaks for anyone; it is indistinguishable from a peer that predates the carrier." }
+      - { id: C8, status: answered, justification: "Each drop and each change of whom the node speaks for is logged." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_node_that_speaks_for_nobody_drops_asks_and_answers_nothing, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: whom_a_node_speaks_for_is_read_from_its_own_cell, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: the_list_says_whom_the_node_speaks_for_and_a_node_for_nobody_lists_nothing, kind: unit }
+      - { path: elohim/elohim-storage/src/services/device_carrier.rs, testName: a_node_that_speaks_for_nobody_decides_nothing, kind: unit }
+
+  - name: sign_in_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/node_account.rs
+      modulePath: services::node_account::sign_in_verdict
+      line: 241
+    summary: >
+      Whether a sign-in word and secret prove this node's own person. The word is compared in
+      constant time as SHA-256 digests; the secret is always checked with Argon2id (the argon2
+      crate's defaults, as the doorway: v19, m=19456 KiB, t=2, p=1), against a decoy made at start
+      when the word is wrong, so a wrong word and a wrong secret cost the same and answer the same
+      (401 INVALID_CREDENTIALS). No secret set answers signin_secret_unset, naming the command to
+      run on the node.
+    concernIds:
+      - { id: C0, status: answered, justification: "The account is node-local SQLite (Path C): never on the DHT, a source chain, the declaration, a sync or a projection." }
+      - { id: C4, status: answered, justification: "A wrong word and a wrong secret are one refusal; no secret set is its own." }
+      - { id: C6a, status: answered, justification: "At most two hashes at once (a semaphore), each of a secret bounded to 1024 bytes; the limiter runs before." }
+      - { id: C12, status: answered, justification: "Only this node's own person can sign in; a lost secret is set again from the node's own machine (the deterministic floor)." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_wrong_word_and_a_wrong_secret_answer_the_same, kind: unit }
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
+
+  - name: signing_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/node_account.rs
+      modulePath: services::node_account::signing_verdict
+      line: 419
+    summary: >
+      The one question every route that makes the node sign (agree, bootstrap, begin, pending
+      decide) and sign-out asks of a caller from another machine: a live session proven by sign-in,
+      with a valid DPoP proof from its key when the session is bound (consent_grant::
+      session_proof_verdict). Asked once per request (a proof is single use) through
+      HttpServer::signing_caller; no route reads the cookie or the DPoP header itself. Reads
+      (`/auth/me`, standing, the pending list) ask request_proven: the session alone.
+    concernIds:
+      - { id: C1, status: answered, justification: "A bound session's cookie alone cannot make the node sign; its key must sign each request." }
+      - { id: C4, status: answered, justification: "No session (403), and missing, invalid, stale and replayed proofs (401), each by name." }
+      - { id: C5, status: partial, justification: "Reads still accept a bound cookie without a proof; device-recognition row 9." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_bound_session_signs_only_with_its_keys_proof, kind: unit }
+      - { path: elohim/elohim-storage/src/services/node_account.rs, testName: a_session_lives_thirty_days_and_ends_at_sign_out_or_a_new_secret, kind: unit }
