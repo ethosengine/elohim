@@ -2424,6 +2424,29 @@ pub fn stamp_own_conductor_canonical_head(
     )
 }
 
+/// Runs `f` in a transaction that holds SQLite's write lock from its first
+/// statement. A stamp reads the row and then writes it; under a deferred
+/// transaction a writer that commits between the two makes SQLite refuse the
+/// read-to-write upgrade at once with "database is locked", whatever the busy
+/// timeout. Taking the lock up front makes the stamp wait its turn instead.
+/// Inside a caller's transaction the lock is already the caller's, and this
+/// is a savepoint.
+fn read_then_write_transaction<T, F>(conn: &mut SqliteConnection, f: F) -> Result<T, StorageError>
+where
+    F: FnOnce(&mut SqliteConnection) -> Result<T, StorageError>,
+{
+    use diesel::connection::{AnsiTransactionManager, TransactionManager};
+    let nested = matches!(
+        AnsiTransactionManager::transaction_manager_status_mut(conn).transaction_depth(),
+        Ok(Some(_))
+    );
+    if nested {
+        conn.transaction(f)
+    } else {
+        conn.immediate_transaction(f)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn stamp_declared_head_witnessed(
     conn: &mut SqliteConnection,
@@ -2437,7 +2460,7 @@ fn stamp_declared_head_witnessed(
     witness: AnchorWitness,
 ) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
-    let (outcome, widened) = conn.transaction(|conn| {
+    let (outcome, widened) = read_then_write_transaction(conn, |conn| {
         // The anchor BEFORE the stamp — read inside the transaction, so the
         // "did the hash change?" test below cannot race another writer.
         let prior_anchor: Option<String> = content::table
