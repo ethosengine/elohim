@@ -59,3 +59,7 @@ Repo (so it cannot happen silently again): the edge pipeline's substrate probe r
 Conductor (kitsune2, as a dependency): a peer-meta write that fails with an I/O error is retried at the gossip loop's pace, which is how 7.4 GB of full volume became four million log lines. One line per peer per minute and a backoff belong in `kitsune2_gossip` `initiate.rs` (0.5.0, line 129); the fork carries kitsune2 as a crate, not as source.
 
 Probe: zero `code: 778` lines on any conductor pod in the hour after a roll; every conductor PVC under 80 percent at the roll's substrate probe; adam's pod log rate within 2× its siblings'.
+
+## DELTA 2026-10-06 (after the conductor roll: eve is full and flooding; adam is at 96 percent)
+
+Prometheus at 23:46Z: `holochain-data-elohim-eve-alpha-0` 100 percent (100 at 23:00Z, 98.1 at 23:30Z, 100 now); `holochain-data-elohim-adam-alpha-0` 96.2 percent (100 at 23:00Z, 94.6 at 23:30Z). Eve's conductor, restarted 23:01:52Z on the new pin, logged 51,163 `code: 778` lines in its first 44 minutes, from 23:31Z at 15,000 to 21,000 per five minutes; the first of them is the peer-meta store's expiry sweep failing (`holochain_p2p::spawn::actor`, `actor.rs:782`, `error returned from database: (code: 778) disk I/O error`), then the gossip-initiate form. Adam logged none. Eve is the same incident on the next node, and adam will be back in it on the next roll's integration. The operator read of the four shem conductor volumes is the open action; nothing here is answered by the conductor change that just landed.

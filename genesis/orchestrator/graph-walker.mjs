@@ -87,6 +87,16 @@ export function dependentsClosure(pipelineMeta, failed) {
   return [...doomed].sort();
 }
 
+// A governance path is never a source change: `.epr-meta` (the compose-gate
+// manifest file, or a directory of habit atoms and rules) sits inside the tree
+// it governs, so a source glob matches it. Mirrors build-graph.groovy's
+// isGovernancePath; orchestrator #1987 rolled the edge fleet for an edit to
+// elohim/elohim-storage/src/.epr-meta.
+export function isGovernancePath(filePath) {
+  const normalized = filePath.startsWith('./') ? filePath.slice(2) : filePath;
+  return normalized.split('/').includes('.epr-meta');
+}
+
 function matchInputs(inputs, changedFiles) {
   const reasons = [];
   if (!inputs) return reasons;
@@ -94,6 +104,7 @@ function matchInputs(inputs, changedFiles) {
   for (const pattern of inputs.sources || []) {
     const matcher = picomatch(pattern);
     for (const file of changedFiles) {
+      if (isGovernancePath(file)) continue;
       if (matcher(file)) {
         reasons.push(`source: ${file}`);
         break;
