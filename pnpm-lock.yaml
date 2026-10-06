@@ -972,6 +972,15 @@ importers:
       '@elohim/service':
         specifier: workspace:*
         version: link:../../app/elohim-library/projects/elohim-service
+      '@fontsource-variable/dm-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource-variable/fraunces':
+        specifier: ^5.2.9
+        version: 5.2.9
+      elohim-imagodei:
+        specifier: workspace:*
+        version: link:../../app/elohim-elements/elohim-imagodei
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2

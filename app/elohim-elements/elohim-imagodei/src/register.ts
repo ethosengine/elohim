@@ -3,6 +3,7 @@
 // to make all custom elements available.
 
 import { ElohimImagodeiAttestorRow } from './elohim-imagodei-attestor-row.js';
+import { ElohimImagodeiDeviceConsentCard } from './elohim-imagodei-device-consent-card.js';
 import { ElohimImagodeiIntrospectionPanel } from './elohim-imagodei-introspection-panel.js';
 import { ElohimImagodeiProtectedTierMarker } from './elohim-imagodei-protected-tier-marker.js';
 import { ElohimImagodeiSettingControl } from './elohim-imagodei-setting-control.js';
@@ -65,6 +66,10 @@ if (!customElements.get('elohim-imagodei-consent-card')) {
   customElements.define('elohim-imagodei-consent-card', ElohimImagodeiConsentCard);
 }
 
+if (!customElements.get('elohim-imagodei-device-consent-card')) {
+  customElements.define('elohim-imagodei-device-consent-card', ElohimImagodeiDeviceConsentCard);
+}
+
 import { ElohimImagodeiOauthCallback } from './elohim-imagodei-oauth-callback.js';
 
 if (!customElements.get('elohim-imagodei-oauth-callback')) {
@@ -75,4 +80,10 @@ import { ElohimContributorCard } from './elohim-imagodei-contributor-card.js';
 
 if (!customElements.get('elohim-contributor-card')) {
   customElements.define('elohim-contributor-card', ElohimContributorCard);
+}
+
+import { ElohimImagodeiWitnessTrail } from './elohim-imagodei-witness-trail.js';
+
+if (!customElements.get('elohim-imagodei-witness-trail')) {
+  customElements.define('elohim-imagodei-witness-trail', ElohimImagodeiWitnessTrail);
 }

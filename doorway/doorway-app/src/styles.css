@@ -1,5 +1,10 @@
 /* Doorway-App Global Styles & Design Tokens */
 
+/* Elohim brand tokens (--el-*) and the sign-in portal layout that reads them.
+   The --dw-* tokens below remain the operator dashboard's palette. */
+@import './styles/brand.css';
+@import './styles/portal.css';
+
 /* ============================================================================
    Reset
    ============================================================================ */
@@ -274,7 +279,7 @@ html {
    ============================================================================ */
 
 :focus-visible {
-  outline: 2px solid var(--dw-accent-primary);
+  outline: 2px solid var(--el-focus);
   outline-offset: 2px;
 }
 

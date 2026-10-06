@@ -1,3 +1,8 @@
 :root {
   /* imagodei-portal global styles — D2 may bind brand tokens here */
+
+  /* The portal binds no palette, so its elements draw in system colours;
+     declaring both schemes lets those follow the person's light or dark
+     preference instead of always drawing light. */
+  color-scheme: light dark;
 }

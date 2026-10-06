@@ -24,6 +24,7 @@ import { firstValueFrom } from 'rxjs';
 // contract (auth-wire plan Task 4 — the drifted local duplicate, e.g.
 // `expiresAt: string`, was retired).
 import type { AuthResponse } from '../../generated/auth-response';
+import { gatewayDomain } from '../../core/gateway-domain';
 import { AuthStateService } from '../../services/auth-state.service';
 
 /** OAuth params from query string */
@@ -51,29 +52,28 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="register-container">
-      <div class="register-card">
-        <!-- Doorway branding -->
-        <div class="branding">
-          <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
-          <h1>Create Account</h1>
-          <p class="doorway-name">{{ doorwayName() }}</p>
+    <div class="portal-page">
+      <section class="portal-card" aria-labelledby="threshold-register-title">
+        <span class="portal-mark" role="img" aria-label="Elohim"></span>
+        <div class="portal-heading">
+          <h1 id="threshold-register-title">Create your account</h1>
+          <p>Welcome. This takes a minute.</p>
         </div>
 
-        <!-- OAuth info -->
         @if (oauthParams()) {
-          <div class="oauth-info">
-            <span class="app-name">{{ clientDisplayName() }}</span>
-            <span class="oauth-action">wants you to create an account</span>
-          </div>
+          <!-- prettier-ignore -->
+          <p class="portal-context oauth-info">
+            Create an account to continue to <strong class="app-name">{{ clientDisplayName() }}</strong>.
+          </p>
         }
 
-        <!-- Error message -->
         @if (error()) {
-          <div class="error-banner">
+          <div class="error-banner" role="alert" data-testid="threshold-register-error">
             <span>{{ error() }}</span>
             <button
               class="dismiss"
+              type="button"
+              aria-label="Dismiss this message"
               (click)="clearError()"
               data-testid="threshold-register-error-dismiss"
             >
@@ -82,11 +82,15 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
           </div>
         }
 
-        <!-- Registration form -->
-        @if (state() === 'form') {
-          <form (ngSubmit)="onSubmit()" #registerForm="ngForm">
-            <div class="form-group">
-              <label for="displayName">Display Name</label>
+        @if (state() === 'form' || state() === 'registering') {
+          <form
+            class="portal-form"
+            (ngSubmit)="onSubmit(registerForm.valid)"
+            #registerForm="ngForm"
+            [attr.aria-busy]="busy() ? 'true' : null"
+          >
+            <div class="portal-field">
+              <label for="displayName">Your name</label>
               <input
                 type="text"
                 id="displayName"
@@ -95,13 +99,23 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
                 [(ngModel)]="form.displayName"
                 required
                 autocomplete="name"
-                placeholder="Your name"
+                [readonly]="busy()"
+                [attr.aria-invalid]="displayNameError() ? 'true' : null"
+                [attr.aria-describedby]="
+                  displayNameError() ? 'display-name-error display-name-hint' : 'display-name-hint'
+                "
               />
+              @if (displayNameError(); as message) {
+                <p class="field-error" id="display-name-error">{{ message }}</p>
+              }
+              <p class="input-hint" id="display-name-hint">
+                What people will see. You can change it later.
+              </p>
             </div>
 
-            <div class="form-group">
-              <label for="email">Email</label>
-              <div class="identifier-wrapper">
+            <div class="portal-field">
+              <label for="email">Username</label>
+              <div class="identifier-wrapper" [class.is-invalid]="usernameError()">
                 <input
                   type="text"
                   id="email"
@@ -109,25 +123,37 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
                   [ngModel]="form.email"
                   (ngModelChange)="onIdentifierChange($event)"
                   required
-                  autocomplete="email"
-                  placeholder="username"
+                  autocomplete="username"
+                  [readonly]="busy()"
+                  autocapitalize="none"
+                  spellcheck="false"
                   pattern="[^@\\s]+"
                   inputmode="text"
                   class="identifier-input"
                   data-testid="threshold-register-email"
+                  [attr.aria-invalid]="usernameError() ? 'true' : null"
+                  [attr.aria-describedby]="
+                    usernameError() ? 'username-error username-hint' : 'username-hint'
+                  "
                 />
-                <span class="domain-suffix" data-testid="threshold-register-domain-suffix">
+                <span
+                  class="domain-suffix"
+                  data-testid="threshold-register-domain-suffix"
+                  aria-hidden="true"
+                >
                   &#64;{{ gatewayDomain() }}
                 </span>
               </div>
-              <p class="input-hint">
-                Your account is created at
-                <strong>{{ gatewayDomain() }}</strong>
-                .
+              @if (usernameError(); as message) {
+                <p class="field-error" id="username-error">{{ message }}</p>
+              }
+              <!-- prettier-ignore -->
+              <p class="input-hint" id="username-hint">
+                Your account will live at <strong>{{ gatewayDomain() }}</strong>, so choose only the part before the &#64;.
               </p>
             </div>
 
-            <div class="form-group">
+            <div class="portal-field">
               <label for="password">Password</label>
               <input
                 type="password"
@@ -137,13 +163,21 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
                 required
                 minlength="8"
                 autocomplete="new-password"
-                placeholder="At least 8 characters"
+                [readonly]="busy()"
                 data-testid="threshold-register-password"
+                [attr.aria-invalid]="passwordError() ? 'true' : null"
+                [attr.aria-describedby]="
+                  passwordError() ? 'password-error password-hint' : 'password-hint'
+                "
               />
+              @if (passwordError(); as message) {
+                <p class="field-error" id="password-error">{{ message }}</p>
+              }
+              <p class="input-hint" id="password-hint">At least 8 characters.</p>
             </div>
 
-            <div class="form-group">
-              <label for="confirmPassword">Confirm Password</label>
+            <div class="portal-field">
+              <label for="confirmPassword">Type the password again</label>
               <input
                 type="password"
                 id="confirmPassword"
@@ -151,23 +185,23 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
                 [(ngModel)]="form.confirmPassword"
                 required
                 autocomplete="new-password"
-                placeholder="Re-enter your password"
+                [readonly]="busy()"
                 data-testid="threshold-register-confirm-password"
+                [attr.aria-invalid]="confirmError() ? 'true' : null"
+                [attr.aria-describedby]="confirmError() ? 'confirm-password-error' : null"
               />
-              @if (
-                form.password && form.confirmPassword && form.password !== form.confirmPassword
-              ) {
-                <span class="field-error">Passwords do not match</span>
+              @if (confirmError(); as message) {
+                <p class="field-error" id="confirm-password-error">{{ message }}</p>
               }
             </div>
 
             <button
               type="submit"
               class="btn-primary"
-              [disabled]="!registerForm.valid || form.password !== form.confirmPassword"
               data-testid="threshold-register-submit"
+              [attr.aria-disabled]="busy() ? 'true' : null"
             >
-              Create Account
+              {{ busy() ? 'Creating your account…' : 'Create account' }}
             </button>
 
             @if (oauthParams()) {
@@ -178,44 +212,46 @@ type RegisterState = 'form' | 'registering' | 'authorizing' | 'error';
                   class="federated-link"
                   data-testid="threshold-register-federated"
                 >
-                  Register with a different doorway
+                  Create an account at a different doorway
                 </a>
               </div>
             }
           </form>
         }
 
-        <!-- Loading states -->
-        @if (state() === 'registering') {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Setting up your account...</p>
-          </div>
-        }
-
         @if (state() === 'authorizing') {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Authorizing {{ clientDisplayName() }}...</p>
+          <div class="loading-state" role="status">
+            <div class="trace" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p>Taking you to {{ clientDisplayName() }}…</p>
           </div>
         }
 
         @if (state() === 'error') {
           <div class="error-state">
-            <button class="btn-secondary" (click)="retry()" data-testid="threshold-register-retry">
-              Try Again
+            <button
+              class="btn-secondary"
+              type="button"
+              (click)="retry()"
+              data-testid="threshold-register-retry"
+            >
+              Try again
             </button>
           </div>
         }
 
-        <!-- Footer -->
-        <div class="footer">
+        <div class="portal-footer">
           <p>
             Already have an account?
-            <a [href]="loginUrl()" data-testid="threshold-register-login-link">Sign in</a>
+            <a class="portal-link" [href]="loginUrl()" data-testid="threshold-register-login-link">
+              Sign in
+            </a>
           </p>
         </div>
-      </div>
+      </section>
     </div>
   `,
   styleUrl: './threshold-register.component.css',
@@ -230,6 +266,10 @@ export class ThresholdRegisterComponent implements OnInit {
   readonly state = signal<RegisterState>('form');
   readonly error = signal<string>('');
   readonly oauthParams = signal<OAuthParams | null>(null);
+  /** True once the person has tried to submit — field messages show from then on. */
+  readonly attempted = signal(false);
+  /** The request is in flight: the button says so and the form holds still. */
+  readonly busy = computed(() => this.state() === 'registering');
 
   // Form model
   form: RegisterForm = {
@@ -240,15 +280,8 @@ export class ThresholdRegisterComponent implements OnInit {
   };
 
   // Computed values
-  readonly doorwayName = computed(() => {
-    return window.location.hostname;
-  });
-
-  readonly gatewayDomain = computed(() => {
-    const hostname = window.location.hostname;
-    // doorway-alpha.elohim.host --> alpha.elohim.host
-    return hostname.startsWith('doorway-') ? hostname.replace(/^doorway-/, '') : hostname;
-  });
+  /** doorway-alpha.elohim.host --> alpha.elohim.host */
+  readonly gatewayDomain = computed(() => gatewayDomain(window.location.hostname));
 
   readonly clientDisplayName = computed(() => {
     const params = this.oauthParams();
@@ -323,19 +356,51 @@ export class ThresholdRegisterComponent implements OnInit {
     }
   }
 
-  async onSubmit(): Promise<void> {
+  /** Message for the name field, once a submit has been tried. */
+  displayNameError(): string | null {
+    return this.attempted() && !this.form.displayName.trim() ? 'Tell us what to call you.' : null;
+  }
+
+  /** Message for the username field, once a submit has been tried. */
+  usernameError(): string | null {
+    if (!this.attempted()) return null;
+    if (!this.form.email) return 'Choose a username.';
+    if (/\s/.test(this.form.email)) return 'A username can’t contain spaces.';
+    return null;
+  }
+
+  /** Message for the password field, once a submit has been tried. */
+  passwordError(): string | null {
+    if (!this.attempted()) return null;
+    if (!this.form.password) return 'Choose a password.';
+    if (this.form.password.length < 8) return 'Use at least 8 characters.';
+    return null;
+  }
+
+  /** Shown as soon as both password fields are filled and differ. */
+  confirmError(): string | null {
+    const { password, confirmPassword } = this.form;
+    if (password && confirmPassword && password !== confirmPassword) {
+      return 'These passwords don’t match.';
+    }
+    return this.attempted() && !confirmPassword ? 'Type the password again.' : null;
+  }
+
+  /**
+   * @param formValid the template form's validity; the button is never
+   *   disabled, so an incomplete form explains itself instead of looking dead.
+   */
+  async onSubmit(formValid: boolean | null = true): Promise<void> {
+    if (this.state() !== 'form') return; // already in flight
+    this.attempted.set(true);
     // Validate form
-    if (!this.form.displayName || !this.form.email || !this.form.password) {
+    if (formValid === false || !this.form.displayName || !this.form.email || !this.form.password) {
       return;
     }
 
-    if (this.form.password !== this.form.confirmPassword) {
-      this.error.set('Passwords do not match');
-      return;
-    }
-
-    if (this.form.password.length < 8) {
-      this.error.set('Password must be at least 8 characters');
+    // Mismatch and length are explained beside their fields (confirmError /
+    // passwordError); nothing is sent until they are right.
+    if (this.form.password !== this.form.confirmPassword || this.form.password.length < 8) {
       return;
     }
 
@@ -371,7 +436,7 @@ export class ThresholdRegisterComponent implements OnInit {
         const errorMsg = err.error?.error ?? err.error?.message ?? 'Registration failed';
         // Handle specific error codes
         if (err.status === 409) {
-          this.error.set('An account with this email already exists');
+          this.error.set('That username is already taken here. Try another, or sign in.');
         } else {
           this.error.set(errorMsg);
         }

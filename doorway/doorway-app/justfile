@@ -10,12 +10,17 @@ default:
 install:
     pnpm install
 
-# Start dev server
+# Start dev server (builds the elements first via prestart)
 dev:
     pnpm start
 
+# Build the identity elements the device approval page hosts (their dist is
+# what `elohim-imagodei/register` resolves to)
+elements:
+    pnpm run elements
+
 # Build
-build:
+build: elements
     pnpm exec ng build --configuration=development
 
 # Lint

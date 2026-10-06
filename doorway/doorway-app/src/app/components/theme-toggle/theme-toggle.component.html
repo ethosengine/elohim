@@ -3,14 +3,29 @@
   class="theme-toggle"
   [class.inline-mode]="inline"
   (click)="toggleTheme()"
-  [title]="getTooltip()"
-  [attr.aria-label]="getTooltip()"
+  [title]="tooltip()"
+  [attr.aria-label]="tooltip()"
   data-testid="theme-toggle"
 >
-  <span class="theme-icon">
-    {{ getIcon() }}
-    @if (isAutoMode()) {
-      <span class="auto-indicator" title="Auto (System) Theme">A</span>
+  @switch (currentTheme()) {
+    @case ('light') {
+      <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="4.25" />
+        <path
+          d="M12 2.75v2.1M12 19.15v2.1M2.75 12h2.1M19.15 12h2.1M5.46 5.46l1.48 1.48M17.06 17.06l1.48 1.48M5.46 18.54l1.48-1.48M17.06 6.94l1.48-1.48"
+        />
+      </svg>
     }
-  </span>
+    @case ('dark') {
+      <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" />
+      </svg>
+    }
+    @default {
+      <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="8" />
+        <path class="fill" d="M12 4a8 8 0 0 1 0 16Z" />
+      </svg>
+    }
+  }
 </button>

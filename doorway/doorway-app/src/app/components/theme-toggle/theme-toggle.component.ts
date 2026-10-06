@@ -1,72 +1,54 @@
-import { CommonModule } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  Input,
-  ChangeDetectionStrategy,
-  inject,
-} from '@angular/core';
-
-import { Subscription } from 'rxjs';
+import { ChangeDetectionStrategy, Component, Input, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 import { ThemeService, Theme } from '../../services/theme.service';
 
+/**
+ * Cycles device → light → dark. Drawn with inline SVG rather than emoji: an
+ * emoji glyph depends on the reader's installed fonts and rendered as a bare
+ * dot where none was available.
+ */
 @Component({
   selector: 'app-theme-toggle',
   standalone: true,
-  imports: [CommonModule],
   templateUrl: './theme-toggle.component.html',
-  // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection -- subscribe-mutation pattern, OnPush-unsafe until signals conversion (see backlog-onpush-eager-debt-inventory)
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './theme-toggle.component.css',
 })
-export class ThemeToggleComponent implements OnInit, OnDestroy {
+export class ThemeToggleComponent {
   @Input() inline = false;
-  currentTheme: Theme = 'device';
+
   private readonly themeService = inject(ThemeService);
-  private themeSubscription?: Subscription;
 
-  ngOnInit(): void {
-    this.themeSubscription = this.themeService.getTheme().subscribe(theme => {
-      this.currentTheme = theme;
-    });
-  }
+  /** The chosen theme, kept in step with ThemeService. */
+  readonly currentTheme = toSignal(this.themeService.getTheme(), {
+    initialValue: this.themeService.getCurrentTheme(),
+  });
 
-  ngOnDestroy(): void {
-    this.themeSubscription?.unsubscribe();
-  }
+  readonly tooltip = computed(() => this.tooltipFor(this.currentTheme()));
 
   toggleTheme(): void {
     this.themeService.cycleTheme();
   }
 
-  getIcon(): string {
-    const effectiveTheme = this.getEffectiveTheme();
-    return effectiveTheme === 'light' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-  }
-
   isAutoMode(): boolean {
-    return this.currentTheme === 'device';
-  }
-
-  private getEffectiveTheme(): 'light' | 'dark' {
-    if (this.currentTheme === 'device') {
-      return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    }
-    return this.currentTheme;
+    return this.currentTheme() === 'device';
   }
 
   getTooltip(): string {
-    switch (this.currentTheme) {
+    return this.tooltip();
+  }
+
+  private tooltipFor(theme: Theme): string {
+    switch (theme) {
       case 'light':
-        return 'Light mode - Click to switch to dark';
+        return 'Light mode. Switch to dark';
       case 'dark':
-        return 'Dark mode - Click to switch to auto';
+        return 'Dark mode. Switch to match your device';
       case 'device':
-        return 'Auto mode - Click to switch to light';
+        return 'Auto mode, matching your device. Switch to light';
       default:
-        return 'Toggle theme';
+        return 'Change theme';
     }
   }
 }

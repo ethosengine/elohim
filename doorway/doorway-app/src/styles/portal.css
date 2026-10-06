@@ -1,0 +1,485 @@
+/* ============================================================================
+   Sign-in portal layout — shared by sign in, create account and device approval
+   ============================================================================
+   Reads only the --el-* semantic tokens from brand.css. One place, so the three
+   portal pages cannot drift apart. Component CSS keeps only what is particular
+   to one page.
+   ============================================================================ */
+
+.portal-page {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--el-space-xl) var(--el-space-sm);
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, var(--el-glow), transparent 70%), var(--el-ground);
+  color: var(--el-text);
+  font-family: var(--el-font-ui);
+}
+
+.portal-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-lg);
+  padding: var(--el-space-lg) var(--el-space-lg) var(--el-space-md);
+  box-shadow: var(--el-shadow-card);
+}
+
+.portal-card--wide {
+  max-width: 520px;
+}
+
+/* The constellation mark, recoloured per theme (spec §2 colour contexts):
+   starlight on dark, vineyard on linen. The PNG's alpha is the mask. */
+.portal-mark {
+  display: block;
+  width: 56px;
+  height: 48px;
+  margin: 0 auto var(--el-space-sm);
+  background-color: var(--el-mark);
+  -webkit-mask: url('/threshold/images/elohim_logo_light.png') center / contain no-repeat;
+  mask: url('/threshold/images/elohim_logo_light.png') center / contain no-repeat;
+}
+
+.portal-heading {
+  text-align: center;
+  margin-bottom: var(--el-space-md);
+}
+
+.portal-heading h1 {
+  margin: 0;
+  font-family: var(--el-font-display);
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 1;
+  font-size: 1.875rem;
+  font-weight: 560;
+  line-height: 1.2;
+  color: var(--el-text-strong);
+}
+
+.portal-heading p {
+  margin: var(--el-space-xs) 0 0;
+  color: var(--el-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* A short line of context above the form (who is asking, why you are here). */
+.portal-context {
+  margin: 0 0 var(--el-space-md);
+  padding: 0.75rem 1rem;
+  border-radius: var(--el-radius-md);
+  background: var(--el-surface-2);
+  border-inline-start: 3px solid var(--el-amber);
+  color: var(--el-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.portal-context strong {
+  color: var(--el-text-strong);
+}
+
+/* ---------------------------------------------------------------------------
+   Form
+   --------------------------------------------------------------------------- */
+
+.portal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.portal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.portal-field label {
+  color: var(--el-text-strong);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.portal-input,
+.portal-field input {
+  width: 100%;
+  min-height: 44px;
+  background: var(--el-field-bg);
+  border: 1px solid var(--el-field-border);
+  border-radius: var(--el-radius-md);
+  padding: 0.625rem 0.875rem;
+  color: var(--el-text-strong);
+  font: inherit;
+  font-size: 1rem;
+  transition: border-color var(--el-duration-fast) var(--el-ease-default);
+}
+
+.portal-field input::placeholder {
+  color: var(--el-text-muted);
+  opacity: 0.85;
+}
+
+.portal-field input:focus-visible {
+  outline: 2px solid var(--el-focus);
+  outline-offset: 1px;
+  border-color: var(--el-focus);
+}
+
+.portal-field input[aria-invalid='true'] {
+  border-color: var(--el-warm);
+}
+
+/* Username + fixed @domain suffix read as ONE field. */
+.portal-page .identifier-wrapper {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  background: var(--el-field-bg);
+  border: 1px solid var(--el-field-border);
+  border-radius: var(--el-radius-md);
+  overflow: hidden;
+}
+
+.portal-page .identifier-wrapper:focus-within {
+  outline: 2px solid var(--el-focus);
+  outline-offset: 1px;
+  border-color: var(--el-focus);
+}
+
+.portal-page .identifier-wrapper.is-invalid {
+  border-color: var(--el-warm);
+}
+
+.portal-field .identifier-wrapper input {
+  flex: 1 1 0;
+  min-width: 5ch;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-height: 42px;
+}
+
+.portal-field .identifier-wrapper input:focus-visible {
+  outline: none;
+}
+
+.portal-page .domain-suffix {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 65%;
+  padding: 0 0.75rem;
+  background: var(--el-surface-2);
+  border-inline-start: 1px solid var(--el-border);
+  color: var(--el-text-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.portal-page .input-hint {
+  margin: 0;
+  color: var(--el-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.portal-page .input-hint .portal-link {
+  white-space: nowrap;
+}
+
+.portal-page .input-hint strong {
+  color: var(--el-text-strong);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.portal-page .field-error {
+  margin: 0;
+  color: var(--el-warm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ---------------------------------------------------------------------------
+   Links and buttons
+   --------------------------------------------------------------------------- */
+
+.portal-link {
+  color: var(--el-link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  border-radius: 2px;
+}
+
+.portal-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.portal-link:focus-visible {
+  outline: 2px solid var(--el-focus);
+  outline-offset: 2px;
+}
+
+.portal-page .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.25rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: var(--el-radius-md);
+  background: var(--el-action);
+  color: var(--el-on-action);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--el-duration-fast) var(--el-ease-default);
+}
+
+.portal-page .btn-primary:hover {
+  background: var(--el-action-hover);
+}
+
+.portal-page .btn-primary:focus-visible,
+.portal-page .btn-secondary:focus-visible,
+.portal-page .federated-link:focus-visible {
+  outline: 2px solid var(--el-focus);
+  outline-offset: 2px;
+}
+
+.portal-page .btn-secondary,
+.portal-page .federated-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--el-field-border);
+  border-radius: var(--el-radius-md);
+  background: transparent;
+  color: var(--el-text-strong);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--el-duration-fast) var(--el-ease-default);
+}
+
+.portal-page .btn-secondary:hover,
+.portal-page .federated-link:hover {
+  background: var(--el-surface-2);
+}
+
+.portal-page .divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.25rem 0 0.75rem;
+  color: var(--el-text-muted);
+  font-size: 0.875rem;
+}
+
+.portal-page .divider::before,
+.portal-page .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--el-border);
+}
+
+/* ---------------------------------------------------------------------------
+   Witness trail — takes the place of a waiting indicator after a submit.
+   Bound only through <elohim-imagodei-witness-trail>'s declared @cssprop
+   hooks and parts; the token values follow the theme via --el-*.
+   --------------------------------------------------------------------------- */
+
+.portal-page .portal-trail {
+  display: block;
+  color: var(--el-text);
+  font-size: 0.9375rem;
+
+  --elohim-witness-trail-gap: 0.5rem;
+  --elohim-witness-trail-step-gap: 0.375rem;
+  --elohim-witness-trail-line-height: 1.5;
+  /* Full strength: dimmed hearthstone drops below AA on linen; the mark's
+     shape and fill already say which steps are waiting. */
+  --elohim-witness-trail-muted-opacity: 1;
+  --elohim-witness-trail-current-weight: 600;
+  --elohim-witness-trail-mark-size: 0.75em;
+  --elohim-witness-trail-mark-color: var(--el-action);
+  --elohim-witness-trail-failed-color: var(--el-warm);
+  --elohim-witness-trail-note-border: 3px solid var(--el-warm);
+  --elohim-witness-trail-slot-bg: var(--el-surface-2);
+  --elohim-witness-trail-slot-padding: 0.75rem;
+  --elohim-witness-trail-radius: var(--el-radius-md);
+  --elohim-witness-trail-focus-ring: 2px solid var(--el-focus);
+  --elohim-witness-trail-ease-duration: var(--el-duration-fast);
+}
+
+/* Under the device approval card, set the trail apart from the card's last line. */
+.portal-page elohim-imagodei-device-consent-card + .portal-trail {
+  margin-top: var(--el-space-md);
+  padding-top: var(--el-space-sm);
+  border-top: 1px solid var(--el-border);
+}
+
+/* After the line saying what the approval rests on, the trail follows it closely. */
+.portal-page .portal-standing + .portal-trail {
+  margin-top: var(--el-space-sm);
+}
+
+.portal-page .portal-trail::part(heading),
+.portal-page .portal-trail::part(summary) {
+  color: var(--el-text-strong);
+  font-weight: 600;
+}
+
+.portal-page .portal-trail::part(summary) {
+  cursor: pointer;
+}
+
+/* The busy button still reads as the action in progress, not as disabled. */
+.portal-page .btn-primary[aria-disabled='true'] {
+  cursor: progress;
+}
+
+/* ---------------------------------------------------------------------------
+   Messages, status, footer
+   --------------------------------------------------------------------------- */
+
+.portal-page .error-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: var(--el-space-md);
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border-radius: var(--el-radius-md);
+  background: var(--el-warm-bg);
+  border-inline-start: 3px solid var(--el-warm);
+  color: var(--el-text-strong);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.portal-page .dismiss {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--el-text-strong);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.portal-page .dismiss:hover {
+  background: var(--el-surface-2);
+}
+
+.portal-page .dismiss:focus-visible {
+  outline: 2px solid var(--el-focus);
+  outline-offset: 1px;
+}
+
+.portal-page .loading-state,
+.portal-page .error-state {
+  text-align: center;
+  padding: var(--el-space-md) 0;
+}
+
+.portal-page .loading-state p {
+  margin: 0;
+  color: var(--el-text);
+}
+
+/* Still, not spinning (spec §6, §9): three stars light in turn, as if traced. */
+.portal-page .trace {
+  display: inline-flex;
+  gap: 10px;
+  margin-bottom: var(--el-space-sm);
+}
+
+.portal-page .trace span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--el-amber);
+  opacity: 0.25;
+  animation: trace 1.8s var(--el-ease-default) infinite;
+}
+
+.portal-page .trace span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.portal-page .trace span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes trace {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.portal-footer {
+  margin-top: var(--el-space-md);
+  padding-top: var(--el-space-sm);
+  border-top: 1px solid var(--el-border);
+  text-align: center;
+}
+
+.portal-footer p {
+  margin: 0;
+  color: var(--el-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Small screens — usable down to 320px
+   --------------------------------------------------------------------------- */
+
+@media (width <= 480px) {
+  .portal-page {
+    padding: var(--el-space-md) 0.75rem;
+  }
+
+  .portal-card {
+    padding: var(--el-space-md) var(--el-space-sm) var(--el-space-sm);
+    border-radius: var(--el-radius-md);
+  }
+
+  .portal-heading h1 {
+    font-size: 1.625rem;
+  }
+
+  .portal-page .domain-suffix {
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
+  }
+}

@@ -5,6 +5,23 @@ import { property } from 'lit/decorators.js';
 export type TrustMode = 'doorway-host' | 'peer-conductor';
 
 /**
+ * The chip's mode words. A host replaces either through `strings` when its
+ * own words are truer for the person in front of it; the English defaults
+ * fill whatever is not supplied.
+ */
+export interface TrustIndicatorStrings {
+  /** Lead words in `doorway-host` mode, before the authority label. */
+  hostedLabel: string;
+  /** Lead words in `peer-conductor` mode, before the authority label. */
+  ownNodeLabel: string;
+}
+
+export const TRUST_INDICATOR_STRINGS_EN: TrustIndicatorStrings = {
+  hostedLabel: 'Hosted via',
+  ownNodeLabel: 'Your conductor —',
+};
+
+/**
  * <elohim-imagodei-trust-indicator> — small chip showing where the conductor
  * lives. Two modes, two glyphs, two accent colors. Tap emits a tap event
  * that consumers (omnibar, portal-shell) can surface a details panel from.
@@ -19,6 +36,7 @@ export type TrustMode = 'doorway-host' | 'peer-conductor';
  * @prop {TrustMode} trustMode - 'doorway-host' | 'peer-conductor'
  * @prop {string} authorityLabel - human-readable authority description
  * @prop {boolean} flywheelHint - render the "you can graduate" hint (doorway-host only)
+ * @prop {Partial<TrustIndicatorStrings>} strings - Replace the mode words (property only)
  *
  * @fires {CustomEvent<{trustMode: TrustMode, authorityLabel: string}>} trust-indicator-tap
  *
@@ -127,11 +145,14 @@ export class ElohimImagodeiTrustIndicator extends CapabilityAwareElement(LitElem
   @property({ attribute: 'trust-mode' }) trustMode: TrustMode = 'doorway-host';
   @property({ attribute: 'authority-label' }) authorityLabel = '';
   @property({ attribute: 'flywheel-hint', type: Boolean }) flywheelHint = false;
+  /** Replace the mode words; unspecified keys use the English defaults. */
+  @property({ attribute: false }) strings: Partial<TrustIndicatorStrings> = {};
 
   override render() {
     const isDoorwayHost = this.trustMode === 'doorway-host';
     const modeIcon = isDoorwayHost ? '⌂' : '◇'; // ⌂ or ◇
-    const modeLabel = isDoorwayHost ? 'Hosted via' : 'Your conductor —';
+    const words = { ...TRUST_INDICATOR_STRINGS_EN, ...this.strings };
+    const modeLabel = isDoorwayHost ? words.hostedLabel : words.ownNodeLabel;
     const showFlywheelHint = this.flywheelHint && isDoorwayHost;
 
     return html`
@@ -139,7 +160,7 @@ export class ElohimImagodeiTrustIndicator extends CapabilityAwareElement(LitElem
         type="button"
         part="mode"
         data-mode=${this.trustMode}
-        aria-label="${modeLabel} ${this.authorityLabel}${showFlywheelHint
+        aria-label="${[modeLabel, this.authorityLabel].filter(Boolean).join(' ')}${showFlywheelHint
           ? ' (flywheel — you can graduate to your own conductor)'
           : ''}"
         @click=${this._onTap}
