@@ -45,14 +45,7 @@
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { AfterAll, Given, Then, When } from '@cucumber/cucumber';
 
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import {
   buildFixtureBundle,
   buildServerFixture,
@@ -67,7 +61,6 @@ import {
   visitInBrowser,
   type FixtureBundle,
 } from '../dataplane/epr-app-deliverability.helpers.js';
-import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -994,7 +987,7 @@ async function setRetentionDepth(peer: PeerName, depth: number | null): Promise<
         .split('\n')
         .filter(line => !line.trimStart().startsWith(RETENTION_KEY))
     : [];
-  while (kept.length > 0 && kept[kept.length - 1] === '') kept.pop();
+  while (kept.length > 0 && kept.at(-1) === '') kept.pop();
   if (depth !== null) kept.push(`${RETENTION_KEY} = ${depth}`);
   writeFileSync(file, `${kept.join('\n')}\n`);
   const reloaded = await postRaw(`${storageUrl(peer)}/admin/runtime-config/reload`);
@@ -1072,7 +1065,7 @@ When(
       const label = ['first', 'second', 'third'][run.kept.length];
       const builds = buildApps(`kept-${label}`);
       // A release names the one before it on the channel; the first names none.
-      const parent = run.kept.length === 0 ? null : run.kept[run.kept.length - 1].cid;
+      const parent = run.kept.at(-1)?.cid ?? null;
       const { manifestPath, packagerLog } = packageRelease(
         this,
         `kept-${label}`,
@@ -1131,14 +1124,17 @@ Then("the first release's bundle files, for both apps, are gone from matthew's p
   }
 });
 
-Then("the second and third releases' bundle files, for both apps, are still on matthew's peer", function () {
-  for (const release of [run.kept[1], run.kept[2]]) {
-    for (const hash of bundleHashes(release)) {
-      const file = bundleFile('matthew', hash);
-      assert.ok(existsSync(file), `matthew's peer let go of ${release.label}'s ${file}`);
+Then(
+  "the second and third releases' bundle files, for both apps, are still on matthew's peer",
+  function () {
+    for (const release of [run.kept[1], run.kept[2]]) {
+      for (const hash of bundleHashes(release)) {
+        const file = bundleFile('matthew', hash);
+        assert.ok(existsSync(file), `matthew's peer let go of ${release.label}'s ${file}`);
+      }
     }
   }
-});
+);
 
 Then("the first release's bundle files, for both apps, are still on jessica's peer", function () {
   for (const hash of bundleHashes(run.kept[0])) {

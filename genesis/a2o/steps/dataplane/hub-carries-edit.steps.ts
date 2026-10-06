@@ -15,6 +15,7 @@ import {
 } from '../../src/framework/dataplane/surfaces.js';
 import { destructiveAllowed } from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
+
 import { meshControl } from './epr-app-deliverability.helpers.js';
 
 const shutPeers = new WeakMap<E2EWorld, Set<string>>();
@@ -90,7 +91,9 @@ Then(
         peerHeads = (await probeSyncDocHeads(storageUrl(peer), 'elohim', docId)).body.heads;
         const same =
           peerHeads.length === authorHeads.length &&
-          [...peerHeads].sort().every((head, i) => head === [...authorHeads].sort()[i]);
+          [...peerHeads]
+            .sort((a, b) => a.localeCompare(b))
+            .every((head, i) => head === [...authorHeads].sort((a, b) => a.localeCompare(b))[i]);
         return same ? true : undefined;
       },
       { intervalMs: 250, timeoutMs: seconds * 1_000 }
