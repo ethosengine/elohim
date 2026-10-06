@@ -4,6 +4,10 @@
 //! implementation provides a memory-backed adapter used by tests and early
 //! consumers while the storage HTTP/DHT contract is selected.
 
+// `async_trait` marks its generated futures `#[must_use]`; clippy 1.99 reads
+// that as doubled on methods returning `Result`. The attribute is the macro's.
+#![allow(clippy::double_must_use)]
+
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
