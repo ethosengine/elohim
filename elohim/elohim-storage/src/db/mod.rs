@@ -640,9 +640,10 @@ mod lock_upgrade_tests {
     use diesel::prelude::*;
     use std::sync::mpsc;
 
-    /// Busy timeout short enough to keep the test fast, long enough that a
-    /// waiting writer outlasts the holder's brief critical section.
-    const BUSY_MS: u64 = 2000;
+    /// Long enough that a waiting writer outlasts the holder's brief critical
+    /// section even when the full suite has the machine saturated. Nothing
+    /// here waits the timeout out, so the length costs no time.
+    const BUSY_MS: u64 = 5000;
 
     #[derive(diesel::QueryableByName)]
     struct Val {
@@ -652,8 +653,11 @@ mod lock_upgrade_tests {
 
     fn open(path: &std::path::Path) -> SqliteConnection {
         let mut conn = SqliteConnection::establish(path.to_str().unwrap()).expect("open");
+        // busy_timeout FIRST: the journal-mode pragma takes a lock of its own,
+        // and with no timeout set yet it fails at once against another
+        // connection that is opening or closing.
         conn.batch_execute(&format!(
-            "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = {BUSY_MS};"
+            "PRAGMA busy_timeout = {BUSY_MS}; PRAGMA journal_mode = WAL;"
         ))
         .expect("pragmas");
         conn
@@ -702,11 +706,12 @@ mod lock_upgrade_tests {
     fn read_then_write_transaction_makes_the_other_writer_wait() {
         let (_dir, path) = fixture();
         let mut a = open(&path);
-        let b_path = path.clone();
+        // Opened here, before A's transaction, so the only contention the
+        // thread ever sees is the write lock under test.
+        let mut b = open(&path);
         let (go_tx, go_rx) = mpsc::channel::<()>();
 
         let b = std::thread::spawn(move || {
-            let mut b = open(&b_path);
             go_rx.recv().expect("go");
             // A holds the write lock: this waits under busy_timeout, then lands.
             b.batch_execute("UPDATE t SET v = v + 10 WHERE id = 1")

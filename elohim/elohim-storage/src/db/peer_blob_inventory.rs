@@ -576,14 +576,15 @@ mod tests {
     fn snapshot_apply_waits_for_a_concurrent_writer_instead_of_losing_the_lock() {
         use diesel::connection::SimpleConnection;
         use std::sync::mpsc;
-        use std::time::{Duration, Instant};
+        use std::time::Duration;
 
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("pbi_lock.db");
         let path_str = path.to_str().unwrap().to_string();
         let open = |p: &str| {
             let mut c = SqliteConnection::establish(p).expect("open");
-            c.batch_execute("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 1000;")
+            // busy_timeout first: the journal-mode pragma locks too.
+            c.batch_execute("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;")
                 .expect("pragmas");
             c
         };
@@ -596,32 +597,31 @@ mod tests {
             run_migrations(&pool).expect("migrations");
         }
 
+        // Both connections exist before either writes, so the only contention
+        // in this test is the write lock under test.
+        let mut a = open(&path_str);
+        let mut b = open(&path_str);
         let (held_tx, held_rx) = mpsc::channel::<()>();
-        let b_path = path_str.clone();
         let b = std::thread::spawn(move || {
-            let mut b = open(&b_path);
             crate::db::read_then_write_transaction(&mut b, |b| {
                 apply_snapshot(b, "peer_B", &["hb".into()], 1, "2026-10-06T00:00:00Z")?;
                 held_tx.send(()).expect("signal held");
-                // Hold well past A's start (A is already open, so only a
-                // scheduler stall could outlast this) and well inside A's
-                // busy timeout.
+                // Keep the lock across A's start. The assertions below hold
+                // whether or not A arrives inside this window: no timing is
+                // asserted, so a stalled scheduler cannot fail the test.
                 std::thread::sleep(Duration::from_millis(150));
                 Ok::<_, StorageError>(())
             })
         });
 
-        let mut a = open(&path_str);
         held_rx.recv().expect("B holds the write lock");
-        let started = Instant::now();
         let outcome = apply_snapshot(&mut a, "peer_A", &["ha".into()], 1, "2026-10-06T00:00:00Z")
             .expect("A waits for B's commit instead of losing the upgrade");
         assert!(matches!(outcome, SnapshotApplyOutcome::Applied));
-        assert!(
-            started.elapsed() >= Duration::from_millis(20),
-            "A must have waited on B's lock"
-        );
         b.join().unwrap().expect("B committed");
+        // Neither write was lost.
+        assert_eq!(read_cursor_sequence(&mut a, "peer_A").unwrap(), Some(1));
+        assert_eq!(read_cursor_sequence(&mut a, "peer_B").unwrap(), Some(1));
     }
 
     #[test]
