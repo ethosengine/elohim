@@ -153,6 +153,7 @@ const PID_JESSICA = 'pid-jessica';
 const PROBE_HASH = 'sha256-probe';
 const AFTER_ISO = '2026-08-15T00:00:00Z';
 const N_MESH_VERSION_PARITY = 'mesh.version-parity';
+const N_PROJECTION_STUCK_STREAMS = 'projection.stuck.streams';
 const N_DELIVERY_EVENTS = 'delivery.serve-blob-events';
 const USAGE_LINE =
   'usage: substrate-verify.ts {mesh|upload|propagation|delivery|projection|federation|resilience}';
@@ -1218,18 +1219,24 @@ async function projectionSlowVersusStuck(): Promise<void> {
       PROJECTION_STALL_SECS: '30',
     });
     eqDeep(
-      h.report.assertions.filter(a => a.name.endsWith('.streams')).map(a => `${a.status}:${a.name}`),
+      h.report.assertions
+        .filter(a => a.name.endsWith('.streams'))
+        .map(a => `${a.status}:${a.name}`),
       ['pass:projection.slow.streams', 'fail:projection.stuck.streams'],
       'advancing pull passes after waiting; stalled pull fails'
     );
     check(
-      detailOf(h.report, 'projection.stuck.streams') ===
+      detailOf(h.report, N_PROJECTION_STUCK_STREAMS) ===
         'replication=true pull=false projection_reconcile=true fetched=3/10 — stalled: pull.fetched did not advance in 30s after 30s, 4 attempt(s)',
       'stuck failure names the stall window and fetched/total',
-      detailOf(h.report, 'projection.stuck.streams')
+      detailOf(h.report, N_PROJECTION_STUCK_STREAMS)
     );
     // slow: 5 sleeps (reads 1..5 not caught up); stuck: 3 sleeps to reach 30 s.
-    eqDeep(h.sleeps, [10, 10, 10, 10, 10, 10, 10, 10], 'slow waits 50 s, stuck stops at the 30 s stall window');
+    eqDeep(
+      h.sleeps,
+      [10, 10, 10, 10, 10, 10, 10, 10],
+      'slow waits 50 s, stuck stops at the 30 s stall window'
+    );
     // Shared budget: the first stuck peer spends the whole 40 s, so the
     // second gets ONE read (stall window set past the bound).
     const shared = await run('projection', {
@@ -1237,11 +1244,15 @@ async function projectionSlowVersusStuck(): Promise<void> {
       PROJECTION_SYNC_TIMEOUT_SECS: '40',
       PROJECTION_STALL_SECS: '300',
     });
-    eqDeep(shared.sleeps, [10, 10, 10, 10], 'one 40 s budget across peers — the second peer never sleeps');
+    eqDeep(
+      shared.sleeps,
+      [10, 10, 10, 10],
+      'one 40 s budget across peers — the second peer never sleeps'
+    );
     check(
-      detailOf(shared.report, 'projection.stuck.streams').endsWith('after 0s, 1 attempt(s)'),
+      detailOf(shared.report, N_PROJECTION_STUCK_STREAMS).endsWith('after 0s, 1 attempt(s)'),
       'a peer read after the shared budget is spent gets exactly one read',
-      detailOf(shared.report, 'projection.stuck.streams')
+      detailOf(shared.report, N_PROJECTION_STUCK_STREAMS)
     );
   } finally {
     await Promise.all([slow.close(), stuck.close()]);

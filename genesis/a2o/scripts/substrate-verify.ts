@@ -1324,7 +1324,8 @@ export const PROJECTION_STALL_SECS = 90;
 /** `pull.fetched` / `pull.total` from one /p2p/status body, when numeric. */
 function pullProgress(body: unknown): { fetched: number | null; total: number | null } {
   const pull = asObject(asObject(body)['pull']);
-  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null;
   return { fetched: num(pull['fetched']), total: num(pull['total']) };
 }
 
