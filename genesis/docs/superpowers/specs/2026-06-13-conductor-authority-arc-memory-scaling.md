@@ -6,7 +6,7 @@ class: substrate
 artifact_kind: spec
 written: 2026-06-13
 cites:
-  - tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - "tiered-quilt-stewardship-design | the data-plane stewardship canon whose shared-custody model (no single steward required to hold everything, K-of-N restitution) this note extends to the conductor working set as arc-shrink | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - genesis/plans/2026-04-13-device-archetypes-design.md
 ---
 

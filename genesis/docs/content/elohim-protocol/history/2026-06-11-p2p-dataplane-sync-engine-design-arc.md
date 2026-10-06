@@ -18,7 +18,7 @@ cites:
   - "conductor-agent-info-substrate-gossip | how conductor-side discovery actually landed in place of the doc's signal-server bootstrap flow | sha256:7ee98c749aadb58d | path: genesis/docs/content/elohim-protocol/history/2026-06-02-conductor-agent-info-substrate-gossip.md"
   - "dht-is-a-notary-not-a-byte-store | the canon that corrected the March drawing's one lost direction (who-has-what index on the DHT) | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md"
   - "iroh-libp2p-complementarity | why the libp2p bet aged into permanent dual transport rather than being replaced | sha256:da518f4d0861aff8 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
-  - "tiered-quilt-stewardship-design | the three-truth-layer canon the 4-layer drawing's vocabulary grew into | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "tiered-quilt-stewardship-design | the three-truth-layer canon the 4-layer drawing's vocabulary grew into | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - elohim/elohim-storage/src/p2p/sync_protocol.rs
   - elohim/elohim-storage/src/p2p/shard_protocol.rs
   - elohim/elohim-storage/src/p2p/behaviour.rs

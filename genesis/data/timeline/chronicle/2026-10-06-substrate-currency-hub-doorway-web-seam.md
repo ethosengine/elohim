@@ -41,12 +41,12 @@ surfaces_rewritten:
 - fifteen citation descriptions across specs, plans, history and gospel (reworded with the cite tool)
 diff_review_verdict: GREEN on the fourth pass (code-reviewer). Passes one to three were YELLOW and each was repaired inline; no dead path and no misquote survived. The node decision and the anchor repairs had two further passes, the first YELLOW (eight findings, all repaired) and the second GREEN.
 coherence_verdict: YELLOW-resolved (three fresh implementation readers; the last routed five sample tasks correctly from the seam map alone and after following pointers, and its leftovers were repaired in the final batch)
-next_topic_sampled: the 32 citations of today's edited documents that were stale before the session and whose claims nobody has read (tiered-quilt 17, seam map 5, records-lifecycle 4, cradle-to-grave 3, iroh 1, observation 1, resilience 1)
+next_topic_sampled: none in the documents; the next work is the first slice of the device footprint spec (holds and autoclean in elohim-storage)
 agent_minutes: unknown
 surfaces_read: unknown
 tokens: unknown
 recall_correctness: not sampled; neither session could retain a finding (see the habit delta)
-review_rounds: blind-reader README, 8 rounds, every round a new reader. Rounds 1 and 2 REVISE (1 correctness, 7 interpretability each); rounds 3 to 8 READY with 0 correctness. Round 8 returned no finding above minor (5 interpretability, 2 preference). The loop was stopped there on diminishing returns with the README exactly as round 8 read it; those five minor findings were applied afterwards. Rounds 9 to 11, each a new reader, were READY with 0 correctness; the two round-10 findings above minor (no list of the crates the test routes between; the stop-here section too long) were repaired before round 11, and the README stands as round 11 read it, with that round's three interpretability and three preference findings unapplied.
+review_rounds: blind-reader README, 8 rounds, every round a new reader. Rounds 1 and 2 REVISE (1 correctness, 7 interpretability each); rounds 3 to 8 READY with 0 correctness. Round 8 returned no finding above minor (5 interpretability, 2 preference). The loop was stopped there on diminishing returns with the README exactly as round 8 read it; those five minor findings were applied afterwards. Rounds 9 to 11, each a new reader, were READY with 0 correctness; the two round-10 findings above minor (no list of the crates the test routes between; the stop-here section too long) were repaired before round 11, and the README stands as round 11 read it, with that round's three interpretability and three preference findings unapplied. Round 12 read the README after the round-11 repairs (conductor and iroh glossed, the shell defined with the conventions, the decision heading led by the decision) and was READY with 0 correctness, 2 interpretability (no template for creating the crate; blade and fabric not defined inline) and 3 preference; the README stands as round 12 read it.
 rework: nine repair batches, each validated across all files before any write
 correction_cids_closed:
 - bafyreiezw7lze73ie7skt7ebgfkmu2tfrkrk3edpsyh2gbkfebh5yomhoq
@@ -105,10 +105,21 @@ The last re-bless went edge by edge under a written rule: only citations whose c
 checked today, or that were healthy at the last commit, or that were written today. 111 edges on
 86 documents. The cite graph ends at 182 stale edges, from 228.
 
-Left open, by name: the 32 citations of today's edited documents that were already stale before
-the session and whose claims nobody has read; the retired name `HouseholdHub` in two older specs,
-one feature file and one memory entry; the semantic fold, about 2,900 files behind, which does
-not rebuild in this workspace; and the code the debt table names, none of which has moved.
+After the commit of the seam documents (`5c4c4d0ac`) the two remaining document items were closed.
+Two independent readers checked the 32 citations that had been left stale: 14 held, 6 were
+title-only, 11 were partly wrong and 1 described a model the target does not contain. The 18 that
+did not hold were reworded with the cite tool, one that held was refined to match today's seam
+map, and all 32 were re-blessed. Every citation of a document this work edited is now at that
+document's current fingerprint. One reader did not read the tiered-quilt design in full: about half
+of it was searched for the claimed terms and not read line by line. `HouseholdHub` became
+`DwellingHub` in the feature file, the two specs and the memory entry; generated a2o layering
+reports and build output still carry it until they are next generated.
+
+Left open, by name: the semantic fold, about 2,900 files behind, which does not rebuild in this
+workspace; 168 stale edges graph-wide, none of them citing a document this work touched; and the
+code the debt table names, none of which has moved. The design that moves it is
+`genesis/docs/superpowers/specs/2026-10-06-device-footprint-residency-carrying-capacity-design.md`,
+written the same day; its first slice is holds and autoclean in `elohim-storage`.
 
 ## Horizon-scan reference
 

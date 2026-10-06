@@ -757,7 +757,7 @@ from it; the DB-pool metrics hook becomes a parser callback), then storage itsel
 the fleet; storage keeps custody/offer/attest (it owns the swarm and the conductor). `steward/node`:
 the executor's `RestartService` calls the envelope's lifecycle verb; its `ServiceStatus{running,
 healthy, uptime_secs, restart_count}` becomes true; the `pod` module is renamed at the Hub refactor
-(hub-boundaries already plans to fold it into `HouseholdHub`). `lvi-actuator`: a driver profile and
+(hub-boundaries already plans to fold it into `DwellingHub`). `lvi-actuator`: a driver profile and
 a consumer of verdicts, never a second supervisor. `hc-mesh.sh`: `direct` mode becomes `ark run`.
 The conductor template: the `elohim-conductor` container's entrypoint becomes `ark`. Tauri: the
 sidecar becomes `ark` with storage as its child. **Deleted or demoted:** `steward/node/src/update/`

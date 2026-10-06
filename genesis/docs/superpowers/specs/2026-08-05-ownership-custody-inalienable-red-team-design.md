@@ -22,9 +22,9 @@ topic:
   - safety
   - governance
 cites:
-  - stewardship-over-sovereignty | The foundational canon the ownership guard extends — rejects crypto-sovereignty as apex, reserves stewardship/agency/authority | path: genesis/docs/architecture/stewardship-over-sovereignty.md
-  - cradle-to-grave-capability-gradient | The life-stage gradient this spec stress-tests — ward/guardian rows assume benign guardianship, which is the IPV and child-abuse failure | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md
-  - cluster2-sacredness-surface-firewall-anti-capture-design | Prior art on re-identification surfaces and cache de-anon; the anonymity findings here compose with it rather than restate it | path: genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md
+  - "stewardship-over-sovereignty | The foundational canon the ownership guard extends — rejects crypto-sovereignty as apex, reserves stewardship/agency/authority | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "cradle-to-grave-capability-gradient | The life-stage gradient this spec stress-tests — ward/guardian rows assume benign guardianship, which is the IPV and child-abuse failure | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "cluster2-sacredness-surface-firewall-anti-capture-design | Prior art on re-identification surfaces and cache de-anon; the anonymity findings here compose with it rather than restate it | path: genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md"
 ---
 
 # Ownership, Custody, and the Inalienable — Red-Team of the Stewardship Ontology

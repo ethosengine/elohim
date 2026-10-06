@@ -1,7 +1,7 @@
 ---
 id: elohim-cache-core-gospel
 cites:
-  - tiered-quilt-stewardship-design | the tiered-quilt three-layer content model (Truth/Cache/Client) whose Cache layer this crate implements | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - "tiered-quilt-stewardship-design | the stewardship canon whose cache-seam non-goal assigns rebuildable Category C state to this crate's device-derived budgets and TTL | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
 ---
 
 # Elohim Cache Core — Protocol Caching Substrate

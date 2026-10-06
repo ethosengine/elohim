@@ -19,7 +19,7 @@ cites:
   - elohim/elohim-storage/src/cluster.rs
   - elohim/elohim-storage/src/identity.rs
   - elohim/elohim-storage/src/services/sealed_against_self.rs
-  - tiered-quilt-stewardship-design | the canonical substrate model any encryption-at-rest answer must compose WITH (temperature/floor, custody commitments) — currently silent on encryption | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - "tiered-quilt-stewardship-design | the canonical substrate model any encryption-at-rest answer must compose WITH (temperature/floor, custody commitments) — currently silent on encryption | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
 ---
