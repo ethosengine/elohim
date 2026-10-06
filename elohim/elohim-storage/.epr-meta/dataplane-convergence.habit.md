@@ -903,3 +903,10 @@ with storage `1.0.0-dev-4dde4f3d` (content rows counted on the storage pod). Rol
 2,700 s — three passing stretches (3, 6 and 6 polls) each broken by matthew reporting not caught up or one actionable divergence — so no
 sprint report and no saga movement. Owed: a validate-only measure once matthew holds caughtUp; the conductor-side footprint gauges' first
 read, to see whether the wasm store stops growing per coordinator update.
+
+DELTA 2026-10-06 (RED preserved; the post-roll fleet measure exists, on the second roll): edge #1551 rolled storage `1.0.0-dev-53160f37`
+(release retention) to all 7 alpha peers and restarted all 7 conductors a second time with the pin unchanged at conductor-3c1e8052504f;
+all six roll gates released in 30–181 s, none at deadline. Its validate-only sibling, edge #1552, SUCCESS: fleet-quiesce held 330 s within
+about 6 minutes of starting (01:33–01:39 UTC), 132 scenarios with 9 passed, 123 skipped, 0 findings; `federation-deploy` passed 2 with 1
+pending. Owed: why the conductors rolled with an unchanged pin (a hApp bundle stamp is the likeliest input, unconfirmed); the first read
+of the conductor footprint gauges and of the release-retention gauges.
