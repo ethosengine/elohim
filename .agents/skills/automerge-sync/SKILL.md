@@ -1,6 +1,6 @@
 ---
 name: automerge-sync
-description: Reference for Automerge 0.5 CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks "how does sync work", "handle merge conflicts", "manage stream positions", "offline-first content", or implements CRDT document flows.
+description: Reference for the Automerge CRDT sync engine, stream positions, delta sync protocol, document lifecycle, conflict resolution, and browser-side integration. Use when someone asks "how does sync work", "handle merge conflicts", "manage stream positions", "offline-first content", or implements CRDT document flows.
 metadata:
   runtime: antigravity
   sourceRuntime: claude
@@ -16,7 +16,7 @@ The sync engine provides **local-first** experience with CRDT-based conflict res
 
 ## Design Philosophy
 
-- **Offline-first**: Full functionality without network
+- **Offline-first** is the aim, not the state: today only published content nodes are projected into documents, the browser keeps no document across a reload, and nothing queues a person's edit offline. The contract for that is the working-version standard (`genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md`)
 - **Eventual consistency**: All nodes converge to same state
 - **No conflicts**: CRDTs make concurrent edits merge cleanly
 - **Stream-based sync**: Delta updates via position tracking
@@ -25,7 +25,7 @@ The sync engine provides **local-first** experience with CRDT-based conflict res
 
 ## Document Model
 
-Each content item is one Automerge document, stored in SQLite (native) or IndexedDB (browser).
+Each content item is one Automerge document. `elohim-storage` keeps them in a sled `DocStore` (`src/sync/doc_store.rs`); there is no browser-side document store.
 
 ```
 Content item "concept-governance"  ->  Automerge document (binary blob)
@@ -234,7 +234,7 @@ Key methods: `listDocuments()`, `getHeads()`, `getChangesSince()`, `applyChanges
 
 ## Gotchas
 
-1. **Automerge 0.5 crate vs 3.0 design** - The Rust crate is `automerge = "0.5"` (in Cargo.toml). The design docs reference "Automerge 3.0" which is the JavaScript version. The Rust API differs.
+1. **Automerge 0.10 crate vs 3.0 design** - The Rust crates (`elohim-storage`, `steward/node`, `elohim-storage-client`) declare `automerge = "0.10"`. The design docs reference "Automerge 3.0" which is the JavaScript version. The Rust API differs.
 
 2. **Per-agent stream positions** - Each agent has its own monotonic position. Don't confuse with document-level heads. Positions track the agent's event log, heads track document state.
 
@@ -261,5 +261,5 @@ Key methods: `listDocuments()`, `getHeads()`, `getChangesSince()`, `applyChanges
 ## External References
 
 - Automerge docs: `https://automerge.org/docs/`
-- Automerge Rust crate (0.5): `https://docs.rs/automerge/0.5/automerge/`
+- Automerge Rust crate (0.10): `https://docs.rs/automerge/0.10/automerge/`
 - Automerge JS: `https://automerge.org/docs/quickstart/`

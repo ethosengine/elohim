@@ -28,7 +28,7 @@ cites:
   - "private-thought-governed-fruit | the reserve: claims and acts are fruit, recall receipts and transcripts never cross; §4 boundaries 5 and 6 bound the acts store | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "cradle-to-grave-capability-gradient | mediated agency named out of scope; no ward entity added here | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
   - "elohim-seam-map-concern-routing | places the actor plane: a repo-node rehearsal of the imagodei identity seam, not a new seam | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "elohim-protocol-manifesto | the canon the witness leg takes up: its section Witnessed Humanity: Attunement, Not Filters (humanity is witnessed by those who know you, never scored by a filter) is what an agent's epr actor witness rehearses at this node | sha256:7bc38f4e8e38b9a8 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - "elohim-protocol-manifesto | the canon the witness leg takes up: its section Witnessed Humanity: Attunement, Not Filters (humanity is witnessed by those who know you, never scored by a filter) is what an agent's epr actor witness rehearses at this node | sha256:66c8e3b40b858b92 | path: genesis/docs/content/elohim-protocol/manifesto.md"
 ---
 
 # Human Participant in the Actor Plane

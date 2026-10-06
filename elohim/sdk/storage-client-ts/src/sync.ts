@@ -94,7 +94,7 @@ export class AutomergeSync {
       }
 
       // Track known heads
-      this.knownHeads.set(docId, response.new_heads);
+      this.knownHeads.set(docId, response.newHeads);
 
       return doc;
     } catch (error) {
@@ -129,9 +129,9 @@ export class AutomergeSync {
     const response = await this.client.applyChanges(docId, [changeBytes]);
 
     // Update known heads
-    this.knownHeads.set(docId, response.new_heads);
+    this.knownHeads.set(docId, response.newHeads);
 
-    return response.new_heads;
+    return response.newHeads;
   }
 
   /**
