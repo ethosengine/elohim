@@ -5,11 +5,11 @@ created: 2026-06-23
 class: imagodei
 artifact_kind: spec
 cites:
-  - recovery-protocol-phase-2-revised-design | the Phase-2 recovery design whose IntimateQuorum wiring this spec makes real (the RecoveryAuthority it reconnects) | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md
-  - justice-manifesto | the recovery FLOOR this interface makes exercisable — no key ever truly lost, absolute-lockout-impossible | path: genesis/docs/architecture/justice-manifesto.md
-  - stewardship-over-sovereignty | social-recovery floor over crypto self-custody; cryptography accelerates recovery, never gates it | path: genesis/docs/architecture/stewardship-over-sovereignty.md
-  - cradle-to-grave-capability-gradient | the graduated recovery-authority stack whose IntimateQuorum rung this wires | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md
-  - elohim-seam-map-concern-routing | where recovery sits across the seams — imagodei DNA truth + doorway projection | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "recovery-protocol-phase-2-revised-design | the Phase-2 recovery design whose IntimateQuorum wiring this spec makes real (the RecoveryAuthority it reconnects) | path: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md"
+  - "justice-manifesto | the recovery FLOOR this interface makes exercisable — no key ever truly lost, absolute-lockout-impossible | path: genesis/docs/architecture/justice-manifesto.md"
+  - "stewardship-over-sovereignty | social-recovery floor over crypto self-custody; cryptography accelerates recovery, never gates it | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "cradle-to-grave-capability-gradient | the graduated recovery-authority stack whose IntimateQuorum rung this wires | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "elohim-seam-map-concern-routing | the truth-versus-projection routing this spec obeys: witness tallies read the DHT-notary control plane, storage SQLite and the doorway (§3.9) are projections and never truth, and a doorway route needs is_service_path | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Recovery FLOOR — Witness Reconnection & IoC Interface Spec

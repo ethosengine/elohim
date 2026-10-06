@@ -3,13 +3,15 @@ epr-meta-version: 1
 id: doorway-service-src-seam-birth-rule
 purpose: >
   Nested under `../.epr-meta` (`covers: subtree`) — this manifest does not reclaim
-  coverage; it adds ONE edit-time signal (plan task P4.5, the seam-concern
-  contract architecture's design-time birth rule). `doorway/doorway-service/
+  coverage; it adds two edit-time signals. The first is plan task P4.5, the seam-concern
+  contract architecture's design-time birth rule. `doorway/doorway-service/
   seam-registry.yaml` already registers this crate's decision surface
   (decide_reconcile/ReconcileDecision, classify_dispatch/Disposition,
   epr_should_serve_ssr/SsrFallbackReason, fetch_projections_with_fallback/
   FallbackOutcome, K2Store::put_at/K2PutOutcome, should_serve_response) — the
-  rule below catches the NEXT one before it ships unregistered.
+  rule below catches the NEXT one before it ships unregistered. The second,
+  `web-seam-placement` (2026-10-06), sends a new source file born here
+  to a background placement review against the hub seam.
 rules:
   - id: seam-birth-rule
     class: inject
@@ -38,6 +40,39 @@ rules:
       `projection/epr_router.rs`, `bootstrap/k2.rs`, `cache/reach_aware_serving.rs`)
       re-fires too — the accepted cost of a declarative advisory that never
       blocks (never a validator: this is a judgement call, not a textual proof).
+  - id: web-seam-placement
+    class: dispatch
+    when: { write: "*.rs", new: true }
+    route-to: { dest: elohim/elohim-hub/ }
+    parameters:
+      dispatch-agent: organizer
+      dispatch-prompt: >
+        A new Rust source file is being born in doorway-service. Apply the placement test in
+        elohim/elohim-hub/README.md, section "The web seam" (that README is the statement of the
+        test; this prompt only summarises it): does this concern exist only because
+        the other end cannot address and verify a peer by key? Report exactly one of KEEP (it
+        serves a browser, a crawler or a web2 protocol: a registered name, the certificate for it,
+        TLS termination, host-to-app routing, a cache for traffic with no relationship, a web2
+        protocol projection; say which), ROUTE (it is web-level but works when the peer is reached
+        by its key: name elohim/elohim-hub, whose crate the first new piece creates; or it is
+        about bytes, heads, custody or reach: name elohim-storage)
+        or SPLIT (name the half that stays and the half that goes), with the shortest supporting
+        reason. Do not create, move or rewrite files; report to the editing agent and let
+        development continue.
+    why: >
+      doorway-service is for what exists only because the other end cannot address and verify a
+      peer by key (a browser, a crawler, a web2 protocol). Web-level work a peer needs
+      when it is reached by key (serving an app's files, rendering a page, judging which head is
+      deliverable) belongs in elohim/elohim-hub/, so the same code serves a person's own device, a
+      household hub and the peer behind a doorway. New hub-side work starts that crate; it does
+      not deepen the debt here. About seven thousand lines of hub-side work grew in
+      this crate (`render/{registry,capability,breaker,bundle_heads,coherence}.rs`, `ssr.rs`,
+      `routes/chrome.rs`) before the seam was marked on 2026-10-06; `render/warm_shell.rs` and
+      `routes/apps.rs` are edge caches and belong here. The list is in the hub README.
+      Birth-time only: editing an existing file never fires this.
+    retire-when: >
+      when the dependency graph is the boundary: doorway-service no longer depends on elohim-render,
+      and a renderer or a head judgement cannot compile in this crate
 cites:
   - seam-concern-contract-architecture-plan
 ---

@@ -280,7 +280,7 @@ mechanics.
 - `TierController` never writes to DHT directly. It calls the elohim DNA
   coordinator zome (for `Commitment` and `Attestation` writes) or the
   existing post-commit signal projection (for storage-side reception).
-  Honors `project_elohim_agent_sense_respond_architecture`.
+  Honors the sense-and-respond rule: discernment and gates live in Rust, in elohim-agent (`2026-04-21-elohim-core-graph-substrate-design.md`).
 - `ShelfRouter` is the only component that knows about external destinations.
   Adding IPFS/Arweave is a new driver, not a change to the controller.
 - `HeuristicClassifier` is a pure function of observable signals. Swappable

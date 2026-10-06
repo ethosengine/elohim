@@ -10,7 +10,7 @@ process_subdomain: doc-lifecycle
 cites:
   - .claude/subject-routing.yaml
   - "subject-routed-decomposition-design | the class gate this gotcha motivates — the fix for process specs mis-filing as D4 substrate | sha256:0d910143a8498b64 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md"
-  - "map | the product-only D1–D10 lattice with no meta axis that made D4 magnetic for process specs | sha256:4d707bfda967a21a | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
+  - "map | the domain map whose D1–D10 lattice had no meta axis when D4 became magnetic for process specs; it has since gained Axis 0, the subject class read first, in answer | sha256:b82315de9b006e9a | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
 qualifies:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md    # the magnetic D4 seed (innocent — the dogfood vocabulary it shares is the trap)
 # Bidirectional: the canonical surface this record is a reading of (it points back).

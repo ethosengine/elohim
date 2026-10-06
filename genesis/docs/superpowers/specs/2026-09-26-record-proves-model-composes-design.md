@@ -27,7 +27,7 @@ informed-by:
 cites:
   - "runtime-artifacts-elected-content | §12: deploy = declare a head — the election this spec makes the only trust point | sha256:eaa2716381075140 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
   - genesis/plans/2026-03-30-resilient-html5-app-delivery-design.md
-  - "elohim-seam-map-concern-routing | the atlas this claim graduates into: a composer / local-inference row, reader never authority (§9) | sha256:dd0f3b2ec2776bcd | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | the atlas this claim graduates into: a composer / local-inference row, reader never authority (§9) | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "values-forward | the values canon a Stance joins at graduation; Stance V.1 (never claim designed as done) bounds this spec | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "native-delivery-sprint-plan | Lane N6: the household proof that a new app build reaches every peer by election | sha256:8a08fcde0dec6869 | path: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md"
 ---

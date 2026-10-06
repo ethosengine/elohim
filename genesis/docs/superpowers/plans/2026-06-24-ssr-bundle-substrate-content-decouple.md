@@ -8,7 +8,7 @@ topic: [ssr, doorway, projection, content-addressing, app-bundle, build-decouple
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md
 cites:
-  - "ssr-bundle-substrate-content-decouple-design | The design spec this plan implements task-by-task; carries the gate answers, rollout phases, and decisions | sha256:8a2e71a5b235206e | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md"
+  - "ssr-bundle-substrate-content-decouple-design | The design spec this plan implements task-by-task; carries the gate answers, rollout phases, and decisions | sha256:ceb4661d51bcfbcb | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md"
 requires_env: [household-nodes]
 ---
 

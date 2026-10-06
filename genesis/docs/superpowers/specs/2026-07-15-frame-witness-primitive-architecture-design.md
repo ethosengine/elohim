@@ -16,9 +16,9 @@ refines:
   - genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md
   - genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md
 cites:
-  - sense-respond-governance-classifier | the governance instance whose Layer-A/frame-ontology this homes + projects; §8, §10.4B resolve_escalation, §14 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md
-  - eprfs-witnessed-interaction-primitive | the parent primitive whose envelope (object_cid, substrate, action, magnitude) + extractor trait + 3-rung ladder this gives a home + contract | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md
-  - elohim-seam-map-concern-routing | the routing: SDK-seam (envelope type + frame data, compose inward) + T1 carriers + Track-4 element + mod/plugin extractor bank; no bridges, no brit engine change | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "sense-respond-governance-classifier | the governance instance whose Layer-A/frame-ontology this homes + projects; §8, §10.4B resolve_escalation, §14 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
+  - "eprfs-witnessed-interaction-primitive | the parent primitive whose envelope (object_cid, substrate, action, magnitude) + extractor trait + 3-rung ladder this gives a home + contract | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md"
+  - "elohim-seam-map-concern-routing | the routing: SDK-seam (envelope type + frame data, compose inward) + T1 carriers + Track-4 element + mod/plugin extractor bank; no bridges, no brit engine change | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - .claude/skills/epr-content-addressing/SKILL.md
 ---
 

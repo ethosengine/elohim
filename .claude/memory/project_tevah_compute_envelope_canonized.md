@@ -11,7 +11,7 @@ metadata:
   originSessionId: 08dda108-5eac-4580-8178-d1bade78f0ab
   modified: 2026-09-02T14:17:25.259Z
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:006fd66d23e8f6c2 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - elohim/ark/
 ---
 

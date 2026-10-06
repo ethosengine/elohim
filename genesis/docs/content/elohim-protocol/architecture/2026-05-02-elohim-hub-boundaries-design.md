@@ -13,7 +13,7 @@ compacted_from:
   - genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md
   - genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md
 informs:
-  - All future hub-archetype implementations (HouseholdHub, CollectiveHub)
+  - All future hub-archetype implementations (DwellingHub, CollectiveHub)
   - All Phase 3+ work that needs to land in the right crate the first time (hub vs node vs storage)
   - All future runtime composition specs (operator UI, fixtures crate) that consume the Hub trait
   - The doorway-vs-hub responsibility split and the four reach-earning surfaces at hub scale
@@ -75,12 +75,12 @@ The substrate is **not** built for FB/YT-shape hyperscale; it is built for a fed
 │ elohim-hub   — composition primitive (Hub trait)                │
 │   trait Hub { id, archetype, governance, storage_budget,        │
 │                operator_surface, federation_contract, ... }     │
-│   impl HouseholdHub                                             │
+│   impl DwellingHub                                              │
 │   impl CollectiveHub                                            │
 │                                                                 │
-│   Question this sprint: new crate, or trait inside elohim-node? │
-│   Default: trait module inside elohim-node until a second       │
-│   consumer (operator UI, fixtures crate) needs it independently.│
+│   The crate starts with the web seam's first piece (2026-10-06).│
+│   The Hub trait is planned as a module of elohim-node until a   │
+│   second consumer (operator UI, fixtures crate) needs it alone. │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
                               │ embeds
@@ -91,7 +91,7 @@ The substrate is **not** built for FB/YT-shape hyperscale; it is built for a fed
 │   • Runs cluster discovery (mDNS), leader election, pod monitor │
 │   • Owns operator-side surfaces: dashboard router, registration │
 │   • Today: cluster/, network/, pod/, dashboard/, sync/, storage/│
-│   • Becomes: HouseholdHub or CollectiveHub instance, depending  │
+│   • Becomes: DwellingHub or CollectiveHub instance, depending   │
 │              on archetype declared at boot                      │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
@@ -109,7 +109,7 @@ The substrate is **not** built for FB/YT-shape hyperscale; it is built for a fed
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-The arrows do not reverse. elohim-storage stays oblivious to hub composition; what it sees are peers and contracts. elohim-node assembles hub-shaped behavior on top of multiple storage instances (when the household has multiple blades) and wires in the operator surface. elohim-hub names the abstraction.
+Both arrows are read from `elohim-node`: it embeds `elohim-hub`, the box above it, and depends on `elohim-storage`, the box below it. The arrows do not reverse. elohim-storage stays oblivious to hub composition; what it sees are peers and contracts. elohim-node assembles hub-shaped behavior on top of multiple storage instances (when the household has multiple blades) and wires in the operator surface. elohim-hub names the abstraction. In dependency terms: the node process, `elohim-node`, links `elohim-hub` and `elohim-storage` on every peer-capable device, a laptop included; `elohim-hub` may use `elohim-storage`; `elohim-storage` links neither.
 
 ## Hub trait — sketch
 
@@ -124,23 +124,23 @@ The arrows do not reverse. elohim-storage stays oblivious to hub composition; wh
 /// nodes. A hub IS the composition that makes a Tier 3 node coherent.
 pub trait Hub: Send + Sync {
     /// Stable identity for this hub. Content-derived where possible
-    /// (per project_first_class_graph_pattern).
+    /// (the protocol is a content-addressed graph: 2026-04-21-elohim-core-graph-substrate-design.md).
     fn id(&self) -> &HubId;
 
     /// Which kind of hub this is. Drives governance shape, federation
     /// behavior, and operator surface.
     fn archetype(&self) -> HubArchetype;
 
-    /// What human-scale governance applies to this hub. For HouseholdHub:
+    /// What human-scale governance applies to this hub. For DwellingHub:
     /// household members (qahal-bounded). For CollectiveHub: the collective's
-    /// stewardship contract (per project_social_compute_collective_is_stewardship_unit).
+    /// stewardship contract (a household is one kind of collective; others contract the same way).
     fn governance(&self) -> &dyn Governance;
 
     /// How much this hub commits to host. Bounded by what humans inside
     /// can steward; growth = more hubs, never bigger hubs.
     fn storage_budget(&self) -> StorageBudget;
 
-    /// The operator UX endpoint set. HouseholdHub: family dashboard.
+    /// The operator UX endpoint set. DwellingHub: family dashboard.
     /// CollectiveHub: stewardship admin (varies by collective shape).
     fn operator_surface(&self) -> &dyn OperatorSurface;
 
@@ -149,7 +149,7 @@ pub trait Hub: Send + Sync {
     /// gossip is metadata-only; byte movement is single-target dispatch.
     fn federation_contract(&self) -> &FederationContract;
 
-    /// All elohim-storage participants composing this hub. A HouseholdHub
+    /// All elohim-storage participants composing this hub. A DwellingHub
     /// with two blades has two; a single-process hub has one. The substrate
     /// sees each one as a peer; the hub sees them collectively.
     fn storage_participants(&self) -> &[StorageHandle];
@@ -168,14 +168,14 @@ pub enum HubArchetype {
 | `elohim-storage/src/p2p/*` | substrate | substrate participant; oblivious to hubs | Stays. Hub-aware behavior never leaks here. |
 | `elohim-storage/src/services/*` | substrate | view aggregation over local + federated state | Stays. Federation queries other peers, not other hubs. |
 | `elohim-storage/src/views.rs` | substrate | wire shapes; ts-rs export | Stays. View kinds may grow (e.g. `HubTopology`) but the file itself is substrate. |
-| `steward/node/src/cluster/*` | hub-internal | mDNS discovery, leader election, membership | Becomes `HouseholdHub::cluster()` — already hub-shape, just unnamed. |
-| `steward/node/src/network/operator.rs` | hub | operator identity + permissions | Becomes part of `OperatorSurface`. (Pre-existing `OperatorRelationship::Owner` should be renamed per `project_no_sovereignty_stewardship_over_ownership` — flagged as cleanup, not blocking.) |
+| `steward/node/src/cluster/*` | hub-internal | mDNS discovery, leader election, membership (three stub files today; discovery lives in the p2p swarm and leader election is not built) | Becomes `DwellingHub::cluster()` — already hub-shape, just unnamed. |
+| `steward/node/src/network/operator.rs` | hub | operator identity + permissions | Becomes part of `OperatorSurface`. (Pre-existing `OperatorRelationship::Owner` should be renamed per `genesis/docs/architecture/stewardship-over-sovereignty.md`, where stewards do not "own" what they steward — flagged as cleanup, not blocking.) |
 | `steward/node/src/network/registration.rs` | hub | how a node joins a hub | Becomes `Hub::register_participant()` flow. |
-| `steward/node/src/network/sync_state.rs` | hub-internal | inter-blade sync within a household | Stays inside HouseholdHub; CollectiveHub will not have this shape. |
-| `steward/node/src/pod/*` | hub-internal | k8s-style pod monitor / consensus | Stays inside HouseholdHub. Maps to `project_household_fabric`. |
-| `steward/node/src/dashboard/*` | hub-presentation | operator-facing UI server | Becomes `HouseholdHub::operator_surface()`'s router. |
+| `steward/node/src/network/sync_state.rs` | hub-internal | inter-blade sync within a household | Stays inside DwellingHub; CollectiveHub will not have this shape. |
+| `steward/node/src/pod/*` | hub-internal | k8s-style pod monitor / consensus | Stays inside DwellingHub. Maps to `project_household_fabric`. |
+| `steward/node/src/dashboard/*` | hub-presentation | operator-facing UI server | Becomes `DwellingHub::operator_surface()`'s router. |
 | `steward/node/src/p2p/*` | hub libp2p | secondary swarm for cluster ops | This is interesting — see "two libp2p swarms" below. |
-| `steward/node/src/elohim_service.rs` | hub | embeds elohim-storage in the runtime | Becomes `HouseholdHub::storage_participants()` provisioning. |
+| `steward/node/src/elohim_service.rs` | hub | wires the `elohim-agent` crate into the runtime (storage is embedded through the Cargo dependency and `main.rs`) | Becomes `DwellingHub::storage_participants()` provisioning. |
 
 ## Two libp2p swarms: substrate vs hub-internal
 
@@ -186,7 +186,7 @@ elohim-storage runs a libp2p swarm (the substrate). steward/node also has a `p2p
 | **Substrate** (in elohim-storage) | Hub-to-hub federation; protocol participation; the alpha cluster topology per `project_alpha_topology_bootstrap_pair` | Every Tier 3 node in the protocol | Bounded by deliberate federation policy |
 | **Hub-internal** (in elohim-node) | Blade-to-blade within a household; pod consensus; failover | Only this hub's blades | Tight, local, mDNS-first |
 
-The Hub trait owns the substrate-side handle (the storage participants); the hub-internal swarm is private to the HouseholdHub implementation. CollectiveHub may not need a hub-internal swarm at all — that decision is per-archetype.
+The Hub trait owns the substrate-side handle (the storage participants); the hub-internal swarm is private to the DwellingHub implementation. CollectiveHub may not need a hub-internal swarm at all — that decision is per-archetype.
 
 ### Horizontal scaling is the operator's placement job
 
@@ -196,9 +196,9 @@ A hub grows by adding blades, never by growing one process — `storage_particip
 
 A reasonable sequence when this gets picked up:
 
-1. **Crate decision.** Inside elohim-node first (`mod hub`). Promote to `elohim-hub` only if a second consumer (operator UI compiled separately, fixtures crate, simulation harness per `project_hub_archetype_abstraction`'s `@wip` note) needs it.
-2. **Add `Hub` trait + `HouseholdHub` skeleton** that re-exports today's modules behind it. No behavior change; just naming.
-3. **Move `cluster::`, `pod::`, `dashboard::`** into `HouseholdHub` impl methods.
+1. **Crate decision (amended 2026-10-06).** The `elohim-hub` crate is created by the first web-seam work (see "Doorway / hub edge"). The Hub trait starts inside elohim-node (`mod hub`, not written yet) and moves into that crate when a second consumer (operator UI compiled separately, fixtures crate, a simulation harness for hub-shaped a2o scenarios, which are written `@wip` against hub fixtures until one exists) needs it.
+2. **Add `Hub` trait + `DwellingHub` skeleton** that re-exports today's modules behind it. No behavior change; just naming.
+3. **Move `cluster::`, `pod::`, `dashboard::`** into `DwellingHub` impl methods.
 4. **Add `CollectiveHub` skeleton** with empty impls; wire one behavior (e.g. `governance()`) end to end.
 5. **Reframe `network::operator`** as `OperatorSurface` trait; rename `Owner → Steward` per stewardship vocabulary; archetype-vary the permission shape.
 6. **Federation contract reads cross-hub topology** — at this point Phase 3+ federation work in elohim-storage has a typed Hub-to-Hub call site, not just peer-to-peer.
@@ -229,9 +229,9 @@ The companion plan (`2026-05-01-light-up-the-topology-plan.md`) gets a short fra
 
 ## Open questions (deferred)
 
-1. **Where does the hub identity come from?** Content-derived from genesis configuration? Notarized via DHT? Self-signed at first boot? Probably starts self-signed and graduates per `project_bootstrap_to_elohim_security_gradient`.
+1. **Where does the hub identity come from?** Content-derived from genesis configuration? Notarized via DHT? Self-signed at first boot? Probably starts self-signed and graduates along the staged security gradient: structural and social checks first, elohim-integrated checks layered in later.
 2. **How does a household with two blades present as one substrate peer?** Today each blade runs its own elohim-storage and shows up as a separate libp2p peer. The hub-internal swarm could let one blade speak for the household, but that is a federation-aggregation question, not a substrate-identity question. Defer until needed. *Direction for the human-facing answer:* the surface a human sees is the **hub aggregate**, not a per-device breakdown — a hub is a storage pool rolling up its members' capacities (sliding a blade in jumps "5GB / 15GB" to "5GB / 100GB" without changing the human's sense of "my hub"). Substrate truth stays per-device (system_metrics probes + rea_commitments); the projection layer rolls it up with progressive disclosure by capability (kids/grandma see the two-tuple; power users see the stewarded/self triptych and drill down to per-device tiles). Build the per-device substrate without hub-aggregate coupling, but design the projection to roll up cleanly.
-3. **Does CollectiveHub federate via the same protocol as HouseholdHub?** Likely yes for view federation; possibly no for blob custody (collectives may have institutional storage with different commitment shapes). Out of scope until a CollectiveHub exists.
+3. **Does CollectiveHub federate via the same protocol as DwellingHub?** Likely yes for view federation; possibly no for blob custody (collectives may have institutional storage with different commitment shapes). Out of scope until a CollectiveHub exists.
 
 ---
 
@@ -256,6 +256,8 @@ Doorway is the **per-deployment web2 projection surface** and should stay simple
 
 A village's hub may *peer with* a doorway when it wants a public web2 face, but the hub stands alone without one. The design test for any new projection feature: **is this serving browsers + other doorways, or nearby peers, or both?** A view contract (cluster-view, peer-topology, reciprocity, distribution, doorway-dashboard) that is valid on one edge should not bake the other edge's assumptions in — serve it from both where it makes sense.
 
+**The web seam (2026-10-06) applies this test to app serving and rendering.** Work that exists only because the other end cannot address and verify a peer by key (a registered name, its certificate, the cache that absorbs traffic arriving with no relationship, a web2 protocol projection) is doorway work. Web-level work a peer needs when it is reached by key (serving an elected app bundle's files, server rendering, the deliverability verdict) is hub work, and its home is `elohim/elohim-hub/`. The doorway relays and caches what the hub produced; it does not execute a render or judge a head. That README states the test in full and lists the code that has not moved yet. The first web-seam work creates the `elohim-hub` crate; "Migration story" below says when the Hub trait joins it. The process that serves this work is the node process, `elohim-node`, which links both `elohim-hub` and `elohim-storage` on every peer-capable device (decided 2026-10-06; reasons in that README); storage stays oblivious to the hub. A browser-only device cannot reach a peer by key, so serving one, even a household's own, is doorway work run on the hub box.
+
 ### The four reach-earning surfaces at hub scale
 
 The protocol already earns reach at **message authoring** (`project_reach_earned_at_authoring`, `project_social_reach_nervous_system`). The hub layer extends the *same* earning signal to four aggregate-scale surfaces:
@@ -264,6 +266,8 @@ The protocol already earns reach at **message authoring** (`project_reach_earned
 2. **Distribution reach** — does this traffic propagate across federated hubs? Cross-hub gossip, load balancing, content fanout, federation projection all spend the same signal. **A pattern shaped like a DDoS attack is structurally just unearned distribution reach** — it dies at the first unconvinced hub. There is no central anti-spam classifier; there is the cumulative judgment of every hub.
 3. **Defense reach** — defense is a **side-effect of earning, not a bolt-on firewall**. The hub fabric simply doesn't engage with unearned reach.
 4. **AI-coordination reach** — elohim-operator discernment at hub scale spends the same earning signal.
+
+**The scaling target these four enable is FANG-subsumption** (restored 2026-10-06 from the retired hub-edge spec): aggregate compute (Google AI), aggregate distribution (YouTube/Netflix CDN), aggregate defense (Cloudflare) and aggregate algorithmic discernment (Facebook's feed), carried by the federation of hubs and never by any single hub.
 
 **"DDoS = unearned reach"** is the throughline that makes the doorway/hub boundary coherent.
 

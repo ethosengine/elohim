@@ -7,7 +7,7 @@ domain: D8
 topic: [doorway, membrane, edge, federation, multi-wan, cdn, ddos, dns, pkarr, peer-selection, serve-routing, self-heal, pro-social, mutual-aid, defense-in-depth, fail2ban, peer-fabric, crate-extraction, origin-cloaking, dataplane]
 cites:
   - "weave-epic-arc-design | the D5 substrate epic this arc CONSUMES not forks (#0 lens, #1 CoverageRollup, #2 tier-capability, #3 compute-contracts/recognition); sibling-arc placement | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
-  - "doorway-ssr-runtime | the canonical doorway-as-compute seed this refines; the capability-advertisement substrate the membrane extends | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "doorway-ssr-runtime | the render-capability seed this refines: the capability-advertisement substrate the membrane extends; its placement note of 2026-10-06 moves render execution to the hub | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
   - doorway/doorway-service/EDGE-DESIGN.md
   - "landing-page-epr-dual-doorway | the unexecuted dual-federated-doorway plan this supersedes with the membrane + capability-routing + self-heal model | sha256:161bb449d50df804 | path: genesis/docs/superpowers/plans/2026-05-23-landing-page-epr-dual-doorway.md"
   - "pillar-epr-decomposition-design | the EPR projection the membrane caches/serves; projection-as-disposable (P1) is why a doorway can be untrusted/replaceable | sha256:3db7d2c205a0d7d6 | path: genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md"

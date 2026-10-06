@@ -26,8 +26,8 @@ informed-by:
 cites:
   - "stewardship-over-sovereignty | the §3 lexicon (stewardship, agency, authority) this spec frames the human claim in; no sovereignty apex | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - "private-thought-governed-fruit | the reserve: claims and acts are fruit, recall receipts and transcripts never cross; §4 boundaries 5 and 6 bound the acts store | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
-  - "cradle-to-grave-capability-gradient | mediated agency named out of scope; no ward entity added here | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
-  - "elohim-seam-map-concern-routing | places the actor plane: a repo-node rehearsal of the imagodei identity seam, not a new seam | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "cradle-to-grave-capability-gradient | mediated agency named out of scope; no ward entity added here | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "elohim-seam-map-concern-routing | the seam catalog this spec adds nothing to: the human claim rehearses, at the repository node, the identity the map carries on track T1 (the DHT-notary floor, all devices); it is not a new seam | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "elohim-protocol-manifesto | the canon the witness leg takes up: its section Witnessed Humanity: Attunement, Not Filters (humanity is witnessed by those who know you, never scored by a filter) is what an agent's epr actor witness rehearses at this node | sha256:66c8e3b40b858b92 | path: genesis/docs/content/elohim-protocol/manifesto.md"
 ---
 

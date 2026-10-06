@@ -8,7 +8,7 @@ metadata:
   type: project
 cites:
   - doorway/doorway-service/src/server/http.rs
-  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
 ---
 
 # Doorway/EPR serving path + SSR (umbrella)

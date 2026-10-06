@@ -6,7 +6,7 @@ class: architecture
 artifact_kind: canon
 cites:
   - "stewardship-over-sovereignty | the foundational inversion this manifesto extends into justice — sovereignty subordinated to community governance, no self-sovereign apex | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
-  - "cradle-to-grave-capability-gradient | graduated/mediated agency + the superadmin-decomposed-into-bounded-quorums shape the floor and ceiling inherit | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "cradle-to-grave-capability-gradient | graduated/mediated agency + the superadmin-decomposed-into-bounded-quorums shape the floor and ceiling inherit | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
   - "theology | servants-not-gods; the serpent's-offer-refused; the reserved place — the non-divinity confession the ceiling keeps | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
   - "confession | El Roi limit (hold the score, not judge the heart); humility a confident system cannot perform; grace precedes the demand | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
   - "elohim-protocol-manifesto | put the fruit back on the tree; best-self judgment at machine speed; pause-and-verify-not-block | sha256:cd62d3cc869bada5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/manifesto.md"

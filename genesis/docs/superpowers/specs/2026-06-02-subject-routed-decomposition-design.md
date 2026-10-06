@@ -10,7 +10,7 @@ topic: [decomposition, routing, subject-class, manifest, brainstorm-gate, placem
 cites:
   - "placement | current subject-class home contract; the originally proposed section is present, without proving gate implementation | sha256:95be31e6724bb9f5 | path: genesis/docs/PLACEMENT.md"
   - genesis/docs/claude.md
-  - "map | current subject-class routing above the product D1–D10/pillar lattice; the original absence diagnosis is historical | sha256:d43860fc500b5d8b | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
+  - "map | current subject-class routing above the product D1–D10/pillar lattice; the original absence diagnosis is historical | sha256:b82315de9b006e9a | path: genesis/docs/content/elohim-protocol/architecture/MAP.md"
   - .claude/scripts/memory-kit/decompose.py
   - .claude/commands/brainstorm.md
   - .claude/memory-kit/CLAUDE.md

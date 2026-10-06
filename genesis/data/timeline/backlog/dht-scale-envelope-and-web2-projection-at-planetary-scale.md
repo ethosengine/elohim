@@ -17,9 +17,9 @@ relatedNodeIds:
   - "memory:project_earned_reach_governance_pr_ceremony_vision"
   - "memory:project_hub_optional_floor"
 cites:
-  - genesis-pair-dht-unity-plan | Genesis-Pair DHT Unity | sha256:4740875c8434d6be | path: genesis/docs/superpowers/plans/2026-07-11-genesis-pair-dht-unity-plan.md
-  - peer-discovery-fractal-federation | Peer Discovery as Fractal Federation | sha256:42ae0e67f9e9d4bc | path: genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md
-  - iroh-libp2p-complementarity | iroh ↔ libp2p Complementarity | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - "genesis-pair-dht-unity-plan | Genesis-Pair DHT Unity | sha256:4740875c8434d6be | path: genesis/docs/superpowers/plans/2026-07-11-genesis-pair-dht-unity-plan.md"
+  - "peer-discovery-fractal-federation | Peer Discovery as Fractal Federation | sha256:42ae0e67f9e9d4bc | path: genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md"
+  - "iroh-libp2p-complementarity | iroh ↔ libp2p Complementarity | sha256:da518f4d0861aff8 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
 tags: [architecture, scale, dht, arc-factor, sharding, hot-content, patron-cdn, reach-earning, rea, web2-projection, brainstorm-needed, performance, perf-scale, friction-mechanical, custody-everyone, plane-notary, unit-peer, phase-growth]
 ---
 

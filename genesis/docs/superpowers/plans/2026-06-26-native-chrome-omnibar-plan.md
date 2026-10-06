@@ -8,7 +8,7 @@ topic: [ssr, doorway, elohim-render, omnibar, chrome, composition, splice, epr-t
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md
 cites:
-  - native-rust-epr-shell-ssr-design | The design spec this plan implements (Phase 2: omnibar as native runtime chrome composed around the V8 body; §4.1 composition, §4.3 theme, §4.4 PE, §4.5 migration) | path: genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md
+  - "native-rust-epr-shell-ssr-design | The design spec this plan implements (Phase 2: omnibar as native runtime chrome; §4.1 the composition engine, since superseded for the omnibar; §4.5 progressive enhancement; §4.6 migration of the Angular app) | sha256:624ac62d7957db51 | path: genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md"
 requires_env: [household-nodes]
 ---
 

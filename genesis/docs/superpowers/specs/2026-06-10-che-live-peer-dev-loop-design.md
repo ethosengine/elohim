@@ -6,9 +6,9 @@ class: process-meta
 topic: [che, browser, playwright, look, alpha, doorway, dev-proxy, live-data, agentic-eyes]
 process_subdomain: build-and-test
 cites:
-  - che-browser-feedback-foundation-design | L1 of this series — the look primitive + Che browser wiring this loop renders through; L3 refines it with a live-data backend | sha256:db154b7bbc93ba3b | path: genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md
-  - che-browser-completion-oracle-design | L2 of this series — the visual done-gate; L3 rail #3 keeps gates on deterministic fixtures, live-peer loop is polish/diagnosis only | sha256:355cc8523a03f33b | path: genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md
-  - doorway-access-tier-patterns | canonical doorway access model — governs what an unauthenticated/fixture-authed dev proxy may read from alpha and why writes are deliberate acts | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md
+  - "che-browser-feedback-foundation-design | L1 of this series — the look primitive + Che browser wiring this loop renders through; L3 refines it with a live-data backend | sha256:db154b7bbc93ba3b | path: genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md"
+  - "che-browser-completion-oracle-design | L2 of this series — the visual done-gate; L3 rail #3 keeps gates on deterministic fixtures, live-peer loop is polish/diagnosis only | sha256:355cc8523a03f33b | path: genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md"
+  - "doorway-access-tier-patterns | canonical doorway access model — governs what an unauthenticated or session-authenticated dev proxy may read from alpha, and states that writes are gated by reach and by the conductor's validation | sha256:ea892dec0171246b | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
 informed-by:
   - genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md
 refines: genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md

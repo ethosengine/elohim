@@ -45,12 +45,14 @@ informed-by:                       # ← architecture or sprint specs this build
   - <path> (one-line context)
 informs:                           # ← downstream specs / code this constrains
   - <category or specific spec>
-memory_anchors:                    # ← MemPalace entries the spec leans on
+memory_anchors:                    # ← memory entries the spec leaned on (provenance; see below)
   - project_<slug>
 defers:                            # ← things explicitly out of scope
   - <one-line description>
 ---
 ```
+
+**`memory_anchors:` is provenance.** Each entry names a memory file, `.claude/memory/<name>.md`, that the document leaned on when it was written. Most of those files were retired on 2026-06-03, when their content was folded into the documents in this directory, so a name with no file there is a retired entry and not a broken link. Read one with `git show 7b0eefee9^:.claude/memory/<name>.md`. Four older ones were archived first; find one with `git log --all --diff-filter=D --name-only -- '*<name>.md'`, then read it from the parent of the commit that prints, at the path that prints. A document states its principles itself: body text does not rest a claim on an anchor.
 
 The four relationship fields — `realizes`, `informed-by`, `informs`, `defers` — are the **graph edges** that knit architecture specs to epics, to each other, to downstream sprint specs, and to scope boundaries. Together they make the architecture navigable in both directions: epic ↔ architecture spec ↔ sprint spec ↔ code.
 
@@ -105,7 +107,7 @@ The records-lifecycle spec rests on these substrate-defining architecture specs 
 | [`2026-05-15-dna-signal-as-epr-envelope.md`](./2026-05-15-dna-signal-as-epr-envelope.md) | DNA signal as EPR envelope pattern |
 | [`2026-05-23-doorway-access-tier-patterns.md`](./2026-05-23-doorway-access-tier-patterns.md) | Doorway web2 projection access tiers |
 | [`2026-06-02-sweettest-integration-layer.md`](./2026-06-02-sweettest-integration-layer.md) | DNA-level integration test tier (in-process conductors; native-build CI gotchas) |
-| [`2026-06-02-doorway-ssr-runtime.md`](./2026-06-02-doorway-ssr-runtime.md) | Doorway server-render as an honest compute capability (Angular-19 SSR build-glue) |
+| [`2026-06-02-doorway-ssr-runtime.md`](./2026-06-02-doorway-ssr-runtime.md) | Server-render as an honest compute capability (Angular-19 SSR build-glue); render execution is hub work by the web seam, 2026-10-06 |
 | [`2026-05-02-blob-custody-reconciliation-design.md`](./2026-05-02-blob-custody-reconciliation-design.md) | Blob custody reconciliation — placement/salvage as a reconciled substrate primitive (placement signals are economic inputs to shefa) |
 | [`2026-06-11-doorway-two-axis-scaling.md`](./2026-06-11-doorway-two-axis-scaling.md) | Doorway's two independent scaling axes — the projection read path vs the conductor/identity-hosting pool — and the graduation flywheel between them (graduation is accounting-only as-implemented; no source-chain export exists) |
 | [`2026-08-25-doorway-auth-posture-declared-stage.md`](./2026-08-25-doorway-auth-posture-declared-stage.md) | Doorway write authority derived from the declared network stage, with seed authority distinct from per-doorway admin identity |

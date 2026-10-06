@@ -18,7 +18,7 @@ cites:
   - "evidence-ladder-push-left | Evidence Ladder + Push-Left Pressure | sha256:ac39aeb003dada60 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md"
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
   - "latency-valueflow-chain | The Latency Valueflow Chain | sha256:9b3106cb3707e838 | path: genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
   - elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md
   - .epr-meta/reach-enforced-everywhere.habit.md

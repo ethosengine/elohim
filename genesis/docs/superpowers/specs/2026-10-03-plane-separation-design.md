@@ -16,7 +16,7 @@ cites:
   - "shem-performance-deep-dive-report-20261002 | 2026-10-02-shem-performance-deep-dive-report | sha256:df11f4c346d960e2 | path: genesis/docs/superpowers/sprints/2026-10-02-shem-performance-deep-dive-report.md"
   - "campaign-1-4-leg2-device-authorization-20261003 | Campaign 1.4 leg 2 | sha256:a8b6df7ced5151b6 | path: genesis/docs/superpowers/sprints/2026-10-03-campaign-1.4-leg2-device-authorization.md"
   - "trust-as-efficiency-signal | Trust is an Efficiency Signal | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
-  - "observation-event-layer-design | Observation/Event Layer | sha256:2b57787e60a0ddc6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
+  - "observation-event-layer-design | Observation/Event Layer | sha256:2b8d214094200bb6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
   - elohim/holochain/.epr-meta/zome-call-cost-bounded.habit.md
   - elohim/elohim-storage/.epr-meta/idle-is-free.habit.md
 ---
@@ -432,4 +432,3 @@ One instrument limit found in the household proof: `hc_ribosome_zome_call_durati
 include authorisation (it read a 5.7 ms mean for calls the client waited 1.5 s on), so it cannot
 be the per-call cost that `zome-call-cost-bounded`'s retire-when names. The check needs the
 authorising read counted, or a client-side measure.
-

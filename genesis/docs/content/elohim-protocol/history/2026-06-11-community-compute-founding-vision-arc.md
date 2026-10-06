@@ -17,23 +17,23 @@ canonical:
   - genesis/docs/content/elohim-protocol/resilience/README.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
 cites:
-  - storage-dual-plane-design-arc | same-day sibling arc that owns the ContentLocation/replication-sketch never-shipped verdicts this record points at instead of re-deriving | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md
-  - d1-through-d5-node-and-household-canon | the canon that superseded the Stage 1-4 ladder vocabulary | sha256:5ee9472bbefad806 | path: genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md
-  - doorway-two-axis-scaling | graduation flywheel + axis-2-shrinks — where doorway-becomes-one-node-among-many and the agency ladder shape now live | sha256:36fb15e24ceaf8b2 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md
-  - elohim-hub-boundaries-design | the hub design the hub-optional floor constrains — Stage 1/2 humans first-class, count humans carried not nodes | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
-  - wave3-valueflows-hrea-interop-design | the designed-pre-implementation VF/hREA interop surface the vision's hREA bet still awaits | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
-  - requests-offers-application-design | §D.20 Layered Commons + friction-gradient limitarianism — where the commons fund evolved | sha256:321ac092b956fe8e | path: genesis/docs/content/elohim-protocol/architecture/applications/requests-offers-application-design.md
-  - governance-epic | epic | sha256:be850529ab645a30 | path: genesis/docs/content/elohim-protocol/governance/epic.md
+  - "storage-dual-plane-design-arc | same-day sibling arc that owns the ContentLocation/replication-sketch never-shipped verdicts this record points at instead of re-deriving | sha256:2315c84345a2ef3c | path: genesis/docs/content/elohim-protocol/history/2026-06-11-storage-dual-plane-design-arc.md"
+  - "d1-through-d5-node-and-household-canon | the canon that superseded the Stage 1-4 ladder vocabulary | sha256:5ee9472bbefad806 | path: genesis/docs/content/elohim-protocol/history/2026-04-19-d1-through-d5-node-and-household-canon.md"
+  - "doorway-two-axis-scaling | graduation flywheel + axis-2-shrinks — where doorway-becomes-one-node-among-many and the agency ladder shape now live | sha256:36fb15e24ceaf8b2 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-doorway-two-axis-scaling.md"
+  - "elohim-hub-boundaries-design | the hub design the hub-optional floor constrains — Stage 1/2 humans first-class, count humans carried not nodes | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "wave3-valueflows-hrea-interop-design | the designed-pre-implementation VF/hREA interop surface the vision's hREA bet still awaits | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md"
+  - "requests-offers-application-design | §D.20 Layered Commons + friction-gradient limitarianism — where the commons fund evolved | sha256:321ac092b956fe8e | path: genesis/docs/content/elohim-protocol/architecture/applications/requests-offers-application-design.md"
+  - "governance-epic | epic | sha256:be850529ab645a30 | path: genesis/docs/content/elohim-protocol/governance/epic.md"
   - genesis/docs/content/elohim-protocol/social_medium/epic.md
   - genesis/docs/content/elohim-protocol/lamad.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - per-substrate-limitarian-governor-design | rates-as-governed-EPR through propose→vote→tally — where constitutional rates evolved | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md
-  - trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
+  - "per-substrate-limitarian-governor-design | rates-as-governed-EPR through propose→vote→tally — where constitutional rates evolved | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md"
+  - "trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - genesis/data/timeline/backlog/storage-island-harvest-residue.md
   - elohim/holochain/docs/README.md
   - elohim/epr/src/reach.rs
-  - elohim-cache-core-gospel | the extracted crate gospel — live home of the holochain-cache-core component the vision named | sha256:359677d53fb0dcd7 | path: elohim/elohim-cache-core/CLAUDE.md
+  - "elohim-cache-core-gospel | the extracted crate gospel — live home of the holochain-cache-core component the vision named | sha256:359677d53fb0dcd7 | path: elohim/elohim-cache-core/CLAUDE.md"
   - elohim/elohim-storage/src/api/compute.rs
   - app/elohim-app/src/app/shefa/components/shefa-dashboard/shefa-dashboard.component.html
 memory_anchors:

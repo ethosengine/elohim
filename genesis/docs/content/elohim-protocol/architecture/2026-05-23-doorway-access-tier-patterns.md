@@ -34,6 +34,8 @@ The shakeout work surfaced that the doorway's current behavior is partially hone
 
 This is **descriptive**, not prescriptive. The next `/shift` picks one pattern to ship first based on the operator's call.
 
+> **Placement amended 2026-10-06 (the web seam).** The doorway stays the complete web2 projection, with one ingress rule per host. What it dispatches to changes: executing a render and serving an app's files are hub work, and the doorway relays and caches what the hub produced (`elohim/elohim-hub/README.md`, "The web seam"). Read "→ elohim-render" and the baked-in bundle in the next paragraph as debt against that seam.
+
 **Foundational direction (orthogonal to the tiers, but the surface they sit on):** the doorway is converging toward being the *complete* web2 projection of its substrate — absorbing the SPA-host role currently split across a separate `elohim-site` pod + ingress rules. The end state retires the static-site pod: one ingress rule per host (`/` Prefix → doorway), and the doorway internally dispatches SSR-eligible manifest routes (→ elohim-render), API/blob routes (→ storage proxy / blob cache), bare client-side SPA routes (→ baked-in `index.html`), and static assets (→ baked-in browser bundle). This collapses the "drift between ingress and storage manifest" bug class — the source of truth (storage's `build_manifest()` with `render: "angular-ssr"` annotations) becomes the *only* declaration of what a doorway does for an HTTP client. Every access tier below assumes this single-process projection surface.
 
 ---
@@ -126,13 +128,13 @@ Practical tell: any design that names "the human's doorway" (singular) is suspec
 
 **Problem statement:** The Diesel `content` SQL table — backing `elohim/elohim-storage/src/cache_stream.rs` and consumed by doorway's warm-stream — does NOT replicate peer-to-peer. When the CI pipeline PATCHes `matthew`'s `elohim-host-landing.blobHash`, only `matthew` has the updated row. Warm-stream then fans across `matthew + 13 other peers` (sequentially per the actual code; not "indiscriminately" as an earlier handoff claimed). The stale-data peers are not unhealthy from their own perspective; they have no signal that their content row is stale. Last-write-wins at the doorway means the projection cache randomly serves stale data.
 
-**The right shape:** Content rows are projections of ContentEntry on the DHT (or a libp2p sync stream, depending on what scope the project_three_layer_truth_model classifies content metadata as). Either DHT-notarized or libp2p-data-ops, **not** per-peer SQLite islands.
+**The right shape:** Content rows are projections of ContentEntry on the DHT (or a libp2p sync stream, depending on what scope the three-layer truth model (DHT / libp2p / doorway projection) classifies content metadata as). Either DHT-notarized or libp2p-data-ops, **not** per-peer SQLite islands.
 
 **Integration points:**
 - `genesis/docs/superpowers/specs/2026-04-19-self-healing-p2p-dataplane-design.md` — the blob-replication spec. Extend it to cover content metadata rows, OR write a sibling spec for metadata sync.
 - `elohim/elohim-storage/src/db/cache_queries.rs` — where the doorway reads cacheable content; should observe a sync stream rather than poll per-peer.
 - `project_inventory_exchange_not_byte_replication` memory — content-row sync is gossip+metadata; it does NOT need to ride the blob-replication path. Cheaper substrate.
-- `project_three_layer_truth_model` memory — decide which layer owns content metadata. Likely libp2p (cheap, ops-shape) not DHT (expensive, notary-shape).
+- the three-layer truth model (`doorway/CLAUDE.md`, "No Blob Fan-Out": DHT / libp2p / doorway-projection) — decide which layer owns content metadata. Likely libp2p (cheap, ops-shape) not DHT (expensive, notary-shape).
 
 **Workaround in place today:** CI `stageSpaBlob` fans out the PATCH across all peers (Layer-A bypass at the CI level). Linear in peer count; fragile but functional. Acceptable as a stopgap until Pattern A lands.
 

@@ -3601,6 +3601,40 @@ habits:
       25dd2d0be, not the running binary), with every role `zomePath: live`, `just mesh preflight` ok on
       every line, and the development dists rebuilt at f45fb527e's source and re-staged via doorway A and
       propagated to B with the carried record (attempt 1 each).
+
+      DELTA 2026-10-06 (memory ceremony `coherence-hub-seam-2026-10-06`, focused door; NO status change, the
+      habit stays red). The entry could not hold this concern. `elohim/elohim-hub/README.md` and
+      `doorway/doorway-service/EDGE-DESIGN.md` cite other documents only as prose paths, so
+      `epr flow context <path> --concerns` reads 0 indexed edges on both, and 18 dead memory anchors plus a
+      spec retired in 53190a234 never appeared as drift. `recall select --path` refused ("--edge must name a
+      row in the last displayed page") and `recall remember` refused ("choose an assertion before retaining a
+      finding"), so no finding was retained in the session: it holds 3 read receipts (about 11.9 KB of
+      source) while the investigation's evidence was carried by direct reads and five reader agents outside
+      the executor. That is the defect this habit names. One correction was written and closed by note on
+      the doorway consolidation history record (`bafyreiezw7…mhoq`). Chronicle:
+      `genesis/data/timeline/chronicle/2026-10-06-substrate-currency-hub-doorway-web-seam.md`.
+
+      DELTA 2026-10-06b (memory ceremony `coherence-hub-seam-2026-10-06-b`, focused door; NO status change, the
+      habit stays red). Second session of the same day, same defect: across four repair batches on seventeen
+      documents the session retained no finding, because none of the investigated assertions is an indexed
+      edge row. Verification was carried by reviewers outside the executor (four diff regressions, the last
+      GREEN; three cold implementation readers; eight blind readers of the hub README, rounds 3 to 8 READY).
+      What the entry did supply: the baseline for the six-document cohort (295,229 B), the corrections read
+      (0 unresolved, 1 closed), and edge-granular `epr flow cites refresh` for the citations whose claims
+      were re-read after the edits. Chronicle:
+      `genesis/data/timeline/chronicle/2026-10-06-substrate-currency-hub-doorway-web-seam.md`.
+
+      DELTA 2026-10-06c (same day, no ceremony session open; NO status change, the habit stays red). The five
+      items the second session left open were closed outside the executor, which is the same defect seen from
+      the other side: the work that settled them had no assertion to select. Fifteen citation descriptions were
+      reworded after an independent reader checked each claim against its target, about 26 claims that rested
+      on retired memory anchors were repointed or stated inline, and the last `epr flow cites refresh` pass was
+      edge by edge under a written rule (111 edges on 86 documents; 32 edges that were stale before the session
+      were left stale because nobody read their claims). Native `epr flow status` reads 182 stale edges, from
+      228 at the day's start. One new observation for this habit: the SessionStart recall bootstrap refused
+      mid-session with "executor bytes changed since this session began", so a session that outlives an `epr`
+      rebuild loses its bootstrap continuation unless it adopts. Chronicle:
+      `genesis/data/timeline/chronicle/2026-10-06-substrate-currency-hub-doorway-web-seam.md`.
     guard: >
       Regression risks: (1) greening by widening source_roots to everything — the private recall
       store and other worktrees stay refused, and a scope that admits scratch is not a governed

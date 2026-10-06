@@ -121,3 +121,10 @@ OPEN QUESTION: the hub-edge design spec
 to git (deleted in 53190a234) while its 13 decomposed gap-items remain OPEN in
 `.claude/memory-kit/gap-items/specs__2026-05-08-doorway-hub-edge-design.json` —
 where does live hub-edge guidance now anchor?
+
+ANSWERED 2026-10-06: the anchor is `2026-05-02-elohim-hub-boundaries-design.md`, section
+"Doorway / hub edge (amended 2026-06-02)", as the seam map §3.9 states ("do NOT cite the retired
+`2026-05-08-doorway-hub-edge-design.md`"). The web-level part of that split is marked in
+`elohim/elohim-hub/README.md` ("The web seam") and `doorway/doorway-service/EDGE-DESIGN.md`. The
+gap-items file named above exists at neither `.claude/memory-kit/gap-items/` nor
+`.eprfs/status/gap-items/`, so the thirteen open gap-items could not be verified.

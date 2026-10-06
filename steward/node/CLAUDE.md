@@ -1,19 +1,21 @@
 ---
 id: steward-node-gospel
 cites:
-  - "elohim-hub-boundaries-design | the orchestration epic ABOVE this crate — hub composition truth (Hub trait, crate-map L171-178, two-swarms); this gospel covers crate mechanics only | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "elohim-hub-boundaries-design | the orchestration epic ABOVE this crate — hub composition truth (Hub trait, crate-map L171-178, two-swarms); this gospel covers crate mechanics only | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - "p2p-dataplane-sync-engine-design-arc | protocol lineage home — the /elohim/doc-sync vs /elohim/storage-sync two-dialect divergence and its recorded convergence open question; cite, never restate | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - .claude/skills/automerge-sync/SKILL.md
-  - "steward-device-gospel | device-side Tauri shell gospel — the ephemeral spoke this always-on node serves; device concerns route there | sha256:1d7a9fb8f5da3e01 | status: stale — target content moved on; re-verify | path: steward/device/CLAUDE.md"
+  - "steward-device-gospel | device-side Tauri shell gospel — the desktop shell whose sidecar is to be the envelope that supervises this node process; device concerns route there | sha256:22e28b661efea8fb | path: steward/device/CLAUDE.md"
   - steward/node/simulation/P2P-COMPUTE-FOOTPRINT.md
-  - "elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns the hub cluster ops / hub-internal swarm seam (§3.12); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this crate owns the hub cluster ops / hub-internal swarm seam (§3.12); routes any where-does-this-go? question | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
-# steward/node — elohim-node (always-on P2P runtime)
+# steward/node — elohim-node (the node process on every peer)
+
+By the decision of 2026-10-06 (`elohim/elohim-hub/README.md`, "The web seam"), this crate is the node process for every peer-capable device: the one composition root that links `elohim-storage`, `elohim-hub` and the agent crates. It is always-on when its device is. Under the compute envelope it is the child `ark` supervises; on a desktop the Tauri shell's sidecar is that envelope. Today it is a binary with no library target, published by no pipeline, and its own description still says always-on; all of that is debt listed in the hub README.
 
 This crate **implements** the elohim-hub boundary design; it does not author hub
-architecture. Hub-composition decisions — the `Hub` trait, `HouseholdHub` /
+architecture. Hub-composition decisions — the `Hub` trait, `DwellingHub` /
 `CollectiveHub`, what-lives-in-which-crate — belong to the epic
 `elohim-hub-boundaries-design`. Its crate-map table (lines 171-178) and its
 "Two libp2p swarms" section are the authority for *why* these modules exist and
@@ -26,7 +28,8 @@ is "should this be a hub method / which hub owns it," route to the epic
 This crate owns the **hub cluster ops** seam (atlas §3.12 — the hub-INTERNAL
 swarm: blade-to-blade mDNS discovery, leader election, pod consensus, replica/PVC
 placement, plus the enablement "hubbiness dial" and identity-preserving tier
-graduation).
+graduation). It does not own the hub side of the web seam (app serving and rendering for
+peers reached by key), whose home is `elohim/elohim-hub/`.
 
 Any "where does this go?" concern routes through the concern-routing atlas:
 `elohim-seam-map-concern-routing`.
@@ -38,7 +41,7 @@ means the wrong one.
 
 ## Binary identity
 
-- `[package] name = "elohim-node"`, single `[[bin]] name = "elohim-node", path = "src/main.rs"` (`steward/node/Cargo.toml:2,101-103`). Description: "Always-on infrastructure runtime for the Elohim Protocol."
+- `[package] name = "elohim-node"`, single `[[bin]] name = "elohim-node", path = "src/main.rs"` (`steward/node/Cargo.toml:2,110-112`). Description: "Always-on infrastructure runtime for the Elohim Protocol."
 - Entry is `#[tokio::main] async fn main()` with a `clap`-derived `Cli` (config path, data dir, node-id/cluster-name overrides, `--enable-bitswap`, and an optional `pod` subcommand) (`src/main.rs:36-66`).
 - Boot wires, in order: pod (optional background task), shared `elohim_storage::BlobStore`, the unified P2P swarm + sync engine + coordinator, a minimal blob-serving storage HTTP server, the elohim-agent service, and the axum dashboard router (`src/main.rs:107-298`).
 
@@ -83,12 +86,12 @@ The real HTTP surface is **`src/dashboard/` (axum router) + `src/elohim_service.
 ## Stubs and not-built (recorded, not blessed)
 
 - `src/api/{http,grpc}.rs` — **3-line TODO stubs** ("Implement management API" / "Implement device sync API"); `src/api/mod.rs` is an 11-line TODO. `tonic = "0.11"` + `tonic-build` are present in `Cargo.toml` but **unused** — the gRPC device API is **designed-not-built**.
-- `src/cluster/{discovery,membership,leader}.rs` — **3-line TODO stubs**. The mDNS discovery / Kademlia membership they describe actually live in the p2p swarm (`ElohimBehaviour.mdns` + `.kademlia`); leader election is **not built**. The epic maps `cluster/*` to `HouseholdHub::cluster()` (crate-map L172).
+- `src/cluster/{discovery,membership,leader}.rs` — **3-line TODO stubs**. The mDNS discovery / Kademlia membership they describe actually live in the p2p swarm (`ElohimBehaviour.mdns` + `.kademlia`); leader election is **not built**. The epic maps `cluster/*` to `DwellingHub::cluster()` (crate-map L171).
 - `src/storage/reach.rs` — `Reach` enum + `can_serve` / `should_replicate` / `replication_policy`. The enum is referenced as a `trust_level` field default in `coordinator.rs:24,99`, but the three policy functions have **zero production callers** (only unit tests inside `reach.rs`). This is a **recorded dormant definition site** — do NOT canonize any reach vocabulary here; route all reach questions to `reach-vocabulary-frontend-strand.md`.
 
 ## Pod subsystem (`src/pod/`)
 
-An autonomous "cluster operator" (monitor → analyze → decide → execute, with consensus) for local-cluster orchestration: storage replication/eviction, workload balancing, cache management, health recovery (`pod/mod.rs` doc-comment). Modules present and built: `admission.rs`, `analyzer.rs`, `capacity.rs`, `compute_rea.rs` (REA compute-commitment accounting), `consensus.rs`, `decider.rs`, `executor.rs` + `actions/`, `monitor.rs`, `protocol.rs`, `models.rs`, `cli.rs`. Exposed both as a background task (`config.pod.enabled`) and as a `pod` CLI subcommand (`main.rs:107-131`). The epic keeps `pod/*` inside `HouseholdHub` (crate-map L175).
+An autonomous "cluster operator" (monitor → analyze → decide → execute, with consensus) for local-cluster orchestration: storage replication/eviction, workload balancing, cache management, health recovery (`pod/mod.rs` doc-comment). Modules present and built: `admission.rs`, `analyzer.rs`, `capacity.rs`, `compute_rea.rs` (REA compute-commitment accounting), `consensus.rs`, `decider.rs`, `executor.rs` + `actions/`, `monitor.rs`, `protocol.rs`, `models.rs`, `cli.rs`. Exposed both as a background task (`config.pod.enabled`) and as a `pod` CLI subcommand (`main.rs:107-131`). The epic keeps `pod/*` inside `DwellingHub` (crate-map L175).
 
 ## Config (`src/config.rs`)
 

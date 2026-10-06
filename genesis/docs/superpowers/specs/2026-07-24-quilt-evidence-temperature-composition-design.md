@@ -26,11 +26,11 @@ informed-by:
   - genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md
   - elohim/sdk/schemas/v1/manifest/app-manifest.schema.json
 cites:
-  - tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
-  - durability-topology-felt-resilience | 2026-05-29-durability-topology-felt-resilience | sha256:935b1dd7d8121267 | path: genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md
-  - cite-fingerprint-cid-convergence | Cite Fingerprint ↔ Canonical CID Convergence | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
-  - attestation-consolidation-design | Attestation Consolidation | sha256:220c0a2a68c2a805 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md
+  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "durability-topology-felt-resilience | 2026-05-29-durability-topology-felt-resilience | sha256:935b1dd7d8121267 | path: genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md"
+  - "cite-fingerprint-cid-convergence | Cite Fingerprint ↔ Canonical CID Convergence | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md"
+  - "attestation-consolidation-design | Attestation Consolidation | sha256:220c0a2a68c2a805 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md"
 ---
 
 # Quilt/Pantry Ontology and Evidence-Qualified Placement Composition

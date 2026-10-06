@@ -10,7 +10,7 @@ created: 2026-07-16
 maintainers: Matthew Dowell + Opus 4.8
 cites:
   - genesis/data/timeline/backlog/doorway-utility-plane-and-borrowed-infra-exit-doctrine.md
-  - iroh-libp2p-complementarity | Track 1 DHT-notary bootstrap (`https://doorway.elohim.host/bootstrap`) and signal (`wss://signal.doorway.elohim.host`) endpoints — the concrete HTTP/WS surfaces this doc's failover options apply to | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
+  - "iroh-libp2p-complementarity | Track 1 DHT-notary bootstrap (`https://doorway.elohim.host/bootstrap`) and signal (`wss://signal.doorway.elohim.host`) endpoints — the concrete HTTP/WS surfaces this doc's failover options apply to | sha256:8495ed55ec9759c2 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
   - genesis/data/timeline/backlog/sovereign-turn-relay-transport-commons.md
   - .claude/skills/p2p-design-gate/SKILL.md
 ---

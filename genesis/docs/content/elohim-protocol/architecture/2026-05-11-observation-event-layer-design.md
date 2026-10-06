@@ -126,7 +126,7 @@ pub struct Observation {
     pub observer_collective_cid: Option<Cid>,
     pub observer_region: Option<String>,
     pub observer_archetype: Option<String>,         // consumer-grade | tier-1-hub | tier-3-hub | wearable
-    pub observer_compute_class: Option<String>,     // per project_compute_and_model_independent_diversity_surfaces
+    pub observer_compute_class: Option<String>,     // compute and model capability are independent diversity surfaces (2026-05-23-multi-collective-collaboration-epr-design.md)
 
     // Signature
     pub signature: Signature,            // observer signs the canonical encoding above
@@ -363,7 +363,7 @@ Each pillar manifest declares its observation_kinds. The substrate validates the
 
 ### 7.2 Retention — comet shape per class
 
-Per `project_memory_lifecycle_comet_shape` and `project_memory_classes`:
+Per the memory-lifecycle design (`2026-05-10-memory-lifecycle-design.md`: comet-shaped memory, and "Lifecycle primitives are the operations. Memory classes are the defaults."):
 
 | retention_class | Hot (SQL) | Warm (SQL paged) | Cold (iroh-log only) | Memorialized |
 |---|---|---|---|---|

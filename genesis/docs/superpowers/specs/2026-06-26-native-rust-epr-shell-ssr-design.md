@@ -11,14 +11,16 @@ topic: [ssr, doorway, projection, render, elohim-render, omnibar, epr, theme, co
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 cites:
-  - "doorway-ssr-runtime | SSR-as-compute-capability seed (D8); this spec KEEPS its V8 render core for the Angular body, wraps it in a native-Rust EPR-agnostic composition layer + runtime omnibar chrome, and routes the SSR-vs-static decision through the peer RenderCapabilityProfile it already defines | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
-  - "elohim-seam-map-concern-routing | Seam placement (D8 projection, Track 4 doorway); the omnibar moves from per-EPR app bundle (SDK seam) to runtime chrome (mod/plugin + projection seam); SSR-capability is EPR content (the \"what\"), serving is peer participation (the \"how\") | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
-  - "ssr-bundle-substrate-content-decouple-design | Foundation; this spec EXTENDS it — V8 materialize-at-boot is RETAINED — and CORRECTS its two-row model: the server bundle collapses from a sibling `elohim-host-landing-ssr` content row into a field on the one EPR node | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md"
+  - "doorway-ssr-runtime | SSR-as-compute-capability seed; this spec keeps its V8 render core, wraps it in a native-Rust composition layer and runtime chrome, and routes SSR-versus-static through its render capability profile (execution moved to the hub 2026-10-06) | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "elohim-seam-map-concern-routing | Seam placement (D8 projection, Track 4 doorway); the omnibar moves from per-EPR app bundle (SDK seam) to runtime chrome (mod/plugin + projection seam); SSR-capability is EPR content (the \"what\"), serving is peer participation (the \"how\") | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "ssr-bundle-substrate-content-decouple-design | Foundation; this spec EXTENDS it — V8 materialize-at-boot is RETAINED — and CORRECTS its two-row model: the server bundle collapses from a sibling `elohim-host-landing-ssr` content row into a field on the one EPR node | sha256:ceb4661d51bcfbcb | path: genesis/docs/superpowers/specs/2026-06-24-ssr-bundle-substrate-content-decouple-design.md"
   - "tiered-quilt-stewardship-design | Trajectory target (substrate stewardship/replication, D8); the per-host blob-upload + per-host blobHash PATCH this spec relies on is MVP scaffold — gossip carries inventory not bytes, so content-addressed byte replication is what finally makes \"alpha vs elohim.host\" irrelevant | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
 requires_env: [household-nodes]
 ---
 
 # Native Rust EPR-Agnostic SSR Engine — Omnibar as Runtime Chrome; SSR as One EPR's Nature × Peer Capability
+
+> **Placement amended 2026-10-06 (the web seam).** Executing a render is hub work: the hub runs the renderer and judges a head, and a doorway relays and caches the result (`elohim/elohim-hub/README.md`, "The web seam"). This spec labels the render runtime and the runtime chrome as doorway projection; the web seam makes both hub work. Its engine and chrome-as-runtime design stands. The render code still in `doorway-service` is debt listed in that README.
 
 - **Date:** 2026-06-26
 - **Status:** Design (approved direction; pre-implementation)

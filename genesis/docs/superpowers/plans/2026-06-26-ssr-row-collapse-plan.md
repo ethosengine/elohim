@@ -8,7 +8,7 @@ topic: [ssr, doorway, storage, content-node, server-bundle, collapse, epr, imple
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md
 cites:
-  - native-rust-epr-shell-ssr-design | The design spec this plan implements (Phase 1: the row collapse only); carries the gate answers, the EPR-nature × peer-capability model, and the trajectory framing | path: genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md
+  - "native-rust-epr-shell-ssr-design | The design spec this plan implements (Phase 1: the row collapse only); carries the gate answers, the EPR-nature × peer-capability model, and the trajectory framing | sha256:624ac62d7957db51 | path: genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md"
 requires_env: [household-nodes]
 ---
 

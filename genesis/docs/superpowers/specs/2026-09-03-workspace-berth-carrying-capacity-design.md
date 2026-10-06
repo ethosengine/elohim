@@ -13,7 +13,7 @@ serves:
   - runtime-death-witnessed
   - dev-system-equilibrium
 cites:
-  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:006fd66d23e8f6c2 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
   - "holochain-0-7-upgrade-guide | Holochain 0.7.0 Upgrade Guide | sha256:30ca33eb616ef0b1 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-09-02-holochain-0-7-upgrade-guide.md"
 memory_anchors:

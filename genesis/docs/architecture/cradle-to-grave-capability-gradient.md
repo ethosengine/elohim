@@ -230,8 +230,8 @@ What's implemented (or implementing in the current sprint):
 | Deploy-svc-agent (protocol-level instance) | Spec landed; implementation in current Z.D sprint | `2026-05-25-stagespablob-substrate-correct-deploy.md`; this canon's plan |
 | Capability-profile element contract | Spec landed, primitive surface available | `2026-05-20-capability-profile-element-contract-design.md` |
 | Ward / IDD / senior / end-of-life flows | Canon written (this doc); concrete specs pending | This document is the entry point |
-| Elohim-counsel + specialists | Memory anchored; spec extraction pending | `project_elohim_as_counsel`, `project_elohim_subagent_specialists` |
-| Commons-elohim co-steward | Memory anchored; spec extraction pending | `project_commons_elohim_co_steward` |
+| Elohim-counsel + specialists | Stated in this document ("Counsel" and "Specialist subagents"); spec extraction pending | `project_elohim_as_counsel`, `project_elohim_subagent_specialists` |
+| Commons-elohim co-steward | Stated in this document ("Commons-elohim co-steward"); spec extraction pending | `project_commons_elohim_co_steward` |
 
 **What's next** (after Z.D Phase 1+2 lands):
 

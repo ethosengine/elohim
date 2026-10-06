@@ -254,7 +254,7 @@ These are NOT answered by this contract; the Phase 2 plan must address them:
 1. **Who writes the backfill schemas?** Phase 2 plan Task 0 / Task 1 ships the JSON schemas for Phase 1 types. Should this be gated as a prerequisite separate from Phase 2's storage work?
 2. **p2p-design-gate category for self-notarized atoms.** Does the gate skill need a new category (A', A+signature) or does existing Category A with modified language suffice?
 3. **Diesel column ↔ schema property lookup table.** Which JSON schema primitive maps to which diesel type? This needs a one-time spec.
-4. **Write-through feature flag format.** `VITE_EPR_WRITE_THROUGH` for frontend; what's the server-side equivalent? Env var, config.toml key, or agent-observed state (per the `project_elohim_active_observed_not_flagged.md` memory)?
+4. **Write-through feature flag format.** `VITE_EPR_WRITE_THROUGH` for frontend; what's the server-side equivalent? Env var, config.toml key, or agent-observed state (per the observed-not-flagged invariant, which `MAP.md` names as one the elohim-agent seed must establish: the phase is derived from whether real inference ran, never assigned from a config flag)?
 5. **Reach backfill value.** Commit to `collective` default for existing rows, or defer to the ADR in Phase 2?
 6. **Schema versioning.** When a schema evolves (e.g., new optional field), does the version bump live in the schema `$id`, the surrounding manifest, or both?
 

@@ -9,8 +9,8 @@ graduation-trigger: ratified-and-decomposed OR superseded-by-implementation
 created: 2026-08-06
 cites:
   - genesis/data/timeline/backlog/staggered-conductor-fleet-restarts.md
-  - elohim-seam-map-concern-routing | Routes rollout classification to OS/packaging and wave admission to resource governance. | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
-  - substrate-trust-contract-runbook | Supplies the hours-scale catch-up distinction and the fresh-sweep quiescence predicates reused by the proposed wave gate. | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - "elohim-seam-map-concern-routing | Routes rollout classification to OS/packaging and wave admission to resource governance. | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "substrate-trust-contract-runbook | Supplies the hours-scale catch-up distinction and the fresh-sweep quiescence predicates reused by the proposed wave gate. | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
 ---
 
 # Staggered Conductor Restart Mitigation

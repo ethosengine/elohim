@@ -11,13 +11,13 @@ graduation-trigger: one pool exists on the household mesh as a Collective with a
 cites:
   - genesis/research/commons-data-pools-hot-path-and-external-tooling-2026-09-11.md
   - "memory-search-scale-three-seams-design | Memory, search and scale | sha256:c119695543a2854f | path: genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:dd0f3b2ec2776bcd | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "hardware-providence-commons | Hardware Providence | sha256:17e52609abf5f92a | path: genesis/docs/content/elohim-protocol/hardware-providence-commons.md"
   - "elohim-protocol-manifesto | manifesto | sha256:66c8e3b40b858b92 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "values-forward | values-forward | sha256:f4e7524522d3b811 | path: genesis/docs/content/elohim-protocol/values-forward.md"
   - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "swarm-curve-and-blind-custody-design | The swarm curve and blind custody | sha256:ef23b30ec9b8145c | path: genesis/docs/superpowers/specs/2026-08-23-swarm-curve-and-blind-custody-design.md"
-  - "compute-envelope-tevah | Tevah | sha256:6c9f84bc831ac1bc | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "compute-envelope-tevah | Tevah | sha256:006fd66d23e8f6c2 | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "eprfs-witnessed-interaction-primitive | The eprfs Witnessed-Interaction Primitive | sha256:6a24773ffd7b83f4 | path: genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md"
   - "working-version-sdk-standard-design | The working-version standard | sha256:b323e209c972831d | path: genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md"
   - elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs
