@@ -988,6 +988,11 @@ pub fn report_json() -> serde_json::Value {
         // What the last release retention pass kept and let go, per channel.
         // `null` until the first pass (one interval after boot).
         "retention": super::retention::report_json(),
+        // Why this peer holds each blob in its blob store, by reason, and the
+        // blobs it brought here itself that nothing names. `null` until the
+        // first pass. Node-local: the doorway's projection of this report
+        // does not carry it.
+        "holds": crate::services::holds::report_json(),
     })
 }
 

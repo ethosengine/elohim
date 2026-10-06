@@ -209,6 +209,12 @@ pub enum Key {
     DiagnosticsWindowSeconds = 11,
     /// `ELOHIM_RELEASE_RETENTION_DEPTH` — releases this peer keeps per channel.
     ReleaseRetentionDepth = 12,
+    /// `ELOHIM_UNNAMED_MIN_AGE_SECONDS` — how long a blob nothing names is kept.
+    UnnamedMinAgeSeconds = 13,
+    /// `ELOHIM_UNNAMED_MIN_PASSES` — consecutive passes a blob must read unnamed.
+    UnnamedMinPasses = 14,
+    /// `ELOHIM_RELEASE_RETENTION_PASS_SECONDS` — retention pass cadence.
+    ReleaseRetentionPassSeconds = 15,
 }
 
 impl Key {
@@ -217,7 +223,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 13] = [
+    pub const ALL: [Key; 16] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -231,12 +237,29 @@ impl Key {
         Key::MissDormancyCapSeconds,
         Key::DiagnosticsWindowSeconds,
         Key::ReleaseRetentionDepth,
+        Key::UnnamedMinAgeSeconds,
+        Key::UnnamedMinPasses,
+        Key::ReleaseRetentionPassSeconds,
     ];
 }
 
 /// The declared default for [`Key::ReleaseRetentionDepth`]: the ten latest
 /// releases of a channel, matching what the build server retains.
 pub const DEFAULT_RELEASE_RETENTION_DEPTH: u64 = 10;
+
+/// The declared default for [`Key::UnnamedMinAgeSeconds`]: a day. A blob this
+/// peer brought here itself is not let go sooner than this after it arrived,
+/// however long nothing has named it.
+pub const DEFAULT_UNNAMED_MIN_AGE_SECONDS: u64 = 86_400;
+
+/// The declared default for [`Key::UnnamedMinPasses`].
+pub const DEFAULT_UNNAMED_MIN_PASSES: u64 = 2;
+
+/// The declared default for [`Key::ReleaseRetentionPassSeconds`].
+pub const DEFAULT_RELEASE_RETENTION_PASS_SECONDS: u64 = 300;
+
+/// The retention pass never runs more often than this, whatever is declared.
+pub const MIN_RELEASE_RETENTION_PASS_SECONDS: u64 = 10;
 
 /// Static description of a registered setting. The mutable state lives in
 /// `Setting`; this is the part that is the same in every process.
@@ -266,7 +289,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 13] = [
+pub static SPECS: [SettingSpec; 16] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -435,6 +458,50 @@ pub static SPECS: [SettingSpec; 13] = [
         unpublished_by_design: Some(
             "no boot publisher: the declared default applies until a peer's runtime-config \
              file states its own depth",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_UNNAMED_MIN_AGE_SECONDS",
+        kind: Kind::Seconds,
+        default: DEFAULT_UNNAMED_MIN_AGE_SECONDS,
+        doc: "How long after it arrived a blob this peer brought here itself is kept once \
+              nothing names it. Counted from the record of its arrival.",
+        note: Some(
+            "hot — the retention pass reads it each run. It bounds only blobs with an arrival \
+             record; a blob with none is never let go by the pass, whatever this says.",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: the declared default applies until a peer's runtime-config \
+             file states its own age",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_UNNAMED_MIN_PASSES",
+        kind: Kind::Count,
+        default: DEFAULT_UNNAMED_MIN_PASSES,
+        doc: "How many consecutive retention passes a blob must read as unnamed before it is \
+              let go.",
+        note: Some(
+            "hot — the retention pass reads it each run. Read as at least 2: one pass alone \
+             never lets a blob go, and a blob named again starts its count over.",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: the declared default applies until a peer's runtime-config \
+             file states its own count",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_RELEASE_RETENTION_PASS_SECONDS",
+        kind: Kind::Seconds,
+        default: DEFAULT_RELEASE_RETENTION_PASS_SECONDS,
+        doc: "How often the retention pass runs.",
+        note: Some(
+            "hot — the pass re-reads it every few seconds while it waits, so a shorter \
+             interval takes effect at once. Never shorter than ten seconds.",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: the declared default applies until a peer's runtime-config \
+             file states its own cadence",
         ),
     },
 ];
@@ -910,6 +977,23 @@ pub fn get_secs(key: Key) -> u64 {
 /// Never below 1: the newest release is always kept.
 pub fn release_retention_depth() -> usize {
     GLOBAL.get(Key::ReleaseRetentionDepth).max(1) as usize
+}
+
+/// How long after its arrival a blob nothing names is kept, in seconds.
+pub fn unnamed_min_age_seconds() -> u64 {
+    get_secs(Key::UnnamedMinAgeSeconds)
+}
+
+/// Consecutive passes a blob must read unnamed before it is let go. Never
+/// below 2: one pass alone never lets a blob go.
+pub fn unnamed_min_passes() -> u64 {
+    GLOBAL.get(Key::UnnamedMinPasses).max(2)
+}
+
+/// How often the retention pass runs, in seconds. Never below
+/// [`MIN_RELEASE_RETENTION_PASS_SECONDS`].
+pub fn release_retention_pass_seconds() -> u64 {
+    get_secs(Key::ReleaseRetentionPassSeconds).max(MIN_RELEASE_RETENTION_PASS_SECONDS)
 }
 
 /// Requested duration for one bounded diagnostic capture window.

@@ -5323,9 +5323,9 @@ decisionPoints:
       - { id: C0, status: answered, justification: "Peer-local bytes and a peer-local Category C ledger; nothing notarized moves and no other peer is told to delete anything." }
       - { id: C2, status: n-a, justification: "Decides what a peer stops holding, never which head is canonical." }
       - { id: C4, status: answered, justification: "A failed in-use read keeps the blob; a ledger row whose artifacts cannot be read names no bytes; bytes the ledger does not name are never touched." }
-      - { id: C6a, status: answered, justification: "One pass per 300 s, at most MAX_PAST_WINDOW_PER_PASS releases examined, rotating so unfinished ones do not starve the rest." }
+      - { id: C6a, status: answered, justification: "One pass per declared interval (ELOHIM_RELEASE_RETENTION_PASS_SECONDS, default 300 s, never under 10 s), at most MAX_PAST_WINDOW_PER_PASS releases examined, rotating so unfinished ones do not starve the rest." }
       - { id: C6b, status: answered, justification: "Files are deleted before rows, so a repeated or interrupted pass finishes the same release and deletes nothing further." }
-      - { id: C7, status: partial, justification: "The inventory snapshot drops a deleted file on its next tick and the self-custody row is removed, but a shard assignment already registered on the DHT is not retracted: no retract call exists." }
+      - { id: C7, status: partial, justification: "The inventory snapshot drops a deleted file on its next tick, and only this peer's own records go: its self-custody row, its arrival records, and its own shard-location rows (self-held, or naming one of its ids). Location rows naming other holders are kept, since those peers still hold their copies. Still open: a shard assignment registered on the DHT is not retracted, and a peer this one placed copies with is not told to let them go (no withdrawal message exists)." }
       - { id: C8, status: answered, justification: "elohim_release_retention_* gauges and counters per channel and per hold reason, and the retention section of GET /admin/adoption." }
       - { id: C12, status: partial, justification: "The depth is the peer's own runtime setting with the declared default of ten. A window declared by the channel or the holon with standing does not exist yet." }
       - { id: C14, status: partial, justification: "A blob can be re-named by a new release between the in-use read and the delete; the window is one pass's read-then-delete per blob and the bytes would then be healed from a peer or re-published." }
@@ -5335,6 +5335,74 @@ decisionPoints:
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_is_let_go_only_when_nothing_holds_it, kind: unit }
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: a_blob_this_peer_serves_is_kept_past_the_window_and_let_go_once_it_is_not, kind: unit }
       - { path: elohim/elohim-storage/src/services/release_adoption/retention.rs, testName: releases_past_the_window_leave_every_store_and_the_window_stays_whole, kind: unit }
+
+  - name: holds_reason_for_blob
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/holds.rs
+      modulePath: services::holds::hold_reason
+      line: 118
+    summary: >
+      Why this peer holds one blob in its blob store, strongest reason first: a kept release names
+      it, a content row names it, a live custody commitment names it, it is a shard of a blob that
+      is itself held, another peer placed it and has not withdrawn, the adoption controller is
+      pulling it for a release it is taking up, or nothing names it. Of the unnamed, a blob with a
+      record that this peer brought it here (put, fetch, adoption, or a placement since withdrawn)
+      reads own_unnamed; one with no record of how it arrived reads unrecorded. Every input is a
+      row in this peer's own tables; nothing is inferred from the file.
+    concernIds:
+      - { id: C0, status: answered, justification: "Peer-local bytes and peer-local Category C rows (blob_arrivals, release_ledger, content projection, custody projection). Nothing is notarized and no other peer is asked." }
+      - { id: C1, status: answered, justification: "A peer never decides that another peer's placement has ended: placed outranks own_unnamed until the placer's own withdrawal is recorded." }
+      - { id: C4, status: answered, justification: "No record is its own answer (unrecorded), distinct from own_unnamed, and a lost arrival row degrades to unrecorded, which is never let go." }
+      - { id: C5, status: answered, justification: "A fetch made before arrival records existed counts as this peer's own only when the serve-blob event names this node as receiver; another peer's projected event does not. Self-put evidence is matched on the row's source, never on a peer id. A custody commitment's blob is read in every spelling it is written in (sha256-hex, bare hex, a CID, a CID behind a prefix, bare or in a JSON list)." }
+      - { id: C6a, status: answered, justification: "One read of each table and one walk of the blob store per pass; the per-blob authoritative read is bounded by MAX_UNNAMED_PER_PASS." }
+      - { id: C8, status: answered, justification: "elohim_node_holds_bytes and elohim_node_holds_blobs by store and reason, and the holds section of node-local GET /admin/adoption with each own_unnamed blob listed." }
+      - { id: C12, status: answered, justification: "The account is own-node only: served on the node-local admin report, which the doorway's projection does not carry." }
+      - { id: C14, status: partial, justification: "Reasons come from one snapshot of the tables; a row written during the walk is seen on the next pass. A blob over the single-shard size is judged as the one blob its manifest names, whether or not a file by its own name is on disk. Only the blob store is classified by reason; the other stores are sized by elohim_node_store_bytes." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_is_held_for_the_strongest_reason_that_applies, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_under_a_live_pledge_is_held_however_the_pledge_spells_it, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_held_only_as_shards_is_let_go_whole, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_nothing_records_is_reported_and_never_let_go, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_shard_of_a_held_blob_is_held_as_part_of_it, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_fetch_this_node_made_before_arrivals_were_recorded_is_its_own_act, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_pushed_shard_is_held_until_the_peer_that_placed_it_withdraws, kind: unit }
+
+  - name: autoclean_eligibility
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/holds.rs
+      modulePath: services::holds::may_let_go
+      line: 150
+    summary: >
+      Whether a blob may be let go by the holds pass. Only a blob that reads own_unnamed, on at
+      least ELOHIM_UNNAMED_MIN_PASSES consecutive passes (never fewer than two), whose newest
+      arrival record is at least ELOHIM_UNNAMED_MIN_AGE_SECONDS old (default a day). The pass adds
+      two guards the predicate does not see: the same process must already have read the blob as
+      unnamed on an earlier pass, and the authoritative per-blob read (any content row naming the
+      hash anywhere, any live custody commitment) runs immediately before the count and the
+      delete.
+    concernIds:
+      - { id: C0, status: answered, justification: "Peer-local: lets go this peer's own copy and this peer's own rows; other holders' location rows are kept." }
+      - { id: C1, status: answered, justification: "A peer lets go only what it brought here itself. A placed blob is never eligible while its placement stands, a placed shard stays when the blob whose manifest names it goes, and unrecorded is never eligible." }
+      - { id: C3, status: answered, justification: "The watch persists across restarts, a restarted process still needs two of its own passes before it lets anything go, and its first pass waits a full default interval after boot so the adoption controller has checked its channels." }
+      - { id: C4, status: answered, justification: "An arrival time that cannot be read is no age; a failed in-use read keeps the blob; one pass alone never lets a blob go whatever is declared." }
+      - { id: C6a, status: answered, justification: "At most MAX_UNNAMED_PER_PASS blobs examined per pass, rotating; one pass per declared interval." }
+      - { id: C6b, status: answered, justification: "Files are deleted before rows; a blob named again between passes has its watch cleared and starts its count over; bytes brought here again are a new arrival, which also clears the watch." }
+      - { id: C8, status: answered, justification: "Each let-go is logged with how the blob arrived, counted in elohim_node_holds_released_total and _bytes_released_total, and listed under recentlyLetGo in the node-local report." }
+      - { id: C12, status: answered, justification: "The age, the pass count and the interval are the peer's own runtime settings with declared defaults." }
+      - { id: C14, status: partial, justification: "Arrivals and the delete exclude each other (blob_arrivals::arrival_gate): a put, fetch or push of the same bytes either lands before the last look and stops the delete, or lands after it and stores them again. Still open: a content row or pledge naming the blob, written between the authoritative read and the delete with no accompanying arrival, is not seen; the bytes would then be fetched again." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: only_a_blob_this_peer_brought_here_may_be_let_go, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: an_unnamed_blob_stays_until_it_is_old_enough_and_seen_twice, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_this_peer_put_and_nothing_names_is_let_go_on_its_second_pass_past_the_age, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_named_again_between_passes_starts_its_count_over, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_named_only_inside_a_content_rows_metadata_is_not_let_go, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_restart_never_lets_a_blob_go_on_its_first_look, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: letting_a_blob_go_leaves_other_peers_location_rows, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_blob_put_again_while_it_waits_to_be_let_go_starts_over, kind: unit }
+      - { path: elohim/elohim-storage/src/services/holds.rs, testName: a_shard_another_peer_placed_stays_when_the_blob_it_is_part_of_goes, kind: unit }
+      - { path: elohim/elohim-storage/src/db/blob_arrivals.rs, testName: an_arrival_recorded_again_is_a_new_arrival_and_starts_the_watch_over, kind: unit }
 
   - name: carrier_on_code
     kind: pure-decision-predicate

@@ -6492,6 +6492,13 @@ async fn async_main(
                 pool.clone(),
                 blob_store.clone(),
                 staging_root.clone(),
+            )
+            .with_self_cid(config.self_cid.clone())
+            .with_self_agent_cid(
+                hc_registry_for_http
+                    .as_ref()
+                    .and_then(|r| r.lamad_client())
+                    .map(|hc| hc.agent_key_uhcak()),
             );
             if let Some(ref cache) = extraction_cache {
                 sweeper = sweeper.with_extraction_cache(Arc::clone(cache));

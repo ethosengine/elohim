@@ -649,6 +649,41 @@ impl AdoptionController {
         }
     }
 
+    /// Record that an artifact's bytes are here for `release_cid`. Until the
+    /// release is whole and in the ledger, this is the only thing that says
+    /// what those bytes are for, so the retention pass reads them as arriving
+    /// and leaves them alone. Skipped once the release is in the ledger.
+    fn record_adoption_arrival(&self, channel_id: &str, release_cid: &str, sha256: &str) {
+        let Some(pool) = self.db.as_ref() else {
+            return;
+        };
+        let key = format!("{channel_id}|{release_cid}");
+        if self.ledger_recorded.lock().unwrap().contains(&key) {
+            return;
+        }
+        let blob_hash = format!("sha256-{}", sha256.to_ascii_lowercase());
+        let recorded = pool
+            .get()
+            .map_err(|e| crate::error::StorageError::Database(e.to_string()))
+            .and_then(|mut conn| {
+                crate::db::blob_arrivals::record_arrival(
+                    &mut conn,
+                    &blob_hash,
+                    crate::db::blob_arrivals::ArrivalVia::Adoption,
+                    None,
+                    Some(release_cid),
+                )
+            });
+        if let Err(e) = recorded {
+            tracing::warn!(
+                channel = %channel_id,
+                release_cid = %release_cid,
+                error = %e,
+                "release-adoption: artifact arrival not recorded"
+            );
+        }
+    }
+
     /// Record a release in the ledger the retention pass reads, once every
     /// artifact's bytes are here and prove out. A release whose bytes did not
     /// all arrive is not recorded: the ledger names only what this peer holds.
@@ -1674,6 +1709,7 @@ impl AdoptionController {
                 match source.fetch(artifact, &staging_dir).await {
                     Ok(f) => {
                         *byte_budget = byte_budget.saturating_sub(f.bytes);
+                        self.record_adoption_arrival(&channel.channel_id, &release_cid, &f.sha256);
                         fetched.push(f);
                     }
                     Err(refusal) => {

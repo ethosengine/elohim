@@ -91,6 +91,7 @@ pub mod head_adoption; // adopt-before-author — consult the substrate for an e
 pub mod head_adoption_trigger; // event-driven ADOPTION TRIGGER — a content-sync apply schedules the adopt-before-author decision for that id (no second adoption implementation; it only makes the existing one earlier)
 pub mod head_batch_resolver; // L1 — batched head-plane reads (round-trip collapse at flat read-permit cost; caps and concurrency never rise)
 pub mod heal_backoff; // drain lever 2 — replay a known conductor-missing answer instead of re-paying for it (bounded, always-expiring)
+pub mod holds; // why this peer holds each blob, and letting go of its own that nothing names
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_identity; // cid↔slug household vocabulary bridge — the CONVERGENT grouping key the resilience fold and its sibling joins share

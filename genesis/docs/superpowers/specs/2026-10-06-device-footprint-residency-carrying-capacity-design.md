@@ -141,7 +141,9 @@ commitment). Put, fetch and adoption are the peer's *own acts*: it can always fe
 nothing names such a byte it is the peer's to let go. A byte another peer placed is held until that
 peer withdraws it. A byte with no arrival record is never let go by this pass, however long it has
 been unnamed. Eligibility is judged per byte, not per store, so cleaning is automatic from the
-first pass for every byte that has a record, with no report-only phase.
+first pass for every byte that has a record, with no report-only phase. A blob too large for one
+file is held as shards under a manifest; it is judged, and let go, as the one blob it is. Bringing
+the same bytes here again is a new arrival: the wait starts over.
 
 Three consequences.
 
@@ -156,7 +158,10 @@ on that route as it stands.
 **Autoclean.** A byte that reads as own-unnamed is let go automatically. The safeguards are that it
 must read so on two consecutive passes and be older than 24 hours, the age counted from the arrival
 record and not from the file's modification time, and that the peer asks again, immediately before
-deleting, whether anything names it. Both are declared defaults, reloadable. The pass is periodic (the
+deleting, whether anything names it. That last look and the delete are closed to arrivals: a put
+or fetch of the same bytes either lands before, and stops the delete, or lands after, and stores
+them again. A process that has just started lets nothing go until its own second pass, and its
+first pass waits a full default interval after boot. Both are declared defaults, reloadable. The pass is periodic (the
 retention pass runs every 300 seconds today), and a story shortens the age the way the retention
 story shortens the window. Letting go removes the byte from every place the peer keeps it, files
 first and rows after, as the retention pass already does, and removes only this peer's own records

@@ -23,6 +23,11 @@
 //!
 //! Only `app-bundle` releases are released today. Other classes are recorded in
 //! the ledger and left alone.
+//!
+//! After the window pass, the same tick runs the holds pass
+//! ([`crate::services::holds`]): it says why every blob in the blob store is
+//! held, and lets go the ones this peer brought here itself that nothing names
+//! any more. That is what reaches bytes this ledger never named.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
@@ -38,7 +43,8 @@ use crate::db::release_ledger::{self, LedgerArtifact, LedgerRelease};
 use crate::db::DbPool;
 use crate::error::StorageError;
 
-/// How often the pass runs.
+/// How often the pass runs when nothing declares otherwise. The effective
+/// cadence is `runtime_config::release_retention_pass_seconds()`.
 pub const PASS_INTERVAL_SECS: u64 = 300;
 
 /// bounded-work: how many past-window releases one pass examines. A release a
@@ -179,6 +185,17 @@ pub struct RetentionSweeper {
     #[cfg(feature = "p2p-iroh")]
     iroh: Option<Arc<crate::p2p_iroh::IrohBlobStore>>,
     cursor: AtomicUsize,
+    /// This node's own transport identity, as its fetches record it.
+    self_cid: Option<String>,
+    /// This node's own agent key, as read from the conductor at boot. It is
+    /// what `shard_locations.peer_id` holds for this peer's own rows.
+    self_agent_cid: Option<String>,
+    /// Holds pass: where the bounded look at unnamed blobs resumes.
+    pub(crate) holds_cursor: AtomicUsize,
+    /// Holds pass: blobs THIS process has already read as unnamed. A blob is
+    /// let go only on a later pass of the same process, so a restart never
+    /// lets a blob go on its first look.
+    pub(crate) seen_unnamed: Mutex<HashSet<String>>,
 }
 
 impl RetentionSweeper {
@@ -191,7 +208,34 @@ impl RetentionSweeper {
             #[cfg(feature = "p2p-iroh")]
             iroh: None,
             cursor: AtomicUsize::new(0),
+            self_cid: None,
+            self_agent_cid: None,
+            holds_cursor: AtomicUsize::new(0),
+            seen_unnamed: Mutex::new(HashSet::new()),
         }
+    }
+
+    /// This node's own transport identity: the `receiver` its fetches record.
+    /// Without it, a blob fetched before arrival records existed cannot be
+    /// told from one another peer fetched, and reads as unrecorded.
+    pub fn with_self_cid(mut self, self_cid: Option<String>) -> Self {
+        self.self_cid = self_cid.filter(|cid| !cid.is_empty());
+        self
+    }
+
+    /// This node's own agent key from the conductor at boot. Used with any
+    /// signed-in session's key to find this peer's own location rows.
+    pub fn with_self_agent_cid(mut self, agent_cid: Option<String>) -> Self {
+        self.self_agent_cid = agent_cid.filter(|cid| !cid.is_empty());
+        self
+    }
+
+    pub(crate) fn blobs(&self) -> &Arc<BlobStore> {
+        &self.blobs
+    }
+
+    pub(crate) fn self_cid(&self) -> Option<&str> {
+        self.self_cid.as_deref()
     }
 
     pub fn with_extraction_cache(mut self, cache: Arc<ExtractionCache>) -> Self {
@@ -205,7 +249,7 @@ impl RetentionSweeper {
         self
     }
 
-    async fn db<T, F>(&self, work: F) -> Result<T, StorageError>
+    pub(crate) async fn db<T, F>(&self, work: F) -> Result<T, StorageError>
     where
         T: Send + 'static,
         F: FnOnce(&mut diesel::sqlite::SqliteConnection) -> Result<T, StorageError>
@@ -314,7 +358,7 @@ impl RetentionSweeper {
                         *report.blobs_held.entry(hold.label()).or_default() += 1;
                         finished = false;
                     }
-                    None => match self.release_blob(artifact).await {
+                    None => match self.release_blob(artifact, &HashSet::new()).await {
                         Ok(bytes) => report.blob_bytes_released += bytes,
                         Err(e) => {
                             tracing::warn!(
@@ -400,9 +444,62 @@ impl RetentionSweeper {
         }
     }
 
+    /// Let one blob go from every store, knowing only its blob-store hash.
+    /// `keep` names files held in their own right: none of them goes with the
+    /// blob, even when its manifest names them. Returns the blob-store bytes
+    /// removed.
+    pub(crate) async fn release_hash(
+        &self,
+        blob_hash: &str,
+        keep: &HashSet<String>,
+    ) -> Result<u64, StorageError> {
+        let sha256 = blob_hash
+            .strip_prefix("sha256-")
+            .unwrap_or(blob_hash)
+            .to_string();
+        let blob_cid = BlobStore::hash_to_cid(&sha256)
+            .map(|cid| cid.to_string())
+            .unwrap_or_default();
+        self.release_blob(
+            &LedgerArtifact {
+                sha256,
+                blob_cid,
+                bytes: 0,
+                filename: String::new(),
+            },
+            keep,
+        )
+        .await
+    }
+
     /// Let one blob go from every store. Returns the blob-store bytes removed.
-    async fn release_blob(&self, artifact: &LedgerArtifact) -> Result<u64, StorageError> {
+    ///
+    /// Bytes another peer placed here are never let go this way: a blob under
+    /// a live placement is left whole, and a placed shard stays when the blob
+    /// its manifest belongs to goes. The same holds for every file in `keep`.
+    async fn release_blob(
+        &self,
+        artifact: &LedgerArtifact,
+        keep: &HashSet<String>,
+    ) -> Result<u64, StorageError> {
         let blob_hash = artifact.blob_hash();
+
+        let mut plan = {
+            let blob_hash = blob_hash.clone();
+            self.db(move |conn| release_ledger::plan_forget_blob(conn, &blob_hash))
+                .await?
+        };
+        let placed = {
+            let mut files = plan.files.clone();
+            files.push(blob_hash.clone());
+            self.db(move |conn| release_ledger::live_placements_among(conn, &files))
+                .await?
+        };
+        if placed.contains(&blob_hash) || keep.contains(&blob_hash) {
+            return Ok(0);
+        }
+        plan.files
+            .retain(|file| !placed.contains(file) && !keep.contains(file));
 
         // The extraction first: it is what a request would be served from.
         if let Some(cache) = self.extraction.as_ref() {
@@ -411,6 +508,9 @@ impl RetentionSweeper {
                 artifact.sha256.as_str(),
                 artifact.blob_cid.as_str(),
             ] {
+                if spelling.is_empty() {
+                    continue;
+                }
                 cache
                     .evict_blob(spelling)
                     .await
@@ -418,11 +518,20 @@ impl RetentionSweeper {
             }
         }
 
-        let plan = {
-            let blob_hash = blob_hash.clone();
-            self.db(move |conn| release_ledger::plan_forget_blob(conn, &blob_hash))
-                .await?
-        };
+        // A blob that arrived by fetch or push has an iroh copy only if some
+        // path put one there, and no alias row either way. Its BLAKE3 address
+        // is computable from the bytes while they are still here.
+        #[cfg(feature = "p2p-iroh")]
+        let computed_alias: Option<iroh_blobs::Hash> =
+            if self.iroh.is_some() && plan.blake3.is_none() {
+                self.blobs
+                    .get(&blob_hash)
+                    .await
+                    .ok()
+                    .map(|bytes| iroh_blobs::Hash::new(&bytes))
+            } else {
+                None
+            };
 
         let mut bytes = 0u64;
         for file in &plan.files {
@@ -449,9 +558,32 @@ impl RetentionSweeper {
                 .await
                 .map_err(|e| StorageError::Internal(format!("iroh forget {alias}: {e}")))?;
         }
+        #[cfg(feature = "p2p-iroh")]
+        if let (Some(store), Some(hash)) = (self.iroh.as_ref(), computed_alias) {
+            store
+                .forget(hash)
+                .await
+                .map_err(|e| StorageError::Internal(format!("iroh forget {hash}: {e}")))?;
+        }
 
-        self.db(move |conn| release_ledger::forget_blob_rows(conn, &plan))
-            .await?;
+        let self_cid = self.self_cid.clone();
+        let boot_agent = self.self_agent_cid.clone();
+        self.db(move |conn| {
+            // Every name this peer may have written its own location rows
+            // under: the boot cell key, a signed-in session's key, and its
+            // transport id (which the column should not hold, but has).
+            let mut self_ids: Vec<String> = self_cid.into_iter().collect();
+            self_ids.extend(boot_agent.clone());
+            if let Some(agent) =
+                crate::reconcile::custody::resolve_self_agent_cid(conn, boot_agent.as_deref())
+            {
+                if !self_ids.contains(&agent) {
+                    self_ids.push(agent);
+                }
+            }
+            release_ledger::forget_blob_rows(conn, &plan, &self_ids)
+        })
+        .await?;
         Ok(bytes)
     }
 }
@@ -479,7 +611,7 @@ fn publish(report: &PassReport) {
 }
 
 /// Releases the controller reports as resolved or applied, on any channel.
-fn in_use_release_cids() -> HashSet<String> {
+pub(crate) fn in_use_release_cids() -> HashSet<String> {
     let mut in_use = HashSet::new();
     for channel in state::snapshot() {
         if let Some(head) = channel.resolved_head {
@@ -495,20 +627,49 @@ fn in_use_release_cids() -> HashSet<String> {
 /// Spawn the pass. Its first run waits one interval, so the adoption
 /// controller has resolved its channels before anything is judged.
 ///
-/// bounded-work: one pass per [`PASS_INTERVAL_SECS`], missed ticks skipped, at
-/// most [`MAX_PAST_WINDOW_PER_PASS`] releases examined per pass.
+/// bounded-work: one pass per declared interval, at most
+/// [`MAX_PAST_WINDOW_PER_PASS`] releases and
+/// [`crate::services::holds::MAX_UNNAMED_PER_PASS`] unnamed blobs examined per
+/// pass. The interval is re-read every few seconds while waiting, so a peer
+/// told to check more often does so without waiting out the old interval.
 pub fn spawn(sweeper: RetentionSweeper) {
+    /// How often the wait re-reads the declared interval.
+    const RECHECK: Duration = Duration::from_secs(5);
     tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(PASS_INTERVAL_SECS));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        ticker.tick().await;
+        // The first pass never runs sooner than the default interval after
+        // boot, however short the declared one: the adoption controller must
+        // have checked its channels before anything is judged unnamed.
+        tokio::time::sleep(Duration::from_secs(PASS_INTERVAL_SECS)).await;
         loop {
-            ticker.tick().await;
+            let waited_from = tokio::time::Instant::now();
+            loop {
+                let declared =
+                    Duration::from_secs(crate::runtime_config::release_retention_pass_seconds());
+                let left = declared.saturating_sub(waited_from.elapsed());
+                if left.is_zero() {
+                    break;
+                }
+                tokio::time::sleep(left.min(RECHECK)).await;
+            }
             let depth = crate::runtime_config::release_retention_depth();
-            match sweeper.run_pass(depth, &in_use_release_cids()).await {
+            let in_use = in_use_release_cids();
+            match sweeper.run_pass(depth, &in_use).await {
                 Ok(report) => publish(&report),
                 Err(e) => {
                     tracing::warn!(error = %e, "release retention: pass did not run");
+                    crate::metrics::add_release_retention_failures(1);
+                }
+            }
+            // After the window pass, so a release it just let go is not
+            // counted, and one it kept is read as kept.
+            let limits = crate::services::holds::Limits {
+                min_age_secs: crate::runtime_config::unnamed_min_age_seconds(),
+                min_passes: crate::runtime_config::unnamed_min_passes(),
+            };
+            match crate::services::holds::run_pass(&sweeper, depth, &in_use, limits).await {
+                Ok(report) => crate::services::holds::publish(&report),
+                Err(e) => {
+                    tracing::warn!(error = %e, "holds: pass did not run");
                     crate::metrics::add_release_retention_failures(1);
                 }
             }

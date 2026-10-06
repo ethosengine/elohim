@@ -25,6 +25,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::blob_store::BlobStore;
 use crate::db::DbPool;
+use crate::error::StorageError;
 use crate::p2p::shard_protocol::{self, ShardRequest, ShardResponse};
 use crate::private_reach::{
     private_serve_verdict, PrivateServeVerdict, ServeReason, WithholdReason,
@@ -108,7 +109,7 @@ impl ShardService {
         match request {
             ShardRequest::Get { hash } => self.handle_get(requester, hash).await,
             ShardRequest::Have { hash } => self.handle_have(hash).await,
-            ShardRequest::Push { hash, data } => self.handle_push(hash, data).await,
+            ShardRequest::Push { hash, data } => self.handle_push(requester, hash, data).await,
             ShardRequest::ListContent {
                 reach_filter,
                 offset,
@@ -475,23 +476,77 @@ impl ShardService {
         ShardResponse::Have(exists)
     }
 
-    async fn handle_push(&self, hash: String, data: Vec<u8>) -> ShardResponse {
+    async fn handle_push(
+        &self,
+        requester: &Requester,
+        hash: String,
+        data: Vec<u8>,
+    ) -> ShardResponse {
         debug!(hash = %hash, size = data.len(), "Handling shard Push request");
+        // The bytes are checked against the name they were pushed under BEFORE
+        // they are stored. Storing first left mismatched bytes on disk under
+        // their real hash, with nothing to say how they got there.
+        let actual = BlobStore::compute_hash(&data);
+        if actual != hash {
+            warn!(expected = %hash, actual = %actual, "Shard hash mismatch; nothing stored");
+            return ShardResponse::Error("Hash mismatch".to_string());
+        }
+        // Under the arrival gate from the record to the store, so the
+        // retention pass cannot let these bytes go in between.
+        let _arriving = crate::db::blob_arrivals::arrival_gate().read().await;
+        // Who placed it, recorded before the bytes: these are another peer's
+        // bytes to withdraw, not ours to let go. A record that cannot be
+        // written refuses the push, because bytes stored with no record could
+        // never be told from ones nobody placed.
+        if let Err(e) = self.record_placement(requester, &hash).await {
+            error!(hash = %hash, error = %e, "Push refused: placement could not be recorded");
+            return ShardResponse::Error(format!("Storage error: {}", e));
+        }
         match self.blob_store.store(&data).await {
-            Ok(result) => {
-                if result.hash == hash {
-                    info!(hash = %hash, "Shard stored via P2P push");
-                    ShardResponse::PushAck
-                } else {
-                    warn!(expected = %hash, actual = %result.hash, "Shard hash mismatch");
-                    ShardResponse::Error("Hash mismatch".to_string())
-                }
+            Ok(_) => {
+                info!(hash = %hash, "Shard stored via P2P push");
+                ShardResponse::PushAck
             }
             Err(e) => {
                 error!(hash = %hash, error = %e, "Failed to store shard");
                 ShardResponse::Error(format!("Storage error: {}", e))
             }
         }
+    }
+
+    /// Record that `requester` placed `hash` here. The placer is its agent
+    /// when the custody resolver knows one, otherwise its transport label: an
+    /// unresolved placer still placed it. With no content database there is
+    /// nowhere to record and nothing reads records, so the push proceeds.
+    async fn record_placement(
+        &self,
+        requester: &Requester,
+        hash: &str,
+    ) -> Result<(), StorageError> {
+        let Some(pool) = self.db_pool.clone() else {
+            return Ok(());
+        };
+        let agent = match self.custody_standing.as_ref() {
+            Some(standing) => standing.resolve_agent(requester).await,
+            None => None,
+        };
+        // This node handing bytes to its own shard service is its own act.
+        let own_act = requester.label() == "local";
+        let placed_by = agent.unwrap_or_else(|| requester.label());
+        let hash = hash.to_string();
+        tokio::task::spawn_blocking(move || {
+            use crate::db::blob_arrivals::{record_arrival, ArrivalVia};
+            let mut conn = pool
+                .get()
+                .map_err(|e| StorageError::Database(format!("placement record: {e}")))?;
+            if own_act {
+                record_arrival(&mut conn, &hash, ArrivalVia::SelfPut, None, None)
+            } else {
+                record_arrival(&mut conn, &hash, ArrivalVia::Placed, Some(&placed_by), None)
+            }
+        })
+        .await
+        .map_err(|e| StorageError::Internal(format!("placement record task: {e}")))?
     }
 
     async fn handle_list_content(
@@ -1210,6 +1265,100 @@ mod tests {
                 ShardResponse::Data(_)
             ));
         }
+    }
+
+    fn arrivals(svc: &ShardService, hash: &str) -> Vec<crate::db::blob_arrivals::Arrival> {
+        let mut conn = svc.db_pool.as_ref().unwrap().get().unwrap();
+        crate::db::blob_arrivals::arrivals_by_hash(&mut conn)
+            .unwrap()
+            .remove(hash)
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn a_pushed_shard_records_who_placed_it() {
+        use crate::db::blob_arrivals::ArrivalVia;
+        let fake = Arc::new(FakeCustodyStanding::new());
+        let placer = Requester::libp2p("12D3KooWPlacer");
+        fake.bind(&placer, CUSTODIAN);
+        let stranger = Requester::iroh("node-with-no-known-agent");
+        let (svc, _) = gated_service(fake).await;
+
+        let data = b"a shard another peer places".to_vec();
+        let hash = BlobStore::compute_hash(&data);
+        for requester in [&placer, &stranger] {
+            let res = svc
+                .handle(
+                    requester,
+                    ShardRequest::Push {
+                        hash: hash.clone(),
+                        data: data.clone(),
+                    },
+                )
+                .await;
+            assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
+        }
+
+        let mut placed: Vec<String> = arrivals(&svc, &hash)
+            .into_iter()
+            .inspect(|a| assert_eq!(a.via, ArrivalVia::Placed))
+            .map(|a| a.placed_by)
+            .collect();
+        placed.sort();
+        // The resolved agent where one is known; the transport label where not.
+        assert_eq!(
+            placed,
+            vec![
+                "iroh:node-with-no-known-agent".to_string(),
+                CUSTODIAN.to_string()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_push_whose_bytes_do_not_match_stores_nothing() {
+        let fake = Arc::new(FakeCustodyStanding::new());
+        let (svc, _) = gated_service(fake).await;
+        let data = b"not what the name says".to_vec();
+        let claimed = BlobStore::compute_hash(b"something else");
+        let res = svc
+            .handle(
+                &Requester::libp2p("12D3KooWPlacer"),
+                ShardRequest::Push {
+                    hash: claimed.clone(),
+                    data: data.clone(),
+                },
+            )
+            .await;
+        assert!(matches!(res, ShardResponse::Error(_)), "{res:?}");
+        assert!(!svc.blob_store.exists(&claimed).await);
+        assert!(
+            !svc.blob_store.exists(&BlobStore::compute_hash(&data)).await,
+            "the mismatched bytes must not be left on disk under their real hash"
+        );
+        assert!(arrivals(&svc, &claimed).is_empty());
+    }
+
+    #[tokio::test]
+    async fn bytes_this_node_hands_its_own_shard_service_are_its_own_act() {
+        use crate::db::blob_arrivals::ArrivalVia;
+        let fake = Arc::new(FakeCustodyStanding::new());
+        let (svc, _) = gated_service(fake).await;
+        let data = b"handed over in process".to_vec();
+        let hash = BlobStore::compute_hash(&data);
+        let res = svc
+            .handle(
+                &Requester::local(),
+                ShardRequest::Push {
+                    hash: hash.clone(),
+                    data,
+                },
+            )
+            .await;
+        assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
+        let recorded = arrivals(&svc, &hash);
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].via, ArrivalVia::SelfPut);
     }
 
     #[tokio::test]

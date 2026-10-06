@@ -298,11 +298,34 @@ impl RaceFetchPuller {
     /// to a synthetic composite source.
     async fn store_reassembled(&self, bytes: Vec<u8>, source_peer: &str) -> PullOutcome {
         let len = bytes.len() as u64;
+        let _arriving = crate::db::blob_arrivals::arrival_gate().read().await;
         match self.blob_store.store(&bytes).await {
-            Ok(_) => PullOutcome::Pulled {
-                source_peer: source_peer.to_string(),
-                bytes: len,
-            },
+            Ok(stored) => {
+                // How these bytes got here: this peer fetched and reassembled
+                // them. Not recording it would leave them with no record, and
+                // a blob with no record is never let go.
+                let recorded = self
+                    .pool
+                    .get()
+                    .map_err(|e| e.to_string())
+                    .and_then(|mut conn| {
+                        crate::db::blob_arrivals::record_arrival(
+                            &mut conn,
+                            &stored.hash,
+                            crate::db::blob_arrivals::ArrivalVia::SelfFetch,
+                            None,
+                            None,
+                        )
+                        .map_err(|e| e.to_string())
+                    });
+                if let Err(e) = recorded {
+                    tracing::warn!(blob = %stored.hash, error = %e, "blob arrival not recorded");
+                }
+                PullOutcome::Pulled {
+                    source_peer: source_peer.to_string(),
+                    bytes: len,
+                }
+            }
             Err(e) => PullOutcome::Failed(format!("could not store reassembled bytes: {e}")),
         }
     }

@@ -394,6 +394,10 @@ pub async fn finalize_fetch_success(
     self_cid: &str,
     blob_store: &BlobStore,
 ) -> Result<(), StorageError> {
+    // Under the arrival gate from the store to the arrival record, so the
+    // retention pass cannot let these bytes go in between.
+    let _arriving = crate::db::blob_arrivals::arrival_gate().read().await;
+
     // Step 1: persist to filesystem first. On error, return without writing
     // any SQL — leaving inventory clean.
     blob_store.store(bytes).await?;
@@ -417,6 +421,16 @@ pub async fn finalize_fetch_success(
     // on these fields must be aware of the per-action semantics.
     conn.transaction::<(), StorageError, _>(|txn| {
         record_fetch_success(txn, source_peer, blob_hash, &now_iso)?;
+        // How these bytes got here: this peer fetched them. Keyed by the
+        // blob store's own spelling of the hash, which is what the retention
+        // pass walks; a caller may have asked by another spelling.
+        crate::db::blob_arrivals::record_arrival(
+            txn,
+            &BlobStore::compute_hash(bytes),
+            crate::db::blob_arrivals::ArrivalVia::SelfFetch,
+            None,
+            None,
+        )?;
 
         let new_event = NewEconomicEvent {
             id: &event_id,

@@ -940,6 +940,42 @@ lazy_static! {
     )
     .unwrap();
 
+    /// What this peer holds in a store after the last holds pass, by the
+    /// reason it holds it. Own-node only: what a peer holds says what its
+    /// person uses.
+    pub static ref NODE_HOLDS_BYTES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_holds_bytes",
+            "Bytes this peer holds in a store, by reason (kept_release | served | pledged | part_of | placed | arriving | own_unnamed | unrecorded).",
+        ),
+        &["store", "reason"],
+    )
+    .unwrap();
+
+    /// The same account in blobs.
+    pub static ref NODE_HOLDS_BLOBS: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_holds_blobs",
+            "Blobs this peer holds in a store, by reason.",
+        ),
+        &["store", "reason"],
+    )
+    .unwrap();
+
+    /// Blobs this peer brought here itself and let go once nothing named them.
+    pub static ref NODE_HOLDS_RELEASED: IntCounter = IntCounter::new(
+        "elohim_node_holds_released_total",
+        "Blobs this peer brought here itself and let go once nothing named them.",
+    )
+    .unwrap();
+
+    /// Blob-store bytes those blobs freed.
+    pub static ref NODE_HOLDS_BYTES_RELEASED: IntCounter = IntCounter::new(
+        "elohim_node_holds_bytes_released_total",
+        "Blob-store bytes freed by letting go blobs nothing named.",
+    )
+    .unwrap();
+
     /// Steps of the retention pass that failed and will be tried again.
     pub static ref RELEASE_RETENTION_FAILURES: IntCounter = IntCounter::new(
         "elohim_release_retention_failures_total",
@@ -3056,6 +3092,18 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_RELEASED.clone()));
         let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_BLOBS_HELD.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_HOLDS_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_HOLDS_BLOBS.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_HOLDS_RELEASED.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_HOLDS_BYTES_RELEASED.clone()));
+        for reason in crate::services::holds::HoldReason::ALL {
+            NODE_HOLDS_BYTES
+                .with_label_values(&["blobs", reason.label()])
+                .set(0);
+            NODE_HOLDS_BLOBS
+                .with_label_values(&["blobs", reason.label()])
+                .set(0);
+        }
         let _ = REGISTRY.register(Box::new(RELEASE_RETENTION_FAILURES.clone()));
         for store in ["blobs", "staging"] {
             RELEASE_RETENTION_BYTES
@@ -4286,6 +4334,21 @@ pub fn set_release_retention_blobs_held(reason: &str, blobs: usize) {
 
 pub fn add_release_retention_failures(failures: usize) {
     RELEASE_RETENTION_FAILURES.inc_by(failures as u64);
+}
+
+/// What this peer holds in `store` for `reason`, after a holds pass.
+pub fn set_node_holds(store: &str, reason: &str, blobs: usize, bytes: u64) {
+    NODE_HOLDS_BLOBS
+        .with_label_values(&[store, reason])
+        .set(blobs as i64);
+    NODE_HOLDS_BYTES
+        .with_label_values(&[store, reason])
+        .set(bytes as i64);
+}
+
+pub fn add_node_holds_released(blobs: usize, bytes: u64) {
+    NODE_HOLDS_RELEASED.inc_by(blobs as u64);
+    NODE_HOLDS_BYTES_RELEASED.inc_by(bytes);
 }
 
 /// Set the node corpus size for an app scope (content rows held).

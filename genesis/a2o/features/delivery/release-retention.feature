@@ -33,7 +33,7 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
   A peer's RECORD of an app is the entry that peer keeps saying which
   bundles are the app right now. An app is BOUND to a channel when its
   record names that channel: only releases on that channel can move the
-  record, and each app is bound to one channel. Each peer's runtime watches the channels
+  record, and an app is bound to at most one channel. Each peer's runtime watches the channels
   it follows and TAKES UP the release it should run by itself: it
   downloads the bundles, checks them, and points its own record of each
   app at them. A release a peer has
@@ -57,11 +57,14 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
   well, so the account is checked against the files themselves.
 
   The check that lets old releases go runs every five minutes. A peer may
-  also have made a standing promise to hold a bundle its app once pointed
-  at; a bundle under such a promise is not let go until the promise is
-  withdrawn, which a separate five-minute check does once the app's record
-  has moved on. The scenario does not test that promise; it is here only
-  to explain why the scenario allows fifteen minutes.
+  also have made a STANDING PROMISE: a pledge to the household to keep
+  holding the bundle an app's record points at. When the record moves to
+  a newer bundle, a separate five-minute check moves the promise to the
+  newer bundle and withdraws it from the older one. Until then the older
+  bundle is not let go. So at worst a bundle waits one check for its
+  promise to be withdrawn and another to be let go. The scenario allows
+  fifteen minutes to cover both with room. It does not test the promise;
+  the promise is here only to explain the fifteen minutes.
 
   Three people share this house, and the peers they run are one
   HOUSEHOLD. matthew stewards the channel and publishes the releases.
@@ -73,6 +76,47 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
   takes each one up before the next is published, so every peer sees all
   three in the same order. With three seen and a setting of two, the
   first is the one let go.
+
+  The second scenario is about bundles no release names. Before release
+  channels existed, an app's record named its bundle directly. A new
+  build was published by handing the bundle to a peer and pointing the
+  app's record at it. To HAND a peer a bundle is to upload the bundle to
+  that peer. Nothing kept count of the builds that came before, so
+  nothing ever let them go. This story calls such a bundle an EARLIER
+  BUILD: a bundle a peer still holds that no app's record points at and no
+  release names.
+
+  A peer knows how each file it holds ARRIVED, because whatever stored
+  the file wrote that down. There are three ways. The peer was handed the
+  file. The peer fetched the file from another peer. Or another peer
+  placed the file there. A file the peer was handed or fetched is its
+  OWN: it can always fetch it again, so once nothing names the file the
+  peer may let it go. A file another peer placed is that peer's to take
+  back, and is never let go this way. A file with no note of how it
+  arrived is UNRECORDED: the peer cannot tell whose it is, so it reports
+  the file and keeps it.
+
+  A peer lets an own file go slowly, on purpose. The file must have gone
+  unnamed on two checks in a row, and it must have arrived at least a day
+  ago. Both are the peer's own settings. The second scenario sets
+  matthew's and jessica's peers to check every fifteen seconds and to
+  wait one minute instead of a day, so the rule can be seen in minutes.
+  A peer's own account also says how much it holds for each reason, lists
+  each own file that nothing names, and lists the files it has lately let
+  go.
+
+  The second scenario uses one more app, which this run also owns. Its
+  record names its bundle directly and it is bound to no channel. Only
+  matthew's peer is handed its builds. Jessica's peer comes to hold the
+  first build another way: it is asked for the app's page while it holds
+  no copy of the bundle, so it fetches the bundle from another peer and
+  then serves the page. That makes the first build an own file on both
+  peers, handed to one and fetched by the other. A standing promise can
+  cover this app's bundles too, which is why the second scenario also
+  allows fifteen minutes. Each peer runs its checks on its own clock, and
+  jessica's peer hears that a promise was withdrawn only after matthew's
+  peer has withdrawn it. So her peer may let the first build go a little
+  after his does, and the scenario gives it five minutes more.
 
   The story runs as a test on the household's own mesh. "This run" means
   one execution of it, which creates its own two apps and its own channel
@@ -97,3 +141,17 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
     And the second and third releases' bundle files, for both apps, are still on matthew's peer
     And the first release's bundle files, for both apps, are still on jessica's peer
     And doorway "alpha" still serves the third release's build of each app
+
+  Scenario: A peer lets go of an earlier build that nothing names, and keeps a file it has no record of
+    Given one more app this run owns, whose record names its bundle directly and which is bound to no channel
+    And matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it has been unnamed for one minute
+    And matthew's peer holds a file with no note of how it arrived
+    When matthew hands his peer a first build of that app and points the app's record at it
+    And jessica's peer serves that app once, fetching the first build to do so
+    And matthew hands his peer a second build of that app and points the app's record at that instead
+    Then within 15 minutes matthew's peer's own account has listed the first build as an own file that nothing names, and then as let go
+    And the first build's bundle file is gone from matthew's peer
+    And within 5 minutes more the first build's bundle file is gone from jessica's peer
+    And the second build's bundle file is still on matthew's peer
+    And the file with no note of how it arrived is still on matthew's peer, and his peer's own account counts it as unrecorded
+    And doorway "alpha" serves the second build of that app

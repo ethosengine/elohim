@@ -3900,6 +3900,30 @@ impl HttpServer {
                 .unwrap());
         }
 
+        // How these bytes got here, recorded BEFORE they are stored and under
+        // the arrival gate, held until this put has answered: this peer was
+        // handed them. The retention pass may let them go once nothing names
+        // them, and a put of bytes it was about to let go stops it.
+        let _arriving = crate::db::blob_arrivals::arrival_gate().read().await;
+        if let Some(pool) = self.db_pool.clone() {
+            let sha = computed_hash.clone();
+            let recorded = tokio::task::spawn_blocking(move || {
+                let mut conn = pool.get().map_err(|e| e.to_string())?;
+                crate::db::blob_arrivals::record_arrival(
+                    &mut conn,
+                    &sha,
+                    crate::db::blob_arrivals::ArrivalVia::SelfPut,
+                    None,
+                    None,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .await;
+            if !matches!(recorded, Ok(Ok(()))) {
+                tracing::warn!(sha256 = %computed_hash, result = ?recorded, "blob arrival not recorded");
+            }
+        }
+
         // Create shard encoder and generate manifest
         let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
         let manifest = match encoder.create_manifest(&data, mime_type, "commons") {

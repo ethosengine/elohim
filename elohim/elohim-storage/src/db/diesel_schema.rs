@@ -1627,6 +1627,30 @@ diesel::table! {
     }
 }
 
+// Category C, local — how each blob in this peer's blob store got here. Read
+// by the retention pass to tell this peer's own bytes from bytes another peer
+// placed and from bytes with no record.
+diesel::table! {
+    blob_arrivals (blob_hash, arrived_via, placed_by) {
+        blob_hash -> Text,
+        arrived_via -> Text,
+        placed_by -> Text,
+        named_for -> Nullable<Text>,
+        arrived_at -> Text,
+        withdrawn_at -> Nullable<Text>,
+    }
+}
+
+// Category C, local — blobs the retention pass currently reads as this peer's
+// own and named by nothing, with the consecutive-pass count.
+diesel::table! {
+    blob_unnamed_watch (blob_hash) {
+        blob_hash -> Text,
+        first_unnamed_at -> Text,
+        passes -> Integer,
+    }
+}
+
 // Category C — a generation's aggregate while it is still `building`.
 diesel::table! {
     standing_generation_aggregate (generation_id, evaluator_pubkey, subject_pubkey) {
@@ -2129,6 +2153,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     recovery_flows,
     rea_commitments,
     release_ledger,
+    blob_arrivals,
+    blob_unnamed_watch,
     recovery_requests,
     recovery_witnesses,
     relationships,

@@ -58,6 +58,8 @@ import {
   buildFixtureBundle,
   buildServerFixture,
   pollUntil,
+  removeFixtureBundle,
+  stageBundleThroughStorage,
   visitInBrowser,
   type FixtureBundle,
 } from '../dataplane/epr-app-deliverability.helpers.js';
@@ -976,32 +978,40 @@ const RETENTION_KEY = 'ELOHIM_RELEASE_RETENTION_DEPTH';
 const RETENTION_BUDGET_MS = 15 * 60_000;
 
 /**
- * Set (or, with `null`, clear) one peer's retention depth: rewrite the key in
+ * Set (or, with `null`, clear) one of a peer's own settings: rewrite the key in
  * the runtime-config file the peer watches, then ask the peer to re-read it.
  * Every other line of the file is left as it was.
  */
-async function setRetentionDepth(peer: PeerName, depth: number | null): Promise<void> {
+async function setRuntimeSetting(peer: PeerName, key: string, value: number | null): Promise<void> {
   const file = path.join(householdMeshDir(), peer, 'runtime-config.toml');
   const kept = existsSync(file)
     ? readFileSync(file, 'utf8')
         .split('\n')
-        .filter(line => !line.trimStart().startsWith(RETENTION_KEY))
+        .filter(line => !line.trimStart().startsWith(key))
     : [];
   while (kept.length > 0 && kept.at(-1) === '') kept.pop();
-  if (depth !== null) kept.push(`${RETENTION_KEY} = ${depth}`);
+  if (value !== null) kept.push(`${key} = ${value}`);
   writeFileSync(file, `${kept.join('\n')}\n`);
   const reloaded = await postRaw(`${storageUrl(peer)}/admin/runtime-config/reload`);
   assert.equal(reloaded.status, 200, `${peer} did not reload its settings: ${reloaded.text}`);
 }
 
-/** The depth a peer is running with right now, read from the peer itself. */
-async function retentionDepth(peer: PeerName): Promise<unknown> {
+/** What a peer is running one setting at right now, read from the peer itself. */
+async function runtimeSetting(peer: PeerName, key: string): Promise<unknown> {
   const { status, text } = await getRaw(`${storageUrl(peer)}/admin/runtime-config`, {
     timeoutMs: 10_000,
   });
   assert.equal(status, 200, `${peer} /admin/runtime-config answered ${status}`);
   const body = JSON.parse(text) as { settings?: { name: string; effectiveValue: unknown }[] };
-  return (body.settings ?? []).find(setting => setting.name === RETENTION_KEY)?.effectiveValue;
+  return (body.settings ?? []).find(setting => setting.name === key)?.effectiveValue;
+}
+
+async function setRetentionDepth(peer: PeerName, depth: number | null): Promise<void> {
+  await setRuntimeSetting(peer, RETENTION_KEY, depth);
+}
+
+async function retentionDepth(peer: PeerName): Promise<unknown> {
+  return runtimeSetting(peer, RETENTION_KEY);
 }
 
 interface RetentionChannel {
@@ -1165,6 +1175,301 @@ Then(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// An earlier build that nothing names (release-retention.feature, scenario 2)
+// ---------------------------------------------------------------------------
+
+const PASS_SECONDS_KEY = 'ELOHIM_RELEASE_RETENTION_PASS_SECONDS';
+const UNNAMED_AGE_KEY = 'ELOHIM_UNNAMED_MIN_AGE_SECONDS';
+/** The app whose record names its bundle directly: bound to no channel. */
+const SOLO_APP = `a2o-app-${RUN_STAMP}-solo`;
+const QUICK_PEERS: PeerName[] = ['matthew', 'jessica'];
+const FIRST_BUILD_MISSING = 'the first build must be handed over first';
+
+interface SoloBuild {
+  bundle: FixtureBundle;
+  /** `sha256-<hex>` of the zip the peer was handed. */
+  hash: string;
+}
+
+const solo: {
+  authored: boolean;
+  first?: SoloBuild;
+  second?: SoloBuild;
+  /** A file handed to matthew's peer by a route that records nothing. */
+  unrecorded?: string;
+  quickened: Set<PeerName>;
+} = { authored: false, quickened: new Set<PeerName>() };
+
+interface HoldsAccount {
+  blobs?: Record<string, { blobs: number; bytes: number }>;
+  ownUnnamed?: { blobHash: string; arrivedVia: string[]; passes: number }[];
+  recentlyLetGo?: { blobHash: string }[];
+}
+
+/** A peer's own account of why it holds what is in its blob store. */
+async function holdsAccount(peer: PeerName): Promise<HoldsAccount | null> {
+  const { status, text } = await getRaw(`${storageUrl(peer)}${ADOPTION_PATH}`, {
+    timeoutMs: 10_000,
+  });
+  if (status !== 200) return null;
+  return (JSON.parse(text) as { holds?: HoldsAccount | null }).holds ?? null;
+}
+
+/** Hand matthew's peer one build of the solo app and point its record at it. */
+async function handSoloBuild(stepTimeoutMs: number): Promise<SoloBuild> {
+  process.env['STORAGE_API_KEY_ADMIN'] ??= adminKey();
+  const bundle = buildFixtureBundle({ coherent: true, baseHref: `/apps/${SOLO_APP}/` });
+  const staged = await stageBundleThroughStorage({
+    bundle,
+    slug: SOLO_APP,
+    storageUrl: storageUrl('matthew'),
+    stepTimeoutMs,
+  });
+  assert.equal(staged.code, 0, `matthew's peer did not take the build: ${staged.output}`);
+  const build = { bundle, hash: staged.blobHash };
+  // jessica's own record of the app must name it before she can be asked for it.
+  const reached = await pollUntil(
+    async () => (await contentRow('jessica', SOLO_APP))?.['blobHash'] === build.hash,
+    ADOPT_BUDGET_MS,
+    2_000
+  );
+  assert.notEqual(reached, null, `jessica's record of ${SOLO_APP} never named ${build.hash}`);
+  return build;
+}
+
+Given(
+  'one more app this run owns, whose record names its bundle directly and which is bound to no channel',
+  { timeout: ADOPT_BUDGET_MS + 30_000 },
+  async function () {
+    if (solo.authored) return;
+    const response = await fetch(`${storageUrl('matthew')}/db/content/bulk`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-schema-version': '1',
+        'x-api-key': adminKey(),
+      },
+      body: JSON.stringify([
+        {
+          id: SOLO_APP,
+          title: `Earlier-build story fixture (${SOLO_APP})`,
+          description: 'an app this test run owns, whose record names its bundle directly',
+          contentType: 'collective',
+          contentFormat: 'html5-app',
+          content: { slug: SOLO_APP, entryPoint: 'index.html' },
+          reach: 'commons',
+        },
+      ]),
+    });
+    assert.ok(response.ok, `authoring ${SOLO_APP}: ${response.status} ${await response.text()}`);
+    const everywhere = await pollUntil(
+      async () => {
+        for (const peer of PEERS) {
+          if ((await contentRow(peer, SOLO_APP)) === null) return false;
+        }
+        return true;
+      },
+      ADOPT_BUDGET_MS,
+      2_000
+    );
+    assert.notEqual(everywhere, null, `${SOLO_APP} did not reach every household peer`);
+    solo.authored = true;
+  }
+);
+
+Given(
+  "matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it has been unnamed for one minute",
+  { timeout: 60_000 },
+  async function () {
+    for (const peer of QUICK_PEERS) {
+      await setRuntimeSetting(peer, PASS_SECONDS_KEY, 15);
+      await setRuntimeSetting(peer, UNNAMED_AGE_KEY, 60);
+      solo.quickened.add(peer);
+      assert.equal(await runtimeSetting(peer, PASS_SECONDS_KEY), 15);
+      assert.equal(await runtimeSetting(peer, UNNAMED_AGE_KEY), 60);
+    }
+  }
+);
+
+Given(
+  "matthew's peer holds a file with no note of how it arrived",
+  { timeout: 30_000 },
+  async function () {
+    // The direct shard route stores bytes and writes nothing about them.
+    const bytes = Buffer.from(`a2o file with no note of how it arrived (${RUN_STAMP})`);
+    const hash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const response = await fetch(`${storageUrl('matthew')}/shard/${hash}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/octet-stream', 'x-api-key': adminKey() },
+      body: new Uint8Array(bytes),
+      signal: AbortSignal.timeout(20_000),
+    });
+    assert.ok(response.ok, `handing matthew's peer the file: ${response.status}`);
+    assert.ok(
+      existsSync(bundleFile('matthew', hash)),
+      `matthew's peer does not hold ${bundleFile('matthew', hash)}`
+    );
+    solo.unrecorded = hash;
+  }
+);
+
+When(
+  "matthew hands his peer a first build of that app and points the app's record at it",
+  { timeout: ADOPT_BUDGET_MS + 240_000 },
+  async function () {
+    solo.first = await handSoloBuild(180_000);
+    assert.ok(existsSync(bundleFile('matthew', solo.first.hash)));
+  }
+);
+
+When(
+  "jessica's peer serves that app once, fetching the first build to do so",
+  { timeout: ADOPT_BUDGET_MS + 30_000 },
+  async function () {
+    assert.ok(solo.first, FIRST_BUILD_MISSING);
+    const entry = solo.first.bundle.entryScript;
+    const served = await pollUntil(
+      async () => {
+        const { status, text } = await getRaw(
+          `${storageUrl('jessica')}/apps/${SOLO_APP}/index.html`,
+          { timeoutMs: 20_000 }
+        );
+        return status === 200 && text.includes(entry);
+      },
+      ADOPT_BUDGET_MS,
+      3_000
+    );
+    assert.notEqual(served, null, `jessica's peer never served ${SOLO_APP} naming ${entry}`);
+    assert.ok(
+      existsSync(bundleFile('jessica', solo.first.hash)),
+      `jessica's peer served the first build without holding ${solo.first.hash}`
+    );
+  }
+);
+
+When(
+  "matthew hands his peer a second build of that app and points the app's record at that instead",
+  { timeout: ADOPT_BUDGET_MS + 240_000 },
+  async function () {
+    assert.ok(solo.first, FIRST_BUILD_MISSING);
+    solo.second = await handSoloBuild(180_000);
+    assert.notEqual(solo.second.hash, solo.first.hash, 'the two builds must differ');
+  }
+);
+
+Then(
+  "within 15 minutes matthew's peer's own account has listed the first build as an own file that nothing names, and then as let go",
+  { timeout: RETENTION_BUDGET_MS + 60_000 },
+  async function () {
+    assert.ok(solo.first, FIRST_BUILD_MISSING);
+    const first = solo.first.hash;
+    let listedAs: string[] | undefined;
+    const letGo = await pollUntil(
+      async () => {
+        const account = await holdsAccount('matthew');
+        listedAs ??= account?.ownUnnamed?.find(blob => blob.blobHash === first)?.arrivedVia;
+        return (account?.recentlyLetGo ?? []).some(blob => blob.blobHash === first);
+      },
+      RETENTION_BUDGET_MS,
+      3_000
+    );
+    const account = await holdsAccount('matthew');
+    assert.notEqual(
+      letGo,
+      null,
+      `matthew's peer did not let ${first} go: ${JSON.stringify(account).slice(0, 1200)}`
+    );
+    assert.ok(
+      listedAs,
+      `matthew's peer let ${first} go without ever listing it as an own file nothing names`
+    );
+    assert.ok(
+      listedAs.includes('self-put'),
+      `the first build should read as handed to matthew's peer, not ${JSON.stringify(listedAs)}`
+    );
+  }
+);
+
+Then("the first build's bundle file is gone from matthew's peer", function () {
+  assert.ok(solo.first, FIRST_BUILD_MISSING);
+  const file = bundleFile('matthew', solo.first.hash);
+  assert.ok(!existsSync(file), `matthew's peer still holds ${file}`);
+});
+
+Then(
+  "within 5 minutes more the first build's bundle file is gone from jessica's peer",
+  { timeout: 330_000 },
+  async function () {
+    assert.ok(solo.first, FIRST_BUILD_MISSING);
+    const file = bundleFile('jessica', solo.first.hash);
+    const gone = await pollUntil(async () => Promise.resolve(!existsSync(file)), 300_000, 3_000);
+    assert.notEqual(
+      gone,
+      null,
+      `jessica's peer still holds ${file}: ${JSON.stringify(await holdsAccount('jessica')).slice(0, 1200)}`
+    );
+  }
+);
+
+Then("the second build's bundle file is still on matthew's peer", function () {
+  assert.ok(solo.second, 'the second build must be handed over first');
+  const file = bundleFile('matthew', solo.second.hash);
+  assert.ok(existsSync(file), `matthew's peer no longer holds ${file}`);
+});
+
+Then(
+  "the file with no note of how it arrived is still on matthew's peer, and his peer's own account counts it as unrecorded",
+  { timeout: 30_000 },
+  async function () {
+    assert.ok(solo.unrecorded, 'the unrecorded file must be handed over first');
+    const file = bundleFile('matthew', solo.unrecorded);
+    assert.ok(existsSync(file), `matthew's peer no longer holds ${file}`);
+    const account = await holdsAccount('matthew');
+    const unrecorded = account?.blobs?.['unrecorded']?.blobs ?? 0;
+    assert.ok(unrecorded >= 1, `matthew's account counts ${unrecorded} unrecorded files`);
+    assert.ok(
+      !(account?.ownUnnamed ?? []).some(blob => blob.blobHash === solo.unrecorded),
+      'a file with no note of how it arrived must never be listed as an own file'
+    );
+  }
+);
+
+Then(
+  'doorway {string} serves the second build of that app',
+  { timeout: 120_000 },
+  async function (this: E2EWorld, doorway: string) {
+    assert.ok(solo.second, 'the second build must be handed over first');
+    const entry = solo.second.bundle.entryScript;
+    const base = doorwayUrl(this, doorway);
+    const served = await pollUntil(
+      async () => {
+        const { status, text } = await getRaw(`${base}/apps/${SOLO_APP}/index.html`, {
+          timeoutMs: 10_000,
+        });
+        return status === 200 && text.includes(entry);
+      },
+      SERVE_BUDGET_MS,
+      3_000
+    );
+    assert.notEqual(served, null, `doorway ${doorway} is not serving ${SOLO_APP} naming ${entry}`);
+  }
+);
+
+AfterAll({ timeout: 60_000 }, async function () {
+  for (const peer of solo.quickened) {
+    try {
+      await setRuntimeSetting(peer, PASS_SECONDS_KEY, null);
+      await setRuntimeSetting(peer, UNNAMED_AGE_KEY, null);
+    } catch {
+      // Best effort: the keys are this run's own and a later run sets them again.
+    }
+  }
+  for (const build of [solo.first, solo.second]) {
+    if (build) removeFixtureBundle(build.bundle);
+  }
+});
 
 AfterAll({ timeout: 60_000 }, async function () {
   for (const peer of run.retentionSet) {

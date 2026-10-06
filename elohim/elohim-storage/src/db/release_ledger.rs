@@ -125,21 +125,26 @@ pub fn content_rows_naming(
     conn: &mut SqliteConnection,
     artifact: &LedgerArtifact,
 ) -> Result<i64, StorageError> {
-    let blob_hash = artifact.blob_hash();
+    // The digest, wherever it appears and however it is spelled: `sha256-<hex>`,
+    // bare hex, or the CID that wraps it. SQLite's LIKE is case-insensitive
+    // for ASCII, so an upper-case hex spelling matches too.
     let hex_anywhere = format!("%{}%", artifact.sha256.to_ascii_lowercase());
     let cid_anywhere = format!("%{}%", artifact.blob_cid);
     let mut query = content::table
         .filter(
             content::blob_hash
-                .eq(&blob_hash)
-                .or(content::server_blob_hash.eq(&blob_hash))
+                .like(&hex_anywhere)
+                .or(content::server_blob_hash.like(&hex_anywhere))
+                .or(content::blob_cid.like(&hex_anywhere))
                 .or(content::metadata_json.like(&hex_anywhere)),
         )
         .into_boxed();
     if !artifact.blob_cid.is_empty() {
         query = query
-            .or_filter(content::blob_cid.eq(&artifact.blob_cid))
-            .or_filter(content::metadata_json.like(cid_anywhere));
+            .or_filter(content::blob_cid.like(&cid_anywhere))
+            .or_filter(content::blob_hash.like(&cid_anywhere))
+            .or_filter(content::server_blob_hash.like(&cid_anywhere))
+            .or_filter(content::metadata_json.like(&cid_anywhere));
     }
     query
         .count()
@@ -149,17 +154,73 @@ pub fn content_rows_naming(
 
 /// How many custody commitments still oblige someone to hold `blob_hash`.
 /// While one stands, the custody pass would fetch the bytes straight back.
+///
+/// A commitment names its blob in more than one spelling (`sha256-<hex>`, bare
+/// hex, a CID, a CID behind a `sha256-` prefix) and either bare or as a JSON
+/// list. All of them contain the hex digest or the CID, so the match is on
+/// either appearing anywhere in the field: a pledge this read cannot spell is
+/// a blob it would let go.
 pub fn live_custody_pledges_naming(
     conn: &mut SqliteConnection,
     blob_hash: &str,
 ) -> Result<i64, StorageError> {
-    rea_commitments::table
+    let hex = blob_hash.strip_prefix("sha256-").unwrap_or(blob_hash);
+    let hex_anywhere = format!("%{}%", hex.to_ascii_lowercase());
+    let mut query = rea_commitments::table
         .filter(rea_commitments::action.eq("custody-blob"))
-        .filter(rea_commitments::resource_classified_as.eq(blob_hash))
         .filter(rea_commitments::state.ne_all(super::models::commitment_withdrawn_states::ALL))
+        .filter(rea_commitments::resource_classified_as.like(hex_anywhere))
+        .into_boxed();
+    if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(hex) {
+        query = query.or_filter(
+            rea_commitments::action
+                .eq("custody-blob")
+                .and(rea_commitments::state.ne_all(super::models::commitment_withdrawn_states::ALL))
+                .and(rea_commitments::resource_classified_as.like(format!("%{cid}%"))),
+        );
+    }
+    query
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Database(format!("live_custody_pledges_naming: {e}")))
+}
+
+/// How many rows outside the content table name `blob_hash` as something this
+/// peer shows: today, a signed-in person's profile image.
+pub fn other_rows_naming(
+    conn: &mut SqliteConnection,
+    blob_hash: &str,
+) -> Result<i64, StorageError> {
+    let hex = blob_hash.strip_prefix("sha256-").unwrap_or(blob_hash);
+    let hex_anywhere = format!("%{}%", hex.to_ascii_lowercase());
+    let mut query = super::diesel_schema::local_sessions::table
+        .filter(super::diesel_schema::local_sessions::profile_image_hash.like(hex_anywhere))
+        .into_boxed();
+    if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(hex) {
+        query = query.or_filter(
+            super::diesel_schema::local_sessions::profile_image_hash.like(format!("%{cid}%")),
+        );
+    }
+    query
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Database(format!("other_rows_naming: {e}")))
+}
+
+/// Of `blob_hashes`, the ones another peer placed here and has not withdrawn.
+pub fn live_placements_among(
+    conn: &mut SqliteConnection,
+    blob_hashes: &[String],
+) -> Result<HashSet<String>, StorageError> {
+    use super::diesel_schema::blob_arrivals;
+    let placed: Vec<String> = blob_arrivals::table
+        .filter(blob_arrivals::blob_hash.eq_any(blob_hashes))
+        .filter(blob_arrivals::arrived_via.eq("placed"))
+        .filter(blob_arrivals::withdrawn_at.is_null())
+        .select(blob_arrivals::blob_hash)
+        .load(conn)
+        .map_err(|e| StorageError::Database(format!("live_placements_among: {e}")))?;
+    Ok(placed.into_iter().collect())
 }
 
 /// What letting go of one blob touches.
@@ -211,13 +272,18 @@ pub fn plan_forget_blob(
 }
 
 /// Drop this peer's own record of holding a blob whose files are already gone:
-/// its manifests, the location rows of its unshared shards, and its
-/// self-custody inventory rows. Run AFTER the files are deleted, so a crash in
-/// between leaves rows that the next pass finishes rather than files nothing
-/// names.
+/// its manifests, its own location rows for its unshared shards, its
+/// self-custody inventory rows, and its arrival records. Run AFTER the files
+/// are deleted, so a crash in between leaves rows that the next pass finishes
+/// rather than files nothing names.
+///
+/// Only THIS peer's location rows go: the ones it wrote as self-held and the
+/// ones naming one of `self_ids`. A row naming another holder says that peer
+/// holds the shard, which letting our own copy go does not change.
 pub fn forget_blob_rows(
     conn: &mut SqliteConnection,
     plan: &ForgetBlobPlan,
+    self_ids: &[String],
 ) -> Result<(), StorageError> {
     conn.transaction(|conn| {
         diesel::delete(
@@ -225,13 +291,29 @@ pub fn forget_blob_rows(
         )
         .execute(conn)?;
         diesel::delete(
-            shard_locations::table.filter(shard_locations::shard_hash.eq_any(&plan.files)),
+            shard_locations::table
+                .filter(shard_locations::shard_hash.eq_any(&plan.files))
+                .filter(
+                    shard_locations::status
+                        .eq(crate::services::self_stewardship::SELF_HELD_STATUS)
+                        .or(shard_locations::peer_id.eq_any(self_ids)),
+                ),
         )
         .execute(conn)?;
         diesel::delete(
             peer_blob_inventory::table
                 .filter(peer_blob_inventory::blob_hash.eq_any(&plan.files))
                 .filter(peer_blob_inventory::source.eq("self-custody")),
+        )
+        .execute(conn)?;
+        diesel::delete(
+            super::diesel_schema::blob_arrivals::table
+                .filter(super::diesel_schema::blob_arrivals::blob_hash.eq_any(&plan.files)),
+        )
+        .execute(conn)?;
+        diesel::delete(
+            super::diesel_schema::blob_unnamed_watch::table
+                .filter(super::diesel_schema::blob_unnamed_watch::blob_hash.eq_any(&plan.files)),
         )
         .execute(conn)?;
         Ok::<(), diesel::result::Error>(())

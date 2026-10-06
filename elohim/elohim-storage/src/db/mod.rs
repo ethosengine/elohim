@@ -188,6 +188,10 @@ pub mod mishpat_commitments;
 // in first-seen order (Category C, local). Read by the release retention pass.
 pub mod release_ledger;
 
+// Blob arrivals — how each blob in the local blob store got here (Category C,
+// local), and the watch the retention pass keeps on blobs nothing names.
+pub mod blob_arrivals;
+
 // Lens projection — `author-lens` Mishpat::Commitment cache (Category A DHT projection).
 // Source of truth: Holochain DHT (mishpat DNA Commitment entry, action='author-lens').
 // Populated from create_commitment post-commit signal (plan S3). NULL dht_anchor_hash
