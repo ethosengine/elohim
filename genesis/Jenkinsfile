@@ -1861,9 +1861,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         sh "bash '${env.WORKSPACE}/genesis/scripts/ci/wait-storage-ready.sh' '${doorwayHost}'"
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             // CONDUCTOR_URLS: custody pairs resolve agent keys from each
-                            // human's OWN conductor (seeder node-identity.ts).
+                            // human's OWN conductor (seeder node-identity.ts). Read the list
+                            // BEFORE dir(): getConductorAppUrls() finds deployments.json by a
+                            // workspace-relative path, and inside genesis/seeder it missed the
+                            // file and fell back to three hard-coded peers (genesis #1626: james
+                            // had no entry, 4 of 7 pairs skipped).
+                            def custodyConductorUrls = getConductorAppUrls() ?: ''
                             dir('genesis/seeder') {
-                                withEnv(["CONDUCTOR_URLS=${getConductorAppUrls() ?: ''}"]) {
+                                withEnv(["CONDUCTOR_URLS=${custodyConductorUrls}"]) {
                                     sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
                                 }
                             }

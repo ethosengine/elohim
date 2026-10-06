@@ -29,7 +29,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { DoorwayClient } from './doorway-client.js';
+import { DoorwayClient, type HealthStatus } from './doorway-client.js';
 import { deterministicPeerId, storageUrlForHuman, type Archetype } from './peer-id.js';
 import { LAMAD_ROUTE_CLAIMS, type RouteClaimTemplate } from './generated/route-claims.js';
 
@@ -862,6 +862,71 @@ export function groupSpecsByAuthor(
 }
 
 // =============================================================================
+// Authoring-peer readiness — a bounded wait, not a first-read verdict
+// =============================================================================
+
+/**
+ * How long the seeder waits for its authoring peer's conductor to connect.
+ * A fleet roll leaves a storage peer answering /health with 0/0 workers for
+ * many minutes; failing on the first read turned that window into a red stage.
+ * Override with PROJECTION_AUTHOR_WAIT_SECONDS.
+ */
+export const AUTHOR_PEER_WAIT_DEFAULT_SECONDS = 600;
+export const AUTHOR_PEER_POLL_INTERVAL_MS = 10_000;
+const AUTHOR_PEER_PROGRESS_EVERY_MS = 60_000;
+
+export interface AuthorPeerWaitDeps {
+  /** One health read; `healthy` keeps checkHealth()'s meaning (conductor connected). */
+  checkHealth: () => Promise<HealthStatus>;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  log?: (line: string) => void;
+  timeoutMs?: number;
+  intervalMs?: number;
+}
+
+export type AuthorPeerWaitResult =
+  | { ok: true; polls: number; waitedMs: number }
+  | { ok: false; polls: number; waitedMs: number; error: string };
+
+export function authorPeerWaitTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PROJECTION_AUTHOR_WAIT_SECONDS;
+  const seconds = raw === undefined || raw === '' ? Number.NaN : Number(raw);
+  return (Number.isFinite(seconds) && seconds >= 0 ? seconds : AUTHOR_PEER_WAIT_DEFAULT_SECONDS) * 1000;
+}
+
+/** Poll the authoring peer until its conductor is connected, or the bound expires. */
+export async function waitForAuthorPeerHealthy(
+  authorUrl: string,
+  deps: AuthorPeerWaitDeps,
+): Promise<AuthorPeerWaitResult> {
+  const now = deps.now ?? Date.now;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const timeoutMs = deps.timeoutMs ?? authorPeerWaitTimeoutMs();
+  const intervalMs = deps.intervalMs ?? AUTHOR_PEER_POLL_INTERVAL_MS;
+  const started = now();
+  let nextProgress = started + AUTHOR_PEER_PROGRESS_EVERY_MS;
+  let polls = 0;
+  for (;;) {
+    const health = await deps.checkHealth();
+    polls += 1;
+    const waitedMs = now() - started;
+    if (health.healthy) return { ok: true, polls, waitedMs };
+    const error = health.error ?? 'not healthy';
+    if (waitedMs >= timeoutMs) return { ok: false, polls, waitedMs, error };
+    if (now() >= nextProgress) {
+      log(
+        `  waiting for authoring peer ${authorUrl} — ${error} ` +
+          `(${Math.round(waitedMs / 1000)}s of ${Math.round(timeoutMs / 1000)}s)`,
+      );
+      nextProgress += AUTHOR_PEER_PROGRESS_EVERY_MS;
+    }
+    await sleep(Math.min(intervalMs, Math.max(0, timeoutMs - waitedMs)));
+  }
+}
+
+// =============================================================================
 // Standalone execution
 // =============================================================================
 
@@ -898,10 +963,20 @@ if (isMain) {
 
   for (const [authorUrl, group] of groups) {
     const client = new ProjectionClient({ baseUrl: authorUrl, apiKey });
-    const health = await client.checkHealth();
-    if (!health.healthy) {
-      console.error(`ERROR: authoring peer ${authorUrl} not healthy — ${health.error}`);
+    const ready = await waitForAuthorPeerHealthy(authorUrl, {
+      checkHealth: () => client.checkHealth(),
+    });
+    if (!ready.ok) {
+      console.error(
+        `ERROR: authoring peer ${authorUrl} not healthy — ${ready.error} ` +
+          `(waited ${Math.round(ready.waitedMs / 1000)}s over ${ready.polls} polls)`,
+      );
       process.exit(1);
+    }
+    if (ready.polls > 1) {
+      console.log(
+        `  authoring peer ${authorUrl} healthy after ${Math.round(ready.waitedMs / 1000)}s (${ready.polls} polls)`,
+      );
     }
     await seedProjections(client, group);
   }

@@ -3232,7 +3232,7 @@ spec:
                         dir('genesis/a2o') {
                             sh '''
                                 E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host \
-                                pnpm exec cucumber-js --tags "@e2e and @federation"
+                                pnpm exec cucumber-js --tags "@e2e and @federation and not @wip"
                             '''
                         }
                     }

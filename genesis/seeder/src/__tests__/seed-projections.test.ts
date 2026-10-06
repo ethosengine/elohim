@@ -17,6 +17,9 @@ import {
   type ProjectionRelevantMetadata,
   type EprProjectionViewLite,
   groupSpecsByAuthor,
+  waitForAuthorPeerHealthy,
+  authorPeerWaitTimeoutMs,
+  AUTHOR_PEER_WAIT_DEFAULT_SECONDS,
 } from '../seed-projections.js';
 
 
@@ -515,5 +518,64 @@ describe('project-epr authoring route + id generation (double-root cure)', () =>
     expect(regen).toMatch(/^project-epr-[0-9a-f]{16}$/);
     // generation 1 is the original id (no suffix in the digest)
     expect(baseProjectionId({ ...landing, idGeneration: 1 })).toBe('project-epr-98f0d59051751497');
+  });
+});
+
+describe('waitForAuthorPeerHealthy', () => {
+  function fakeClock() {
+    let t = 0;
+    return {
+      now: () => t,
+      sleep: async (ms: number) => {
+        t += ms;
+      },
+    };
+  }
+  const down = { healthy: false, cacheEnabled: false, error: 'Conductor not connected (0/0 workers)' };
+  const up = { healthy: true, cacheEnabled: true };
+
+  it('proceeds once the conductor connects on the 3rd poll', async () => {
+    const clock = fakeClock();
+    const checkHealth = vi
+      .fn()
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(up);
+    const result = await waitForAuthorPeerHealthy('http://peer:8090', {
+      checkHealth,
+      ...clock,
+      log: () => {},
+      timeoutMs: 600_000,
+      intervalMs: 10_000,
+    });
+    expect(result).toEqual({ ok: true, polls: 3, waitedMs: 20_000 });
+    expect(checkHealth).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails after the bound with the waited time, one progress line per minute', async () => {
+    const clock = fakeClock();
+    const lines: string[] = [];
+    const checkHealth = vi.fn().mockResolvedValue(down);
+    const result = await waitForAuthorPeerHealthy('http://peer:8090', {
+      checkHealth,
+      ...clock,
+      log: (l) => lines.push(l),
+      timeoutMs: 600_000,
+      intervalMs: 10_000,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.waitedMs).toBe(600_000);
+    expect(result.error).toBe('Conductor not connected (0/0 workers)');
+    expect(checkHealth).toHaveBeenCalledTimes(61);
+    expect(lines).toHaveLength(9);
+    expect(lines[0]).toContain('60s of 600s');
+  });
+
+  it('reads the bound from PROJECTION_AUTHOR_WAIT_SECONDS, defaulting to 600 s', () => {
+    expect(AUTHOR_PEER_WAIT_DEFAULT_SECONDS).toBe(600);
+    expect(authorPeerWaitTimeoutMs({})).toBe(600_000);
+    expect(authorPeerWaitTimeoutMs({ PROJECTION_AUTHOR_WAIT_SECONDS: '30' })).toBe(30_000);
+    expect(authorPeerWaitTimeoutMs({ PROJECTION_AUTHOR_WAIT_SECONDS: 'junk' })).toBe(600_000);
   });
 });
