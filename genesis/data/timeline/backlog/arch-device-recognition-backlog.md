@@ -638,6 +638,17 @@ Each dial: the reviewer's attack, the fix that would close it, and what it would
       origin.
     - *Cost:* none.
 
+## Row 20 — CI seeders read a node's agent key from the route Row 15 closed (found on the fleet, 2026-10-06)
+
+Closing the active-session fallback to callers from another machine also closed it to the genesis
+seeders, which call `GET <pod>:8090/auth/me` with no cookie to learn each household node's agent
+key. elohim-genesis #1624: `Seed Custody Commitments` 0 of 7 created, every pair `/auth/me returned
+HTTP 401`; two custody legs of `Verify Substrate Propagation` red in consequence. The hardening
+stands; how a seeder on another machine learns which agent a node speaks as is an open design
+question with four options and a recommendation in
+`genesis/data/timeline/backlog/genesis-seeders-read-node-agent-key-from-closed-auth-me.md`.
+Probe: the custody stage seeds 7 of 7 and both custody legs pass in one genesis build.
+
 ## shift_objective
 
 ```
