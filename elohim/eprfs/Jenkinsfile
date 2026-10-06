@@ -100,6 +100,11 @@ spec:
       steps {
         container('builder') {
           dir('elohim/eprfs') {
+            // Rust is the version declared in elohim/epr/rust-toolchain.toml, the same one
+            // the local gate pins, so clippy here is the clippy the gate ran. The former
+            // double_must_use allowance existed only because the flake floated to 1.99.
+            // Keep comments OUT of the block below: it is one single-quoted bash -c string,
+            // and an apostrophe in a comment ends it (elohim-eprfs #47: Syntax error).
             sh '''
               nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
                 set -euo pipefail
@@ -107,10 +112,6 @@ spec:
                 export RUSTC_WRAPPER=""
                 cargo --version
                 cargo fmt --check
-                # Rust is the version declared in elohim/epr/rust-toolchain.toml (= the
-                # local gate's pin), so clippy here is the clippy the gate ran. The former
-                # `-A clippy::double_must_use` allowance existed only because the flake
-                # floated to clippy 1.99; that lint does not fire on 1.96.1.
                 cargo clippy --workspace --all-targets -- -D warnings
               '
             '''
