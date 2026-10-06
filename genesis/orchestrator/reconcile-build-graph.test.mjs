@@ -11,7 +11,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { reconcile } from './reconcile-build-graph.mjs';
+import { describeSeedOutcomes, reconcile } from './reconcile-build-graph.mjs';
 
 // ── Fixtures ────────────────────────────────────────────────────────
 
@@ -378,6 +378,30 @@ describe('reconcile — stageAnnotations pointers', () => {
       r.investigationPointers.some(p => p.includes('seed-conductor-identities') && p.includes('partial') && p.includes('human-terrance-tutor')),
       `expected seed-conductor-identities partial pointer naming terrance; got ${JSON.stringify(r.investigationPointers)}`,
     );
+  });
+
+  it('lists non-succeeded humans by outcome — a conflict is named, never "(none listed)"', () => {
+    const line = describeSeedOutcomes({
+      results: [
+        { humanId: 'human-matthew-manager', result: 'conflict' },
+        { humanId: 'human-jessica-spouse', result: 'created' },
+        { humanId: 'human-terrance-tutor', result: 'failed' },
+        { humanId: 'human-james-son', result: 'skipped' },
+        { humanId: 'human-adam-elder', result: 'embodied', embodiedHumanId: '5f27bc9b' },
+      ],
+    });
+    assert.equal(
+      line,
+      'failed: human-terrance-tutor; conflict: human-matthew-manager; skipped: human-james-son; embodied: human-adam-elder→5f27bc9b',
+    );
+    // An `embodied` row is success: it never appears under failed/conflict/skipped.
+    assert.equal(
+      describeSeedOutcomes({ embodiedAs: { 'human-matthew-manager': '5f27bc9b' }, results: [{ humanId: 'human-matthew-manager', result: 'embodied' }] }),
+      'embodied: human-matthew-manager→5f27bc9b',
+    );
+    // Older artifacts (no embodied, nothing unsucceeded) stay legible.
+    assert.equal(describeSeedOutcomes({ results: [{ humanId: 'a', result: 'created' }] }), 'not succeeded: (none listed)');
+    assert.equal(describeSeedOutcomes({}), 'not succeeded: (none listed)');
   });
 
   it('omits stageAnnotations pointers when annotations are clean (allReady + allSucceeded)', () => {

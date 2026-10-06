@@ -29,6 +29,7 @@ import {
   planRunClasses,
   loadPipelineRegistry,
 } from "./pipeline-registry.mjs";
+import * as registry from "./pipeline-registry.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -214,7 +215,8 @@ describe("Groovy mirrors carry the class", () => {
   });
 
   test("build-graph.groovy returns the derived class per pipeline and the tag selections", () => {
-    assert.match(buildGraph, /runClasses: deriveRunClasses\(pipelineSteps, graph\)/);
+    assert.match(buildGraph, /def runClasses = deriveRunClasses\(pipelineSteps, graph\)/);
+    assert.match(buildGraph, /runClasses: runClasses,/);
     assert.match(buildGraph, /runClassSelections: runClassSelections\(graph\)/);
     assert.match(buildGraph, /stepClasses: stepClassesOf\(manifest\.steps\)/);
   });
@@ -275,5 +277,52 @@ describe("edge declares RUN_CLASS and reads verify as validate-only", () => {
     const def = topLevelDef(edge, "computeValidateOnly");
     assert.match(def, /params\.RUN_CLASS \?: 'build'/);
     assert.match(def, /runClass == 'verify'/);
+  });
+});
+
+describe("manifest-only change caps the run class at verify", () => {
+  const { planRunClasses, capManifestOnly, manifestOnlyLine } = registry;
+  const stepClasses = { "elohim-edge": { "build-image": "build", "deploy-alpha": "deploy" }, genesis: { probe: "measure" } };
+  const staleSteps = { "elohim-edge": ["build-image", "deploy-alpha"], genesis: ["probe"] };
+
+  test("manifest-only → verify", () => {
+    const plan = planRunClasses({ staleSteps, stepClasses, triggerFiles: { "elohim-edge": ["elohim/holochain/build-manifest.json"] } });
+    assert.equal(plan["elohim-edge"], "verify");
+  });
+
+  test("manifest + source → unchanged", () => {
+    const plan = planRunClasses({
+      staleSteps, stepClasses,
+      triggerFiles: { "elohim-edge": ["elohim/holochain/build-manifest.json", "elohim/holochain/Dockerfile"] },
+    });
+    assert.equal(plan["elohim-edge"], "build");
+  });
+
+  test("forced → unchanged", () => {
+    const plan = planRunClasses({
+      staleSteps, stepClasses, forced: ["elohim-edge"],
+      triggerFiles: { "elohim-edge": ["elohim/holochain/build-manifest.json"] },
+    });
+    assert.equal(plan["elohim-edge"], "build");
+    assert.equal(capManifestOnly("deploy", ["build-manifest.json"], { forced: true }), "deploy");
+  });
+
+  test("a pipeline already below verify → unchanged (never raised)", () => {
+    const plan = planRunClasses({ staleSteps, stepClasses, triggerFiles: { genesis: ["genesis/build-manifest.json"] } });
+    assert.equal(plan.genesis, "measure");
+    assert.equal(capManifestOnly("profile", ["build-manifest.json"]), "profile");
+  });
+
+  test("no trigger files (build-process/propagated) → unchanged", () => {
+    assert.equal(capManifestOnly("build", []), "build");
+    assert.equal(capManifestOnly("build", undefined), "build");
+  });
+
+  test("plan line and Groovy helper names are pinned", () => {
+    assert.equal(manifestOnlyLine("elohim-edge"), "RUN-CLASS elohim-edge: manifest-only change → verify (no build, no deploy)");
+    assert.match(buildGraph, /def manifestOnlyPipelines\(Map pipelineSteps, Map graph, Map staleMap, List changedFiles\)/);
+    assert.match(buildGraph, /def capManifestOnlyRunClasses\(Map runClasses, Set manifestOnly\)/);
+    assert.match(buildGraph, /RUN-CLASS \$\{p\}: manifest-only change → verify \(no build, no deploy\)/);
+    assert.match(buildGraph, /RUN-CLASS cap skipped: /);
   });
 });

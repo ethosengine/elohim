@@ -67,6 +67,30 @@ export function deriveRunClass(classes) {
   return best;
 }
 
+/**
+ * Manifest-only cap. When every changed file that made any of a pipeline's
+ * steps stale is a build-manifest.json, nothing it builds or deploys changed:
+ * its run class is capped at verify (never raised). A forced dispatch is never
+ * capped, and an empty trigger set (stale by build-process or propagation) is
+ * not manifest-only. Mirrors build-graph.groovy manifestOnlyPipelines +
+ * capManifestOnlyRunClasses.
+ */
+export const MANIFEST_ONLY_CAP = 'verify';
+
+export function isManifestOnly(triggerFiles) {
+  return Array.isArray(triggerFiles) && triggerFiles.length > 0 &&
+    triggerFiles.every((f) => f === 'build-manifest.json' || f.endsWith('/build-manifest.json'));
+}
+
+export function capManifestOnly(runClass, triggerFiles, { forced = false } = {}) {
+  if (forced || !runClass || !isManifestOnly(triggerFiles)) return runClass;
+  return runClassRank(runClass) > runClassRank(MANIFEST_ONLY_CAP) ? MANIFEST_ONLY_CAP : runClass;
+}
+
+export function manifestOnlyLine(pipeline) {
+  return `RUN-CLASS ${pipeline}: manifest-only change → verify (no build, no deploy)`;
+}
+
 /** Does a run of `runClass` execute a step of `cls`? (at or below it) */
 export function classAllows(runClass, cls) {
   return runClassRank(cls) <= runClassRank(runClass);
@@ -91,7 +115,7 @@ export function parseRunClassTag(message) {
  * @param {string[]} [args.forced]  `[build:*]` pipelines — always build
  * @returns {Record<string,string>} pipeline → run class
  */
-export function planRunClasses({ staleSteps = {}, stepClasses = {}, tag = null, forced = [] }) {
+export function planRunClasses({ staleSteps = {}, stepClasses = {}, tag = null, forced = [], triggerFiles = {} }) {
   const plan = {};
   if (tag) {
     for (const [pipeline, steps] of Object.entries(stepClasses)) {
@@ -100,7 +124,7 @@ export function planRunClasses({ staleSteps = {}, stepClasses = {}, tag = null, 
   } else {
     for (const [pipeline, steps] of Object.entries(staleSteps)) {
       const cls = deriveRunClass(steps.map((s) => stepClasses[pipeline]?.[s]));
-      if (cls) plan[pipeline] = cls;
+      if (cls) plan[pipeline] = capManifestOnly(cls, triggerFiles[pipeline], { forced: forced.includes(pipeline) });
     }
   }
   for (const pipeline of forced) plan[pipeline] = DEFAULT_RUN_CLASS;

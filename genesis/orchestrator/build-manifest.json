@@ -34,6 +34,10 @@
       "orchestrator": {
         "dir": "genesis/orchestrator",
         "steps": ["lint-jenkinsfiles"],
+        "inputs": {
+          "sources": ["**/Cargo.toml", "**/Cargo.lock", "**/build-manifest.json"],
+          "buildProcess": ["genesis/orchestrator/build-inputs-closure.test.mjs"]
+        },
         "run": { "kind": "just", "recipe": "gate" }
       },
       "rakia-codegen": {

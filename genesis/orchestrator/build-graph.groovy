@@ -467,6 +467,60 @@ def deriveRunClasses(Map pipelineSteps, Map graph) {
     return out
 }
 
+// A manifest-only change caps a pipeline at verify: when every changed file
+// that made any of its stale steps stale is a build-manifest.json, nothing it
+// builds or deploys changed. Conservative: a step stale by build-process hash
+// or by propagation (reason not "source:"), or one with a stale dependency,
+// leaves its pipeline uncapped. Forced pipelines are reset to build by the
+// orchestrator after this. JS mirror: capManifestOnly in pipeline-registry.mjs.
+@NonCPS
+def manifestOnlyPipelines(Map pipelineSteps, Map graph, Map staleMap, List changedFiles) {
+    def out = [] as Set
+    for (def entry : pipelineSteps.entrySet()) {
+        String pipeline = entry.key.toString()
+        boolean onlyManifests = true
+        int triggers = 0
+        for (def localName : entry.value) {
+            String q = "${pipeline}:${localName}".toString()
+            def step = graph.steps[q]
+            String reason = staleMap[q]?.reason?.toString() ?: ''
+            if (step == null || !reason.startsWith('source:')) { onlyManifests = false; break }
+            for (def dep : (step.depends ?: [])) {
+                if (staleMap[dep.toString()]?.stale) { onlyManifests = false; break }
+            }
+            if (!onlyManifests) break
+            for (def file : (changedFiles ?: [])) {
+                String f = file.toString()
+                for (def pattern : (step.inputs?.sources ?: [])) {
+                    if (matchesGlob(f, pattern.toString())) {
+                        triggers++
+                        if (f != 'build-manifest.json' && !f.endsWith('/build-manifest.json')) onlyManifests = false
+                        break
+                    }
+                }
+            }
+            if (!onlyManifests) break
+        }
+        if (onlyManifests && triggers > 0) out.add(pipeline)
+    }
+    return out
+}
+
+/** Caps each manifest-only pipeline at verify (never raises); returns the plan lines. */
+@NonCPS
+def capManifestOnlyRunClasses(Map runClasses, Set manifestOnly) {
+    def lines = []
+    for (def pipeline : manifestOnly) {
+        String p = pipeline.toString()
+        String cls = runClasses[p] ?: 'build'
+        if (runClassRank(cls) > runClassRank('verify')) {
+            runClasses[p] = 'verify'
+            lines.add("RUN-CLASS ${p}: manifest-only change → verify (no build, no deploy)".toString())
+        }
+    }
+    return lines
+}
+
 /**
  * [run:<cls>] tag → the non-manual pipelines declaring at least one step at or
  * below <cls>. Only the three sub-deploy classes are run tags.
@@ -784,6 +838,16 @@ def walkBuildGraph(List changedFiles) {
     def pipelineSteps = groupByPipeline(staleSteps, graph)
 
     echo "Rebuild set: ${staleSteps.size()} steps across ${pipelineSteps.size()} pipelines"
+    def runClasses = deriveRunClasses(pipelineSteps, graph)
+    try {
+        def capLines = capManifestOnlyRunClasses(runClasses, manifestOnlyPipelines(pipelineSteps, graph, staleMap, changedFiles))
+        for (int i = 0; i < capLines.size(); i++) {
+            echo capLines[i]
+        }
+    } catch (Exception e) {
+        echo "RUN-CLASS cap skipped: ${e.message}"
+        runClasses = deriveRunClasses(pipelineSteps, graph)
+    }
     if (levels) {
         levels.eachWithIndex { level, i ->
             echo "  Level ${i}: ${level.join(', ')}"
@@ -837,7 +901,7 @@ def walkBuildGraph(List changedFiles) {
         staleSteps: staleSteps,
         levels: levels,
         pipelineSteps: pipelineSteps,
-        runClasses: deriveRunClasses(pipelineSteps, graph),
+        runClasses: runClasses,
         runClassSelections: runClassSelections(graph),
         buildProcessHashes: buildProcessHashes,
         previousState: buildState,

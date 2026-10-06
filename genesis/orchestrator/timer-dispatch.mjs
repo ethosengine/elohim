@@ -228,6 +228,23 @@ export function defaultDeps(root = REPO_ROOT) {
       if (content === null) return null;
       return content.longRunning === true ? 'dispatch-only' : 'verdict';
     },
+    /**
+     * The verdict a dispatch-only pipeline's build of `sha` reached AFTER the run
+     * that dispatched it ended ('SUCCESS' | 'FAILURE' | 'ABORTED' | … | null).
+     * Read from pipeline-verdicts.json in the orchestrator's working directory,
+     * `{<pipeline>: {sha, result, build?}}`, written by the run that reads the
+     * downstream job's result. Absent file, absent row or a row for another sha
+     * is null — no evidence, and KEPT stays KEPT.
+     */
+    recordedVerdict(name, sha) {
+      try {
+        const rows = JSON.parse(readFileSync(resolve(process.cwd(), 'pipeline-verdicts.json'), 'utf8'));
+        const row = rows?.[name];
+        return row && row.sha === sha && typeof row.result === 'string' ? row.result : null;
+      } catch {
+        return null;
+      }
+    },
     /** dependsOn exactly as needsDetachedDependencyBarrier reads it. */
     async dependsOn(name) {
       const content = await metaOf(name);
@@ -327,7 +344,18 @@ export async function planNarrowGroups(state = {}, deps = defaultDeps()) {
         notes[name] = 'no build-manifest.json in this checkout — baseline provenance unknown';
         continue;
       }
-      provenance[name] = prov;
+      // Evidence, not an exception to the rule: a dispatch-only producer whose
+      // build OF THIS baseline later finished SUCCESS is as proven as one that was
+      // waited on. Any other verdict, or none, leaves it dispatch-only (KEPT when
+      // a survivor reaches it). Input changes since the baseline still dispatch it:
+      // the walker, not provenance, decides that.
+      if (prov === 'dispatch-only' && typeof deps.recordedVerdict === 'function' &&
+          deps.recordedVerdict(name, baseline) === 'SUCCESS') {
+        provenance[name] = 'verdict-recorded';
+        notes[name] = `dispatch-only, but its build of ${baseline.slice(0, 8)} was later recorded SUCCESS`;
+      } else {
+        provenance[name] = prov;
+      }
       if (!groups[baseline]) {
         groups[baseline] = { changedFiles: deps.changedFiles(baseline, headSha), pipelines: [] };
       }
@@ -454,7 +482,9 @@ export async function decideDispatch(state = {}, plan = {}, walks = {}, deps = d
     const proof =
       provenance[name] === 'dispatch-only'
         ? 'dispatched (longRunning: verdict never recorded), nothing surviving needs it'
-        : 'built green';
+        : provenance[name] === 'verdict-recorded'
+          ? 'dispatched (longRunning) and its verdict was later recorded SUCCESS'
+          : 'built green';
     logLines.push(
       `⏭️  ${trigger} already-built filter: ${name} skipped — baseline ` +
         `${baselineOf.get(name).slice(0, 8)} ${proof}, no watched input changed since ` +
