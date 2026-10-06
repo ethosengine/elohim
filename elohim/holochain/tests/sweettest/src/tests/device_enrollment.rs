@@ -821,6 +821,7 @@ async fn a_node_with_its_own_identity_joins_as_it_is(
 /// while still verifying at an authenticated earlier moment.
 async fn every_device_speaks_for_its_person(
     c: &SweetConductor,
+    attacks: &mut Attacks,
     cells: &[(SweetCell, SweetCell, SweetCell)],
     operator: &AgentPubKey,
     authority: &Receipt,
@@ -848,7 +849,7 @@ async fn every_device_speaks_for_its_person(
     };
 
     // B joins, approved by the root.
-    let (b, _) = enroll_by(
+    let (b, b_binding) = enroll_by(
         c,
         &[(root, None)],
         &bee.1,
@@ -937,7 +938,7 @@ async fn every_device_speaks_for_its_person(
 
     // The root and B approve two new devices at once; neither holds up the
     // other, and the authority does not move.
-    let (t, _) = enroll_by(
+    let (t, t_binding) = enroll_by(
         c,
         &[(root, None)],
         &tee.1,
@@ -1083,6 +1084,71 @@ async fn every_device_speaks_for_its_person(
         devices.devices.len()
     );
 
+    // Adversarial review, medium 7: discovery links from anyone are not
+    // followed. An agent that is not the person's floods the identity root
+    // with device| links and T's record with affirmed| links, past both caps.
+    let flooder = &cells[3].1;
+    let link = |base: AnyLinkableHash, target: &ActionHash, tag: String| {
+        ActionData::CreateLink(CreateLinkData {
+            base_address: base,
+            target_address: target.clone().into(),
+            zome_index: ZomeIndex(0),
+            link_type: LinkType(23),
+            tag: LinkTag::new(tag),
+        })
+    };
+    // Each link points somewhere new (the flooder's previous action), so none
+    // collapses into another.
+    let mut target = t.action_hash.clone();
+    for n in 0..65 {
+        let data = link(human.clone().into(), &target, format!("device|{n}"));
+        target = attacks.write(c, flooder, data, None).await;
+    }
+    for n in 0..33 {
+        let data = link(
+            t.action_hash.clone().into(),
+            &target,
+            format!("affirmed|{n}"),
+        );
+        target = attacks.write(c, flooder, data, None).await;
+    }
+    // A device that joins after the flood is still found, and a real
+    // affirmation of T still counts.
+    let (e, _) = enroll_by(
+        c,
+        &[(root, None)],
+        &eve.1,
+        intent_for(&eve.1, authority, human, content, 206),
+    )
+    .await
+    .expect("the root approves E after the flood");
+    let _: Receipt = c
+        .call(
+            &bee.1.zome("mishpat"),
+            "affirm_identity_device",
+            query(&t, &tee.1, content),
+        )
+        .await;
+    let devices = read().await;
+    assert!(
+        devices
+            .devices
+            .iter()
+            .any(|d| d.device_key == *eve.1.agent_pubkey() && d.binding == e.action_hash),
+        "a device that joins after a link flood is still listed"
+    );
+    let of_t = devices
+        .devices
+        .iter()
+        .find(|d| d.device_key == *tee.1.agent_pubkey())
+        .unwrap();
+    assert_eq!(
+        of_t.affirmed_by,
+        vec![bee_key.clone()],
+        "a speaker's affirmation still counts under a flood of others' links"
+    );
+    eprintln!("every-device: device| and affirmed| floods from a non-speaker hide nothing");
+
     // Revocation: the root withdraws B.
     let before = Timestamp::now();
     let mut revocation = DeviceRevocation {
@@ -1154,6 +1220,122 @@ async fn every_device_speaks_for_its_person(
         .await;
     eprintln!(
         "every-device: revoked B cannot approve; C verifies before the revocation and not now"
+    );
+
+    // Adversarial review, critical 1: a revoked joining record does not come
+    // back by being republished with other unsigned contents.
+    let stands = |receipt: ActionHash, device: AgentPubKey| {
+        let content = content.clone();
+        async move {
+            c.call_fallible::<_, VerifiedDevice>(
+                &cells[2].1.zome("mishpat"),
+                "verify_device_binding",
+                VerifyDeviceInput {
+                    binding: receipt,
+                    expected_device: device,
+                    expected_content_dna: content,
+                },
+            )
+            .await
+            .is_ok()
+        }
+    };
+    // (a) B's record, approved by the root alone, with a junk approver
+    // record added: a new entry hash, no revocation link on it.
+    let mut rewrapped = b_binding.clone();
+    rewrapped.approved_via = vec![ApprovedVia {
+        agent: dee.1.agent_pubkey().clone(),
+        binding: d.action_hash.clone(),
+    }];
+    assert!(
+        c.call_fallible::<_, Receipt>(
+            &bee.1.zome("mishpat"),
+            "enroll_identity_device",
+            rewrapped.clone(),
+        )
+        .await
+        .is_err(),
+        "a revoked device cannot rejoin by a rewrapped record"
+    );
+    // Published around the zome's checks, by B's own chain, it does not stand.
+    let raw_rewrap = attacks
+        .commitment(
+            c,
+            &bee.1,
+            RawCommitment {
+                action: "binds-identity".into(),
+                payload_json: serde_json::to_string(&rewrapped).unwrap(),
+                signed_at: rewrapped.intent.issued_at.as_micros().to_string(),
+            },
+        )
+        .await;
+    assert!(
+        !stands(raw_rewrap.clone(), bee_key.clone()).await,
+        "the rewrapped record of a revoked device does not stand"
+    );
+    // (b) A second record of B's key, honestly approved by the root after the
+    // revocation (exact unsigned parts, so only the device anchor refuses it).
+    assert!(
+        enroll_by(
+            c,
+            &[(root, None)],
+            &bee.1,
+            intent_for(&bee.1, authority, human, content, 207),
+        )
+        .await
+        .is_err(),
+        "a revoked device is not joined again by a new record of its key"
+    );
+    // (c) The via-rewrap: C, approved by revoked B, republished by C's own
+    // chain naming the rewrapped B as the record B speaks through.
+    let mut c_rewrapped = c_binding.clone();
+    c_rewrapped.approved_via = vec![ApprovedVia {
+        agent: bee_key.clone(),
+        binding: raw_rewrap.clone(),
+    }];
+    assert!(c
+        .call_fallible::<_, Receipt>(
+            &cee.1.zome("mishpat"),
+            "enroll_identity_device",
+            c_rewrapped.clone(),
+        )
+        .await
+        .is_err());
+    let raw_c = attacks
+        .commitment(
+            c,
+            &cee.1,
+            RawCommitment {
+                action: "binds-identity".into(),
+                payload_json: serde_json::to_string(&c_rewrapped).unwrap(),
+                signed_at: c_rewrapped.intent.issued_at.as_micros().to_string(),
+            },
+        )
+        .await;
+    assert!(
+        !stands(raw_c, cee.1.agent_pubkey().clone()).await,
+        "what a revoked device approved does not come back through a rewrap"
+    );
+    // (d) A copy of the root-approved T published by another chain is not a
+    // joining record: a device joins itself.
+    let copied = attacks
+        .commitment(
+            c,
+            &eve.1,
+            RawCommitment {
+                action: "binds-identity".into(),
+                payload_json: serde_json::to_string(&t_binding).unwrap(),
+                signed_at: t_binding.intent.issued_at.as_micros().to_string(),
+            },
+        )
+        .await;
+    assert!(
+        !stands(copied, tee.1.agent_pubkey().clone()).await,
+        "a joining record published by another chain does not stand"
+    );
+    eprintln!(
+        "every-device: rewrapped, re-joined, via-rewrapped and copied records of a revoked or \
+         another device all refuse"
     );
 }
 
@@ -1385,7 +1567,16 @@ async fn device_enrollment_proof() -> Result<()> {
         &c, &cells, &operator, &authority, &human, &content,
     )
     .await;
-    every_device_speaks_for_its_person(&c, &cells, &operator, &authority, &human, &content).await;
+    every_device_speaks_for_its_person(
+        &c,
+        &mut attacks,
+        &cells,
+        &operator,
+        &authority,
+        &human,
+        &content,
+    )
+    .await;
     let (che_binding, signed_binding) = enroll(
         &c,
         &cells[0].1,

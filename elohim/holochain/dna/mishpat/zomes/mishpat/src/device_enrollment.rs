@@ -209,8 +209,19 @@ fn classify_approvers(
     via: &[ApprovedVia],
 ) -> Result<Vec<Approver>, String> {
     let required = threshold(&authority.controller_policy, &authority.controllers)?;
-    if via.len() > proofs.len() {
-        return Err("more approvers named than approved".into());
+    // The unsigned part of a record says exactly one thing per device
+    // approver, in the order they approved, and nothing else: a record cannot
+    // be republished with other unsigned contents and still stand.
+    let devices: Vec<&AgentPubKey> = proofs
+        .iter()
+        .map(|p| &p.agent)
+        .filter(|a| !authority.controllers.contains(a))
+        .collect();
+    if via.len() != devices.len() || via.iter().zip(&devices).any(|(v, a)| &v.agent != *a) {
+        return Err(
+            "approved_via must name exactly the device approvers, in the order they approved"
+                .into(),
+        );
     }
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::with_capacity(proofs.len());
@@ -357,6 +368,74 @@ fn binding_proofs(
     check_approvals(authority, binding, walk, depth)
 }
 
+/// Where a device's revocations are found: one anchor per device of an
+/// identity, from the identity root and the device key, the two facts every
+/// joining record of that device signs. Revocation withdraws the device's
+/// voice for the identity, not one record's bytes: a record republished with
+/// other unsigned parts (another `approved_via`, so another entry hash), or a
+/// second joining record of the same key, finds the same revocations. A
+/// revoked device does not come back by being joined again; re-enrolment is
+/// a design of its own (`supersedes`, not built).
+fn revocation_anchor(
+    identity_root: &ActionHash,
+    device_key: &AgentPubKey,
+) -> ExternResult<AnyLinkableHash> {
+    // The address of a Commitment that is never written: deterministic from
+    // the two signed facts, in the integrity zome's own entry encoding.
+    let anchor = Commitment {
+        action: "device-revocation-anchor".into(),
+        payload_json: String::from_utf8(bytes(&(identity_root, device_key))?)
+            .map_err(|_| refuse("identity encoding"))?,
+        signed_at: "device-revocation-anchor-v1".into(),
+    };
+    Ok(hash_entry(&EntryTypes::Commitment(anchor))?.into())
+}
+
+/// Whether `binding`'s device has been revoked for its identity by the
+/// controllers of `authority`, read under `mode`: now, any revocation
+/// refuses; at an authenticated moment, only one made at or before it.
+/// Revocations are found on the device's anchor and, for revocations made
+/// before the anchor existed, on the record's own entry; each is checked
+/// against the device and identity its target signed, never against bytes.
+fn device_revoked(
+    binding: &DeviceBinding,
+    entry: &Commitment,
+    authority: &Authority,
+    mode: Mode,
+) -> ExternResult<()> {
+    if matches!(mode, Mode::Structure) {
+        return Ok(());
+    }
+    let mut found = lifecycle(
+        revocation_anchor(&binding.intent.identity_root, &binding.intent.device_key)?,
+        &authority.controllers,
+    )?;
+    for target in lifecycle(hash_entry(entry)?, &authority.controllers)? {
+        if !found.contains(&target) {
+            found.push(target);
+        }
+    }
+    for target in found {
+        // A discovered lifecycle prerequisite that cannot be fetched is
+        // pending, never evidence of absence.
+        let (revocation_record, _, revocation): (_, _, DeviceRevocation) =
+            record(target, "revokes-commitment")?;
+        let (_, revoked) = binding_record(revocation.target.clone())?;
+        if revoked.intent.identity_root != binding.intent.identity_root
+            || revoked.intent.device_key != binding.intent.device_key
+        {
+            continue;
+        }
+        verify_revocation(&revocation, &revoked)?;
+        match mode {
+            Mode::At(at) if revocation_record.action().timestamp().as_micros() > at => {}
+            Mode::At(_) => return Err(refuse("device withdrawal preceded witnessed exercise")),
+            _ => return Err(refuse("device binding revoked")),
+        }
+    }
+    Ok(())
+}
+
 /// Whether the joining record at `hash` stands by the module's rule, under
 /// `walk`'s mode. Returns the record and the authority it stands under.
 fn binding_stands(
@@ -374,6 +453,11 @@ fn binding_stands(
     {
         return Err(refuse("noncanonical device binding envelope"));
     }
+    // A device joins itself: its record is on its own chain. A copy published
+    // by anyone else is not a joining record.
+    if native.action().author() != &binding.intent.device_key {
+        return Err(refuse("a joining record is published by its own device"));
+    }
     if let Mode::At(at) = walk.mode {
         if native.action().timestamp().as_micros() > at {
             return Err(refuse("device joining postdates the witnessed moment"));
@@ -381,25 +465,7 @@ fn binding_stands(
     }
     let authority = walk.authority(binding.intent.authority.clone())?;
     binding_proofs(&binding, &authority, walk, depth)?;
-    if !matches!(walk.mode, Mode::Structure) {
-        for target in lifecycle(hash_entry(&entry)?, &authority.controllers)? {
-            // A discovered lifecycle prerequisite that cannot be fetched is
-            // pending, never evidence of absence.
-            let (revocation_record, _, revocation): (_, _, DeviceRevocation) =
-                record(target, "revokes-commitment")?;
-            let (target_entry, _) = binding_record(revocation.target.clone())?;
-            if target_entry == entry {
-                verify_revocation(&revocation, &binding)?;
-                match walk.mode {
-                    Mode::At(at) if revocation_record.action().timestamp().as_micros() > at => {}
-                    Mode::At(_) => {
-                        return Err(refuse("device withdrawal preceded witnessed exercise"))
-                    }
-                    _ => return Err(refuse("device binding revoked")),
-                }
-            }
-        }
-    }
+    device_revoked(&binding, &entry, &authority, walk.mode)?;
     let found = (binding, authority);
     walk.stood(hash, &found);
     Ok(found)
@@ -477,11 +543,14 @@ fn authority_message(authority: &Authority) -> ExternResult<Vec<u8>> {
     unsigned.signatures.clear();
     bytes(&unsigned)
 }
-fn lifecycle(hash: EntryHash, controllers: &[AgentPubKey]) -> ExternResult<Vec<ActionHash>> {
+fn lifecycle(
+    hash: impl Into<AnyLinkableHash>,
+    controllers: &[AgentPubKey],
+) -> ExternResult<Vec<ActionHash>> {
     // Deleting a discoverability link cannot erase an authorized revocation or
     // policy successor. Generic link integrity does not protect deletion.
     let details = get_links_details(
-        LinkQuery::try_new(hash, LinkTypes::CommitmentByState)?,
+        LinkQuery::try_new(hash.into(), LinkTypes::CommitmentByState)?,
         GetStrategy::Network,
     )?
     .into_inner();
@@ -944,26 +1013,54 @@ pub struct IdentityDevices {
     pub truncated: bool,
 }
 
+/// Discovery links under `base` whose tag starts with `prefix`, with their
+/// authors: only links whose author `admits` names, at most `per_author`
+/// from one author and `cap` in all, earliest first. Discovery is not proof;
+/// filtering here keeps a flood from anyone from hiding the links that
+/// matter or costing a walk each.
 fn discovery(
     base: AnyLinkableHash,
     prefix: &str,
+    admits: &dyn Fn(&AgentPubKey) -> bool,
+    per_author: usize,
     cap: usize,
-) -> ExternResult<(Vec<ActionHash>, bool)> {
+) -> ExternResult<(Vec<(AgentPubKey, ActionHash)>, bool)> {
     let links = get_links(
         LinkQuery::try_new(base, LinkTypes::CommitmentByState)?,
         GetStrategy::Network,
     )?;
-    let mut targets: Vec<(Timestamp, ActionHash)> = links
+    let mut targets: Vec<(Timestamp, AgentPubKey, ActionHash)> = links
         .into_iter()
-        .filter(|l| l.tag.0.starts_with(prefix.as_bytes()))
-        .filter_map(|l| l.target.into_action_hash().map(|t| (l.timestamp, t)))
+        .filter(|l| l.tag.0.starts_with(prefix.as_bytes()) && admits(&l.author))
+        .filter_map(|l| {
+            l.target
+                .into_action_hash()
+                .map(|t| (l.timestamp, l.author, t))
+        })
         .collect();
-    targets.sort();
-    targets.dedup_by(|a, b| a.1 == b.1);
-    let truncated = targets.len() > cap;
-    targets.truncate(cap);
-    Ok((targets.into_iter().map(|(_, t)| t).collect(), truncated))
+    targets.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut kept: Vec<(AgentPubKey, ActionHash)> = Vec::new();
+    let mut truncated = false;
+    for (_, author, target) in targets {
+        if kept.iter().any(|(_, t)| t == &target) {
+            continue;
+        }
+        if kept.iter().filter(|(a, _)| a == &author).count() >= per_author {
+            continue;
+        }
+        if kept.len() >= cap {
+            truncated = true;
+            break;
+        }
+        kept.push((author, target));
+    }
+    Ok((kept, truncated))
 }
+
+/// How many discovery links one author's are followed: a device re-joins
+/// rarely; one affirmation per witness counts.
+const DEVICE_LINKS_PER_AUTHOR: usize = 2;
+const AFFIRMATIONS_PER_AUTHOR: usize = 1;
 
 /// Every device that speaks for the person rooted at `identity_root`, with
 /// who approved it and who has affirmed it. A read; bounded by
@@ -975,13 +1072,23 @@ pub fn identity_devices(identity_root: ActionHash) -> ExternResult<IdentityDevic
     let bootstrap = bootstrap_action(&human, dna_info()?.hash)?
         .ok_or_else(|| refuse("identity has no authority yet"))?;
     let authority = current_authority(current_successor(bootstrap)?)?;
-    let (targets, truncated) =
-        discovery(identity_root.clone().into(), "device|", MAX_DEVICE_LINKS)?;
+    // A device links its own joining record; anyone may write a link, so only
+    // a link whose author is the device the record joins is followed.
+    let (targets, truncated) = discovery(
+        identity_root.clone().into(),
+        "device|",
+        &|_| true,
+        DEVICE_LINKS_PER_AUTHOR,
+        MAX_DEVICE_LINKS,
+    )?;
     let mut devices: Vec<IdentityDevice> = Vec::new();
     let mut not_standing = 0u32;
-    for hash in targets {
+    for (author, hash) in targets {
         match binding_stands(hash.clone(), &mut Walk::new(Mode::Now), 0) {
-            Ok((binding, _)) if binding.intent.identity_root == identity_root => {
+            Ok((binding, _))
+                if binding.intent.identity_root == identity_root
+                    && binding.intent.device_key == author =>
+            {
                 if devices
                     .iter()
                     .any(|d| d.device_key == binding.intent.device_key)
@@ -1014,12 +1121,16 @@ pub fn identity_devices(identity_root: ActionHash) -> ExternResult<IdentityDevic
         .chain(devices.iter().map(|d| d.device_key.clone()))
         .collect();
     for device in devices.iter_mut() {
+        // Only a speaker's affirmation counts, so only a speaker's link is
+        // followed: links from anyone else cannot crowd them out.
         let (affirmations, _) = discovery(
             device.binding.clone().into(),
             "affirmed|",
+            &|author| speakers.contains(author),
+            AFFIRMATIONS_PER_AUTHOR,
             MAX_AFFIRMATION_LINKS,
         )?;
-        for action in affirmations {
+        for (_, action) in affirmations {
             let Ok(affirmation) = verify_device_affirmation(action) else {
                 continue;
             };
@@ -1311,6 +1422,56 @@ pub fn sign_device_approval(approval: DeviceApproval) -> ExternResult<DeviceAppr
 /// Whether a controller of the named identity signed this consent. Any holder
 /// of a consent can ask; the answer is recomputed here and trusts nothing the
 /// caller says about who the controllers are.
+/// A statement a node makes over the device-consent carrier, signed by its
+/// agent key so the receiver can tell which key says it from where
+/// (`consent_grant::carrier`). The bytes signed are fixed here and in
+/// `consent_grant::carrier::statement` alike: the domain, then kind, state,
+/// transport id and challenge, one per line.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarrierStatement {
+    pub kind: String,
+    pub state: String,
+    pub transport_id: String,
+    pub challenge: String,
+}
+
+const CARRIER_DOMAIN: &str = "elohim:device-carrier:v1:";
+const MAX_CARRIER_FIELD: usize = 128;
+
+fn carrier_statement_bytes(statement: &CarrierStatement) -> Result<Vec<u8>, &'static str> {
+    if !matches!(
+        statement.kind.as_str(),
+        "ask" | "listed" | "code" | "declined"
+    ) {
+        return Err("not a carrier statement kind");
+    }
+    let fits = |f: &str| f.len() <= MAX_CARRIER_FIELD && !f.contains('\n') && !f.contains('\r');
+    if !(fits(&statement.state) && fits(&statement.transport_id) && fits(&statement.challenge))
+        || statement.transport_id.is_empty()
+    {
+        return Err("carrier statement field malformed");
+    }
+    Ok(format!(
+        "{CARRIER_DOMAIN}{}\n{}\n{}\n{}",
+        statement.kind, statement.state, statement.transport_id, statement.challenge
+    )
+    .into_bytes())
+}
+
+/// Sign a carrier statement with this cell's key. Under the carrier's own
+/// domain only, so it cannot stand for an enrollment, an approval, a consent
+/// or anything else this key signs. Commits nothing.
+#[hdk_extern]
+pub fn sign_carrier_statement(statement: CarrierStatement) -> ExternResult<Proof> {
+    crate::invocation::authorize("sign_carrier_statement", &statement)?;
+    let message = carrier_statement_bytes(&statement).map_err(refuse)?;
+    let me = agent_info()?.agent_initial_pubkey;
+    Ok(Proof {
+        signature: hdk::ed25519::sign_raw(me.clone(), message)?,
+        agent: me,
+    })
+}
+
 #[hdk_extern]
 pub fn verify_device_consent(signed: SignedDeviceConsent) -> ExternResult<bool> {
     let message = consent_message(&signed.consent).map_err(refuse)?;
@@ -1335,7 +1496,18 @@ fn verify_binding(binding: &DeviceBinding) -> ExternResult<Authority> {
 }
 #[hdk_extern]
 pub fn enroll_identity_device(binding: DeviceBinding) -> ExternResult<CommitmentOutput> {
-    verify_binding(&binding)?;
+    if agent_info()?.agent_initial_pubkey != binding.intent.device_key {
+        return Err(refuse("a device enrolls itself, from its own chain"));
+    }
+    let authority = verify_binding(&binding)?;
+    // A revoked device is not joined again by a new record of the same key.
+    let unsigned = Commitment {
+        action: "binds-identity".into(),
+        payload_json: String::from_utf8(bytes(&binding)?)
+            .map_err(|_| refuse("identity encoding"))?,
+        signed_at: binding.intent.issued_at.as_micros().to_string(),
+    };
+    device_revoked(&binding, &unsigned, &authority, Mode::Now)?;
     let out = notarize(
         &binding,
         "binds-identity",
@@ -1420,6 +1592,14 @@ pub fn revoke_identity_device(revocation: DeviceRevocation) -> ExternResult<Comm
     )?;
     create_link(
         hash_entry(&entry)?,
+        out.action_hash.clone(),
+        LinkTypes::CommitmentByState,
+        LinkTag::new(format!("revoked|{}", sys_time()?.as_micros())),
+    )?;
+    // The device's own anchor: what every record of this device for this
+    // identity is read against (`device_revoked`).
+    create_link(
+        revocation_anchor(&binding.intent.identity_root, &binding.intent.device_key)?,
         out.action_hash.clone(),
         LinkTypes::CommitmentByState,
         LinkTag::new(format!("revoked|{}", sys_time()?.as_micros())),
@@ -1821,6 +2001,28 @@ mod tests {
         );
         assert!(classify_approvers(&authority, &i, &[approval(1)], &[via(2), via(3)]).is_err());
         assert!(classify_approvers(&authority, &i, &[], &[]).is_err());
+        // The rewrap (adversarial review, critical 1): a record approved by a
+        // root alone, republished with an unsigned junk approver record, is a
+        // new entry with none of the original's lifecycle. It no longer
+        // classifies: approved_via names exactly the device approvers.
+        assert!(classify_approvers(&authority, &i, &[approval(1)], &[via(2)]).is_err());
+        assert!(classify_approvers(&authority, &i, &[approval(1)], &[via(1)]).is_err());
+        // In the order they approved, and only theirs.
+        assert!(classify_approvers(
+            &authority,
+            &i,
+            &[approval(2), approval(3)],
+            &[via(3), via(2)]
+        )
+        .is_err());
+        assert!(classify_approvers(
+            &authority,
+            &i,
+            &[approval(1), approval(2)],
+            &[via(2), via(3)]
+        )
+        .is_err());
+        assert!(classify_approvers(&authority, &i, &[approval(1), approval(2)], &[via(2)]).is_ok());
     }
 
     #[test]
@@ -1844,6 +2046,25 @@ mod tests {
             &[via(3), via(4)]
         )
         .is_ok());
+    }
+
+    #[test]
+    fn a_carrier_statement_signs_only_its_own_shape() {
+        let st = |kind: &str, state: &str| CarrierStatement {
+            kind: kind.into(),
+            state: state.into(),
+            transport_id: "12D3KooWpeer".into(),
+            challenge: String::new(),
+        };
+        assert_eq!(
+            carrier_statement_bytes(&st("code", "s1")).unwrap(),
+            b"elohim:device-carrier:v1:code\ns1\n12D3KooWpeer\n".to_vec()
+        );
+        assert!(carrier_statement_bytes(&st("enroll", "s1")).is_err());
+        assert!(carrier_statement_bytes(&st("code", "a\nb")).is_err());
+        let mut no_peer = st("ask", "s1");
+        no_peer.transport_id.clear();
+        assert!(carrier_statement_bytes(&no_peer).is_err());
     }
 
     #[test]

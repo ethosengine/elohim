@@ -269,6 +269,10 @@ decisionPoints:
       the current read" is not built, because a joining record's time is author-chosen (a stolen revoked key
       could backdate); the sound anchor (a pre-revocation affirmation by an independent device) is recorded
       in arch-device-recognition-backlog row 12. Who may revoke stays root controllers only (row 13).
+      Revocations are found on the device's anchor (identity_root, device_key), so a record
+      republished with other unsigned parts, or a second record of the same key, is revoked too
+      (adversarial review 2026-10-06, row 16); approved_via must be exactly the device approvers and
+      a record stands only if its device published it.
   - id: C13
     status: partial
     justification: Graduated authority. A joined device speaks with the same voice as a root for approving
@@ -282,6 +286,34 @@ decisionPoints:
   - path: elohim/holochain/tests/sweettest/src/tests/device_enrollment.rs
     testName: independently_keyed_devices_share_one_human_and_revocation_cannot_be_erased
     kind: sweettest
+- name: sign_carrier_statement
+  kind: verdict-fn
+  sourceLocation:
+    file: src/device_enrollment.rs
+    modulePath: device_enrollment::sign_carrier_statement
+  summary: Signs one device-carrier statement (ask, listed, code, declined; state, transport id,
+    challenge) with this cell's key under the carrier's own domain, so a node on the private network
+    proves which key speaks from which transport id. Mandate-gated; commits nothing.
+  concernIds:
+  - id: C1
+    status: answered
+    justification: The statement names the speaker's own transport id; a receiver checks it against
+      the id the message arrived from, so one node's proof cannot stand for another's.
+  - id: C5
+    status: partial
+    justification: Fixed kinds, bounded single-line fields and a domain of its own; sign_for_agent and
+      create_lineage_commitment can still sign the same bytes with the same key (a recorded dial,
+      arch-device-recognition-backlog row 19, dial 4).
+  - id: C6a
+    status: answered
+    justification: One signature per call; one mandate grant.
+  - id: C6b
+    status: answered
+    justification: Nothing written but the mandate grant; deterministic bytes.
+  contractTests:
+  - path: elohim/holochain/dna/mishpat/zomes/mishpat/src/device_enrollment.rs
+    testName: a_carrier_statement_signs_only_its_own_shape
+    kind: unit
 - name: classify_approvers
   kind: pure-decision-predicate
   sourceLocation:
