@@ -80,7 +80,7 @@
       "consent-grant": {
         "dir": "crates/consent-grant",
         "inputs": {
-          "sources": ["crates/consent-grant/**"],
+          "sources": ["crates/consent-grant/**", "elohim/epr/**", "elohim/Cargo.toml"],
           "buildProcess": []
         },
         "run": {

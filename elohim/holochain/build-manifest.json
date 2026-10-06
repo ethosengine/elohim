@@ -40,7 +40,8 @@
           "bridges/did/did-bridge/**",
           "bridges/did/did-types/**",
           "doorway/relay-addr-beacon/**",
-          "doorway/iroh-relay/**"
+          "doorway/iroh-relay/**",
+          "elohim/epr/**"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"
@@ -130,7 +131,9 @@
           "crates/seam-contracts/**",
           "crates/consent-grant/**",
           "crates/elohim-views/**",
-          "scripts/ci/elohim-sdk-feature-matrix.sh"
+          "scripts/ci/elohim-sdk-feature-matrix.sh",
+          "elohim/epr/**",
+          "elohim/Cargo.toml"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"
