@@ -1181,12 +1181,77 @@ impl crate::services::device_consent::IdentifierSource for NodeIdentifierSource 
     }
 }
 
-/// Whether a request came from this machine. A request with no recorded
-/// address (one that did not arrive through `serve`) is not.
+/// Whether a request came from this machine (`consent_grant::network_local`):
+/// a loopback peer that is no trusted proxy, with no forwarding header (a
+/// proxy on the machine forwards requests from anywhere). A request with no
+/// recorded address (one that did not arrive through `serve`) is not. Being
+/// on loopback is still all a this-machine act asks: the install-token dial
+/// that would ask more is recorded, not built
+/// (arch-device-recognition-backlog, "Dialing up").
 fn caller_is_local<B>(req: &Request<B>) -> bool {
-    req.extensions()
-        .get::<CallerAddr>()
-        .is_some_and(|addr| addr.0.ip().is_loopback())
+    let forwarded = FORWARDING_HEADERS
+        .iter()
+        .any(|name| req.headers().contains_key(*name));
+    consent_grant::network_local(
+        req.extensions().get::<CallerAddr>().map(|a| a.0.ip()),
+        HttpServer::trusted_proxies(),
+        forwarded,
+    )
+}
+
+/// The headers a proxy adds: a loopback request carrying any of them came
+/// from wherever the proxy was reached.
+const FORWARDING_HEADERS: [&str; 5] = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-proto",
+    "x-forwarded-host",
+    "x-real-ip",
+];
+
+/// The routes that act for or read about the node's person: identity,
+/// consent, device, sign-in and local sessions. `GET /auth/me` is the one
+/// left out: it is declared for the doorway to proxy (`build_manifest`), which
+/// reaches this node under its upstream name, and it reads only the session a
+/// cookie names, or, for this machine's token, the active one; it acts for
+/// nobody.
+fn is_identity_route(path: &str) -> bool {
+    (path == "/session" || path.starts_with("/session/") || path.starts_with("/auth/"))
+        && path != "/auth/me"
+}
+
+/// The names this node answers its identity routes on besides the loopback
+/// ones: `ELOHIM_ALLOWED_HOSTS`, comma-separated, read once (a node reached by
+/// name through a proxy, for sign-in from elsewhere).
+fn allowed_hosts() -> &'static [String] {
+    static HOSTS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    HOSTS.get_or_init(|| {
+        std::env::var("ELOHIM_ALLOWED_HOSTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty())
+            .collect()
+    })
+}
+
+/// The refusal for an identity route asked under a name that is not this
+/// node's (`consent_grant::host_allowed`): what a page that rebinds its own
+/// name to 127.0.0.1 sends.
+fn host_refusal<B>(req: &Request<B>) -> Option<Response<Full<Bytes>>> {
+    let host = req
+        .headers()
+        .get(header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| req.uri().authority().map(|a| a.as_str()));
+    (!consent_grant::host_allowed(host, allowed_hosts())).then(|| {
+        crate::services::device_consent::refusal(
+            StatusCode::MISDIRECTED_REQUEST,
+            "this node answers its identity routes only under its own names (localhost, \
+             127.0.0.1, [::1], or ELOHIM_ALLOWED_HOSTS)",
+            "host_not_this_node",
+        )
+    })
 }
 
 fn extract_session_cookie(headers: &hyper::HeaderMap) -> Option<String> {
@@ -1991,6 +2056,11 @@ impl HttpServer {
                     if let Some(cell) = server.own_controller_cell() {
                         carrier::carrier().set_self_key(cell.agent());
                         carrier::refresh_speaks(&cell, &names).await;
+                        // bounded-work: one mandated signature per key and
+                        // transport id for the process's life.
+                        if let Some(link) = server.carrier_link() {
+                            carrier::ensure_listed_proof(&cell, link.as_ref()).await;
+                        }
                     }
                     carrier::until_speaks_refresh().await;
                 }
@@ -2151,6 +2221,15 @@ impl HttpServer {
                 }
             }
         };
+
+        // The identity routes answer only under this node's own names, so a
+        // page that rebinds its name to 127.0.0.1 reaches none of them.
+        if is_identity_route(&path) && method != Method::OPTIONS {
+            if let Some(refused) = host_refusal(&req) {
+                __req_metrics.finish(StatusCode::MISDIRECTED_REQUEST.as_u16());
+                return Ok(refused.map(Either::Left));
+            }
+        }
 
         let result = match (method, path.as_str()) {
             // CORS preflight for all routes
@@ -14130,8 +14209,15 @@ impl HttpServer {
             return (consent_grant::Channel::Plain, "unknown".into());
         };
         let header = |name: &str| req.headers().get(name).and_then(|v| v.to_str().ok());
-        let channel =
-            consent_grant::channel(peer, header("x-forwarded-proto"), Self::trusted_proxies());
+        let forwarded = FORWARDING_HEADERS
+            .iter()
+            .any(|name| req.headers().contains_key(*name));
+        let channel = consent_grant::channel(
+            peer,
+            header("x-forwarded-proto"),
+            forwarded,
+            Self::trusted_proxies(),
+        );
         let source = match channel {
             consent_grant::Channel::Tls => header("x-forwarded-for")
                 .and_then(|v| v.rsplit(',').next())
@@ -14705,7 +14791,15 @@ impl HttpServer {
             }
             _ => {
                 let state = self.node_state().await;
-                match carrier::start_announce(link_ref, state, &body) {
+                let device = self
+                    .hc_registry
+                    .as_ref()
+                    .and_then(|r| r.lamad_client())
+                    .and_then(crate::services::device_consent_cell::ConductorDeviceCell::own);
+                let device = device
+                    .as_ref()
+                    .map(|c| c as &dyn crate::services::device_consent::DeviceCell);
+                match carrier::start_announce(link_ref, device, state, &body).await {
                     Ok((answer, _)) => {
                         if let Some(link) = link {
                             tokio::spawn(carrier::run_announce(link));
@@ -22555,19 +22649,61 @@ mod session_exchange_tests {
     // Cookie-extraction helper unit coverage.
     #[test]
     fn only_a_loopback_connection_counts_as_this_machine() {
-        let with = |addr: Option<&str>| {
+        let with = |addr: Option<&str>, headers: &[(&str, &str)]| {
             let mut req = Request::builder().uri("/").body(()).unwrap();
             if let Some(a) = addr {
                 req.extensions_mut().insert(CallerAddr(a.parse().unwrap()));
             }
+            for (name, value) in headers {
+                req.headers_mut().insert(
+                    hyper::header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                    value.parse().unwrap(),
+                );
+            }
             caller_is_local(&req)
         };
-        assert!(with(Some("127.0.0.1:5000")));
-        assert!(with(Some("[::1]:5000")));
-        assert!(!with(Some("10.1.19.170:5000")));
-        assert!(!with(Some("192.168.1.20:5000")));
+        assert!(with(Some("127.0.0.1:5000"), &[]));
+        assert!(with(Some("[::1]:5000"), &[]));
+        assert!(!with(Some("10.1.19.170:5000"), &[]));
+        assert!(!with(Some("192.168.1.20:5000"), &[]));
         // A request that did not come through `serve` carries no address.
-        assert!(!with(None));
+        assert!(!with(None, &[]));
+        // Adversarial review, critical 2: a proxy on the machine passes
+        // requests from anywhere, so a forwarded loopback request is not local.
+        for forwarded in [
+            "forwarded",
+            "x-forwarded-for",
+            "x-forwarded-proto",
+            "x-real-ip",
+        ] {
+            assert!(
+                !with(Some("127.0.0.1:5000"), &[(forwarded, "198.51.100.7")]),
+                "{forwarded}"
+            );
+        }
+    }
+
+    #[test]
+    fn identity_routes_answer_only_this_nodes_names() {
+        let host = |path: &str, host: Option<&str>| {
+            let mut req = Request::builder().uri(path).body(()).unwrap();
+            if let Some(h) = host {
+                req.headers_mut()
+                    .insert(hyper::header::HOST, h.parse().unwrap());
+            }
+            is_identity_route(path) && host_refusal(&req).is_some()
+        };
+        // A page that rebinds its name to 127.0.0.1 still sends its name.
+        assert!(host("/auth/identity/secret", Some("evil.example:8191")));
+        assert!(host("/auth/consent/agree", Some("evil.example")));
+        assert!(host("/session", Some("evil.example")));
+        assert!(host("/auth/device/announce", None));
+        assert!(!host("/auth/identity/secret", Some("127.0.0.1:8191")));
+        assert!(!host("/auth/identity/standing", Some("localhost:8191")));
+        // The doorway proxies /auth/me under its upstream name; it reads, never acts.
+        assert!(!host("/auth/me", Some("elohim-storage:8090")));
+        // Content routes are not identity routes.
+        assert!(!host("/db/content/x", Some("evil.example")));
     }
 
     #[test]

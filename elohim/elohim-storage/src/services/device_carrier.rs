@@ -39,8 +39,8 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
 use consent_grant::{
-    redeem, Ask, CarryRequest, CarryResponse, Dropped, GrantRequest, Listed, MemoryStore,
-    NodeState, PendingAsks, Speaks, ASK_LIFE_MICROS,
+    proof_holds, redeem, Ask, CarrierKind, CarrierProof, CarryRequest, CarryResponse, Dropped,
+    GrantRequest, Listed, MemoryStore, NodeState, PendingAsks, Speaks, ASK_LIFE_MICROS,
 };
 
 /// How often the refresher reads whom this node speaks for.
@@ -57,6 +57,13 @@ pub struct Carrier {
     pub deliveries: Arc<MemoryStore>,
     /// This node's controller key, once its cell is reachable.
     self_key: OnceLock<String>,
+    /// This node's key's proof over (listed, its transport id), made once
+    /// per key and transport id by the refresher, answered with every
+    /// listing (the transport's event loop cannot wait for a signature).
+    listed_proof: Mutex<Option<(String, String, CarrierProof)>>,
+    /// The approver the carrier proved for a request this node redeemed,
+    /// by state: what `/auth/device/enroll` checks the consent against.
+    proven: Mutex<Option<(String, String)>>,
     /// This node's own announce, when it is the asking device.
     announce: Mutex<Option<Announce>>,
     /// Whom this node speaks for, as last read from its own cell, and when.
@@ -72,10 +79,15 @@ pub struct Announce {
     pub state: NodeState,
     pub for_approver: Option<String>,
     pub started_at_micros: i64,
-    /// Approving nodes that listed it: (transport id, approver key, number there).
+    /// The device key's proof over this ask, as sent from this node.
+    pub proof: Option<CarrierProof>,
+    /// Approving nodes that listed it, each with its key proven over its
+    /// transport id: (transport id, approver key, number there).
     pub listed_by: Vec<(String, Option<String>, u32)>,
-    /// The code an approving node that listed it handed back, and from where.
+    /// The code an approving node that listed it handed back, from where, and
+    /// the key whose proof came with it.
     pub code: Option<(String, String)>,
+    pub code_approver: Option<String>,
     /// The approving node that declined it (its key, when known), if one did.
     pub declined_by: Option<Option<String>>,
 }
@@ -86,6 +98,7 @@ impl Announce {
             request: self.request.clone(),
             state: self.state,
             for_approver: self.for_approver.clone(),
+            proof: self.proof.clone(),
         }
     }
 
@@ -100,6 +113,8 @@ pub fn carrier() -> &'static Carrier {
         pending: PendingAsks::new(),
         deliveries: Arc::new(MemoryStore::new()),
         self_key: OnceLock::new(),
+        listed_proof: Mutex::new(None),
+        proven: Mutex::new(None),
         announce: Mutex::new(None),
         speaks: Mutex::new(None),
         speaks_changed: tokio::sync::Notify::new(),
@@ -173,12 +188,77 @@ impl Carrier {
         slot.clone()
     }
 
-    /// Record that the approving node at `source` listed this node's ask.
-    pub fn note_listed(&self, source: &str, approver: Option<String>, number: u32) {
-        if let Some(a) = self.announce_lock().as_mut() {
-            a.listed_by.retain(|(s, _, _)| s != source);
-            a.listed_by.push((source.to_string(), approver, number));
+    /// Keep this node's listing proof for `key` at `transport_id`.
+    pub fn set_listed_proof(&self, key: &str, transport_id: &str, proof: CarrierProof) {
+        *self.listed_proof.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some((key.to_string(), transport_id.to_string(), proof));
+    }
+
+    /// Whether this node holds a listing proof for `key` at `transport_id`.
+    pub fn has_listed_proof(&self, key: &str, transport_id: &str) -> bool {
+        self.listed_proof
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .is_some_and(|(k, t, _)| k == key && t == transport_id)
+    }
+
+    fn listed_proof_for(&self, key: Option<&str>) -> Option<CarrierProof> {
+        let slot = self.listed_proof.lock().unwrap_or_else(|e| e.into_inner());
+        slot.as_ref()
+            .filter(|(k, _, _)| Some(k.as_str()) == key)
+            .map(|(_, _, p)| p.clone())
+    }
+
+    /// The approver the carrier proved for the request with `state`, once
+    /// this node redeemed its code.
+    pub fn proven_approver(&self, state: &str) -> Option<String> {
+        self.proven
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .filter(|(s, _)| s == state)
+            .map(|(_, k)| k.clone())
+    }
+
+    fn set_proven(&self, state: &str, approver: &str) {
+        *self.proven.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some((state.to_string(), approver.to_string()));
+    }
+
+    /// Record that the approving node at `source` listed this node's ask,
+    /// when its key is proven over `source` (adversarial review, high 3) and
+    /// is the declared approver, if one was declared. Whether it was taken.
+    pub fn note_listed(
+        &self,
+        source: &str,
+        approver: Option<String>,
+        proof: Option<&CarrierProof>,
+        number: u32,
+    ) -> bool {
+        let mut slot = self.announce_lock();
+        let Some(a) = slot.as_mut() else {
+            return false;
+        };
+        let Some(key) = approver.filter(|k| {
+            proof.is_some_and(|p| proof_holds(p, k, CarrierKind::Listed, "", source, ""))
+        }) else {
+            warn!(
+                source,
+                "device carrier: a listing came without its key's proof; not taken"
+            );
+            return false;
+        };
+        if a.for_approver.as_ref().is_some_and(|wanted| wanted != &key) {
+            warn!(
+                source,
+                "device carrier: listed by a node other than the declared approver"
+            );
+            return false;
         }
+        a.listed_by.retain(|(s, _, _)| s != source);
+        a.listed_by.push((source.to_string(), Some(key), number));
+        true
     }
 
     /// Answer one carrier request from the peer `source`. `None` is silence:
@@ -186,10 +266,17 @@ impl Carrier {
     pub fn on_request(&self, source: &str, request: CarryRequest) -> Option<CarryResponse> {
         Some(match request {
             CarryRequest::Ask { ask } => return self.on_ask(source, ask),
-            CarryRequest::Code { state, code, .. } => self.on_code(source, &state, code),
-            CarryRequest::Declined { state, approver } => {
-                self.on_declined(source, &state, approver)
-            }
+            CarryRequest::Code {
+                state,
+                code,
+                approver,
+                proof,
+            } => self.on_code(source, &state, code, approver, proof),
+            CarryRequest::Declined {
+                state,
+                approver,
+                proof,
+            } => self.on_declined(source, &state, approver, proof),
             CarryRequest::Redeem { redemption } => {
                 // bounded-work: one sweep over deliveries that each live minutes.
                 self.deliveries.sweep(now_micros());
@@ -241,6 +328,7 @@ impl Carrier {
                 Some(CarryResponse::Listed {
                     number,
                     approver: self.self_key().map(str::to_string),
+                    proof: self.listed_proof_for(self.self_key()),
                 })
             }
             Err(dropped) => {
@@ -257,7 +345,9 @@ impl Carrier {
                     }
                     Dropped::Malformed(_)
                     | Dropped::NotForThisApprover
-                    | Dropped::AlreadyDecided => {
+                    | Dropped::AlreadyDecided
+                    | Dropped::Unsigned
+                    | Dropped::ListedFromElsewhere => {
                         info!(
                             source,
                             device, code, "device carrier: ask received and dropped"
@@ -277,52 +367,117 @@ impl Carrier {
         }
     }
 
-    /// A code for this node's own ask. Taken only from an approving node that listed
-    /// it, so another peer cannot preempt the real code with a false one.
-    fn on_code(&self, source: &str, state: &str, code: String) -> CarryResponse {
-        let mut slot = self.announce_lock();
-        let refused = |code: &str| CarryResponse::Refused { code: code.into() };
-        let Some(a) = slot.as_mut() else {
-            return refused("carry_no_announce");
-        };
+    /// Whether a code or decline from `source` for `state` is the listing
+    /// node's own: that node listed the ask with its key proven, the message
+    /// names that key, and its proof holds over (kind, state, `source`).
+    /// Answers with the key, or the refusal code.
+    fn proven_from(
+        a: &Announce,
+        source: &str,
+        state: &str,
+        kind: CarrierKind,
+        approver: Option<&str>,
+        proof: Option<&CarrierProof>,
+    ) -> Result<String, &'static str> {
         if a.request.state != state {
-            return refused("carry_not_this_ask");
+            return Err("carry_not_this_ask");
         }
-        if !a.listed_by.iter().any(|(s, _, _)| s == source) {
-            warn!(
-                source,
-                "device carrier: a code came from a peer that never listed the ask"
-            );
-            return refused("carry_from_unlisting_peer");
+        let Some(listed) = a
+            .listed_by
+            .iter()
+            .find(|(s, _, _)| s == source)
+            .and_then(|(_, k, _)| k.clone())
+        else {
+            return Err("carry_from_unlisting_peer");
+        };
+        if approver != Some(listed.as_str()) {
+            return Err("carry_from_another_key");
         }
-        info!(
-            source,
-            "device carrier: the approving node handed the code back"
-        );
-        a.code = Some((code, source.to_string()));
-        CarryResponse::CodeTaken
+        if !proof.is_some_and(|p| proof_holds(p, &listed, kind, state, source, "")) {
+            return Err("carry_unproven");
+        }
+        if a.for_approver.as_ref().is_some_and(|w| w != &listed) {
+            return Err("carry_not_the_declared_approver");
+        }
+        Ok(listed)
     }
 
-    /// A decline for this node's own ask, taken only from an approving node
-    /// that listed it, like a code. The announce stops; nothing was signed.
-    fn on_declined(&self, source: &str, state: &str, approver: Option<String>) -> CarryResponse {
+    /// A code for this node's own ask. Taken only from the approving node
+    /// that listed it, signed by the key it listed with (adversarial review,
+    /// high 3), so another peer cannot preempt the real code with its own.
+    fn on_code(
+        &self,
+        source: &str,
+        state: &str,
+        code: String,
+        approver: Option<String>,
+        proof: Option<CarrierProof>,
+    ) -> CarryResponse {
         let mut slot = self.announce_lock();
         let refused = |code: &str| CarryResponse::Refused { code: code.into() };
         let Some(a) = slot.as_mut() else {
             return refused("carry_no_announce");
         };
-        if a.request.state != state {
-            return refused("carry_not_this_ask");
-        }
-        if !a.listed_by.iter().any(|(s, _, _)| s == source) {
-            return refused("carry_from_unlisting_peer");
-        }
-        info!(
+        match Self::proven_from(
+            a,
             source,
-            "device carrier: the approving node declined the ask"
-        );
-        a.declined_by = Some(approver);
-        CarryResponse::DeclineTaken
+            state,
+            CarrierKind::Code,
+            approver.as_deref(),
+            proof.as_ref(),
+        ) {
+            Ok(key) => {
+                info!(
+                    source,
+                    approver = %consent_grant::hash_shape::fingerprint(&key),
+                    "device carrier: the approving node handed the code back"
+                );
+                a.code = Some((code, source.to_string()));
+                a.code_approver = Some(key);
+                CarryResponse::CodeTaken
+            }
+            Err(why) => {
+                warn!(source, why, "device carrier: a code was refused");
+                refused(why)
+            }
+        }
+    }
+
+    /// A decline for this node's own ask, taken only as a code is. The
+    /// announce stops; nothing was signed.
+    fn on_declined(
+        &self,
+        source: &str,
+        state: &str,
+        approver: Option<String>,
+        proof: Option<CarrierProof>,
+    ) -> CarryResponse {
+        let mut slot = self.announce_lock();
+        let refused = |code: &str| CarryResponse::Refused { code: code.into() };
+        let Some(a) = slot.as_mut() else {
+            return refused("carry_no_announce");
+        };
+        match Self::proven_from(
+            a,
+            source,
+            state,
+            CarrierKind::Declined,
+            approver.as_deref(),
+            proof.as_ref(),
+        ) {
+            Ok(key) => {
+                info!(
+                    source,
+                    "device carrier: the approving node declined the ask"
+                );
+                a.declined_by = Some(Some(key));
+                CarryResponse::DeclineTaken
+            }
+            Err(why) => {
+                warn!(source, why, "device carrier: a decline was refused");
+                refused(why)
+            }
+        }
     }
 }
 
@@ -349,6 +504,9 @@ use super::response;
 pub trait CarrierLink: Send + Sync {
     /// The peers local discovery found on the private network.
     fn peers(&self) -> Vec<String>;
+    /// This node's own transport id, as its peers see it: what its carrier
+    /// statements name.
+    fn self_transport(&self) -> Option<String>;
     async fn send(&self, peer: &str, request: CarryRequest) -> Result<CarryResponse, String>;
 }
 
@@ -356,6 +514,9 @@ pub trait CarrierLink: Send + Sync {
 impl CarrierLink for crate::p2p::P2PHandle {
     fn peers(&self) -> Vec<String> {
         self.private_network_peers()
+    }
+    fn self_transport(&self) -> Option<String> {
+        Some(self.local_peer_id()).filter(|id| !id.is_empty())
     }
     async fn send(&self, peer: &str, request: CarryRequest) -> Result<CarryResponse, String> {
         self.device_carry(peer, request).await
@@ -433,6 +594,48 @@ pub async fn read_speaks(
             return None;
         }
     })
+}
+
+/// Make this node's listing proof when it speaks for someone and holds none
+/// for its key at its transport id: one mandate grant, once per key and
+/// transport id (adversarial review, high 3).
+pub async fn ensure_listed_proof(cell: &dyn ControllerCell, link: &dyn CarrierLink) {
+    let Some(tid) = link.self_transport() else {
+        return;
+    };
+    let key = cell.agent();
+    if carrier().speaks(now_micros()).person().is_none() || carrier().has_listed_proof(&key, &tid) {
+        return;
+    }
+    match cell.sign_carrier(CarrierKind::Listed, "", &tid, "").await {
+        Ok(proof) => {
+            info!("device carrier: this node's key is proven over its transport id");
+            carrier().set_listed_proof(&key, &tid, proof);
+        }
+        Err(why) => warn!(?why, "device carrier: the listing proof could not be made"),
+    }
+}
+
+/// This node's key's proof over (kind, state, its transport id), for a code
+/// or a decline it hands back. `None` (logged) when it cannot be made: the
+/// device then refuses what it is handed.
+async fn handback_proof(
+    cell: Option<&dyn ControllerCell>,
+    link: &dyn CarrierLink,
+    kind: CarrierKind,
+    state: &str,
+) -> Option<CarrierProof> {
+    let (Some(cell), Some(tid)) = (cell, link.self_transport()) else {
+        warn!("device carrier: no cell or transport id to prove a hand-back with");
+        return None;
+    };
+    match cell.sign_carrier(kind, state, &tid, "").await {
+        Ok(proof) => Some(proof),
+        Err(why) => {
+            warn!(?why, "device carrier: a hand-back proof could not be made");
+            None
+        }
+    }
 }
 
 /// Wait until the next refresh is due: `SPEAKS_REFRESH_SECS`, or sooner when
@@ -563,11 +766,14 @@ async fn decide_inner(
             info!(number = pending.number, ?by, "device carrier: ask declined");
             let told = match link {
                 Some(link) => {
+                    let state = pending.ask.request.state.clone();
+                    let proof = handback_proof(cell, link, CarrierKind::Declined, &state).await;
                     link.send(
                         &pending.source,
                         CarryRequest::Declined {
-                            state: pending.ask.request.state.clone(),
+                            state,
                             approver: carrier().self_key().map(str::to_string),
+                            proof,
                         },
                     )
                     .await
@@ -618,12 +824,15 @@ async fn decide_inner(
     let code = value.split('#').next().unwrap_or_default().to_string();
     let handed_back = match link {
         Some(link) => {
+            let state = pending.ask.request.state.clone();
+            let proof = handback_proof(cell, link, CarrierKind::Code, &state).await;
             link.send(
                 &pending.source,
                 CarryRequest::Code {
-                    state: pending.ask.request.state.clone(),
+                    state,
                     code,
                     approver: carrier().self_key().map(str::to_string),
+                    proof,
                 },
             )
             .await
@@ -655,8 +864,9 @@ struct AnnounceInput {
 
 /// `POST /auth/device/announce`: begin offering this node's ask to the
 /// approving nodes local discovery finds. `state` is what this node says about itself.
-pub fn start_announce(
+pub async fn start_announce(
     link: Option<&dyn CarrierLink>,
+    cell: Option<&dyn super::device_consent::DeviceCell>,
     state: NodeState,
     body: &[u8],
 ) -> Result<(Response<Full<Bytes>>, bool), Refused> {
@@ -681,13 +891,40 @@ pub fn start_announce(
             "carry_needs_paste_return",
         )));
     }
+    // The ask is this device's own, from here (adversarial review, high 4):
+    // its key signs (ask, state, its transport id, the PKCE challenge).
+    let (Some(cell), Some(tid)) = (cell, link.self_transport()) else {
+        return Err(Box::new(refusal(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "this node cannot sign its ask yet (no cell or no transport id); try again shortly",
+            "carry_cannot_sign_ask",
+        )));
+    };
+    let proof = cell
+        .sign_carrier(
+            CarrierKind::Ask,
+            &input.request.state,
+            &tid,
+            &input.request.code_challenge,
+        )
+        .await
+        .map_err(|why| {
+            warn!(?why, "device carrier: the ask could not be signed");
+            Box::new(refusal(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "this node's key could not sign its ask; try again shortly",
+                "carry_cannot_sign_ask",
+            ))
+        })?;
     carrier().start_announce(Announce {
         request: input.request,
         state,
         for_approver: input.approver_key,
         started_at_micros: now_micros(),
+        proof: Some(proof),
         listed_by: Vec::new(),
         code: None,
+        code_approver: None,
         declined_by: None,
     });
     Ok((
@@ -740,8 +977,12 @@ async fn announce_rounds(link: std::sync::Arc<dyn CarrierLink>) {
                 )
                 .await
             {
-                Ok(CarryResponse::Listed { number, approver }) => {
-                    carrier().note_listed(&peer, approver, number)
+                Ok(CarryResponse::Listed {
+                    number,
+                    approver,
+                    proof,
+                }) => {
+                    carrier().note_listed(&peer, approver, proof.as_ref(), number);
                 }
                 Ok(CarryResponse::Refused { code }) => {
                     tracing::debug!(peer, code, "device carrier: a peer did not list the ask")
@@ -788,6 +1029,8 @@ pub fn announce_status() -> Response<Full<Bytes>> {
         "state": a.state,
         "listedBy": listed_by,
         "code": a.code.as_ref().map(|(c, _)| format!("{c}#{}", a.request.state)),
+        "codeApprover": a.code_approver,
+        "codeApproverFingerprint": a.code_approver.as_deref().map(consent_grant::hash_shape::fingerprint),
         "declinedBy": declined_by,
     }))
 }
@@ -809,7 +1052,10 @@ pub async fn announce_redeem(link: Option<&dyn CarrierLink>, body: &[u8]) -> Res
         Ok(i) => i,
         Err(e) => return response::bad_request(&format!("Invalid JSON: {e}")),
     };
-    let Some((_, source)) = carrier().announce().and_then(|a| a.code) else {
+    let Some((state, (_, source), approver)) = carrier()
+        .announce()
+        .and_then(|a| Some((a.request.state.clone(), a.code?, a.code_approver)))
+    else {
         return refusal(
             StatusCode::CONFLICT,
             "no approving node has handed a code back yet",
@@ -826,6 +1072,11 @@ pub async fn announce_redeem(link: Option<&dyn CarrierLink>, body: &[u8]) -> Res
         .await
     {
         Ok(CarryResponse::Delivered { delivered }) => {
+            // What enrolling checks the consent against: the key whose proof
+            // came with the code.
+            if let Some(approver) = &approver {
+                carrier().set_proven(&state, approver);
+            }
             carrier().stop_announce();
             response::ok(&*delivered)
         }
@@ -873,9 +1124,64 @@ mod tests {
             pending: PendingAsks::new(),
             deliveries: Arc::new(MemoryStore::new()),
             self_key: OnceLock::new(),
+            listed_proof: Mutex::new(None),
+            proven: Mutex::new(None),
             announce: Mutex::new(None),
             speaks: Mutex::new(None),
             speaks_changed: tokio::sync::Notify::new(),
+        }
+    }
+
+    /// A real key `n`, and its agent key text.
+    fn real(n: u8) -> (elohim_epr::proof::AgentKeypair, String) {
+        let kp = elohim_epr::proof::AgentKeypair::from_secret(&[n; 32]).unwrap();
+        let agent =
+            holochain_types::prelude::AgentPubKey::from_raw_32(kp.public_key_bytes().to_vec())
+                .to_string();
+        (kp, agent)
+    }
+
+    /// Key `n`'s proof over a carrier statement.
+    fn proof_by(n: u8, kind: CarrierKind, state: &str, tid: &str, challenge: &str) -> CarrierProof {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let (kp, agent) = real(n);
+        let message = consent_grant::statement(kind, state, tid, challenge).unwrap();
+        CarrierProof {
+            signer: agent,
+            signature: URL_SAFE_NO_PAD.encode(elohim_epr::proof::sign(&kp, &message)),
+        }
+    }
+
+    /// `request` asked by its device (key `n`), signed as sent from `tid`.
+    fn signed_ask(n: u8, mut request: GrantRequest, tid: &str) -> Ask {
+        request.device_key = real(n).1;
+        let proof = proof_by(
+            n,
+            CarrierKind::Ask,
+            &request.state,
+            tid,
+            &request.code_challenge,
+        );
+        Ask {
+            request,
+            state: NodeState::Unassigned,
+            for_approver: None,
+            proof: Some(proof),
+        }
+    }
+
+    /// An announce of `request()` with nothing yet listed.
+    fn announcing() -> Announce {
+        Announce {
+            request: request(),
+            state: NodeState::Unassigned,
+            for_approver: None,
+            started_at_micros: now_micros(),
+            proof: None,
+            listed_by: vec![],
+            code: None,
+            code_approver: None,
+            declined_by: None,
         }
     }
 
@@ -897,22 +1203,17 @@ mod tests {
         let c = fresh();
         c.set_self_key("uhCAkApprover".into());
         c.set_speaks(speaking(), now_micros());
-        let ask = Ask {
-            request: request(),
-            state: NodeState::Unassigned,
-            for_approver: None,
-        };
+        let ask = signed_ask(31, request(), "peer-a");
         assert_eq!(
             c.on_request("peer-a", CarryRequest::Ask { ask: ask.clone() }),
             Some(CarryResponse::Listed {
                 number: 1,
-                approver: Some("uhCAkApprover".into())
+                approver: Some("uhCAkApprover".into()),
+                proof: None,
             })
         );
-        let mut elsewhere = ask;
+        let mut elsewhere = signed_ask(32, request(), "peer-a");
         elsewhere.for_approver = Some("uhCAkOther".into());
-        elsewhere.request.device_key =
-            "uhCAk0t54SuXFHcSgZ4Bx9gQeXPf7zlckCS0ol65f7cgFl3DucibY".into();
         assert_eq!(
             c.on_request("peer-a", CarryRequest::Ask { ask: elsewhere }),
             Some(CarryResponse::Refused {
@@ -927,11 +1228,7 @@ mod tests {
         let c = fresh();
         c.set_self_key(key(60));
         let ask = || CarryRequest::Ask {
-            ask: Ask {
-                request: request(),
-                state: NodeState::Unassigned,
-                for_approver: None,
-            },
+            ask: signed_ask(33, request(), "peer-a"),
         };
         // Never read: unknown, so nothing is listed and nothing is said.
         assert_eq!(c.speaks(now_micros()), Speaks::Unknown);
@@ -1060,89 +1357,173 @@ mod tests {
     #[test]
     fn a_device_takes_a_decline_only_for_its_ask_from_a_node_that_listed_it() {
         let c = fresh();
-        let decline = |source: &str, state: &str| {
+        let state = "s".repeat(32);
+        let (_, approver) = real(50);
+        let decline = |source: &str, state: &str, proof: Option<CarrierProof>| {
             c.on_request(
                 source,
                 CarryRequest::Declined {
                     state: state.into(),
-                    approver: Some("uhCAkApprover".into()),
+                    approver: Some(approver.clone()),
+                    proof,
                 },
             )
             .unwrap()
         };
-        c.start_announce(Announce {
-            request: request(),
-            state: NodeState::Unassigned,
-            for_approver: None,
-            started_at_micros: now_micros(),
-            listed_by: vec![],
-            code: None,
-            declined_by: None,
-        });
+        c.start_announce(announcing());
+        let proven = || Some(proof_by(50, CarrierKind::Declined, &state, "peer-a", ""));
         assert_eq!(
-            decline("peer-a", &"s".repeat(32)),
+            decline("peer-a", &state, proven()),
             CarryResponse::Refused {
                 code: "carry_from_unlisting_peer".into()
             }
         );
-        c.note_listed("peer-a", Some("uhCAkApprover".into()), 1);
+        let listing = proof_by(50, CarrierKind::Listed, "", "peer-a", "");
+        assert!(c.note_listed("peer-a", Some(approver.clone()), Some(&listing), 1));
+        // Unsigned: refused, and the announce keeps waiting.
         assert_eq!(
-            decline("peer-a", &"s".repeat(32)),
+            decline("peer-a", &state, None),
+            CarryResponse::Refused {
+                code: "carry_unproven".into()
+            }
+        );
+        assert_eq!(
+            decline("peer-a", &state, proven()),
             CarryResponse::DeclineTaken
         );
-        assert_eq!(
-            c.announce().unwrap().declined_by,
-            Some(Some("uhCAkApprover".into()))
-        );
+        assert_eq!(c.announce().unwrap().declined_by, Some(Some(approver)));
     }
 
     #[test]
     fn a_device_takes_a_code_only_for_its_ask_from_a_node_that_listed_it() {
         let c = fresh();
-        let code = |source: &str, state: &str| {
+        let state = "s".repeat(32);
+        let (_, approver) = real(50);
+        let code = |source: &str, state: &str, key: &str, proof: Option<CarrierProof>| {
             c.on_request(
                 source,
                 CarryRequest::Code {
                     state: state.into(),
                     code: "c".repeat(32),
-                    approver: None,
+                    approver: Some(key.to_string()),
+                    proof,
+                },
+            )
+            .unwrap()
+        };
+        let proven = |state: &str| Some(proof_by(50, CarrierKind::Code, state, "peer-a", ""));
+        assert_eq!(
+            code("peer-a", &state, &approver, proven(&state)),
+            CarryResponse::Refused {
+                code: "carry_no_announce".into()
+            }
+        );
+        c.start_announce(announcing());
+        assert_eq!(
+            code("peer-a", &state, &approver, proven(&state)),
+            CarryResponse::Refused {
+                code: "carry_from_unlisting_peer".into()
+            }
+        );
+        let listing = proof_by(50, CarrierKind::Listed, "", "peer-a", "");
+        assert!(c.note_listed("peer-a", Some(approver.clone()), Some(&listing), 1));
+        assert_eq!(
+            code(
+                "peer-a",
+                &"x".repeat(32),
+                &approver,
+                proven(&"x".repeat(32))
+            ),
+            CarryResponse::Refused {
+                code: "carry_not_this_ask".into()
+            }
+        );
+        assert_eq!(
+            code("peer-a", &state, &approver, proven(&state)),
+            CarryResponse::CodeTaken
+        );
+        let a = c.announce().unwrap();
+        assert_eq!(a.code, Some(("c".repeat(32), "peer-a".into())));
+        assert_eq!(a.code_approver, Some(approver));
+    }
+
+    #[test]
+    fn a_rogue_node_on_the_network_cannot_capture_the_asking_device() {
+        // Adversarial review, high 3. Before the fix: the rogue answered
+        // Listed with any key, then sent a Code; on_code checked only that
+        // the source had listed the ask and discarded the approver, and the
+        // last code won.
+        let c = fresh();
+        let state = "s".repeat(32);
+        let (_, honest) = real(50);
+        let (_, rogue) = real(66);
+        c.start_announce(announcing());
+        // A listing without its key's proof, or with a proof made for another
+        // transport id (replayed from the honest node), is not taken.
+        assert!(!c.note_listed("rogue-peer", Some(honest.clone()), None, 9));
+        let replayed = proof_by(50, CarrierKind::Listed, "", "honest-peer", "");
+        assert!(!c.note_listed("rogue-peer", Some(honest.clone()), Some(&replayed), 9));
+        // The rogue may list under its own proven key ...
+        let own = proof_by(66, CarrierKind::Listed, "", "rogue-peer", "");
+        assert!(c.note_listed("rogue-peer", Some(rogue.clone()), Some(&own), 9));
+        // ... but cannot hand a code back in the honest node's name, or
+        // without its own key's proof over this ask.
+        let as_honest = Some(proof_by(50, CarrierKind::Code, &state, "rogue-peer", ""));
+        let reply = |key: &str, proof: Option<CarrierProof>| {
+            c.on_request(
+                "rogue-peer",
+                CarryRequest::Code {
+                    state: state.clone(),
+                    code: "r".repeat(32),
+                    approver: Some(key.to_string()),
+                    proof,
                 },
             )
             .unwrap()
         };
         assert_eq!(
-            code("peer-a", &"s".repeat(32)),
+            reply(&honest, as_honest),
             CarryResponse::Refused {
-                code: "carry_no_announce".into()
+                code: "carry_from_another_key".into()
             }
         );
-        c.start_announce(Announce {
-            request: request(),
-            state: NodeState::Unassigned,
-            for_approver: None,
-            started_at_micros: now_micros(),
-            listed_by: vec![],
-            code: None,
-            declined_by: None,
-        });
         assert_eq!(
-            code("peer-a", &"s".repeat(32)),
+            reply(&rogue, None),
+            CarryResponse::Refused {
+                code: "carry_unproven".into()
+            }
+        );
+        // A device that declared its approver takes nothing from another key,
+        // even proven.
+        let mut declared = announcing();
+        declared.for_approver = Some(honest.clone());
+        c.start_announce(declared);
+        assert!(!c.note_listed("rogue-peer", Some(rogue.clone()), Some(&own), 9));
+        assert_eq!(
+            reply(
+                &rogue,
+                Some(proof_by(66, CarrierKind::Code, &state, "rogue-peer", ""))
+            ),
             CarryResponse::Refused {
                 code: "carry_from_unlisting_peer".into()
             }
         );
-        c.note_listed("peer-a", Some("uhCAkApprover".into()), 1);
+        assert!(c.announce().unwrap().code.is_none());
+        // With no approver declared, a proven rogue's code is taken under
+        // its own key, so the terminal names that key and asks before it
+        // enrolls, and enrolling checks the consent against it.
+        let mut open = announcing();
+        open.state = NodeState::Unassigned;
+        c.start_announce(open);
+        assert!(c.note_listed("rogue-peer", Some(rogue.clone()), Some(&own), 9));
         assert_eq!(
-            code("peer-a", &"x".repeat(32)),
-            CarryResponse::Refused {
-                code: "carry_not_this_ask".into()
-            }
+            reply(
+                &rogue,
+                Some(proof_by(66, CarrierKind::Code, &state, "rogue-peer", ""))
+            ),
+            CarryResponse::CodeTaken
         );
-        assert_eq!(code("peer-a", &"s".repeat(32)), CarryResponse::CodeTaken);
-        assert_eq!(
-            c.announce().unwrap().code,
-            Some(("c".repeat(32), "peer-a".into()))
-        );
+        assert_eq!(c.announce().unwrap().code_approver, Some(rogue));
     }
 
     use crate::services::device_consent::tests::{ready, FakeCell};
@@ -1158,6 +1539,9 @@ mod tests {
         fn peers(&self) -> Vec<String> {
             vec!["peer-approver".into()]
         }
+        fn self_transport(&self) -> Option<String> {
+            Some("peer-self".into())
+        }
         async fn send(&self, peer: &str, request: CarryRequest) -> Result<CarryResponse, String> {
             self.0.lock().unwrap().push((peer.to_string(), request));
             Ok(CarryResponse::CodeTaken)
@@ -1165,7 +1549,7 @@ mod tests {
     }
 
     fn key(n: u8) -> String {
-        holochain_types::prelude::AgentPubKey::from_raw_32(vec![n; 32]).to_string()
+        real(n).1
     }
 
     fn state_of(n: u8) -> String {
@@ -1175,17 +1559,14 @@ mod tests {
     /// List an ask from a device with key `key(n)` on the global carrier.
     fn listed(n: u8, state: NodeState) -> String {
         let mut r = request();
-        r.device_key = key(n);
         // Each ask its own state token: a decided one is remembered by it.
         r.state = state_of(n);
+        let mut ask = signed_ask(n, r, &format!("peer-device-{n}"));
+        ask.state = state;
         carrier()
             .pending
             .admit(
-                Ask {
-                    request: r,
-                    state,
-                    for_approver: None,
-                },
+                ask,
                 &format!("peer-device-{n}"),
                 None,
                 &speaking(),
@@ -1328,9 +1709,11 @@ mod tests {
         assert_eq!(answer.status(), StatusCode::UNAUTHORIZED);
     }
 
-    #[test]
-    fn with_no_local_discovery_the_carrier_is_absent_and_says_so() {
-        let refused = start_announce(None, NodeState::Unassigned, b"{}").unwrap_err();
+    #[tokio::test]
+    async fn with_no_local_discovery_the_carrier_is_absent_and_says_so() {
+        let refused = start_announce(None, None, NodeState::Unassigned, b"{}")
+            .await
+            .unwrap_err();
         assert_eq!(refused.status(), StatusCode::CONFLICT);
     }
 

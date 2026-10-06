@@ -39,6 +39,7 @@ const SIGN_ENROLLMENT: &str = "sign_device_enrollment";
 const ENROLL: &str = "enroll_identity_device";
 const DEVICES: &str = "identity_devices";
 const AFFIRM: &str = "affirm_identity_device";
+const SIGN_CARRIER: &str = "sign_carrier_statement";
 /// How long the mandate for one approval stays usable. Long enough for one
 /// call on a busy conductor; after it the grant authorizes nothing.
 const MANDATE_WINDOW: Duration = Duration::from_secs(120);
@@ -178,6 +179,58 @@ struct IdentityDevicesWire {
     devices: Vec<IdentityDeviceWire>,
     not_standing: u32,
     truncated: bool,
+}
+
+/// The mishpat coordinator's `CarrierStatement`. Field order matters: the
+/// mandate carries its exact JSON.
+#[derive(Serialize, Debug)]
+struct CarrierStatementWire<'a> {
+    kind: &'a str,
+    state: &'a str,
+    transport_id: &'a str,
+    challenge: &'a str,
+}
+
+/// Sign a carrier statement with `cell`'s key, under a mandate for this one
+/// call.
+async fn sign_carrier_with(
+    hc: &HcClient,
+    cell: &CellId,
+    kind: consent_grant::CarrierKind,
+    state: &str,
+    transport_id: &str,
+    challenge: &str,
+) -> Result<consent_grant::CarrierProof, CellFailure> {
+    let wire = CarrierStatementWire {
+        kind: kind.as_str(),
+        state,
+        transport_id,
+        challenge,
+    };
+    let json = serde_json::to_string(&wire)
+        .map_err(|e| CellFailure::Unavailable(format!("statement encoding: {e}")))?;
+    let payload = ExternIO::encode(&wire)
+        .map_err(|e| CellFailure::Unavailable(format!("statement encoding: {e}")))?
+        .into_vec();
+    let answer = hc
+        .call_zome_mandated(
+            cell,
+            MISHPAT_ZOME,
+            SIGN_CARRIER,
+            payload,
+            json,
+            MANDATE_WINDOW,
+        )
+        .await
+        .map_err(failure)?;
+    let proof: ProofWire = ExternIO::from(answer)
+        .decode()
+        .map_err(|e| CellFailure::Unavailable(format!("statement proof decode: {e}")))?;
+    let proof = self::proof(proof);
+    Ok(consent_grant::CarrierProof {
+        signer: proof.agent,
+        signature: proof.signature,
+    })
 }
 
 /// The qahal `VerifyDeviceInput` that `affirm_identity_device` takes. Field
@@ -387,6 +440,16 @@ impl ControllerCell for ConductorControllerCell {
         })
     }
 
+    async fn sign_carrier(
+        &self,
+        kind: consent_grant::CarrierKind,
+        state: &str,
+        transport_id: &str,
+        challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        sign_carrier_with(&self.hc, &self.cell, kind, state, transport_id, challenge).await
+    }
+
     async fn affirm(&self, device: &consent_grant::StandingDevice) -> Result<(), CellFailure> {
         let wire = VerifyDeviceWire {
             binding: hash(&device.binding, "joining record")?,
@@ -507,6 +570,16 @@ fn signature(text: &str) -> Result<Signature, CellFailure> {
 
 #[async_trait]
 impl DeviceCell for ConductorDeviceCell {
+    async fn sign_carrier(
+        &self,
+        kind: consent_grant::CarrierKind,
+        state: &str,
+        transport_id: &str,
+        challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        sign_carrier_with(&self.hc, &self.cell, kind, state, transport_id, challenge).await
+    }
+
     async fn whoami(&self) -> Result<DeviceSelf, CellFailure> {
         Ok(DeviceSelf {
             device_key: self.cell.agent_pubkey().to_string(),

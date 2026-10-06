@@ -135,9 +135,12 @@ pub fn redeem_code(store: &MemoryStore, body: &[u8], now_micros: i64) -> Respons
 /// with `Access-Control-Allow-Origin: *` and authenticates the single active
 /// session even without a cookie. So, on top of the session, the request must
 /// be JSON (a plain cross-site form cannot send that) and, when a browser names
-/// an origin, the origin must be this server's own or a loopback one: the
-/// node's portal is served by this node or from the same machine. A caller
-/// that sends no `Origin` is not a browser page and is let through.
+/// an origin, the origin must be this server's own, exactly (scheme aside):
+/// the node's portal is served by this node or a front at its origin. Another
+/// port on this machine is another origin: any page served on localhost
+/// (another app, an XSS) is refused, as is a page that rebinds a name to
+/// 127.0.0.1 (the Host gate refuses its name first). A caller that sends no
+/// `Origin` is not a browser page and is let through.
 pub fn cross_site_refusal(headers: &HeaderMap) -> Option<Response<Full<Bytes>>> {
     let is_json = headers
         .get(header::CONTENT_TYPE)
@@ -175,20 +178,11 @@ pub fn foreign_origin_refusal(headers: &HeaderMap) -> Option<Response<Full<Bytes
         return refuse();
     };
     let same_origin = text(header::HOST).is_some_and(|host| host.eq_ignore_ascii_case(authority));
-    if same_origin || is_loopback(authority) {
+    if same_origin {
         None
     } else {
         refuse()
     }
-}
-
-/// Whether `authority` (`host[:port]`) names this machine.
-fn is_loopback(authority: &str) -> bool {
-    let host = match authority.strip_prefix('[') {
-        Some(v6) => v6.split(']').next().unwrap_or(""),
-        None => authority.split(':').next().unwrap_or(""),
-    };
-    matches!(host, "localhost" | "127.0.0.1" | "::1")
 }
 
 /// What the person sends when they agree: the terminal's request exactly as it
@@ -278,6 +272,19 @@ pub trait ControllerCell: Send + Sync {
     async fn affirm(&self, _device: &consent_grant::StandingDevice) -> Result<(), CellFailure> {
         Err(CellFailure::Unavailable("this cell does not affirm".into()))
     }
+    /// Sign a carrier statement with this cell's key (`consent_grant::carrier`):
+    /// one mandate grant, nothing else written.
+    async fn sign_carrier(
+        &self,
+        _kind: consent_grant::CarrierKind,
+        _state: &str,
+        _transport_id: &str,
+        _challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        Err(CellFailure::Unavailable(
+            "this cell does not sign carrier statements".into(),
+        ))
+    }
 }
 
 /// Where this node reads back the word its person signs in with, for
@@ -355,8 +362,9 @@ pub struct NewHuman {
 /// Who may make this node's key sign as its person
 /// (`consent_grant::may_make_node_sign`).
 ///
-/// A caller on this node's own machine, or a request carrying a session
-/// proven by sign-in for this node's own person (`POST /auth/login`,
+/// A caller on this node's own machine (loopback, not forwarded and not a
+/// trusted proxy), or a request carrying a session proven by sign-in for this
+/// node's own person (`POST /auth/login`,
 /// `services::node_account`). A session minted any other way (`POST
 /// /session`, `/session/exchange`, the single active session a cookie-less
 /// local caller stands on) proves nobody to another machine. Anything else is
@@ -811,6 +819,18 @@ pub trait DeviceCell: Send + Sync {
     /// Sign possession of the enrollment's intent and notarize the binding on
     /// this cell's chain.
     async fn enroll(&self, enrollment: &Enrollment) -> Result<BindingReceipt, CellFailure>;
+    /// Sign a carrier statement with this device's key: its ask.
+    async fn sign_carrier(
+        &self,
+        _kind: consent_grant::CarrierKind,
+        _state: &str,
+        _transport_id: &str,
+        _challenge: &str,
+    ) -> Result<consent_grant::CarrierProof, CellFailure> {
+        Err(CellFailure::Unavailable(
+            "this cell does not sign carrier statements".into(),
+        ))
+    }
 }
 
 /// What the terminal hands its own node to enroll: the request it made and what
@@ -820,6 +840,11 @@ pub trait DeviceCell: Send + Sync {
 struct EnrollInput {
     request: GrantRequest,
     delivered: Delivered,
+    /// The approving node the terminal expects: the one it declared, or the
+    /// one whose proof came with the code over the carrier. When known (here
+    /// or from the carrier) its key must have signed (`check_delivered`).
+    #[serde(default)]
+    approver_key: Option<String>,
 }
 
 /// Refuse a device step from anyone not on this machine. These steps make the
@@ -856,7 +881,13 @@ pub async fn device_enroll(cell: Option<&dyn DeviceCell>, body: &[u8]) -> Respon
         Ok(input) => input,
         Err(refused) => return *refused,
     };
-    if let Err(r) = check_delivered(&input.delivered, &input.request) {
+    // The approver the carrier proved for this request outranks what the
+    // terminal says; a terminal that knows none and declared none was asked
+    // to confirm the approver it was shown.
+    let expected = super::device_carrier::carrier()
+        .proven_approver(&input.request.state)
+        .or(input.approver_key.clone());
+    if let Err(r) = check_delivered(&input.delivered, &input.request, expected.as_deref()) {
         return refusal(
             StatusCode::BAD_REQUEST,
             "what was collected is not a valid consent for this request",
@@ -1355,8 +1386,14 @@ pub(crate) mod tests {
         let host = ("host", "127.0.0.1:8090");
         assert!(foreign_origin_refusal(&headers(&[host])).is_none());
         assert!(
-            foreign_origin_refusal(&headers(&[host, ("origin", "http://localhost:4200")]))
+            foreign_origin_refusal(&headers(&[host, ("origin", "http://127.0.0.1:8090")]))
                 .is_none()
+        );
+        // Another port on this machine is another origin (adversarial review,
+        // critical 2: any page served on localhost).
+        assert!(
+            foreign_origin_refusal(&headers(&[host, ("origin", "http://localhost:4200")]))
+                .is_some()
         );
         assert!(
             foreign_origin_refusal(&headers(&[host, ("origin", "https://evil.example")])).is_some()
@@ -1806,8 +1843,7 @@ pub(crate) mod tests {
                 ("host", "node.example:8090"),
                 ("origin", "https://node.example:8090"),
             ]),
-            headers(&[json_type, host, ("origin", "http://localhost:8081")]),
-            headers(&[json_type, host, ("origin", "http://[::1]:4200")]),
+            headers(&[json_type, host, ("origin", "http://127.0.0.1:8090")]),
         ] {
             assert!(cross_site_refusal(&allowed).is_none(), "{allowed:?}");
         }
@@ -1819,6 +1855,9 @@ pub(crate) mod tests {
             headers(&[json_type, host, ("origin", "null")]),
             headers(&[json_type, host, ("origin", "http://localhost.evil.example")]),
             headers(&[json_type, host, ("sec-fetch-site", "cross-site")]),
+            // A page on another port of this machine.
+            headers(&[json_type, host, ("origin", "http://localhost:8081")]),
+            headers(&[json_type, host, ("origin", "http://[::1]:4200")]),
         ] {
             let response = cross_site_refusal(&refused).expect("refused");
             assert_eq!(response.status(), StatusCode::FORBIDDEN, "{refused:?}");
