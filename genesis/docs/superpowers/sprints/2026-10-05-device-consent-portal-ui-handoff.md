@@ -6,7 +6,7 @@ status: handoff
 author: "claude-fable-5-1 (Che workspace), at the operator's direction"
 habits: [hosted-human-lifecycle]
 cites:
-  - genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md
+  - two-portals-sso-consolidation-design | Two portals, shared like SSO | sha256:38a88563ff60fb43 | path: genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md
 ---
 
 # Handoff — sign-in portal polish and the device approval screen
