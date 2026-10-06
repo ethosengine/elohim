@@ -23,6 +23,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  classifyExistingHuman,
   conductorUrlForHuman,
   extractHumanId,
   ensureOwnAgentProfile,
@@ -370,5 +371,23 @@ describe('selectStewardApp', () => {
 
   it('ignores apps that do not match the prefix at all', () => {
     expect(selectStewardApp([app('other-app')], 'elohim')).toBeUndefined();
+  });
+});
+
+describe('classifyExistingHuman — one agent embodies one Human', () => {
+  it('same id on the conductor is an idempotent exists', () => {
+    expect(classifyExistingHuman('human-matthew-manager', 'human-matthew-manager', true)).toBe('exists');
+  });
+
+  it("a different id on the human's OWN conductor is that person, embodied — the fixture id yields", () => {
+    expect(
+      classifyExistingHuman('5f27bc9b-df99-4a94-9f68-b1d355b4ddef', 'human-matthew-manager', true),
+    ).toBe('embodied');
+  });
+
+  it('a different id on a non-affine conductor is someone else — keep walking', () => {
+    expect(
+      classifyExistingHuman('5f27bc9b-df99-4a94-9f68-b1d355b4ddef', 'human-matthew-manager', false),
+    ).toBe('walk');
   });
 });

@@ -52,12 +52,12 @@ import {
 import {
   deterministicPeerId,
   resolvePeerId,
-  storageUrlForHuman,
   type Archetype,
 } from './peer-id.js';
 import type { CustodyPeerIds } from './seed-commitments.js';
 import { parseConductorUrls, selectStewardApp } from './seed-conductor-identities.js';
 import { retryOnSourceChainHeadMoved } from './retry-source-chain-head-moved.js';
+import { defaultNodeIdentityResolver, type NodeIdentityResolver } from './node-identity.js';
 
 // =============================================================================
 // Canonical household triad
@@ -388,12 +388,10 @@ interface GetMyHumanResult {
  * Sessions that match no member are closed; matched sessions stay open for the
  * ceremony.
  */
-/** Timeout for one per-peer `/auth/me` probe (mirrors seed-provide-rows). */
-const AUTH_ME_TIMEOUT_MS = 8000;
 
 /**
  * Map each household member's LIVE conductor agent key → their canonical
- * humanId, by asking each member's own storage peer `GET /auth/me`.
+ * humanId, by reading each member's OWN conductor (node-identity.ts).
  *
  * # Why this exists (2026-09-12, founder-unbindable)
  *
@@ -417,53 +415,26 @@ const AUTH_ME_TIMEOUT_MS = 8000;
  *
  * The agent key is the identity that actually matters here — the conductor's
  * own key is what every downstream join (`shard_locations.peer_id`,
- * `rea_commitments.provider`, `humans.agent_pub_key`) keys on. `/auth/me` is the
- * SAME probe `seed-provide-rows` already uses successfully for all three
- * members, matthew included, so this adds no new failure mode or new env: the
- * per-peer URL comes from `PEER_STORAGE_URLS` when set, else the
- * `storageUrlForHuman` template.
+ * `rea_commitments.provider`, `humans.agent_pub_key`) keys on, and the conductor
+ * is where that fact lives. The read is the same one seed-provide-rows and the
+ * custody resolver use; the conductor comes from the member's name-affine
+ * CONDUCTOR_URLS entry (never first-reachable).
  *
  * Failures degrade to an absent entry (never a throw): a member whose peer is
  * unreachable simply keeps the id-only matching it had before.
  */
 export async function fetchMemberAgentKeys(
   members: readonly HouseholdMember[] = HOUSEHOLD_MEMBERS,
+  resolver?: NodeIdentityResolver,
 ): Promise<Map<string, string>> {
   const byKey = new Map<string, string>();
-
-  // PEER_STORAGE_URLS (name=host:port,…) wins, exactly as seed-provide-rows
-  // resolves it; anything uncovered falls back to the peer-id template.
-  const explicit = new Map<string, string>();
-  for (const pair of (process.env.PEER_STORAGE_URLS ?? '').split(',')) {
-    const eq = pair.indexOf('=');
-    if (eq < 0) continue;
-    const shortName = pair.slice(0, eq).trim();
-    const hostPort = pair.slice(eq + 1).trim();
-    if (shortName && hostPort) explicit.set(shortName, `http://${hostPort}`);
-  }
-
   for (const member of members) {
-    const shortName = member.humanId.replace(/^human-/, '').split('-')[0];
-    const base = explicit.get(shortName) ?? storageUrlForHuman(member.humanId);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), AUTH_ME_TIMEOUT_MS);
     try {
-      const headers: Record<string, string> = {};
-      if (process.env.DOORWAY_API_KEY) {
-        headers['Authorization'] = `Bearer ${process.env.DOORWAY_API_KEY}`;
-      }
-      const res = await fetch(`${base.replace(/\/$/, '')}/auth/me`, {
-        signal: controller.signal,
-        headers,
-      });
-      if (!res.ok) continue;
-      const body = (await res.json()) as { agentPubKey?: unknown };
-      const key = typeof body.agentPubKey === 'string' ? body.agentPubKey : '';
-      if (key) byKey.set(key, member.humanId);
-    } catch {
-      // Unreachable peer / no session — id-only matching still applies.
-    } finally {
-      clearTimeout(timer);
+      const identity = await (resolver ?? defaultNodeIdentityResolver()).resolve(member.humanId);
+      byKey.set(identity.agentPubKey, member.humanId);
+    } catch (err) {
+      // No affine / readable conductor — id-only matching still applies.
+      console.warn(`  [?] ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -559,7 +530,7 @@ async function findMemberSessions(
           `get_my_human.id=${humanId ?? '<none>'} ` +
           `agentKey=${agentKey.slice(0, 16)}… ` +
           `(agent-key roster has ${wantByAgentKey.size} entr${wantByAgentKey.size === 1 ? 'y' : 'ies'}` +
-          `${wantByAgentKey.size === 0 ? ' — every per-member /auth/me probe failed' : ''})`,
+          `${wantByAgentKey.size === 0 ? ' — no member conductor was readable' : ''})`,
       );
     }
     if (member && !found.has(member.humanId)) {

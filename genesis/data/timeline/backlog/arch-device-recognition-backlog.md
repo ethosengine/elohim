@@ -74,6 +74,9 @@ state`.
 | 17 | A rogue node on the private network cannot hand back a code in another's name | Fixed 2026-10-06 (signing; the confirmation prompt is a dial) |
 | 18 | No one lists or replaces an ask in a device's name | Fixed 2026-10-06 |
 | 19 | Dialing up: the bars kept low for now | Recorded: each with its attack, fix and cost to the person |
+| 20 | CI seeders read a node's agent key from the route Row 15 closed | Cured in repo 2026-10-06 (read from the node's own conductor); awaiting a genesis build with custody 7 of 7 |
+| 21 | The story is partly executable: what its held scenarios wait for | Six grant scenarios have step definitions (2026-10-06); 28 are held, each naming its blocker; three blockers had no row until this one |
+| 22 | A node's established identity differs from the id a fixture declares for its person | Seen on alpha (matthew); the seeder now reports it and no longer calls it a conflict; the two ids are not reconciled |
 
 ## Row 1 — a remote session that proves the person
 
@@ -644,10 +647,80 @@ Closing the active-session fallback to callers from another machine also closed 
 seeders, which call `GET <pod>:8090/auth/me` with no cookie to learn each household node's agent
 key. elohim-genesis #1624: `Seed Custody Commitments` 0 of 7 created, every pair `/auth/me returned
 HTTP 401`; two custody legs of `Verify Substrate Propagation` red in consequence. The hardening
-stands; how a seeder on another machine learns which agent a node speaks as is an open design
-question with four options and a recommendation in
+stands. Decided 2026-10-06 (option D): a seeder reads the agent key from the node's own
+conductor (`genesis/seeder/src/node-identity.ts`), never from a session route; all six reads moved,
+no fallback. Cured in repo, awaiting CI proof; reasoning and the rejected options in
 `genesis/data/timeline/backlog/genesis-seeders-read-node-agent-key-from-closed-auth-me.md`.
 Probe: the custody stage seeds 7 of 7 and both custody legs pass in one genesis build.
+
+## Row 21 — the story is partly executable; what its held scenarios wait for (2026-10-06)
+
+`device-consent-grant.feature` and `device-provisioning-paths.feature` were held whole (`@wip` on
+the Feature line) with no step definitions. `genesis/a2o/steps/auth/device-consent.steps.ts` now
+plays the asking terminal against the nodes' own routes (`/auth/device/self`, `/auth/consent/view`,
+`/auth/consent/agree`, `/auth/consent/redeem`, `/auth/device/enroll`), over loopback, with the PKCE
+verifier held by the steps. The grant is served by the person's own node: the doorway has no
+consent route, and a request a doorway forwards is not local (row 15), so where the story says
+"asks doorway alpha" the steps ask Matthew's node. Six grant scenarios are un-held and need a
+fourth node (`@requires:device-node`, `E2E_DEVICE_NODE_URL`, staged with `just mesh join-peer`);
+without one they skip. Every other scenario carries its own `@wip` with one line naming what it
+waits for. Three of those blockers had no row:
+
+- **Chain:** device consent / after enrollment. **Between:** "the device is enrolled" → "the
+  device still cannot change content it was not given standing over". **Missing node:** a step
+  that publishes as the enrolled device and is refused. **Probe:** the scenario "An enrolled
+  device still cannot change content" passes. **Current state:** no device-publish step exists in
+  a2o; the refusal is untested end to end.
+- **Chain:** device consent / the code's lifetime. **Between:** "a code is issued" → "an unused
+  code stops working". **Missing node:** a clock seam on the node (or a declared short lifetime
+  for a test stage) so expiry is observable without six real minutes. **Probe:** "A code left
+  unused expires" passes in under ten seconds. **Current state:** expiry is covered only by
+  `crates/consent-grant` unit tests; `AgreedView.expiresAt` (`ceremony.rs`) is an `i64` whose unit
+  the wire does not state.
+- **Chain:** operating a node for someone else. **Between:** "a relative operates the node" → "a
+  community caretaker takes over operating it". **Missing node:** the operator-of-record record
+  row 6 names as undesigned. **Probe:** "A community caretaker takes over operating" passes.
+  **Current state:** not designed.
+
+Also read while wiring the steps: no node route answers whether a device is bound, so "enrolled"
+is judged from the 201 the enroll returns plus `record.identityRoot` (rows 3 and 7); a root key is
+recorded in the consent and never bound (row 3).
+
+**DELTA 2026-10-06 (live):** on the i1006 household (pinned conductor `3c1e80525`) with a fourth
+node staged by `just mesh join-peer workspace`, the six un-held scenarios passed, 6 of 6 and 53 of
+53 steps (`sprint-report-household-20261006T145000Z-22c28e84`). The first live run failed two
+redemptions with `redemption_code_unknown`: the steps presented the whole displayed value. The
+portal shows `code#state`; the terminal splits it, matches the state to its own ask and redeems
+the code alone, as `epr device redeem` does. The steps now do the same.
+
+## Row 22 — a node's established identity differs from the id a fixture declares (found on the fleet, 2026-10-06)
+
+- **Chain:** joining "as it is" (row 7), seen from the seeder.
+- **Between:** "a person's own node already embodies a Human, begun through another door" → "the
+  seed data, which names that person by a fixture id, addresses the same person".
+- **Seen:** on alpha, matthew's conductor embodies `5f27bc9b-df99-4a94-9f68-b1d355b4ddef` (minted
+  by a doorway registration); the fixture names him `human-matthew-manager`. Every genesis build
+  reported `[C] Conflict` and the stage ended partial.
+- **What changed:** on a conductor that is name-affine to the person, a different embodied id is
+  reported as `[~] Embodied as <id>` and counted as success, with the mapping written to the
+  results artifact (`embodiedAs`). Nothing is written to the conductor. A conductor that is not
+  the person's own still reads as a conflict.
+- **Not done, on purpose:** downstream seeders still key rows by the fixture id (operator
+  bindings, stewardship allocations, agent bindings, household members). Moving them to the
+  embodied id would strand what the fleet already holds under the fixture id. Reconciling two ids
+  for one person is the reconciliation surface the 2026-10-05 ruling names as unbuilt and
+  epic-level; a seeder must not do it by substitution.
+- **Probe:** `Seed Conductor Identities` in a genesis build prints `Embodied as` for matthew and
+  the stage is not partial for that reason.
+- **DELTA 2026-10-06 (elohim-genesis #1626):** the probe is met (`[~] Matthew … (Embodied as
+  5f27bc9b-…)`, `0 conflict`), and the same two-ids fact surfaced one step later. Household
+  formation now finds matthew (`agent-key roster has 3 entries`, `affirmed=[human-matthew-manager]`)
+  and then cannot invite the others: `issue_household_invite for human-jessica-spouse: … caller is
+  not a current Steward of collective:uhCkkIttw…` (the same for james). The household's collective
+  on alpha was founded under another key than the one matthew's node speaks with, so his node is
+  not one of its stewards. Before this change the stage reported `affirmed=[jessica, james]` and
+  could not bind matthew at all; nothing was written to the fleet in either case. This is the
+  reconciliation the row already names, seen from the household side.
 
 ## shift_objective
 

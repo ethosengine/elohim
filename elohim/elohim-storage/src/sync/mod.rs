@@ -393,14 +393,15 @@ mod tests {
         let first = authored.get_changes(&[])[0].raw_bytes().to_vec();
 
         assert_eq!(
-            new_change_origin_timestamps(&sync, "elohim", "node:new", &[first.clone()]).await,
+            new_change_origin_timestamps(&sync, "elohim", "node:new", std::slice::from_ref(&first))
+                .await,
             vec![Some(99)]
         );
         sync.apply_changes("elohim", "node:new", vec![first.clone()])
             .await
             .unwrap();
         assert!(
-            new_change_origin_timestamps(&sync, "elohim", "node:new", &[first.clone()])
+            new_change_origin_timestamps(&sync, "elohim", "node:new", std::slice::from_ref(&first))
                 .await
                 .is_empty(),
             "a sequential duplicate must not emit a second latency sample"

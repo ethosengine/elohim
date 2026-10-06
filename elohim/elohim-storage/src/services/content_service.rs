@@ -865,8 +865,10 @@ pub(crate) fn project_own_commit(
     author_election: Option<(content_diesel::CanonicalOrdering, i64)>,
     mirror_reach: Option<&str>,
 ) -> Result<(), StorageError> {
-    use diesel::Connection;
-    conn.transaction::<_, StorageError, _>(|conn| {
+    // Read-then-write (the stamp and the upsert both read the row first):
+    // take the write lock up front so a concurrent projection makes this wait
+    // under the busy timeout rather than fail the lock upgrade at once.
+    crate::db::read_then_write_transaction::<_, StorageError, _>(conn, |conn| {
         if let Some(reach) = mirror_reach {
             content_diesel::mirror_committed_reach(conn, ctx, id, reach)?;
         }

@@ -16,4 +16,7 @@ echo "SEED COLLECTIVES"
 echo "═══════════════════════════════════════════════════════════"
 echo "Doorway: ${DOORWAY_HOST}"
 echo ""
+# Seed only into a ready node: a fleet roll leaves storage `catching-up` for minutes
+# (genesis #1625: 503 circuit-open on every write). Soft — never exits non-0.
+bash "$(dirname "${BASH_SOURCE[0]}")/wait-storage-ready.sh" "${DOORWAY_HOST}"
 DOORWAY_URL="${DOORWAY_HOST}" npx tsx src/seed-collectives.ts

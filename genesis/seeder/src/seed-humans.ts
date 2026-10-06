@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { CreateHumanInputView } from '@elohim/storage-client';
 
+import { sendRetryingShed } from './doorway-client.js';
 // =============================================================================
 // Types (mirrors humans.json schema)
 // =============================================================================
@@ -265,11 +266,11 @@ async function registerHuman(
   }
 
   try {
-    const res = await fetch(`${doorwayUrl}/auth/register`, {
+    const res = await sendRetryingShed(() => fetch(`${doorwayUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }), 'POST /auth/register');
 
     if (res.ok) {
       const auth = (await res.json().catch(() => ({}))) as { agentPubKey?: string };
@@ -315,14 +316,14 @@ async function verifyExisting(
   displayName: string
 ): Promise<RegisterResult> {
   try {
-    const loginRes = await fetch(`${doorwayUrl}/auth/login`, {
+    const loginRes = await sendRetryingShed(() => fetch(`${doorwayUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: creds.identifier,
         password: creds.password,
       }),
-    });
+    }), 'POST /auth/login');
 
     if (loginRes.ok) {
       const auth = (await loginRes.json().catch(() => ({}))) as { agentPubKey?: string };
@@ -410,11 +411,11 @@ async function seedProjectionRow(
   }
 
   try {
-    const res = await fetch(`${doorwayUrl}/api/v1/identity/register`, {
+    const res = await sendRetryingShed(() => fetch(`${doorwayUrl}/api/v1/identity/register`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    });
+    }), 'POST /api/v1/identity/register');
 
     if (res.ok) {
       return { result: 'created' };

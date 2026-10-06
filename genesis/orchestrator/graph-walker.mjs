@@ -11,7 +11,7 @@ import { resolve, dirname } from 'path';
 import picomatch from 'picomatch';
 import { loadManifests, resolveStep } from './manifest-utils.mjs';
 import { filterChanged } from './ci-ignore.mjs';
-import { stepClass, deriveRunClass } from './pipeline-registry.mjs';
+import { stepClass, deriveRunClass, capManifestOnly, manifestOnlyLine } from './pipeline-registry.mjs';
 
 /**
  * Topologically sort steps using Kahn's algorithm.
@@ -207,17 +207,24 @@ export function walkGraph(manifests, changedFiles) {
   const pipelineMap = new Map();
   for (const [qualified, reasons] of stale) {
     const { pipeline, step } = stepIndex.get(qualified);
-    if (!pipelineMap.has(pipeline)) pipelineMap.set(pipeline, { reasons: [], steps: [] });
+    if (!pipelineMap.has(pipeline)) pipelineMap.set(pipeline, { reasons: [], steps: [], triggers: [], opaque: false });
     const entry = pipelineMap.get(pipeline);
     entry.reasons.push(...reasons);
+    // Every changed file that made this step stale (matchInputs keeps only the
+    // first per pattern); a build-process trigger is never manifest-only.
+    if (reasons.some((r) => !r.startsWith('source: '))) entry.opaque = true;
+    const matchers = (step.inputs?.sources || []).map((p) => picomatch(p));
+    for (const file of changedFiles) if (matchers.some((m) => m(file))) entry.triggers.push(file);
     entry.steps.push({ name: qualified.slice(pipeline.length + 1), class: stepClass(step) });
   }
-  const pipelines = [...pipelineMap.entries()].map(([name, { reasons, steps }]) => ({
-    name,
-    reasons,
-    steps,
-    runClass: deriveRunClass(steps.map((s) => s.class)),
-  }));
+  const pipelines = [...pipelineMap.entries()].map(([name, { reasons, steps, triggers, opaque }]) => {
+    const derived = deriveRunClass(steps.map((s) => s.class));
+    const runClass = opaque ? derived : capManifestOnly(derived, triggers);
+    // Same line the dispatcher echoes (build-graph.groovy); stderr, because
+    // gate consumers parse stdout.
+    if (runClass !== derived) process.stderr.write(`${manifestOnlyLine(name)}\n`);
+    return { name, reasons, steps, runClass };
+  });
 
   return { projects, pipelines };
 }

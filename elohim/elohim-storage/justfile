@@ -118,6 +118,13 @@ check:
 clippy:
     cargo clippy {{jobs_flag}} -- -D warnings
 
+# Lint the feature set the mesh and the fleet image actually build (p2p + iroh).
+# The default `clippy` leg never compiled this cfg, so its warnings shipped
+# unseen (bc924808f). Type-checks only: clippy never writes the
+# `debug/elohim-storage` binary the mesh runs.
+clippy-iroh:
+    cargo clippy {{jobs_flag}} --features "p2p p2p-iroh" --all-targets -- -D warnings
+
 # Format code
 fmt:
     cargo fmt
@@ -153,5 +160,5 @@ migration-hygiene:
 image-includes:
     python3 {{justfile_directory()}}/../../scripts/ci/check-image-include-targets.py --crate {{justfile_directory()}}
 
-# Quality gate: migration-hygiene + image-includes + fmt-check + clippy + test
-gate: migration-hygiene image-includes fmt-check clippy test
+# Quality gate: migration-hygiene + image-includes + fmt-check + clippy + clippy-iroh + test
+gate: migration-hygiene image-includes fmt-check clippy clippy-iroh test

@@ -46,6 +46,15 @@
 #   APP-RELEASE-STAGE skipped=branch-<name>-has-no-channel
 #   APP-RELEASE-STAGE released=<cid> adopted=<peer,...>
 #   APP-RELEASE-STAGE released=<cid> adopted=<peer,...> pending=<peer,...>
+#   APP-RELEASE-STAGE released=<cid> adopted=<peer,...> pending=<peer,...> bind-not-visible=<peer,...>
+#                               (a pending peer refused the release as
+#                               app_slug_not_bound_to_channel: its OWN slug row did
+#                               not name the channel when the release arrived — a
+#                               terminal refusal for this release on that peer. No
+#                               per-peer slug-row read exists through the doorway
+#                               (only GET /db/p2p/adoption?peer=), so the stage
+#                               cannot wait for the bind to reach each peer before
+#                               publishing; it names the cause instead.)
 #   APP-RELEASE-STAGE refused=app_bundle_cannot_boot
 #   APP-RELEASE-STAGE refused=channel-create-failed channel=<id> …
 #   APP-RELEASE-STAGE refused=channel-bind-failed channel=<id> slug=<slug> …
@@ -368,9 +377,13 @@ vout="$(bash "${VERIFY}" "${DOORWAY}" "${cid}" "${PEERS[@]}")" || rc=$?
 say "${vout}"
 adopted="$(printf '%s\n' "${vout}" | sed -n 's/^APP-ADOPTED \([^ ]*\).*/\1/p' | paste -sd, -)"
 pending="$(printf '%s\n' "${vout}" | sed -n 's/^APP-NOT-ADOPTED \([^ ]*\).*/\1/p' | paste -sd, -)"
+# The pending peers whose refusal is "the bind had not reached my row": named so
+# the summary carries the cause, not only the downstream refusal.
+unbound="$(printf '%s\n' "${vout}" \
+    | sed -n 's/^APP-NOT-ADOPTED \([^ ]*\) .*reason=app_slug_not_bound_to_channel.*/\1/p' | paste -sd, -)"
 case "${rc}" in
     0) say "APP-RELEASE-STAGE released=${cid} adopted=${adopted}"; exit 0 ;;
     1) say "APP-RELEASE-STAGE refused=app_bundle_cannot_boot"; exit 1 ;;
-    3) say "APP-RELEASE-STAGE released=${cid} adopted=${adopted} pending=${pending}"; exit 3 ;;
+    3) say "APP-RELEASE-STAGE released=${cid} adopted=${adopted} pending=${pending}${unbound:+ bind-not-visible=${unbound}}"; exit 3 ;;
     *) say "APP-RELEASE-STAGE refused=verify-exit-${rc}"; exit 2 ;;
 esac

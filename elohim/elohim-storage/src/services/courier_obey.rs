@@ -706,6 +706,8 @@ pub(crate) mod tests {
         }
     }
 
+    // Test double: built once per test, so the variant size gap is irrelevant.
+    #[allow(clippy::large_enum_variant)]
     pub(crate) enum Verdict {
         Proves(CarriedHeadEvidenceWire),
         Refuses(&'static str),

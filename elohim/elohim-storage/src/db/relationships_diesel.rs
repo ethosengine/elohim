@@ -461,7 +461,7 @@ pub fn bulk_create_relationships(
     let mut updated = 0u64;
     let mut errors = vec![];
 
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         for input in inputs {
             let id = input
                 .id

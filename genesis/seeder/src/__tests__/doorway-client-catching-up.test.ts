@@ -12,7 +12,16 @@
  * test runs without fake timers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DoorwayClient } from '../doorway-client.js';
+import {
+  resetShedRetryProcessBudget,
+  SHED_RETRY_PROCESS_BOUND_MS,
+  DoorwayClient,
+  SHED_RETRY_DELAY_CAP_MS,
+  SHED_RETRY_MAX_RETRIES,
+  SHED_RETRY_TOTAL_BOUND_MS,
+  sendRetryingShed,
+  shedRetryDelayMs,
+} from '../doorway-client.js';
 
 /** Exposes the protected fetch() so we can exercise the retry directly. */
 class TestClient extends DoorwayClient {
@@ -97,5 +106,90 @@ describe('DoorwayClient catching-up (503) retry', () => {
     expect(await res.json()).toEqual({ status: 'catching-up', retryAfter: 0 });
     // 1 initial attempt + 12 retries (catchingUpMax) = 13 calls
     expect(counts['/db/presences']).toBe(13);
+  });
+});
+
+describe('sendRetryingShed — the shared 503 policy plain-fetch seeders use', () => {
+  const shed = (body: object, headers: Record<string, string> = {}) => () =>
+    Promise.resolve(new Response(JSON.stringify(body), { status: 503, headers }));
+
+  it('honours the body retryAfter of a circuit-open catching-up shed, then succeeds', async () => {
+    const sleeps: number[] = [];
+    const answers = [
+      shed({ status: 'catching-up', cause: 'upstream', circuit: 'open', retryAfter: 7 }),
+      () => Promise.resolve(new Response('{}', { status: 201 })),
+    ];
+    let n = 0;
+    const res = await sendRetryingShed(() => answers[n++](), 'POST /db/presences', async ms => {
+      sleeps.push(ms);
+    });
+    expect(res.status).toBe(201);
+    expect(sleeps).toEqual([7000]);
+  });
+
+  it('caps a large hint, and backs off (capped doubling) when no hint is given', () => {
+    expect(shedRetryDelayMs(503, '{"retryAfter":600}', null, 0)).toBe(SHED_RETRY_DELAY_CAP_MS);
+    expect(shedRetryDelayMs(503, '{"status":"catching-up"}', null, 0)).toBe(2000);
+    expect(shedRetryDelayMs(503, '{"status":"catching-up"}', null, 1)).toBe(4000);
+    expect(shedRetryDelayMs(503, '{"status":"catching-up"}', null, 9)).toBe(SHED_RETRY_DELAY_CAP_MS);
+    expect(shedRetryDelayMs(503, 'not json', '3', 0)).toBe(3000);
+  });
+
+  it('never retries a non-503 or a 503 with no retry hint', async () => {
+    expect(shedRetryDelayMs(500, '{"retryAfter":1}', '1', 0)).toBeNull();
+    expect(shedRetryDelayMs(503, '{"error":"boom"}', null, 0)).toBeNull();
+    let calls = 0;
+    const res = await sendRetryingShed(
+      () => {
+        calls++;
+        return Promise.resolve(new Response('{"error":"x"}', { status: 409 }));
+      },
+      'POST /x',
+      async () => {}
+    );
+    expect(res.status).toBe(409);
+    expect(calls).toBe(1);
+  });
+
+  it('stops at the total sleep bound and returns a readable 503', async () => {
+    let calls = 0;
+    let slept = 0;
+    const res = await sendRetryingShed(
+      () => {
+        calls++;
+        return shed({ status: 'catching-up', retryAfter: 15 })();
+      },
+      'POST /db/collectives',
+      async ms => {
+        slept += ms;
+      }
+    );
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ status: 'catching-up', retryAfter: 15 });
+    expect(slept).toBeLessThanOrEqual(SHED_RETRY_TOTAL_BOUND_MS);
+    expect(calls).toBe(Math.min(SHED_RETRY_MAX_RETRIES, Math.floor(SHED_RETRY_TOTAL_BOUND_MS / 15_000)) + 1);
+  });
+});
+
+describe('sendRetryingShed — process-wide shed budget', () => {
+  afterEach(() => resetShedRetryProcessBudget());
+
+  it('stops retrying once the process has spent its whole shed budget', async () => {
+    resetShedRetryProcessBudget();
+    const { sendRetryingShed } = await import('../doorway-client.js');
+    const shed = () =>
+      Promise.resolve(new Response(JSON.stringify({ status: 'catching-up', retryAfter: 15 }), { status: 503 }));
+    let slept = 0;
+    const sleep = async (ms: number) => {
+      slept += ms;
+    };
+    for (let i = 0; i < 10; i++) {
+      const r = await sendRetryingShed(shed, `w${i}`, sleep);
+      expect(r.status).toBe(503);
+    }
+    expect(slept).toBeLessThanOrEqual(SHED_RETRY_PROCESS_BOUND_MS);
+    const before = slept;
+    await sendRetryingShed(shed, 'after-budget', sleep);
+    expect(slept).toBe(before);
   });
 });

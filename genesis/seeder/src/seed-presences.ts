@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import { validatePresencesDirectory, type PresenceFrontmatter } from './validate-presences.js';
 
+import { sendRetryingShed } from './doorway-client.js';
 // =============================================================================
 // Types
 // =============================================================================
@@ -92,11 +93,11 @@ async function postPresence(
 ): Promise<PostResult> {
   const id = String(body.id);
   try {
-    const res = await fetch(`${doorwayUrl}/db/presences`, {
+    const res = await sendRetryingShed(() => fetch(`${doorwayUrl}/db/presences`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }), 'POST /db/presences');
     if (res.ok) return { id, outcome: 'created' };
     if (res.status === 409) return { id, outcome: 'exists' };
     const errorText = await res.text();

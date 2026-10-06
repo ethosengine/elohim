@@ -18,9 +18,9 @@
  *   DELEGATES_PAIRS_JSON=./pairs.json npx tsx src/seed-delegates-compute.ts
  *
  * MATTHEW_AGENT_CID / SEED_NOW_ISO / SEED_VALID_UNTIL_ISO are all optional on
- * a live mesh: when unset, MATTHEW_AGENT_CID resolves from STORAGE_URL's own
- * `GET /auth/me` (matthew's live session — the same resolution seed-commitments
- * uses for custody peer ids), and the dates default to now / now+30d. This is a
+ * a live mesh: when unset, MATTHEW_AGENT_CID resolves from matthew's OWN
+ * conductor via CONDUCTOR_URLS (node-identity.ts — the same resolution
+ * seed-commitments uses for custody peer ids), and the dates default to now / now+30d. This is a
  * mesh-local fallback only — no CI stage exports these envs today (this script
  * is a manual/local-mesh lever, not wired into genesis/Jenkinsfile), so the
  * fallback is exercised whenever the caller doesn't supply them, not just in
@@ -32,6 +32,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveNodeIdentity } from './node-identity.js';
+
+/** The fixture human whose conductor is the compute delegator. */
+const MATTHEW_HUMAN_ID = 'human-matthew-manager';
 
 // =============================================================================
 // Minimum-bounds guard (spec §14)
@@ -199,35 +203,25 @@ export async function seedDelegatesComputeCommitments(
 }
 
 /**
- * Resolve MATTHEW_AGENT_CID: explicit env wins, else fetch matthew's live
- * agentPubKey from STORAGE_URL's own `GET /auth/me`. Mirrors the peer-id
- * resolution seed-commitments.ts already relies on (`resolveCustodyPeerIds`) —
- * on a live mesh the storage pod IS the agent's session, so there is no need
- * to make the caller compute a value the pod already knows. Throws (never
- * process.exit) so the caller can print one clear final error line.
+ * Resolve MATTHEW_AGENT_CID: explicit env wins, else the agent key matthew's
+ * OWN conductor speaks as (node-identity.ts, name-affine CONDUCTOR_URLS entry).
+ * Throws (never process.exit) so the caller can print one clear final error line.
  */
-async function resolveMatthewAgentCid(storageUrl: string): Promise<string> {
+async function resolveMatthewAgentCid(): Promise<string> {
   const envCid = process.env.MATTHEW_AGENT_CID;
   if (envCid) return envCid;
-
-  const endpoint = `${storageUrl.replace(/\/+$/, '')}/auth/me`;
-  let response: Response;
+  let identity;
   try {
-    response = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
+    identity = await resolveNodeIdentity(MATTHEW_HUMAN_ID);
   } catch (err) {
     throw new Error(
-      `MATTHEW_AGENT_CID not set and ${endpoint} was unreachable — ${err instanceof Error ? err.message : String(err)}`,
+      `MATTHEW_AGENT_CID not set and ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  if (!response.ok) {
-    throw new Error(`MATTHEW_AGENT_CID not set and ${endpoint} returned HTTP ${response.status}`);
-  }
-  const body = (await response.json()) as { agentPubKey?: unknown };
-  if (typeof body.agentPubKey !== 'string' || !body.agentPubKey.startsWith('uhCAk')) {
-    throw new Error(`MATTHEW_AGENT_CID not set and ${endpoint} did not return a Holochain agentPubKey`);
-  }
-  console.log(`[seed-delegates-compute] MATTHEW_AGENT_CID unset — resolved ${body.agentPubKey.slice(0, 16)}… from ${endpoint}`);
-  return body.agentPubKey;
+  console.log(
+    `[seed-delegates-compute] MATTHEW_AGENT_CID unset — resolved ${identity.agentPubKey.slice(0, 16)}… from ${identity.conductorUrl}`,
+  );
+  return identity.agentPubKey;
 }
 
 /** Explicit env wins; otherwise a loud, logged default (now / now+30d). */
@@ -242,10 +236,10 @@ function resolveDateEnv(key: string, fallback: () => string): string {
 /**
  * Default pair: Matthew→Che self-contract (provider == recipient == MATTHEW_AGENT_CID).
  * Phase-0 <PERFORMER_CLAIM> value from env, or resolved live from storageUrl's
- * /auth/me when unset. Dates from env, or defaulted to now / now+30d when unset.
+ * matthew's own conductor when unset. Dates from env, or defaulted to now / now+30d when unset.
  */
 export async function defaultDelegatesComputePairs(storageUrl: string): Promise<DelegatesComputePair[]> {
-  const m = await resolveMatthewAgentCid(storageUrl);
+  const m = await resolveMatthewAgentCid();
   return [
     {
       scope: 'orchestrate-node',

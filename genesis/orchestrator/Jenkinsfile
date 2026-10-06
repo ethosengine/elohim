@@ -1783,7 +1783,7 @@ def applyAlreadyBuiltFilter(graphPipelines) {
         // in flight intact — a failing `sh` must not become the thing that
         // propagates, and neither must a failing `echo` about it.
         try {
-            sh "rm -f ${stateFile} ${planFile} ${walksFile} ${decideFile}"
+            sh "rm -f ${stateFile} ${planFile} ${walksFile} ${decideFile} pipeline-verdicts.json"
         } catch (Exception cleanupError) {
             try {
                 echo "⚠️  already-built filter: could not remove its temp files (${cleanupError.toString()})"
@@ -1858,6 +1858,16 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // genesis is never pulled in on behalf of a pipeline this filter just
         // dropped (and so an emptied plan stays empty, skipping Execute Builds
         // entirely while the Gate #6 parity stage still runs).
+        // Verdict evidence the filter reads (timer-dispatch.mjs recordedVerdict):
+        // record-pipeline-verdicts.mjs always exits 0; no row = dispatch-only stays KEPT.
+        try {
+            writeJSON file: '.orch-verdict-state.json', json: [baselines: readJSON(text: env.PIPELINE_BASELINES ?: '{}')]
+            sh(script: "node genesis/orchestrator/record-pipeline-verdicts.mjs .orch-verdict-state.json || true", returnStatus: true)
+        } catch (Exception verdictError) {
+            String seen = verdictError.toString()
+            if (seen.contains('FlowInterrupted') || seen.contains('InterruptedException')) throw verdictError
+            echo "⚠️  verdict recorder skipped (${seen}) — dispatch-only producers stay KEPT"
+        }
         graphPipelines = applyAlreadyBuiltFilter(graphPipelines)
         forcedPipelines.each { runClasses[it] = 'build' }
 
@@ -3217,11 +3227,12 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘'''
                         }
                         sh 'corepack enable'
+                        // Installs a2o AND builds @elohim/storage-client (its dist is a runtime import of the steps).
+                        sh "bash '${env.WORKSPACE}/genesis/scripts/ci/install-substrate-runner.sh'"
                         dir('genesis/a2o') {
-                            sh 'pnpm install --frozen-lockfile'
                             sh '''
                                 E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host \
-                                pnpm exec cucumber-js --tags "@e2e and @federation"
+                                pnpm exec cucumber-js --tags "@e2e and @federation and not @wip"
                             '''
                         }
                     }

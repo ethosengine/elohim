@@ -100,7 +100,7 @@
  * seed-row-shape lesson).
  *
  * IDENTITY RULE (the defect this guards): the provider MUST be the agent key
- * the co-steward's pod reports at `GET /auth/me` RIGHT NOW, never the
+ * the co-steward's OWN conductor speaks as RIGHT NOW (node-identity.ts), never the
  * `agentPubKey` cached on her `humans` row. A mesh whose `content.db` outlives
  * its conductor keeps a STALE key on the canonical `human-*` row while the live
  * key lands on a separate `agent:<key>` row — measured on the household mesh
@@ -127,6 +127,7 @@
 import { createHash } from 'node:crypto';
 import { CommitmentClient, seedCapacityPledge } from './seed-commitments.js';
 import { parseNamedCsv, storageUrlForHuman } from './peer-id.js';
+import { defaultNodeIdentityResolver, type NodeIdentityResolver } from './node-identity.js';
 
 // =============================================================================
 // Configuration
@@ -318,7 +319,7 @@ function storageBase(humanId: string): string {
 /**
  * Retry a transiently-failing probe a few times with a short backoff.
  *
- * Exists because conductor-backed key resolution (`GET /auth/me`) was seen to
+ * Exists because conductor-backed key resolution was seen to
  * time out transiently on the household mesh (wave-2b) while the pod was
  * otherwise healthy. Three attempts, short backoff — this is a flake
  * absorber, never a wait-for-deploy loop.
@@ -343,32 +344,18 @@ export async function withRetry<T>(
 }
 
 /**
- * The agent key a human's pod reports RIGHT NOW.
+ * The agent key a human's OWN conductor speaks as RIGHT NOW.
  *
  * No fallback to the `humans` row on purpose (same posture as
- * seed-commitments' `resolveCustodyPeerIds`): an unreachable pod is an honest
- * seed failure, never authority to author a commitment in a stale identity
- * namespace.
- *
- * `storageUrlOverride` bypasses the PEER_STORAGE_URLS/template lookup when the
- * caller already knows the pod (leg 0 probes the SAME node it pins on).
+ * seed-commitments' `resolveCustodyPeerIds`): an unreadable conductor is an
+ * honest seed failure, never authority to author a commitment in a stale
+ * identity namespace.
  */
 export async function resolveLiveAgentKey(
   humanId: string,
-  fetchImpl: typeof fetch = fetch,
-  storageUrlOverride?: string,
+  resolver: NodeIdentityResolver = defaultNodeIdentityResolver(),
 ): Promise<string> {
-  const base = (storageUrlOverride ?? storageBase(humanId)).replace(/\/+$/, '');
-  const url = `${base}/auth/me`;
-  const response = await fetchImpl(url, { signal: AbortSignal.timeout(5000) });
-  if (!response.ok) {
-    throw new Error(`${humanId}: GET ${url} returned HTTP ${response.status}`);
-  }
-  const body = (await response.json()) as { agentPubKey?: unknown };
-  if (typeof body.agentPubKey !== 'string' || !body.agentPubKey.startsWith('uhCAk')) {
-    throw new Error(`${humanId}: ${url} did not return a Holochain agentPubKey`);
-  }
-  return body.agentPubKey;
+  return (await resolver.resolve(humanId)).agentPubKey;
 }
 
 /** Read the household resilience card through a doorway. */
@@ -570,6 +557,8 @@ export async function ensureDistributionMeasured(opts: {
   apiKey?: string;
   fetchImpl?: typeof fetch;
   settleMs?: number;
+  /** Node-identity seam (live agent keys from each human's own conductor). */
+  nodeIdentity?: NodeIdentityResolver;
 }): Promise<DistributionLegResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const settleMs = opts.settleMs ?? 12_000;
@@ -610,14 +599,11 @@ export async function ensureDistributionMeasured(opts: {
   // which is the same measured zero it was called to cure (see the IDENTITY
   // RULE in the module docs).
   const liveKeys = new Map<string, string>();
-  for (const url of peerStorageUrlsFromEnv()) {
+  const nodeIdentity = opts.nodeIdentity ?? defaultNodeIdentityResolver();
+  for (const h of humans as { id?: unknown }[]) {
+    if (typeof h.id !== 'string' || !nodeIdentity.conductorUrlFor(h.id)) continue;
     try {
-      const response = await fetchImpl(`${url}/auth/me`, { signal: AbortSignal.timeout(5000) });
-      if (!response.ok) continue;
-      const body = (await response.json()) as { humanId?: unknown; agentPubKey?: unknown };
-      if (typeof body.humanId === 'string' && typeof body.agentPubKey === 'string') {
-        liveKeys.set(body.humanId, body.agentPubKey);
-      }
+      liveKeys.set(h.id, (await nodeIdentity.resolve(h.id)).agentPubKey);
     } catch {
       // An unreachable peer contributes no override — the cached key stands,
       // and a stale one shows up as a still-zero steward count, reported.
@@ -793,7 +779,7 @@ if (isMain) {
   // while a persistent failure is reported without blocking the consent act.
   try {
     const pinNodeKey = await withRetry(() =>
-      resolveLiveAgentKey(pinStewardHumanId, fetch, pinStorageUrl),
+      resolveLiveAgentKey(pinStewardHumanId),
     );
     console.log(`  [=] ${pinStewardHumanId} live agent key: ${pinNodeKey.slice(0, 20)}...`);
   } catch (error) {

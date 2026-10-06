@@ -3445,6 +3445,11 @@ impl HttpServer {
     fn escaped_error_response(e: &StorageError) -> Response<Full<Bytes>> {
         let mut response = if crate::conductor_admission::is_admission_shed(e) {
             crate::services::response::admission_shed_backpressure()
+        } else if crate::db::is_sqlite_lock_loss(e) {
+            crate::services::response::too_many_requests_with_retry(
+                crate::services::response::SQLITE_LOCK_RETRY_AFTER_SECS,
+                0,
+            )
         } else {
             Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -22305,7 +22310,7 @@ mod candidate_head_state_tests {
                 CONTENT_ID,
                 CANDIDATE,
                 started + std::time::Duration::from_millis(10),
-                || std::future::pending(),
+                std::future::pending,
                 |_| async { panic!("timed-out fetch must not reach verification") },
             )
             .await;

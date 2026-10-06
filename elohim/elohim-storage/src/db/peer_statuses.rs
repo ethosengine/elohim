@@ -68,7 +68,7 @@ pub fn upsert(conn: &mut SqliteConnection, row: &PeerStatusRow) -> QueryResult<u
 /// a single transaction on one pooled connection, so a concurrent writer cannot
 /// interleave between the freshness check and the write.
 pub fn upsert_if_newer(conn: &mut SqliteConnection, row: &PeerStatusRow) -> QueryResult<bool> {
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         let existing_ts: Option<i64> = peer_statuses::table
             .find(&row.peer_id)
             .select(peer_statuses::timestamp)

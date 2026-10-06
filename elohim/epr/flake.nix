@@ -25,11 +25,15 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
 
-        # `default` profile already carries cargo + rustfmt + clippy; rust-src is
-        # added for rust-analyzer parity with the dev container.
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "clippy" "rustfmt" ];
-        };
+        # Pinned, never `stable.latest`: the version is declared ONCE in
+        # ./rust-toolchain.toml (channel + `default` profile + rust-src/clippy/rustfmt)
+        # and equals the local gate's RUSTUP_TOOLCHAIN (genesis/agentic/pool-policy.json;
+        # genesis/orchestrator/rust-toolchain-pin.test.mjs refuses a mismatch). With no
+        # flake.lock, `stable.latest` resolved to whatever rust-overlay HEAD carried on
+        # each run (1.99.0 on elohim-eprfs #43), so CI ran a newer clippy than the gate.
+        # rust-overlay keeps every past stable manifest, so an unlocked overlay still
+        # yields exactly the declared version.
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [

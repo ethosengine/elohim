@@ -9,13 +9,20 @@ import {
   specToMetadata,
   findActiveRowForSpec,
   seedProjections,
+  isDoubleRootRefusal,
+  authorPeerHealthFromBody,
   PROJECTION_RELEVANT_FIELDS,
   withHostnames,
   candidateChannelSpec,
   type ProjectionSpec,
   type ProjectionRelevantMetadata,
   type EprProjectionViewLite,
+  groupSpecsByAuthor,
+  waitForAuthorPeerHealthy,
+  authorPeerWaitTimeoutMs,
+  AUTHOR_PEER_WAIT_DEFAULT_SECONDS,
 } from '../seed-projections.js';
+
 
 /** Build a `Response`-like stub for the fake client. */
 function fakeResponse(status: number, body: unknown): Response {
@@ -290,6 +297,30 @@ describe('seedProjections — 409 drift vs idempotent handling', () => {
     expect(fetchProjections).toHaveBeenCalledTimes(1);
   });
 
+  it('a double-rooted id (zome 503) with an identical active row is an existing grant', async () => {
+    // elohim-genesis #1625: the re-post answers 503 "multiple root Creates for ID"
+    // while the row one of those Creates projected is in force. Not a failure,
+    // and never a second create.
+    const existingRow: EprProjectionViewLite = {
+      commitmentId: baseProjectionId(lamadSpec),
+      eprId: lamadSpec.eprId,
+      doorwayId: `doorway:${lamadSpec.doorwayId}`,
+      ...specToMetadata(lamadSpec),
+    };
+    const refusal =
+      '{"error":"content_store::commitment_observation:21: Guest(\\"commitment observation unavailable: multiple root Creates for ID\\")"}';
+    expect(isDoubleRootRefusal(refusal)).toBe(true);
+    expect(isDoubleRootRefusal('{"status":"catching-up"}')).toBe(false);
+    const createCommitment = vi.fn(async () => fakeResponse(503, refusal));
+    const fetchProjections = vi.fn(async () => [existingRow]);
+    const client = { createCommitment, fetchProjections } as never;
+
+    await seedProjections(client, [lamadSpec]);
+
+    expect(createCommitment).toHaveBeenCalledTimes(1);
+    expect(fetchProjections).toHaveBeenCalledTimes(1);
+  });
+
   it('drift 409 triggers a supersede POST with supersedes + suffixed id', async () => {
     // Existing active row is the live-alpha GRANT-LESS predecessor.
     const grantlessRow: EprProjectionViewLite = {
@@ -460,3 +491,120 @@ describe('candidateChannelSpec — a candidate standing beside a converged contr
     expect(lamadSpec.scopeHost).toBeUndefined();
   });
 });
+
+describe('project-epr authoring route + id generation (double-root cure)', () => {
+  it('routes every spec to its steward\'s own peer, never the doorway name', () => {
+    const specs = defaultProjectionSeeds();
+    const groups = groupSpecsByAuthor(specs, (h) => `http://${h}.storage:8090`);
+    expect([...groups.keys()]).toEqual(['http://human-matthew-manager.storage:8090']);
+    expect(groups.get('http://human-matthew-manager.storage:8090')).toHaveLength(specs.length);
+  });
+
+  it('pins the default ids — an undeclared idGeneration moves no id', () => {
+    const ids = defaultProjectionSeeds().map((s) => baseProjectionId(s));
+    expect(ids).toEqual([
+      'project-epr-98f0d59051751497',
+      'project-epr-70dc4203e6611fb3',
+      'project-epr-b8a51b1a1d8734c1',
+      'project-epr-1001e8243987d40c',
+      'project-epr-1015ecd12b83da8a',
+      'project-epr-fe5368de4495a5fc',
+    ]);
+  });
+
+  it('a declared idGeneration re-mints only that row under a fresh id', () => {
+    const [landing] = defaultProjectionSeeds();
+    const regen = baseProjectionId({ ...landing, idGeneration: 2 });
+    expect(regen).not.toBe('project-epr-98f0d59051751497');
+    expect(regen).toMatch(/^project-epr-[0-9a-f]{16}$/);
+    // generation 1 is the original id (no suffix in the digest)
+    expect(baseProjectionId({ ...landing, idGeneration: 1 })).toBe('project-epr-98f0d59051751497');
+  });
+});
+
+describe('waitForAuthorPeerHealthy', () => {
+  function fakeClock() {
+    let t = 0;
+    return {
+      now: () => t,
+      sleep: async (ms: number) => {
+        t += ms;
+      },
+    };
+  }
+  const down = { healthy: false, cacheEnabled: false, error: 'Conductor not connected (0/0 workers)' };
+  const up = { healthy: true, cacheEnabled: true };
+
+  it('proceeds once the conductor connects on the 3rd poll', async () => {
+    const clock = fakeClock();
+    const checkHealth = vi
+      .fn()
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(up);
+    const result = await waitForAuthorPeerHealthy('http://peer:8090', {
+      checkHealth,
+      ...clock,
+      log: () => {},
+      timeoutMs: 600_000,
+      intervalMs: 10_000,
+    });
+    expect(result).toEqual({ ok: true, polls: 3, waitedMs: 20_000 });
+    expect(checkHealth).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails after the bound with the waited time, one progress line per minute', async () => {
+    const clock = fakeClock();
+    const lines: string[] = [];
+    const checkHealth = vi.fn().mockResolvedValue(down);
+    const result = await waitForAuthorPeerHealthy('http://peer:8090', {
+      checkHealth,
+      ...clock,
+      log: (l) => lines.push(l),
+      timeoutMs: 600_000,
+      intervalMs: 10_000,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.waitedMs).toBe(600_000);
+    expect(result.error).toBe('Conductor not connected (0/0 workers)');
+    expect(checkHealth).toHaveBeenCalledTimes(61);
+    expect(lines).toHaveLength(9);
+    expect(lines[0]).toContain('60s of 600s');
+  });
+
+  it('reads the bound from PROJECTION_AUTHOR_WAIT_SECONDS, defaulting to 600 s', () => {
+    expect(AUTHOR_PEER_WAIT_DEFAULT_SECONDS).toBe(600);
+    expect(authorPeerWaitTimeoutMs({})).toBe(600_000);
+    expect(authorPeerWaitTimeoutMs({ PROJECTION_AUTHOR_WAIT_SECONDS: '30' })).toBe(30_000);
+    expect(authorPeerWaitTimeoutMs({ PROJECTION_AUTHOR_WAIT_SECONDS: 'junk' })).toBe(600_000);
+  });
+});
+
+describe('authorPeerHealthFromBody — the author is a storage peer', () => {
+  it('reads storage health by its zome path, the shape a storage peer answers with', () => {
+    // elohim-genesis #1627 waited 600 s on a live peer: the doorway's check looked
+    // for conductor.connected in a storage body that never carries it.
+    const storageBody = {
+      status: 'ok',
+      conductor: { mode: 'external', zomePath: 'live', lastZomeCallAgeSecs: 3 },
+    };
+    expect(authorPeerHealthFromBody(storageBody)).toMatchObject({ healthy: true });
+  });
+
+  it('names the zome path when a storage peer is not live', () => {
+    for (const zomePath of ['dead', 'app-disabled', 'unknown']) {
+      const health = authorPeerHealthFromBody({ conductor: { mode: 'external', zomePath } });
+      expect(health.healthy).toBe(false);
+      expect(health.error).toContain(zomePath);
+    }
+  });
+
+  it('still reads a doorway-shaped body', () => {
+    expect(authorPeerHealthFromBody({ conductor: { connected: true } }).healthy).toBe(true);
+    expect(authorPeerHealthFromBody({ conductor: { connected: false } }).healthy).toBe(false);
+    expect(authorPeerHealthFromBody({}).healthy).toBe(false);
+    expect(authorPeerHealthFromBody(null).healthy).toBe(false);
+  });
+});
+

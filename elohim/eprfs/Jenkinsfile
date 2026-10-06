@@ -100,6 +100,11 @@ spec:
       steps {
         container('builder') {
           dir('elohim/eprfs') {
+            // Rust is the version declared in elohim/epr/rust-toolchain.toml, the same one
+            // the local gate pins, so clippy here is the clippy the gate ran. The former
+            // double_must_use allowance existed only because the flake floated to 1.99.
+            // Keep comments OUT of the block below: it is one single-quoted bash -c string,
+            // and an apostrophe in a comment ends it (elohim-eprfs #47: Syntax error).
             sh '''
               nix develop --impure --accept-flake-config "path:$WORKSPACE/elohim/epr" --command bash -c '
                 set -euo pipefail
@@ -107,10 +112,7 @@ spec:
                 export RUSTC_WRAPPER=""
                 cargo --version
                 cargo fmt --check
-                # async_trait marks its generated futures must_use; clippy 1.99 reports
-                # that as doubled on trait methods returning Result. Allowed here, not in
-                # the crates: their published sources are immutable per version.
-                cargo clippy --workspace --all-targets -- -D warnings -A clippy::double_must_use
+                cargo clippy --workspace --all-targets -- -D warnings
               '
             '''
           }

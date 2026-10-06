@@ -860,7 +860,7 @@ pub fn bulk_create_content(
     let mut skipped = 0u64;
     let mut errors = vec![];
 
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         for input in items {
             // Check if exists
             let exists: bool = content::table
@@ -1555,7 +1555,10 @@ pub fn upsert_with_anchor(
 ) -> Result<(), StorageError> {
     // Keep the declaration read and serving-field writes in one transaction.
     // A concurrent declaration cannot land between the guard and the patch.
-    conn.transaction(|conn| {
+    // Read-then-write: take the write lock up front (see
+    // `read_then_write_transaction`) so a concurrent writer makes this wait
+    // under the busy timeout instead of failing the lock upgrade at once.
+    super::read_then_write_transaction(conn, |conn| {
         upsert_with_anchor_transaction(conn, ctx, id, patch, dht_anchor_hash, election)
     })
 }
@@ -2424,29 +2427,6 @@ pub fn stamp_own_conductor_canonical_head(
     )
 }
 
-/// Runs `f` in a transaction that holds SQLite's write lock from its first
-/// statement. A stamp reads the row and then writes it; under a deferred
-/// transaction a writer that commits between the two makes SQLite refuse the
-/// read-to-write upgrade at once with "database is locked", whatever the busy
-/// timeout. Taking the lock up front makes the stamp wait its turn instead.
-/// Inside a caller's transaction the lock is already the caller's, and this
-/// is a savepoint.
-fn read_then_write_transaction<T, F>(conn: &mut SqliteConnection, f: F) -> Result<T, StorageError>
-where
-    F: FnOnce(&mut SqliteConnection) -> Result<T, StorageError>,
-{
-    use diesel::connection::{AnsiTransactionManager, TransactionManager};
-    let nested = matches!(
-        AnsiTransactionManager::transaction_manager_status_mut(conn).transaction_depth(),
-        Ok(Some(_))
-    );
-    if nested {
-        conn.transaction(f)
-    } else {
-        conn.immediate_transaction(f)
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn stamp_declared_head_witnessed(
     conn: &mut SqliteConnection,
@@ -2460,7 +2440,7 @@ fn stamp_declared_head_witnessed(
     witness: AnchorWitness,
 ) -> Result<StampOutcome, StorageError> {
     let carries_pointer = patch.as_ref().is_some_and(|p| p.blob_cid.is_some());
-    let (outcome, widened) = read_then_write_transaction(conn, |conn| {
+    let (outcome, widened) = super::read_then_write_transaction(conn, |conn| {
         // The anchor BEFORE the stamp — read inside the transaction, so the
         // "did the hash change?" test below cannot race another writer.
         let prior_anchor: Option<String> = content::table
@@ -2882,7 +2862,7 @@ pub fn heal_election_columns(
     expected_head: &str,
     live: CanonicalOrdering,
 ) -> Result<ElectionColumnHeal, StorageError> {
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         #[allow(clippy::type_complexity)]
         let existing: Option<(Option<String>, Option<i64>, Option<i32>, Option<String>)> =
             content::table
@@ -7030,7 +7010,7 @@ mod tests {
             .with_label_values(&[StaleReason::PointerAbsent.label()])
             .get();
         assert!(
-            pointer_absent_after >= pointer_absent_before + 1,
+            pointer_absent_after > pointer_absent_before,
             "the refusal must be counted under StaleReason::PointerAbsent"
         );
 
@@ -7240,7 +7220,7 @@ mod tests {
             crate::metrics::refused_stale_on_this_thread(StaleReason::StoredNull.label());
 
         assert!(
-            pointer_absent_after >= pointer_absent_before + 1,
+            pointer_absent_after > pointer_absent_before,
             "a pointerless move must be counted under its own reason"
         );
         assert_eq!(
@@ -7300,7 +7280,7 @@ mod tests {
              has already refused the move"
         );
         assert!(
-            stored_null_after >= stored_null_before + 1,
+            stored_null_after > stored_null_before,
             "the refusal must be counted under the verdict's own reason, not the \
              pointer guard's"
         );

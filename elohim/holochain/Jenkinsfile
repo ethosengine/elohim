@@ -382,7 +382,11 @@ def runStorageQualityGate() {
  */
 def runDoorwayQualityGate() {
     try {
-        sh "bash '${env.WORKSPACE}/scripts/ci/doorway-quality-gate.sh'"
+        // Same stage-local timeout as the storage gate: a runaway gate degrades
+        // to UNSTABLE instead of eating the pipeline-global budget.
+        timeout(time: 45, unit: 'MINUTES') {
+            sh "bash '${env.WORKSPACE}/scripts/ci/doorway-quality-gate.sh'"
+        }
     } catch (Exception e) {
         echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
         unstable('Doorway quality gate has warnings')
@@ -575,16 +579,6 @@ def dataplaneNoMeasureReason(String log) {
     if (!(log ?: '').contains('=== Dataplane Validation: DID NOT MEASURE ===')) return null
     def line = log.readLines().find { it.startsWith('Fleet-quiesce gate exited') }
     return (line ?: 'fleet-quiesce gate did not settle').trim()
-}
-
-/**
- * Run P2P simulation test (advisory — failures don't block pipeline).
- * Requires Docker Compose and the elohim-storage Dockerfile.
- */
-def runSimulationTest() {
-    dir('steward/node/simulation') {
-        sh './simulate.sh test'
-    }
 }
 
 /**
@@ -2786,29 +2780,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             // bytecode. The SDK matrix is blocking; the stabilizing storage
             // gate remains non-blocking, then the release build runs.
             steps { container('builder') { script { runStorageStageBody() } } }
-        }
-
-        stage('P2P Simulation Test') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { !skipBuildStage() }
-                    anyOf {
-                        changeset "elohim/elohim-storage/src/p2p/**"
-                        changeset "steward/node/simulation/**"
-                        expression { params.FORCE_BUILD }
-                    }
-                }
-            }
-            steps {
-                container('builder') {
-                    script {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            runSimulationTest()
-                        }
-                    }
-                }
-            }
         }
 
         stage('Build Edge Node Image') {

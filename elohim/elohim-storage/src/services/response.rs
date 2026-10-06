@@ -219,6 +219,9 @@ fn conductor_app_disabled(message: &str) -> Response<Full<Bytes>> {
     )
 }
 
+/// Retry-After (seconds) for a write that lost SQLite's lock race.
+pub const SQLITE_LOCK_RETRY_AFTER_SECS: u64 = 2;
+
 /// Convert a StorageError to an appropriate HTTP response
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     // Classified FIRST, and by MARKER rather than variant: a shed rides
@@ -227,6 +230,11 @@ pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     // conductor was never asked.
     if crate::conductor_admission::is_admission_shed(&error) {
         return admission_shed_backpressure();
+    }
+    // A write that lost SQLite's lock race is a shed too: nothing was
+    // written, and the same call re-offered can land.
+    if crate::db::is_sqlite_lock_loss(&error) {
+        return too_many_requests_with_retry(SQLITE_LOCK_RETRY_AFTER_SECS, 0);
     }
     // SECOND, and before the variant table: a disabled app keeps the 503 the
     // `Conductor` arm below would give it, but must not be mistaken for the
@@ -342,6 +350,26 @@ pub fn from_delete_bool_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sqlite_lock_loss_is_shed_with_retry_after() {
+        for err in [
+            StorageError::Database("database is locked".into()),
+            StorageError::Internal("upsert failed: database table is locked".into()),
+        ] {
+            let resp = error_response(err);
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(
+                resp.headers()
+                    .get(hyper::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok()),
+                Some(SQLITE_LOCK_RETRY_AFTER_SECS.to_string().as_str())
+            );
+        }
+        // A non-lock database fault keeps its ordinary mapping.
+        let resp = error_response(StorageError::Database("no such table: x".into()));
+        assert_ne!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
 
     #[test]
     fn test_ok_response() {

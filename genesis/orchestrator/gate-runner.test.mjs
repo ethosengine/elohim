@@ -80,6 +80,13 @@ describe('manifest-driven local gate registry', () => {
       ['rakia-codegen', 'elohim/rakia/schemas/v1/example.json'],
       ['rakia-validate', 'steward/device/build-manifest.json'],
       ['cargo-coverage', 'steward/node/Cargo.toml'],
+      // Row 35: the path-dependency closure rail (build-inputs-closure.test.mjs) runs
+      // in the orchestrator project, so any Cargo manifest/lock or build-manifest
+      // change anywhere selects it — a new crate under an existing one included.
+      ['orchestrator', 'crates/x/Cargo.toml'],
+      ['orchestrator', 'elohim/epr/Cargo.lock'],
+      ['orchestrator', 'Cargo.toml'],
+      ['orchestrator', 'elohim/eprfs/build-manifest.json'],
       ['elements-codegen', 'app/elohim-elements/elohim-core/src/card.ts'],
       ['pipeline-list-fresh', 'app/elohim-app/build-manifest.json'],
     ];

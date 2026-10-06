@@ -978,3 +978,61 @@ describe('Jenkinsfile wiring', () => {
     assert.match(jf.slice(idx - 400, idx), /if \(env\.BUILD_TRIGGER == 'WEBHOOK'\) \{/);
   });
 });
+
+// Backlog arch-workspace-discipline row 36(i), orchestrator #1978: elohim-holochain #1489
+// finished SUCCESS at baseline 0b85b7c3 before the next run, but the baseline only
+// recorded the dispatch, so a surviving edge KEPT an 84-minute rebuild. The rule stays;
+// the evidence (a recorded verdict for THAT sha) is what lets the filter drop it.
+describe('recorded verdict of a dispatch-only producer (row 36 i)', () => {
+  const state = {
+    trigger: 'WEBHOOK',
+    headSha: HEAD,
+    branch: 'dev',
+    pipelines: ['elohim-holochain', 'elohim-edge'],
+    baselines: { __global__: GLOBAL, 'elohim-holochain': BUILT, 'elohim-edge': BUILT },
+    forced: [],
+  };
+  const run = async (verdict, walked) => {
+    const deps = {
+      ...stubDeps({
+        files: { [BUILT]: ['elohim/epr/build-manifest.json'] },
+        provenance: { 'elohim-holochain': 'dispatch-only' },
+        dependsOn: { 'elohim-edge': ['elohim-holochain'] },
+      }),
+      recordedVerdict: (name, sha) => (name === 'elohim-holochain' && sha === BUILT ? verdict : null),
+    };
+    const plan = await planNarrowGroups(state, deps);
+    return decideDispatch(state, plan, { [BUILT]: walked }, deps);
+  };
+
+  test('verdict SUCCESS and no DNA input changed → dropped although edge survives', async () => {
+    const out = await run('SUCCESS', ['elohim-edge']);
+    assert.deepEqual(out.dispatch, ['elohim-edge']);
+    assert.deepEqual(out.skipped, ['elohim-holochain']);
+    assert.ok(out.logLines.some((l) => l.includes('elohim-holochain skipped') && l.includes('recorded SUCCESS')));
+  });
+
+  test('verdict missing → KEPT, exactly as before', async () => {
+    const out = await run(null, ['elohim-edge']);
+    assert.deepEqual(out.dispatch, ['elohim-holochain', 'elohim-edge']);
+    assert.ok(out.logLines[0].includes('elohim-holochain KEPT'));
+  });
+
+  test('verdict FAILURE or ABORTED → KEPT', async () => {
+    for (const verdict of ['FAILURE', 'ABORTED', 'UNSTABLE']) {
+      const out = await run(verdict, ['elohim-edge']);
+      assert.ok(out.dispatch.includes('elohim-holochain'), verdict);
+    }
+  });
+
+  test('verdict SUCCESS but a DNA input changed since → built', async () => {
+    const out = await run('SUCCESS', ['elohim-holochain', 'elohim-edge']);
+    assert.deepEqual(out.dispatch, ['elohim-holochain', 'elohim-edge']);
+    assert.deepEqual(out.skipped, []);
+  });
+
+  test('a verdict recorded for another sha is no evidence for this baseline', () => {
+    const deps = defaultDeps();
+    assert.equal(deps.recordedVerdict('elohim-holochain', 'f'.repeat(40)), null);
+  });
+});

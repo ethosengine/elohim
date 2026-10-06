@@ -7,7 +7,7 @@ title: "Genesis seeders learn a node's agent key from `/auth/me`, which no longe
 slug: "genesis-seeders-read-node-agent-key-from-closed-auth-me"
 written: "2026-10-06"
 author: "claude-opus-5-5 (overnight shift on the device-consent landing, 2026-10-06)"
-status: "backlog"
+status: "wip"
 priority: "high"
 ci_status: "blocked"
 tags: [genesis, seeder, identity, auth-me, custody, device-consent, regression]
@@ -52,22 +52,38 @@ was closed. Call sites: `seed-commitments.ts` `resolveCustodyPeerIds`, `seed-pro
 `seed-delegates-compute.ts`. Only the custody stage is proven red by a build; the others share the
 call and were already UNSTABLE for other reasons before the landing, so their part is not separated.
 
-## The design question (operator's)
+## Decision (2026-10-06, option D)
 
-How does a CI seeder, on another machine, learn which agent a household node speaks as?
+A seeder learns which agent a node speaks as from that node's own conductor, never from a session
+route. Which agent a node speaks as is a fact about the node's own cell, and the conductor is where
+that fact lives. `/auth/me` answers a different question (which person is signed in here); the
+seeders were reading the first question through the second.
 
-| Option | What changes | New exposure | Cost |
-|---|---|---|---|
-| A. `/p2p/status` also carries the node's own `agentPubKey` | storage view + schema + codegen; seeders read it there | agent key beside the peer id on a public route — the pair an `AgentPeerBinding` already notarizes; no person name, no human id | one edge roll; `humanId` readers need another source |
-| B. The seeder presents a credential the node accepts for this read | storage authorizes an operator key on `/auth/me`; CI passes it | none public; a new authority on a hardened route | one edge roll; a secret in more CI steps |
-| C. The seeder signs in to each node as its person | seeders only | none | a per-node secret in CI for every household human; no edge roll |
-| D. The seeder reads the key from the conductor it already reaches | seeders only (`CONDUCTOR_URLS`, as `seed-conductor-identities.ts` does) | none | depends on CI reaching each conductor's app interface |
+One shared resolver, `genesis/seeder/src/node-identity.ts` (`createNodeIdentityResolver`,
+`resolveNodeIdentity(humanId) -> { agentPubKey, embodiedHumanId | null }`), connects to the human's
+own conductor (a `name=url` CONDUCTOR_URLS entry or the `elohim-<name>-<env>` host; a human with no
+such entry resolves to nothing, never the first conductor that answers), reads the steward app's
+`agent_pub_key` from AppInfo and the Human the cell embodies (`get_my_human`), caches per run,
+closes its sockets, times out each connect, and fails naming the human and the conductor URL. All
+six `/auth/me` reads now go through it (seed-commitments, seed-provide-rows,
+seed-household-formation, seed-household-costeward x2, seed-drill-fixtures,
+seed-delegates-compute). There is no fallback to `/auth/me`. The genesis Jenkinsfile exports
+CONDUCTOR_URLS (from `getConductorAppUrls()`) to the custody and provide-rows legs; household
+formation already ran under the probe-then-seed helper, which exports it.
 
-Recommendation: A for `agentPubKey`, with the five `humanId` reads replaced by the fixture's own
-declared human id (the seeder already knows whom it is seeding for; the read was a cross-check).
-A publishes nothing the DHT does not already hold and adds no authority to a hardened route. It
-was not applied by the shift: it adds to the identity surface the operator ruled on, and every
-storage-side option rolls the fleet again.
+Honest cost: this leans on CI's reach to conductor admin and app sockets, which the genesis
+Jenkinsfile already names as bootstrap debt. It adds a reader of that reach, not a new authority.
+
+Rejected:
+
+- **A. Publish `agentPubKey` beside the peer id on `/p2p/status`.** It would hand any outside
+  observer a join between two identity namespaces that today is notarized only inside the network
+  (`AgentPeerBinding`), it needs a fleet roll, and it adds surface to fix a consumer that was
+  asking the wrong place.
+- **B. An operator credential storage accepts on `/auth/me`.** A new authority on a route that was
+  just hardened, plus an edge roll.
+- **C. The seeder signs in to each node as its person.** A per-node secret in CI for every
+  household human: CI would become a device that speaks for each person with no enrollment.
 
 ## Not the cure
 
@@ -77,3 +93,45 @@ Reopening the active-session fallback for remote callers. It restores the seeder
 
 `elohim-genesis` `Seed Custody Commitments` green with `created + already-exists = 7`, and
 `propagation.custody-manifest` / `propagation.custody-convergence` passing in the same build.
+
+## DELTA 2026-10-06 (elohim-genesis #1626, first build on the cure)
+
+The resolver works on the fleet: provide rows resolved matthew, jessica, james, gertrude, susan and
+eve from their own conductors (`agent_pub_key: …` then `[=] … already exists`), household formation
+read `agent-key roster has 3 entries`, and no `/auth/me` line appears anywhere in the build. The
+probe is not met yet: custody ended `2 created, 1 already-exists, 4 skipped (7 total)`. The four
+skips all name james (`no conductor of its own in CONDUCTOR_URLS (3 entries …)`): the stage read
+its conductor list from inside `dir('genesis/seeder')`, where the helper could not find
+`deployments.json` and fell back to three hard-coded peers. Fixed at the call site the same day;
+the next genesis build is the probe. Adam could not be read in this build for a different reason
+(his conductor answered `database is locked`; conductor-residual-cpu backlog entry).
+
+## DELTA 2026-10-06 (second; elohim-genesis #1627)
+
+Custody seeded 7 of 7: `4 created, 3 already-exists, 0 skipped`, and `propagation.custody-manifest`
+passes. The probe's last leg does not: `propagation.custody-convergence … missing on: adam after
+300s`. Adam's conductor is the cause (conductor-residual-cpu entry, SEEN 2026-10-06), not the
+seeders.
+
+## Found after the decision: storage already publishes these keys
+
+`GET <storage>/health` carries `dhtParticipation.agentKeys`, the node's own cell agent key per role
+(`http.rs` `handle_health`: "Public cell keys let a native publisher verify that storage authors
+through the same agent as its signing connection"). It is storage's own route (a doorway answers
+its own `/health`), it needs no session and no conductor socket, and it existed before the landing.
+Neither the shift's four options nor this decision knew of it. It is a better source for the agent
+key than the conductor read: no reach to conductor admin sockets, and it answers while a conductor
+is too busy to accept a connection (adam, above). The conductor read stays right for the Human a
+cell embodies, which storage does not publish. Not changed today: the resolver works and custody is
+7 of 7. Follow-up, small: `node-identity.ts` reads `dhtParticipation.agentKeys` from the person's
+own storage first and opens a conductor connection only when a caller asks for the embodied Human.
+
+
+## DELTA 2026-10-06 (third; elohim-genesis #1628) — the probe is met
+
+`Seed Custody Commitments`: `0 created, 7 already-exists, 0 skipped (7 total)`.
+`propagation.custody-manifest` and `propagation.custody-convergence` both pass in the same build
+(`visible on every pod (manifest converged by 0s)`). The build has two unstable stages left, neither
+from the seeders' identity source: Seed Substrate (adam's conductor refusing or locked; the
+household-steward mismatch of device-recognition row 22) and E2E Verification. The storage-health
+follow-up above still stands as the better source.

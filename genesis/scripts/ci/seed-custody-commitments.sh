@@ -20,6 +20,8 @@ echo "SEED CUSTODY COMMITMENTS (default custody pair set — seeder prints the a
 echo "═══════════════════════════════════════════════════════════"
 echo "Doorway: ${DOORWAY_HOST}"
 echo "Blob:    ${BLOB_HASH} (${BLOB_SIZE} bytes)"
+# Agent keys come from each human's OWN conductor (seeder node-identity.ts).
+echo "Conductors: ${CONDUCTOR_URLS:-<unset — every custody pair will fail to resolve>}"
 echo ""
 DOORWAY_URL="${DOORWAY_HOST}" \
 CONTENT_BLOB_HASH="${BLOB_HASH}" \

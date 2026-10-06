@@ -66,6 +66,7 @@ import { fileURLToPath } from 'node:url';
 import { CommitmentClient } from './seed-commitments.js';
 import { computeContentAddresses } from './doorway-client.js';
 import { parseNamedCsv } from './peer-id.js';
+import { defaultNodeIdentityResolver, type NodeIdentityResolver } from './node-identity.js';
 
 // =============================================================================
 // Deterministic ZIP (STORE only) — see the module docs for why
@@ -411,29 +412,28 @@ export function buildCustodyPairs(
 }
 
 /**
- * The CANONICAL human id a peer answers with at `GET /auth/me`.
+ * The CANONICAL human id the conductor of household peer `peerName` embodies
+ * (node-identity.ts: `get_my_human` on that peer's own steward cell).
  *
  * Custody pairs are declared in human-id terms because `seed-commitments.ts`
- * re-resolves each side's agent key from that human's own pod — so the id must
- * round-trip through `storageUrlForHuman` back to THIS peer. Reading it from
- * the pod (rather than assuming `human-<peer name>`) is what keeps the pair set
- * honest on a mesh whose peer names and human slugs have drifted apart.
+ * re-resolves each side's agent key from that human's own conductor — so the
+ * id must name-route back to THIS peer. Reading it from the conductor (rather
+ * than assuming `human-<peer name>`) is what keeps the pair set honest on a
+ * mesh whose peer names and human slugs have drifted apart.
  *
- * Returns `undefined` for a pod that answers with a minted UUID identity rather
- * than a canonical slug — an unresolvable peer is skipped loudly upstream, not
- * guessed at.
+ * Returns `undefined` for a conductor that embodies a minted UUID identity
+ * rather than a canonical slug, or that cannot be read — an unresolvable peer
+ * is skipped loudly upstream, not guessed at.
  */
-async function canonicalHumanIdFor(storageUrl: string): Promise<string | undefined> {
+export async function canonicalHumanIdFor(
+  peerName: string,
+  resolver: NodeIdentityResolver = defaultNodeIdentityResolver(),
+): Promise<string | undefined> {
   try {
-    const response = await fetch(`${storageUrl.replace(/\/+$/, '')}/auth/me`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return undefined;
-    const body = (await response.json()) as { humanId?: unknown };
-    return typeof body.humanId === 'string' && body.humanId.startsWith('human-')
-      ? body.humanId
-      : undefined;
-  } catch {
+    const embodied = (await resolver.resolve(`human-${peerName}`)).embodiedHumanId;
+    return embodied?.startsWith('human-') ? embodied : undefined;
+  } catch (err) {
+    console.warn(`  [?] ${err instanceof Error ? err.message : String(err)}`);
     return undefined;
   }
 }
@@ -633,7 +633,10 @@ if (isMain) {
     console.warn(`  [?] ${commonsEprId} left without custody — ${existing.reason}`);
   }
 
-  const humanIds = (await Promise.all(peerUrls.map(canonicalHumanIdFor))).filter(
+  const peerNames = parseNamedCsv(process.env.PEER_STORAGE_URLS ?? '')
+    .map(entry => entry.name)
+    .filter((name): name is string => Boolean(name));
+  const humanIds = (await Promise.all(peerNames.map(name => canonicalHumanIdFor(name)))).filter(
     (id): id is string => Boolean(id),
   );
 
@@ -651,7 +654,7 @@ if (isMain) {
     console.log('      (seed-commitments.ts owns the custody-blob wire contract)');
   } else if (seeded.length > 0) {
     console.warn(
-      '  [?] no household peer answered /auth/me with a canonical human id — custody pairs ' +
+      '  [?] no household conductor embodies a canonical human id — custody pairs ' +
         'not written. Without them the fixtures exist but nothing has PROMISED to hold them, ' +
         'and the chaos drill would be killing peers to watch nothing.',
     );

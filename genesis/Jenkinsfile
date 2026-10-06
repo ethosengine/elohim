@@ -593,13 +593,9 @@ def runContentSeedStage() {
     echo "Genesis peers (direct ingest): ${genesisPeers.collect { it.humanId }.join(', ')}"
     echo "Replica peers (P2P replication): ${replicaPeers.collect { it.humanId }.join(', ')}"
 
-    // ── Genesis peers: grade, then seed whoever is ready (fatal only if zero seeded) ──
-    // Grade first: each genesis peer widens its OWN rows (proven steward-authored — its own
-    // agent or a co-steward genesis peer's, each key read from that peer's own conductor)
-    // to their authored commons/public reach — the anonymous seeder cannot
-    // read, so never corrects, rows an old seeder stamped `private`. Idempotent; a grade
-    // failure is UNSTABLE, never fatal. A peer whose seed fails is UNSTABLE and counts as
-    // not seeded; the loop continues to the next peer.
+    // ── Genesis peers: seed whoever is ready (fatal only if zero seeded) ──
+    // Widening steward-authored rows to their authored reach is the steward's own act from their own device (genesis/a2o/scripts/steward-grade.ts / steward-publish.ts with their own --signing-credentials-dir), not a pipeline leg.
+    // A peer whose seed fails is UNSTABLE and counts as not seeded; the loop continues to the next peer.
     def seededGenesis = []
     def skippedGenesis = []
     def failedGenesis = []
@@ -608,13 +604,6 @@ def runContentSeedStage() {
             echo "⏭️  Skipping genesis peer ${gp.humanId} — storage unreachable (seed-whoever-is-ready)"
             skippedGenesis << gp.humanId
             continue
-        }
-        // Co-stewards: every OTHER genesis peer's conductor admin WS (same derivation as the
-        // wrapper's own). The grade reads each agent key from that conductor, never a header.
-        def coStewardWs = genesisPeers.findAll { it.humanId != gp.humanId }.collect { "ws://${it.service}-conductor.${it.namespace}.svc.cluster.local:4444" }.join(' ')
-        def gradeRc = sh(returnStatus: true, script: "bash '${env.WORKSPACE}/genesis/scripts/ci/steward-grade-peer.sh' '${gp.humanId}' '${gp.storageUrl}' '${gp.service}' '${gp.namespace}' '${coStewardWs}'")
-        if (gradeRc != 0) {
-            unstable("Steward grade failed on genesis peer ${gp.humanId} (exit ${gradeRc}) — continuing to its content seed")
         }
         def seedRc = 0
         dir('genesis/seeder') {
@@ -1754,8 +1743,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // (32→31 stages). Reached only when conductor seeding did NOT
                         // skip (res.skipped returns early above) — i.e. exactly the
                         // CONDUCTOR_SEEDING_READY=='true' gate the old stage carried.
+                        // CONDUCTOR_URLS: provide-rows reads each human's agent key from
+                        // that human's OWN conductor (seeder node-identity.ts), the same
+                        // reach Seed Conductor Identities uses.
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-provide-rows.sh'"
+                            withEnv(["CONDUCTOR_URLS=${getConductorAppUrls() ?: ''}"]) {
+                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-provide-rows.sh'"
+                            }
                         }
                     }
                 }
@@ -1866,8 +1860,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // (genesis #1191 Cluster B). SOFT — warns and proceeds.
                         sh "bash '${env.WORKSPACE}/genesis/scripts/ci/wait-storage-ready.sh' '${doorwayHost}'"
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            // CONDUCTOR_URLS: custody pairs resolve agent keys from each
+                            // human's OWN conductor (seeder node-identity.ts). Read the list
+                            // BEFORE dir(): getConductorAppUrls() finds deployments.json by a
+                            // workspace-relative path, and inside genesis/seeder it missed the
+                            // file and fell back to three hard-coded peers (genesis #1626: james
+                            // had no entry, 4 of 7 pairs skipped).
+                            def custodyConductorUrls = getConductorAppUrls() ?: ''
                             dir('genesis/seeder') {
-                                sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
+                                withEnv(["CONDUCTOR_URLS=${custodyConductorUrls}"]) {
+                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
+                                }
                             }
                         }
                     }

@@ -58,7 +58,7 @@ pub fn apply_snapshot(
 ) -> Result<SnapshotApplyOutcome, StorageError> {
     let content_hash = content_fingerprint(hashes);
 
-    conn.transaction::<SnapshotApplyOutcome, diesel::result::Error, _>(|conn| {
+    super::read_then_write_transaction::<SnapshotApplyOutcome, diesel::result::Error, _>(conn, |conn| {
         // Read the current cursor: sequence high-watermark, the freshness clock
         // (last_updated), and the fingerprint of the last-applied set.
         let existing: Option<(i64, String, Option<String>)> = peer_inventory_cursor::table
@@ -232,7 +232,7 @@ pub fn apply_delta(
     sequence: i64,
     emitted_at: &str,
 ) -> Result<DeltaApplyOutcome, StorageError> {
-    conn.transaction(|conn| {
+    super::read_then_write_transaction(conn, |conn| {
         let stored_max = read_cursor_sequence(conn, peer_id)?;
 
         match stored_max {
@@ -291,7 +291,7 @@ pub fn record_fetch_success(
     blob_hash: &str,
     observed_at: &str,
 ) -> Result<(), StorageError> {
-    conn.transaction(|conn| {
+    super::read_then_write_transaction(conn, |conn| {
         let existing_seq: Option<i64> = peer_blob_inventory::table
             .filter(peer_blob_inventory::peer_id.eq(peer_id))
             .filter(peer_blob_inventory::blob_hash.eq(blob_hash))
@@ -566,6 +566,62 @@ mod tests {
             .expect("pool");
         run_migrations(&pool).expect("migrations");
         pool
+    }
+
+    /// The lock-upgrade shape through a real converted call: while another
+    /// connection holds the write lock, a snapshot apply must WAIT for it
+    /// (immediate transaction) — never read under a snapshot that the other
+    /// writer's commit then makes stale, which SQLite refuses at once.
+    #[test]
+    fn snapshot_apply_waits_for_a_concurrent_writer_instead_of_losing_the_lock() {
+        use diesel::connection::SimpleConnection;
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pbi_lock.db");
+        let path_str = path.to_str().unwrap().to_string();
+        let open = |p: &str| {
+            let mut c = SqliteConnection::establish(p).expect("open");
+            // busy_timeout first: the journal-mode pragma locks too.
+            c.batch_execute("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;")
+                .expect("pragmas");
+            c
+        };
+        drop(open(&path_str));
+        {
+            let pool = Pool::builder()
+                .max_size(1)
+                .build(ConnectionManager::<SqliteConnection>::new(&path_str))
+                .expect("pool");
+            run_migrations(&pool).expect("migrations");
+        }
+
+        // Both connections exist before either writes, so the only contention
+        // in this test is the write lock under test.
+        let mut a = open(&path_str);
+        let mut b = open(&path_str);
+        let (held_tx, held_rx) = mpsc::channel::<()>();
+        let b = std::thread::spawn(move || {
+            crate::db::read_then_write_transaction(&mut b, |b| {
+                apply_snapshot(b, "peer_B", &["hb".into()], 1, "2026-10-06T00:00:00Z")?;
+                held_tx.send(()).expect("signal held");
+                // Keep the lock across A's start. The assertions below hold
+                // whether or not A arrives inside this window: no timing is
+                // asserted, so a stalled scheduler cannot fail the test.
+                std::thread::sleep(Duration::from_millis(150));
+                Ok::<_, StorageError>(())
+            })
+        });
+
+        held_rx.recv().expect("B holds the write lock");
+        let outcome = apply_snapshot(&mut a, "peer_A", &["ha".into()], 1, "2026-10-06T00:00:00Z")
+            .expect("A waits for B's commit instead of losing the upgrade");
+        assert!(matches!(outcome, SnapshotApplyOutcome::Applied));
+        b.join().unwrap().expect("B committed");
+        // Neither write was lost.
+        assert_eq!(read_cursor_sequence(&mut a, "peer_A").unwrap(), Some(1));
+        assert_eq!(read_cursor_sequence(&mut a, "peer_B").unwrap(), Some(1));
     }
 
     #[test]

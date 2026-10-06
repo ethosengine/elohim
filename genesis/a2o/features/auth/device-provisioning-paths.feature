@@ -1,4 +1,6 @@
-@e2e @auth @device-provisioning @act:i @wip
+@e2e @auth @device-provisioning @act:i
+# Every scenario is held (@wip). The household mesh casts three different people, one node each; these stories need
+# several nodes run by one person (the "one-person multi-node topology"), which no fixture stages yet.
 Feature: A person's identity starts on one node and grows to others
   As Matthew, setting up the machines I work from
   I want my identity to begin on whichever node I have first and spread to my others one approval at a time
@@ -116,12 +118,16 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: An identity can begin on a node of the person's own, with no doorway
 
+    # held: needs node "workspace" cut off from every doorway (network isolation) and its native portal (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: Matthew's identity begins on his own node
       Given no doorway is reachable from node "workspace"
       When Matthew creates his identity on node "workspace"
       Then node "workspace" is the only node that speaks for Matthew
       And the portal on node "workspace" tells Matthew that his identity rests on this node alone
 
+    # held: needs every doorway out of reach (network isolation) and the one-person multi-node topology (arch-device-recognition-backlog.md row 2)
+    @wip
     Scenario: A second node of his own joins without a doorway
       Given Matthew's identity began on node "workspace"
       And no doorway is reachable from node "workspace" or node "home"
@@ -136,6 +142,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: An identity can begin on a doorway and grow to a node of the person's own
 
+    # held: needs a real browser on the doorway portal and the one-person multi-node topology (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: An identity that began on a doorway gains a node of Matthew's own
       Given Matthew has an account that doorway "alpha" hosts for him
       And doorway "alpha" is the only node that speaks for Matthew
@@ -145,6 +153,8 @@ Feature: A person's identity starts on one node and grows to others
       Then node "workspace" is one of Matthew's nodes
       And the portal on doorway "alpha" tells Matthew that the doorway holds his key and signed for him
 
+    # held: needs a doorway taken down mid-scenario and the one-person multi-node topology (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: Having begun on a doorway, Matthew no longer depends on it
       Given Matthew's identity began on doorway "alpha" and node "workspace" has since joined it
       When doorway "alpha" becomes unreachable
@@ -152,6 +162,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: An identity that began on the person's own node can later gain a doorway
 
+    # held: needs a real browser signing in at the doorway and the native portal (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: Matthew adds a doorway so he can sign in from a browser
       Given Matthew's identity began on node "workspace"
       When Matthew opens doorway "alpha" in a browser and asks it to join his identity
@@ -160,6 +172,8 @@ Feature: A person's identity starts on one node and grows to others
       Then doorway "alpha" is one of Matthew's nodes
       And Matthew can sign in at doorway "alpha" from a browser
 
+    # held: needs a doorway taken down mid-scenario and the one-person multi-node topology (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: Losing the doorway takes nothing away from his own node
       Given Matthew's identity began on node "workspace"
       And doorway "alpha" has since become one of Matthew's nodes
@@ -169,6 +183,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: One node's approval is enough, and the others that speak for the person affirm later
 
+    # held: needs the one-person multi-node topology, with one node switched off (arch-device-recognition-backlog.md row 12)
+    @wip
     Scenario: A third node joins while one of the nodes that speak for Matthew is away
       Given node "workspace" and node "home" both speak for Matthew
       And node "home" is switched off
@@ -178,6 +194,8 @@ Feature: A person's identity starts on one node and grows to others
       Then node "laptop" is one of Matthew's nodes
       And the joining record carries the signature of node "workspace" and of node "laptop"
 
+    # held: needs the one-person multi-node topology, with a node switched off and back on (arch-device-recognition-backlog.md row 12)
+    @wip
     Scenario: A node that was away affirms what it finds
       Given node "laptop" joined with the approval of node "workspace" alone
       When node "home" is switched on and sees the joining record for node "laptop"
@@ -185,6 +203,8 @@ Feature: A person's identity starts on one node and grows to others
       And Matthew was not asked to approve anything for that
       And node "laptop" was one of Matthew's nodes the whole time
 
+    # held: not built: the node's own portal showing approvals and affirmations (arch-device-recognition-backlog.md row 11)
+    @wip
     Scenario: Matthew can see who approved a node and who has stood behind it
       Given node "workspace" and node "home" both speak for Matthew
       And node "laptop" joined with the approval of node "workspace" alone
@@ -193,6 +213,8 @@ Feature: A person's identity starts on one node and grows to others
       When node "home" has affirmed the joining record for node "laptop"
       Then he sees that node "laptop" has been affirmed by one other node
 
+    # held: not built: an approvals policy above one (arch-device-recognition-backlog.md row 5, superseded by row 12)
+    @wip
     Scenario: Matthew chooses to require two approvals
       Given node "workspace" and node "home" both speak for Matthew
       And Matthew has chosen that a new node needs the approval of two of the nodes that speak for him
@@ -207,6 +229,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: A node Matthew expects joins without his being asked again, and any node of his can approve the next
 
+    # held: needs private-network discovery between two nodes (arch-device-recognition-backlog.md row 2, row 8)
+    @wip
     Scenario: An expected node with no identity of its own joins without a second answer
       Given Matthew's identity began on node "workspace"
       And Matthew has told node "workspace" that he expects node "home" to join
@@ -218,6 +242,8 @@ Feature: A person's identity starts on one node and grows to others
       And node "home" is one of Matthew's nodes
       And Matthew carried neither a link nor a code
 
+    # held: needs the one-person multi-node topology (arch-device-recognition-backlog.md row 12)
+    @wip
     Scenario: A node that joined approves the next one
       Given Matthew's identity began on node "workspace"
       And node "home" has joined Matthew's identity
@@ -230,6 +256,8 @@ Feature: A person's identity starts on one node and grows to others
       When Jessica's node checks for itself whether node "laptop" belongs to Matthew
       Then Jessica's node answers yes from the joining records it read on the network
 
+    # held: needs the one-person multi-node topology, four nodes of one person (arch-device-recognition-backlog.md row 12)
+    @wip
     Scenario: Two of Matthew's nodes approve two new nodes at the same time
       Given node "workspace" and node "home" both speak for Matthew
       And node "workspace" and node "home" cannot reach each other
@@ -242,6 +270,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: The person a node speaks for and the one who operates it can be different
 
+    # held: not built: a node whose operator is not the person it speaks for (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: Gertrude's identity begins on a node Matthew operates
       Given a node "cottage" that Matthew operates for Gertrude
       When Gertrude's identity is created on node "cottage"
@@ -249,12 +279,16 @@ Feature: A person's identity starts on one node and grows to others
       And Matthew is the operator of node "cottage"
       And node "cottage" is not one of Matthew's nodes
 
+    # held: not built: a node whose operator is not the person it speaks for (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: Operating a node gives no say over the identity it speaks for
       Given Gertrude's identity began on node "cottage", which Matthew operates
       When the terminal on a new node "tablet" asks to join Gertrude's identity
       Then the portal on node "cottage" asks for Gertrude's approval, not Matthew's
       And an approval given in Matthew's name is refused
 
+    # held: not built: handing a node's operation to the community's caretaker (device-recognition rows 6, 21)
+    @wip
     Scenario: The community's caretaker operates a node when nobody else can
       Given Gertrude's identity began on node "cottage", which Matthew operates
       When Matthew stops operating node "cottage" and the community's caretaker takes it on
@@ -264,6 +298,8 @@ Feature: A person's identity starts on one node and grows to others
 
   Rule: A node that already began an identity joins with a recommended choice, and confirms what will happen to it
 
+    # held: not built: joining a node that already has an identity of its own (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: A node that made nothing gets a clean start
       Given Matthew's identity began on node "workspace"
       And node "home" began an identity of its own and has made nothing under it
@@ -278,6 +314,8 @@ Feature: A person's identity starts on one node and grows to others
       Then node "home" is one of Matthew's nodes
       And node "home" has a new key
 
+    # held: not built: joining a node that already has an identity of its own (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: A node that made things keeps everything
       Given Matthew's identity began on node "workspace"
       And node "home" began an identity of its own
@@ -293,6 +331,8 @@ Feature: A person's identity starts on one node and grows to others
       And node "home" has the same key it had before
       And the content "sensor-log" still traces to the identity node "home" began
 
+    # held: not built: joining a node that already has an identity of its own (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: Choosing a clean start for a node that made things names what will be lost
       Given Matthew's identity began on node "workspace"
       And node "home" began an identity of its own
@@ -302,6 +342,8 @@ Feature: A person's identity starts on one node and grows to others
       Then node "home" tells its operator that it will give up its key, and that the content "sensor-log" will no longer be its own to change
       And node "home" has changed nothing yet
 
+    # held: not built: joining a node that already has an identity of its own (arch-device-recognition-backlog.md row 7)
+    @wip
     Scenario: The node's operator says no, and nothing changes
       Given Matthew's identity began on node "workspace"
       And node "home" began an identity of its own and has made nothing under it
@@ -312,6 +354,8 @@ Feature: A person's identity starts on one node and grows to others
       And node "home" is not one of Matthew's nodes
       And the portal on node "workspace" shows that node "home" did not confirm
 
+    # held: needs private-network discovery between two nodes (arch-device-recognition-backlog.md row 2, row 8) and a node with its own identity (row 7)
+    @wip
     Scenario: An expected node that already has an identity still confirms
       Given Matthew's identity began on node "workspace"
       And Matthew has told node "workspace" that he expects node "home" to join

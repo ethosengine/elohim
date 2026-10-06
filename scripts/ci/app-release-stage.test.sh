@@ -77,6 +77,10 @@ case "${STUB_VERIFY}" in
         echo "APP-ADOPTED matthew release=${cid}"
         echo "APP-NOT-ADOPTED jessica state=waiting reason=soak"
         exit 3 ;;
+    unbound)
+        echo "APP-ADOPTED matthew release=${cid}"
+        echo "APP-NOT-ADOPTED jessica state=refused reason=app_slug_not_bound_to_channel"
+        exit 3 ;;
     cannot-boot)
         echo "APP-CANNOT-BOOT matthew detail=main.js 404"
         exit 1 ;;
@@ -207,6 +211,13 @@ set +e; out="$(STUB_PUBLISH=published STUB_VERIFY=pending run)"; rc=$?; set -e
 [ "$(tail -n1 <<<"$out")" = "APP-RELEASE-STAGE released=bafyRelease1 adopted=matthew pending=jessica" ] \
   || fail "pending: expected the pending summary: $out"
 echo "ok 3 - a peer not adopted inside the bound is delivered-not-proven (exit 3)"
+
+# 3b. a peer refused as not bound → exit 3, and the summary names the cause.
+set +e; out="$(STUB_PUBLISH=published STUB_VERIFY=unbound run)"; rc=$?; set -e
+[ "$rc" -eq 3 ] || fail "unbound: expected exit 3, got $rc: $out"
+[ "$(tail -n1 <<<"$out")" = "APP-RELEASE-STAGE released=bafyRelease1 adopted=matthew pending=jessica bind-not-visible=jessica" ] \
+  || fail "unbound: expected the bind-not-visible summary: $out"
+echo "ok 3b - a peer refusing as not bound is named bind-not-visible in the summary (exit 3)"
 
 # 4. cannot boot → exit 1.
 set +e; out="$(STUB_PUBLISH=published STUB_VERIFY=cannot-boot run)"; rc=$?; set -e

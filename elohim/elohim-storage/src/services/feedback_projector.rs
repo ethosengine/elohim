@@ -758,7 +758,7 @@ pub fn commit_group(
     outcome: &GroupOutcome,
 ) -> Result<bool, StorageError> {
     let now = Utc::now().to_rfc3339();
-    conn.transaction::<bool, diesel::result::Error, _>(|c| {
+    crate::db::read_then_write_transaction::<bool, diesel::result::Error, _>(conn, |c| {
         let existing = app_db::fetch_application(c, generation_id, &outcome.group_key)?;
         let already_applied = existing
             .as_ref()
@@ -866,7 +866,7 @@ pub fn publish_generation(
     policy_manifest_cid: &str,
 ) -> Result<usize, StorageError> {
     let now = Utc::now().to_rfc3339();
-    conn.transaction::<usize, diesel::result::Error, _>(|c| {
+    crate::db::read_then_write_transaction::<usize, diesel::result::Error, _>(conn, |c| {
         let aggregates = gen_db::list_aggregates(c, generation_id)?;
         for agg in &aggregates {
             let last_signal_at = agg

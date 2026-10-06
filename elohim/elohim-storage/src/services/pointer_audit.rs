@@ -332,11 +332,13 @@ mod tests {
 
     #[test]
     fn batch_and_cadence_are_bounded_and_nonzero() {
-        assert!(
-            POINTER_AUDIT_BATCH > 0,
-            "must bound conductor load per sweep"
-        );
-        assert!(POINTER_AUDIT_TICK_SECONDS > 0, "must not busy-loop");
+        const {
+            assert!(
+                POINTER_AUDIT_BATCH > 0,
+                "must bound conductor load per sweep"
+            );
+            assert!(POINTER_AUDIT_TICK_SECONDS > 0, "must not busy-loop");
+        }
     }
 
     #[test]

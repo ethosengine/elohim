@@ -65,6 +65,34 @@ function pipelineUrl(name, info) {
  *   investigationPointers: string[],
  * }}
  */
+
+/**
+ * Name the humans a seed-results artifact did NOT succeed for, grouped by
+ * outcome — `failed: a; conflict: b; skipped: c` — plus any `embodied`
+ * mappings (a name-affine conductor embodying a different Human id, counted
+ * as success). A conflict is not a failure row, so listing only `failed`
+ * printed "(none listed)" while the stage was partial on a conflict.
+ * Older artifacts without `embodied`/`embodiedAs` read the same.
+ */
+export function describeSeedOutcomes(artifact) {
+  const rows = Array.isArray(artifact?.results) ? artifact.results : [];
+  const who = r => r?.humanId || r?.displayName;
+  const groups = [];
+  for (const outcome of ['failed', 'conflict', 'skipped']) {
+    const names = rows.filter(r => r?.result === outcome).map(who).filter(Boolean);
+    if (names.length > 0) groups.push(`${outcome}: ${names.join(', ')}`);
+  }
+  const embodiedAs = { ...(artifact?.embodiedAs && typeof artifact.embodiedAs === 'object' ? artifact.embodiedAs : {}) };
+  for (const r of rows) {
+    if (r?.result === 'embodied' && r.humanId && r.embodiedHumanId && !embodiedAs[r.humanId]) {
+      embodiedAs[r.humanId] = r.embodiedHumanId;
+    }
+  }
+  const embodied = Object.entries(embodiedAs).map(([from, to]) => `${from}→${to}`);
+  if (embodied.length > 0) groups.push(`embodied: ${embodied.join(', ')}`);
+  return groups.length > 0 ? groups.join('; ') : 'not succeeded: (none listed)';
+}
+
 export function reconcile({ predicted, actual }) {
   if (!predicted || !Array.isArray(predicted.pipelines)) {
     throw new Error('predicted.pipelines must be an array');
@@ -178,25 +206,17 @@ export function reconcile({ predicted, actual }) {
 
     const sci = annotations.seedResultsConductorIdentities;
     if (sci && sci.counts && (sci.partial || sci.allFailed)) {
-      const failed = (sci.results || [])
-        .filter(r => r?.result === 'failed')
-        .map(r => r.humanId || r.displayName)
-        .filter(Boolean);
       const verdict = sci.allFailed ? 'total failure' : 'partial';
       investigationPointers.push(
-        `${name} seed-conductor-identities ${verdict}: ${sci.counts.succeeded ?? 0}/${sci.counts.total ?? '?'} succeeded; failed: ${failed.join(', ') || '(none listed)'}`,
+        `${name} seed-conductor-identities ${verdict}: ${sci.counts.succeeded ?? 0}/${sci.counts.total ?? '?'} succeeded; ${describeSeedOutcomes(sci)}`,
       );
     }
 
     const sab = annotations.seedResultsAgentBindings;
     if (sab && sab.counts && (sab.partial || sab.allFailed)) {
-      const failed = (sab.results || [])
-        .filter(r => r?.result === 'failed')
-        .map(r => r.humanId || r.displayName)
-        .filter(Boolean);
       const verdict = sab.allFailed ? 'total failure' : 'partial';
       investigationPointers.push(
-        `${name} seed-agent-bindings ${verdict}: ${sab.counts.succeeded ?? 0}/${sab.counts.total ?? '?'} succeeded; failed: ${failed.join(', ') || '(none listed)'}`,
+        `${name} seed-agent-bindings ${verdict}: ${sab.counts.succeeded ?? 0}/${sab.counts.total ?? '?'} succeeded; ${describeSeedOutcomes(sab)}`,
       );
     }
   }
