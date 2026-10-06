@@ -311,6 +311,37 @@ pub fn watch_stands(
     Ok(placed == 0)
 }
 
+/// Count one more pass for every blob in `blob_hashes`, in one transaction.
+/// Returns each blob's count after counting.
+pub fn note_unnamed_many(
+    conn: &mut SqliteConnection,
+    blob_hashes: &[String],
+) -> Result<HashMap<String, i32>, StorageError> {
+    conn.transaction(|conn| {
+        let now = current_timestamp();
+        for blob_hash in blob_hashes {
+            diesel::insert_or_ignore_into(blob_unnamed_watch::table)
+                .values((
+                    blob_unnamed_watch::blob_hash.eq(blob_hash),
+                    blob_unnamed_watch::first_unnamed_at.eq(&now),
+                    blob_unnamed_watch::passes.eq(0),
+                ))
+                .execute(conn)?;
+        }
+        diesel::update(
+            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes)),
+        )
+        .set(blob_unnamed_watch::passes.eq(blob_unnamed_watch::passes + 1))
+        .execute(conn)?;
+        let rows: Vec<(String, i32)> = blob_unnamed_watch::table
+            .filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes))
+            .select((blob_unnamed_watch::blob_hash, blob_unnamed_watch::passes))
+            .load(conn)?;
+        Ok::<HashMap<String, i32>, diesel::result::Error>(rows.into_iter().collect())
+    })
+    .map_err(|e| StorageError::Database(format!("note_unnamed_many: {e}")))
+}
+
 /// Stop watching blobs that are named again: their count starts over.
 pub fn clear_watch(
     conn: &mut SqliteConnection,

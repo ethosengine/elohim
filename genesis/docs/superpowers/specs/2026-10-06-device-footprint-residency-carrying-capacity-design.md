@@ -169,8 +169,10 @@ of holding it.
 
 **The backlog.** This is what reclaims the bundles that predate the release ledger, with no
 backfill. A bundle the peer put or fetched itself carries a record of that (the put path has
-written one since 2026-05-10, and every fetch writes one), so it is let go as own-unnamed. An
-older bundle with no record stays, reported as unrecorded, until a person names it.
+written a self-custody row since 2026-05-10, and every fetch writes an event naming this node), so
+it is let go as own-unnamed. A manifest alone is not such a record: the manifest backfill stamps one
+on every blob that is present, however it arrived. An older bundle with no record stays, reported
+as unrecorded, until a person names it.
 
 **Withdrawal.** A peer that placed bytes with others tells each holder, directly and as itself,
 that it no longer needs them held; the holder accepts that only from the peer its record names.

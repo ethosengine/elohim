@@ -40,9 +40,10 @@ use crate::db::diesel_schema::{
 use crate::db::release_ledger::{self, LedgerArtifact};
 use crate::error::StorageError;
 
-/// bounded-work: how many unnamed blobs one pass looks at closely (the
-/// authoritative per-blob read, the watch count, and letting go). The rest are
-/// reported and reached on later passes: the starting point rotates.
+/// bounded-work: how many blobs one pass may let go (each with its
+/// authoritative per-blob read first). Every unnamed blob is counted on every
+/// pass; the rest of the eligible ones are reached on later passes, the starting
+/// point rotating.
 pub const MAX_UNNAMED_PER_PASS: usize = 64;
 
 /// How many unnamed blobs the report lists one by one.
@@ -186,7 +187,7 @@ pub struct HoldsReport {
     /// The blobs that read as own and unnamed, largest first, at most
     /// `MAX_LISTED`.
     pub own_unnamed: Vec<UnnamedBlob>,
-    /// Unnamed blobs this pass did not look at closely.
+    /// Blobs that could have been let go this pass but were not reached.
     pub unexamined: usize,
     /// Blobs this pass let go, and the blob-store bytes that freed.
     pub released: Vec<String>,
@@ -294,6 +295,19 @@ fn read_tables(
     for (blob, server, cid) in rows {
         served.extend([blob, server, cid].into_iter().flatten());
     }
+    // A hash or CID anywhere in a row's metadata names the blob too (a channel
+    // row carries its release manifest there). One read of the column per
+    // pass, instead of one LIKE per blob.
+    let metadata: Vec<Option<String>> = content::table
+        .filter(content::metadata_json.is_not_null())
+        .select(content::metadata_json)
+        .load(conn)
+        .map_err(|e| db("content metadata", e))?;
+    for json in metadata.into_iter().flatten() {
+        for token in digest_tokens(&json) {
+            served.insert(token);
+        }
+    }
 
     let pledged_rows: Vec<Option<String>> = rea_commitments::table
         .filter(rea_commitments::action.eq("custody-blob"))
@@ -318,19 +332,11 @@ fn read_tables(
         ))
         .load(conn)
         .map_err(|e| db("manifests", e))?;
+    // A `blob:` manifest is NOT evidence of how a blob arrived: the manifest
+    // backfill stamps one on every blob present locally, however it got here
+    // (seen on the household on 2026-10-06: a file put over the shard route had
+    // one three minutes later). Only rows a single arrival path writes count.
     let mut own_evidence: HashMap<String, (ArrivalVia, String)> = HashMap::new();
-    let manifest_ids: Vec<(String, String, String)> = shard_manifests::table
-        .filter(shard_manifests::content_id.like("blob:%"))
-        .select((
-            shard_manifests::blob_hash,
-            shard_manifests::content_id,
-            shard_manifests::created_at,
-        ))
-        .load(conn)
-        .map_err(|e| db("put manifests", e))?;
-    for (blob_hash, _, created_at) in manifest_ids {
-        own_evidence.insert(blob_hash, (ArrivalVia::SelfPut, created_at));
-    }
     let manifests = manifest_rows
         .into_iter()
         .map(|(blob, json)| (blob, serde_json::from_str(&json).unwrap_or_default()))
@@ -381,6 +387,38 @@ fn read_tables(
         own_evidence,
         watch: blob_arrivals::watched(conn)?,
     })
+}
+
+/// Every sha2-256 digest (64 hex, as `sha256-<hex>`) and every raw-codec CID
+/// (`bafkrei…`) that appears in a text, in the spellings the served set holds.
+fn digest_tokens(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        // A CID first: its `baf` prefix is also three hex digits.
+        if c == b'b' && text[i..].starts_with("baf") {
+            let start = i;
+            while i < bytes.len() && (bytes[i].is_ascii_lowercase() || bytes[i].is_ascii_digit()) {
+                i += 1;
+            }
+            if i - start >= 50 {
+                out.push(text[start..i].to_string());
+            }
+        } else if c.is_ascii_hexdigit() {
+            let start = i;
+            while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
+                i += 1;
+            }
+            if i - start == 64 {
+                out.push(format!("sha256-{}", text[start..i].to_ascii_lowercase()));
+            }
+        } else {
+            i += 1;
+        }
+    }
+    out
 }
 
 /// A blob address in any of its spellings, as the blob store spells it.
@@ -602,25 +640,48 @@ pub async fn run_pass(
         .collect();
     candidates.sort();
 
-    // The close look, at a bounded slice of them.
-    let start = if candidates.len() > MAX_UNNAMED_PER_PASS {
+    // Every candidate is counted this pass, in one write: a pass is a pass for
+    // every unnamed blob, however many there are. Only the letting go is
+    // bounded.
+    let counted = {
+        let hashes = candidates.clone();
+        sweeper
+            .db(move |conn| blob_arrivals::note_unnamed_many(conn, &hashes))
+            .await?
+    };
+    let passes_now: HashMap<String, u64> = counted
+        .into_iter()
+        .map(|(hash, passes)| (hash, u64::try_from(passes).unwrap_or(0)))
+        .collect();
+    let mut eligible: Vec<String> = Vec::new();
+    for hash in &candidates {
+        let seen_before = !sweeper.seen_unnamed.lock().unwrap().insert(hash.clone());
+        let passes = passes_now.get(hash).copied().unwrap_or(0);
+        let age = age_secs(&standings[hash].own, now_unix);
+        if seen_before && may_let_go(HoldReason::OwnUnnamed, age, passes, limits) {
+            eligible.push(hash.clone());
+        }
+    }
+
+    // The close look, at a bounded slice of the eligible. The rest are reached
+    // on later passes: the starting point rotates.
+    let start = if eligible.len() > MAX_UNNAMED_PER_PASS {
         sweeper
             .holds_cursor
             .fetch_add(MAX_UNNAMED_PER_PASS, Ordering::Relaxed)
-            % candidates.len()
+            % eligible.len()
     } else {
         0
     };
-    report.unexamined = candidates.len().saturating_sub(MAX_UNNAMED_PER_PASS);
-    let examined: Vec<String> = candidates
+    report.unexamined = eligible.len().saturating_sub(MAX_UNNAMED_PER_PASS);
+    let examined: Vec<String> = eligible
         .iter()
         .cycle()
         .skip(start)
-        .take(candidates.len().min(MAX_UNNAMED_PER_PASS))
+        .take(eligible.len().min(MAX_UNNAMED_PER_PASS))
         .cloned()
         .collect();
 
-    let mut passes_now: HashMap<String, u64> = HashMap::new();
     // Blobs the close look found to be named after all, and why.
     let mut named_after_all: HashMap<String, HoldReason> = HashMap::new();
     for hash in &examined {
@@ -669,29 +730,8 @@ pub async fn run_pass(
             continue;
         }
 
-        let watch = {
-            let hash = hash.clone();
-            sweeper
-                .db(move |conn| blob_arrivals::note_unnamed(conn, &hash))
-                .await
-        };
-        let passes = match watch {
-            Ok(watch) => u64::try_from(watch.passes).unwrap_or(0),
-            Err(e) => {
-                tracing::warn!(blob = %hash, error = %e, "holds: could not count an unnamed pass; kept");
-                report.failures += 1;
-                continue;
-            }
-        };
-        passes_now.insert(hash.clone(), passes);
-
-        let seen_before = !sweeper.seen_unnamed.lock().unwrap().insert(hash.clone());
         let own = &standings[hash].own;
-        let age = age_secs(own, now_unix);
-        if !seen_before || !may_let_go(HoldReason::OwnUnnamed, age, passes, limits) {
-            continue;
-        }
-
+        let passes = passes_now.get(hash).copied().unwrap_or(0);
         // From the last look to the delete, nothing may arrive: a put or a
         // fetch of these bytes either lands before, and the watch it clears
         // stops this, or lands after, and stores them again.
@@ -1341,6 +1381,46 @@ mod tests {
         assert!(
             blob_arrivals::arrivals_by_hash(&mut conn).unwrap()[&shards[1]][0].is_live_placement()
         );
+    }
+
+    #[tokio::test]
+    async fn a_manifest_the_backfill_wrote_is_not_a_record_of_how_a_blob_arrived() {
+        let peer = peer().await;
+        let hash = peer.bare(b"present, provenance unknown").await;
+        // The manifest backfill stamps a `blob:` manifest on every local blob.
+        let mut conn = peer.pool.get().unwrap();
+        diesel::sql_query(
+            "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, blob_cid, encoding, \
+             data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
+             shard_size_bytes, mime_type, reach, created_at) VALUES (?, 'lamad', ?, NULL, \
+             'none', 1, 0, ?, 1, 1, 'application/octet-stream', 'commons', '2026-01-01T00:00:00Z')",
+        )
+        .bind::<diesel::sql_types::Text, _>(format!("blob:bafkrei{}", &hash[7..47]))
+        .bind::<diesel::sql_types::Text, _>(&hash)
+        .bind::<diesel::sql_types::Text, _>(format!("[\"{hash}\"]"))
+        .execute(&mut conn)
+        .unwrap();
+        drop(conn);
+        for _ in 0..3 {
+            let report = peer.pass(SOON).await;
+            assert_eq!(tally(&report, HoldReason::Unrecorded), 1);
+            assert!(report.released.is_empty());
+        }
+        assert!(peer.holds(&hash).await);
+    }
+
+    #[test]
+    fn digests_are_found_wherever_metadata_spells_them() {
+        let hex = "a".repeat(64);
+        let cid = BlobStore::hash_to_cid(&hex).unwrap().to_string();
+        let text = format!(
+            r#"{{"artifacts":[{{"sha256":"{}"}}],"blobCid":"{cid}","blobHash":"sha256-{hex}"}}"#,
+            hex.to_ascii_uppercase()
+        );
+        let tokens = digest_tokens(&text);
+        assert!(tokens.contains(&format!("sha256-{hex}")));
+        assert!(tokens.contains(&cid));
+        assert!(digest_tokens("no digest here, just words and 1234").is_empty());
     }
 
     #[tokio::test]
