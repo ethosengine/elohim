@@ -136,6 +136,9 @@ struct Pending {
     approver: String,
     node: String,
     asked_at_unix: u64,
+    /// The approving node's key, when it was declared.
+    #[serde(default)]
+    approver_key: Option<String>,
 }
 
 fn pending_dir() -> Outcome<PathBuf> {
@@ -312,6 +315,7 @@ fn ask(args: &[String]) -> Outcome<ExitCode> {
         approver,
         node: node.clone(),
         asked_at_unix: now_unix(),
+        approver_key: approver_key.clone(),
     };
     pending.save()?;
     if announcing {
@@ -363,6 +367,9 @@ struct AnnounceStatus {
     code: Option<String>,
     #[serde(default)]
     declined_by: Option<DeclinedBy>,
+    /// The key whose proof came with the code.
+    #[serde(default)]
+    code_approver: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -413,7 +420,7 @@ fn announce(pending: Pending, approver_key: Option<String>, node: &str) -> Outco
     }
     let mut told: Vec<u32> = Vec::new();
     let deadline = Instant::now() + WINDOW + Duration::from_secs(10);
-    let code = loop {
+    let (code, proven_approver) = loop {
         if Instant::now() > deadline {
             pending.forget();
             return Err("no approving node approved within five minutes; ask again".into());
@@ -431,7 +438,7 @@ fn announce(pending: Pending, approver_key: Option<String>, node: &str) -> Outco
             }
         }
         match (status.status.as_str(), status.code) {
-            ("code", Some(code)) => break code,
+            ("code", Some(code)) => break (code, status.code_approver),
             ("declined", _) => {
                 pending.forget();
                 let by = status
@@ -476,7 +483,8 @@ fn announce(pending: Pending, approver_key: Option<String>, node: &str) -> Outco
             ));
         }
     };
-    finish(pending, delivered, node)
+    let expected = approver_key.or(proven_approver);
+    finish(pending, delivered, node, expected)
 }
 
 /// Take one `GET /callback?code=…&state=…` on the terminal's listener.
@@ -595,13 +603,23 @@ fn redeem(pending: Pending, code: &str, node: &str) -> Outcome<ExitCode> {
             return Err(format!("the approving node's answer is unreadable: {e}"));
         }
     };
-    finish(pending, delivered, node)
+    let expected = pending.approver_key.clone();
+    finish(pending, delivered, node, expected)
 }
 
 /// Check what was collected, have this node enroll with it, and report.
-fn finish(pending: Pending, delivered: Delivered, node: &str) -> Outcome<ExitCode> {
+/// `expected` is the approving node's key when one is known (declared, or
+/// proven over the carrier): it must be among the signers. The approving
+/// node and the identity are shown before this device enrolls (adversarial
+/// review, high 3); asking the person to confirm them is a recorded dial.
+fn finish(
+    pending: Pending,
+    delivered: Delivered,
+    node: &str,
+    expected: Option<String>,
+) -> Outcome<ExitCode> {
     let request = &pending.request;
-    if let Err(r) = check_delivered(&delivered, request) {
+    if let Err(r) = check_delivered(&delivered, request, expected.as_deref()) {
         pending.forget();
         return Err(format!(
             "{}: what the approving node handed over is not a valid consent for this request; nothing was signed",
@@ -627,9 +645,20 @@ fn finish(pending: Pending, delivered: Delivered, node: &str) -> Outcome<ExitCod
         println!("Enrolling this device was not agreed, so nothing was enrolled.");
         return Ok(ExitCode::SUCCESS);
     }
+    let named: Vec<String> =
+        consent_grant::verify::signers(&delivered, consent_grant::SignerRole::Controller)
+            .iter()
+            .map(|k| consent_grant::hash_shape::fingerprint(k))
+            .collect();
+    println!(
+        "Approved by node {} for identity {}.",
+        named.join(", "),
+        consent_grant::hash_shape::fingerprint(&record.identity_root)
+    );
     let enroll = serde_json::to_vec(&serde_json::json!({
         "request": request,
         "delivered": delivered,
+        "approverKey": expected,
     }))
     .map_err(|e| e.to_string())?;
     let receipt: BindingReceipt = json_call(
