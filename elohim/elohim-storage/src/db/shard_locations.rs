@@ -114,7 +114,7 @@ pub fn apply_peer_announced(
 
     let announced_rfc3339 = announced_ms_to_rfc3339(announced_at_ms);
 
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         let existing: Option<(String, Option<String>)> = shard_locations::table
             .filter(shard_locations::shard_hash.eq(shard_hash))
             .filter(shard_locations::peer_id.eq(holder_agent_cid))

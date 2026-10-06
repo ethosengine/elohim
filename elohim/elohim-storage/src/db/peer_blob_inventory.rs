@@ -58,7 +58,7 @@ pub fn apply_snapshot(
 ) -> Result<SnapshotApplyOutcome, StorageError> {
     let content_hash = content_fingerprint(hashes);
 
-    conn.transaction::<SnapshotApplyOutcome, diesel::result::Error, _>(|conn| {
+    super::read_then_write_transaction::<SnapshotApplyOutcome, diesel::result::Error, _>(conn, |conn| {
         // Read the current cursor: sequence high-watermark, the freshness clock
         // (last_updated), and the fingerprint of the last-applied set.
         let existing: Option<(i64, String, Option<String>)> = peer_inventory_cursor::table
@@ -232,7 +232,7 @@ pub fn apply_delta(
     sequence: i64,
     emitted_at: &str,
 ) -> Result<DeltaApplyOutcome, StorageError> {
-    conn.transaction(|conn| {
+    super::read_then_write_transaction(conn, |conn| {
         let stored_max = read_cursor_sequence(conn, peer_id)?;
 
         match stored_max {
@@ -291,7 +291,7 @@ pub fn record_fetch_success(
     blob_hash: &str,
     observed_at: &str,
 ) -> Result<(), StorageError> {
-    conn.transaction(|conn| {
+    super::read_then_write_transaction(conn, |conn| {
         let existing_seq: Option<i64> = peer_blob_inventory::table
             .filter(peer_blob_inventory::peer_id.eq(peer_id))
             .filter(peer_blob_inventory::blob_hash.eq(blob_hash))
@@ -566,6 +566,62 @@ mod tests {
             .expect("pool");
         run_migrations(&pool).expect("migrations");
         pool
+    }
+
+    /// The lock-upgrade shape through a real converted call: while another
+    /// connection holds the write lock, a snapshot apply must WAIT for it
+    /// (immediate transaction) — never read under a snapshot that the other
+    /// writer's commit then makes stale, which SQLite refuses at once.
+    #[test]
+    fn snapshot_apply_waits_for_a_concurrent_writer_instead_of_losing_the_lock() {
+        use diesel::connection::SimpleConnection;
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pbi_lock.db");
+        let path_str = path.to_str().unwrap().to_string();
+        let open = |p: &str| {
+            let mut c = SqliteConnection::establish(p).expect("open");
+            c.batch_execute("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 1000;")
+                .expect("pragmas");
+            c
+        };
+        drop(open(&path_str));
+        {
+            let pool = Pool::builder()
+                .max_size(1)
+                .build(ConnectionManager::<SqliteConnection>::new(&path_str))
+                .expect("pool");
+            run_migrations(&pool).expect("migrations");
+        }
+
+        let (held_tx, held_rx) = mpsc::channel::<()>();
+        let b_path = path_str.clone();
+        let b = std::thread::spawn(move || {
+            let mut b = open(&b_path);
+            crate::db::read_then_write_transaction(&mut b, |b| {
+                apply_snapshot(b, "peer_B", &["hb".into()], 1, "2026-10-06T00:00:00Z")?;
+                held_tx.send(()).expect("signal held");
+                // Hold well past A's start (A is already open, so only a
+                // scheduler stall could outlast this) and well inside A's
+                // busy timeout.
+                std::thread::sleep(Duration::from_millis(150));
+                Ok::<_, StorageError>(())
+            })
+        });
+
+        let mut a = open(&path_str);
+        held_rx.recv().expect("B holds the write lock");
+        let started = Instant::now();
+        let outcome = apply_snapshot(&mut a, "peer_A", &["ha".into()], 1, "2026-10-06T00:00:00Z")
+            .expect("A waits for B's commit instead of losing the upgrade");
+        assert!(matches!(outcome, SnapshotApplyOutcome::Applied));
+        assert!(
+            started.elapsed() >= Duration::from_millis(20),
+            "A must have waited on B's lock"
+        );
+        b.join().unwrap().expect("B committed");
     }
 
     #[test]

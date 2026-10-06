@@ -219,7 +219,7 @@ pub fn record_libp2p_observation(
     use peer_transport_manifest as t;
     let addrs_json = serialize_string_array(addrs);
     let supports_json = serialize_string_array(&supports_to_strings(supports));
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         let existing: Option<ManifestRow> = t::table
             .filter(t::agent_cid.eq(agent_cid))
             .first(conn)
@@ -268,7 +268,7 @@ pub fn record_iroh_observation(
     use peer_transport_manifest as t;
     let relays_json = serialize_string_array(relays);
     let supports_json = serialize_string_array(&supports_to_strings(supports));
-    conn.transaction(|conn| {
+    crate::db::read_then_write_transaction(conn, |conn| {
         let existing: Option<ManifestRow> = t::table
             .filter(t::agent_cid.eq(agent_cid))
             .first(conn)

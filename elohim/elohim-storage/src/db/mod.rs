@@ -247,6 +247,52 @@ pub use diesel::sqlite::SqliteConnection;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+/// Runs `f` in a transaction that holds SQLite's write lock from its first
+/// statement. Use it for every transaction that READS and then WRITES.
+///
+/// A deferred transaction (diesel's `transaction`) starts as a reader and
+/// upgrades to a writer at its first write. If another connection holds the
+/// write lock at that moment, SQLite refuses the upgrade AT ONCE with
+/// "database is locked" — `busy_timeout` does not apply to an upgrade, because
+/// waiting could deadlock two readers that both want to write. Taking the lock
+/// up front (`BEGIN IMMEDIATE`) turns that refusal into an ordinary wait under
+/// the 30 s busy timeout.
+///
+/// Inside a caller's transaction the lock question is the caller's, and this
+/// is a savepoint: nesting never opens a second `BEGIN`.
+pub(crate) fn read_then_write_transaction<T, E, F>(
+    conn: &mut SqliteConnection,
+    f: F,
+) -> Result<T, E>
+where
+    F: FnOnce(&mut SqliteConnection) -> Result<T, E>,
+    E: From<diesel::result::Error>,
+{
+    use diesel::connection::{AnsiTransactionManager, TransactionManager};
+    let nested = matches!(
+        AnsiTransactionManager::transaction_manager_status_mut(conn).transaction_depth(),
+        Ok(Some(_))
+    );
+    if nested {
+        conn.transaction(f)
+    } else {
+        conn.immediate_transaction(f)
+    }
+}
+
+/// True when an error is SQLite refusing a lock (`SQLITE_BUSY` /
+/// `SQLITE_LOCKED`) rather than a fault in the request: the write lost a race
+/// for the database and the same call, re-offered, can succeed.
+///
+/// Classified by MARKER, not variant, for the same reason the conductor
+/// admission shed is: the diesel error reaches the HTTP boundary already
+/// formatted into whichever `StorageError` variant its call site chose
+/// (`Database`, `Internal`, …).
+pub fn is_sqlite_lock_loss(err: &impl std::fmt::Display) -> bool {
+    let text = err.to_string();
+    text.contains("database is locked") || text.contains("database table is locked")
+}
+
 /// Database statistics
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -581,5 +627,115 @@ mod pool_size_tests {
             parse_db_pool_size(Some("".to_string())),
             DB_POOL_SIZE_DEFAULT
         );
+    }
+}
+
+#[cfg(test)]
+mod lock_upgrade_tests {
+    //! Pins the SQLite lock-upgrade failure a deferred read-then-write
+    //! transaction suffers under WAL, and that `read_then_write_transaction`
+    //! cannot suffer it.
+    use super::{is_sqlite_lock_loss, read_then_write_transaction, SqliteConnection};
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use std::sync::mpsc;
+
+    /// Busy timeout short enough to keep the test fast, long enough that a
+    /// waiting writer outlasts the holder's brief critical section.
+    const BUSY_MS: u64 = 2000;
+
+    #[derive(diesel::QueryableByName)]
+    struct Val {
+        #[diesel(sql_type = diesel::sql_types::BigInt)]
+        v: i64,
+    }
+
+    fn open(path: &std::path::Path) -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(path.to_str().unwrap()).expect("open");
+        conn.batch_execute(&format!(
+            "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = {BUSY_MS};"
+        ))
+        .expect("pragmas");
+        conn
+    }
+
+    fn fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("lock.db");
+        open(&path)
+            .batch_execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER NOT NULL); INSERT INTO t VALUES (1, 1);")
+            .expect("schema");
+        (dir, path)
+    }
+
+    fn read_v(conn: &mut SqliteConnection) -> QueryResult<i64> {
+        diesel::sql_query("SELECT v FROM t WHERE id = 1")
+            .get_result::<Val>(conn)
+            .map(|r| r.v)
+    }
+
+    #[test]
+    fn deferred_read_then_write_loses_the_lock_upgrade_at_once() {
+        let (_dir, path) = fixture();
+        let mut a = open(&path);
+        let mut b = open(&path);
+
+        let started = std::time::Instant::now();
+        let result: QueryResult<()> = a.transaction(|a| {
+            let seen = read_v(a)?; // A now holds a read snapshot.
+            b.batch_execute("UPDATE t SET v = v + 10 WHERE id = 1")
+                .expect("B writes past A's snapshot and commits");
+            diesel::sql_query(format!("UPDATE t SET v = {} WHERE id = 1", seen + 1)).execute(a)?;
+            Ok(())
+        });
+
+        let err = result.expect_err("a stale snapshot cannot upgrade to a writer");
+        assert!(is_sqlite_lock_loss(&err), "unexpected error: {err}");
+        assert!(
+            started.elapsed() < std::time::Duration::from_millis(BUSY_MS),
+            "the refusal is immediate: busy_timeout does not cover an upgrade"
+        );
+        assert_eq!(read_v(&mut b).unwrap(), 11, "only B's write landed");
+    }
+
+    #[test]
+    fn read_then_write_transaction_makes_the_other_writer_wait() {
+        let (_dir, path) = fixture();
+        let mut a = open(&path);
+        let b_path = path.clone();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        let b = std::thread::spawn(move || {
+            let mut b = open(&b_path);
+            go_rx.recv().expect("go");
+            // A holds the write lock: this waits under busy_timeout, then lands.
+            b.batch_execute("UPDATE t SET v = v + 10 WHERE id = 1")
+        });
+
+        let result: QueryResult<()> = read_then_write_transaction(&mut a, |a| {
+            let seen = read_v(a)?;
+            go_tx.send(()).expect("signal B");
+            // Give B time to reach the lock; well inside its busy timeout.
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            diesel::sql_query(format!("UPDATE t SET v = {} WHERE id = 1", seen + 1)).execute(a)?;
+            Ok(())
+        });
+
+        result.expect("an immediate transaction never loses the upgrade");
+        b.join().unwrap().expect("B waited for A, then committed");
+        assert_eq!(read_v(&mut a).unwrap(), 12, "both writes landed, none lost");
+    }
+
+    #[test]
+    fn nested_call_is_a_savepoint_not_a_second_begin() {
+        let (_dir, path) = fixture();
+        let mut a = open(&path);
+        let result: QueryResult<i64> = read_then_write_transaction(&mut a, |a| {
+            read_then_write_transaction(a, |a| {
+                diesel::sql_query("UPDATE t SET v = 5 WHERE id = 1").execute(a)?;
+                read_v(a)
+            })
+        });
+        assert_eq!(result.unwrap(), 5);
     }
 }
