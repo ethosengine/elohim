@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-09-11"
+updated: "2026-10-06"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
@@ -302,3 +302,84 @@ Three things changed, and each sharpens the record above:
 Still **blocked** on the same grounds: the fix path touches `elohim/elohim-storage/src`,
 held as in-flight WIP by another lane, and runtime proof needs an operator-owned edge roll.
 Ledger line restored to `status: blocked` with the pointer to this file.
+
+## 2026-10-06 — recurrence at poll 189: F2 has landed, the population fell 9 → 1, and the residue is still unreadable
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`first_poll: 189`) after the node restarted.
+The ledger line:
+
+```json
+{"fp": "2b4761b2eaf6", "class": "provide-loop-dead-remaining-stuck", "node": "alpha-b",
+ "provenance": "p2p-status:provide-loop",
+ "line": "provideLoop.deadRemainingStuck reanchorDeadRemaining=1 reanchorPending=2 stuckSweeps=18",
+ "status": "open", "first_poll": 189, "ts": "2026-10-06T19:42:25+00:00"}
+```
+
+Re-fetched live at 2026-10-06T19:43Z, `GET https://elohim.host/p2p/status .provideLoop`
+(`/health` `uptime: 8160`, so the process started around 17:28Z):
+
+```json
+{"selfCidSource": "derived-libp2p-peer-id", "active": true, "reanchorPending": 2,
+ "reanchorCompleted": 7, "reanchorFailed": 7, "reanchorCaughtUp": false,
+ "reanchorDeadRemaining": 1, "stuckSweeps": 18, "deadRemainingStuck": true,
+ "reanchorSkippedReach": 0, "reanchorSkippedContentType": 0}
+```
+
+`GET https://elohim.host/admin/self-healing` rules out the other mechanisms: admission
+`shedTotal 0`, the single upstream `circuit: "closed"`, `errorStreak 0`. The projector reads
+`caughtUp false` and `divergentAnchor 21`, but that is the separate projection-catchup concern
+(`self-heal-adam-projection-catchup-exhaustion-full-arc.md`, fp `79f357281ca5`). It is not
+this wedge.
+
+### What changed since 2026-09-12
+
+1. **F2 has landed.** Commit `421fa55ea` (2026-10-05, on `origin/dev`) stamps
+   `dht_anchor_state = live` in the same transaction as an adoption. The function is
+   `content_diesel::stamp_own_conductor_canonical_head`, called from
+   `elohim/elohim-storage/src/services/head_adoption.rs` (the stamp sits beside the
+   "liveness observation" comment, around line 2201, and is tested around lines 4354-4413).
+   That closes root-cause sites 2 and 6 for the `Adopted` arm: an adopted row now leaves the
+   dead population. The fall from 9 to 1 fits that change reaching adam. `/health` does not
+   publish a git SHA, so the surface cannot prove which build is running.
+2. **Held candidates now back off.** Commit `aa55b2e71`
+   (`services::reanchor_backoff::note_held`, `reanchor_backfill.rs:436-445`) stops a
+   `Held`/`Contested` row from being probed again every sweep. As a result,
+   `reanchorCompleted` no longer equals `stuckSweeps × deadRemaining`, so the 2026-09-11
+   arithmetic proof (1512 = 168 × 9) cannot be repeated on this surface.
+3. **One row remains, and its arm cannot be named.** `reanchorFailed: 7` in 18 sweeps with
+   both skip counters at 0 means the residue is either a `Held`/`Contested` row (site 7, and
+   F3 has not landed) or a row whose re-author keeps failing. The endpoint cannot tell these
+   apart. **F1 is the missing node.** It has not landed: `ProvideLoopStatus` still carries no
+   per-arm `adopted`/`held` counts.
+4. **F4 has not landed, and it is not a comment-only edit.** The misleading text ("a seed-data
+   correction is needed … `reanchorSkippedReach` / `reanchorSkippedContentType` name the
+   likely reason") is the doc of a field on a `#[derive(TS)] #[ts(export)]` struct
+   (`provide_loop_status.rs:173-215`). It is emitted into
+   `elohim/sdk/storage-client-ts/src/generated/ProvideLoopStatus.ts`, into
+   `p2p-status-view.schema.json`, and into four generated `p2p-status-view.ts` copies
+   (elohim-app, elohim-identity, elohim-service, lamad). It ships with F1/F3 as one
+   codegen-bearing change.
+
+### Current decision — still BLOCKED (2026-10-06)
+
+The 2026-09-11 worktree-ownership blocker is gone: `elohim/elohim-storage/src` is clean on
+`fix/coordinator-acceptance-contract`. Two blockers remain:
+
+1. **F1/F3/F4 are one wire-shape change, which needs a sprint lane rather than a background
+   agent.** The change adds `provideLoop` fields (per-arm `adopted`/`held`, and
+   `deadSettledByDeclaration`) and corrects the field docs. It touches the schema, the Rust
+   struct, schema-contract cases, `cargo test export_bindings`, `pnpm run schema:codegen:ts`,
+   and the generated copies (about 10 files). It needs the full `just gate elohim-storage`
+   lane (`CARGO_BUILD_JOBS=1`). F3 also carries a semantic choice: whether a row settled by
+   declaration counts toward `caughtUp`.
+2. **Runtime proof needs an edge roll to adam,** which the operator owns. The roll should also
+   expose the build SHA so the next triage can tell whether a fix is deployed.
+
+Ledger line `2b4761b2eaf6` is set `status: blocked`, `backlog:
+dataplane-reanchor-dead-remaining-rekeyed-peer`. The plan sketch for the sprint is F1 + F3 + F4
+together, in `elohim-storage`, with one schema bump. Then roll, re-read `.provideLoop`, and
+confirm one of two outcomes: the residue row is named and settled-by-declaration (not
+stuck), or `reanchorDeadRemaining` reaches 0.
+
+Not verified as of 2026-10-06T19:43Z: the condition is live (`stuckSweeps: 18`,
+`reanchorDeadRemaining: 1`).
