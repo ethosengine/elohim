@@ -112,7 +112,7 @@
 #                   `cargo test` never overwrites it — else the pool release, then debug slot)
 #   DOORWAY_BIN     doorway binary (default: the mesh's own copy at
 #                   <pool>/doorway__doorway-service/mesh-bin/ when present, else the pool debug slot)
-#   Build both mesh copies with `just mesh build [storage|doorway]` (mesh_build below);
+#   Build both mesh copies with `just mesh build [storage|doorway|beacon]` (mesh_build below);
 #   MESH_BUILD_DRY_RUN=1 prints the exact commands without running them.
 #   MONGOD_BIN      mongod binary (default: first of $PATH mongod, ~/bin/mongod);
 #                   empty/absent => the doorways run WITHOUT an archive (inert
@@ -1549,7 +1549,7 @@ print_iroh_build_command() { # <binary>
   echo "  install -D '$built' '$_storage_mesh'"
 }
 
-# mesh_build [storage|doorway] — the ONE recipe for the household's binaries (`just mesh build`).
+# mesh_build [storage|doorway|beacon] — the ONE recipe for the household's binaries (`just mesh build`).
 # Builds in the crate's existing pool slot (the PreToolUse cargo policy and cargo-pool's disk
 # accounting already know those slots; a second target dir would double a multi-GB footprint),
 # then installs a COPY into <slot>/mesh-bin/, which the gate never writes and which the binary
@@ -1582,10 +1582,10 @@ for k, v in merged.items():
 PY
 }
 
-mesh_build() { # [storage|doorway] (default both)
+mesh_build() { # [storage|doorway|beacon] (default all three)
   local which="${1:-all}" dry="${MESH_BUILD_DRY_RUN:-0}" rc=0
-  case "$which" in all|storage|doorway) ;; *)
-    echo "usage: hc-mesh.sh build [storage|doorway]" >&2; return 2 ;; esac
+  case "$which" in all|storage|doorway|beacon) ;; *)
+    echo "usage: hc-mesh.sh build [storage|doorway|beacon]" >&2; return 2 ;; esac
   _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest>
     local project="$1" crate="$2" slot="$3" bin="$4" rustflags="$5" features="$6" dest="$7"
     local envs=() line
@@ -1600,10 +1600,10 @@ mesh_build() { # [storage|doorway] (default both)
     local built="$POOL/$slot/dev/debug/$bin"
     echo "[mesh build] $project -> $dest"
     printf '  (cd %q &&' "$REPO_ROOT/$crate"; printf ' %q' "${cmd[@]}"; printf ')\n'
-    printf '  install -D -m 0755 %q %q\n' "$built" "$dest"
+    [ "$built" = "$dest" ] || printf '  install -D -m 0755 %q %q\n' "$built" "$dest"
     [ "$dry" = "1" ] && return 0
     (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
-    install -D -m 0755 "$built" "$dest" || return 1
+    [ "$built" = "$dest" ] || install -D -m 0755 "$built" "$dest" || return 1
     echo "[mesh build] ok $dest"
   }
   if [ "$which" = all ] || [ "$which" = storage ]; then
@@ -1613,6 +1613,11 @@ mesh_build() { # [storage|doorway] (default both)
   if [ "$which" = all ] || [ "$which" = doorway ]; then
     _mesh_build_one doorway doorway/doorway-service doorway__doorway-service doorway \
       "" "" "$_doorway_mesh" || rc=1
+  fi
+  if [ "$which" = all ] || [ "$which" = beacon ]; then
+    # Its own workspace root and slot; nothing else writes that binary, so it is run in place.
+    _mesh_build_one relay-addr-beacon doorway/relay-addr-beacon relay-addr-beacon relay-addr-beacon \
+      "" "" "$_beacon_pool" || rc=1
   fi
   [ "$dry" = "1" ] && echo "[mesh build] MESH_BUILD_DRY_RUN=1 — nothing was run"
   return "$rc"
@@ -4338,7 +4343,7 @@ preflight() {
     if [ -x "$BEACON_BIN" ]; then
       echo "ok relay-addr-beacon binary: $BEACON_BIN"
     else
-      echo "REFUSED relay-addr-beacon binary: not executable ($BEACON_BIN) — the household stages its public-name membership authority with it; build it: cd doorway/relay-addr-beacon && just gate (or RUSTFLAGS=\"\" CARGO_TARGET_DIR=$POOL/relay-addr-beacon/dev cargo build --bin relay-addr-beacon), or MESH_MEMBERSHIP=0 to declare the absence"
+      echo "REFUSED relay-addr-beacon binary: not executable ($BEACON_BIN) — the household stages its public-name membership authority with it; build it: just mesh build beacon, or MESH_MEMBERSHIP=0 to declare the absence"
       fail=1
     fi
   else
@@ -5418,6 +5423,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     lineage-reset) lineage_reset_all ;;
     blocks)   shift; mesh_blocks "$@" ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|preflight|build [storage|doorway]|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|portal-restart|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|preflight|build [storage|doorway|beacon]|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|portal-restart|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi

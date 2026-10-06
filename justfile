@@ -445,7 +445,7 @@ mesh action="status" *args:
       # brings it back — no other mesh component is touched.
       portal-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" portal-restart ;;
       join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
-      *) echo "mesh action must be start|preflight|build [storage|doorway]|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|doorway-restart <a|b|c>|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
+      *) echo "mesh action must be start|preflight|build [storage|doorway|beacon]|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|doorway-restart <a|b|c>|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
