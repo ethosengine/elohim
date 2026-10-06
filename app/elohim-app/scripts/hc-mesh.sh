@@ -110,7 +110,10 @@
 #   STORAGE_BIN     elohim-storage binary (default: the mesh's own copy at
 #                   <pool>/elohim__elohim-storage/mesh-bin/ when present — the gate's
 #                   `cargo test` never overwrites it — else the pool release, then debug slot)
-#   DOORWAY_BIN     doorway binary (default: pool debug slot)
+#   DOORWAY_BIN     doorway binary (default: the mesh's own copy at
+#                   <pool>/doorway__doorway-service/mesh-bin/ when present, else the pool debug slot)
+#   Build both mesh copies with `just mesh build [storage|doorway]` (mesh_build below);
+#   MESH_BUILD_DRY_RUN=1 prints the exact commands without running them.
 #   MONGOD_BIN      mongod binary (default: first of $PATH mongod, ~/bin/mongod);
 #                   empty/absent => the doorways run WITHOUT an archive (inert
 #                   warm-shell store, memory-only projection) exactly as before
@@ -391,6 +394,12 @@ elif [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storag
   STORAGE_BIN="$_storage_debug"
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
+# The doorway's own copy, for the same reason as _storage_mesh: the gate's `cargo test --lib
+# --bins` never refreshes dev/debug/doorway, and a hand build there is overwritten by the next one.
+_doorway_mesh="$POOL/doorway__doorway-service/mesh-bin/doorway"
+if [ -z "${DOORWAY_BIN:-}" ] && [ -x "$_doorway_mesh" ]; then
+  DOORWAY_BIN="$_doorway_mesh"
+fi
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
 # relay-addr-beacon (doorway/relay-addr-beacon/): its own workspace root, so its own
 # pool slot rather than elohim's. Only the membership legs need it.
@@ -1533,10 +1542,80 @@ print_iroh_build_command() { # <binary>
   esac
   built="$target_dir/debug/elohim-storage"
   [ -n "$profile" ] && built="$target_dir/release/elohim-storage"
+  echo "  just mesh build storage     # (MESH_BUILD_DRY_RUN=1 prints its commands) — or by hand:"
   echo "  cd '$REPO_ROOT/elohim/elohim-storage'"
   echo "  CARGO_TARGET_DIR='$target_dir' RUSTFLAGS='--cfg getrandom_backend=\"custom\"' cargo build$profile --features \"p2p p2p-iroh\" --bin elohim-storage"
   # …then park it where the gate's `cargo test` cannot overwrite it (see _storage_mesh).
   echo "  install -D '$built' '$_storage_mesh'"
+}
+
+# mesh_build [storage|doorway] — the ONE recipe for the household's binaries (`just mesh build`).
+# Builds in the crate's existing pool slot (the PreToolUse cargo policy and cargo-pool's disk
+# accounting already know those slots; a second target dir would double a multi-GB footprint),
+# then installs a COPY into <slot>/mesh-bin/, which the gate never writes and which the binary
+# resolution above prefers. Storage: features `p2p p2p-iroh`, its required custom getrandom
+# RUSTFLAGS. Doorway: RUSTFLAGS="". Both: the local gate's toolchain pin and cargo caps, merged
+# exactly as gate-runner.mjs gateChildEnv does (the crate manifest's gate run.cargo.env wins,
+# then pool-policy cargo_env_overrides[<project>], then ["*"]), over the caller's env.
+mesh_build_env() { # <gate-project-name> -> prints `KEY=VALUE` lines
+  python3 - "$REPO_ROOT" "$1" <<'PY'
+import json, sys, pathlib
+root, name = pathlib.Path(sys.argv[1]), sys.argv[2]
+merged = {}
+try:
+    pol = json.loads((root / "genesis/agentic/pool-policy.json").read_text()).get("cargo_env_overrides", {})
+    merged.update(pol.get("*", {})); merged.update(pol.get(name, {}))
+except Exception:
+    pass
+for mf in root.glob("*/**/build-manifest.json"):
+    if "node_modules" in mf.parts:
+        continue
+    try:
+        proj = json.loads(mf.read_text()).get("gate", {}).get("projects", {}).get(name)
+    except Exception:
+        continue
+    if proj:
+        merged.update(((proj.get("run") or {}).get("cargo") or {}).get("env") or {})
+        break
+for k, v in merged.items():
+    print(f"{k}={v}")
+PY
+}
+
+mesh_build() { # [storage|doorway] (default both)
+  local which="${1:-all}" dry="${MESH_BUILD_DRY_RUN:-0}" rc=0
+  case "$which" in all|storage|doorway) ;; *)
+    echo "usage: hc-mesh.sh build [storage|doorway]" >&2; return 2 ;; esac
+  _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest>
+    local project="$1" crate="$2" slot="$3" bin="$4" rustflags="$5" features="$6" dest="$7"
+    local envs=() line
+    # Declared values win over the caller's environment, exactly as run-local-gate.sh exports
+    # them: the workspace shell carries CARGO_BUILD_JOBS=4, and storage's measured cap is 1.
+    while IFS= read -r line; do
+      [ -n "$line" ] && envs+=("$line")
+    done < <(mesh_build_env "$project")
+    local cmd=(env "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
+      cargo build --bin "$bin")
+    [ -n "$features" ] && cmd+=(--features "$features")
+    local built="$POOL/$slot/dev/debug/$bin"
+    echo "[mesh build] $project -> $dest"
+    printf '  (cd %q &&' "$REPO_ROOT/$crate"; printf ' %q' "${cmd[@]}"; printf ')\n'
+    printf '  install -D -m 0755 %q %q\n' "$built" "$dest"
+    [ "$dry" = "1" ] && return 0
+    (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
+    install -D -m 0755 "$built" "$dest" || return 1
+    echo "[mesh build] ok $dest"
+  }
+  if [ "$which" = all ] || [ "$which" = storage ]; then
+    _mesh_build_one elohim-storage elohim/elohim-storage elohim__elohim-storage elohim-storage \
+      '--cfg getrandom_backend="custom"' "p2p p2p-iroh" "$_storage_mesh" || rc=1
+  fi
+  if [ "$which" = all ] || [ "$which" = doorway ]; then
+    _mesh_build_one doorway doorway/doorway-service doorway__doorway-service doorway \
+      "" "" "$_doorway_mesh" || rc=1
+  fi
+  [ "$dry" = "1" ] && echo "[mesh build] MESH_BUILD_DRY_RUN=1 — nothing was run"
+  return "$rc"
 }
 
 # A pool binary that PREDATES the source it is built from is the quietest way to
@@ -4175,7 +4254,7 @@ preflight() {
   if [ -x "$STORAGE_BIN" ]; then
     echo "ok elohim-storage binary: $STORAGE_BIN"
   else
-    echo "REFUSED elohim-storage binary: not executable ($STORAGE_BIN) — build it first, see CLAUDE.md pool-slot paths"
+    echo "REFUSED elohim-storage binary: not executable ($STORAGE_BIN) — build it: just mesh build storage"
     fail=1
   fi
 
@@ -4184,7 +4263,7 @@ preflight() {
     if [ -x "$DOORWAY_BIN" ]; then
       echo "ok doorway binary: $DOORWAY_BIN"
     else
-      echo "REFUSED doorway binary: not executable ($DOORWAY_BIN) — build it first, see CLAUDE.md pool-slot paths"
+      echo "REFUSED doorway binary: not executable ($DOORWAY_BIN) — build it: just mesh build doorway"
       fail=1
     fi
   else
@@ -4230,14 +4309,14 @@ preflight() {
     if assert_binary_newer_than_source "$STORAGE_BIN" elohim/elohim-storage/src 2>"$tmp"; then
       echo "ok elohim-storage binary is not older than elohim/elohim-storage/src"
     else
-      echo "REFUSED elohim-storage binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it (\`just gate elohim-storage\`, or RUSTFLAGS=\"--cfg getrandom_backend=\\\"custom\\\"\" cargo build --bin elohim-storage in the pool slot) or set MESH_ALLOW_STALE_BINARY=1"
+      echo "REFUSED elohim-storage binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build storage (the gate's default-feature \`cargo test\` never refreshes the mesh copy) or set MESH_ALLOW_STALE_BINARY=1"
       fail=1
     fi
     if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
       if assert_binary_newer_than_source "$DOORWAY_BIN" doorway/doorway-service/src 2>"$tmp"; then
         echo "ok doorway binary is not older than doorway/doorway-service/src"
       else
-        echo "REFUSED doorway binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it (RUSTFLAGS=\"\" cargo build --bin doorway in the pool slot; the gate's \`cargo test --lib --bins\` does NOT refresh the --bin artifact) or set MESH_ALLOW_STALE_BINARY=1"
+        echo "REFUSED doorway binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build doorway (the gate's \`cargo test --lib --bins\` does NOT refresh the --bin artifact) or set MESH_ALLOW_STALE_BINARY=1"
         fail=1
       fi
     fi
@@ -5322,6 +5401,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     start)    start_detached ;;
     __start_all_inner) start_all ;; # internal: the detached re-exec target of `start` — never call directly
     preflight) preflight ;;
+    build)    shift; mesh_build "$@" ;;
     wait)     shift; wait_all "$@" ;;
     stop)     stop_all ;;
     status)   status_all ;;
@@ -5338,6 +5418,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     lineage-reset) lineage_reset_all ;;
     blocks)   shift; mesh_blocks "$@" ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|preflight|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|portal-restart|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|preflight|build [storage|doorway]|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|portal-restart|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi

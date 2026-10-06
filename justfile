@@ -408,6 +408,9 @@ mesh action="status" *args:
       # launches detached — these are for checking readiness/refusals independently (a fresh
       # shell polling a `start` someone else kicked off, or a dry-run binary/port check).
       preflight) exec "{{ app_dir }}/scripts/hc-mesh.sh" preflight ;;
+      # build the mesh's OWN storage (p2p p2p-iroh) + doorway binaries and install them into the
+      # pool's mesh-bin/ paths, which the gate never writes; MESH_BUILD_DRY_RUN=1 prints the commands.
+      build) exec "{{ app_dir }}/scripts/hc-mesh.sh" build {{ args }} ;;
       wait) exec "{{ app_dir }}/scripts/hc-mesh.sh" wait {{ args }} ;;
       quiesce) exec "{{ app_dir }}/scripts/hc-mesh-quiesce.sh" ;;
       monitor) exec python3 "{{ app_dir }}/scripts/hc-mesh-monitor.py" ;;
@@ -442,7 +445,7 @@ mesh action="status" *args:
       # brings it back — no other mesh component is touched.
       portal-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" portal-restart ;;
       join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
-      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|doorway-restart <a|b|c>|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
+      *) echo "mesh action must be start|preflight|build [storage|doorway]|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|doorway-restart <a|b|c>|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
