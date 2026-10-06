@@ -38,11 +38,15 @@ FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 # NOTE: Build context should be repo root directory
 # Run: docker build -f elohim/elohim-storage/Dockerfile -t elohim-storage .
 # Match dev environment Rust version for dependency compatibility
-# `deps` pre-builds the dependency graph against placeholder sources; the
-# `check` (CI quality gate, `--target check` only) and `builder` (release)
-# stages both branch off it, so a source-only change never recompiles
-# third-party crates in either path.
-FROM rust:1.94.0-slim-bookworm AS deps
+# `dep-sources` assembles everything the dependency compile needs (toolchain,
+# apt packages, manifests, path-dependency trees, placeholder sources) and
+# compiles NOTHING. Two branches sit on it: `deps` (release-profile dependency
+# compile → `builder` → runtime) and `check-deps` (dev/test-profile dependency
+# compile → `check`, CI quality gate, `--target check` only). So a source-only
+# change never recompiles third-party crates in either path, and the quality
+# gate never pays for the release dependency graph it does not use (edge #1555:
+# 1466 s of the storage gate's 2691 s was that release compile).
+FROM rust:1.94.0-slim-bookworm AS dep-sources
 
 WORKDIR /app
 
@@ -327,6 +331,12 @@ RUN mkdir -p src benches && \
     echo 'pub fn placeholder() {}' > src/lib.rs && \
     echo 'fn main() {}' > benches/graph_traversal.rs
 
+# ═══════════════════════════════════════════════════════════════════════════
+# deps: the release-profile dependency warm (release path only:
+# dep-sources → deps → builder → runtime).
+# ═══════════════════════════════════════════════════════════════════════════
+FROM dep-sources AS deps
+
 # Build dependencies (this layer gets cached).
 # Mirror the real build's `--features p2p-iroh` (below) so the iroh / iroh-blobs
 # / iroh-gossip dependency crates land in THIS cached layer instead of
@@ -344,15 +354,17 @@ RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
     target/release/build/elohim* target/release/.fingerprint/elohim*
 
 # ═══════════════════════════════════════════════════════════════════════════
-# check-deps: dev-profile dependency warm for the quality gate — branched OFF
-# the release path so the default build (deps → builder → runtime) never pays
-# for it (the deps cache chain includes every path-dep source tree, so it
-# churns far more often than "manifest changes"). Requires BuildKit: a legacy
-# builder executes ALL stages in file order — CI uses buildkitd; local one-off
-# builds need DOCKER_BUILDKIT=1.
+# check-deps: dev-profile dependency warm for the quality gate — branched off
+# dep-sources, BESIDE the release path: the default build (deps → builder →
+# runtime) never pays for it, and `--target check` never pays for the release
+# dependency compile in `deps` (the dep-sources cache chain includes every
+# path-dep source tree, so it churns far more often than "manifest changes").
+# Requires BuildKit: a legacy builder executes ALL stages in file order — CI
+# uses buildkitd; local one-off builds need DOCKER_BUILDKIT=1.
 # ═══════════════════════════════════════════════════════════════════════════
-FROM deps AS check-deps
-# Recreate the placeholder targets (deps removed them after the release warm).
+FROM dep-sources AS check-deps
+# Placeholder targets: dep-sources already wrote these; rewriting them is
+# idempotent and keeps this stage correct if that step ever moves.
 RUN mkdir -p src benches && \
     echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
     echo 'pub fn placeholder() {}' > src/lib.rs && \
@@ -431,7 +443,7 @@ RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 
 # SDK feature-matrix gate (CI `--target sdk-check` only) — never on the
 # default build path. Same pattern as `check`: the CI builder image carries NO
 # Rust toolchain (by design — see scripts/ci/storage-quality-gate.sh), so the
-# matrix runs in here. Deliberately NOT `FROM deps`: crates/elohim-sdk is its
+# matrix runs in here. Deliberately NOT `FROM dep-sources`/`deps`: crates/elohim-sdk is its
 # own workspace root whose `../elohim-views` path deps expect the
 # REPO shape, not the flattened /app layout — and an independent stage keeps
 # its layer cache keyed on crates/** + elohim-views alone. The script it runs
@@ -455,7 +467,7 @@ COPY scripts/ci/elohim-sdk-feature-matrix.sh ./scripts/ci/elohim-sdk-feature-mat
 RUN bash scripts/ci/elohim-sdk-feature-matrix.sh
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Release build stage (the default image path: deps → builder → runtime).
+# Release build stage (the default image path: dep-sources → deps → builder → runtime).
 # ═══════════════════════════════════════════════════════════════════════════
 FROM deps AS builder
 

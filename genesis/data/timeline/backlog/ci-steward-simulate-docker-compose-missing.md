@@ -7,7 +7,7 @@ title: "steward simulate.sh P2P simulation leg 127s in CI — docker-compose abs
 slug: "ci-steward-simulate-docker-compose-missing"
 written: "2026-08-07"
 author: "hoot-owl integrator shift"
-status: "open"
+status: "wip"
 priority: "low"
 area: "ci"
 domain: "code"
@@ -29,3 +29,5 @@ if the sweettest/a2o layers supersede it. Decide against what simulate.sh actual
 proves today.
 
 **SEEN AGAIN 2026-10-06:** edge #1551, #1553 and #1555 each mark `P2P Simulation Test` UNSTABLE within 1 to 4 s; on #1553 the step is `./simulate.sh test`, `script returned exit code 127`. It contributes an UNSTABLE mark to every edge build, which hides other reasons a build is unstable.
+
+**RESOLUTION 2026-10-06 — option (c), CI leg retired.** The `P2P Simulation Test` stage and its `runSimulationTest` helper are removed from `elohim/holochain/Jenkinsfile`. Why: the CI builder has no Docker daemon (it builds with buildctl/nerdctl), so the stage exited 127 in 1 to 4 s on every run and never once exercised P2P; its only effect was an UNSTABLE mark that hid real reasons. The P2P proof the project relies on is the household mesh a2o lanes (`just test mesh`) and the edge pipeline's Dataplane Validation, not this leg. `steward/node/simulation/` stays as a local developer tool: `simulate.sh` now resolves Compose once (`docker compose`, else `docker-compose`) and, with neither present, exits 3 with one line naming what is missing instead of 127. Status `wip` until an edge build without the stage lands; `/deliver` owns the move beyond that.

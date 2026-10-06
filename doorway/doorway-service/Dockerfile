@@ -1,7 +1,12 @@
-# Dependency stage — cached layer shared by check and build targets
+# dep-sources: everything the dependency compile needs (toolchain, apt packages,
+# manifests, path-dependency trees, placeholder sources), compiling NOTHING.
+# `deps` (release dependency compile → builder → runtime) and `check` (CI
+# quality gate, `--target check` only) both branch off it, so the quality gate
+# never pays for the release dependency graph it does not use (edge #1555:
+# 1212 s of release deps before clippy/test).
 # NOTE: Build context should be repo root directory
 # Run: docker build -f doorway/doorway-service/Dockerfile -t doorway .
-FROM rust:1.93-slim-bookworm AS deps
+FROM rust:1.93-slim-bookworm AS dep-sources
 
 WORKDIR /app
 
@@ -107,12 +112,16 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml
 
+# Release dependency warm (release path only: dep-sources → deps → builder → runtime).
+FROM dep-sources AS deps
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
 
-# Quality check stage — CI quality gate (build with --target check)
-FROM deps AS check
-RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
+# Quality check stage — CI quality gate (build with --target check). Sits on
+# dep-sources, not deps: there is no target/ here, so only the placeholder
+# source needs removing before the real COPY.
+FROM dep-sources AS check
+RUN rm -rf src
 COPY doorway/doorway-service/src ./src
 COPY doorway/doorway-service/templates ./templates
 # Shared test-vector fixtures consumed via `include_str!(concat!(env!("CARGO_MANIFEST_DIR"),

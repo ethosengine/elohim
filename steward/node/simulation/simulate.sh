@@ -14,6 +14,26 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Compose is resolved ONCE: the v2 plugin (`docker compose`) when present, else the
+# v1 binary (`docker-compose`). With neither, every compose-backed command exits 3
+# with one line — not 127 — so a missing tool reads as what it is. This is a local
+# developer tool; CI no longer runs it (the edge pipeline's P2P Simulation Test
+# stage was retired 2026-10-06 — see
+# genesis/data/timeline/backlog/ci-steward-simulate-docker-compose-missing.md).
+COMPOSE=()
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+fi
+compose() {
+    if [ "${#COMPOSE[@]}" -eq 0 ]; then
+        echo "simulate.sh: no Docker Compose found (need 'docker compose' or 'docker-compose')" >&2
+        exit 3
+    fi
+    "${COMPOSE[@]}" "$@"
+}
 cd "$SCRIPT_DIR"
 
 # Colors
@@ -39,9 +59,9 @@ cmd_start() {
 
     if [[ "$1" == "--latency" ]]; then
         log_info "Starting with WAN latency simulation (50ms)"
-        docker-compose --profile latency up -d
+        compose --profile latency up -d
     else
-        docker-compose up -d
+        compose up -d
     fi
 
     log_info "Waiting for nodes to be healthy..."
@@ -52,11 +72,11 @@ cmd_start() {
 
 cmd_stop() {
     log_info "Stopping simulation..."
-    docker-compose down
+    compose down
 }
 
 cmd_logs() {
-    docker-compose logs -f "$@"
+    compose logs -f "$@"
 }
 
 cmd_status() {
@@ -110,7 +130,7 @@ cmd_heal() {
 
 cmd_clean() {
     log_warn "Stopping and removing all simulation resources..."
-    docker-compose down -v --rmi local --remove-orphans
+    compose down -v --rmi local --remove-orphans
     log_info "Cleanup complete."
 }
 
