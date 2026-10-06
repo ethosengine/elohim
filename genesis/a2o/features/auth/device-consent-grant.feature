@@ -1,4 +1,6 @@
-@e2e @auth @device-consent-grant @requires:doorway @act:i @wip
+@e2e @auth @device-consent-grant @requires:doorway @requires:device-node @act:i
+# The grant is served by the person's own node, not by the doorway; the steps call that node directly over loopback.
+# E2E_DEVICE_NODE_URL is the storage URL of a fourth "workspace" node (`just mesh join-peer workspace`); unset, these scenarios are skipped.
 Feature: A device asks, and its person approves in a portal
   As Matthew, working on a machine that is not yet mine to act from
   I want to sign in through my doorway's portal and approve that machine there
@@ -46,6 +48,8 @@ Feature: A device asks, and its person approves in a portal
     And Jessica, another person on the network, runs her own node, which doorway "alpha" does not host
     And a one-time code is good for five minutes
 
+  # held: no node route answers whether a device is bound to a person (device-recognition rows 7, 3)
+  @wip
   Scenario: Matthew approves a remote device by pasting the code
     When the terminal on device "workspace" asks doorway "alpha" to enroll the device, returning the code by paste
     Then the terminal prints a portal link and waits for a code
@@ -64,6 +68,8 @@ Feature: A device asks, and its person approves in a portal
     And the browser hands the code to the terminal
     And the device "workspace" is enrolled under Matthew's identity
 
+  # held: needs the rendered portal; on loopback the node's active session always counts as signed in (device-recognition row 11)
+  @wip
   Scenario: Matthew is asked to sign in before he is asked to approve
     Given Matthew is not signed in to the portal
     When the terminal on device "workspace" asks doorway "alpha" to enroll the device, returning the code by paste
@@ -77,6 +83,8 @@ Feature: A device asks, and its person approves in a portal
     Then the portal shows the name "workspace" and a short form of the device's key
     And the portal lists "enroll this device" as the only thing being asked
 
+  # held: a root-key binding is recorded only in the consent, not observable on the network (device-recognition row 3)
+  @wip
   Scenario: A device also binds its root key when it asks to
     When the terminal on device "workspace" asks doorway "alpha" to enroll the device and bind its root key, returning the code by paste
     And Matthew opens the link and signs in
@@ -87,6 +95,8 @@ Feature: A device asks, and its person approves in a portal
     And the device "workspace" is enrolled under Matthew's identity
     And the root key of device "workspace" is bound to Matthew
 
+  # held: a root-key binding is recorded only in the consent, not observable on the network (device-recognition row 3)
+  @wip
   Scenario: Matthew agrees to less than the terminal asked for
     When the terminal on device "workspace" asks doorway "alpha" to enroll the device and bind its root key, returning the code by paste
     And Matthew opens the link and signs in
@@ -101,6 +111,8 @@ Feature: A device asks, and its person approves in a portal
     Then the doorway refuses with code "request_acts_incoherent"
     And the terminal prints no portal link
 
+  # held: no step drives a device publish yet (device-recognition row 21)
+  @wip
   Scenario: An enrolled device still cannot change content on that basis alone
     Given the device "workspace" has been enrolled with a code
     And Matthew is the author of the content "garden-notes"
@@ -108,6 +120,8 @@ Feature: A device asks, and its person approves in a portal
     Then the update is not accepted as the content's current version
     And the device "workspace" remains enrolled under Matthew's identity
 
+  # held: needs the rendered portal; the node exposes no decline route to call (device-recognition row 11)
+  @wip
   Scenario: Declining leaves the device unenrolled
     When the terminal on device "workspace" asks doorway "alpha" to enroll the device, returning the code by paste
     And Matthew opens the link, signs in, and declines
@@ -126,6 +140,8 @@ Feature: A device asks, and its person approves in a portal
     When the terminal on device "workspace" presents that code to doorway "alpha" again
     Then the doorway refuses with code "redemption_already_redeemed"
 
+  # held: needs a clock seam on the node or six real minutes of waiting (device-recognition row 21)
+  @wip
   Scenario: A code left unused expires
     Given Matthew has approved the device "workspace" and the portal has shown a code
     When the terminal on device "workspace" presents that code six minutes later
