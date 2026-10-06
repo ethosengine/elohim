@@ -93,3 +93,15 @@ Reopening the active-session fallback for remote callers. It restores the seeder
 
 `elohim-genesis` `Seed Custody Commitments` green with `created + already-exists = 7`, and
 `propagation.custody-manifest` / `propagation.custody-convergence` passing in the same build.
+
+## DELTA 2026-10-06 (elohim-genesis #1626, first build on the cure)
+
+The resolver works on the fleet: provide rows resolved matthew, jessica, james, gertrude, susan and
+eve from their own conductors (`agent_pub_key: …` then `[=] … already exists`), household formation
+read `agent-key roster has 3 entries`, and no `/auth/me` line appears anywhere in the build. The
+probe is not met yet: custody ended `2 created, 1 already-exists, 4 skipped (7 total)`. The four
+skips all name james (`no conductor of its own in CONDUCTOR_URLS (3 entries …)`): the stage read
+its conductor list from inside `dir('genesis/seeder')`, where the helper could not find
+`deployments.json` and fell back to three hard-coded peers. Fixed at the call site the same day;
+the next genesis build is the probe. Adam could not be read in this build for a different reason
+(his conductor answered `database is locked`; conductor-residual-cpu backlog entry).

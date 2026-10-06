@@ -712,6 +712,15 @@ the code alone, as `epr device redeem` does. The steps now do the same.
   epic-level; a seeder must not do it by substitution.
 - **Probe:** `Seed Conductor Identities` in a genesis build prints `Embodied as` for matthew and
   the stage is not partial for that reason.
+- **DELTA 2026-10-06 (elohim-genesis #1626):** the probe is met (`[~] Matthew … (Embodied as
+  5f27bc9b-…)`, `0 conflict`), and the same two-ids fact surfaced one step later. Household
+  formation now finds matthew (`agent-key roster has 3 entries`, `affirmed=[human-matthew-manager]`)
+  and then cannot invite the others: `issue_household_invite for human-jessica-spouse: … caller is
+  not a current Steward of collective:uhCkkIttw…` (the same for james). The household's collective
+  on alpha was founded under another key than the one matthew's node speaks with, so his node is
+  not one of its stewards. Before this change the stage reported `affirmed=[jessica, james]` and
+  could not bind matthew at all; nothing was written to the fleet in either case. This is the
+  reconciliation the row already names, seen from the household side.
 
 ## shift_objective
 
