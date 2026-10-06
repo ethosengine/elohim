@@ -10,6 +10,7 @@ import {
   findActiveRowForSpec,
   seedProjections,
   isDoubleRootRefusal,
+  authorPeerHealthFromBody,
   PROJECTION_RELEVANT_FIELDS,
   withHostnames,
   candidateChannelSpec,
@@ -579,3 +580,31 @@ describe('waitForAuthorPeerHealthy', () => {
     expect(authorPeerWaitTimeoutMs({ PROJECTION_AUTHOR_WAIT_SECONDS: 'junk' })).toBe(600_000);
   });
 });
+
+describe('authorPeerHealthFromBody — the author is a storage peer', () => {
+  it('reads storage health by its zome path, the shape a storage peer answers with', () => {
+    // elohim-genesis #1627 waited 600 s on a live peer: the doorway's check looked
+    // for conductor.connected in a storage body that never carries it.
+    const storageBody = {
+      status: 'ok',
+      conductor: { mode: 'external', zomePath: 'live', lastZomeCallAgeSecs: 3 },
+    };
+    expect(authorPeerHealthFromBody(storageBody)).toMatchObject({ healthy: true });
+  });
+
+  it('names the zome path when a storage peer is not live', () => {
+    for (const zomePath of ['dead', 'app-disabled', 'unknown']) {
+      const health = authorPeerHealthFromBody({ conductor: { mode: 'external', zomePath } });
+      expect(health.healthy).toBe(false);
+      expect(health.error).toContain(zomePath);
+    }
+  });
+
+  it('still reads a doorway-shaped body', () => {
+    expect(authorPeerHealthFromBody({ conductor: { connected: true } }).healthy).toBe(true);
+    expect(authorPeerHealthFromBody({ conductor: { connected: false } }).healthy).toBe(false);
+    expect(authorPeerHealthFromBody({}).healthy).toBe(false);
+    expect(authorPeerHealthFromBody(null).healthy).toBe(false);
+  });
+});
+

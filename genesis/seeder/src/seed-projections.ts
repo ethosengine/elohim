@@ -640,7 +640,56 @@ export interface EprProjectionViewLite extends Partial<ProjectionRelevantMetadat
   doorwayId: string;
 }
 
+/**
+ * Read an authoring peer's `/health` body. The author is a STORAGE peer, and
+ * storage reports its conductor as `conductor.zomePath` (`live` | `dead` |
+ * `app-disabled` | `unknown` — `conductor_bridge_health.rs`), not as the
+ * doorway's `conductor.connected`. Reading a storage body with the doorway's
+ * check found no `connected` field and called every peer unhealthy forever
+ * (elohim-genesis #1626 at once, #1627 after its full 600 s wait). A body in
+ * the doorway's shape is still read, for a run that names a doorway as author.
+ */
+export function authorPeerHealthFromBody(data: unknown): HealthStatus {
+  const conductor = (data as { conductor?: Record<string, unknown> } | null)?.conductor ?? {};
+  const zomePath = typeof conductor.zomePath === 'string' ? conductor.zomePath : undefined;
+  if (zomePath !== undefined) {
+    const live = zomePath === 'live';
+    return {
+      healthy: live,
+      cacheEnabled: true,
+      error: live ? undefined : `storage peer's conductor zome path is ${zomePath}`,
+    };
+  }
+  const connected = conductor.connected === true;
+  return {
+    healthy: connected,
+    cacheEnabled: true,
+    error: connected ? undefined : 'conductor not connected (no zomePath and no connected flag)',
+  };
+}
+
 class ProjectionClient extends DoorwayClient {
+  /** One health read of the authoring peer, in whichever shape it answers. */
+  async checkAuthorPeerHealth(): Promise<HealthStatus> {
+    try {
+      const response = await this.fetch('/health', { method: 'GET', timeout: 5000 });
+      if (!response.ok) {
+        return {
+          healthy: false,
+          cacheEnabled: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+      return authorPeerHealthFromBody(await response.json());
+    } catch (err) {
+      return {
+        healthy: false,
+        cacheEnabled: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   async createCommitment(body: CommitmentBody): Promise<Response> {
     return this.fetch('/api/v1/commitments', {
       method: 'POST',
@@ -964,7 +1013,7 @@ if (isMain) {
   for (const [authorUrl, group] of groups) {
     const client = new ProjectionClient({ baseUrl: authorUrl, apiKey });
     const ready = await waitForAuthorPeerHealthy(authorUrl, {
-      checkHealth: () => client.checkHealth(),
+      checkHealth: () => client.checkAuthorPeerHealth(),
     });
     if (!ready.ok) {
       console.error(
