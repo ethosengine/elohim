@@ -107,10 +107,11 @@ spec:
                 export RUSTC_WRAPPER=""
                 cargo --version
                 cargo fmt --check
-                # async_trait marks its generated futures must_use; clippy 1.99 reports
-                # that as doubled on trait methods returning Result. Allowed here, not in
-                # the crates: their published sources are immutable per version.
-                cargo clippy --workspace --all-targets -- -D warnings -A clippy::double_must_use
+                # Rust is the version declared in elohim/epr/rust-toolchain.toml (= the
+                # local gate's pin), so clippy here is the clippy the gate ran. The former
+                # `-A clippy::double_must_use` allowance existed only because the flake
+                # floated to clippy 1.99; that lint does not fire on 1.96.1.
+                cargo clippy --workspace --all-targets -- -D warnings
               '
             '''
           }

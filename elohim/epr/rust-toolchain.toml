@@ -1,0 +1,9 @@
+# The ONE declared Rust toolchain for the elohim-epr / elohim-eprfs CI pipelines.
+# elohim/epr/flake.nix reads this file (rust-overlay fromRustupToolchainFile), and
+# genesis/orchestrator/rust-toolchain-pin.test.mjs fails when `channel` differs from
+# the local gate's pin (genesis/agentic/pool-policy.json cargo_env_overrides."*".
+# RUSTUP_TOOLCHAIN). Moving either is a commit that moves both.
+[toolchain]
+channel = "1.96.1"
+profile = "default"
+components = ["rust-src", "clippy", "rustfmt"]
