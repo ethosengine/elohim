@@ -155,7 +155,7 @@ mod tests {
         let list = PendingAsks::new();
         let mut a = ask(1);
         a.state = state;
-        list.admit(a, "peer", None, &speaks(), &policy(), 0)
+        list.admit(a, "peer-a", None, &speaks(), &policy(), 0)
             .unwrap();
         list.list(0).remove(0)
     }

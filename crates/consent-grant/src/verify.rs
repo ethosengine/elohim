@@ -42,6 +42,9 @@ pub enum DeliveredRefusal {
     EnrollmentMismatch,
     /// A controller proof on the enrollment does not verify.
     EnrollmentSignatureInvalid,
+    /// The approving node the device expected (declared, or proven over the
+    /// carrier) did not sign: some other key approved.
+    NotTheExpectedApprover,
 }
 
 impl DeliveredRefusal {
@@ -54,6 +57,7 @@ impl DeliveredRefusal {
             Self::SignatureInvalid => "delivered_signature_invalid",
             Self::EnrollmentMismatch => "delivered_enrollment_mismatch",
             Self::EnrollmentSignatureInvalid => "delivered_enrollment_signature_invalid",
+            Self::NotTheExpectedApprover => "delivered_not_the_expected_approver",
         }
     }
 }
@@ -66,9 +70,15 @@ fn verifies(signer: &str, message: &[u8], signature: &str) -> bool {
 }
 
 /// Check what was collected for `asked` before anything is signed over it.
+/// `approver` is the key the device expects to have approved, when it knows
+/// one: the one it declared, or the one whose proof came with the code over
+/// the carrier. That key must then be among the consent's controller signers
+/// and the enrollment's approvers (adversarial review, high 3: a rogue node
+/// on the network cannot hand back a consent of its own making).
 pub fn check_delivered(
     delivered: &Delivered,
     asked: &GrantRequest,
+    approver: Option<&str>,
 ) -> Result<(), DeliveredRefusal> {
     use DeliveredRefusal as R;
 
@@ -105,6 +115,19 @@ pub fn check_delivered(
         .all(|s| verifies(&s.signer, &message, &s.signature))
     {
         return Err(R::SignatureInvalid);
+    }
+    if let Some(expected) = approver {
+        let signed_consent = consent
+            .signatures
+            .iter()
+            .any(|s| s.role == SignerRole::Controller && s.signer == expected);
+        let signed_enrollment = delivered
+            .enrollment
+            .as_ref()
+            .is_none_or(|e| e.controllers.iter().any(|p| p.agent == expected));
+        if !signed_consent || !signed_enrollment {
+            return Err(R::NotTheExpectedApprover);
+        }
     }
     match (&delivered.enrollment, EnrollmentIntent::agreed_in(r)) {
         (None, None) => Ok(()),
@@ -191,7 +214,7 @@ pub(crate) mod tests {
 
     #[test]
     fn an_honest_delivery_checks() {
-        assert_eq!(check_delivered(&delivered(), &peer_request()), Ok(()));
+        assert_eq!(check_delivered(&delivered(), &peer_request(), None), Ok(()));
         assert_eq!(signers(&delivered(), SignerRole::Controller).len(), 1);
         assert_eq!(delivered().consent.record.agreed_at_micros, AT);
     }
@@ -202,7 +225,7 @@ pub(crate) mod tests {
         let refused = |change: &dyn Fn(&mut Delivered)| {
             let mut d = delivered();
             change(&mut d);
-            check_delivered(&d, &peer_request()).unwrap_err()
+            check_delivered(&d, &peer_request(), None).unwrap_err()
         };
         assert_eq!(
             refused(&|d| d.consent.record.agreed_at_micros += 1),
@@ -230,15 +253,28 @@ pub(crate) mod tests {
         let consent_sig = swapped.consent.signatures[0].signature.clone();
         swapped.enrollment.as_mut().unwrap().controllers[0].signature = consent_sig;
         assert_eq!(
-            check_delivered(&swapped, &peer_request()),
+            check_delivered(&swapped, &peer_request(), None),
             Err(R::EnrollmentSignatureInvalid)
+        );
+
+        // Adversarial review, high 3: the device expected another approver; a
+        // consent this key made is not that one's.
+        let signer = delivered().consent.signatures[0].signer.clone();
+        assert_eq!(
+            check_delivered(&delivered(), &peer_request(), Some(&signer)),
+            Ok(())
+        );
+        let (_, rogue) = crate::pending::tests::keypair(77);
+        assert_eq!(
+            check_delivered(&delivered(), &peer_request(), Some(&rogue)),
+            Err(R::NotTheExpectedApprover)
         );
 
         // Another terminal's request.
         let mut other = peer_request();
         other.code_challenge = crate::pkce::challenge(&"v".repeat(43));
         assert_eq!(
-            check_delivered(&delivered(), &other),
+            check_delivered(&delivered(), &other, None),
             Err(R::NotThisRequest)
         );
     }

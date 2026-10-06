@@ -223,6 +223,29 @@ pub struct Ask {
     /// other node ignores the ask.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub for_approver: Option<String>,
+    /// The device key's signature over (ask, state, the device's transport id,
+    /// the request's PKCE challenge) (`crate::carrier`). An ask without one,
+    /// or whose proof does not hold for the transport id it came from, is
+    /// not listed: no one lists, or replaces, an ask in a device's name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof: Option<crate::carrier::CarrierProof>,
+}
+
+impl Ask {
+    /// Whether the device key the request names signed this ask, as sent
+    /// from `transport_id`.
+    pub fn signed_from(&self, transport_id: &str) -> bool {
+        self.proof.as_ref().is_some_and(|p| {
+            crate::carrier::proof_holds(
+                p,
+                &self.request.device_key,
+                crate::carrier::CarrierKind::Ask,
+                &self.request.state,
+                transport_id,
+                &self.request.code_challenge,
+            )
+        })
+    }
 }
 
 /// One ask waiting on this node.
@@ -269,6 +292,11 @@ pub enum Dropped {
     Full,
     /// This source already holds its share.
     SourceOverLimit,
+    /// The device key the request names did not sign it from where it came.
+    Unsigned,
+    /// The same device's ask is already listed from another transport id; an
+    /// ask is replaced only from where it was listed, by its own device.
+    ListedFromElsewhere,
 }
 
 impl Dropped {
@@ -281,6 +309,8 @@ impl Dropped {
             Self::NotForThisApprover => "ask_for_another_approver",
             Self::Full => "ask_list_full",
             Self::SourceOverLimit => "ask_source_over_limit",
+            Self::Unsigned => "ask_unsigned",
+            Self::ListedFromElsewhere => "ask_listed_from_elsewhere",
         }
     }
 }
@@ -289,7 +319,8 @@ impl Dropped {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Listed {
     New(u32),
-    /// The same device asked again; its earlier ask is replaced.
+    /// The same device asked again, from the same transport id; its earlier
+    /// ask is replaced.
     Replaced(u32),
 }
 
@@ -340,6 +371,10 @@ impl PendingAsks {
             Speaks::Unknown => return Err(Dropped::StandingUnknown),
         }
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
+        // Adversarial review, high 4: the ask is the device's own, from here.
+        if !ask.signed_from(source) {
+            return Err(Dropped::Unsigned);
+        }
         {
             let mut inner = self.lock();
             // bounded-work: at most MAX_DECIDED entries, each an ask's life.
@@ -370,6 +405,7 @@ impl PendingAsks {
             .map(|(n, p)| (*n, p.source.clone()));
         let from_source = inner.asks.values().filter(|p| p.source == source).count();
         let listed = match earlier {
+            Some((_, from)) if from != source => return Err(Dropped::ListedFromElsewhere),
             Some((n, _)) => {
                 inner.asks.remove(&n);
                 Listed::Replaced(n)
@@ -524,14 +560,52 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn ask(device: u8) -> Ask {
+    /// A real key for device `n`, and its agent key text.
+    pub(crate) fn keypair(n: u8) -> (elohim_epr::proof::AgentKeypair, String) {
+        let key = elohim_epr::proof::AgentKeypair::from_secret(&[n; 32]).unwrap();
+        let agent = crate::hash_shape::agent_key_of(key.public_key_bytes());
+        (key, agent)
+    }
+
+    /// `ask`, signed by its device as sent from `transport_id`.
+    pub(crate) fn signed(mut ask: Ask, device: u8, transport_id: &str) -> Ask {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let (key, agent) = keypair(device);
+        assert_eq!(agent, ask.request.device_key);
+        let message = crate::carrier::statement(
+            crate::carrier::CarrierKind::Ask,
+            &ask.request.state,
+            transport_id,
+            &ask.request.code_challenge,
+        )
+        .unwrap();
+        ask.proof = Some(crate::carrier::CarrierProof {
+            signer: agent,
+            signature: URL_SAFE_NO_PAD.encode(elohim_epr::proof::sign(&key, &message)),
+        });
+        ask
+    }
+
+    /// An unsigned ask from device `device` (a real key, so it can be signed).
+    pub(crate) fn unsigned_ask(device: u8) -> Ask {
         let mut r = request();
-        r.device_key = sample_key(device);
+        r.device_key = keypair(device).1;
         Ask {
             request: r,
             state: NodeState::Unassigned,
             for_approver: None,
+            proof: None,
         }
+    }
+
+    /// Device `device`'s ask, signed as sent from "peer-a".
+    pub(crate) fn ask(device: u8) -> Ask {
+        signed(unsigned_ask(device), device, "peer-a")
+    }
+
+    /// Device `device`'s ask, signed as sent from `source`.
+    pub(crate) fn ask_from(device: u8, source: &str) -> Ask {
+        signed(unsigned_ask(device), device, source)
     }
 
     const NOW: i64 = 1_000_000;
@@ -547,13 +621,88 @@ pub(crate) mod tests {
             list.admit(ask(2), "peer-a", None, &speaks(), &policy(), NOW),
             Ok(Listed::New(2))
         );
+        // The same device, from the same place, replaces its own ask.
         assert_eq!(
-            list.admit(ask(1), "peer-b", None, &speaks(), &policy(), NOW + 5),
+            list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW + 5),
             Ok(Listed::Replaced(1))
         );
         let listed = list.list(NOW + 6);
         assert_eq!(listed.len(), 2);
-        assert_eq!(listed[0].source, "peer-b");
+        assert_eq!(listed[0].source, "peer-a");
+    }
+
+    #[test]
+    fn no_one_lists_or_replaces_an_ask_in_a_devices_name() {
+        // Adversarial review, high 4: the attacker sends an ask naming the
+        // victim's device key, with its own challenge and state, from its own
+        // transport id. Before the fix it replaced the victim's ask by device
+        // key alone and moved its source.
+        let list = PendingAsks::new();
+        assert_eq!(
+            list.admit(
+                ask_from(1, "victim"),
+                "victim",
+                None,
+                &speaks(),
+                &policy(),
+                NOW
+            ),
+            Ok(Listed::New(1))
+        );
+        let mut hijack = unsigned_ask(1);
+        hijack.request.code_challenge = crate::pkce::challenge(&"a".repeat(43));
+        hijack.request.state = "x".repeat(32);
+        assert_eq!(
+            list.admit(
+                hijack.clone(),
+                "attacker",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + 1
+            ),
+            Err(Dropped::Unsigned)
+        );
+        // The victim's own signed ask, replayed from elsewhere: the proof
+        // names the victim's transport id.
+        assert_eq!(
+            list.admit(
+                ask_from(1, "victim"),
+                "attacker",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + 2
+            ),
+            Err(Dropped::Unsigned)
+        );
+        // Signed by another key: not the device's.
+        let mut forged = ask_from(2, "attacker");
+        forged.request.device_key = keypair(1).1;
+        assert_eq!(
+            list.admit(forged, "attacker", None, &speaks(), &policy(), NOW + 3),
+            Err(Dropped::Unsigned)
+        );
+        // Even the device's own key, asking from a new transport id, does not
+        // move a listed ask.
+        assert_eq!(
+            list.admit(
+                ask_from(1, "elsewhere"),
+                "elsewhere",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + 4
+            ),
+            Err(Dropped::ListedFromElsewhere)
+        );
+        let listed = list.list(NOW + 5);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].source, "victim");
+        assert_eq!(
+            listed[0].ask.request.state,
+            ask_from(1, "victim").request.state
+        );
     }
 
     #[test]
@@ -569,7 +718,7 @@ pub(crate) mod tests {
         );
         for d in 0..(MAX_PENDING - MAX_PER_SOURCE) as u8 {
             list.admit(
-                ask(d + 20),
+                ask_from(d + 20, &format!("peer-{d}")),
                 &format!("peer-{d}"),
                 None,
                 &speaks(),
@@ -580,14 +729,21 @@ pub(crate) mod tests {
         }
         assert_eq!(list.len(), MAX_PENDING);
         assert_eq!(
-            list.admit(ask(99), "peer-z", None, &speaks(), &policy(), NOW),
+            list.admit(
+                ask_from(99, "peer-z"),
+                "peer-z",
+                None,
+                &speaks(),
+                &policy(),
+                NOW
+            ),
             Err(Dropped::Full)
         );
         // Five minutes later they are gone, and room is made.
         assert!(list.list(NOW + ASK_LIFE_MICROS).is_empty());
         assert!(list
             .admit(
-                ask(99),
+                ask_from(99, "peer-z"),
                 "peer-z",
                 None,
                 &speaks(),
@@ -605,7 +761,7 @@ pub(crate) mod tests {
         assert_eq!(
             list.admit(
                 addressed.clone(),
-                "p",
+                "peer-a",
                 Some(&sample_key(8)),
                 &speaks(),
                 &policy(),
@@ -614,13 +770,13 @@ pub(crate) mod tests {
             Err(Dropped::NotForThisApprover)
         );
         assert_eq!(
-            list.admit(addressed.clone(), "p", None, &speaks(), &policy(), NOW),
+            list.admit(addressed.clone(), "peer-a", None, &speaks(), &policy(), NOW),
             Err(Dropped::NotForThisApprover)
         );
         assert!(list
             .admit(
                 addressed,
-                "p",
+                "peer-a",
                 Some(&sample_key(9)),
                 &speaks(),
                 &policy(),
@@ -630,7 +786,7 @@ pub(crate) mod tests {
         let mut bad = ask(2);
         bad.request.client_id = "stranger".into();
         assert_eq!(
-            list.admit(bad, "p", None, &speaks(), &policy(), NOW)
+            list.admit(bad, "peer-a", None, &speaks(), &policy(), NOW)
                 .unwrap_err()
                 .code(),
             "request_client_unknown"
@@ -642,7 +798,7 @@ pub(crate) mod tests {
         let list = PendingAsks::new();
         list.admit(ask(1), "peer-a", None, &speaks(), &policy(), NOW)
             .unwrap();
-        let key = sample_key(1);
+        let key = keypair(1).1;
         for text in ["1", key.as_str(), fingerprint(&key).as_str()] {
             assert!(list.pick(text, NOW).is_some(), "{text}");
         }
@@ -706,7 +862,7 @@ pub(crate) mod tests {
             .unwrap();
         let view = PendingView::of(&list.list(NOW)[0], NOW + 60_000_000, &speaks());
         assert_eq!(view.seconds_left, 240);
-        assert_eq!(view.device_fingerprint, fingerprint(&sample_key(1)));
+        assert_eq!(view.device_fingerprint, fingerprint(&keypair(1).1));
         let json = serde_json::to_value(&view).unwrap();
         for field in [
             "number",
@@ -839,8 +995,9 @@ pub(crate) mod tests {
         );
         assert_eq!(Dropped::AlreadyDecided.code(), "ask_already_decided");
         // A new ask from the same device (a new state token) is listed.
-        let mut fresh = ask(1);
+        let mut fresh = unsigned_ask(1);
         fresh.request.state = "t".repeat(32);
+        let fresh = signed(fresh, 1, "peer-a");
         assert!(list
             .admit(fresh, "peer-a", None, &speaks(), &policy(), NOW + 1)
             .is_ok());

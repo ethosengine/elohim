@@ -838,3 +838,62 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/device_affirmation.rs
         testName: a_pass_affirms_a_few_others_oldest_first_and_a_later_pass_catches_up
         kind: unit
+  - name: network_local
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/signin.rs
+      modulePath: consent_grant::signin::network_local
+    summary: >
+      Whether the network shows a request as from this machine: a loopback peer that is no trusted
+      proxy and carries no forwarding header. With `host_allowed` (the names the identity routes
+      answer under) the cheap part of the 2026-10-06 review's critical 2; the install token that
+      would make loopback alone not enough is a recorded dial.
+    concernIds:
+      - id: C1
+        status: partial
+        justification: >
+          A proxy on the machine or a page that rebinds a name no longer acts as the person; a
+          local process or a page that reaches loopback under a loopback name still does (dial 1).
+      - id: C5
+        status: answered
+        justification: >
+          Locality is the transport's fact; a forwarding header from loopback refuses it rather
+          than vouching for anyone.
+    contractTests:
+      - path: crates/consent-grant/src/signin.rs
+        testName: a_forwarded_or_proxied_loopback_request_is_not_local
+        kind: unit
+      - path: crates/consent-grant/src/signin.rs
+        testName: only_this_nodes_names_are_hosts_it_answers
+        kind: unit
+  - name: proof_holds
+    kind: verdict-fn
+    sourceLocation:
+      file: src/carrier.rs
+      modulePath: consent_grant::carrier::proof_holds
+    summary: >
+      Whether a carrier message's proof is the claimed key's signature over (kind, state, the
+      sender's transport id, challenge). Gates listing an ask, a listing, a code and a decline
+      (adversarial review 2026-10-06, high 3 and 4).
+    concernIds:
+      - id: C1
+        status: answered
+        justification: >
+          No node lists, replaces, hands back or declines in another key's name; a proof replayed
+          from another transport id fails.
+      - id: C5
+        status: answered
+        justification: The transport id is the transport's authenticated fact; the key is proven.
+      - id: C6a
+        status: answered
+        justification: One ed25519 verification per message.
+    contractTests:
+      - path: crates/consent-grant/src/carrier.rs
+        testName: a_proof_holds_only_for_its_own_signer_kind_state_and_transport
+        kind: unit
+      - path: crates/consent-grant/src/pending.rs
+        testName: no_one_lists_or_replaces_an_ask_in_a_devices_name
+        kind: unit
+      - path: elohim/elohim-storage/src/services/device_carrier.rs
+        testName: a_rogue_node_on_the_network_cannot_capture_the_asking_device
+        kind: unit

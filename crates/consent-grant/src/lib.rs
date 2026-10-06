@@ -69,7 +69,9 @@ pub mod verify;
 pub mod witness;
 
 pub use act::{ActRefusal, RequestedAct};
-pub use carrier::{CarryRequest, CarryResponse};
+pub use carrier::{
+    proof_holds, statement, CarrierKind, CarrierProof, CarryRequest, CarryResponse, CARRIER_DOMAIN,
+};
 pub use ceremony::{
     attendance, issue, redeem, settle, AgreedView, Attendance, ConsentView, ControllerTally,
     Delivered, Held, IssueRefusal, MemoryStore, Relation, ReturnTargetView, Taken,
@@ -107,9 +109,9 @@ pub use pending::{
 pub use request::{admit_request, AdmittedRequest, GrantPolicy, GrantRequest, RequestRefusal};
 pub use return_path::{parse_pasted, return_target, ReturnPath, ReturnTarget};
 pub use signin::{
-    attend_sign_in, channel, may_make_node_sign, sign_in_channel_verdict, sign_in_key_rule,
-    AttemptLimiter, Channel, SignInClaims, SignInRefusal, PLAIN_SIGN_IN_ALLOWED,
-    SESSION_LIFE_MICROS,
+    attend_sign_in, channel, host_allowed, may_make_node_sign, network_local,
+    sign_in_channel_verdict, sign_in_key_rule, AttemptLimiter, Channel, SignInClaims,
+    SignInRefusal, PLAIN_SIGN_IN_ALLOWED, SESSION_LIFE_MICROS,
 };
 pub use verify::{check_delivered, DeliveredRefusal};
 pub use witness::{

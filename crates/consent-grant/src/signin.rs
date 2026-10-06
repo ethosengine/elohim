@@ -9,7 +9,9 @@
 //! What lives here is what decides, with no socket, clock or store of its
 //! own (the host passes the time in):
 //!
-//! - [`may_make_node_sign`]: who may make the node sign as its person.
+//! - [`may_make_node_sign`]: who may make the node sign as its person, with
+//!   [`network_local`] (loopback, not forwarded, not a trusted proxy) and
+//!   [`host_allowed`] (the names the node answers its identity routes on).
 //! - [`channel`]: how a sign-in arrived ([`Channel`]), and
 //!   [`sign_in_channel_verdict`]: whether that channel may carry it. Open to a
 //!   plain channel today, by operator ruling; a must-have before the floor is
@@ -32,11 +34,50 @@ use std::sync::Mutex;
 /// or ended by a new secret.
 pub const SESSION_LIFE_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
 
-/// Who may make the node sign as its person: a caller on this machine, or a
-/// request carrying a session proven by sign-in for this node's own person.
-/// Nothing else: a session minted any other way proves nobody.
+/// Who may make the node sign as its person: a caller on this machine
+/// ([`network_local`]), or a request carrying a session proven by sign-in for
+/// this node's own person. Nothing else: a session minted any other way
+/// proves nobody. Loopback alone still counts as this machine: anything that
+/// reaches loopback (a page in a browser on the machine, any process) acts as
+/// the person. Asking more of it (an install token) is a recorded dial, not
+/// built (arch-device-recognition-backlog, "Dialing up").
 pub fn may_make_node_sign(caller_is_local: bool, proven_by_signin: bool) -> bool {
     caller_is_local || proven_by_signin
+}
+
+/// Whether the network shows a request as coming from this machine: the peer
+/// is a loopback address, is not a proxy this node was told to trust, and the
+/// request carries no forwarding header (`Forwarded`, `X-Forwarded-*`,
+/// `X-Real-Ip`): a proxy on the machine forwards requests from anywhere.
+pub fn network_local(peer: Option<IpAddr>, trusted_proxies: &[IpAddr], forwarded: bool) -> bool {
+    peer.is_some_and(|p| p.is_loopback() && !trusted_proxies.contains(&p)) && !forwarded
+}
+
+/// Whether the `Host` a request names is this node: a loopback name
+/// (`localhost`, `127.0.0.1`, `[::1]`, any port) or one the operator
+/// configured. Refusing every other name is what stops a page that rebinds
+/// its own name to 127.0.0.1 from reaching the node's identity routes: the
+/// browser still sends the page's name. No `Host` is refused.
+pub fn host_allowed(host: Option<&str>, configured: &[String]) -> bool {
+    let Some(host) = host.map(str::trim).filter(|h| !h.is_empty()) else {
+        return false;
+    };
+    let name = match host.strip_prefix('[') {
+        Some(v6) => match v6.split_once(']') {
+            Some((name, rest)) if rest.is_empty() || rest.starts_with(':') => name,
+            _ => return false,
+        },
+        None => match host.rsplit_once(':') {
+            Some((name, port)) if port.chars().all(|c| c.is_ascii_digit()) => name,
+            Some(_) => return false,
+            None => host,
+        },
+    };
+    let name = name.to_ascii_lowercase();
+    matches!(name.as_str(), "localhost" | "127.0.0.1" | "::1")
+        || configured
+            .iter()
+            .any(|c| c.trim().eq_ignore_ascii_case(&name))
 }
 
 /// How a request reached the node, as far as the node can know.
@@ -59,15 +100,28 @@ pub enum Channel {
 /// be `https`. A forwarded header from any other peer is ignored: a caller on
 /// the same network can send one, and by doing so exposes only the secret it
 /// sends itself.
-pub fn channel(peer: IpAddr, forwarded_proto: Option<&str>, trusted_proxies: &[IpAddr]) -> Channel {
-    if peer.is_loopback() {
-        return Channel::Loopback;
-    }
+pub fn channel(
+    peer: IpAddr,
+    forwarded_proto: Option<&str>,
+    forwarded: bool,
+    trusted_proxies: &[IpAddr],
+) -> Channel {
     let says_tls = forwarded_proto
         .and_then(|v| v.rsplit(',').next())
         .is_some_and(|last| last.trim().eq_ignore_ascii_case("https"));
-    if says_tls && trusted_proxies.contains(&peer) {
-        Channel::Tls
+    // A proxy this node trusts speaks for a caller elsewhere, even from
+    // loopback: never this machine.
+    if trusted_proxies.contains(&peer) {
+        return if says_tls {
+            Channel::Tls
+        } else {
+            Channel::Plain
+        };
+    }
+    // Loopback is this machine only when nothing says it forwarded the
+    // request: a proxy on the machine passes requests from anywhere.
+    if peer.is_loopback() && !forwarded {
+        Channel::Loopback
     } else {
         Channel::Plain
     }
@@ -325,23 +379,73 @@ mod tests {
     }
 
     #[test]
+    fn a_forwarded_or_proxied_loopback_request_is_not_local() {
+        let lo: IpAddr = "127.0.0.1".parse().unwrap();
+        let v6: IpAddr = "::1".parse().unwrap();
+        let lan: IpAddr = "192.168.1.20".parse().unwrap();
+        assert!(network_local(Some(lo), &[], false));
+        assert!(network_local(Some(v6), &[], false));
+        // A forwarded request, a trusted proxy on loopback, or another machine
+        // is not local.
+        assert!(!network_local(Some(lo), &[], true));
+        assert!(!network_local(Some(lo), &[lo], false));
+        assert!(!network_local(Some(lan), &[], false));
+        assert!(!network_local(None, &[], false));
+    }
+
+    #[test]
+    fn only_this_nodes_names_are_hosts_it_answers() {
+        for ok in [
+            "localhost",
+            "localhost:8191",
+            "127.0.0.1:8191",
+            "[::1]:8191",
+            "LOCALHOST",
+        ] {
+            assert!(host_allowed(Some(ok), &[]), "{ok}");
+        }
+        // A page that rebinds its own name to 127.0.0.1 still sends its name.
+        for bad in [
+            "evil.example",
+            "evil.example:8191",
+            "127.0.0.1.evil.example",
+            "[::1",
+            "",
+            "localhost:x",
+        ] {
+            assert!(!host_allowed(Some(bad), &[]), "{bad}");
+        }
+        assert!(!host_allowed(None, &[]));
+        let named = vec!["node.home.arpa".to_string()];
+        assert!(host_allowed(Some("node.home.arpa:443"), &named));
+        assert!(!host_allowed(Some("other.home.arpa"), &named));
+    }
+
+    #[test]
     fn tls_is_known_only_from_a_trusted_proxy_that_says_so() {
         let proxy: IpAddr = "10.0.0.2".parse().unwrap();
         let lan: IpAddr = "10.0.0.9".parse().unwrap();
         let local: IpAddr = "127.0.0.1".parse().unwrap();
         let six: IpAddr = "::1".parse().unwrap();
-        assert_eq!(channel(local, None, &[]), Channel::Loopback);
-        assert_eq!(channel(six, None, &[]), Channel::Loopback);
-        assert_eq!(channel(proxy, Some("https"), &[proxy]), Channel::Tls);
-        assert_eq!(channel(proxy, Some("http, https"), &[proxy]), Channel::Tls);
+        assert_eq!(channel(local, None, false, &[]), Channel::Loopback);
+        // A proxy on loopback, trusted or not, is not this machine.
+        assert_eq!(channel(local, Some("https"), true, &[local]), Channel::Tls);
+        assert_eq!(channel(local, None, false, &[local]), Channel::Plain);
+        assert_eq!(channel(local, Some("http"), true, &[]), Channel::Plain);
+        assert_eq!(channel(six, None, false, &[]), Channel::Loopback);
+        assert_eq!(channel(proxy, Some("https"), true, &[proxy]), Channel::Tls);
         assert_eq!(
-            channel(proxy, Some("https, http"), &[proxy]),
+            channel(proxy, Some("http, https"), true, &[proxy]),
+            Channel::Tls
+        );
+        assert_eq!(
+            channel(proxy, Some("https, http"), true, &[proxy]),
             Channel::Plain
         );
-        assert_eq!(channel(proxy, None, &[proxy]), Channel::Plain);
+        assert_eq!(channel(proxy, None, false, &[proxy]), Channel::Plain);
         // A header from a peer nobody named is ignored.
-        assert_eq!(channel(lan, Some("https"), &[proxy]), Channel::Plain);
-        assert_eq!(channel(lan, Some("https"), &[]), Channel::Plain);
+        assert_eq!(channel(lan, Some("https"), true, &[proxy]), Channel::Plain);
+        assert_eq!(channel(lan, Some("https"), true, &[]), Channel::Plain);
     }
 
     #[test]

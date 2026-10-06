@@ -89,6 +89,18 @@ fn sample(prefix: [u8; 3], fill: u8) -> String {
     format!("u{}", URL_SAFE_NO_PAD.encode(bytes))
 }
 
+/// An agent key's text for an ed25519 public key, with zeroed location bytes
+/// (enough for shape checks and signature verification, which read only the
+/// key). For tests that sign with a real key.
+#[cfg(test)]
+pub(crate) fn agent_key_of(public_key: [u8; 32]) -> String {
+    let mut bytes = Vec::with_capacity(AGENT_KEY_LEN);
+    bytes.extend_from_slice(&AGENT_PREFIX);
+    bytes.extend_from_slice(&public_key);
+    bytes.extend_from_slice(&[0; 4]);
+    format!("u{}", URL_SAFE_NO_PAD.encode(bytes))
+}
+
 #[cfg(test)]
 pub(crate) fn sample_key(fill: u8) -> String {
     sample(AGENT_PREFIX, fill)

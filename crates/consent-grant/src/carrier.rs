@@ -13,14 +13,125 @@
 //! the link-and-paste path, so a carrier that copies a message gains nothing.
 //! The messages travel as JSON so optional fields keep their meaning under any
 //! outer encoding.
+//!
+//! Who says what is proven, not taken from the transport. Every node on the
+//! private network can send anything; the transport id it arrives from is
+//! authenticated by the transport, the agent key it claims is not. So each
+//! message that a node acts on carries a [`CarrierProof`]: the claimed agent
+//! key's signature over what the message says, which transport id says it, and
+//! what kind of message it is ([`statement`]):
+//!
+//! - an [`crate::pending::Ask`] is signed by the device key the request names,
+//!   over its state, its PKCE challenge and the device's transport id, so no
+//!   one else can list, or replace, an ask in that device's name;
+//! - a `Listed` is signed by the approving node's key over its own transport
+//!   id, so a device knows which key listed it and from where;
+//! - a `Code` and a `Declined` are signed by that same key over the request's
+//!   state and its transport id, so only the node that listed an ask can hand
+//!   back its code or decline it, and a device that declared its approver
+//!   takes them only from that key.
+//!
+//! A replayed proof does not travel: it names the transport id it was made
+//! for, and the receiver checks it against the one the message came from.
 
 use serde::{Deserialize, Serialize};
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+
 use crate::ceremony::Delivered;
 use crate::delivery::Redemption;
+use crate::hash_shape::agent_public_key;
 use crate::pending::Ask;
 
+/// The domain every carrier statement is signed under. Nothing else signed by
+/// an agent key starts with it.
+pub const CARRIER_DOMAIN: &str = "elohim:device-carrier:v1:";
+
+/// What a carrier statement says it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CarrierKind {
+    Ask,
+    Listed,
+    Code,
+    Declined,
+}
+
+impl CarrierKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Listed => "listed",
+            Self::Code => "code",
+            Self::Declined => "declined",
+        }
+    }
+}
+
+/// An agent key's signature over a carrier statement.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CarrierProof {
+    /// The agent key that signed.
+    pub signer: String,
+    /// Its ed25519 signature, base64url.
+    pub signature: String,
+}
+
+/// The longest field a statement carries: states and challenges are short
+/// tokens, transport ids a few dozen characters.
+pub const MAX_STATEMENT_FIELD: usize = 128;
+
+/// The bytes a carrier statement is signed as: the domain, then the kind,
+/// the request's state, the speaker's transport id and the PKCE challenge,
+/// one per line (empty when a kind carries none). `None` when a field is
+/// too long or holds a line break, so no two statements share bytes.
+pub fn statement(
+    kind: CarrierKind,
+    state: &str,
+    transport_id: &str,
+    challenge: &str,
+) -> Option<Vec<u8>> {
+    let fits = |f: &str| f.len() <= MAX_STATEMENT_FIELD && !f.contains(['\n', '\r']);
+    if !(fits(state) && fits(transport_id) && fits(challenge)) || transport_id.is_empty() {
+        return None;
+    }
+    Some(
+        format!(
+            "{CARRIER_DOMAIN}{}\n{state}\n{transport_id}\n{challenge}",
+            kind.as_str()
+        )
+        .into_bytes(),
+    )
+}
+
+/// Whether `proof` is `signer`'s signature over the statement, and `signer`
+/// is who it says.
+pub fn proof_holds(
+    proof: &CarrierProof,
+    signer: &str,
+    kind: CarrierKind,
+    state: &str,
+    transport_id: &str,
+    challenge: &str,
+) -> bool {
+    if proof.signer != signer {
+        return false;
+    }
+    let (Some(key), Ok(raw), Some(message)) = (
+        agent_public_key(signer),
+        URL_SAFE_NO_PAD.decode(&proof.signature),
+        statement(kind, state, transport_id, challenge),
+    ) else {
+        return false;
+    };
+    elohim_epr::proof::verify(&key, &message, &raw)
+}
+
 /// What one node asks of another over a carrier.
+// One message is built per send and dropped after it; the ask's size is
+// not worth an indirection on the wire type.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum CarryRequest {
@@ -28,11 +139,14 @@ pub enum CarryRequest {
         ask: Ask,
     },
     /// The approving node hands back the code for the request with `state`.
+    /// `proof` is `approver`'s over (code, state, its transport id).
     Code {
         state: String,
         code: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         approver: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof: Option<CarrierProof>,
     },
     Redeem {
         redemption: Redemption,
@@ -43,6 +157,9 @@ pub enum CarryRequest {
         state: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         approver: Option<String>,
+        /// `approver`'s over (declined, state, its transport id).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof: Option<CarrierProof>,
     },
 }
 
@@ -55,6 +172,9 @@ pub enum CarryResponse {
         number: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         approver: Option<String>,
+        /// `approver`'s over (listed, its transport id).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof: Option<CarrierProof>,
     },
     /// The ask was not listed, or the code not taken, and why.
     Refused { code: String },
@@ -97,6 +217,7 @@ mod tests {
                 state: "s".repeat(32),
                 code: "c".repeat(32),
                 approver: None,
+                proof: None,
             },
         ] {
             assert_eq!(
@@ -108,6 +229,7 @@ mod tests {
             CarryResponse::Listed {
                 number: 3,
                 approver: Some("uhCAk".into()),
+                proof: None,
             },
             CarryResponse::Refused {
                 code: "ask_list_full".into(),
@@ -120,5 +242,64 @@ mod tests {
             );
         }
         assert!(CarryRequest::from_bytes(b"{\"kind\":\"Grant\"}").is_err());
+    }
+
+    #[test]
+    fn a_proof_holds_only_for_its_own_signer_kind_state_and_transport() {
+        let (key, agent) = crate::pending::tests::keypair(7);
+        let sign = |kind, state: &str, tid: &str, ch: &str| CarrierProof {
+            signer: agent.clone(),
+            signature: URL_SAFE_NO_PAD.encode(elohim_epr::proof::sign(
+                &key,
+                &statement(kind, state, tid, ch).unwrap(),
+            )),
+        };
+        let p = sign(CarrierKind::Code, "state-1", "peer-a", "");
+        assert!(proof_holds(
+            &p,
+            &agent,
+            CarrierKind::Code,
+            "state-1",
+            "peer-a",
+            ""
+        ));
+        // Replayed from another transport id, for another ask, as another
+        // kind, or claimed for another key: nothing.
+        assert!(!proof_holds(
+            &p,
+            &agent,
+            CarrierKind::Code,
+            "state-1",
+            "peer-b",
+            ""
+        ));
+        assert!(!proof_holds(
+            &p,
+            &agent,
+            CarrierKind::Code,
+            "state-2",
+            "peer-a",
+            ""
+        ));
+        assert!(!proof_holds(
+            &p,
+            &agent,
+            CarrierKind::Declined,
+            "state-1",
+            "peer-a",
+            ""
+        ));
+        let (_, other) = crate::pending::tests::keypair(8);
+        assert!(!proof_holds(
+            &p,
+            &other,
+            CarrierKind::Code,
+            "state-1",
+            "peer-a",
+            ""
+        ));
+        // A field cannot smuggle a second line.
+        assert!(statement(CarrierKind::Ask, "a\nb", "peer-a", "").is_none());
+        assert!(statement(CarrierKind::Ask, "a", "", "").is_none());
     }
 }
