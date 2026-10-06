@@ -266,6 +266,104 @@ export interface ImportStatusResponse {
 }
 
 // =============================================================================
+// Shed-write retry (the one 503 policy every seeder write goes through)
+// =============================================================================
+
+/** Retries after the first attempt for a 503 that carries a retry hint. */
+export const SHED_RETRY_MAX_RETRIES = 12;
+/** Longest single wait, whatever the server's hint says. */
+export const SHED_RETRY_DELAY_CAP_MS = 15_000;
+/** Backoff base when a retryable 503 names no `retryAfter` (doubles, capped). */
+export const SHED_RETRY_BACKOFF_BASE_MS = 2_000;
+/** Total sleep one request may spend waiting on sheds before its 503 is returned. */
+export const SHED_RETRY_TOTAL_BOUND_MS = 180_000;
+/**
+ * Total shed-wait one seeder PROCESS may spend across all its requests. A peer
+ * whose circuit stays open would otherwise cost every one of N writes its full
+ * per-request bound (165 presences x 180 s); past this the 503 is returned at once.
+ */
+export const SHED_RETRY_PROCESS_BOUND_MS = 600_000;
+let processShedSleptMs = 0;
+/** Test seam: forget the process-wide shed wait already spent. */
+export function resetShedRetryProcessBudget(): void {
+  processShedSleptMs = 0;
+}
+
+/**
+ * The wait (ms) a 503 asks for, or null when the 503 is not retryable.
+ *
+ * A 503 is retryable only when it says it is transient: a JSON body with
+ * `status: "catching-up"` (storage/doorway admission shed — e.g.
+ * `{"status":"catching-up","cause":"upstream","circuit":"open","retryAfter":30}`)
+ * or a retry hint (`retryAfter` in the body, else the `Retry-After` header).
+ * The hint wins, capped; with no hint the wait is a capped doubling backoff.
+ */
+export function shedRetryDelayMs(
+  status: number,
+  bodyText: string,
+  retryAfterHeader: string | null,
+  retryIndex: number
+): number | null {
+  if (status !== 503) return null;
+  let body: { status?: unknown; retryAfter?: unknown } = {};
+  try {
+    const parsed: unknown = JSON.parse(bodyText);
+    if (parsed && typeof parsed === 'object') body = parsed as typeof body;
+  } catch {
+    // not JSON: only the header can make it retryable
+  }
+  const bodyHint = typeof body.retryAfter === 'number' ? body.retryAfter : NaN;
+  const headerHint = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : NaN;
+  const hintSecs = Number.isFinite(bodyHint) ? bodyHint : headerHint;
+  if (body.status !== 'catching-up' && !Number.isFinite(hintSecs)) return null;
+  const wait = Number.isFinite(hintSecs)
+    ? Math.max(0, hintSecs) * 1000
+    : SHED_RETRY_BACKOFF_BASE_MS * 2 ** retryIndex;
+  return Math.min(wait, SHED_RETRY_DELAY_CAP_MS);
+}
+
+/**
+ * Issue one write via `send` and re-issue it while the answer is a retryable 503
+ * (see shedRetryDelayMs), within SHED_RETRY_MAX_RETRIES and
+ * SHED_RETRY_TOTAL_BOUND_MS. Any other response — and a 503 left after the
+ * budget — is returned with its body still readable; errors thrown by `send`
+ * propagate untouched (never retried here). `send` must build a fresh request
+ * each call (a string body is safe to resend).
+ */
+export async function sendRetryingShed(
+  send: () => Promise<Response>,
+  label: string,
+  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms))
+): Promise<Response> {
+  let slept = 0;
+  for (let retry = 0; ; retry++) {
+    const response = await send();
+    if (response.status !== 503) return response;
+    const text = await response.text();
+    const delay = shedRetryDelayMs(503, text, response.headers.get('Retry-After'), retry);
+    if (
+      delay !== null &&
+      retry < SHED_RETRY_MAX_RETRIES &&
+      slept + delay <= SHED_RETRY_TOTAL_BOUND_MS &&
+      processShedSleptMs + delay <= SHED_RETRY_PROCESS_BOUND_MS
+    ) {
+      console.log(
+        `   ⏳ 503 shed on ${label} — retry ${retry + 1}/${SHED_RETRY_MAX_RETRIES} in ${delay / 1000}s`
+      );
+      await sleep(delay);
+      slept += delay;
+      processShedSleptMs += delay;
+      continue;
+    }
+    return new Response(text, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  }
+}
+
+// =============================================================================
 // Doorway Client
 // =============================================================================
 
@@ -1205,12 +1303,9 @@ export class DoorwayClient {
     // retry the whole request until the projector drains, respecting
     // Retry-After. Bounded; on exhaustion the 503 is returned (reconstructed so
     // the body stays readable) and the caller's own handling runs unchanged.
-    // Mirrors queueImport()'s catching-up loop, hoisted here so EVERY seed path
-    // (stewardship / projections / commitments / operator-bindings) is
-    // resilient, not just /import.
-    const catchingUpMax = 12;
-
-    for (let catchingUpAttempt = 0; ; catchingUpAttempt++) {
+    // The policy lives in sendRetryingShed (above), shared with the seeders
+    // that write with plain fetch.
+    return sendRetryingShed(async () => {
       let lastError: Error | null = null;
       let response: Response | null = null;
 
@@ -1242,47 +1337,8 @@ export class DoorwayClient {
       if (!response) {
         throw lastError || new Error('Request failed after retries');
       }
-
-      // Non-503 responses return untouched (body stream unconsumed).
-      if (response.status !== 503) {
-        return response;
-      }
-
-      // 503: inspect the body for the catching-up shed marker. Reading the body
-      // consumes the stream, so we always reconstruct a fresh Response before
-      // handing it back to the caller.
-      const text = await response.text();
-      const isCatchingUp = (() => {
-        try {
-          return (JSON.parse(text) as { status?: string })?.status === 'catching-up';
-        } catch {
-          return false;
-        }
-      })();
-
-      if (isCatchingUp && catchingUpAttempt < catchingUpMax) {
-        const retryAfterRaw = response.headers.get('Retry-After');
-        const retryAfterSecs = retryAfterRaw ? parseInt(retryAfterRaw, 10) : NaN;
-        const delay = Math.min(
-          Number.isFinite(retryAfterSecs) ? retryAfterSecs * 1000 : 5000,
-          15000
-        );
-        console.log(
-          `   ⏳ Projector catching-up (503) on ${options.method || 'GET'} ${path} — ` +
-            `retry ${catchingUpAttempt + 1}/${catchingUpMax} in ${delay / 1000}s`
-        );
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-
-      // Not a catching-up shed, or the budget is exhausted: hand back a
-      // readable 503 so the caller's status/body checks run unchanged.
-      return new Response(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      });
-    }
+      return response;
+    }, `${options.method || 'GET'} ${path}`);
   }
 }
 

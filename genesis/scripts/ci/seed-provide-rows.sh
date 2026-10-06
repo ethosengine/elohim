@@ -7,8 +7,10 @@
 #
 # Required env (from genesis Jenkinsfile):
 #   DOORWAY_URL          Target doorway (e.g. https://doorway-alpha.elohim.host)
-#   PEER_STORAGE_URLS    Comma-separated name=host:port pairs for /auth/me probes
-#                        (from peerStorageUrlsCsv() in Jenkinsfile)
+#   CONDUCTOR_URLS       Conductor app WS URLs (name=url or elohim-<name>-<env>);
+#                        each human's agent key is read from its OWN conductor
+#                        (from getConductorAppUrls() in Jenkinsfile)
+#   PEER_STORAGE_URLS    Comma-separated name=host:port pairs (storage writes)
 #
 # Optional:
 #   DOORWAY_API_KEY      API key when doorway requires auth
@@ -31,6 +33,7 @@ echo "SEED CONTENT-PROVIDE ROWS (EPR Resilience Card — Workstream D)"
 echo "══════════════════════════════════════════════════════════════"
 echo "Doorway:            ${DOORWAY_URL}"
 echo "Peer storage URLs:  ${PEER_STORAGE_URLS:-<unset — using PEER_STORAGE_URL_TEMPLATE default>}"
+echo "Conductors:         ${CONDUCTOR_URLS:-<unset — every human will be skipped>}"
 echo "Reaches:            ${PROVIDE_REACHES:-commons (default)}"
 echo "Humans:             ${PROVIDE_HUMAN_IDS:-<default alpha set>}"
 echo ""

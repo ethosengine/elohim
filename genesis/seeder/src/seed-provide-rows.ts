@@ -33,8 +33,8 @@
  *
  * So `provider` MUST equal `humans.agent_pub_key` — the Holochain
  * agent public key (`uhCAk…`), NOT the libp2p peer id. This script
- * fetches it from each pod's `GET /auth/me` endpoint, which returns the
- * `agent_pub_key` from the pod's local session.
+ * reads it from each human's OWN conductor (node-identity.ts: the steward
+ * app's agent key) — never from storage's session route.
  *
  * ## Conductor seeding pre-condition
  *
@@ -42,8 +42,8 @@
  * identity seeder (`seed-conductor-identities.ts`) AND updated by the
  * `MembershipProjected` signal with `agent_pub_key`. This script runs AFTER
  * conductor seeding (the Jenkinsfile gates it on CONDUCTOR_SEEDING_READY).
- * If a pod has no local session yet, the `/auth/me` call returns 401 and
- * that human is skipped with a warning (non-fatal; the row won't join, but
+ * If the human's own conductor cannot be read (no name-affine CONDUCTOR_URLS
+ * entry, or unreachable), that human is skipped with a warning (non-fatal; the row won't join, but
  * the partial set still lights the card for the humans that did seed).
  *
  * ## Idempotency
@@ -76,6 +76,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
 import { storageUrlForHuman } from './peer-id.js';
+import { resolveNodeIdentity } from './node-identity.js';
 
 // =============================================================================
 // Configuration
@@ -92,8 +93,6 @@ const API_KEY = process.env.DOORWAY_API_KEY;
  */
 const DEFAULT_REACH = 'commons';
 
-/** Timeout for one /auth/me probe. */
-const AUTH_ME_TIMEOUT_MS = 8000;
 
 // =============================================================================
 // Parse PEER_STORAGE_URLS env (name=host:port,...)
@@ -137,62 +136,20 @@ function buildStorageUrlMap(humanIds: string[]): Map<string, string> {
 }
 
 // =============================================================================
-// Fetch agent_pub_key from a pod's /auth/me
+// Agent key from the human's own conductor (node-identity.ts)
 // =============================================================================
 
-interface AuthMeResponse {
-  agentPubKey?: string;
-  // Other fields not needed here
-}
-
 /**
- * Fetch the Holochain agent public key from a per-pod storage endpoint.
- * Returns null on any failure (pod unreachable, no session, 401).
- *
- * Uses GET /auth/me (storage's own session endpoint, not doorway's), which
- * returns the same MeResponse shape including `agentPubKey` when a local
- * session is registered. The agent_pub_key is the `uhCAk…` base64url-encoded
- * Holochain key that also populates `humans.agent_pub_key` via the
- * MembershipProjected signal — the snapshot join key.
+ * The `uhCAk…` agent key the human's OWN conductor speaks as — the key that
+ * also populates `humans.agent_pub_key` via the MembershipProjected signal
+ * (the snapshot join key). Null (per-human skip) when the human has no affine
+ * conductor in CONDUCTOR_URLS or it cannot be read.
  */
-async function fetchAgentPubKey(
-  storageBaseUrl: string,
-  humanId: string
-): Promise<string | null> {
-  const url = `${storageBaseUrl.replace(/\/+$/, '')}/auth/me`;
+async function fetchAgentPubKey(humanId: string): Promise<string | null> {
   try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(AUTH_ME_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      // 401 = no local session yet (pod not yet identity-seeded by conductor
-      // seeder or /auth/me requires authentication — either way, skip).
-      if (response.status === 401 || response.status === 404) {
-        console.warn(
-          `  [?] ${humanId}: /auth/me → HTTP ${response.status} — pod has no ` +
-            `local session yet (conductor seeding may not have run for this pod)`
-        );
-      } else {
-        console.warn(
-          `  [?] ${humanId}: /auth/me → HTTP ${response.status} — skipping`
-        );
-      }
-      return null;
-    }
-    const body = (await response.json()) as AuthMeResponse;
-    const key = body.agentPubKey;
-    if (typeof key === 'string' && key.length > 0) {
-      return key;
-    }
-    console.warn(
-      `  [?] ${humanId}: /auth/me response missing agentPubKey field — skipping`
-    );
-    return null;
+    return (await resolveNodeIdentity(humanId)).agentPubKey;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `  [?] ${humanId}: /auth/me failed (${msg}) — pod may be unreachable; skipping`
-    );
+    console.warn(`  [?] ${err instanceof Error ? err.message : String(err)} — skipping`);
     return null;
   }
 }
@@ -273,7 +230,7 @@ class ProvideClient extends DoorwayClient {
    * commitment `provider` (the `uhCAk…` agent key) the snapshot join compares
    * against (`household_resilience.rs:172-174`). Production rows are created by
    * `seed-humans.ts` with `agentPubKey: null`; this stamps the truthful key
-   * fetched from `/auth/me` so the existing direct-equality join lights the
+   * read from the human's own conductor so the existing direct-equality join lights the
    * `commitment_backed_collectives` column.
    *
    * NULL-only on the storage side — never overwrites a set key. Routed through
@@ -526,13 +483,13 @@ async function main(): Promise<void> {
     const shortName = humanId.replace(/^human-/, '').split('-')[0];
     const storageUrl = storageUrlMap.get(shortName) ?? storageUrlForHuman(humanId);
 
-    console.log(`[${humanId}] Fetching agent_pub_key from ${storageUrl}/auth/me ...`);
-    const agentPubKey = await fetchAgentPubKey(storageUrl, humanId);
+    console.log(`[${humanId}] Reading agent_pub_key from its own conductor ...`);
+    const agentPubKey = await fetchAgentPubKey(humanId);
 
     if (!agentPubKey) {
       console.warn(
-        `  SKIPPED: no agent_pub_key — conductor seeding must run first ` +
-          `(Seed Conductor Identities stage) and the pod must have a local session`
+        `  SKIPPED: no agent_pub_key — the human's own conductor was not ` +
+          `readable (CONDUCTOR_URLS needs its name=url entry)`
       );
       skipped += 1;
       continue;
@@ -543,7 +500,7 @@ async function main(): Promise<void> {
     // STOPGAP (resolver spec §3.4): heal humans.agent_pub_key = uhCAk BEFORE
     // writing provide rows, so the snapshot join (humans.agent_pub_key =
     // rea_commitments.provider) is satisfied. NULL-only on the storage side;
-    // per-human non-fatal (mirror the /auth/me 401-skip pattern — a heal
+    // per-human non-fatal (mirror the agent-key per-human skip — a heal
     // failure must not block the provide seed for the remaining humans).
     try {
       const healResp = await client.healHumanIdentity(humanId, agentPubKey);

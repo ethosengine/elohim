@@ -1300,37 +1300,92 @@ function streamDetail(run: Run, body: unknown): { detail: string; ok: boolean } 
   };
 }
 
-/** Sync streams: retry briefly — right after seeding the drain is legitimate. */
+/** Poll cadence of the sync-stream probe, seconds. */
+export const PROJECTION_POLL_SECS = 10;
+/**
+ * Total bound on the sync-stream wait, seconds — the same ~300 s budget the
+ * custody-convergence poll in this file uses (PROPAGATION_TIMEOUT_SECS). A peer
+ * read soon after its own rollout legitimately drains its acquisition backlog
+ * for minutes; three 10 s reads mistook that drain for a defect.
+ */
+export const PROJECTION_SYNC_TIMEOUT_SECS = 300;
+// The bound is SHARED across peers (one deadline for the whole stage, as the
+// custody poll shares its budget): peers are read in turn, so a per-peer
+// 300 s would let a freshly rolled 7-peer fleet hold the stage for 35 min.
+// Once spent, every remaining peer still gets one read.
+/**
+ * Stall window, seconds: while `pull.fetched` keeps advancing the peer is SLOW
+ * and the probe keeps waiting; no advance for this long means STUCK and fails
+ * before the bound. A stream that is not pull (replication / reconcile false,
+ * unreachable) has no progress counter, so it fails at this window too.
+ */
+export const PROJECTION_STALL_SECS = 90;
+
+/** `pull.fetched` / `pull.total` from one /p2p/status body, when numeric. */
+function pullProgress(body: unknown): { fetched: number | null; total: number | null } {
+  const pull = asObject(asObject(body)['pull']);
+  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return { fetched: num(pull['fetched']), total: num(pull['total']) };
+}
+
+/**
+ * Sync streams: wait a BOUNDED time, distinguishing slow from stuck. Keeps
+ * polling while `pull.fetched` advances; fails when it has not advanced for
+ * `stallSecs`, or when `timeoutSecs` is reached, quoting fetched/total.
+ */
 async function assertSyncStreams(
   run: Run,
   name: string,
   client: StorageClientLike,
-  retries: number
-): Promise<void> {
+  timeoutSecs: number,
+  stallSecs: number
+): Promise<number> {
   let attempt = 0;
+  let waited = 0;
   let ok = false;
   let detail = '';
-  while (attempt < retries) {
+  let progress: { fetched: number | null; total: number | null } = { fetched: null, total: null };
+  let lastFetched: number | null = null;
+  let lastAdvanceAt = 0;
+  let reason = '';
+  for (;;) {
     attempt++;
     const statusRes = await run.call(async () => client.dataplane.getP2pStatus());
     if (statusRes.ok) {
       const rendered = streamDetail(run, statusRes.value);
       detail = rendered.detail;
+      progress = pullProgress(statusRes.value);
       if (rendered.ok) {
         ok = true;
         break;
       }
+      if (progress.fetched !== null && lastFetched !== null && progress.fetched > lastFetched) {
+        lastAdvanceAt = waited;
+      }
+      if (progress.fetched !== null) lastFetched = progress.fetched;
     } else {
       detail = `p2p/status unreachable (${run.lastStatus})`;
     }
-    // bash sleeps 10s at the end of every non-breaking iteration, including
-    // the last one before the loop condition fails.
-    await run.ctx.sleep(10);
+    if (waited >= timeoutSecs) {
+      reason = `wait bound reached (${timeoutSecs}s remained of the shared ${PROJECTION_SYNC_TIMEOUT_SECS}s budget)`;
+      break;
+    }
+    if (waited - lastAdvanceAt >= stallSecs) {
+      reason = `stalled: pull.fetched did not advance in ${stallSecs}s`;
+      break;
+    }
+    await run.ctx.sleep(PROJECTION_POLL_SECS);
+    waited += PROJECTION_POLL_SECS;
   }
 
   const assertionName = `projection.${name}.streams`;
   if (!ok) {
-    run.fail(assertionName, `${detail} after ${retries} attempt(s)`);
+    const fetched = progress.fetched ?? '?';
+    const total = progress.total ?? '?';
+    run.fail(
+      assertionName,
+      `${detail} fetched=${fetched}/${total} — ${reason} after ${waited}s, ${attempt} attempt(s)`
+    );
   } else if (detail.includes('null')) {
     // bash `case "$detail"` — null is tested BEFORE idle.
     run.warn(
@@ -1347,12 +1402,15 @@ async function assertSyncStreams(
   } else {
     run.pass(assertionName, detail);
   }
+  return waited;
 }
 
 async function cmdProjection(run: Run): Promise<RunResult> {
   const env = run.ctx.env;
   const maxLag = numEnv(env['PROJECTION_MAX_LAG_SECS'], 120);
-  const retries = numEnv(env['PROJECTION_RETRIES'], 3);
+  const timeoutSecs = numEnv(env['PROJECTION_SYNC_TIMEOUT_SECS'], PROJECTION_SYNC_TIMEOUT_SECS);
+  const stallSecs = numEnv(env['PROJECTION_STALL_SECS'], PROJECTION_STALL_SECS);
+  let spentSecs = 0;
 
   run.ctx.log(HR);
   run.ctx.log('VERIFY PROJECTION SYNC — cursors + replication/pull streams');
@@ -1360,7 +1418,8 @@ async function cmdProjection(run: Run): Promise<RunResult> {
 
   for (const { name, client } of run.fleet().peers()) {
     await assertProjectorLag(run, name, client, maxLag);
-    await assertSyncStreams(run, name, client, retries);
+    const remaining = Math.max(0, timeoutSecs - spentSecs);
+    spentSecs += await assertSyncStreams(run, name, client, remaining, stallSecs);
   }
 
   return run.finish('projection');

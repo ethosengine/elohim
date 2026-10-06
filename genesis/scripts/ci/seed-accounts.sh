@@ -22,6 +22,9 @@ else
   echo "Doorway: ${DOORWAY_HOST}  (single target; set SEEDER_TARGET_PEERS to split)"
 fi
 echo ""
+# Seed only into a ready node: a fleet roll leaves storage `catching-up` for minutes
+# (genesis #1625: 503 circuit-open on every write). Soft — never exits non-0.
+bash "$(dirname "${BASH_SOURCE[0]}")/wait-storage-ready.sh" "${DOORWAY_HOST}"
 DOORWAY_URL="${DOORWAY_HOST}" \
 SEEDER_TARGET_PEERS="${TARGET_PEERS}" \
   npx tsx src/seed-accounts.ts

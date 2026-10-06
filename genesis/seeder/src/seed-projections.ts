@@ -30,7 +30,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DoorwayClient } from './doorway-client.js';
-import { deterministicPeerId, type Archetype } from './peer-id.js';
+import { deterministicPeerId, storageUrlForHuman, type Archetype } from './peer-id.js';
 import { LAMAD_ROUTE_CLAIMS, type RouteClaimTemplate } from './generated/route-claims.js';
 
 // =============================================================================
@@ -135,6 +135,15 @@ export interface ProjectionSpec {
    * Omitted on every contract today.
    */
   scopeHost?: string;
+  /**
+   * OPTIONAL id generation (integer >= 2). When declared, the id digest gains
+   * `|gen:{n}` and THIS row re-mints under a fresh id; when absent the digest
+   * input is byte-identical to before, so no other row's id moves. It exists
+   * for one shape only: an id the DHT refuses forever because two cells each
+   * minted a root Create for it ("multiple root Creates for ID"). The scope
+   * (`inScopeOf`) is unchanged — it is the same contract, re-rooted once.
+   */
+  idGeneration?: number;
   mode: ProjectionMode;
   reach: string;
   baseHref: string;
@@ -363,7 +372,8 @@ export function regrantFingerprint(desired: Partial<ProjectionRelevantMetadata>)
  * Distinct (doorway, epr) pairs produce distinct ids; re-runs are idempotent.
  *
  * ID DERIVATION FORMULA (documented here AND in genesis/Jenkinsfile seed stage):
- *   base       = `project-epr-${sha256(stewardPeerId|project-epr|scope)[:16]}`
+ *   base       = `project-epr-${sha256(stewardPeerId|project-epr|scope[|gen:N])[:16]}`
+ *                (`|gen:N` only when the spec declares `idGeneration`)
  *   superseder = `${base}-r${sha256(stableJson(projectionRelevantMetadata))[:8]}`
  * where scope = `doorway:{doorwayId}|epr:{eprId}`.
  */
@@ -383,8 +393,9 @@ export function projectionScope(spec: ProjectionSpec): string {
 export function baseProjectionId(spec: ProjectionSpec): string {
   const stewardPeerId = deterministicPeerId(spec.stewardHumanId, spec.stewardArchetype);
   const scope = projectionScope(spec);
+  const generation = spec.idGeneration && spec.idGeneration > 1 ? `|gen:${spec.idGeneration}` : '';
   const idDigest = createHash('sha256')
-    .update(`${stewardPeerId}|project-epr|${scope}`, 'utf8')
+    .update(`${stewardPeerId}|project-epr|${scope}${generation}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
   return `project-epr-${idDigest}`;
@@ -681,6 +692,18 @@ export function findActiveRowForSpec(
 }
 
 /**
+ * Whether a create was refused because the commitment's deterministic id has
+ * more than one root Create on the DHT (two peers' cells each minted one
+ * before writes were routed to the steward's own peer). The zome refuses to
+ * observe such an id (`content_store::commitment_observation`), so a re-post
+ * answers 503 forever while the row one of those Creates projected stays in
+ * force. Seeing it is "this id exists", never a reason to mint another.
+ */
+export function isDoubleRootRefusal(responseText: string): boolean {
+  return responseText.includes('multiple root Creates for ID');
+}
+
+/**
  * Factory — lets callers in seed.ts (or integration tests) construct a
  * ProjectionClient without importing the private class directly.
  */
@@ -725,8 +748,15 @@ export async function seedProjections(
     }
 
     const text = await response.text();
+    // A double-rooted id answers 503 from the zome's observation, not 409: the
+    // id exists (twice) on the DHT, so it takes the same compare-then-decide
+    // path as a conflict. An identical active row means the grant is in force.
+    const doubleRooted = isDoubleRootRefusal(text);
     const isConflict =
-      response.status === 409 || text.includes('UNIQUE') || text.includes('already exists');
+      doubleRooted ||
+      response.status === 409 ||
+      text.includes('UNIQUE') ||
+      text.includes('already exists');
 
     if (isConflict) {
       // The content-addressed id already exists. Determine whether the existing
@@ -755,7 +785,12 @@ export async function seedProjections(
 
       const drifted = metadataDrift(specToMetadata(spec), existing);
       if (drifted.length === 0) {
-        console.log(`  [=] ${label} (idempotent re-run)`);
+        console.log(
+          doubleRooted
+            ? `  [=] ${label} (in force on this peer; its DHT id has two root Creates and ` +
+                `cannot change state — genesis-seeders-double-rooted-projection-commitment)`
+            : `  [=] ${label} (idempotent re-run)`,
+        );
         alreadyExists += 1;
         continue;
       }
@@ -808,6 +843,24 @@ export async function seedProjections(
   );
 }
 
+/**
+ * Group specs by the storage URL of the peer that must author them (the
+ * steward's own peer), preserving spec order within each group.
+ */
+export function groupSpecsByAuthor(
+  specs: ProjectionSpec[],
+  authorUrlFor: (stewardHumanId: string) => string,
+): Map<string, ProjectionSpec[]> {
+  const groups = new Map<string, ProjectionSpec[]>();
+  for (const spec of specs) {
+    const url = authorUrlFor(spec.stewardHumanId);
+    const group = groups.get(url) ?? [];
+    group.push(spec);
+    groups.set(url, group);
+  }
+  return groups;
+}
+
 // =============================================================================
 // Standalone execution
 // =============================================================================
@@ -822,21 +875,35 @@ if (isMain) {
     ? (JSON.parse(readFileSync(projectionsJsonPath, 'utf-8')) as ProjectionSpec[])
     : defaultProjectionSeeds();
 
-  const client = new ProjectionClient({ baseUrl: doorwayUrl, apiKey });
+  // Commitment writes go to ONE declared authoring peer — the steward's own
+  // storage (`storageUrlForHuman(stewardHumanId)`), never the shared doorway
+  // name. A project-epr id is deterministic; posting through a load-balanced
+  // doorway lands creates on different cells, and two cells each minting a
+  // root Create for one id is "multiple root Creates for ID" — refused
+  // forever. Same rule as custody (providerCommitmentClientResolver).
+  // PROJECTION_AUTHOR_STORAGE_URL overrides for a single-peer target.
+  const groups = groupSpecsByAuthor(specs, (humanId) =>
+    process.env.PROJECTION_AUTHOR_STORAGE_URL || storageUrlForHuman(humanId),
+  );
 
   console.log('='.repeat(60));
   console.log('EPR-Projection Seeder');
-  console.log(`  Target:      ${doorwayUrl}`);
+  console.log(`  Doorway:     ${doorwayUrl} (named in scope only; writes go to the author peer)`);
   console.log(`  Projections: ${specs.length}`);
+  for (const [authorUrl, group] of groups) {
+    console.log(`  Author peer: ${authorUrl} (${group.length} projection(s))`);
+  }
   console.log('='.repeat(60));
   console.log();
 
-  const health = await client.checkHealth();
-  if (!health.healthy) {
-    console.error(`ERROR: Doorway not healthy — ${health.error}`);
-    process.exit(1);
+  for (const [authorUrl, group] of groups) {
+    const client = new ProjectionClient({ baseUrl: authorUrl, apiKey });
+    const health = await client.checkHealth();
+    if (!health.healthy) {
+      console.error(`ERROR: authoring peer ${authorUrl} not healthy — ${health.error}`);
+      process.exit(1);
+    }
+    await seedProjections(client, group);
   }
-
-  await seedProjections(client, specs);
   process.exit(0);
 }

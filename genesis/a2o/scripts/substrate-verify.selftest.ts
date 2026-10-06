@@ -1089,7 +1089,8 @@ async function projectionTriState(): Promise<void> {
         `renamed=${renamed.baseUrl}`,
         `${dead.name}=${dead.url}`,
       ].join(','),
-      PROJECTION_RETRIES: '1',
+      // Bound 0 s: one read, no polling — the tri-state inventory, not the wait.
+      PROJECTION_SYNC_TIMEOUT_SECS: '0',
       PROJECTION_MAX_LAG_SECS: '120',
     });
     assertEnvelope(h, 'projection');
@@ -1143,8 +1144,8 @@ async function projectionTriState(): Promise<void> {
     );
     check(
       detailOf(h.report, 'projection.behind.streams') ===
-        'replication=true pull=false projection_reconcile=true after 1 attempt(s)',
-      'pull=false fails after PROJECTION_RETRIES attempts',
+        'replication=true pull=false projection_reconcile=true fetched=?/9 — wait bound reached (0s remained of the shared 300s budget) after 0s, 1 attempt(s)',
+      'pull=false fails at the bound, quoting fetched/total',
       detailOf(h.report, 'projection.behind.streams')
     );
     check(
@@ -1164,9 +1165,8 @@ async function projectionTriState(): Promise<void> {
       'unreachable peer fails streams with the last-status detail',
       detailOf(h.report, 'projection.dead.streams')
     );
-    // Only the failing-stream peers sleep (10s per non-breaking attempt):
-    // behind, dead, and renamed (fail-closed on a present-but-renamed field).
-    eqDeep(h.sleeps, [10, 10, 10], 'a 10s sleep per non-breaking stream attempt');
+    // A 0 s bound reads once and never sleeps.
+    eqDeep(h.sleeps, [], 'a 0 s bound never polls');
     eqDeep(h.report.context, {}, 'projection context is {}');
   } finally {
     await Promise.all([
@@ -1177,6 +1177,74 @@ async function projectionTriState(): Promise<void> {
       unparseable.close(),
       renamed.close(),
     ]);
+  }
+}
+
+/**
+ * Ruling 3b: slow is not stuck. A peer whose pull.fetched keeps advancing is
+ * waited on (within the bound) and passes once caught up; a peer whose
+ * fetched stays put fails at the stall window, quoting fetched/total.
+ */
+async function projectionSlowVersusStuck(): Promise<void> {
+  testCase('projection — slow (advancing) vs stuck (stalled) pull');
+  const OK_PROJECTOR = { json: { lag: [{ cursor: 'a', lagSeconds: 3 }] } };
+  const slow = await startFixture({
+    '/api/v1/status/projector': OK_PROJECTOR,
+    '/p2p/status': (_req: IncomingMessage, hit: number) => ({
+      json: {
+        replication: { caughtUp: true },
+        // fetched advances 2 per read; caught up on the 6th read (50 s).
+        pull:
+          hit >= 6
+            ? { total: 10, fetched: 10, caughtUp: true }
+            : { total: 10, fetched: hit * 2 - 2, caughtUp: false },
+        projectionReconcile: { caughtUp: true },
+      },
+    }),
+  });
+  const stuck = await startFixture({
+    '/api/v1/status/projector': OK_PROJECTOR,
+    '/p2p/status': {
+      json: {
+        replication: { caughtUp: true },
+        pull: { total: 10, fetched: 3, caughtUp: false },
+        projectionReconcile: { caughtUp: true },
+      },
+    },
+  });
+  try {
+    const h = await run('projection', {
+      PEER_STORAGE_URLS: `slow=${slow.baseUrl},stuck=${stuck.baseUrl}`,
+      PROJECTION_STALL_SECS: '30',
+    });
+    eqDeep(
+      h.report.assertions.filter(a => a.name.endsWith('.streams')).map(a => `${a.status}:${a.name}`),
+      ['pass:projection.slow.streams', 'fail:projection.stuck.streams'],
+      'advancing pull passes after waiting; stalled pull fails'
+    );
+    check(
+      detailOf(h.report, 'projection.stuck.streams') ===
+        'replication=true pull=false projection_reconcile=true fetched=3/10 — stalled: pull.fetched did not advance in 30s after 30s, 4 attempt(s)',
+      'stuck failure names the stall window and fetched/total',
+      detailOf(h.report, 'projection.stuck.streams')
+    );
+    // slow: 5 sleeps (reads 1..5 not caught up); stuck: 3 sleeps to reach 30 s.
+    eqDeep(h.sleeps, [10, 10, 10, 10, 10, 10, 10, 10], 'slow waits 50 s, stuck stops at the 30 s stall window');
+    // Shared budget: the first stuck peer spends the whole 40 s, so the
+    // second gets ONE read (stall window set past the bound).
+    const shared = await run('projection', {
+      PEER_STORAGE_URLS: `first=${stuck.baseUrl},stuck=${stuck.baseUrl}`,
+      PROJECTION_SYNC_TIMEOUT_SECS: '40',
+      PROJECTION_STALL_SECS: '300',
+    });
+    eqDeep(shared.sleeps, [10, 10, 10, 10], 'one 40 s budget across peers — the second peer never sleeps');
+    check(
+      detailOf(shared.report, 'projection.stuck.streams').endsWith('after 0s, 1 attempt(s)'),
+      'a peer read after the shared budget is spent gets exactly one read',
+      detailOf(shared.report, 'projection.stuck.streams')
+    );
+  } finally {
+    await Promise.all([slow.close(), stuck.close()]);
   }
 }
 
@@ -1322,6 +1390,7 @@ async function main(): Promise<void> {
   await propagationStatePrecedence();
   await deliveryCases();
   await projectionTriState();
+  await projectionSlowVersusStuck();
   await federationCases();
   await resilienceCases();
   cliUsageExitCode();

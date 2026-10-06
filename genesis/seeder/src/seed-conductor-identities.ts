@@ -35,8 +35,15 @@
  * Output:
  *   [+] Created  — Human profile was just created on the conductor
  *   [=] Exists   — THIS human's profile already present (idempotent)
- *   [C] Conflict — the human's own conductor already embodies a DIFFERENT
- *                  human id (one agent = one Human; needs operator attention)
+ *   [~] Embodied — the human's OWN (name-affine) conductor already embodies a
+ *                  different Human id: this person, registered through another
+ *                  door (a doorway registration). One agent = one Human, so the
+ *                  fixture id yields — the embodied id is this person's canonical
+ *                  id on this deployment, recorded in the results artifact
+ *                  (`embodiedAs`). Counted as success; the seeder never re-keys
+ *                  or overwrites an established identity (read-only outcome).
+ *   [C] Conflict — reserved for a conductor that is NOT name-affine to the human
+ *                  (the legacy walk keeps looking instead, so it ends [X])
  *   [-] Skipped  — no conductor deployed for this human (soft, not a failure)
  *   [X] Failed   — could not connect or create (see error)
  *
@@ -145,7 +152,7 @@ interface HumanOutput {
   display_name: string;
 }
 
-type SeedResult = 'created' | 'exists' | 'conflict' | 'skipped' | 'failed';
+type SeedResult = 'created' | 'exists' | 'embodied' | 'conflict' | 'skipped' | 'failed';
 
 interface ConductorResult {
   displayName: string;
@@ -154,6 +161,8 @@ interface ConductorResult {
   result: SeedResult;
   error?: string;
   agentProfile?: AgentProfileReceipt;
+  /** Set only for `embodied`: the Human id this person's own conductor embodies. */
+  embodiedHumanId?: string;
 }
 
 // =============================================================================
@@ -581,6 +590,24 @@ export async function ensureOwnAgentProfile(
  * CONDUCTOR_URLS has NO named or hostname-affine entries at all (a bare
  * loopback mesh) — walk the whole list with the id-aware exists check.
  */
+/**
+ * What an EXISTING Human on a conductor means for the fixture human being seeded.
+ *   - same id → `exists` (idempotent);
+ *   - different id on the human's OWN (name-affine) conductor → `embodied`: the
+ *     established identity is this person's, reached through another door; the
+ *     fixture id yields to it and nothing is written;
+ *   - different id on a non-affine conductor (legacy walk) → `walk`: someone
+ *     else's conductor, keep looking.
+ */
+export function classifyExistingHuman(
+  existingId: string,
+  fixtureHumanId: string,
+  affine: boolean,
+): 'exists' | 'embodied' | 'walk' {
+  if (existingId === fixtureHumanId) return 'exists';
+  return affine ? 'embodied' : 'walk';
+}
+
 async function seedHumanOnConductor(
   human: HumansJsonHuman,
   conductorUrls: ConductorUrlEntry[],
@@ -634,7 +661,10 @@ async function seedHumanOnConductor(
       const existing = await getMyHuman(appWs, cellId);
       const existingId = extractHumanId(existing);
 
-      if (existingId === human.id) {
+      const verdict =
+        existingId === undefined ? undefined : classifyExistingHuman(existingId, human.id, affine);
+
+      if (verdict === 'exists') {
         const agentProfile = await ensureOwnAgentProfile(
           (fn_name, payload) =>
             appWs.callZome({
@@ -652,12 +682,15 @@ async function seedHumanOnConductor(
 
       if (existingId !== undefined) {
         await (appWs.client as unknown as { close(): unknown }).close();
-        if (affine) {
+        if (verdict === 'embodied') {
+          // The conductor is this human's own (name-affine), so the Human it
+          // embodies is THIS person reached through another door — not a
+          // squatter. The established identity stands; the fixture id yields.
           return {
             ...base,
             conductorUrl,
-            result: 'conflict',
-            error: `conductor already embodies '${existingId}' — expected '${human.id}'`,
+            result: 'embodied',
+            embodiedHumanId: existingId,
           };
         }
         // Legacy walk: someone else's conductor — keep looking.
@@ -793,25 +826,31 @@ async function main(): Promise<void> {
     const icon =
       result.result === 'created' ? '+'
       : result.result === 'exists' ? '='
+      : result.result === 'embodied' ? '~'
       : result.result === 'conflict' ? 'C'
       : result.result === 'skipped' ? '-'
       : 'X';
     const phase = (human.agencyPhase ?? '').padEnd(6);
     const name = result.displayName.padEnd(16);
-    const suffix = result.error ? ` (${result.error})` : '';
+    const suffix = result.error
+      ? ` (${result.error})`
+      : result.embodiedHumanId
+        ? ` (Embodied as ${result.embodiedHumanId})`
+        : '';
     console.log(`  [${icon}] ${name} ${phase} ${result.conductorUrl}${suffix}`);
   }
 
   const created = results.filter(r => r.result === 'created').length;
   const exists = results.filter(r => r.result === 'exists').length;
+  const embodied = results.filter(r => r.result === 'embodied').length;
   const conflict = results.filter(r => r.result === 'conflict').length;
   const skipped = results.filter(r => r.result === 'skipped').length;
   const failed = results.filter(r => r.result === 'failed').length + conflict;
-  const succeeded = created + exists;
+  const succeeded = created + exists + embodied;
 
   console.log('');
   console.log(
-    `=== Results: ${created} created, ${exists} existing, ${conflict} conflict, ${skipped} skipped, ${failed - conflict} failed ===`
+    `=== Results: ${created} created, ${exists} existing, ${embodied} embodied, ${conflict} conflict, ${skipped} skipped, ${failed - conflict} failed ===`
   );
 
   // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
@@ -821,7 +860,7 @@ async function main(): Promise<void> {
     schemaVersion: '1',
     seededAt: new Date().toISOString(),
     script: 'seed-conductor-identities',
-    counts: { created, exists, conflict, skipped, failed, succeeded, total: results.length },
+    counts: { created, exists, embodied, conflict, skipped, failed, succeeded, total: results.length },
     partial: succeeded > 0 && failed > 0,
     allSucceeded: failed === 0,
     allFailed: succeeded === 0 && failed > 0,
@@ -832,7 +871,15 @@ async function main(): Promise<void> {
       conductorUrl: r.conductorUrl,
       error: r.error ?? null,
       agentProfile: r.agentProfile ?? null,
+      embodiedHumanId: r.embodiedHumanId ?? null,
     })),
+    // Declared fixture-id → canonical-id mapping for this deployment: the id
+    // each person's own conductor embodies where it is not the fixture id.
+    embodiedAs: Object.fromEntries(
+      results
+        .filter(r => r.result === 'embodied' && r.embodiedHumanId)
+        .map(r => [r.humanId, r.embodiedHumanId as string]),
+    ),
   };
   try {
     writeFileSync(SEED_RESULTS_FILE, JSON.stringify(report, null, 2));

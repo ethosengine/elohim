@@ -1,3 +1,11 @@
+import { createNodeIdentityResolver } from '../node-identity.js';
+
+/** Every human's own conductor speaks as `key` (offline reader seam). */
+const stubNodeIdentity = (key: string) =>
+  createNodeIdentityResolver({
+    conductorUrls: 'matthew=ws://localhost:4445,jessica=ws://localhost:4455',
+    reader: async () => ({ agentPubKey: key, embodiedHumanId: null }),
+  });
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import {
   activateCustodyCommitments,
@@ -181,16 +189,14 @@ describe('resolvePeerId (Stage 2)', () => {
   });
 
   it('resolveCustodyPeerIds preserves role semantics in the agent-CID namespace', async () => {
-    const ids: Record<string, string> = {
-      'http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090/auth/me': 'uhCAkmatthewagentkey',
-      'http://elohim-jessica-alpha.elohim-alpha.svc.cluster.local:8090/auth/me': 'uhCAkjessicaagentkey',
+    const keys: Record<string, string> = {
+      'ws://elohim-matthew-alpha:4445': 'uhCAkmatthewagentkey',
+      'ws://elohim-jessica-alpha:4445': 'uhCAkjessicaagentkey',
     };
-    const fetchImpl = vi.fn(
-      async (url: string) =>
-        new Response(JSON.stringify({ agentPubKey: ids[url] }), {
-          status: 200,
-        }),
-    );
+    const nodeIdentity = createNodeIdentityResolver({
+      conductorUrls: 'ws://elohim-matthew-alpha:4445,ws://elohim-jessica-alpha:4445',
+      reader: async url => ({ agentPubKey: keys[url], embodiedHumanId: null }),
+    });
     const resolved = await resolveCustodyPeerIds(
       {
         providerHumanId: 'human-matthew-manager',
@@ -200,14 +206,17 @@ describe('resolvePeerId (Stage 2)', () => {
         blobHash: 'sha256-deadbeef',
         blobSizeBytes: 1,
       },
-      { fetchImpl },
+      { nodeIdentity },
     );
     expect(resolved.provider).toBe('uhCAkmatthewagentkey');
     expect(resolved.receiver).toBe('uhCAkjessicaagentkey');
   });
 
   it('refuses a transport peer ID rather than creating an unjoinable commitment', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ agentPubKey: REAL_ID }), { status: 200 }));
+    const nodeIdentity = createNodeIdentityResolver({
+      conductorUrls: 'matthew=ws://localhost:4445,jessica=ws://localhost:4455',
+      reader: async () => ({ agentPubKey: REAL_ID, embodiedHumanId: null }),
+    });
     await expect(
       resolveCustodyPeerIds(
         {
@@ -218,7 +227,7 @@ describe('resolvePeerId (Stage 2)', () => {
           blobHash: 'sha256-deadbeef',
           blobSizeBytes: 1,
         },
-        { fetchImpl },
+        { nodeIdentity },
       ),
     ).rejects.toThrow('Holochain agentPubKey');
   });
@@ -581,9 +590,9 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
   beforeEach(() => clearPeerIdCache());
   afterEach(() => vi.restoreAllMocks());
 
-  // Every /auth/me probe returns the same agent key → deterministic body ids
-  // computed offline; no live pods touched.
-  const peerFetch = () => vi.fn(async () => new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 }));
+  // Every human's own conductor speaks as the same agent key → deterministic
+  // body ids computed offline; no live conductor touched.
+  const peerFetch = () => vi.fn(async () => new Response('{}', { status: 200 }));
 
   it('already-active commitment: recognized via GET, NOT re-PATCHed', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -603,6 +612,7 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
 
     await activateCustodyCommitments(client, [pair], {
       fetchImpl: peerFetch(),
+      nodeIdentity: stubNodeIdentity('uhCAkmatthewagentkey'),
     });
 
     expect(getCommitment).toHaveBeenCalledWith(expectedId);
@@ -625,6 +635,7 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
 
     await activateCustodyCommitments(client, [pair], {
       fetchImpl: peerFetch(),
+      nodeIdentity: stubNodeIdentity('uhCAkmatthewagentkey'),
     });
 
     expect(patchCommitmentState).toHaveBeenCalledTimes(1);
@@ -642,6 +653,7 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
 
     await activateCustodyCommitments(client, [pair], {
       fetchImpl: peerFetch(),
+      nodeIdentity: stubNodeIdentity('uhCAkmatthewagentkey'),
     });
 
     expect(patchCommitmentState).not.toHaveBeenCalled();
@@ -676,11 +688,6 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
           { status: 200 },
         );
       }
-      if (url.endsWith('/auth/me')) {
-        return new Response(JSON.stringify({ agentPubKey: REAL }), {
-          status: 200,
-        });
-      }
       throw new Error(`unexpected fetch: ${url}`);
     });
 
@@ -703,7 +710,10 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
       patchCommitmentState,
     } as unknown as CommitmentClient;
 
-    await seedCustodyCommitments(client, [contentIdPair], { fetchImpl });
+    await seedCustodyCommitments(client, [contentIdPair], {
+      fetchImpl,
+      nodeIdentity: stubNodeIdentity(REAL),
+    });
 
     // Created with the explicitly selected SSR-server artifact address.
     expect(createCommitment).toHaveBeenCalledTimes(1);
@@ -731,9 +741,6 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
           { status: 200 },
         );
       }
-      if (url.endsWith('/auth/me')) {
-        return new Response(JSON.stringify({ agentPubKey: REAL }), { status: 200 });
-      }
       throw new Error(`unexpected fetch: ${url}`);
     });
 
@@ -753,7 +760,10 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
       patchCommitmentState,
     } as unknown as CommitmentClient;
 
-    const result = await seedCustodyCommitments(client, [contentIdPair], { fetchImpl });
+    const result = await seedCustodyCommitments(client, [contentIdPair], {
+      fetchImpl,
+      nodeIdentity: stubNodeIdentity(REAL),
+    });
 
     expect(createCommitment).not.toHaveBeenCalled();
     expect(result.created).toBe(0);

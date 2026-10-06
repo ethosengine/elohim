@@ -42,6 +42,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
 import { storageUrlForHuman, type Archetype, type ResolvePeerIdOptions } from './peer-id.js';
+import { resolveNodeIdentity, type NodeIdentityResolver } from './node-identity.js';
 
 // =============================================================================
 // Suspended-persona guard
@@ -202,36 +203,24 @@ export interface CustodyPeerIds {
 }
 
 /**
- * Resolve the Holochain agent CIDs for a custody pair from each human's
- * storage pod. shard_locations.peer_id is agent-CID keyed, so authoring a
- * transport peer ID here leaves an active commitment unjoinable by the
- * custody-facing fold. Unlike the older transport resolver, this has no
- * deterministic fallback: an unavailable local session is an honest seed
- * failure, not authority to mint a row in the wrong identity namespace.
+ * Resolve the Holochain agent CIDs for a custody pair from each human's OWN
+ * conductor (node-identity.ts — the steward app's agent key). shard_locations
+ * .peer_id is agent-CID keyed, so authoring a transport peer ID here leaves an
+ * active commitment unjoinable by the custody-facing fold. There is no
+ * deterministic fallback: an unresolvable human is an honest seed failure,
+ * not authority to mint a row in the wrong identity namespace.
  */
 export async function resolveCustodyPeerIds(
   pair: CustodyPair,
-  opts: ResolvePeerIdOptions = {},
+  opts: { nodeIdentity?: NodeIdentityResolver } = {},
 ): Promise<CustodyPeerIds> {
-  const fetchImpl = opts.fetchImpl ?? fetch;
-  const resolveAgentCid = async (humanId: string): Promise<string> => {
-    const storageUrl = opts.storageUrl ?? storageUrlForHuman(humanId);
-    const response = await fetchImpl(`${storageUrl.replace(/\/+$/, '')}/auth/me`, {
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
-    });
-    if (!response.ok) {
-      throw new Error(`${humanId}: /auth/me returned HTTP ${response.status}`);
-    }
-    const body = (await response.json()) as { agentPubKey?: unknown };
-    if (typeof body.agentPubKey !== 'string' || !body.agentPubKey.startsWith('uhCAk')) {
-      throw new Error(`${humanId}: /auth/me did not return a Holochain agentPubKey`);
-    }
-    return body.agentPubKey;
-  };
-
+  const agentKey = async (humanId: string): Promise<string> =>
+    opts.nodeIdentity
+      ? (await opts.nodeIdentity.resolve(humanId)).agentPubKey
+      : (await resolveNodeIdentity(humanId)).agentPubKey;
   return {
-    provider: await resolveAgentCid(pair.providerHumanId),
-    receiver: await resolveAgentCid(pair.receiverHumanId),
+    provider: await agentKey(pair.providerHumanId),
+    receiver: await agentKey(pair.receiverHumanId),
   };
 }
 
@@ -590,6 +579,8 @@ export type CommitmentClientResolver = (pair: CustodyPair) => CommitmentClient;
  */
 export type CustodySeedOptions = ResolvePeerIdOptions & {
   clientForPair?: CommitmentClientResolver;
+  /** Node-identity seam (agent keys from each human's own conductor). */
+  nodeIdentity?: NodeIdentityResolver;
 };
 
 /** One `CommitmentClient` per resolved storage URL, cached for the run — the
@@ -619,7 +610,7 @@ export function clearProviderClientCache(): void {
  * this directly — the doorway manifest declares auth_required() and doorway
  * rejects unauthenticated requests before they reach storage") — storage
  * itself never checks it, the same unauthenticated posture `peer-id.ts`
- * already relies on for `/auth/me` and `/p2p/status` against these same
+ * already relies on for `/p2p/status` against these same
  * peers.
  */
 export function providerCommitmentClientResolver(

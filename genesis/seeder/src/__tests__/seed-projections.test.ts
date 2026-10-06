@@ -9,13 +9,16 @@ import {
   specToMetadata,
   findActiveRowForSpec,
   seedProjections,
+  isDoubleRootRefusal,
   PROJECTION_RELEVANT_FIELDS,
   withHostnames,
   candidateChannelSpec,
   type ProjectionSpec,
   type ProjectionRelevantMetadata,
   type EprProjectionViewLite,
+  groupSpecsByAuthor,
 } from '../seed-projections.js';
+
 
 /** Build a `Response`-like stub for the fake client. */
 function fakeResponse(status: number, body: unknown): Response {
@@ -290,6 +293,30 @@ describe('seedProjections — 409 drift vs idempotent handling', () => {
     expect(fetchProjections).toHaveBeenCalledTimes(1);
   });
 
+  it('a double-rooted id (zome 503) with an identical active row is an existing grant', async () => {
+    // elohim-genesis #1625: the re-post answers 503 "multiple root Creates for ID"
+    // while the row one of those Creates projected is in force. Not a failure,
+    // and never a second create.
+    const existingRow: EprProjectionViewLite = {
+      commitmentId: baseProjectionId(lamadSpec),
+      eprId: lamadSpec.eprId,
+      doorwayId: `doorway:${lamadSpec.doorwayId}`,
+      ...specToMetadata(lamadSpec),
+    };
+    const refusal =
+      '{"error":"content_store::commitment_observation:21: Guest(\\"commitment observation unavailable: multiple root Creates for ID\\")"}';
+    expect(isDoubleRootRefusal(refusal)).toBe(true);
+    expect(isDoubleRootRefusal('{"status":"catching-up"}')).toBe(false);
+    const createCommitment = vi.fn(async () => fakeResponse(503, refusal));
+    const fetchProjections = vi.fn(async () => [existingRow]);
+    const client = { createCommitment, fetchProjections } as never;
+
+    await seedProjections(client, [lamadSpec]);
+
+    expect(createCommitment).toHaveBeenCalledTimes(1);
+    expect(fetchProjections).toHaveBeenCalledTimes(1);
+  });
+
   it('drift 409 triggers a supersede POST with supersedes + suffixed id', async () => {
     // Existing active row is the live-alpha GRANT-LESS predecessor.
     const grantlessRow: EprProjectionViewLite = {
@@ -458,5 +485,35 @@ describe('candidateChannelSpec — a candidate standing beside a converged contr
     expect(lamadSpec.channel).toBe('converged');
     expect(lamadSpec.hostnames).toEqual([]);
     expect(lamadSpec.scopeHost).toBeUndefined();
+  });
+});
+
+describe('project-epr authoring route + id generation (double-root cure)', () => {
+  it('routes every spec to its steward\'s own peer, never the doorway name', () => {
+    const specs = defaultProjectionSeeds();
+    const groups = groupSpecsByAuthor(specs, (h) => `http://${h}.storage:8090`);
+    expect([...groups.keys()]).toEqual(['http://human-matthew-manager.storage:8090']);
+    expect(groups.get('http://human-matthew-manager.storage:8090')).toHaveLength(specs.length);
+  });
+
+  it('pins the default ids — an undeclared idGeneration moves no id', () => {
+    const ids = defaultProjectionSeeds().map((s) => baseProjectionId(s));
+    expect(ids).toEqual([
+      'project-epr-98f0d59051751497',
+      'project-epr-70dc4203e6611fb3',
+      'project-epr-b8a51b1a1d8734c1',
+      'project-epr-1001e8243987d40c',
+      'project-epr-1015ecd12b83da8a',
+      'project-epr-fe5368de4495a5fc',
+    ]);
+  });
+
+  it('a declared idGeneration re-mints only that row under a fresh id', () => {
+    const [landing] = defaultProjectionSeeds();
+    const regen = baseProjectionId({ ...landing, idGeneration: 2 });
+    expect(regen).not.toBe('project-epr-98f0d59051751497');
+    expect(regen).toMatch(/^project-epr-[0-9a-f]{16}$/);
+    // generation 1 is the original id (no suffix in the digest)
+    expect(baseProjectionId({ ...landing, idGeneration: 1 })).toBe('project-epr-98f0d59051751497');
   });
 });

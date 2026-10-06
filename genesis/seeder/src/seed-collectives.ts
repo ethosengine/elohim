@@ -23,6 +23,7 @@ import type { CreateCollectiveInputView, JsonValue } from '@elohim/storage-clien
 
 import { validateCollectivesFile, validateReferentialIntegrity } from './validate-collectives.js';
 
+import { sendRetryingShed } from './doorway-client.js';
 // =============================================================================
 // Types
 // =============================================================================
@@ -205,11 +206,11 @@ async function main(): Promise<void> {
   for (const coll of sorted) {
     const inputView = toInputView(coll);
     try {
-      const res = await fetch(`${doorwayUrl}/db/collectives`, {
+      const res = await sendRetryingShed(() => fetch(`${doorwayUrl}/db/collectives`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(inputView),
-      });
+      }), 'POST /db/collectives');
 
       if (res.ok) {
         console.log(`  [+] ${coll.id.padEnd(35)} ${coll.governanceLayer.padEnd(12)} ${coll.name}`);

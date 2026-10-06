@@ -7,7 +7,7 @@ title: "Genesis seeders learn a node's agent key from `/auth/me`, which no longe
 slug: "genesis-seeders-read-node-agent-key-from-closed-auth-me"
 written: "2026-10-06"
 author: "claude-opus-5-5 (overnight shift on the device-consent landing, 2026-10-06)"
-status: "backlog"
+status: "wip"
 priority: "high"
 ci_status: "blocked"
 tags: [genesis, seeder, identity, auth-me, custody, device-consent, regression]
@@ -52,22 +52,38 @@ was closed. Call sites: `seed-commitments.ts` `resolveCustodyPeerIds`, `seed-pro
 `seed-delegates-compute.ts`. Only the custody stage is proven red by a build; the others share the
 call and were already UNSTABLE for other reasons before the landing, so their part is not separated.
 
-## The design question (operator's)
+## Decision (2026-10-06, option D)
 
-How does a CI seeder, on another machine, learn which agent a household node speaks as?
+A seeder learns which agent a node speaks as from that node's own conductor, never from a session
+route. Which agent a node speaks as is a fact about the node's own cell, and the conductor is where
+that fact lives. `/auth/me` answers a different question (which person is signed in here); the
+seeders were reading the first question through the second.
 
-| Option | What changes | New exposure | Cost |
-|---|---|---|---|
-| A. `/p2p/status` also carries the node's own `agentPubKey` | storage view + schema + codegen; seeders read it there | agent key beside the peer id on a public route — the pair an `AgentPeerBinding` already notarizes; no person name, no human id | one edge roll; `humanId` readers need another source |
-| B. The seeder presents a credential the node accepts for this read | storage authorizes an operator key on `/auth/me`; CI passes it | none public; a new authority on a hardened route | one edge roll; a secret in more CI steps |
-| C. The seeder signs in to each node as its person | seeders only | none | a per-node secret in CI for every household human; no edge roll |
-| D. The seeder reads the key from the conductor it already reaches | seeders only (`CONDUCTOR_URLS`, as `seed-conductor-identities.ts` does) | none | depends on CI reaching each conductor's app interface |
+One shared resolver, `genesis/seeder/src/node-identity.ts` (`createNodeIdentityResolver`,
+`resolveNodeIdentity(humanId) -> { agentPubKey, embodiedHumanId | null }`), connects to the human's
+own conductor (a `name=url` CONDUCTOR_URLS entry or the `elohim-<name>-<env>` host; a human with no
+such entry resolves to nothing, never the first conductor that answers), reads the steward app's
+`agent_pub_key` from AppInfo and the Human the cell embodies (`get_my_human`), caches per run,
+closes its sockets, times out each connect, and fails naming the human and the conductor URL. All
+six `/auth/me` reads now go through it (seed-commitments, seed-provide-rows,
+seed-household-formation, seed-household-costeward x2, seed-drill-fixtures,
+seed-delegates-compute). There is no fallback to `/auth/me`. The genesis Jenkinsfile exports
+CONDUCTOR_URLS (from `getConductorAppUrls()`) to the custody and provide-rows legs; household
+formation already ran under the probe-then-seed helper, which exports it.
 
-Recommendation: A for `agentPubKey`, with the five `humanId` reads replaced by the fixture's own
-declared human id (the seeder already knows whom it is seeding for; the read was a cross-check).
-A publishes nothing the DHT does not already hold and adds no authority to a hardened route. It
-was not applied by the shift: it adds to the identity surface the operator ruled on, and every
-storage-side option rolls the fleet again.
+Honest cost: this leans on CI's reach to conductor admin and app sockets, which the genesis
+Jenkinsfile already names as bootstrap debt. It adds a reader of that reach, not a new authority.
+
+Rejected:
+
+- **A. Publish `agentPubKey` beside the peer id on `/p2p/status`.** It would hand any outside
+  observer a join between two identity namespaces that today is notarized only inside the network
+  (`AgentPeerBinding`), it needs a fleet roll, and it adds surface to fix a consumer that was
+  asking the wrong place.
+- **B. An operator credential storage accepts on `/auth/me`.** A new authority on a route that was
+  just hardened, plus an edge roll.
+- **C. The seeder signs in to each node as its person.** A per-node secret in CI for every
+  household human: CI would become a device that speaks for each person with no enrollment.
 
 ## Not the cure
 

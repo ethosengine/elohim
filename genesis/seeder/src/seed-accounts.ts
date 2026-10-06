@@ -34,6 +34,7 @@ import type { AccountImportResultView, AccountPackageInputView } from '@elohim/s
 import type { DeploymentRegistry } from './deployment-registry.js';
 import { loadDeploymentRegistry, parseDeployedHumansArg } from './deployment-registry.js';
 
+import { sendRetryingShed } from './doorway-client.js';
 // =============================================================================
 // Package loading
 // =============================================================================
@@ -152,11 +153,11 @@ export function resolveTargetUrl(pkg: AccountPackageInputView, targetPeers: stri
 
 async function importAgainst(targetUrl: string, pkg: AccountPackageInputView): Promise<{ ok: true; result: AccountImportResultView } | { ok: false; error: string }> {
   try {
-    const res = await fetch(`${targetUrl}/account/import`, {
+    const res = await sendRetryingShed(() => fetch(`${targetUrl}/account/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pkg),
-    });
+    }), 'POST /account/import');
     if (!res.ok) {
       const errorText = await res.text();
       return { ok: false, error: `HTTP ${res.status}: ${errorText}` };
