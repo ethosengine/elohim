@@ -114,6 +114,16 @@ over TLS it must be. A bound session must present a valid proof from its key on 
 makes the node sign and on sign-out. What a stolen bound cookie can still do is read
 (`/auth/me`, standing, the pending list): device-recognition row 9.
 
+## Worse than recorded (2026-10-06): loopback is the person, with no session
+
+The adversarial review found that "this machine" meant any TCP peer on loopback. Closed now: every
+identity route answers only under this node's names (`ELOHIM_ALLOWED_HOSTS` adds more), so a page
+that rebinds its name to 127.0.0.1 reaches none of them; Origin must equal Host exactly; a
+forwarded or trusted-proxy request is not local. Kept, by operator ruling (keep the bar low for
+now): anything that reaches loopback under a loopback name, a local process above all, still acts
+as the person with no session. The install-token dial that would close it, with its steps and
+cost: [arch-device-recognition-backlog](epr:arch-device-recognition-backlog) row 19, dial 1.
+
 ## Must-have before floor readiness: no secret or cookie in the clear
 
 **Required, not optional hardening.** A sign-in secret and a session cookie must not cross a

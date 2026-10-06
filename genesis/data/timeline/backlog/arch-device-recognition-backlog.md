@@ -55,20 +55,25 @@ state`.
 
 | # | Missing node | Current state |
 |---|---|---|
-| 1 | A remote session that proves the person | Built: sign-in to the node's own person; must-have before floor readiness: no secret in the clear |
+| 1 | A remote session that proves the person | Built: sign-in to the node's own person; must-have before floor readiness: no secret in the clear. **Worse than recorded** (review 2026-10-06): anything on loopback is the person with no session; a dial (row 19, dial 1) |
 | 2 | A declared pair of nodes completes the ceremony with nobody carrying anything (carriers: private-network discovery, a doorway's relay/signal) | Carrier 1 built; carrier 2 not |
 | 3 | A device's root key is bound to the person | Recorded in the consent only |
 | 4 | A revoked device re-enrolls | `supersedes` always None |
 | 5 | A declared approvals count above one is enforced | Superseded by row 12: a policy above one counts distinct devices that speak and is verified; no write sets such a policy yet |
 | 6 | Who is on the node's own machine when it is asked to sign | Reframed: a signed-in device acts with the person's authority; a witness may pause for re-authentication. Row 1's sign-in is built |
 | 7 | A node with an identity of its own knows whose device it is, without its own work being re-attributed | Enrolled but not registered |
-| 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed |
-| 9 | A sign-in session bound to a key the browser holds | Built (RFC 9449 DPoP, adapted): signing routes and sign-out need the key's proof; reads do not yet |
+| 8 | The first carrier's remaining gaps | Built on libp2p mDNS; gaps listed. **Worse than recorded** (review 2026-10-06): a rogue node could hand back its own code and hijack an ask; fixed (rows 17, 18), reconnaissance a dial (row 19) |
+| 9 | A sign-in session bound to a key the browser holds | Built (RFC 9449 DPoP, adapted): signing routes and sign-out need the key's proof; reads do not yet. **Worse than recorded** (review 2026-10-06): loopback skips the key's proof altogether; jti in memory (row 19, dials 1 and 10) |
 | 10 | A second device of the person as a human witness ("is this you?") | Recorded; nothing designed |
 | 11 | A node serves its own native portal | Not built: the browser run served it from a front at the same origin |
-| 12 | Every device of a person speaks for them, and any may approve the next | Built (coordinator only, DNA hash unchanged); affirmation automatic; sweettest and live run |
-| 13 | Who may withdraw a device's voice | Open question: root controllers only, as before |
+| 12 | Every device of a person speaks for them, and any may approve the next | Built (coordinator only, DNA hash unchanged); affirmation automatic; sweettest and live run. **Worse than recorded** (review 2026-10-06): a revoked record came back by rewrap; fixed (row 16) |
+| 13 | Who may withdraw a device's voice | Open question: root controllers only, as before. **Worse than recorded** (review 2026-10-06): affirmation must never be the anchor; bounds turn approvals into liabilities (row 19, dials 5 and 7) |
 | 14 | A device of the person contests another's joining ("I saw it; I do not affirm it") | Missing node: no contest exists |
+| 15 | The identity routes answer only under this node's names; a proxied loopback request is not local | Fixed 2026-10-06 (the cheap part of critical 2; the rest is a dial) |
+| 16 | A revoked joining record cannot come back by being republished | Fixed 2026-10-06 |
+| 17 | A rogue node on the private network cannot hand back a code in another's name | Fixed 2026-10-06 (signing; the confirmation prompt is a dial) |
+| 18 | No one lists or replaces an ask in a device's name | Fixed 2026-10-06 |
+| 19 | Dialing up: the bars kept low for now | Recorded: each with its attack, fix and cost to the person |
 
 ## Row 1 — a remote session that proves the person
 
@@ -385,8 +390,9 @@ and is never acted on by itself.
   verifying at the current read too; that is not sound on the evidence the zome holds, because a
   joining record's time is chosen by its author, so a stolen and revoked key could approve a new
   device with a backdated record. The sound anchor, not built: an affirmation, made before the
-  revocation, by a device whose own way back does not pass through the revoked one. Row 13 holds
-  the who.
+  revocation, by a device whose own way back does not pass through the revoked one, and never an
+  automatic one (row 19). Row 13 holds the who. Since the review (row 16), revocation withdraws
+  the device for the identity, found from `(identity_root, device_key)`, not one record's bytes.
 - **Affirmation (automatic).** Each speaking node, a minute after start and then every 30
   minutes, reads its standing and `identity_devices` and affirms at most 4 devices it did not
   approve, has not affirmed, and is not, oldest first (`services::device_affirmation`); a node
@@ -448,6 +454,189 @@ and is never acted on by itself.
 - **Probe:** device D contests C's joining; `identity_devices` shows C with D's contest and C's
   own standing names it.
 - **Current state:** nothing; affirmations only.
+
+## Adversarial review 2026-10-06 — what is fixed
+
+A read for attackers (reviewer's report; coordinator's brief, then the operator's ruling: keep the
+bar low for now, fix what costs the person nothing and closes a true bug, record the rest as
+dials). Each fix names the test that reproduces the attack.
+
+## Row 15 — the identity routes answer only under this node's names (critical 2, the cheap part)
+
+- **Attack (reviewer):** DNS rebinding to 127.0.0.1, any localhost page with XSS, any process in
+  the pod, any reverse proxy on the machine: `caller_is_local` was the TCP peer IP alone,
+  `foreign_origin_refusal` accepted `Origin == Host` with no Host validation and any localhost
+  port, and `ELOHIM_TRUSTED_PROXIES` was consulted for TLS only, never for locality.
+- **Fix:** every identity, consent, device, sign-in and session route answers only under
+  `localhost`, `127.0.0.1`, `[::1]` or a name in `ELOHIM_ALLOWED_HOSTS` (`421
+  host_not_this_node`; `GET /auth/me` is left out: the doorway proxies it under its upstream name,
+  and it only reads). Origin must equal Host exactly: another port on this machine is another
+  origin. A loopback peer carrying `Forwarded`/`X-Forwarded-*`/`X-Real-Ip`, or listed as a trusted
+  proxy, is not local (`consent_grant::network_local`), for signing and for the sign-in channel.
+- **What it closes:** a rebound name reaches no identity route; a page on another localhost port
+  cannot agree or read standing; a proxy on the machine no longer makes its clients local.
+- **Left open, by ruling:** a process or page that reaches loopback directly under a loopback name
+  still acts as the person with no session (dial 1).
+- **Tests:** `identity_routes_answer_only_this_nodes_names`,
+  `only_a_loopback_connection_counts_as_this_machine` (each forwarding header),
+  `a_forwarded_or_proxied_loopback_request_is_not_local`, `only_this_nodes_names_are_hosts_it_
+  answers`, `a_page_on_another_site_cannot_read_the_standing_either` and `only_this_nodes_own_
+  portal_may_ask_it_to_sign` (`http://localhost:4200` refused), the `channel` cases for a proxy on
+  loopback. A dev portal on another localhost port is now served through a same-origin front.
+
+## Row 16 — a revoked joining record cannot come back by being republished (critical 1)
+
+- **Attack (reviewer):** root R approves D, record B (controllers=[R], approved_via=[]); R revokes
+  B; anyone builds B′ = B with approved_via=[{agent X, binding Y}] and publishes it; the signatures
+  pass (the intent is unchanged), classify_approvers passes (R is a root, so the junk entry is
+  never read), and the revocation lookup read lifecycle(hash_entry(&entry)): B′ has a new entry
+  hash and no links, so B′ stood, register_device_identity(B′) re-resolved D, and E approved by
+  revoked D came back as E′ via B′.
+- **Fix (coordinator only, DNA hash unchanged):** revocations are found on an anchor per device of
+  an identity, from `(identity_root, device_key)`, the two signed facts every joining record of the
+  device carries (and on the entry, for revocations made before). Keyed on the device rather than
+  the intent's bytes because revoking a device withdraws its voice: an intent anchor would let a
+  second joining record of the same key keep speaking and its approvals return. `device_revoked`
+  compares the revoked target's identity and device, never bytes; `approved_via` must name exactly
+  the device approvers, in proof order; a record stands only if its native author is its device;
+  `enroll_identity_device` refuses a caller that is not the device and a device already revoked
+  (re-enrolment waits for `supersedes`, row 4).
+- **Tests:** sweettest rewrap stage: (a) B with a junk approver record refused at enroll and,
+  published around the zome, not standing; (b) a new root-approved record of revoked B's key
+  refused; (c) C, approved by revoked B, rewrapped to name the rewrapped B, refused; (d) a copy of T
+  published by another chain not standing. Against the pre-fix coordinator it failed at (a): "a
+  revoked device cannot rejoin by a rewrapped record" (`genesis/local-dev/device-consent/
+  sweettest-fix1-before.log`). Unit: one root proof with a junk via refused.
+
+## Row 17 — a rogue node cannot hand back a code in another's name (high 3, the signing part)
+
+- **Attack (reviewer):** the attacker answers Listed{approver: any key}; note_listed recorded it;
+  the attacker sends Code; on_code checked only that the source listed the ask and discarded the
+  approver; the last code won; the CLI redeemed at the attacker; check_delivered never checked whose
+  key signed nor approverKey; finish enrolled; the device resolved to the attacker's Human.
+- **Fix:** Listed, Code and Declined are taken only with a proof by the claimed key over (kind,
+  the sender's transport id, and for Code and Declined the request's state); the key must be the
+  one that listed and equal a declared `approverKey`; `check_delivered` takes the expected approver
+  (declared, or proven with the code) and requires it among the consent's and enrollment's signers
+  (`delivered_not_the_expected_approver`); `/auth/device/enroll` checks against the carrier's
+  proven approver. The asking terminal prints the approving node's and the identity's
+  fingerprints before it enrolls. Signing: coordinator extern `sign_carrier_statement` under the
+  `elohim:device-carrier:v1:` domain, one mandate grant per signature.
+- **Deviation:** the Listed proof names the transport id but not the ask's state: Listed is answered
+  inside the transport's event loop, where a zome call per ask would stall it, so it is signed once
+  per key and transport id. Code and Declined are state-bound.
+- **Left open, by ruling:** with no approver declared, a proven rogue that is a person of its own
+  can still approve and the device enrolls into that identity after printing it (dial 2).
+- **Tests:** `a_rogue_node_on_the_network_cannot_capture_the_asking_device`,
+  `a_proof_holds_only_for_its_own_signer_kind_state_and_transport`,
+  `each_way_a_delivery_can_be_wrong_is_refused_by_name` (a consent by another key refused).
+
+## Row 18 — no one lists or replaces an ask in a device's name (high 4)
+
+- **Attack (reviewer):** the attacker sends an Ask with the victim's device key and its own
+  challenge, state, acts and device_root_key; PendingAsks::admit replaced by device key alone and
+  moved the source; the attacker redeemed: not enrolling its own key, but denying the real device
+  and able to swap in its own device.bind-root key.
+- **Fix:** an ask carries the device key's proof over (ask, state, the device's transport id, the
+  PKCE challenge), signed by the device's node when it starts announcing; unsigned or sent from
+  elsewhere it is dropped (`ask_unsigned`); it is replaced only from the source it was listed from
+  (`ask_listed_from_elsewhere`). The test that asserted the cross-source replacement now asserts
+  the same-source one.
+- **Test:** `no_one_lists_or_replaces_an_ask_in_a_devices_name`.
+
+## Also fixed: discovery floods and authorship (medium 7, half of medium 8)
+
+- **Attack (reviewer):** discovery() did not filter link authors: 64 device| or 32 affirmed| links
+  from anyone hid the real ones, each costing a walk; binding_stands never checked native author
+  == device key.
+- **Fix:** device| links are followed only when their author is the device the record joins,
+  affirmed| only from a speaker, each capped per author; a record stands only if its device
+  published it.
+- **Test:** sweettest flood stage (65 device| and 33 affirmed| links from a non-speaker; a device
+  joining after them is listed and a real affirmation counts); pre-fix it failed: "a device that
+  joins after a link flood is still listed" (`sweettest-fix5-before.log`); the copy-by-another-
+  chain case in row 16.
+
+## Row 19 — Dialing up: the bars kept low for now
+
+Each dial: the reviewer's attack, the fix that would close it, and what it would cost the person.
+
+1. **Loopback is the person, with no session** (rows 1 and 9, worse than recorded).
+   - *Attack:* any process on the machine, a page on another app's localhost origin that a person
+     visits (once it can name a loopback host: DNS rebinding is now refused by the Host gate), or
+     an XSS in anything served on loopback sends JSON to `/auth/identity/secret`,
+     `/auth/consent/agree` or `/auth/consent/pending/decide` with no Origin (a non-browser
+     process) and is the person: `signing_caller` returns early for local callers and
+     `person_signed_in` falls back to the single active session. Rebinding steps (reviewer):
+     attacker.example resolves to the attacker, then to 127.0.0.1; the page fetches
+     `http://attacker.example:8191/auth/identity/secret` with a new secret; before row 15 the node
+     took it, and `GET /auth/device/announce` handed back `code#state`.
+   - *Fix:* a per-install token (random, in a user-only file in the node's data dir, read by `epr`
+     and the shell, sent in a header) or a signed-in session for every this-machine act, even on
+     loopback; begin on a node with no identity the one exception; `/auth/identity/secret` and
+     agree never without a session.
+   - *Cost:* nothing visible on the CLI; the Tauri shell and its webview must read and send the
+     token; a browser that begins an identity must then sign in before it approves.
+2. **No confirmation before enrolling** (row 17).
+   - *Attack:* with no approver declared, a node of another person on the same network that is
+     faster to approve hands back a proven code; the device enrolls into that identity, having
+     printed it.
+   - *Fix:* ask the person to confirm the approver and identity shown before
+     `/auth/device/enroll` (`--yes` for scripts).
+   - *Cost:* one more answer at every undeclared join.
+3. **Historical reads take the moment they are given** (the other half of medium 8).
+   - *Attack:* `verify_historical_device_binding` takes a caller-chosen `witnessed_at`;
+     identity_devices keeps the earliest-linked copy, so `joined_at` is forgeable within the
+     device's chain; Mode::At's "joining postdates the witnessed moment" uses the native time alone.
+   - *Fix:* use `max(native time, intent.issued_at)` and either keep the read off public paths or
+     say in its docs that it is evidence only.
+   - *Cost:* none; deferred to keep historical semantics unchanged in this slice.
+4. **Signing oracles on the person's key** (high 5).
+   - *Attack (reviewer):* `imagodei::sign_for_agent` signs arbitrary bytes for any chain-author
+     caller (sign_for_agent.rs:143); the enrollment message is plain JSON (device_enrollment.rs);
+     `mishpat::create_lineage_commitment` signs an arbitrary `signing_payload_cid`
+     (commitments.rs:373). All three use the agent key the device ceremonies sign with, so a caller
+     that may call either can sign an enrollment intent or approval as the person.
+   - *Fix:* domain-prefix what they sign and refuse input that parses as an intent, revocation,
+     consent, authority or carrier statement; coordinator-only for the refusal half (the prefix
+     half moves sign_for_agent's verifiers in storage and the seeder, and lineage signatures are
+     checked by integrity validation, so it would move the DNA hash).
+   - *Cost:* none to the person; a coordinator change in two DNAs.
+5. **Automatic affirmation reads as evidence** (row 13).
+   - *Attack (reviewer):* device_affirmation affirms every standing device not approved by this
+     node, up to 4 per pass every 30 minutes; a thief's devices read "affirmed by N" within
+     minutes; building row 12's sound anchor on it would make stolen approvals survive revocation.
+   - *Fix:* never use automatic affirmation as that anchor; mark affirmations automatic in the
+     record and the words.
+   - *Cost:* none; it stays as built and counts as it does.
+6. **A policy above one counts keys, not root lineages** (medium 9).
+   - *Attack:* classify_approvers counts distinct device keys toward recovery-quorum m and
+     steward-set, so one root's descendants can meet a quorum meant to need two roots.
+   - *Fix:* resolve each approver's way back to its root and count roots.
+   - *Cost:* a person with one root can never meet a policy above one by devices alone.
+7. **Bounds that refuse honest growth; approvals that become liabilities.**
+   - *Attack:* the depth bound (8) refuses a 10th sequential device; check_approvals checks every
+     approver, so an extra approval by a later-revoked device makes the whole record stop
+     verifying.
+   - *Fix:* stand when enough approvals stand; bound by root distance.
+   - *Cost:* none; a wider walk.
+8. **Carrier reconnaissance and the per-source cap.**
+   - *Attack:* asks broadcast label and key to 16 peers every 5 s; Listed reveals the approver key;
+     new PeerIds defeat the per-source cap and fill MAX_PENDING.
+   - *Fix:* send a declared approver's ask to it alone; cap per proven device key (now possible,
+     row 18).
+   - *Cost:* an undeclared ask still has to be heard by someone.
+9. **Remote sign-in lockout.**
+   - *Attack:* the account limiter (FREE_FAILURES_PER_ACCOUNT=10, 15 min, signin.rs:176) lets
+     anyone who can reach the node lock its person out remotely.
+   - *Fix:* do not count this machine's sign-ins against the account; slow remote sources only.
+   - *Cost:* none.
+10. **DPoP jti in memory; htu by path only** (row 9).
+    - *Attack:* a restart forgets the replay set, so a captured proof replays within its ±60 s
+      window after a restart; htu is compared by path only.
+    - *Fix:* persist the jti set for its window; compare the full htu when the node knows its own
+      origin.
+    - *Cost:* none.
 
 ## shift_objective
 
