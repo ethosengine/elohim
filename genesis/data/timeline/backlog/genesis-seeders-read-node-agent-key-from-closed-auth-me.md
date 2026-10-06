@@ -126,3 +126,12 @@ cell embodies, which storage does not publish. Not changed today: the resolver w
 7 of 7. Follow-up, small: `node-identity.ts` reads `dhtParticipation.agentKeys` from the person's
 own storage first and opens a conductor connection only when a caller asks for the embodied Human.
 
+
+## DELTA 2026-10-06 (third; elohim-genesis #1628) — the probe is met
+
+`Seed Custody Commitments`: `0 created, 7 already-exists, 0 skipped (7 total)`.
+`propagation.custody-manifest` and `propagation.custody-convergence` both pass in the same build
+(`visible on every pod (manifest converged by 0s)`). The build has two unstable stages left, neither
+from the seeders' identity source: Seed Substrate (adam's conductor refusing or locked; the
+household-steward mismatch of device-recognition row 22) and E2E Verification. The storage-health
+follow-up above still stands as the better source.
