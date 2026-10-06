@@ -2,11 +2,11 @@
 
 Runtime composition primitive for the Elohim Protocol's **hub layer**: the cluster of machines in one home or one collective that stewards its people's compute, federates with peer hubs, and takes on the aggregate-scale concerns that hyperscalers usually centralize. In plain terms: the code that turns several crates into one running service for a home or a collective.
 
-**This README is a placement guide and an architectural orientation for a crate that has no code yet.** It says where concerns belong; where the code differs, the code is expected to move. If you came here to decide where a piece of code goes, read "The web seam" as far as the heading "Rules of the seam" and stop there. It assumes you know what Holochain's DHT and conductor, libp2p and iroh are. The placement test routes between three crates: `doorway-service` (`doorway/doorway-service/`, the gateway that serves browsers and other web2 clients), `elohim-storage` (`elohim/elohim-storage/`, a peer's storage and sync service) and `elohim-hub` (this directory). `elohim-node` (`steward/node/`) is the process that links storage and the hub on a peer.
+**This README is a placement guide and an architectural orientation for a crate that has no code yet.** It says where concerns belong; where the code differs, the code is expected to move. If you came here to decide where a piece of code goes, read "The web seam" as far as the heading "Rules of the seam" and stop there. It assumes you know Holochain (its DHT is the shared, validated record; its conductor is the process that runs a device's Holochain apps) and libp2p and iroh, the two peer-to-peer transports storage uses. On all of them a peer is addressed by its public key and proves it holds that key, which is what "address and verify a peer by key" means below. The placement test routes between three crates: `doorway-service` (`doorway/doorway-service/`, the gateway that serves browsers and other web2 clients), `elohim-storage` (`elohim/elohim-storage/`, a peer's storage and sync service) and `elohim-hub` (this directory). `elohim-node` (`steward/node/`) is the process that links storage and the hub on a peer.
 
 > **Status:** no code yet. This directory holds only this README; it reserves the name. The hub trait is sketched in `genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md`, and that document's section "Doorway / hub edge" is the live statement of the doorway/hub split. Hub cluster code lives in the `elohim-node` crate (`steward/node/`) until a second consumer (operator UI, fixtures crate) needs the trait independently. The web-level hub work that already exists is still in `elohim-storage` and `doorway-service`; the next section lists it as debt.
 
-Architecture documents named below by a dated filename live in `genesis/docs/content/elohim-protocol/architecture/`. Every other document is named by its full path. `genesis/` is the monorepo's root for documentation, stories and deployment data. In this README `elohim-hub` in code font is the crate, and "a hub" is the box or cluster that runs it.
+Architecture documents named below by a dated filename live in `genesis/docs/content/elohim-protocol/architecture/`. Every other document is named by its full path. `genesis/` is the monorepo's root for documentation, stories and deployment data. In this README `elohim-hub` in code font is the crate, "a hub" is the box or cluster that runs it, and "the shell" is the person's own desktop app (the Tauri app in `steward/device/`).
 
 ## The web seam (decided 2026-10-06)
 
@@ -53,7 +53,7 @@ They are the target; the debt table below lists where today's code falls short o
 
 ### Debt against this seam
 
-The rules above say where things belong. This table lists what the code has not caught up with, from a first reading of module headers. Each row is work to move or change, not a description of how things should stay.
+The rules above say where things belong. This table lists what the code has not caught up with, from a first reading of module headers. Each row is work to move or change, not a description of how things should stay. The table is for whoever moves a module; placing new code does not need it.
 
 | Where it is now | What it is | Where it belongs |
 |---|---|---|
@@ -75,7 +75,7 @@ The rules above say where things belong. This table lists what the code has not 
 
 Not debt: `doorway-service/src/render/warm_shell.rs` and `src/routes/apps.rs` are edge caches and belong in the doorway.
 
-### Decided 2026-10-06: `elohim-node` is the node process on every device
+### `elohim-node` is the node process on every device (decided 2026-10-06)
 
 One composition root links `elohim-storage`, `elohim-hub` and the agent crates, and every peer-capable device runs it. Three reasons:
 
@@ -140,7 +140,7 @@ The cluster sized to one family in one dwelling: a known set of people who live 
 
 **Attitude: co-presence.** The people and their elohim-operator are both present in the fabric. The fabric is visible, family members can intervene, and the operator helps alongside them without owning it. This is the protocol's claim that the intelligence revolution can "scale a system *to* human complexity rather than *away from* it" (`genesis/docs/content/elohim-protocol/manifesto.md`) at its most direct.
 
-`HouseholdHub` is "a retired synonym for `DwellingHub`" (`2026-05-02-elohim-hub-boundaries-design.md`). Rust code has no hub type yet; the only trace is a payload field, `provider_dwelling_hub_id`. The retired name survives in two older specs, one acceptance-scenario feature file under `genesis/a2o/` and one memory entry, and means the same thing.
+`HouseholdHub` is "a retired synonym for `DwellingHub`" (`2026-05-02-elohim-hub-boundaries-design.md`). Rust code has no hub type yet; the only trace is a payload field, `provider_dwelling_hub_id`. The retired name can still appear in generated reports and build output until they are next regenerated, and means the same thing.
 
 ### CollectiveHub
 

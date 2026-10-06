@@ -9,7 +9,7 @@ cites:
   - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
   - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
-  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "tiered-quilt-stewardship-design | the quilt-plane canon this atlas routes durable multi-site custody concerns to: temperature classes, custody-quilt commitments and the planned tier controller | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - "hardware-spec | Elohim Protocol Hardware Ecosystem: Technical Specification | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "dna-upgrade-governance | DNA Upgrade Governance | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
   - "wave3-valueflows-hrea-interop-design | Wave 3 | sha256:c8d903ad73f0284d | path: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md"

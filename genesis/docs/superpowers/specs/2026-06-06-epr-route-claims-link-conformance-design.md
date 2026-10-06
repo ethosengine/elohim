@@ -17,7 +17,7 @@ cites:
   - "trust-compute-gradient-brainstorm | 2026-04-30-trust-compute-gradient-brainstorm | sha256:89c493c73ff6b06b | path: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md"
   - "doorway-stewardship-chain-design | grant/snapshot precedent: Commitment+Attestation chain, JWT fast-path, supersession — the visitor-reach and grant mechanics template | sha256:f90729e7a9887de8 | path: genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - "records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
+  - "records-lifecycle-design | link lifecycle precedent: intentionally-degraded vs maintained, closure rejection, redaction markers — the alias retirement lens | sha256:cbf6fb8b0df178c7 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
   - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
   - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
   - genesis/docs/architecture/pillar-bundle-split-runbook.md

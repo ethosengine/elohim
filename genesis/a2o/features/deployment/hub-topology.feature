@@ -2,7 +2,7 @@
 Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementations
   As the Elohim Protocol
   I want hub-and-spoke topology modeled as a narrow abstract Hub interface
-  with intentionally separate HouseholdHub and CollectiveHub implementations
+  with intentionally separate DwellingHub and CollectiveHub implementations
   So that substrate scaling reaches billions of humans through trusted hosting
   without collapsing realm-specific governance into config flags
 
@@ -35,19 +35,19 @@ Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementation
   # --- Hub Portfolio Scope ---
 
   @wip
-  Scenario: Hub portfolio includes HouseholdHub and CollectiveHub implementations
+  Scenario: Hub portfolio includes DwellingHub and CollectiveHub implementations
     Given the hub portfolio is loaded
-    Then there should be at least 1 hub of type "HouseholdHub"
+    Then there should be at least 1 hub of type "DwellingHub"
     And there should be at least 1 hub of type "CollectiveHub"
     And every hub should declare its stewards, devices, and governance contract
     And the abstract Hub interface should never be instantiated directly
 
-  # --- HouseholdHub Archetypes ---
+  # --- DwellingHub Archetypes ---
 
   @wip
   Scenario: Phone-only solo household participates without owning a hub
     Given hub archetype "Solo Phone-Only" from the hub portfolio
-    Then the hub type should be "HouseholdHub"
+    Then the hub type should be "DwellingHub"
     And the hub should declare 1 steward
     And the hub should declare 0 Tier 3 nodes
     And the hub stage distribution should include "hosted-user"
@@ -56,7 +56,7 @@ Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementation
   @wip
   Scenario: Young family with one Tier 3 is the canonical Stage-4 household
     Given hub archetype "Young Family with Family Node" from the hub portfolio
-    Then the hub type should be "HouseholdHub"
+    Then the hub type should be "DwellingHub"
     And the hub should declare 2 to 4 stewards
     And the hub should include device "Family Node (Base)"
     And the hub connectivity profile should be "always-on"
@@ -65,7 +65,7 @@ Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementation
   @wip
   Scenario: Multi-generational household carries a hosted-only grandmother
     Given hub archetype "Multi-Gen Household" from the hub portfolio
-    Then the hub type should be "HouseholdHub"
+    Then the hub type should be "DwellingHub"
     And the hub should declare at least 4 stewards across age categories
     And the hub should include device "Family Node (Base)"
     And the hub should host custodial keys for at least 1 hosted-only steward
@@ -75,7 +75,7 @@ Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementation
   @wip
   Scenario: Extended family with two hubs provides mutual relational backup
     Given hub archetype "Extended Family Two Hubs" from the hub portfolio
-    Then the hub type should be "HouseholdHub"
+    Then the hub type should be "DwellingHub"
     And the archetype should declare 2 paired hubs
     And each paired hub should hold backup shards for the other
     And cross-household substrate routing should be exercised
@@ -103,7 +103,7 @@ Feature: Hub Topology — Substrate Aggregation as Realm-Specific Implementation
   # --- Realm Separation: Governance Differs in Shape, Not Settings ---
 
   @wip
-  Scenario: HouseholdHub adds spokes through trust without explicit consent
+  Scenario: DwellingHub adds spokes through trust without explicit consent
     Given hub archetype "Multi-Gen Household" from the hub portfolio
     When a steward adds a new family member spoke
     Then the spoke is provisioned without a community-vote event

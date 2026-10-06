@@ -2,7 +2,7 @@
 id: elohim-sdk-gospel
 cites:
   - "elohim-sdk-architecture | the consumption-layer + five-library SDK boundary architecture this surface implements (not a source of truth — symbols reconstructible from substrate) | sha256:473b0387d26b578f | path: genesis/docs/architecture/elohim-sdk.md"
-  - "elohim-seam-map-concern-routing | the concern-routing atlas — which seam(s) this surface owns (SDK grammar §3.5 + app-manifest/domain §3.7) and where any where-does-this-go? question routes | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — which seam(s) this surface owns (SDK grammar §3.5 + app-manifest/domain §3.7) and where any where-does-this-go? question routes | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Elohim Protocol SDK

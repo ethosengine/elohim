@@ -7,7 +7,7 @@ artifact_kind: spec
 written: 2026-06-13
 cites:
   - "conductor-authority-arc-memory-scaling | 2026-06-13-conductor-authority-arc-memory-scaling | sha256:9ae7987743bec6bc | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md"
-  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "tiered-quilt-stewardship-design | the data-plane stewardship canon (custody floors spread across diverse stewards, K-of-N restitution from surviving shards) that this arc-shrink policy mirrors for the conductor DHT working set | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - genesis/plans/2026-04-13-device-archetypes-design.md
 ---
 

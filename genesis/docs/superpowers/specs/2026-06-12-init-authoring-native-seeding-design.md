@@ -2,8 +2,8 @@
 id: init-authoring-native-seeding-design
 cites:
   - genesis/data/timeline/backlog/resilience-unmeasured-vs-zero-honest-denominators.md
-  - resilience-dimensions-proof-suite | the D1/D2 boundary tests this spec extends with an authored+stocked measured case; its @wip rows are the multi-peer acceptance gate | sha256:a89f58ec4906e152 | path: genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md
-  - tiered-quilt-stewardship-design | the custody-quilt / RS(N,K) replication canon this rides toward; replica_target_for(reach) and custody-blob commitments are the resiliency-replication primitives borrowed here | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
+  - "resilience-dimensions-proof-suite | the D1/D2 boundary tests this spec extends with an authored+stocked measured case; its @wip rows are the multi-peer acceptance gate | sha256:a89f58ec4906e152 | path: genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md"
+  - "tiered-quilt-stewardship-design | the custody-quilt floor and RS(N,K) shard canon this spec rides toward; the custody-blob commitments and replica_target_for map used here are existing primitives outside that document | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
 # This spec DISTILLS the historical-provenance design it replaced (§The scope cut carries its lesson).
 # The retired body lives in git: `git log --diff-filter=D --oneline -- <path>` then `git show <sha>^:<path>`.

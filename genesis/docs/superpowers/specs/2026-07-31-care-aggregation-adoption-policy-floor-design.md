@@ -9,7 +9,7 @@ graduation-trigger: decompose-complete OR superseded-by-implementation
 topic: [care-economy, aggregation, reach, coupling, valueflows, rea, mishpat, bounds, k-anonymity, adoption-policy, graduation-ceremony, observer-protocol, lanes, homeostat, epr]
 cites:
   - "observer-protocol | The elohim-observer epic this design gives a substrate path: witnessed care → REA story elements → aggregate layers (Individual→Family→Community→Municipal→Global); its ephemeral sensor pipeline stays OUTSIDE the floor by design | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
-  - "observation-event-layer-design | The landed observation substrate (tables, observation-log protocol, graduation path) this design feeds with a care kind; it deferred sensor→story extraction to the elohim plane — kept deferred here | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
+  - "observation-event-layer-design | The observation substrate design (observation tables, observation-log ALPN, two graduation paths) this design feeds with a care kind; it defers the sensor-to-REA-story extraction gateway to the elohim-observer epic as its own spec, and that stays deferred here | sha256:2b8d214094200bb6 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
   - "elohim-seam-map-concern-routing | Seam placement: care rollups are the aggregation seam (§3.11); lane checks extend the bounds_validator of §3.4 and §3.15; reverse links are notary truth with a SQL projection (§7) | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 

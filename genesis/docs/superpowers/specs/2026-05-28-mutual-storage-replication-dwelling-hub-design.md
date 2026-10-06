@@ -113,7 +113,7 @@ Per shipped `HubComputeAggregateView` and `project_hub_archetype_abstraction`:
 
 `HubKind` enum (already shipped): `"dwelling" | "collective" | "computed"`. `hubId` defaults to `peer_id` for single-device-participants (Computed kind) before hub-binding tables distinguish.
 
-`HouseholdHub` and `CollectiveHub` are intentionally **separate implementations** at the projection layer (governance considerations differ in shape, not in settings — per memory). The substrate stays kind-agnostic at the DHT layer.
+`DwellingHub` and `CollectiveHub` are intentionally **separate implementations** at the projection layer (governance considerations differ in shape, not in settings — per memory). The substrate stays kind-agnostic at the DHT layer.
 
 ### 2.3 Hub-aware vocabulary in spec vs narrative
 

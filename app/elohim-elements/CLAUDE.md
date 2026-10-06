@@ -6,7 +6,7 @@ cites:
   - "lamad-bundle-gospel | the bundle-consumer side of the layer rails — B18 token wiring is the worked example | sha256:1bc6eb8e1c112bc4 | status: stale — target content moved on; re-verify | path: app/lamad/CLAUDE.md"
   - genesis/data/timeline/backlog/bundle-styling-token-contract.md
   - "omnibar-consolidation-epr-native-links-design | the design whose theme/serving-context/nav decisions the layer rails enforce; records the B18 styling audit | sha256:92df16eea8d9bcf8 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md"
-  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7fd48274fae5e8c5 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the client surface seam (§3.8); routes any where-does-this-go? question | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # elohim-elements — UI Substrate Gospel

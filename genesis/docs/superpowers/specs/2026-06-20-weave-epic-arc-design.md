@@ -6,14 +6,14 @@ class: protocol-canonical
 domain: D5
 topic: [weave, operational, recursion, vsm, councils, tiers, capability, compute-contracts, rea, sharding, encryption, dataplane, epic-index]
 cites:
-  - operational-weave-facing-lens-design | the lens this epic seeds from (#0); its hand-written aggregate() is what #1 replaces with CoverageRollup descent | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md
-  - recursive-architecture-design | canonical home for #1; its CoverageRollup keystone (recursion.rs) is built-but-unconsumed and #1 wires it in | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md
-  - tiered-quilt-stewardship-design | the tier canon; §6 already names #2 storage-capability as earned-witnessed (not self-declared) | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
-  - rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md
-  - rea-economic-facing-lens-design | #3 lands its two named non-goals: the delegates-compute bridge + the observed realized-compute event | sha256:b83ead21be13bbaa | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
-  - mutual-storage-replication-dwelling-hub-design | the First REA Compute-Commitment Instance; #3 inherits its bilateral/self-directed dual | sha256:1acbeeec8b7a3956 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md
-  - epr-durability-replication-arc-plan | #4 build home (new Private-Replica Encryption workstream); owns the real distribute_shards path | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md
-  - dht-is-a-notary-not-a-byte-store | the binding constraint: capacity/rollup aggregation is gossip+projection, never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md
+  - "operational-weave-facing-lens-design | the lens this epic seeds from (#0); its hand-written aggregate() is what #1 replaces with CoverageRollup descent | sha256:fc432fea065dca00 | path: genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md"
+  - "recursive-architecture-design | canonical home for #1; its CoverageRollup keystone (recursion.rs) is built-but-unconsumed and #1 wires it in | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
+  - "tiered-quilt-stewardship-design | the tier canon; §6 already names #2 storage-capability as earned-witnessed (not self-declared) | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "rea-compute-commitment-primitive | rea-compute-commitment-primitive | sha256:3ea123e3a9796449 | path: genesis/docs/architecture/rea-compute-commitment-primitive.md"
+  - "rea-economic-facing-lens-design | #3 lands its two named non-goals: the delegates-compute bridge + the observed realized-compute event | sha256:b83ead21be13bbaa | path: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md"
+  - "mutual-storage-replication-dwelling-hub-design | the First REA Compute-Commitment Instance; #3 inherits its bilateral/self-directed dual | sha256:3ef54b7a3bec9f17 | path: genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md"
+  - "epr-durability-replication-arc-plan | #4 build home (new Private-Replica Encryption workstream); owns the real distribute_shards path | sha256:f263ed845af2f916 | path: genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md"
+  - "dht-is-a-notary-not-a-byte-store | the binding constraint: capacity/rollup aggregation is gossip+projection, never a DHT entry | sha256:a1d408ef2478b288 | path: genesis/docs/content/elohim-protocol/history/2026-06-01-dht-is-a-notary-not-a-byte-store.md"
 informed-by:
   - genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md

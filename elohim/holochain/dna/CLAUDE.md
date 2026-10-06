@@ -1,9 +1,9 @@
 ---
 id: holochain-integrity-layer-gospel
 cites:
-  - elohim-protocol-specification | the authoritative protocol specification this DNA implements as the distributed truth layer for notarized primitives (Economic, Identity, Content, Infrastructure) | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md
-  - records-lifecycle-design | the canonical link-type triage rule + 256-cap accounting the link-budget rail descends from (D.11 Backfill 3 owns the *By* sweep) | sha256:2b5f54d20108bcf0 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
-  - dna-upgrade-governance | the upgrade-policy home — forward-compat rules, network-seed ladder, lineage status; read before any integrity-zome change | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md
+  - "elohim-protocol-specification | the authoritative protocol specification this DNA implements as the distributed truth layer for notarized primitives (Economic, Identity, Content, Infrastructure) | sha256:659b0d47078b298f | path: genesis/docs/content/elohim-protocol/protocol-specification.md"
+  - "records-lifecycle-design | restates the LINK_ARCHITECTURE.md link-type triage rule at the 256-cap and its slot accounting, which the link-budget rail descends from; its D.11 Backfill 3 owns the *By{Attribute} retirement sweep | sha256:cbf6fb8b0df178c7 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md"
+  - "dna-upgrade-governance | the upgrade-policy home — forward-compat rules, network-seed ladder, lineage status; read before any integrity-zome change | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
   - genesis/data/timeline/backlog/deprecation-link-architecture-query-index-sweep.md
 ---
 

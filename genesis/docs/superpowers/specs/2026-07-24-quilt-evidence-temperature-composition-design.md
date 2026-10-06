@@ -26,7 +26,7 @@ informed-by:
   - genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md
   - elohim/sdk/schemas/v1/manifest/app-manifest.schema.json
 cites:
-  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
+  - "tiered-quilt-stewardship-design | the draft stewardship canon whose single tier ordering (drawn ranked above stocked-warm) this spec corrects by separating custody-commitment floor from working-set state | sha256:14ee4836af492ff1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "durability-topology-felt-resilience | 2026-05-29-durability-topology-felt-resilience | sha256:935b1dd7d8121267 | path: genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md"
   - "cite-fingerprint-cid-convergence | Cite Fingerprint ↔ Canonical CID Convergence | sha256:0a657c9c1b0c43e7 | path: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md"

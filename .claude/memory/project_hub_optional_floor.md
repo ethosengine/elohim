@@ -15,7 +15,7 @@ The protocol's primitives are sized so a single device can be a complete partici
 
 **How to apply:**
 - Any feature that *requires* a hub for the basic learner/contributor/steward experience is a smell. Re-check the design.
-- Hub designs (HouseholdHub, CollectiveHub, school-hub, parish-hub) are graduations on top of the laptop-floor, sized at "desktop with extra drives + reliable internet" before scaling further.
+- Hub designs (DwellingHub, CollectiveHub, school-hub, parish-hub) are graduations on top of the laptop-floor, sized at "desktop with extra drives + reliable internet" before scaling further.
 - Brainstorm flow: design the laptop-only path FIRST. Then layer hub-as-bonus. Never the inverse.
 - "Hubs needed at this scale" is a real constraint at higher node counts, but it is reached by graduation, not by gate.
 - Test framing: "Could a village in Kenya, with no hub and no doorway operator nearby, run this feature on laptop-class devices?" If no, push hub-coupling out of the primitive into a graduation path.
