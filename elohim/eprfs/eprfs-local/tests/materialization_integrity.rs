@@ -1,7 +1,3 @@
-// `async_trait` marks its generated futures `#[must_use]`; clippy 1.99 reads
-// that as doubled on methods returning `Result`. The attribute is the macro's.
-#![allow(clippy::double_must_use)]
-
 use bytes::Bytes;
 use eprfs_core::{
     AttestationDraft, BlobCid, BlobHandle, BlobPresence, EntryKind, EprRecord, EprRef, EprfsError,
