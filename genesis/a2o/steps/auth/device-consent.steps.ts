@@ -244,7 +244,16 @@ async function approve(s: DeviceConsentState, agreedActs?: string[]): Promise<vo
   );
   s.agreed = r.json;
   const target = r.json.returnTarget as { kind: string; value?: string } | undefined;
-  if (target?.kind === 'display') s.code = target.value;
+  if (target?.kind === 'display') {
+    // The portal shows `code#state` (consent-grant return_path.rs). The terminal
+    // splits it, matches the state to the ask it made, and redeems the code alone
+    // (epr-cli device.rs `parse_pasted`).
+    const shown = String(target.value ?? '');
+    const at = shown.lastIndexOf('#');
+    assert.ok(at > 0, `the displayed value is not code#state: ${shown}`);
+    assert.equal(shown.slice(at + 1), s.ask?.state, 'the displayed state does not match the ask');
+    s.code = shown.slice(0, at);
+  }
   const expiresAt = Number(r.json.expiresAt);
   // expiresAt's unit is not declared on the wire; normalise micros/millis/seconds.
   let secs = expiresAt;

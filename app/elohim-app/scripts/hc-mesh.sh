@@ -2061,7 +2061,11 @@ MESH_RUST_LOG="${MESH_RUST_LOG:-warn,holochain_sqlite::db::access=info,holochain
 # own human's agent_pub_key from its conductor cell key, NULL-only. Without
 # this env the saga ch02 finish line (non-null agentPubKey) can never light.
 human_id() {
-  if [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ]; then
+  # Canonical resolution binds the household's OWN members. A late joiner
+  # (`join-peer <fresh-name>`) is by definition not one of them, so it takes the
+  # derived id below; requiring a canonical binding for it refused every
+  # join-peer on the default household (seen 2026-10-06).
+  if [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ] && [[ ",$DEFAULT_HOUSEHOLD_PEERS," == *",$1,"* ]]; then
     [ -n "${CANONICAL_HUMAN_IDS[$1]:-}" ] || {
       echo "canonical household binding has not resolved peer '$1'" >&2
       return 1
@@ -3981,6 +3985,11 @@ join_peer() { # <fresh-peer-name>
     return 2
   fi
   guard_conductor_data_roots join-peer || return 1
+  # The joiner's storage launches through the boot roster's path, which names the
+  # household it joins. Load that binding here, while PEERS is still the
+  # incumbents and before any sandbox is generated: without it the launch
+  # refused after the joiner's conductor was already running (2026-10-06).
+  load_canonical_household_binding || return 1
 
   # This verb is deliberately an append to a LIVE mesh. A cold or partial
   # roster is not a late-join regime, and starting around it would make the

@@ -686,6 +686,13 @@ Also read while wiring the steps: no node route answers whether a device is boun
 is judged from the 201 the enroll returns plus `record.identityRoot` (rows 3 and 7); a root key is
 recorded in the consent and never bound (row 3).
 
+**DELTA 2026-10-06 (live):** on the i1006 household (pinned conductor `3c1e80525`) with a fourth
+node staged by `just mesh join-peer workspace`, the six un-held scenarios passed, 6 of 6 and 53 of
+53 steps (`sprint-report-household-20261006T145000Z-22c28e84`). The first live run failed two
+redemptions with `redemption_code_unknown`: the steps presented the whole displayed value. The
+portal shows `code#state`; the terminal splits it, matches the state to its own ask and redeems
+the code alone, as `epr device redeem` does. The steps now do the same.
+
 ## Row 22 — a node's established identity differs from the id a fixture declares (found on the fleet, 2026-10-06)
 
 - **Chain:** joining "as it is" (row 7), seen from the seeder.
