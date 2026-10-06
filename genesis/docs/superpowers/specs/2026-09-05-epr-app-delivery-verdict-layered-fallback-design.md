@@ -13,7 +13,7 @@ cites:
   - "doorway-catching-up-page | Doorway catching-up shed page | sha256:2dbde4d56b074a5e | path: genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md"
   - "trust-legibility-atlas | Trust-Legibility Atlas | sha256:17685eb252d53116 | path: genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md"
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
-  - "doorway-access-tier-patterns | Doorway Access-Tier Patterns | sha256:f862d55525b442c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
+  - "doorway-access-tier-patterns | Doorway Access-Tier Patterns | sha256:ea892dec0171246b | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-doorway-access-tier-patterns.md"
   - genesis/a2o/features/dataplane/served-shell-boots.feature
   - genesis/a2o/features/dataplane/served-projected-head.feature
   - genesis/a2o/features/dataplane/doorway-failover.feature

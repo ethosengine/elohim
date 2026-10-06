@@ -17,7 +17,7 @@ This crate owns a compound stack of seams: **runtime/footprint** (atlas §3.3 �
 
 Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
 
-Confusion-to-avoid: peerId ≠ hostname ("reach my household node" is a peerId→household binding, not DNS/ingress); and the **hub-internal swarm lives in `steward/node`, not here** — debugging blade/pod consensus in `src/p2p/` means you're in the wrong crate (§3.12 is that crate's seam).
+Confusion-to-avoid: peerId ≠ hostname ("reach my household node" is a peerId→household binding, not DNS/ingress); and the **hub-internal swarm lives in `steward/node`, not here** — debugging blade/pod consensus in `src/p2p/` means you're in the wrong crate (§3.12 is that crate's seam). And web-level work for peers reached by key (app serving, rendering, the deliverability verdict) belongs to the hub side of the web seam, home `elohim/elohim-hub/`: the `/apps` serving, `src/ssr.rs` and `src/app_deliverability.rs` in this crate are debt against that seam and not a pattern to extend. This crate stays oblivious to the hub.
 
 ## Core Principle
 

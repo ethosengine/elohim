@@ -6,7 +6,7 @@ status: Draft (architecture spec — gates Phase 11 backend wiring)
 created: 2026-05-08
 informed-by:
   - genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
-  - genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md
+  - genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md  # retired to git history in 53190a234; compacted into the boundaries design on the next line
   - genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
   - genesis/plans/2026-04-13-device-archetypes-design.md
   - genesis/plans/2026-04-10-agency-phase-registration-design.md
@@ -218,7 +218,7 @@ The operator is bound by the **substrate-floor / elohim-ceiling pattern** (`proj
 
 **Stewardship is two-way:** the operator stewards the hub's capacity for the household's needs; the household stewards the operator's discernment shape via manifest configuration and witness-and-reverse mechanisms. Per `project_elohim_as_counsel`, the operator has standing to act in the household's defense even against the household's current-moment preferences when stewardship is at stake — but always within the substrate floor and always reversibly.
 
-The operator's specific role-manifest, witness-UX, and renegotiation-flow are out of scope for this spec — they're seeded as stub epics in `2026-05-08-doorway-hub-edge-design.md` (Stub-epic seeds #2, #3, #6, #9). What this spec settles is **the operator is the entity that orchestrates the hub's use of Tracks 1, 2, and 3**, and the dual-stack Track 2 posture is what gives operators on consumer-grade hardware a first-class role from day one.
+The operator's specific role-manifest, witness-UX, and renegotiation-flow are out of scope for this spec — they're seeded as stub epics in the retired hub-edge spec (`git show 53190a234^:genesis/docs/superpowers/specs/2026-05-08-doorway-hub-edge-design.md`; Stub-epic seeds #2, #3, #6, #9). What this spec settles is **the operator is the entity that orchestrates the hub's use of Tracks 1, 2, and 3**, and the dual-stack Track 2 posture is what gives operators on consumer-grade hardware a first-class role from day one.
 
 **Hubbiness is a dial, not a binary.** The boundary between "this device is just my device" and "this device is also a hub" is a continuous setting humans dial at the device level — not a hard architectural distinction. A laptop at 6pm is just-the-steward's-laptop and the operator's role on it is small (the steward gets the consistency of personal space — the operator doesn't intrude on what they're doing). The same laptop plugged in overnight, shared with the household, becomes a-hub-too — its operator picks up Track 3 spoke commitments and Track 2 federation participation. Humans dial up hubbiness as comfort and capacity allow; humans hand it off as Tier-3 hardware arrives and the household-fabric-manager role migrates to a more capable operator. **The steward+device layer gives humans the consistency of their own space; the hub layer gives the elohim-operator a dwelling to be opinionated and helpful at social-coordination scope without stepping on human toes.** The operator's discernment is at hub scope; what happens on the personal device is the human's, full stop. The dial is owned by the human, declared via standing manifests, signed/witnessable/reversible at every increment.
 
@@ -239,7 +239,7 @@ iroh requires UDP and works best on always-on hardware. A wearable running a sin
 
 ### Track 4 — Doorway web2 projection (visitors, hosted users, federation)
 
-Per `2026-05-08-doorway-hub-edge-design.md` — kept unchanged by this spec for completeness. Doorway speaks HTTP, presents identity (OAuth-RP, never owns), routes via manifest, and **never swarms libp2p or iroh**. Doorway's co-located storage pod runs Track 2.
+Per `2026-05-08-doorway-hub-edge-design.md` (retired; now the boundaries design's "Doorway / hub edge") — kept unchanged by this spec for completeness. Doorway speaks HTTP, presents identity (OAuth-RP, never owns), routes via manifest, and **never swarms libp2p or iroh**. Doorway's co-located storage pod runs Track 2.
 
 ## Device-archetype × transport matrix
 
@@ -389,13 +389,13 @@ A laptop CAN choose direct libp2p substrate participation. A phone running its o
 
 ### 5. Constitutional bifurcation: DwellingHub vs CollectiveHub vs nothing
 
-Per `project_hub_archetype_abstraction` and `2026-05-08-doorway-hub-edge-design.md`: a dwelling hub is bounded by "humans inside can govern." Past that capacity, it must split (fork into two dwelling hubs) or convert to a CollectiveHub with delegated-stewardship governance. **There is no archetype for "datacenter."** Operators can run datacenter infrastructure as opt-in fronting (hyperscaler-fronting per the doorway-hub-edge spec), but the protocol does not natively model a hub at that scale.
+Per `2026-05-02-elohim-hub-boundaries-design.md` (the Hub trait sketch): a hub does not grow "past what the humans inside it can govern." Past that capacity, it must split (fork into two dwelling hubs) or convert to a CollectiveHub with delegated-stewardship governance. **There is no archetype for "datacenter."** Operators can run datacenter infrastructure as opt-in fronting (hyperscaler-fronting per the doorway-hub-edge spec), but the protocol does not natively model a hub at that scale.
 
 **The corollary:** if someone wants to run "FANG-scale infrastructure," they have to run *thousands of federated hubs*, not one giant hub. Federation is the only scaling vector, and federation requires bilateral standing and continuously-negotiated REA contracts at every edge. The structural advantage federation has over centralization is built into the cost asymmetry (Reason 2 in §Anti-capture, mechanism 2 here). FANG-scale via federation is *possible*; FANG-scale via vertical consolidation is *expensive enough to be unattractive*.
 
 ## Subsuming Cloudflare and FANG (the federation answer)
 
-Per `2026-05-08-doorway-hub-edge-design.md`'s thesis — **the federation IS the FANG-equivalent**, not any single hub. The four reach-earning surfaces (compute, distribution, defense, AI-coordination) absorb at federation aggregate.
+Per the retired hub-edge spec's thesis, now in the boundaries design ("The four reach-earning surfaces at hub scale") — **the federation IS the FANG-equivalent**, not any single hub. The four reach-earning surfaces (compute, distribution, defense, AI-coordination) absorb at federation aggregate.
 
 This spec's transport-track decomposition makes the libraries concrete:
 
@@ -517,7 +517,7 @@ Phase 11's existing prerequisites stand, with these spec-level additions:
 2. **HTTP route graduation** — `/api/v1/blob/{hash}` reads from `IrohBlobStore` for blobs registered as iroh-canonical; falls through to legacy `BlobStore` for libp2p-fallback peers.
 3. **Genesis seeder rewrite** — writes to `IrohBlobStore` AND `BlobStore` during transition; canonical address is BLAKE3 post-cutover, SHA256 retained as alternate for libp2p fallback.
 4. **Gossip topic broadcast wiring** — per-topic publish call sites route to **both** iroh-gossip and libp2p-gossipsub during transition; same topic-id (BLAKE3-hashed); same wire format. **Permanent post-cutover** for inventory + identity-binding + recovery topics (consumer-grade peers must receive).
-5. **Recovery e2e** — full social-recovery flow runs over both stacks. The recovery-seed shares (per `project_socially_derived_security`) traverse whichever transport profile each peer supports.
+5. **Recovery e2e** — full social-recovery flow runs over both stacks. The recovery-seed shares (Shamir shares released by trusted contacts' elohim-agents; `genesis/docs/architecture/cradle-to-grave-capability-gradient.md`) traverse whichever transport profile each peer supports.
 6. **CI parity soak** — nightly run of every parity test for one week with zero divergences. **Permanent**, not transition-only.
 7. **Alpha-cluster soak** — 6-peer cluster runs in dual-stack mode for one week. Both transports active; cross-stack peer-map governs selection.
 8. **Latency stress** — 10k blob round-trips on iroh-canonical path; p99 ≤ libp2p baseline. (Already established at p50; revalidate post-Phase-11 wiring.)
@@ -531,9 +531,9 @@ Phase 11's existing prerequisites stand, with these spec-level additions:
 These are open questions explicitly outside this spec's scope:
 
 - **Hub-internal protocol shape (Track 3) detailed wire format.** This spec names HTTP-over-WebSocket with doorway-shaped semantics; the concrete sub-protocol (frame format, auth handshake, stewardship-contract enforcement) is a sibling spec. Existing doorway HTTP routes are the starting point.
-- **DwellingHub trait surface implementation.** Per `2026-05-02-elohim-hub-boundaries-design.md` and `2026-05-08-doorway-hub-edge-design.md`. This spec assumes the hub trait exists at Phase 11 wiring time; if it doesn't, the wiring wires through current `elohim-node` orchestration.
+- **DwellingHub trait surface implementation.** Per `2026-05-02-elohim-hub-boundaries-design.md`, which now carries the retired hub-edge spec. This spec assumes the hub trait exists at Phase 11 wiring time; if it doesn't, the wiring wires through current `elohim-node` orchestration.
 - **Wearable / IoT registration flow.** Track 3 endpoints exist; the registration UX (how a wearable announces itself to a dwelling hub, how stewards consent) is a separate epic.
-- **CollectiveHub differentiation in transport defaults.** Sketched as "different attitude" in `2026-05-08-doorway-hub-edge-design.md`; concrete config defaults are a follow-up.
+- **CollectiveHub differentiation in transport defaults.** Sketched as "different attitude" in the boundaries design ("Vocabulary: DwellingHub / CollectiveHub"); concrete config defaults are a follow-up.
 - **Browser-direct-WebRTC P2P participation surface.** libp2p-WebRTC is a real path; the user-facing surface for "advanced browser users want direct substrate" is undesigned. Most browsers will use Track 4 doorway.
 - **Federation manifest schema for `discovery_resolvers`.** Sketched in §n0 mitigation Step 3; concrete schema is part of the federation manifest epic.
 - **Reach-authorization wire-composition design.** Reach-authorization is canonical to the protocol — it's the elohim-mediated matchmaking surface that decides whether a peer is authorized to receive content under reach class (commons / regional / bioregional / municipal / neighborhood / local / invited / private). The integrity property the protocol commits to: **reach-gate decisions are anchored in DHT-notarized stewardship contracts and reach-class manifests**, never in transport-level claims. Today reach-authorization is an internal service consumed by the wire planes that carry data being authorized; how it composes across both transports while preserving DHT-derived integrity (especially as features like sponsorship contracts, witness-mediated upgrades, and reach-gate elohim discernment land) is in-progress feature design. Likely a sibling spec when the feature design completes. The transport question for reach-authorization is **NOT** "which wire is more secure" — both wires preserve DHT-derived integrity equally; the question is how the feature composes its wire participation cleanly across the two transports.
@@ -563,7 +563,7 @@ A reference to this spec is added to the module README's "What works / What's ne
 
 ## Sibling specs
 
-- `2026-05-08-doorway-hub-edge-design.md` — companion spec on doorway/hub responsibilities; this spec extends it with the Track 1/2/3 transport decomposition.
+- `2026-05-08-doorway-hub-edge-design.md` (retired; now the boundaries design's "Doorway / hub edge") — companion spec on doorway/hub responsibilities; this spec extends it with the Track 1/2/3 transport decomposition.
 - `2026-05-02-elohim-hub-boundaries-design.md` — Hub trait sketch.
 - `2026-05-07-iroh-parallel-stack.md` — the executable plan that produced Phases 1–10; this spec is its Phase 11 architectural input.
 - `2026-04-13-device-archetypes-design.md` — device archetype catalog; the matrix in this spec is keyed by it.

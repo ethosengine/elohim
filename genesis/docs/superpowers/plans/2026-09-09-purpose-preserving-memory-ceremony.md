@@ -14,7 +14,7 @@ cites:
   - "governed-retrieval-execution | Governed retrieval execution and progressive discovery | sha256:14cafaec2b815d08 | path: genesis/docs/superpowers/plans/2026-09-09-governed-retrieval-execution.md"
   - "acceptance-plan | Acceptance-aware native reconciliation | sha256:d794ff0ca171a660 | path: genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md"
   - "ceremony-efficacy | Memory ceremony efficacy | sha256:23eb372f4ba66135 | path: genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Purpose-preserving memory ceremony — first reconciliation journey

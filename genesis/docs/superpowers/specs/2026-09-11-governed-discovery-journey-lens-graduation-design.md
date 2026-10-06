@@ -18,8 +18,8 @@ cites:
   - "bounded-recall-mastery-sprint | the sprint whose five rounds and three fresh readers proved the journey this design generalizes | sha256:d4c6f66d1685d124 | path: genesis/docs/superpowers/plans/2026-09-11-bounded-recall-mastery-sprint.md"
   - "unified-memory-loop-design | the collective-memory owner split and the graduation-as-reach-rehearsal rule this ladder extends | sha256:07e941a325cc49c2 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md"
   - "private-thought-governed-fruit | the SDO/RWA boundaries every entity row answers — journeys are held by the holon, only outcomes cross | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"
-  - "cradle-to-grave-capability-gradient | the life-stage gradient a human lens preset must hold for — mediated agency, never an autonomy apex | sha256:1a5b2f7e6433230f | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
-  - "elohim-seam-map-concern-routing | places the lens at the client/SDK seam and the recipe at the SDK seam; providers are bridges | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "cradle-to-grave-capability-gradient | the life-stage gradient a human lens preset must hold for — mediated agency, never an autonomy apex | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
+  - "elohim-seam-map-concern-routing | places the lens at the client/SDK seam and the recipe at the SDK seam; providers are bridges | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "ceremony-efficacy | the five fresh-start questions the question bank instantiates | sha256:23eb372f4ba66135 | path: genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md"
 ---
 

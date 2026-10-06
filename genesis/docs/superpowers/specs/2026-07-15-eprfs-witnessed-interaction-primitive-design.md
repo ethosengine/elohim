@@ -15,11 +15,11 @@ sovereignty-frame: descriptive  # cites values-forward's REJECTION of a self-sov
 refines:
   - genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md
 cites:
-  - sense-respond-governance-classifier | the sibling instance — proves this skeleton on the HARDEST substrate (contested meaning); §1.2 skeleton + instance table, §10.4 agent-governance-action as witnessed event, the honesty discipline this inherits | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md
-  - elohim-seam-map-concern-routing | where the light-runtime routes — a Track-3 spoke + T1 notary, not a new seam; the participation-track vs seam distinction | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
-  - substrate-trust-contract-runbook | verify-locally-then-serve; client clocks advisory; the network-assigned timestamp is the only trustworthy clock; fills-never-moves | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
-  - values-forward | friction-gradient limitarianism (Stance II.4) — the reach/propagation-velocity model; the human floor sovereign, never a self-sovereign apex | path: genesis/docs/content/elohim-protocol/values-forward.md
-  - stewardship-over-sovereignty | credit is stewardship reconciliation, not ownership/payout; the recovery ladder + bounded_by spine | path: genesis/docs/architecture/stewardship-over-sovereignty.md
+  - "sense-respond-governance-classifier | the sibling instance — proves this skeleton on the HARDEST substrate (contested meaning); §1.2 skeleton + instance table, §10.4 agent-governance-action as witnessed event, the honesty discipline this inherits | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
+  - "elohim-seam-map-concern-routing | where the light-runtime routes — a Track-3 spoke + T1 notary, not a new seam; the participation-track vs seam distinction | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "substrate-trust-contract-runbook | verify-locally-then-serve; client clocks advisory; the network-assigned timestamp is the only trustworthy clock; fills-never-moves | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
+  - "values-forward | friction-gradient limitarianism (Stance II.4) — the reach/propagation-velocity model; the human floor sovereign, never a self-sovereign apex | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "stewardship-over-sovereignty | credit is stewardship reconciliation, not ownership/payout; the recovery ladder + bounded_by spine | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
 ---
 
 # The eprfs Witnessed-Interaction Primitive

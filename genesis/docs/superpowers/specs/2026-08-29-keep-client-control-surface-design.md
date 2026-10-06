@@ -13,7 +13,7 @@ domain: client SDK seam x identity/custody plane x peer plurality x doorway proj
 habits: [operator-runtime-surface]
 topic: [keep, sdk, client-surface, identity, storage, keystore, recovery, peer-plurality, custodian, witnesses, discovery]
 cites:
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
   - genesis/data/timeline/backlog/security-client-doorway-origin-synthesis-credential-exfil.md
   - genesis/data/timeline/backlog/security-doorway-oauth-redirect-uri-interception.md

@@ -13,7 +13,7 @@ cites:
   - "freenet-lift-and-shift | Freenet lift-and-shift | sha256:b0ae39cb40ffce76 | path: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
   - genesis/research/freenet-peer-confrontation-2026-07-27.md
   - genesis/manifests/habits.yaml
-  - "iroh-libp2p-complementarity | iroh ↔ libp2p Complementarity | sha256:29235aeb35aff128 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
+  - "iroh-libp2p-complementarity | iroh ↔ libp2p Complementarity | sha256:da518f4d0861aff8 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md"
   - "adam-slow-link-write-guard-saturation | History/Finding: adam slow-link melt | sha256:556142ddd510a091 | path: genesis/docs/content/elohim-protocol/history/2026-07-20-adam-slow-link-write-guard-saturation.md"
 ---
 

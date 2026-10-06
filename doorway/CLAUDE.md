@@ -29,6 +29,8 @@ A dedicated match arm in `http.rs` is only needed when the route requires **door
 
 The other categories reserved for direct doorway Rust code: federation (peer discovery, cross-community routing), CDN (caching layer), DNS (DNS-over-HTTPS, human-readable names → CIDs), bootstrap, and signal. Everything that surfaces app-domain data (gate decisions, content nodes, attestations, economic events) flows through manifest-declared routes — adding a new such endpoint means a manifest change, not a doorway code change.
 
+Web-level work for a peer that is reached by key is not doorway work either. Serving an app's files, rendering a page and judging whether a version starts belong to the hub side of the web seam, home `elohim/elohim-hub/` (its README states the test; `doorway-service/EDGE-DESIGN.md` is this crate's side of it). The render code in `doorway-service/src/render/` today is debt against that seam, not a pattern to extend (except `warm_shell.rs`, an edge cache that stays). Work that exists because the other end is a browser stays here, even for a household's own browser-only devices.
+
 ## CRITICAL: No Blob Fan-Out — Doorway is Single-Target Dispatch
 
 **Doorway forwards each request to a SINGLE storage target.** It does NOT iterate `STORAGE_URLS` looking for which peer holds a particular blob. If a request lands on a peer that doesn't have the bytes, that is a substrate replication problem to fix in elohim-storage's P2P layer — never a doorway dispatcher fix.

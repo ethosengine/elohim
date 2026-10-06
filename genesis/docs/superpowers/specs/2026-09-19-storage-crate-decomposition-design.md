@@ -14,7 +14,7 @@ cites:
   - genesis/data/timeline/backlog/arch-dataplane-refactor-backlog.md
   - genesis/data/timeline/backlog/projection-reconcile-loc-ceiling-decomposition.md
   - "serving-edge-failover-balance-stream-campaign-plan | Serving edge campaign | sha256:c52d3b58876c3304 | path: genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md"
-  - "elohim-storage-gospel | CLAUDE | sha256:cc601a081fc94151 | path: elohim/elohim-storage/CLAUDE.md"
+  - "elohim-storage-gospel | CLAUDE | sha256:703e0ca88d0cd972 | path: elohim/elohim-storage/CLAUDE.md"
   - elohim/elohim-facings/CLAUDE.md
 ---
 

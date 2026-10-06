@@ -1,8 +1,9 @@
 ---
 id: doorway-service-gospel
 cites:
-  - "resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:147140028ad65820 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/resilience/README.md"
-  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-hub-boundaries-design | the live doorway/hub split (\"Doorway / hub edge\") and the web seam that says render, head-judgement and app-serving code is hub work, not this crate — the authority this gospel defers to for what stays in the doorway | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "resilience-protocol-spec | the resilience protocol + account-recovery canon (Parts V/VI) this gateway implements as the web2 projection — patron-CDN, social-recovery, creator-succession | sha256:396d7d7a2b8b354c | path: genesis/docs/content/elohim-protocol/resilience/README.md"
+  - "elohim-seam-map-concern-routing | the concern-routing atlas — this surface owns the Doorway projection seam (§3.9, Track 4); routes any where-does-this-go? question | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "doorway-auth-posture-declared-stage | the auth-posture entrypoint for this crate — the declared-stage rule, why DEV_MODE is never a posture, the API_KEY_ADMIN vs API_KEY_SEED distinction, the chaperone exception, the three developer modes, and the eight questions to answer before adding any gate here | sha256:ba3b216fd5998473 | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
   - "doorway-auth-refusal-runbook | the symptom-side companion for this crate — what to do when a doorway refusal actually happens, including the decision tree that stops a 403 on the write path being filed as a dataplane divergence | sha256:0929079216f0c37d | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-refusal-runbook.md"
 ---
@@ -17,7 +18,7 @@ This surface owns the **Doorway projection** seam (atlas §3.9, Track 4 — make
 
 Any "where does this go?" concern routes through the concern-routing atlas: `elohim-seam-map-concern-routing`.
 
-Confusion-to-avoid: hub ≠ doorway — the doorway projects **outward** to web2 and is **not a P2P participant**; the hub projects inward to nearby peers (§3.12, `steward/node`).
+Confusion-to-avoid: hub ≠ doorway — the doorway projects **outward** to web2 and is **not a P2P participant**; the hub projects inward to nearby peers (cluster ops: §3.12, `steward/node`; web-level work for peers reached by key: the hub side of the web seam, home `elohim/elohim-hub/`). Render, head-judgement and app-serving code is hub-side by that seam: new code of that kind does not go in this crate, and what is already here is debt listed in the hub README. `EDGE-DESIGN.md` names what stays.
 
 ## Auth posture — read BEFORE touching any gate
 
@@ -84,7 +85,7 @@ The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM.
 |------|---------|
 | `src/server/http.rs` | HTTP router — match block dispatches to handlers |
 | `src/services/route_registry.rs` | Dynamic route table from three Source types: DNA discovery, peer registration, steward self-registration |
-| `src/routes/storage_proxy.rs` | Single canonical `forward_to_storage` — single-target dispatch, with iroh dispatch boundary commented; doorway forwards bytes but does not reconcile them ([[project_doorway_single_target_no_fanout]], [[project_inventory_exchange_not_byte_replication]]) |
+| `src/routes/storage_proxy.rs` | Single canonical `forward_to_storage` — single-target dispatch, with iroh dispatch boundary commented; doorway forwards bytes but does not reconcile them (`../CLAUDE.md`, "No Blob Fan-Out"; [[project_inventory_exchange_not_byte_replication]]) |
 | `src/routes/mod.rs` | Route module declarations and re-exports |
 | `src/routes/admin.rs` | Admin dashboard endpoints including `GET /admin/routes` |
 | `src/routes/collectives.rs` | Collective governance (has business logic — not a simple proxy) |
@@ -92,13 +93,13 @@ The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM.
 | `src/routes/identity.rs` | DID documents + identity API proxy |
 | `src/routes/pkarr_resolver.rs` | Pkarr-backed DID/key resolution HTTP surface |
 | `src/services/pkarr_resolver.rs` | Pkarr resolver service (DHT-backed name → key) |
-| `src/render/` | Manifest-driven SSR dispatch (V8 + capability + concurrency semaphore) |
-| `src/ssr.rs` | SSR entry orchestration and `x-ssr-*` observability headers |
+| `src/render/` | Manifest-driven SSR dispatch (V8 + capability + concurrency semaphore). Hub-side by the web seam and due to move, except `warm_shell.rs`, the edge cache that stays |
+| `src/ssr.rs` | SSR entry orchestration and `x-ssr-*` observability headers. Hub-side by the web seam and due to move |
 | `src/main.rs` | Startup: creates AppState, self-registers steward storage |
 | `src/conductor/registry.rs` + `src/conductor/router.rs` | Conductor pool: agent_pub_key → conductor mapping with per-request routing (identity-hosting axis) |
 | `src/routes/admin_conductors.rs` | Hosted-user provisioning (`POST /admin/hosted-users`) + graduation accounting (MongoDB flag-state; source-chain migration not yet built) |
 | `src/services/federation.rs` | DHT self-registration as `DoorwayRegistration` + federation peer discovery |
-| `src/cache/resolution.rs` | DoorwayResolver: tiered Projection → Conductor → External resolution, exactly the three-layer truth model ([[project_three_layer_truth_model]]); also the write-on-fetch site for the projection cache |
+| `src/cache/resolution.rs` | DoorwayResolver: tiered Projection → Conductor → External resolution, exactly the three-layer truth model (`../CLAUDE.md`, "No Blob Fan-Out", reason 1); also the write-on-fetch site for the projection cache |
 | `src/projection/subscriber.rs` | Signal subscriber: connects to conductor app interface, receives DHT signals |
 | `src/services/discovery.rs` | DiscoveryService: conductor DNA introspection (route stubs, future) |
 
@@ -114,7 +115,7 @@ The subscriber (`src/projection/subscriber.rs`) feeds the projection cache — d
 
 ## Adding New Routes
 
-Almost always, you should NOT touch doorway-service when adding a new route. Routes are manifest-driven: a peer's storage declares them, the registry compiles them, doorway serves them. This is why we deleted the 13 identical per-domain proxy files — a doorway is not the author of substrate logic, it is one of many surfaces the substrate is reached through ([[project_doorway_manifest_driven_routes]], [[project_doorway_views_through_not_owned]]).
+Almost always, you should NOT touch doorway-service when adding a new route. Routes are manifest-driven: a peer's storage declares them, the registry compiles them, doorway serves them. This is why we deleted the 13 identical per-domain proxy files — a doorway is not the author of substrate logic, it is one of many surfaces the substrate is reached through (`../CLAUDE.md`, "No Per-Domain Proxy Files" and "Trust Model").
 
 1. Add the endpoint to elohim-storage
 2. Add it to `build_manifest()` in elohim-storage's `http.rs`

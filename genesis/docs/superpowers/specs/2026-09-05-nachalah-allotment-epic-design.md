@@ -25,7 +25,7 @@ informed-by:
 cites:
   - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
   - "runtime-artifacts-elected-content | Runtime Artifacts as Elected Content | sha256:48ff8d7f46d423b9 | path: genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "substrate-trust-contract-runbook | The Substrate Trust Contract | sha256:e47d962ca7259c79 | path: genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md"
   - "holochain-evolution-epic-mvp-plan | Holochain Evolution Epic | sha256:467fa823a8d1c32a | path: genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md"
   - elohim/holochain-conductor/crates/holochain_p2p/src/local_agent.rs

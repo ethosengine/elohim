@@ -320,7 +320,7 @@ The sprint's foundational artifacts (this canon doc + the runbook) are the durab
 
 - `project_elohim_dna_as_sdk_boundary` — DNA-as-SDK shape that this canon's TypeScript surface mirrors.
 - `project_first_class_graph_pattern` — the graph shape the wire types in `@elohim/storage-client` express.
-- `project_schema_first_ioc` — the JSON-Schema-first IoC pattern `@elohim/storage-client` operates under.
+- `feedback_schema_first_ioc` (retired; the rule lives in `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-epr-integrator-compatibility-contract.md`) — the JSON-Schema-first IoC pattern `@elohim/storage-client` operates under.
 - `project_no_sovereignty_stewardship_over_ownership` — the vocabulary discipline the SDK enforces.
 
 ---

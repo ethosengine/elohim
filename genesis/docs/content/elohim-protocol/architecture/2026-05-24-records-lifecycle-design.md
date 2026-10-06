@@ -2126,7 +2126,7 @@ This is the same right-to-be-forgotten flow described in `2026-05-11-observation
 3. New bridge's stewardship-commitment Attestation activates; new bridge can issue new credentials
 4. Household's effective identity is the union of all valid bridge-authored credentials (no single bridge holds identity authority alone)
 
-This is the same parallel-credentials pattern as multi-doorway human registration (per `project_multi_doorway_human_registration` memory).
+This is the same parallel-credentials pattern as multi-doorway human registration (per `2026-05-23-doorway-access-tier-patterns.md`, "Humans register with multiple doorways").
 
 **Manifest declaration.** Per-pillar declarations for bridge kinds + per-bridge fee schedules (feed D.20):
 
@@ -2735,7 +2735,7 @@ All three have `stake_class: high` — reach mutations are not graduatable from 
 
 Plus a codegen bug: a literal `"$ref"` string appears as a member of the generated `ATTESTATION_KINDS` array, meaning an attestation with `content_type: "$ref"` would currently pass Floor 1 integrity validation.
 
-These are **surface-drift bugs**, not authoring bugs. The schema-first IoC discipline (per `feedback_schema_first_ioc` memory) has not been applied uniformly. Without a structural fix, every sprint that adds vocabulary in one location without the others compounds the drift, producing silent 503/401 cascades downstream (per `feedback_schema_data_enum_drift_cascade`).
+These are **surface-drift bugs**, not authoring bugs. The schema-first IoC discipline (per `2026-04-21-elohim-epr-integrator-compatibility-contract.md`: "for any wire contract, a JSON schema is authored FIRST") has not been applied uniformly. Without a structural fix, every sprint that adds vocabulary in one location without the others compounds the drift, producing silent 503/401 cascades downstream (a seed value the protocol schema rejects surfaces later as an unrelated-looking login failure).
 
 **Design — unified extensibility-vocabulary CI gate.** A single CI script (`pnpm run schema:check-extensibility-vocabulary`) validates each governed vocabulary across all four authoritative surfaces:
 
@@ -3023,7 +3023,7 @@ The 10-year-deep query collapses to (snapshot + recent-quarter deltas) — usual
 
 ### D.13 Missing View Schemas + Enum Reconciliation (Gap 14) — Wave A prerequisite
 
-**Motivation.** Phase 1 architectural composition found three concrete schema-layer gaps that produce silent cascade failures (per `feedback_schema_data_enum_drift_cascade`):
+**Motivation.** Phase 1 architectural composition found three concrete schema-layer gaps that produce silent cascade failures (a seed value the protocol schema rejects surfaces later as an unrelated-looking login failure):
 
 - **`economic-resource-view.schema.json` does not exist.** The Resource is one of the eight foundational primitives (Part A.3) and a load-bearing primitive across every application archetype, yet the JSON schema declaring its HTTP wire shape was never authored. Without it, the doorway projection shape is undefined, the schema-contract test (`schema_contract.rs`) cannot detect drift, and the TS codegen has no source for the `EconomicResourceView` type. Any sprint that adds a Resource HTTP route is building on undeclared ground.
 - **`proofClass` enum drift in `attestation-view.schema.json`.** The view schema declares `proofClass: "witness | self-attest | audit-signature | computational"`. The validator (`attestation_validator.rs` Floor 8) and the canonical computation-attestation spec (`2026-05-01-computation-attestation-graduated-rigor-design.md`) use a different set: `witness | audit | proof | confirmation`. Any client validating the wire shape against the schema fails on attestations using validator-canonical class names. This is the exact 503/401 cascade shape the memory anchor warns about.

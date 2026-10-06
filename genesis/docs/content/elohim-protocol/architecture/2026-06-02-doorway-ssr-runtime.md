@@ -30,6 +30,8 @@ defers:
 
 # Doorway SSR Runtime — server-render as an honest compute capability
 
+> **Placement amended 2026-10-06 (the web seam).** Executing a render is hub work: the hub runs the renderer and judges a head, and a doorway relays and caches the result (`elohim/elohim-hub/README.md`, "The web seam"). The capability, auth-context and concurrency design in this document stands and moves with the runtime. The render code still in `doorway-service` is debt listed in that README.
+
 > **Canon status:** Architecture seed for the doorway server-render path.
 > **Held:** code + tests landed; the alpha SSR pod deploy is BLOCKED on a Harbor registry storage EIO
 > (`cf53a76c2`). Do not read this seed as "in-cluster verified" — it describes the landed shape, not a live pod.

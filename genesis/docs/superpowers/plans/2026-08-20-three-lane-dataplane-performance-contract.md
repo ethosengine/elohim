@@ -8,7 +8,7 @@ domain: D5
 sprint: three-lane-performance
 cites:
   - "content-reconcile-gap-rca-handoff | Content-reconcile gap plateau | sha256:78b831ddfe2b825f | path: genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "trust-as-efficiency-signal | Trust is an Efficiency Signal | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
   - "head-plane-trust-gradient-program-plan | Head-Plane Trust-Gradient Program | sha256:aee96a34080d4efa | path: genesis/docs/superpowers/plans/2026-08-08-head-plane-trust-gradient-program-plan.md"
   - genesis/manifests/habits.yaml

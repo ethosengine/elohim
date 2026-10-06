@@ -13,7 +13,7 @@ tags: [open-question, legacy-web-projection, bridge, external-format, embed, pri
 cites:
   - bridges/CLAUDE.md
   - doorway/CLAUDE.md
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - app/elohim-app/src/app/components/hero/hero.component.html
   - genesis/a2o/steps/dataplane/apex-transition.steps.ts
   - genesis/a2o/src/framework/dataplane/real-app-network.ts

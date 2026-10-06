@@ -224,7 +224,7 @@ A viral Post EPR accumulates signals at velocity. Without intervention, a single
 A Collective EPR (`content_type: "qahal"`) is the moderation surface. When a `report` FeedbackSignal lands on a post within the Collective's reach:
 
 - The signal's `signal_class: "governance"` routes it to the Collective's mishpat-pipeline via D.15 cross-DNA bridge call (`call(CallTargetCell::OtherRole("mishpat"), ...)`)
-- The Collective's stewards (Memberships with steward-attestation) plus the Collective's co-steward elohim agent (per `project_commons_elohim_co_steward`) participate in mediation
+- The Collective's stewards (Memberships with steward-attestation) plus the Collective's co-steward elohim agent (every Qahal has an autonomous elohim that co-stewards alongside its human stewards: `genesis/docs/architecture/stewardship-over-sovereignty.md`) participate in mediation
 - Outcomes: a `correction` FeedbackSignal (if evidence supports), a `revoke-reach` Event (D.9), or no action (the report itself is recorded; the reporter's standing in governance-class is staked on report quality)
 - **No platform-owned moderation queue.** The Collective owns its space; its mishpat-pipeline owns its policy
 - Cross-Collective: a Post that spans multiple Collectives (the contributor cross-posted into three groups) gets one mediation per Collective; mediation outcomes are per-Collective reach-mutations, not global

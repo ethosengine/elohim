@@ -106,6 +106,35 @@ rules:
       bar: any two doorways asked about the same commons EPR testify the SAME footprint.
       Destination: earned forgetting — data held so reliably that the mental load of
       platform surveillance dissolves, not transfers.
+  - id: web-seam-placement
+    class: dispatch
+    when:
+      write: "*.rs"
+      new: true
+      contains-any: ["/apps/", "/spa/", "SsrState", "elohim_render", "Deliverability"]
+    route-to: { dest: elohim/elohim-hub/ }
+    parameters:
+      dispatch-agent: organizer
+      dispatch-prompt: >
+        A new Rust source file in elohim-storage carries app-serving, rendering or deliverability
+        code. Apply the placement test in elohim/elohim-hub/README.md, section "The web seam"
+        (that README is the statement of the test; this prompt only summarises it). Report exactly
+        one of KEEP (it is about bytes, heads, custody or reach themselves; say which), ROUTE (it
+        is web-level work for a peer reached by key: name elohim/elohim-hub, whose crate the first
+        new piece creates) or SPLIT (name the half that stays and the half that goes), with the
+        shortest supporting reason. Do not create, move or rewrite files; report to the editing
+        agent and let development continue.
+    why: >
+      elohim-storage is for bytes, heads, custody and reach, and it stays oblivious to the hub.
+      Serving an app's files, rendering a page and judging whether a version starts are web-level
+      work for a peer reached by key, and belong in elohim/elohim-hub/. That work grew in this
+      crate before the seam was marked on 2026-10-06 (`/apps` serving, `ssr.rs`,
+      `app_deliverability.rs`; listed as debt in the hub README). New work of that kind starts
+      the hub crate; it does not deepen the debt here. Birth-time and content-scoped: it fires
+      only on a new file that carries one of the listed markers.
+    retire-when: >
+      when the dependency graph is the boundary: elohim-storage no longer depends on
+      elohim-render and serves no app files or renders itself
 cites:
   - backlog-dataplane-peer-fallback-and-blob-replication
   - substrate-convergence-five-defect-arc

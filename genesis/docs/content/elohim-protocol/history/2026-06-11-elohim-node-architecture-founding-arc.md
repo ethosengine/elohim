@@ -14,9 +14,9 @@ canonical:
   - genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
   - steward/node/CLAUDE.md   # the node gospel (the automerge-sync skill stays the behavior reference, cited below)
 cites:
-  - p2p-dataplane-sync-engine-design-arc | the March master-drawing sibling — owns the technology-bet ledger and the two-dialect doc-sync/storage-sync story this record points into | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md
-  - community-compute-founding-vision-arc | records the family-node-as-requirement inversion by the hub-optional floor — the same inversion this drawing sat on the pre-inversion side of | sha256:435254a4149365bb | path: genesis/docs/content/elohim-protocol/history/2026-06-11-community-compute-founding-vision-arc.md
-  - elohim-hub-boundaries-design | the living epic that now owns hub composition and maps each of this drawing's modules to its Hub-trait destination | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md
+  - "p2p-dataplane-sync-engine-design-arc | the March master-drawing sibling — owns the technology-bet ledger and the two-dialect doc-sync/storage-sync story this record points into | sha256:d509030b5f00acd0 | path: genesis/docs/content/elohim-protocol/history/2026-06-11-p2p-dataplane-sync-engine-design-arc.md"
+  - "community-compute-founding-vision-arc | records the family-node-as-requirement inversion by the hub-optional floor — the same inversion this drawing sat on the pre-inversion side of | sha256:435254a4149365bb | path: genesis/docs/content/elohim-protocol/history/2026-06-11-community-compute-founding-vision-arc.md"
+  - "elohim-hub-boundaries-design | the boundary design, amended since, that now owns hub composition: its Hub-trait sketch, two-swarms split, and a table placing the cluster, network, pod, dashboard, p2p and elohim_service modules audited here in hub layers | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   - .claude/skills/automerge-sync/SKILL.md
   - steward/node/src/sync/stream.rs

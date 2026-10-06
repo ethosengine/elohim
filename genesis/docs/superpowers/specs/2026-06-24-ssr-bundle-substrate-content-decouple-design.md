@@ -8,12 +8,14 @@ topic: [ssr, doorway, projection, content-addressing, app-bundle, build-decouple
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md
 cites:
-  - "doorway-ssr-runtime | SSR-as-compute-capability architecture seed (D8); this spec moves its bundle distribution from image-bake to substrate content, reusing its cold-start + pod-resource-floor budget | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
-  - "elohim-seam-map-concern-routing | Seam placement (D8 projection); names the brittle sed that strips V8/SSR from the storage image that this spec retires | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "doorway-ssr-runtime | SSR-as-compute-capability architecture seed; this spec moves its bundle distribution into substrate content, reusing its cold-start and pod-resource-floor budget; execution placement amended to the hub 2026-10-06 | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "elohim-seam-map-concern-routing | Seam placement (D8 projection); names the brittle sed that strips V8/SSR from the storage image that this spec retires | sha256:7ea7563016174974 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 requires_env: [household-nodes]
 ---
 
 # SSR Bundle as Substrate Content — Decoupling the Angular SSR Runtime from the Doorway Image
+
+> **Placement amended 2026-10-06 (the web seam).** Executing a render is hub work: the hub runs the renderer and judges a head, and a doorway relays and caches the result (`elohim/elohim-hub/README.md`, "The web seam"). This spec places render execution at the doorway; its bundle-as-substrate-content design stands. The render code still in `doorway-service` is debt listed in that README.
 
 - **Date:** 2026-06-24
 - **Status:** Design (approved spine; pre-implementation)

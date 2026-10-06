@@ -18,7 +18,7 @@ cites:
   - "plural-mishpat-lenses-over-epr-design | Plural Mishpat Lenses over an EPR | sha256:ab0055896398ef95 | path: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md"
   - genesis/docs/content/elohim-protocol/global-orchestra.md
   - "governance-layers-elohim-specialist-subagents | Elohim Specialist Subagents | sha256:a0f82593b0b15f76 | path: genesis/docs/content/elohim-protocol/architecture/governance-layers-architecture.md"
-  - "multi-collective-collaboration-epr-design | Multi-Collective Collaboration EPR Design | sha256:81807b4f6b5a9fca | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md"
+  - "multi-collective-collaboration-epr-design | Multi-Collective Collaboration EPR Design | sha256:608bc4e7725b6ec1 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-23-multi-collective-collaboration-epr-design.md"
   - "wisdom-layer-floor-ceiling-judgment-culminating-design | Wisdom Layer | sha256:f5d694c382a76c1f | path: genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-floor-ceiling-judgment-culminating-design.md"
   - "middot-measure-primitive-design | Middot | sha256:336ab2b4619b9144 | path: genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md"
 ---

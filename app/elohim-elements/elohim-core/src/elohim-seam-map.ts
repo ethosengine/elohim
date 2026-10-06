@@ -316,7 +316,7 @@ export const DEFAULT_SEAM_MAP: SeamMap = {
       problemClass: msg('Make canonical substrate truth legible to browsers and the web2 world — HTTP, OAuth, manifest-driven routes, single-target proxy + cache.'),
       addNewX: msg('Add the match arm AND is_service_path (else EPR router shadows it). Add an is_service_path unit test.'),
       home: 'doorway/doorway-service/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md',
-      confusion: msg('Hub ≠ doorway. "Doorway projects outward to web2; hub projects inward to nearby peers." Doorway is NOT a P2P participant.'),
+      confusion: msg('Hub ≠ doorway. "Doorway projects outward to web2; hub projects inward to nearby peers." Doorway is NOT a P2P participant. Web-level work for a peer reached by key is hub work (elohim/elohim-hub).'),
       applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'partial', 5: 'host' },
     },
     // §3.10
@@ -347,7 +347,7 @@ export const DEFAULT_SEAM_MAP: SeamMap = {
       title: msg('Role: Hub Cluster Ops + Enablement'),
       group: 'role-hub-cluster',
       problemClass: msg('k8s-class concerns absorbed inside a hub — blade-to-blade mDNS, leader election, pod consensus, replica/PVC placement. Plus the "hubbiness dial".'),
-      addNewX: msg('steward/node/src/{cluster,pod,p2p}/; hub-internal swarm is private to HouseholdHub/CollectiveHub impl, mDNS-first.'),
+      addNewX: msg('steward/node/src/{cluster,pod,p2p}/; hub-internal swarm is private to DwellingHub/CollectiveHub impl, mDNS-first.'),
       home: 'steward/node/CLAUDE.md; 2026-05-02-elohim-hub-boundaries-design.md; steward/node/src/',
       confusion: msg('Hub-internal swarm (steward/node, 3.12) ≠ Track-2 hub-to-hub federation (elohim-storage, 3.10/3.11). Also: hub-as-role ≠ Tier-3 hardware.'),
       applicability: { 0: 'none', 1: 'none', 2: 'none', 3: 'partial', 4: 'partial', 5: 'full' },

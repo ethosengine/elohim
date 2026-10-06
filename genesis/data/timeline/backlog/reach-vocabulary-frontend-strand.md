@@ -17,7 +17,7 @@ derived_from:
   - doorway/doorway-service/REACH.md                # retired to git 2026-06-11 (doorway island recompose) — sibling origin-strand; same geographic 8 as its enforcement ladder + access matrix
   - elohim/holochain/docs/REACH.md                  # retired to git 2026-06-11 (holochain docs island recompose) — the SYSTEM-WIDE overview strand; same geographic 8 (pre-reorg holochain/REACH.md — the "../REACH.md" target the doorway + imagodei dead pointers intended)
 cites:
-  - resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:b27fc4e09bd6eb33 | path: genesis/docs/content/elohim-protocol/resilience/README.md
+  - "resilience-protocol-spec | the canonical reconciliation home — gap-matrix row :628 + roadmap item 13 :704 name only three of the (now five+) reach vocabularies | sha256:eb697d7ad0f621ea | path: genesis/docs/content/elohim-protocol/resilience/README.md"
   - genesis/data/timeline/backlog/http-reach-enforcement-gap.md
   - app/elohim-app/src/app/elohim/models/protocol-core.model.ts
   - elohim/sdk/storage-client-ts/src/protocol-core.model.ts

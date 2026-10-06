@@ -122,7 +122,7 @@ The link types from the existing spec (`MemberOf`, `HasMember`, `HasMembership`,
 What changes is the **set of validation rules** applied during `validate_create_membership`:
 - When `member_kind == Person`, the CID must resolve to an Agent EPR (existing behavior)
 - When `member_kind == Collective`, the CID must resolve to a Collective entry (via `must_get_entry`), and the *parent Qahal's rubric* must permit collective-membership at the requested role
-- When `member_kind == ElohimAgent`, the CID must resolve to an ElohimAgent entry per `project_elohim_subagent_specialists`, and the parent Qahal must explicitly permit ElohimAgent membership (Collectives may exclude AI advocates; this is a per-rubric configuration)
+- When `member_kind == ElohimAgent`, the CID must resolve to an ElohimAgent entry (elohims act through specialists, each with a manifest declaring inputs, outputs and disclosure rules: `genesis/docs/architecture/stewardship-over-sovereignty.md`), and the parent Qahal must explicitly permit ElohimAgent membership (Collectives may exclude AI advocates; this is a per-rubric configuration)
 
 ### 2.2 Graph shape
 
@@ -331,7 +331,7 @@ Three responses are legitimate:
 
 Manufactured-emergence attacks (fake personas creating fake affinity convergence to spawn a Collab whose existence laundering grants the attackers reach) hit a structural ceiling: **emergent-only collabs cannot graduate to T1+ without commons-elohim counter-attestation**, and commons-elohims represent the commons-interest of their Collective — they refuse formalization when the convergence is manufactured, because:
 - The value-scanner pattern recognition exposes manufactured signal (no real care-history at intimate scale)
-- Substrate-wide standing checks per `project_socially_derived_security` expose synthetic personas
+- Substrate-wide standing checks expose synthetic personas (a person is vouched for by peers who know them; see the recovery layers in `genesis/docs/architecture/cradle-to-grave-capability-gradient.md`)
 - Cross-attestation graph analysis reveals abnormal connectivity (real social networks have characteristic graph signatures; manufactured ones don't match)
 
 The attacker's collab stays bounded at T0 reach — they can shout in their own manufactured room.
@@ -599,7 +599,7 @@ Five substantial pieces are named here as dependencies/follow-ons but not design
 
 ### 9.1 Proof-of-Care consensus mechanism for the chain layer
 
-The chain layer's consensus weight is sourced from aggregated proof-of-care witnessed across the participating commons. The mechanism — how value-scanner aggregates project into validator weight, the cryptography of aggregation, anti-Sybil at the witnessing layer, aggregation-attack defenses, how the chain layer's append-only properties are achieved without PoS/PoW capture-vulnerabilities — is its own substantial spec. **Prerequisite: value-scanner online** (per `project_household_living_core_lived_contrast_diffusion`).
+The chain layer's consensus weight is sourced from aggregated proof-of-care witnessed across the participating commons. The mechanism — how value-scanner aggregates project into validator weight, the cryptography of aggregation, anti-Sybil at the witnessing layer, aggregation-attack defenses, how the chain layer's append-only properties are achieved without PoS/PoW capture-vulnerabilities — is its own substantial spec. **Prerequisite: value-scanner online** (the value scanner is what makes household care legible: `genesis/docs/content/elohim-protocol/value_scanner/epic.md`).
 
 This spec NAMES the layer, declares its consensus substrate is proof-of-care, and references the interface points (commitment anchoring, council resolution records, multi-council ratification). The mechanism design lives in a follow-on spec.
 

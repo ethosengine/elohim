@@ -6,9 +6,9 @@ status: Living reference
 author: workflow:elohim-seam-map-atlas
 cites:
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
-  - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:d7ffa707a34d126f | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
+  - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
-  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
+  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:6e3bdadec535536c | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
   - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
   - "hardware-spec | Elohim Protocol Hardware Ecosystem: Technical Specification | sha256:230d54b7e8ad2df2 | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "dna-upgrade-governance | DNA Upgrade Governance | sha256:48b79bbffd184d89 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md"
@@ -129,7 +129,7 @@ the **four tracks** are *how a running thing participates*. They meet but never 
 `device-*` definitions in `genesis/data/devices/devices.json`, wired per human via
 `deviceArchetype` in `genesis/orchestrator/data/deployments.json`.
 
-| Rung | Archetype (`device-*`) | L | formFactor | Binary it runs | Role(s) it can play | Tracks |
+| Rung | Archetype (`device-*`) | L | formFactor | Binary it runs today | Role(s) it can play | Tracks |
 |---|---|---|---|---|---|---|
 | Wearable / identity fob | `biometric-fob` | 0 | fob | none (`streamsTo` a peer) | signing oracle / identity attestation | T1, T3 (spoke) |
 | Civic camera | `observer-camera` | 0 | iot-sensor | none | presence/observation attestation | T1, T3 |
@@ -212,7 +212,9 @@ canonical home · the adjacent-seam confusion to avoid.**
   `elohim/elohim-storage/CLAUDE.md`; `steward/node/CLAUDE.md`; `doorway/doorway-service/CLAUDE.md`.
 - **Confusion:** the **`elohim-node` name overload** — the `steward/node` *binary* `elohim-node`
   (the dashboard/wizard daemon) vs the k8s *container* named `elohim-node` that runs
-  `elohim-storage`. Also: footprint tuning is native-binary-only —
+  `elohim-storage`. Target (2026-10-06): one node process, `elohim-node`, on every peer-capable
+  device, linking storage and the hub; the bare-storage container and the desktop's bare storage
+  sidecar are debt (`elohim/elohim-hub/README.md`). Also: footprint tuning is native-binary-only —
   never tweak WASM/DNA per device (it changes the DNA hash → partition).
 
 ### 3.4 Mod / plugin (native extension INTO the runtime)
@@ -309,6 +311,11 @@ canonical home · the adjacent-seam confusion to avoid.**
   retired `2026-05-08-doorway-hub-edge-design.md`** (compacted into the 05-02 doc).
 - **Confusion:** hub ≠ doorway — "doorway projects outward to web2; hub projects inward to
   nearby peers." A "decentralize the doorway" concern is its own work, not the hub seam.
+  Web-level work for a peer reached by key (serving an app's files, rendering, the
+  deliverability verdict) is hub work, not doorway work: the hub side of the web seam, home
+  `elohim/elohim-hub/` (its README states the test and lists the code that has not moved).
+  Work that exists because the other end is a browser stays doorway work, even for a
+  household's own browser-only devices.
 
 ### 3.10 Role seam — Peer-hoster dataplane (Tracks 2 + 3)
 - **Problem-class:** durable availability of records across disconnect — A edits offline →
@@ -319,10 +326,14 @@ canonical home · the adjacent-seam confusion to avoid.**
   (skills `libp2p-protocols`/`libp2p-transport`); the CRDT engine is Automerge (`automerge-sync`).
 - **Home:** `elohim/elohim-storage/CLAUDE.md`; assessment
   `genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md`; CRDT store `sync/doc_store.rs`,
-  node↔node loop `p2p/mod.rs`, spoke route `http.rs`.
+  node↔node loop `p2p/mod.rs`, spoke route `http.rs`. Web-level work for peers reached by key
+  (app serving, rendering, the deliverability verdict) belongs to the hub side of the web seam, home
+  `elohim/elohim-hub/`, not to this crate.
 - **Confusion:** peerId ≠ hostname — "reach my household node" is a peerId→household-binding
   problem (`household_id` at discovery), NOT a DNS/ingress problem. And peer-hoster (durable
   *availability* of records) ≠ aggregation (value *rollup* of aggregates), though both ride T2.
+  One exception to "no DNS": a browser-only device cannot reach a peer by key, so a household
+  that wants one served runs the doorway role on its hub box (the doorway side of the web seam).
 
 ### 3.11 Role seam — Aggregation / recursive rollup (Track 2)
 - **Problem-class:** recursive signal aggregation (region ← councils ← households) over the
@@ -344,7 +355,7 @@ canonical home · the adjacent-seam confusion to avoid.**
   axis: the "hubbiness dial" that flips recycled hardware into the hub role, and identity-
   preserving tier graduation. Runs on a **second libp2p swarm distinct from Track 2**.
 - **Add a new X (cluster behaviour):** `steward/node/src/{cluster,pod,p2p}/`; the hub-internal
-  swarm is private to the `HouseholdHub`/`CollectiveHub` impl, mDNS-first.
+  swarm is private to the `DwellingHub`/`CollectiveHub` impl, mDNS-first.
 - **Home:** `steward/node/CLAUDE.md`; arch `2026-05-02-elohim-hub-boundaries-design.md`
   (Hub trait, two-swarms table `:180-189`); assessment
   `genesis/data/timeline/backlog/hub-enablement-dial-readiness-2026-06-21.md`; DNA-key lineage
@@ -353,6 +364,8 @@ canonical home · the adjacent-seam confusion to avoid.**
   federation (Seam 3.10/3.11, `elohim-storage`). Debugging blade consensus in
   `elohim-storage/src/p2p` means you're in the wrong crate. Also: hub-as-role ≠ Tier-3 hardware
   — a recycled laptop plugged in overnight IS a consumer-grade hub.
+  And hub cluster ops (this seam) ≠ the hub side of the web seam (app serving and rendering for peers
+  reached by key; home `elohim/elohim-hub/`).
 
 ### 3.13 Confidentiality / encryption / secrets (the third CIA leg)
 - **Problem-class:** keeping content readable only by intended readers — encryption-at-rest,
