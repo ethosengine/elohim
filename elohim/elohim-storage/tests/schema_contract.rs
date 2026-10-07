@@ -355,6 +355,13 @@ fn p2p_status_fixture() -> P2PStatusInfo {
             dead_remaining_stuck: false,
             reanchor_skipped_reach: 0,
             reanchor_skipped_content_type: 0,
+            reanchor_adopted: 2,
+            reanchor_held: 0,
+            reanchor_held_backoff: 0,
+            reanchor_held_unbacked: 0,
+            reanchor_held_unanswered: 0,
+            dead_settled_by_declaration: 0,
+            reanchor_awaiting_channel: 0,
         }),
         // Dual-stack: exercise the additive irohNodeId serialization against the
         // schema (64-char hex NodeId).
@@ -486,6 +493,13 @@ fn p2p_status_view_with_stuck_dead_anchor_population_matches_schema() {
             dead_remaining_stuck: true,
             reanchor_skipped_reach: 1,
             reanchor_skipped_content_type: 1,
+            reanchor_adopted: 0,
+            reanchor_held: 0,
+            reanchor_held_backoff: 0,
+            reanchor_held_unbacked: 0,
+            reanchor_held_unanswered: 0,
+            dead_settled_by_declaration: 0,
+            reanchor_awaiting_channel: 0,
         }),
         iroh_node_id: None,
     };
@@ -504,6 +518,53 @@ fn p2p_status_view_with_stuck_dead_anchor_population_matches_schema() {
     );
     assert_eq!(provide_loop.get("reanchorCaughtUp"), Some(&false.into()));
     assert_eq!(provide_loop.get("reanchorPending"), Some(&2.into()));
+
+    validate_against_schema("views/p2p-status-view.schema.json", &json);
+}
+
+/// F1 + F3 (2026-10-07): the per-arm counts and the settled-by-declaration
+/// split ride the wire beside the untouched dead/pending counts. A household
+/// whose only dead rows are settled by a declaration, and whose only
+/// never-authored rows await their release channel, reads caught up and not
+/// stuck, while `reanchorDeadRemaining` and `reanchorPending` still count them
+/// (never laundered to live).
+#[test]
+fn p2p_status_view_with_per_arm_counts_and_settled_dead_rows_matches_schema() {
+    let mut status = p2p_status_fixture();
+    status.provide_loop = Some(ProvideLoopStatus {
+        self_cid_source: "derived-libp2p-peer-id".to_string(),
+        active: true,
+        reanchor_pending: 16,
+        reanchor_completed: 12,
+        reanchor_failed: 0,
+        reanchor_caught_up: true,
+        reanchor_dead_remaining: 3,
+        stuck_sweeps: 0,
+        dead_remaining_stuck: false,
+        reanchor_skipped_reach: 0,
+        reanchor_skipped_content_type: 0,
+        reanchor_adopted: 1,
+        reanchor_held: 1,
+        reanchor_held_backoff: 2,
+        reanchor_held_unbacked: 52,
+        reanchor_held_unanswered: 0,
+        dead_settled_by_declaration: 3,
+        reanchor_awaiting_channel: 13,
+    });
+    let json = serde_json::to_value(&status).unwrap();
+    let provide_loop = json.get("provideLoop").expect("provideLoop present");
+    assert_eq!(provide_loop.get("reanchorAdopted"), Some(&1.into()));
+    assert_eq!(provide_loop.get("reanchorHeld"), Some(&1.into()));
+    assert_eq!(provide_loop.get("reanchorHeldBackoff"), Some(&2.into()));
+    assert_eq!(provide_loop.get("reanchorHeldUnbacked"), Some(&52.into()));
+    assert_eq!(provide_loop.get("reanchorHeldUnanswered"), Some(&0.into()));
+    assert_eq!(
+        provide_loop.get("deadSettledByDeclaration"),
+        Some(&3.into())
+    );
+    assert_eq!(provide_loop.get("reanchorDeadRemaining"), Some(&3.into()));
+    assert_eq!(provide_loop.get("reanchorCaughtUp"), Some(&true.into()));
+    assert_eq!(provide_loop.get("deadRemainingStuck"), Some(&false.into()));
 
     validate_against_schema("views/p2p-status-view.schema.json", &json);
 }

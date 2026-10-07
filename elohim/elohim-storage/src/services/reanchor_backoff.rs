@@ -55,6 +55,8 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+use crate::services::head_adoption::HoldBasis;
+
 /// Hard cap on the ledger. The live dead-anchor population is tens of rows per
 /// pod and the fleet-wide contested set ~11.4k; 50k leaves generous headroom
 /// while making unbounded growth impossible on a pathological corpus. Mirrors
@@ -78,6 +80,11 @@ struct HeldEntry {
     /// The peer-advertised head this candidate was held against (`""` when the
     /// sweep carried no hint for it). Exit (3) keys on this.
     against: String,
+    /// What the hold rested on. Replayed by [`skip_verdict`] so a skipped row
+    /// is counted (`deadSettledByDeclaration`, `reanchorAwaitingChannel`,
+    /// `reanchorHeldUnanswered`) exactly as its last real pre-flight was —
+    /// never upgraded by the skip itself.
+    basis: HoldBasis,
 }
 
 fn ledger() -> &'static Mutex<HashMap<String, HeldEntry>> {
@@ -92,6 +99,12 @@ fn ledger() -> &'static Mutex<HashMap<String, HeldEntry>> {
 /// skip path, so a skip can never extend its own window into an unbounded hold.
 /// That is the single rule that keeps exit (1) reachable.
 pub fn note_held(id: &str, against: &str) {
+    note_held_with_basis(id, against, HoldBasis::Settled);
+}
+
+/// [`note_held`], recording what the hold rested on. Every basis backs off the
+/// same way; only the published counts read the difference.
+pub fn note_held_with_basis(id: &str, against: &str, basis: HoldBasis) {
     let id = id.trim();
     if id.is_empty() {
         return;
@@ -115,6 +128,7 @@ pub fn note_held(id: &str, against: &str) {
         HeldEntry {
             at: Instant::now(),
             against: against.trim().to_string(),
+            basis,
         },
     );
 }
@@ -144,17 +158,23 @@ pub fn note_progress(id: &str) {
 /// provable without touching a process-wide `OnceLock` — the parallel-test flake
 /// this crate has already paid for once (see `heal_backoff::should_replay`).
 pub fn should_skip(id: &str, advertised_head: &str, window: Duration) -> bool {
+    skip_verdict(id, advertised_head, window).is_some()
+}
+
+/// [`should_skip`], also returning what the replayed hold rested on: `Some`
+/// = skip, with the basis the last real pre-flight held on; `None` = do not
+/// skip.
+pub fn skip_verdict(id: &str, advertised_head: &str, window: Duration) -> Option<HoldBasis> {
     if window.is_zero() {
-        return false;
+        return None;
     }
     let id = id.trim();
     let advertised_head = advertised_head.trim();
-    let Ok(guard) = ledger().lock() else {
-        return false;
-    };
+    let guard = ledger().lock().ok()?;
     guard
         .get(id)
-        .is_some_and(|e| e.at.elapsed() < window && e.against == advertised_head)
+        .filter(|e| e.at.elapsed() < window && e.against == advertised_head)
+        .map(|e| e.basis)
 }
 
 /// Candidates currently holding an entry (expired-but-unobserved included).
@@ -325,6 +345,41 @@ mod tests {
             !should_skip("cap:0", "h", Duration::from_secs(900)),
             "overflow must RELEASE candidates (fail-open), never strand them"
         );
+        reset_for_test();
+    }
+
+    /// F3: a skip replays what the last REAL hold rested on, so a row held on
+    /// an unanswered probe is never counted settled-by-declaration just
+    /// because the next sweeps skipped it.
+    #[test]
+    fn a_skip_replays_the_hold_basis_it_was_earned_with() {
+        let _g = exclusive();
+        reset_for_test();
+        let window = Duration::from_secs(900);
+        note_held_with_basis("basis:settled", "", HoldBasis::Settled);
+        note_held_with_basis("basis:unanswered", "", HoldBasis::Unanswered);
+        note_held_with_basis("basis:channel", "", HoldBasis::AwaitingChannel);
+        assert_eq!(
+            skip_verdict("basis:settled", "", window),
+            Some(HoldBasis::Settled)
+        );
+        assert_eq!(
+            skip_verdict("basis:unanswered", "", window),
+            Some(HoldBasis::Unanswered)
+        );
+        assert_eq!(
+            skip_verdict("basis:channel", "", window),
+            Some(HoldBasis::AwaitingChannel)
+        );
+        assert_eq!(skip_verdict("basis:never-held", "", window), None);
+        // The plain form records a settled hold, as every hold was before F5.
+        note_held("basis:plain", "");
+        assert_eq!(
+            skip_verdict("basis:plain", "", window),
+            Some(HoldBasis::Settled)
+        );
+        // A disabled window never skips, whatever the basis.
+        assert_eq!(skip_verdict("basis:settled", "", Duration::ZERO), None);
         reset_for_test();
     }
 }

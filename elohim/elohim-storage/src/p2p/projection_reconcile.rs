@@ -2545,6 +2545,7 @@ pub async fn run_heal(
         healed: content_healed,
         conductor_missing: content_missing,
         ghost_candidates,
+        ghost_replayed,
         adopt_candidates,
     } = heal_content(
         &mut content_tracker,
@@ -2729,7 +2730,16 @@ pub async fn run_heal(
     // Ghost-anchor witness: the NULL-anchor sweep above cannot see rows whose
     // anchor string outlived its conductor incarnation. Runs on the same leg,
     // fed by the conductor answers the heal already paid for.
-    witness_ghost_anchors(hc, pool, &ghost_candidates, &adopt, &pacing, resolver).await;
+    witness_ghost_anchors(
+        hc,
+        pool,
+        &ghost_candidates,
+        &ghost_replayed,
+        &adopt,
+        &pacing,
+        resolver,
+    )
+    .await;
 
     // Publish the WHOLE sweep (F-D, 2026-08-01): every arm's post-heal counts
     // folded, alongside the divergent-anchor counter that already folded across
@@ -2922,6 +2932,12 @@ struct ContentHealOutcome {
     /// Ids the own conductor could not resolve — the ghost-anchor candidate
     /// set, narrowed to the truly-anchored rows by [`witness_ghost_anchors`].
     ghost_candidates: Vec<String>,
+    /// The subset of `ghost_candidates` that entered from the backoff REPLAY
+    /// (`heal_backoff::should_replay`) — a CACHED absence, not an answer this
+    /// sweep. Such rows may still be re-authored, but never stamped `dead`: a
+    /// dead verdict needs a fresh conductor answer in the same sweep (site 5 of
+    /// the dead-anchor wedge, 2026-10-07).
+    ghost_replayed: std::collections::HashSet<String>,
     /// Ids whose `GapFill` was SKIPPED because it would have self-elected over a
     /// peer's advertised declaration ([`gapfill_would_self_elect`]). Handed to
     /// [`adopt_deferred_heads`] in the same sweep.
@@ -2934,6 +2950,20 @@ struct ContentHealOutcome {
     /// Carries that answer with each id (see [`AdoptCandidate`]) so the adopt arm
     /// can take `AdoptLocal` on a canonical one instead of asserting absence.
     adopt_candidates: Vec<AdoptCandidate>,
+}
+
+/// The ghost ids whose absence was answered THIS sweep — the only ones the
+/// ghost-witness may stamp `dead` (site 5). Pure; order follows `ghosts`.
+fn fresh_ghost_ids(
+    ghosts: &[(String, String, String)],
+    replayed: &std::collections::HashSet<String>,
+) -> Vec<String> {
+    ghosts
+        .iter()
+        .map(|(id, _, _)| id)
+        .filter(|id| !replayed.contains(*id))
+        .cloned()
+        .collect()
 }
 
 /// Ghost-anchor witness: author a local notarized head for rows whose SQL
@@ -2999,6 +3029,7 @@ async fn witness_ghost_anchors(
     hc: &Arc<HcClient>,
     pool: &DbPool,
     candidates: &[String],
+    replayed: &std::collections::HashSet<String>,
     adopt: &crate::services::head_adoption::AdoptContext<'_>,
     pacing: &HealPacing,
     resolver: &dyn crate::services::head_batch_resolver::HeadBatchResolver,
@@ -3047,13 +3078,17 @@ async fn witness_ghost_anchors(
     // heal loop's second arm (`list_dead_anchor_content_ids`), so a re-author
     // that fails this tick is retried instead of forgotten.
     //
-    // Honest about its own freshness: `heal_content`'s backoff replay can put an
-    // id here from a CACHED absence rather than a fresh call (bounded by
-    // `config::heal_missing_backoff_window`). The verdict recorded is therefore
-    // "this conductor's standing answer is absent", stamped with when we last
-    // acted on it — never a claim that a call was made this instant.
-    {
-        let ghost_ids: Vec<String> = ghosts.iter().map(|(id, _, _)| id.clone()).collect();
+    // FRESH ANSWERS ONLY (site 5, 2026-10-07). `heal_content`'s backoff replay
+    // can put an id here from a CACHED absence rather than a call this sweep
+    // (bounded by `config::heal_missing_backoff_window`). A cached absence may
+    // still route the row to the author path below — that is the replay's
+    // purpose — but it never WRITES a death certificate: `dead` is persisted
+    // with no expiry and only a re-author clears it, so stamping it from a
+    // replay re-kills rows on the strength of an answer nobody gave this sweep.
+    // A replayed id that is still absent is re-asked once its backoff lapses,
+    // and is stamped then, on that fresh answer.
+    let ghost_ids: Vec<String> = fresh_ghost_ids(&ghosts, replayed);
+    if !ghost_ids.is_empty() {
         match pool.get() {
             Ok(mut conn) => {
                 match crate::db::content_diesel::mark_anchor_state(
@@ -3115,6 +3150,8 @@ async fn witness_ghost_anchors(
         let mut failed = 0usize;
         let mut adopted = 0usize;
         let mut held = 0usize;
+        let mut held_unanswered = 0usize;
+        let mut held_unbacked = 0usize;
         for (id, reach, content_type) in ghosts.iter().take(pacing.witness_max_per_tick as usize) {
             // Same guard as the re-anchor path: a reach outside the DNA-notarized
             // vocabulary can never be re-authored, so it would burn a conductor
@@ -3177,7 +3214,7 @@ async fn witness_ghost_anchors(
             let adopt_declare_started = std::time::Instant::now();
             let preflight = crate::chain_write_gate::as_writer(
                 crate::chain_write_gate::WriterKind::SweepAdopt,
-                crate::services::head_adoption::try_adopt_canonical_head(
+                crate::services::head_adoption::try_adopt_canonical_head_explained(
                     hc,
                     pool,
                     &ghost_ctx,
@@ -3199,7 +3236,7 @@ async fn witness_ghost_anchors(
                 crate::metrics::ConvergenceAtom::AdoptDeclare,
                 adopt_declare_started.elapsed(),
             );
-            let pending_adopt = match preflight {
+            let pending_adopt = match preflight.outcome {
                 crate::services::head_adoption::AdoptOutcome::Adopted => {
                     adopted += 1;
                     continue;
@@ -3210,9 +3247,20 @@ async fn witness_ghost_anchors(
                 crate::services::head_adoption::AdoptOutcome::Held
                 | crate::services::head_adoption::AdoptOutcome::Contested => {
                     held += 1;
+                    if preflight.hold_basis
+                        == Some(crate::services::head_adoption::HoldBasis::Unanswered)
+                    {
+                        held_unanswered += 1;
+                    }
                     continue;
                 }
                 crate::services::head_adoption::AdoptOutcome::Author => None,
+                // F5: the declaration is UNBACKED on this network — author the
+                // row exactly as an undeclared ghost (the update below).
+                crate::services::head_adoption::AdoptOutcome::AuthorUnbacked => {
+                    held_unbacked += 1;
+                    None
+                }
                 crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt {
                     head_action_hash,
                     carried_record,
@@ -3294,11 +3342,19 @@ async fn witness_ghost_anchors(
                 }
             }
         }
-        (authored, skipped, failed, adopted, held)
+        (
+            authored,
+            skipped,
+            failed,
+            adopted,
+            held,
+            held_unanswered,
+            held_unbacked,
+        )
     };
 
     match tokio::time::timeout(pacing.witness_sweep_budget, sweep).await {
-        Ok((authored, skipped, failed, adopted, held)) => {
+        Ok((authored, skipped, failed, adopted, held, held_unanswered, held_unbacked)) => {
             crate::metrics::add_content_witness_authored(authored as u64);
             tracing::warn!(
                 target: "elohim_storage::projection_reconcile",
@@ -3309,6 +3365,8 @@ async fn witness_ghost_anchors(
                 failed,
                 adopted,
                 held,
+                held_unanswered,
+                held_unbacked,
                 "projection-reconcile[ghost-witness]: authored local heads for rows whose claimed \
                  dht_anchor_hash this conductor cannot resolve (stale-anchor class)"
             );
@@ -5130,6 +5188,7 @@ async fn heal_content(
         .pending_ids()
         .into_iter()
         .partition(|id| crate::services::heal_backoff::should_replay(id, replay_window));
+    let ghost_replayed: std::collections::HashSet<String> = replayed.iter().cloned().collect();
     conductor_missing += apply_replayed_missing(
         &replayed,
         tracker,
@@ -5815,6 +5874,7 @@ async fn heal_content(
         healed,
         conductor_missing,
         ghost_candidates,
+        ghost_replayed,
         adopt_candidates,
     }
 }
@@ -6278,7 +6338,11 @@ async fn adopt_deferred_heads(
                 crate::services::head_adoption::AdoptOutcome::Held => {
                     held_ref.fetch_add(1, Ordering::Relaxed);
                 }
-                crate::services::head_adoption::AdoptOutcome::Author => {
+                // `AuthorUnbacked` needs an ANSWERED local absence, which this
+                // arm never passes (`observed(Some)` / `unresolved()`); kept
+                // with `Author` so the match stays total if that ever changes.
+                crate::services::head_adoption::AdoptOutcome::Author
+                | crate::services::head_adoption::AdoptOutcome::AuthorUnbacked => {
                     retry_ref.fetch_add(1, Ordering::Relaxed);
                 }
                 crate::services::head_adoption::AdoptOutcome::AuthorThenAdopt { .. } => {
@@ -11996,5 +12060,45 @@ mod tests {
             crate::services::conductor_writes::REA_COMMITMENT_READ_DEFAULT_CLASS,
             "the reconciler's reads and a person's read must not draw on the same wait bound"
         );
+    }
+
+    /// Site 5 of the dead-anchor wedge (2026-10-07): the ghost-witness stamps
+    /// `dead` only for ids whose absence the conductor answered THIS sweep. An
+    /// id that reached the ghost set from the backoff REPLAY (a cached answer)
+    /// may still be re-authored, but never re-killed on an answer nobody gave.
+    #[test]
+    fn ghost_witness_stamps_dead_only_from_a_fresh_answer() {
+        let ghosts = vec![
+            (
+                "fresh-a".to_string(),
+                "commons".to_string(),
+                "concept".to_string(),
+            ),
+            (
+                "cached-b".to_string(),
+                "commons".to_string(),
+                "concept".to_string(),
+            ),
+            (
+                "fresh-c".to_string(),
+                "commons".to_string(),
+                "concept".to_string(),
+            ),
+        ];
+        let replayed: std::collections::HashSet<String> =
+            ["cached-b".to_string()].into_iter().collect();
+        assert_eq!(
+            fresh_ghost_ids(&ghosts, &replayed),
+            vec!["fresh-a".to_string(), "fresh-c".to_string()]
+        );
+        // Nothing replayed: every ghost answered fresh, every ghost is stamped.
+        assert_eq!(
+            fresh_ghost_ids(&ghosts, &std::collections::HashSet::new()).len(),
+            3
+        );
+        // Everything replayed: no death certificate is written this sweep.
+        let all: std::collections::HashSet<String> =
+            ghosts.iter().map(|(id, _, _)| id.clone()).collect();
+        assert!(fresh_ghost_ids(&ghosts, &all).is_empty());
     }
 }

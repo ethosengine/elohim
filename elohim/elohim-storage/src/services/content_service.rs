@@ -35,6 +35,27 @@ async fn create_or_update_existing_content(
     }
 }
 
+/// True when `update_content` refused because THIS network holds no Content
+/// root for the id at all — the stale-anchor class `update_via_conductor`
+/// heals by re-publishing the full entry through `create_content`.
+///
+/// Two spellings of one fact. `"no Content entry found"` is the original
+/// (2026-06-10). `"canonical root history unavailable"` is what the zome says
+/// since `update_content` resolves the canonical identity root FIRST: with no
+/// `IdToContent` link anywhere, that resolution is empty and the zome answers
+/// `PENDING` before it can reach the older message — so the post-reset class
+/// the heal exists for stopped matching it (the 2026-10-07 household recast:
+/// 50+ minutes of PENDING on `elohim-host-landing`). Healing on it is safe for
+/// the same reason the original is: `create_content` refuses (`already exists`)
+/// whenever any `IdToContent` link is visible on the network, so a root that
+/// does exist is never shadowed. The sibling `"candidate root history
+/// unavailable"` (links exist, a root has not gossiped in) is deliberately NOT
+/// matched — that is a wait, not an absence.
+pub(crate) fn is_stale_anchor_error(err: &StorageError) -> bool {
+    let msg = err.to_string();
+    msg.contains("no Content entry found") || msg.contains("canonical root history unavailable")
+}
+
 /// Content service for business logic
 pub struct ContentService {
     pool: DbPool,
@@ -559,7 +580,7 @@ impl ContentService {
                 // ContentCommitted projection overwrites the stale anchor.
                 // Without this, every post-reset PATCH 503s forever and the
                 // EPR-routed mounts (the landing a human visits) stay 404.
-                Err(e) if e.to_string().contains("no Content entry found") => {
+                Err(e) if is_stale_anchor_error(&e) => {
                     tracing::warn!(
                         id = %id,
                         "update_via_conductor: stale dht_anchor_hash (no DHT entry behind it) — healing via create_content re-publish"
@@ -1046,6 +1067,38 @@ pub(crate) fn committed_projection_patch(oc: &lamad_types::Content) -> ContentPr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The 2026-10-07 household recast: `update_content` answers PENDING (no
+    /// canonical identity root on this network) where it used to answer "no
+    /// Content entry found", so the stale-anchor heal never fired and the
+    /// stage leg's blobHash PATCH failed for 50+ minutes. Both spellings of
+    /// "no root here" heal; a root that exists but has not gossiped in does not.
+    #[test]
+    fn stale_anchor_heal_matches_both_spellings_of_no_root() {
+        let pending = StorageError::Conductor(
+            "Zome call failed: External API wire error: InternalError(\"Wasm runtime error \
+             while working with Ribosome: RuntimeError: content_store:2522: \
+             Guest(\\\"update_content: canonical root history unavailable — PENDING\\\")\")"
+                .into(),
+        );
+        assert!(is_stale_anchor_error(&pending));
+        let legacy = StorageError::Conductor(
+            "Zome call failed: Guest(\"update_content: no Content entry found for id 'x'\")".into(),
+        );
+        assert!(is_stale_anchor_error(&legacy));
+        let waiting = StorageError::Conductor(
+            "Zome call failed: Guest(\"update_content: candidate root history unavailable — \
+             PENDING\")"
+                .into(),
+        );
+        assert!(
+            !is_stale_anchor_error(&waiting),
+            "links exist and a root has not gossiped in: that is a wait, not an absence"
+        );
+        assert!(!is_stale_anchor_error(&StorageError::Internal(
+            "Pool error: connection timed out".into()
+        )));
+    }
 
     #[tokio::test]
     async fn duplicate_native_root_updates_once_and_returns_the_committed_update() {

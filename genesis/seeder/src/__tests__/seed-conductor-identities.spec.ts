@@ -28,6 +28,7 @@ import {
   extractHumanId,
   ensureOwnAgentProfile,
   humanShortName,
+  resultSuffix,
   parseConductorUrls,
   resolveCandidateUrls,
   selectStewardApp,
@@ -288,12 +289,13 @@ describe('own Agent onboarding', () => {
     expect(f.calls.map((c) => c.fn)).toEqual(['get_my_human']);
   });
 
+  // Identity is id + holochain_agent_key (2026-10-07 ruling, recast household).
   it.each([
     { holochain_agent_key: 'another-caller' },
-    { visibility: 'public' },
-    { display_name: 'Another profile' },
+    { holochain_agent_key: 'another-caller', visibility: 'public' },
+    { id: 'human-someone-else' },
   ])(
-    'refuses an existing conflicting Agent without overwriting it: %j',
+    '(1) refuses an Agent held by another agent key without overwriting it: %j',
     async (conflict) => {
       const f = fixture({
         action_hash: 'conflicting-action',
@@ -305,6 +307,94 @@ describe('own Agent onboarding', () => {
       expect(f.calls.some((c) => c.fn === 'create_agent')).toBe(false);
     },
   );
+
+  it('(2) same key and every field matching is an existing Agent, with no field report', async () => {
+    const f = fixture({ action_hash: 'existing-action', agent });
+    const receipt = await ensureOwnAgentProfile(f.call, human.id, caller);
+    expect(receipt).toEqual({
+      created: false,
+      actionHash: 'existing-action',
+      callerAgentKey: caller,
+    });
+    expect(receipt).not.toHaveProperty('profileFieldsDiffer');
+  });
+
+  it('(3) same key with differing profile fields is the node\'s own identity: reported, not refused, never written', async () => {
+    // A storage peer self-healed a bare profile at boot (GENESIS_SELF_HEAL_IDENTITY=1).
+    const selfHealed = {
+      ...agent,
+      bio: null,
+      affinities: [],
+      visibility: 'public',
+      location: 'somewhere',
+    };
+    const f = fixture({ action_hash: 'self-healed-action', agent: selfHealed });
+    await expect(
+      ensureOwnAgentProfile(f.call, human.id, caller),
+    ).resolves.toEqual({
+      created: false,
+      actionHash: 'self-healed-action',
+      callerAgentKey: caller,
+      profileFieldsDiffer: ['bio', 'affinities', 'visibility', 'location'],
+    });
+    expect(f.calls.map((c) => c.fn)).toEqual([
+      'get_my_human',
+      'get_agent_by_id',
+      'get_agent_by_id',
+    ]);
+  });
+
+  it('(3) the readback follows the same rule: same key with differing fields on readback is not a conflict', async () => {
+    let reads = 0;
+    const call = async (fn: string): Promise<unknown> => {
+      if (fn === 'get_my_human') return { human };
+      if (fn === 'get_agent_by_id') {
+        reads += 1;
+        return {
+          action_hash: 'existing-action',
+          agent: reads === 1 ? agent : { ...agent, display_name: 'Jess' },
+        };
+      }
+      throw new Error(`Unexpected coordinator ${fn}`);
+    };
+    await expect(ensureOwnAgentProfile(call, human.id, caller)).resolves.toMatchObject({
+      actionHash: 'existing-action',
+      profileFieldsDiffer: ['display_name'],
+    });
+  });
+
+  it('(1) the readback follows the same rule: another key on readback is a conflict', async () => {
+    let reads = 0;
+    const call = async (fn: string): Promise<unknown> => {
+      if (fn === 'get_my_human') return { human };
+      if (fn === 'get_agent_by_id') {
+        reads += 1;
+        return {
+          action_hash: 'existing-action',
+          agent: reads === 1 ? agent : { ...agent, holochain_agent_key: 'another-caller' },
+        };
+      }
+      throw new Error(`Unexpected coordinator ${fn}`);
+    };
+    await expect(ensureOwnAgentProfile(call, human.id, caller)).rejects.toThrow('conflicts');
+  });
+
+  it('refuses a freshly created Agent whose stored fields differ from what was authored', async () => {
+    const call = async (fn: string, payload: unknown): Promise<unknown> => {
+      if (fn === 'get_my_human') return { human };
+      if (fn === 'get_agent_by_id') return null;
+      if (fn === 'create_agent') {
+        return {
+          action_hash: 'created-action',
+          agent: { ...(payload as object), bio: 'rewritten', holochain_agent_key: caller },
+        };
+      }
+      throw new Error(`Unexpected coordinator ${fn}`);
+    };
+    await expect(ensureOwnAgentProfile(call, human.id, caller)).rejects.toThrow(
+      'differs from its input: bio',
+    );
+  });
 
   it.each(['commons', 'draft', 'intimate'])('refuses unsupported Human reach %s before authoring', async reach => {
     const f = fixture(null, { ...human, profile_reach: reach });
@@ -389,5 +479,42 @@ describe('classifyExistingHuman — one agent embodies one Human', () => {
     expect(
       classifyExistingHuman('5f27bc9b-df99-4a94-9f68-b1d355b4ddef', 'human-matthew-manager', false),
     ).toBe('walk');
+  });
+});
+
+describe('resultSuffix — the printed line', () => {
+  const base = {
+    displayName: 'Matthew',
+    humanId: 'human-matthew-manager',
+    conductorUrl: 'ws://localhost:4445',
+  };
+
+  it('(3) names the same id and the differing fields, and says nothing was written', () => {
+    expect(
+      resultSuffix({
+        ...base,
+        result: 'embodied',
+        embodiedHumanId: 'human-matthew-manager',
+        agentProfile: {
+          created: false,
+          actionHash: 'a',
+          callerAgentKey: 'k',
+          profileFieldsDiffer: ['bio', 'visibility'],
+        },
+      }),
+    ).toBe(
+      ' (Embodied as human-matthew-manager; profile fields differ: bio, visibility; left as the node holds them, no update_agent coordinator)',
+    );
+  });
+
+  it('keeps the different-id embodied line as it was', () => {
+    expect(
+      resultSuffix({ ...base, result: 'embodied', embodiedHumanId: '5f27bc9b' }),
+    ).toBe(' (Embodied as 5f27bc9b)');
+  });
+
+  it('prints the error for a failure and nothing for a plain exists', () => {
+    expect(resultSuffix({ ...base, result: 'failed', error: 'boom' })).toBe(' (boom)');
+    expect(resultSuffix({ ...base, result: 'exists' })).toBe('');
   });
 });

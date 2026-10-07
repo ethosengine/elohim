@@ -3260,6 +3260,7 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(CONTENT_WITNESS_AUTHORED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_HEAD_ADOPTED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_HEAD_UNBACKED_RELEASED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CANONICAL_ANSWERS.clone()));
         // Pre-touch every canonical-election tier so `/metrics` can distinguish
         // "this tier never wins" from "this tier was never asked about" from
@@ -4839,6 +4840,28 @@ pub fn inc_ghost_decay_blocked(leg: GhostDecayBlockedLeg) {
 /// declared through the own conductor) instead of re-authored locally.
 pub fn inc_content_head_adopted() {
     CONTENT_HEAD_ADOPTED.inc();
+}
+
+/// Adopt-before-author pre-flights that RELEASED a declared row because the
+/// own conductor ANSWERED that the records behind its declaration are absent on
+/// this network (F5, 2026-10-07) — the row proceeds as an undeclared row
+/// instead of holding forever. Reads against `elohim_content_adopt_held_total`:
+/// a recast household climbs this once per stale-declared row and then goes
+/// quiet. Outside the `lazy_static!` block, which sits at the macro recursion
+/// limit.
+pub static CONTENT_HEAD_UNBACKED_RELEASED: std::sync::LazyLock<IntCounter> =
+    std::sync::LazyLock::new(|| {
+        IntCounter::new(
+            "elohim_content_head_unbacked_released_total",
+            "Declared content rows released from Held because their backing records answered absent.",
+        )
+        .unwrap()
+    });
+
+/// Record one declared row released from `Held` as UNBACKED (F5) — see
+/// [`CONTENT_HEAD_UNBACKED_RELEASED`].
+pub fn inc_head_adoption_unbacked_released() {
+    CONTENT_HEAD_UNBACKED_RELEASED.inc();
 }
 
 /// Record one ghost-witness re-author call failure of `class` — one of

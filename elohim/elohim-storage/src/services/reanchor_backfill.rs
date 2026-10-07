@@ -35,7 +35,7 @@ use std::time::Duration;
 
 use crate::db::DbPool;
 use crate::generated_enums::{ALL_CONTENT_TYPES, CORE_REACH_LEVELS};
-use crate::services::head_adoption::{AdoptContext, AdoptOutcome};
+use crate::services::head_adoption::{AdoptContext, AdoptOutcome, HoldBasis};
 use crate::services::provide_loop_status::{ProvideLoopState, ReanchorSweepResult};
 use crate::services::ContentService;
 use crate::StorageError;
@@ -135,6 +135,25 @@ pub struct ReanchorReport {
     /// zero `remaining` is the honest shape of "nothing to author, something to
     /// re-adopt" — the state the NULL-only selection could not express.
     pub dead_remaining: usize,
+    /// Rows the pre-flight RELEASED to the author path because the records
+    /// behind their declaration answered ABSENT on this network (F5,
+    /// `AdoptOutcome::AuthorUnbacked`). Counted at the pre-flight; the row's
+    /// re-author result is then recorded like any other (`reanchored`,
+    /// `already_anchored` or `failed`).
+    pub held_unbacked: usize,
+    /// Of `held` + `held_backoff`: holds resting on an unanswered probe or a
+    /// DB-pool error (`HoldBasis::Unanswered`). Never settled.
+    pub held_unanswered: usize,
+    /// DEAD-arm candidates whose hold (fresh or replayed by the backoff) rests
+    /// on an ANSWER — settled by a declaration (F3). Published as
+    /// `deadSettledByDeclaration`; the rows stay dead and stay counted in
+    /// `dead_remaining`.
+    pub dead_settled_by_declaration: usize,
+    /// NULL-arm candidates held (fresh or replayed) because their slug is bound
+    /// to a release channel (`HoldBasis::AwaitingChannel`) — not re-anchor work;
+    /// they author when the channel adopts. Published as
+    /// `reanchorAwaitingChannel`; they stay counted in `remaining`.
+    pub awaiting_channel: usize,
 }
 
 /// True when a re-author error means the content is ALREADY committed to the
@@ -198,6 +217,54 @@ pub(crate) enum RowOutcome {
 }
 
 impl ReanchorReport {
+    /// What `/p2p/status` publishes for this sweep. One place, so the run and
+    /// its tests cannot drift on which counter feeds which field.
+    ///
+    /// `completed` = rows brought to a settled state this sweep: fresh
+    /// re-authors, already-anchored recoveries, ADOPTED heads and HELD rows.
+    /// `remaining`/`dead_remaining` (recounted after the loop) still count
+    /// every unanchored or dead row; `caughtUp` subtracts only the dead rows
+    /// settled by declaration.
+    pub fn sweep_result(&self) -> ReanchorSweepResult {
+        ReanchorSweepResult {
+            completed: self.reanchored + self.already_anchored + self.adopted + self.held,
+            adopted: self.adopted,
+            held: self.held,
+            held_backoff: self.held_backoff,
+            held_unbacked: self.held_unbacked,
+            held_unanswered: self.held_unanswered,
+            dead_settled_by_declaration: self.dead_settled_by_declaration,
+            awaiting_channel: self.awaiting_channel,
+            failed: self.failed,
+            remaining: self.remaining,
+            dead_remaining: self.dead_remaining,
+            skipped_reach: self.skipped_reach,
+            skipped_content_type: self.skipped_content_type,
+        }
+    }
+
+    /// Fold a hold's basis into the published split. `dead_arm` is whether the
+    /// candidate came from the DEAD-anchor selection.
+    ///
+    /// - `Unanswered` (either arm) → `held_unanswered`; never excluded from the
+    ///   residue.
+    /// - dead arm, `Settled` or `AwaitingChannel` → `dead_settled_by_declaration`
+    ///   (F3).
+    /// - NULL arm, `AwaitingChannel` → `awaiting_channel`: a never-authored slug
+    ///   its release channel owns, which authors when that channel adopts.
+    /// - NULL arm, `Settled` → nothing (a NULL-arm row has no dead verdict to
+    ///   settle, and is not waiting on a channel).
+    fn record_hold_basis(&mut self, basis: HoldBasis, dead_arm: bool) {
+        match (basis, dead_arm) {
+            (HoldBasis::Unanswered, _) => self.held_unanswered += 1,
+            (HoldBasis::Settled | HoldBasis::AwaitingChannel, true) => {
+                self.dead_settled_by_declaration += 1
+            }
+            (HoldBasis::AwaitingChannel, false) => self.awaiting_channel += 1,
+            (HoldBasis::Settled, false) => {}
+        }
+    }
+
     /// Fold a single row's outcome into the report counters.
     fn record(&mut self, outcome: RowOutcome) {
         match outcome {
@@ -310,6 +377,9 @@ pub async fn run_once(
         dead_candidates: dead_candidates.len(),
         ..Default::default()
     };
+    // The first `report.candidates` entries are the never-authored arm; the
+    // rest are the DEAD arm (F3 counts settled holds on the dead arm only).
+    let null_arm_len = report.candidates;
     let candidates: Vec<ReanchorCandidate> =
         candidates.into_iter().chain(dead_candidates).collect();
 
@@ -333,7 +403,8 @@ pub async fn run_once(
         "reanchor_backfill: re-authoring NULL-anchor and DEAD-anchor content via conductor"
     );
 
-    for (id, reach, content_type) in &candidates {
+    for (index, (id, reach, content_type)) in candidates.iter().enumerate() {
+        let dead_arm = index >= null_arm_len;
         // HELD BACKOFF — ahead of every conductor round-trip, and ahead of the
         // vocabulary guards because it is strictly cheaper than both. A previous
         // sweep's pre-flight already HELD this candidate against this same
@@ -352,12 +423,13 @@ pub async fn run_once(
             .get(id)
             .map(|h| h.head_action_hash.as_str())
             .unwrap_or("");
-        if crate::services::reanchor_backoff::should_skip(
+        if let Some(basis) = crate::services::reanchor_backoff::skip_verdict(
             id,
             advertised,
             crate::config::reanchor_held_backoff_window(),
         ) {
             report.record(RowOutcome::HeldBackoff);
+            report.record_hold_basis(basis, dead_arm);
             crate::metrics::inc_reanchor_skipped(crate::metrics::ReanchorSkip::HeldBackoff);
             continue;
         }
@@ -400,7 +472,7 @@ pub async fn run_once(
         let adopt_declare_started = std::time::Instant::now();
         let preflight = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::Reanchor,
-            crate::services::head_adoption::try_adopt_canonical_head(
+            crate::services::head_adoption::try_adopt_canonical_head_explained(
                 hc,
                 pool,
                 &app_ctx,
@@ -421,7 +493,8 @@ pub async fn run_once(
             crate::metrics::ConvergenceAtom::AdoptDeclare,
             adopt_declare_started.elapsed(),
         );
-        let pending_adopt = match preflight {
+        let hold_basis = preflight.hold_basis;
+        let pending_adopt = match preflight.outcome {
             AdoptOutcome::Adopted => {
                 report.record(RowOutcome::Adopted);
                 continue;
@@ -439,11 +512,25 @@ pub async fn run_once(
                 // answer with two conductor round-trips. Bounded and
                 // always-expiring: see `services::reanchor_backoff` for the three
                 // automated exits (window lapse, row stamped, advertiser change).
-                crate::services::reanchor_backoff::note_held(id, advertised);
+                //
+                // F5: the basis rides along. A hold on an unanswered probe backs
+                // off exactly like a settled one (no probe storm against a
+                // conductor that is not answering) but is never counted settled.
+                let basis = hold_basis.unwrap_or(HoldBasis::Settled);
+                crate::services::reanchor_backoff::note_held_with_basis(id, advertised, basis);
                 report.record(RowOutcome::Held);
+                report.record_hold_basis(basis, dead_arm);
                 continue;
             }
             AdoptOutcome::Author => None,
+            // F5: the declaration holding this row is UNBACKED on this network.
+            // The row is not settled — author it exactly as an undeclared row.
+            // For a dead row, `update_via_conductor`'s stale-anchor heal lands
+            // the re-publish and `upsert_with_anchor` revives `dead → live`.
+            AdoptOutcome::AuthorUnbacked => {
+                report.held_unbacked += 1;
+                None
+            }
             // The peer's head is adoptable but this conductor has no local chain
             // to hang the declaration on. Author first (non-declaring), then
             // finish the adoption below.
@@ -576,33 +663,20 @@ pub async fn run_once(
         )
     };
 
-    // `completed` = rows brought to a settled state this sweep. Fresh re-authors,
-    // already-anchored recoveries, ADOPTED heads and HELD rows are all rows that
-    // no longer need this sweep's attention, so all four count toward progress;
-    // `remaining` (recounted above) already excludes the anchored ones.
+    // `pending` sums BOTH arms, every row: a node serving rows under anchors
+    // its own conductor cannot resolve is not caught up, and reporting green
+    // there is the measured-yet-dark dishonesty this class exists to close.
+    // `caughtUp` subtracts exactly one thing — dead rows settled by a
+    // declaration whose records answered present (F3) — and never a hold that
+    // rests on an unanswered probe.
     //
-    // `pending` sums BOTH arms: `/p2p/status` derives `caughtUp` from it, and a
-    // node with nothing left to author but a standing DEAD-anchor population is
-    // NOT caught up — it is serving rows under anchors its own conductor cannot
-    // resolve. Reporting green there is the same measured-yet-dark dishonesty
-    // this whole class exists to close. The arms stay separately legible in
-    // `ReanchorReport` and in the sweep-complete log line below.
-    //
-    // The arms also go over SEPARATELY so the holder can watch the dead one
-    // across sweeps: a `dead_remaining` that never moves (every candidate hit
-    // the skip-guards above) is a seed-data correction waiting, not a heal in
-    // progress, and `/p2p/status` says so via `deadRemainingStuck`. The pending
-    // arithmetic is unchanged — only the reading of it gained a second axis.
-    state
-        .publish_reanchor_sweep(ReanchorSweepResult {
-            completed: report.reanchored + report.already_anchored + report.adopted + report.held,
-            failed: report.failed,
-            remaining: report.remaining,
-            dead_remaining: report.dead_remaining,
-            skipped_reach: report.skipped_reach,
-            skipped_content_type: report.skipped_content_type,
-        })
-        .await;
+    // The arms also go over SEPARATELY so the holder can watch the unhealed
+    // dead residue across sweeps: a residue that never moves is wedged, and
+    // `/p2p/status` says so via `deadRemainingStuck`. WHICH wedge is read off the
+    // per-arm counts beside it — the skip counters (a seed-data correction) or
+    // the held counters (the pre-flight holding the rows; the first live
+    // instance, adam 2026-09-11, was this one with both skip counters at 0).
+    state.publish_reanchor_sweep(report.sweep_result()).await;
 
     tracing::info!(
         reanchored = report.reanchored,
@@ -610,6 +684,10 @@ pub async fn run_once(
         adopted = report.adopted,
         held = report.held,
         held_backoff = report.held_backoff,
+        held_unbacked = report.held_unbacked,
+        held_unanswered = report.held_unanswered,
+        dead_settled_by_declaration = report.dead_settled_by_declaration,
+        awaiting_channel = report.awaiting_channel,
         failed = report.failed,
         remaining = report.remaining,
         skipped_reach = report.skipped_reach,
@@ -872,14 +950,7 @@ mod tests {
         report.record(RowOutcome::SkippedNonCanonicalReach);
         report.record(RowOutcome::SkippedNonCanonicalContentType);
 
-        let published = ReanchorSweepResult {
-            completed: report.reanchored + report.already_anchored + report.adopted + report.held,
-            failed: report.failed,
-            remaining: report.remaining,
-            dead_remaining: report.dead_remaining,
-            skipped_reach: report.skipped_reach,
-            skipped_content_type: report.skipped_content_type,
-        };
+        let published: ReanchorSweepResult = report.sweep_result();
         assert_eq!(published.completed, 0, "a skip-only sweep settles nothing");
 
         let state = ProvideLoopState::new();
@@ -900,5 +971,90 @@ mod tests {
         // node still reads NOT caught up.
         assert_eq!(snap.reanchor_pending, 2);
         assert!(!snap.reanchor_caught_up);
+    }
+
+    /// F3's accounting at the sweep: only a DEAD-arm hold that rests on an
+    /// answer is settled by declaration; an unanswered hold is never settled
+    /// on either arm; a NULL-arm settled hold has no dead verdict to settle.
+    #[test]
+    fn hold_basis_splits_settled_from_unanswered_on_the_dead_arm_only() {
+        let mut report = ReanchorReport {
+            dead_candidates: 4,
+            dead_remaining: 4,
+            remaining: 1,
+            ..Default::default()
+        };
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::Settled, true); // dead, settled
+        report.record(RowOutcome::HeldBackoff);
+        report.record_hold_basis(HoldBasis::Settled, true); // dead, replayed settled
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::Unanswered, true); // dead, probe unanswered
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::Settled, false); // NULL arm, settled
+
+        assert_eq!(report.dead_settled_by_declaration, 2);
+        assert_eq!(report.held_unanswered, 1);
+        assert_eq!(report.awaiting_channel, 0);
+        let published = report.sweep_result();
+        assert_eq!(published.held, 3);
+        assert_eq!(published.held_backoff, 1);
+        assert_eq!(published.dead_settled_by_declaration, 2);
+        assert_eq!(published.held_unanswered, 1);
+        // Two dead rows settled, two genuinely unhealed (one unanswered hold,
+        // one never visited), plus the NULL row: not caught up.
+        assert_eq!(published.dead_residue(), 2);
+        assert_eq!(published.unhealed_pending(), 3);
+        assert_eq!(published.pending(), 5, "pending still counts every row");
+    }
+
+    /// Refinement B: a NEVER-AUTHORED slug its release channel owns is awaiting
+    /// its channel, not unhealed re-anchor work; a channel-bound DEAD row stays
+    /// settled by declaration; an unanswered hold is never excluded.
+    #[test]
+    fn a_channel_bound_null_row_is_awaiting_its_channel() {
+        let mut report = ReanchorReport {
+            candidates: 3,
+            remaining: 3,
+            dead_candidates: 1,
+            dead_remaining: 1,
+            ..Default::default()
+        };
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::AwaitingChannel, false);
+        report.record(RowOutcome::HeldBackoff);
+        report.record_hold_basis(HoldBasis::AwaitingChannel, false);
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::Unanswered, false);
+        report.record(RowOutcome::Held);
+        report.record_hold_basis(HoldBasis::AwaitingChannel, true);
+
+        assert_eq!(report.awaiting_channel, 2);
+        assert_eq!(report.dead_settled_by_declaration, 1);
+        assert_eq!(report.held_unanswered, 1);
+        let published = report.sweep_result();
+        assert_eq!(published.awaiting_channel, 2);
+        assert_eq!(published.pending(), 4, "pending stays raw");
+        assert_eq!(
+            published.unhealed_pending(),
+            1,
+            "only the unanswered NULL row is unhealed work"
+        );
+    }
+
+    /// F5's accounting: a row released as UNBACKED is counted where the
+    /// pre-flight released it, and its re-author result lands like any other.
+    #[test]
+    fn an_unbacked_release_is_counted_apart_from_its_reauthor_result() {
+        let mut report = ReanchorReport::default();
+        report.held_unbacked += 1;
+        report.record(RowOutcome::Reanchored);
+        report.held_unbacked += 1;
+        report.record(RowOutcome::Failed);
+        let published = report.sweep_result();
+        assert_eq!(published.held_unbacked, 2);
+        assert_eq!(published.held, 0, "an unbacked row is NOT held");
+        assert_eq!(published.completed, 1);
+        assert_eq!(published.failed, 1);
     }
 }

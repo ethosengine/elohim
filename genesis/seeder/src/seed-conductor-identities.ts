@@ -42,6 +42,14 @@
  *                  id on this deployment, recorded in the results artifact
  *                  (`embodiedAs`). Counted as success; the seeder never re-keys
  *                  or overwrites an established identity (read-only outcome).
+ *                  Also the outcome when the node already holds the fixture's
+ *                  OWN id — same Human id, Agent under the caller's own agent
+ *                  key — but its Agent profile fields differ from the ones this
+ *                  seeder would author (a storage peer self-heals a bare
+ *                  profile at boot: GENESIS_SELF_HEAL_IDENTITY=1). Identity is
+ *                  id + holochain_agent_key; profile fields are not identity.
+ *                  The line names the differing fields and leaves them as the
+ *                  node holds them (no update_agent coordinator exists).
  *   [C] Conflict — reserved for a conductor that is NOT name-affine to the human
  *                  (the legacy walk keeps looking instead, so it ends [X])
  *   [-] Skipped  — no conductor deployed for this human (soft, not a failure)
@@ -154,7 +162,7 @@ interface HumanOutput {
 
 type SeedResult = 'created' | 'exists' | 'embodied' | 'conflict' | 'skipped' | 'failed';
 
-interface ConductorResult {
+export interface ConductorResult {
   displayName: string;
   humanId: string;
   conductorUrl: string;
@@ -488,10 +496,18 @@ export function extractHumanId(result: unknown): string | undefined {
   return undefined;
 }
 
-interface AgentProfileReceipt {
+export interface AgentProfileReceipt {
   created: boolean;
   actionHash: string;
   callerAgentKey: string;
+  /**
+   * Present (non-empty) only when the node's own Agent — same id, same
+   * caller agent key — carries profile fields that differ from the ones this
+   * seeder would author. Left as the node holds them: there is no
+   * update_agent coordinator, and a create over an existing Agent is never
+   * an option.
+   */
+  profileFieldsDiffer?: string[];
 }
 
 interface OwnHumanProfile {
@@ -547,7 +563,14 @@ export async function ensureOwnAgentProfile(
     did: null,
     activity_pub_type: null,
   };
-  const requireMatchingAgent = (value: unknown): string => {
+  // Identity is `id` + `holochain_agent_key`. An Agent under this id held by
+  // another agent key is a conflict (someone else holds the id) and is
+  // refused. Under the caller's own key it is this node's own identity, even
+  // when its profile fields differ (a storage peer self-heals a bare profile
+  // at boot) — those differences are reported, never "fixed" by substitution.
+  const readOwnAgent = (
+    value: unknown,
+  ): { actionHash: string; differs: string[] } => {
     const record = value as {
       action_hash?: unknown;
       agent?: Record<string, unknown>;
@@ -555,29 +578,59 @@ export async function ensureOwnAgentProfile(
     if (
       !record?.agent ||
       typeof record.action_hash !== 'string' ||
-      record.agent.holochain_agent_key !== callerAgentKey ||
-      !Object.entries(input).every(
-        ([key, expected]) =>
-          JSON.stringify(record.agent?.[key]) === JSON.stringify(expected),
-      )
+      record.agent.id !== human.id ||
+      record.agent.holochain_agent_key !== callerAgentKey
     ) {
       throw new Error(
-        `Agent profile '${expectedHumanId}' conflicts with the own Human/caller; refusing overwrite`,
+        `Agent profile '${expectedHumanId}' conflicts with the own Human/caller (absent, or held by another agent key); refusing overwrite`,
       );
     }
-    return record.action_hash;
+    const differs = Object.entries(input)
+      .filter(
+        ([key, expected]) =>
+          JSON.stringify(record.agent?.[key]) !== JSON.stringify(expected),
+      )
+      .map(([key]) => key);
+    return { actionHash: record.action_hash, differs };
   };
   let agent = await call('get_agent_by_id', human.id);
   const created = agent === null;
   if (created) agent = await call('create_agent', input);
-  const actionHash = requireMatchingAgent(agent);
-  const readback = await call('get_agent_by_id', human.id);
-  if (requireMatchingAgent(readback) !== actionHash) {
+  const { actionHash, differs: authoredDiffers } = readOwnAgent(agent);
+  if (created && authoredDiffers.length > 0) {
+    // The seeder authored this record from `input`; a mismatch here is the
+    // zome storing something other than what was sent, not a self-heal.
+    throw new Error(
+      `Agent profile '${expectedHumanId}' was created but differs from its input: ${authoredDiffers.join(', ')}`,
+    );
+  }
+  const readback = readOwnAgent(await call('get_agent_by_id', human.id));
+  if (readback.actionHash !== actionHash) {
     throw new Error(
       `Agent profile '${expectedHumanId}' readback changed action`,
     );
   }
-  return { created, actionHash, callerAgentKey };
+  const receipt: AgentProfileReceipt = { created, actionHash, callerAgentKey };
+  if (readback.differs.length > 0) receipt.profileFieldsDiffer = readback.differs;
+  return receipt;
+}
+
+/**
+ * The parenthesised tail of one result line. Pure; exported for tests.
+ *   error                                  → `(<error>)`
+ *   embodied, different id                 → `(Embodied as <id>)`
+ *   embodied, same id, profile fields differ →
+ *     `(Embodied as <id>; profile fields differ: <list>; left as the node holds them, no update_agent coordinator)`
+ */
+export function resultSuffix(result: ConductorResult): string {
+  if (result.error) return ` (${result.error})`;
+  if (!result.embodiedHumanId) return '';
+  const differs = result.agentProfile?.profileFieldsDiffer ?? [];
+  const fields =
+    differs.length > 0
+      ? `; profile fields differ: ${differs.join(', ')}; left as the node holds them, no update_agent coordinator`
+      : '';
+  return ` (Embodied as ${result.embodiedHumanId}${fields})`;
 }
 
 // =============================================================================
@@ -677,6 +730,18 @@ async function seedHumanOnConductor(
           encodeHashToBase64(cellId[1]),
         );
         await (appWs.client as unknown as { close(): unknown }).close();
+        if (agentProfile.profileFieldsDiffer) {
+          // Same Human id, Agent under the caller's own key: this node holds
+          // its own identity (self-healed at boot) with profile fields that
+          // differ from the seeder's. Embodied as the same id; nothing written.
+          return {
+            ...base,
+            conductorUrl,
+            result: 'embodied',
+            embodiedHumanId: human.id,
+            agentProfile,
+          };
+        }
         return { ...base, conductorUrl, result: 'exists', agentProfile };
       }
 
@@ -832,11 +897,7 @@ async function main(): Promise<void> {
       : 'X';
     const phase = (human.agencyPhase ?? '').padEnd(6);
     const name = result.displayName.padEnd(16);
-    const suffix = result.error
-      ? ` (${result.error})`
-      : result.embodiedHumanId
-        ? ` (Embodied as ${result.embodiedHumanId})`
-        : '';
+    const suffix = resultSuffix(result);
     console.log(`  [${icon}] ${name} ${phase} ${result.conductorUrl}${suffix}`);
   }
 
@@ -877,7 +938,9 @@ async function main(): Promise<void> {
     // each person's own conductor embodies where it is not the fixture id.
     embodiedAs: Object.fromEntries(
       results
-        .filter(r => r.result === 'embodied' && r.embodiedHumanId)
+        .filter(
+          r => r.result === 'embodied' && r.embodiedHumanId && r.embodiedHumanId !== r.humanId,
+        )
         .map(r => [r.humanId, r.embodiedHumanId as string]),
     ),
   };

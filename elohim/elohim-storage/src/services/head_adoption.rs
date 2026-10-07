@@ -893,6 +893,19 @@ fn note_declare_backoff_unless_shed(
 /// qualifies. What it authors is a fresh provable root that a later real
 /// canonical declaration outranks; it still asserts nothing about
 /// network-wide absence.
+///
+/// A SECOND REFINEMENT, operator-ruled 2026-10-07 (F5,
+/// [`declaration_backing`]): a DECLARED row the decision rule would `Hold` is
+/// released to the author path when this conductor ANSWERED `Absent` for the
+/// id AND answered `Absent` for every record behind the declaration (the
+/// declared head, and the elected winner when one is visible) — where a record
+/// is `Absent` only when its LOCAL miss is confirmed by a NETWORK-strategy read
+/// ([`backing_record_answer`]); a local miss alone never qualifies.
+/// `Unreachable` anywhere keeps the hold. What it releases is the same non-declaring author
+/// path, under `PreserveExistingDeclaration`, whose writes the zome gates on
+/// its own NETWORK-strategy reads — it never deletes, tombstones, declares or
+/// moves a declared head, and asserts nothing about network-wide absence
+/// beyond "this network cannot back the declaration from here".
 #[derive(Debug, Clone, Copy)]
 pub enum LocalResolve<'a> {
     /// Not yet asked — the pre-flight calls `resolve_content_head` itself.
@@ -1610,6 +1623,16 @@ pub enum AdoptOutcome {
     Contested,
     /// Nothing adoptable. Proceed with the caller's existing author path.
     Author,
+    /// **F5 (2026-10-07).** The row carries a declaration — and possibly an
+    /// election — but this node's RESPONSIVE own conductor answered that the
+    /// records backing it are absent: no head resolves for the id, and the
+    /// declared head (and the elected winner, when one is visible) is not held
+    /// here. The declaration points at a network that no longer exists, so it
+    /// settles nothing: proceed with the caller's author path EXACTLY as for
+    /// [`AdoptOutcome::Author`]. A distinct variant only so the sweeps can count
+    /// it (`heldUnbacked`) apart from first authorship. See
+    /// [`declaration_backing`] for the evidence rule.
+    AuthorUnbacked,
     /// A peer's head is adoptable but this conductor has no local chain to hang
     /// the declaration on. Run the author path, then call
     /// [`finish_author_then_adopt`] with these values.
@@ -1618,6 +1641,281 @@ pub enum AdoptOutcome {
         carried_record: Option<Vec<u8>>,
         peer_id: String,
     },
+}
+
+/// What the election read inside the obey arm SAW — the F5 input that keeps
+/// "no election here" apart from "the conductor never answered".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ElectionSeen {
+    /// The obey arm did not read an election for this id (it was not reached).
+    NotProbed,
+    /// The own conductor answered: no election, and no carried election was
+    /// supplied.
+    Absent,
+    /// The election read went unanswered (timeout, backpressure, an unattempted
+    /// batch id).
+    Unreachable,
+    /// An election is visible (own conductor or peer-carried, wasm re-derived)
+    /// naming `winner`.
+    Present { winner: String },
+}
+
+impl ElectionSeen {
+    /// The answer state, `None` when the election was never read.
+    pub fn state(&self) -> Option<seam_contracts::AnswerState> {
+        use seam_contracts::AnswerState;
+        match self {
+            ElectionSeen::NotProbed => None,
+            ElectionSeen::Absent => Some(AnswerState::Absent),
+            ElectionSeen::Unreachable => Some(AnswerState::Unreachable),
+            ElectionSeen::Present { .. } => Some(AnswerState::Present),
+        }
+    }
+}
+
+/// F5's verdict on a declared row: are the records behind its declaration on
+/// THIS network, as far as a responsive own conductor can say?
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclarationBacking {
+    /// A record backing the declaration (or a head for the id) answered
+    /// PRESENT. The declaration settles the row: hold.
+    Backed,
+    /// Every read answered, and every backing record answered ABSENT. The
+    /// declaration points at a network that no longer exists: author.
+    Unbacked,
+    /// Some read went unanswered (timeout / conductor error). Absence was
+    /// never established in either direction: hold, and do not count the
+    /// hold as settled.
+    Unanswered,
+}
+
+/// **Pure.** Fold the own conductor's answers into a [`DeclarationBacking`].
+///
+/// - `local_head` — what `resolve_content_head` answered for the id.
+/// - `election` — what the obey arm's election read answered (`None` when it
+///   was not read; an election link alone is NOT backing — the household
+///   repro's rows each carried one, minted record-less, over a head whose
+///   record never existed on the new network).
+/// - `records` — one answer per backing hash (the declared head, then the
+///   elected winner), each already folded by [`backing_record_answer`]: a
+///   LOCAL miss is only `Absent` once a NETWORK-strategy read confirmed it. The
+///   probe stops at the first `Present`.
+///
+/// Rule, in order: any PRESENT (head or record) ⇒ `Backed`; else any
+/// UNREACHABLE (head, election, or record) ⇒ `Unanswered`; else, with at least
+/// one record asked, ⇒ `Unbacked`. Nothing asked ⇒ `Backed` (nothing to
+/// falsify, so the hold stands — the conservative direction).
+///
+/// **Scope, stated against the C4 canon on [`LocalResolve`]:** this is the
+/// second refinement of "an `Absent` never authors" (the first is
+/// ghost-declaration decay). It is operator-ruled (2026-10-07). It never reads
+/// absence off a local get: each record's `Absent` needs a network-strategy
+/// read to agree ([`backing_record_answer`]), and the head answer the reanchor
+/// sweep probes with (`resolve_content_head`) is itself the network-strategy
+/// extern. It is bounded the same way as decay: what it releases is the NON-declaring author path under
+/// `HeadElection::PreserveExistingDeclaration`, whose writes are themselves
+/// gated by the zome's NETWORK-strategy reads (`update_content`'s root
+/// resolution and `create_content`'s duplicate-id check), so a root that does
+/// exist on the network is updated, never shadowed; and a later canonical
+/// declaration still outranks what it authors. It never deletes, tombstones,
+/// declares or moves a declared head.
+pub fn declaration_backing(
+    local_head: seam_contracts::AnswerState,
+    election: Option<seam_contracts::AnswerState>,
+    records: &[seam_contracts::AnswerState],
+) -> DeclarationBacking {
+    use seam_contracts::AnswerState;
+    if local_head == AnswerState::Present || records.contains(&AnswerState::Present) {
+        return DeclarationBacking::Backed;
+    }
+    if local_head == AnswerState::Unreachable
+        || election == Some(AnswerState::Unreachable)
+        || records.contains(&AnswerState::Unreachable)
+    {
+        return DeclarationBacking::Unanswered;
+    }
+    if records.is_empty() {
+        return DeclarationBacking::Backed;
+    }
+    DeclarationBacking::Unbacked
+}
+
+/// **Pure.** One backing hash's answer, from its two reads.
+///
+/// `local` is `get_record_for_action` (LOCAL get, by design — see that extern).
+/// A local miss is a gossip-delivery fact, never an existence fact (C4,
+/// `Answer::from_local_get`), so it is only `Absent` when `network` — the
+/// `content_store::get_content` extern, whose `get` is the HDK default
+/// `GetStrategy::Network` — also answered absent. `network = None` means the
+/// network read was not made, which can never establish absence.
+///
+/// | local | network | ⇒ |
+/// |---|---|---|
+/// | Present | – | Present |
+/// | Unreachable | – | Unreachable |
+/// | Absent | Present | Present |
+/// | Absent | Absent | Absent |
+/// | Absent | Unreachable / not asked | Unreachable |
+pub fn backing_record_answer(
+    local: seam_contracts::AnswerState,
+    network: Option<seam_contracts::AnswerState>,
+) -> seam_contracts::AnswerState {
+    use seam_contracts::AnswerState;
+    match local {
+        AnswerState::Present => AnswerState::Present,
+        AnswerState::Unreachable => AnswerState::Unreachable,
+        AnswerState::Absent => network.unwrap_or(AnswerState::Unreachable),
+    }
+}
+
+/// The NETWORK-strategy record read F5 needs before calling a local miss
+/// absent: `content_store::get_content(action_hash)` — an existing extern whose
+/// `get` uses `GetOptions::default()` (`GetStrategy::Network`), called the way
+/// `release_adoption::watch` already calls it (Background lane). `Ok(None)` ⇒
+/// `Absent`; any error, an undecodable hash, or an undecodable answer ⇒
+/// `Unreachable` — never absence.
+async fn network_record_answer(
+    hc: &Arc<HcClient>,
+    id: &str,
+    hash: &str,
+) -> seam_contracts::AnswerState {
+    use seam_contracts::AnswerState;
+    let Ok(action_hash) = conductor_writes::decode_action_hash(hash) else {
+        return AnswerState::Unreachable;
+    };
+    let Ok(payload) = rmp_serde::to_vec_named(&action_hash) else {
+        return AnswerState::Unreachable;
+    };
+    match hc
+        .call_zome_timed("content_store", "get_content", payload, SWEEP_PROBE_CLASS)
+        .await
+    {
+        Ok((bytes, _timing)) => {
+            match rmp_serde::from_slice::<Option<lamad_types::ContentOutput>>(&bytes) {
+                Ok(Some(_)) => AnswerState::Present,
+                Ok(None) => AnswerState::Absent,
+                Err(_) => AnswerState::Unreachable,
+            }
+        }
+        Err(e) => {
+            tracing::debug!(
+                content_id = %id, head = %hash, error = %e,
+                "adopt-before-author: network backing-record read went unanswered"
+            );
+            AnswerState::Unreachable
+        }
+    }
+}
+
+/// The hashes whose records would back a declared row: the declared head and,
+/// when an election is visible, its winner — trimmed, non-empty, deduplicated,
+/// in that order. Pure.
+pub fn backing_hashes<'a>(declared: Option<&'a str>, election: &'a ElectionSeen) -> Vec<&'a str> {
+    let mut out: Vec<&str> = Vec::new();
+    let winner = match election {
+        ElectionSeen::Present { winner } => Some(winner.as_str()),
+        _ => None,
+    };
+    for h in [declared, winner].into_iter().flatten() {
+        let h = h.trim();
+        if !h.is_empty() && !out.contains(&h) {
+            out.push(h);
+        }
+    }
+    out
+}
+
+/// Ask the own conductor (sweep lane) whether it holds the records behind a
+/// declared row. Skips every call when the answer is already decided by
+/// `local_head`/`election` alone.
+async fn evaluate_declaration_backing(
+    hc: &Arc<HcClient>,
+    id: &str,
+    local_head: seam_contracts::AnswerState,
+    election: &ElectionSeen,
+    declared: Option<&str>,
+) -> DeclarationBacking {
+    use seam_contracts::AnswerState;
+    let election_state = election.state();
+    let decided = declaration_backing(local_head, election_state, &[]);
+    if local_head != AnswerState::Absent || decided == DeclarationBacking::Unanswered {
+        return decided;
+    }
+    let mut records: Vec<AnswerState> = Vec::new();
+    for hash in backing_hashes(declared, election) {
+        let local =
+            match conductor_writes::call_get_record_for_action_classed(hc, hash, SWEEP_PROBE_CLASS)
+                .await
+            {
+                Ok(Some(_)) => AnswerState::Present,
+                Ok(None) => AnswerState::Absent,
+                Err(e) => {
+                    tracing::debug!(
+                        content_id = %id, head = %hash, error = %e,
+                        "adopt-before-author: backing-record read went unanswered"
+                    );
+                    AnswerState::Unreachable
+                }
+            };
+        // ONE network-strategy read, on the local-miss path only: the common
+        // (present or unanswered) case costs nothing more.
+        let network = if local == AnswerState::Absent {
+            Some(network_record_answer(hc, id, hash).await)
+        } else {
+            None
+        };
+        let state = backing_record_answer(local, network);
+        records.push(state);
+        if state == AnswerState::Present {
+            break;
+        }
+    }
+    declaration_backing(local_head, election_state, &records)
+}
+
+/// Why a pre-flight HELD, for the sweeps' `deadSettledByDeclaration` count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoldBasis {
+    /// The hold rests on an answer: a declaration whose backing answered
+    /// present, a contest that minted a candidate, or a stamp the guard
+    /// refused. The row is settled by declaration.
+    Settled,
+    /// The slug is bound to a release channel (`metadata.releaseChannel`), which
+    /// owns its serving pointer — the pre-flight's step (−1). A NEVER-AUTHORED
+    /// row in this state is not re-anchor work: it authors when its channel
+    /// adopts (`reanchorAwaitingChannel`). On the dead arm it counts as settled
+    /// by declaration, as before.
+    AwaitingChannel,
+    /// The hold rests on a NON-answer: a probe that timed out or a DB pool that
+    /// errored. Never counted as settled — it is unhealed residue.
+    Unanswered,
+}
+
+/// [`try_adopt_canonical_head`]'s outcome plus, for a hold, what it rests on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreflightVerdict {
+    pub outcome: AdoptOutcome,
+    /// `Some` exactly when `outcome` is `Held` or `Contested`.
+    pub hold_basis: Option<HoldBasis>,
+}
+
+impl PreflightVerdict {
+    fn held(basis: HoldBasis) -> Self {
+        Self {
+            outcome: AdoptOutcome::Held,
+            hold_basis: Some(basis),
+        }
+    }
+
+    /// Wrap an outcome from an arm whose holds are answers, not silences.
+    fn settled(outcome: AdoptOutcome) -> Self {
+        let hold_basis = matches!(outcome, AdoptOutcome::Held | AdoptOutcome::Contested)
+            .then_some(HoldBasis::Settled);
+        Self {
+            outcome,
+            hold_basis,
+        }
+    }
 }
 
 /// Pre-flight for ONE content id. Never errors: every failure degrades to
@@ -1650,12 +1948,44 @@ pub async fn try_adopt_canonical_head(
     adopt: &AdoptContext<'_>,
     priced: PricedVerification,
 ) -> AdoptOutcome {
+    try_adopt_canonical_head_explained(
+        hc,
+        pool,
+        ctx,
+        id,
+        local_resolve,
+        election_resolve,
+        adopt,
+        priced,
+    )
+    .await
+    .outcome
+}
+
+/// [`try_adopt_canonical_head`], plus what a hold rests on ([`HoldBasis`]).
+///
+/// The two re-anchor sweeps call this form: they publish how many dead rows are
+/// settled by a declaration (`deadSettledByDeclaration`) and must not count a
+/// hold that rests on an unanswered probe as settled.
+#[allow(clippy::too_many_arguments)]
+pub async fn try_adopt_canonical_head_explained(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    local_resolve: LocalResolve<'_>,
+    election_resolve: ElectionResolve<'_>,
+    adopt: &AdoptContext<'_>,
+    priced: PricedVerification,
+) -> PreflightVerdict {
+    use seam_contracts::AnswerState;
+
     // (-1) SLICE 2 — a slug bound to a release channel is elected by that
     // channel, not by its own head. Hold BEFORE any pointer or head stamp, or
     // the heal below would put the vehicle-written pointer back every sweep.
     // An unreadable row falls through to (0), which holds it anyway.
     if held_by_release_channel(pool, ctx, id) {
-        return AdoptOutcome::Held;
+        return PreflightVerdict::held(HoldBasis::AwaitingChannel);
     }
 
     // (0) What does this row already claim? A pool failure is not a licence to
@@ -1673,7 +2003,7 @@ pub async fn try_adopt_canonical_head(
                     "adopt-before-author: could not read the local declaration — holding \
                      (a transient DB error must never authorize minting a competing root)"
                 );
-                return AdoptOutcome::Held;
+                return PreflightVerdict::held(HoldBasis::Unanswered);
             }
         },
         Err(e) => {
@@ -1681,11 +2011,19 @@ pub async fn try_adopt_canonical_head(
                 content_id = %id, error = %e,
                 "adopt-before-author: db conn unavailable — holding"
             );
-            return AdoptOutcome::Held;
+            return PreflightVerdict::held(HoldBasis::Unanswered);
         }
     };
 
     // (1) LOCAL-DHT ARM. Reuse a resolve the caller already paid for.
+    //
+    // `local_state` keeps the three answers apart for F5 (an ANSWERED absence
+    // may release an unbacked declaration; an unanswered one never does) —
+    // `head` below still collapses them for every other arm, unchanged.
+    let mut local_state = match local_resolve {
+        LocalResolve::Resolved(answer) => answer.state(),
+        LocalResolve::Probe => AnswerState::Unreachable,
+    };
     let probed: Option<ContentHeadWire> = match local_resolve {
         LocalResolve::Resolved(_) => None,
         // BACKGROUND, explicitly — not inherited. Plain
@@ -1699,7 +2037,14 @@ pub async fn try_adopt_canonical_head(
             match conductor_writes::call_resolve_content_head_classed(hc, id, SWEEP_PROBE_CLASS)
                 .await
             {
-                Ok(head) => head,
+                Ok(head) => {
+                    local_state = if head.is_some() {
+                        AnswerState::Present
+                    } else {
+                        AnswerState::Absent
+                    };
+                    head
+                }
                 Err(e) => {
                     // A conductor that will not answer cannot be shown to hold a
                     // canonical head; fall through with "not canonical" rather than
@@ -1735,6 +2080,10 @@ pub async fn try_adopt_canonical_head(
     // already settled is strictly better than contesting it again, and a row this
     // arm moves is left holding the elected head with its ordering recorded — so
     // the very next sweep sees `canonical_declared_at` set and quiesces.
+    let mut election_seen = ElectionSeen::NotProbed;
+    // F5's verdict, once paid for: the obey arm's hold and the decision rule's
+    // `Hold` ask the same question and must not buy the record reads twice.
+    let mut backing: Option<DeclarationBacking> = None;
     if should_probe_election(head.is_some()) {
         if let Some(outcome) = try_obey_visible_election(
             hc,
@@ -1745,10 +2094,32 @@ pub async fn try_adopt_canonical_head(
             adopt.fetcher,
             adopt.bytes,
             election_resolve,
+            &mut election_seen,
         )
         .await
         {
-            return outcome;
+            // F5: an obey that HELD a DECLARED row is only a settlement if the
+            // records behind the declaration/election are on this network.
+            if outcome != AdoptOutcome::Held || local_declared.is_none() {
+                return PreflightVerdict::settled(outcome);
+            }
+            let verdict = evaluate_declaration_backing(
+                hc,
+                id,
+                local_state,
+                &election_seen,
+                local_declared.as_deref(),
+            )
+            .await;
+            match verdict {
+                DeclarationBacking::Backed => return PreflightVerdict::held(HoldBasis::Settled),
+                DeclarationBacking::Unanswered => {
+                    return PreflightVerdict::held(HoldBasis::Unanswered)
+                }
+                // Fall through: the decision below reaches `Hold` on this
+                // declared row and releases it with the cached verdict.
+                DeclarationBacking::Unbacked => backing = Some(verdict),
+            }
         }
     } else if should_probe_declared_divergence_election(
         canonical_head.is_some(),
@@ -1774,11 +2145,12 @@ pub async fn try_adopt_canonical_head(
             adopt.fetcher,
             adopt.bytes,
             election_resolve,
+            &mut election_seen,
         )
         .await
         {
             if matches!(outcome, AdoptOutcome::Adopted) {
-                return outcome;
+                return PreflightVerdict::settled(outcome);
             }
         }
     }
@@ -1851,11 +2223,11 @@ pub async fn try_adopt_canonical_head(
                  path so the witness sweep can mint a provable root; a later real canonical \
                  declaration still wins outright"
             );
-            return AdoptOutcome::Author;
+            return PreflightVerdict::settled(AdoptOutcome::Author);
         }
     }
 
-    match decision {
+    let outcome = match decision {
         HeadDecision::AdoptLocal => {
             // `canonical_head.is_some()` is what produced this arm.
             let head = canonical_head.expect("AdoptLocal implies a canonical head");
@@ -1889,14 +2261,133 @@ pub async fn try_adopt_canonical_head(
             }
         }
         HeadDecision::Hold => {
-            tracing::debug!(
-                content_id = %id,
-                declared = ?local_declared,
-                "adopt-before-author: row already declared — neither adopting nor authoring"
-            );
-            AdoptOutcome::Held
+            // F5 — ABSENT vs UNREACHABLE. A declared row holds only while the
+            // records behind its declaration are on this network, or while
+            // nobody answered. An ANSWERED absence makes the declaration
+            // unbacked here: the row is not settled, and it proceeds exactly
+            // as an undeclared row would.
+            let verdict = match backing {
+                Some(v) => v,
+                None if local_declared.is_some() => {
+                    evaluate_declaration_backing(
+                        hc,
+                        id,
+                        local_state,
+                        &election_seen,
+                        local_declared.as_deref(),
+                    )
+                    .await
+                }
+                // Hold without a local declaration is the decision rule's
+                // no-advertiser shape for an undeclared row — never reached
+                // today (`decide_head_action` returns Author there), kept
+                // total rather than guessed.
+                None => DeclarationBacking::Backed,
+            };
+            match verdict {
+                DeclarationBacking::Backed => {
+                    tracing::debug!(
+                        content_id = %id,
+                        declared = ?local_declared,
+                        "adopt-before-author: row already declared — neither adopting nor authoring"
+                    );
+                    return PreflightVerdict::held(HoldBasis::Settled);
+                }
+                DeclarationBacking::Unanswered => {
+                    tracing::debug!(
+                        content_id = %id,
+                        declared = ?local_declared,
+                        local = ?local_state,
+                        election = ?election_seen,
+                        "adopt-before-author: held — a backing read went unanswered, so absence \
+                         is not established (not counted as settled)"
+                    );
+                    return PreflightVerdict::held(HoldBasis::Unanswered);
+                }
+                DeclarationBacking::Unbacked => {
+                    return release_unbacked_declaration(
+                        hc,
+                        pool,
+                        ctx,
+                        id,
+                        hint,
+                        adopt,
+                        priced,
+                        local_declared.as_deref(),
+                        &election_seen,
+                    )
+                    .await;
+                }
+            }
         }
         HeadDecision::Author => AdoptOutcome::Author,
+    };
+    PreflightVerdict::settled(outcome)
+}
+
+/// **Pure.** May a peer's advertised head count as fresh evidence for a row
+/// whose own declaration is unbacked? Only when it names a DIFFERENT head — a
+/// peer echoing the very head this row declares is the unbacked declaration
+/// itself. Trimmed on both sides; no advertiser is no evidence.
+pub fn peer_head_is_fresh_evidence(declared: Option<&str>, peer_head: Option<&str>) -> bool {
+    match peer_head.map(str::trim) {
+        None | Some("") => false,
+        Some(peer) => declared.is_none_or(|d| d.trim() != peer),
+    }
+}
+
+/// **Pure.** F5's re-decision: the row as if undeclared, with no election —
+/// [`decide_head_action`] with the declaration voided and nothing canonical
+/// locally (an unbacked row's own conductor answered absent). The contest
+/// switches are irrelevant without a local declaration and are passed off.
+pub fn unbacked_release_decision(fresh_peer_head: bool) -> HeadDecision {
+    decide_head_action(false, fresh_peer_head, false, false, false, false)
+}
+
+/// F5's release: a declared row whose declaration is UNBACKED on this network
+/// proceeds exactly as an undeclared row would — [`decide_head_action`] with no
+/// local declaration and no local election.
+///
+/// The one guard: a peer echoing the SAME head this row already declares is the
+/// unbacked declaration itself, not fresh evidence — adopting it again would
+/// re-declare a head whose record this network does not hold, and the next
+/// ghost sweep would kill the row again (the household's 19:34 → 19:35 loop,
+/// 2026-10-07). A peer advertising a DIFFERENT head is adopted through the
+/// ordinary verified arm, so a carried record that IS backed still wins.
+#[allow(clippy::too_many_arguments)]
+async fn release_unbacked_declaration(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    hint: Option<&PeerHeadHint>,
+    adopt: &AdoptContext<'_>,
+    priced: PricedVerification,
+    declared: Option<&str>,
+    election: &ElectionSeen,
+) -> PreflightVerdict {
+    let fresh_peer_head =
+        hint.filter(|h| peer_head_is_fresh_evidence(declared, Some(h.head_action_hash.as_str())));
+    let redecided = unbacked_release_decision(fresh_peer_head.is_some());
+    tracing::warn!(
+        target: "elohim_storage::head_adoption",
+        content_id = %id,
+        declared = ?declared,
+        election = ?election,
+        redecided = ?redecided,
+        "adopt-before-author: UNBACKED declaration — the own conductor answered that the \
+         records behind it are absent on this network; the row is not settled and proceeds \
+         as an undeclared row (F5)"
+    );
+    crate::metrics::inc_head_adoption_unbacked_released();
+    match (redecided, fresh_peer_head) {
+        (HeadDecision::AdoptPeer, Some(h)) => {
+            PreflightVerdict::settled(adopt_peer(hc, pool, ctx, id, h, adopt.fetcher, priced).await)
+        }
+        _ => PreflightVerdict {
+            outcome: AdoptOutcome::AuthorUnbacked,
+            hold_basis: None,
+        },
     }
 }
 
@@ -2561,6 +3052,7 @@ async fn try_obey_visible_election(
     fetcher: Option<&dyn HeadRecordFetcher>,
     byte_presence: Option<&dyn crate::services::courier_obey::BytePresence>,
     election_resolve: ElectionResolve<'_>,
+    seen: &mut ElectionSeen,
 ) -> Option<AdoptOutcome> {
     // (0) The DENOMINATOR. Counted at entry, before any gate, because the
     // question this arm went two shifts unable to answer was "how often does a
@@ -2591,6 +3083,7 @@ async fn try_obey_visible_election(
                     e
                 }
                 None => {
+                    *seen = ElectionSeen::Absent;
                     crate::metrics::inc_election_obey_probe(
                         crate::metrics::ElectionObeyProbe::NoElection,
                     );
@@ -2599,6 +3092,7 @@ async fn try_obey_visible_election(
             }
         }
         ElectionResolve::Resolved(Answer::Unreachable) => {
+            *seen = ElectionSeen::Unreachable;
             // Identical to the `Err` arm below: the batch never answered for
             // this id (unattempted, backpressured, or extern-absent). A
             // conductor that will not answer is not evidence of anything —
@@ -2633,6 +3127,7 @@ async fn try_obey_visible_election(
                         e
                     }
                     None => {
+                        *seen = ElectionSeen::Absent;
                         crate::metrics::inc_election_obey_probe(
                             crate::metrics::ElectionObeyProbe::NoElection,
                         );
@@ -2654,6 +3149,7 @@ async fn try_obey_visible_election(
                     // error here is the didn't-land signal). Do NOT assume (b) from
                     // rate alone: the 2026-08-03 misdiagnosis assumed it while the
                     // hot-swap was proven applied 7/7 — read the error text.
+                    *seen = ElectionSeen::Unreachable;
                     crate::metrics::inc_election_obey_probe(
                         crate::metrics::ElectionObeyProbe::ResolveError,
                     );
@@ -2679,12 +3175,18 @@ async fn try_obey_visible_election(
     let (hint, fetcher) = match (hint, fetcher) {
         (Some(h), Some(f)) => (h, f),
         _ => {
+            *seen = ElectionSeen::Present {
+                winner: election.winner_target.to_string(),
+            };
             crate::metrics::inc_election_obey_probe(crate::metrics::ElectionObeyProbe::NoCourier);
             return None;
         }
     };
 
     let winner = election.winner_target.to_string();
+    *seen = ElectionSeen::Present {
+        winner: winner.clone(),
+    };
 
     // (3) Fetch. The peer answers with ITS head for this id; that is only useful
     // if it happens to BE the elected action. A mismatch is not a lie — the peer
@@ -6875,5 +7377,208 @@ mod tests {
             candidate_blob_for_bound_slug(CHANNEL, "lamad-spa", "{}"),
             None
         );
+    }
+
+    // ── F5: an ANSWERED absence vs an UNANSWERED probe (2026-10-07) ──────────
+
+    /// THE split, as a truth table. The household repro's rows each carried a
+    /// declaration AND an election link (minted record-less over a head whose
+    /// record never existed on the recast network); the own conductor answered
+    /// for the id and for the head. That is `Unbacked`. The same rows with any
+    /// read unanswered are `Unanswered` — held, never released.
+    #[test]
+    fn declaration_backing_splits_absent_from_unreachable() {
+        use seam_contracts::AnswerState::{Absent, Present, Unreachable};
+
+        // The household repro: everything answered, every backing record absent.
+        assert_eq!(
+            declaration_backing(Absent, Some(Present), &[Absent]),
+            DeclarationBacking::Unbacked,
+            "an election link over an absent record is not backing"
+        );
+        assert_eq!(
+            declaration_backing(Absent, Some(Absent), &[Absent, Absent]),
+            DeclarationBacking::Unbacked
+        );
+
+        // Same row, one read unanswered at each position: hold (Unanswered).
+        assert_eq!(
+            declaration_backing(Unreachable, Some(Absent), &[Absent]),
+            DeclarationBacking::Unanswered,
+            "a timed-out head probe never releases a declaration"
+        );
+        assert_eq!(
+            declaration_backing(Absent, Some(Unreachable), &[Absent]),
+            DeclarationBacking::Unanswered,
+            "a timed-out election read never releases a declaration"
+        );
+        assert_eq!(
+            declaration_backing(Absent, Some(Absent), &[Absent, Unreachable]),
+            DeclarationBacking::Unanswered,
+            "a timed-out record read never releases a declaration"
+        );
+
+        // Any present backing settles the row, whatever else went unanswered.
+        assert_eq!(
+            declaration_backing(Present, Some(Unreachable), &[]),
+            DeclarationBacking::Backed,
+            "a head that resolves here is a root on this network"
+        );
+        assert_eq!(
+            declaration_backing(Absent, Some(Unreachable), &[Present]),
+            DeclarationBacking::Backed,
+            "carried records are obeyed whenever their backing IS present"
+        );
+
+        // Nothing asked: nothing falsified, the hold stands.
+        assert_eq!(
+            declaration_backing(Absent, Some(Absent), &[]),
+            DeclarationBacking::Backed
+        );
+        assert_eq!(
+            declaration_backing(Absent, None, &[]),
+            DeclarationBacking::Backed
+        );
+    }
+
+    /// Exhaustive over every answer state at every position (3 × 4 × 3 × 3):
+    /// `Unbacked` is reachable ONLY when the head and every record answered
+    /// `Absent` and no read went unanswered. Pins the rule against a future
+    /// edit that would release on a silence.
+    #[test]
+    fn unbacked_requires_every_read_answered_and_absent() {
+        use seam_contracts::AnswerState::{self, Absent, Present, Unreachable};
+        let states = [Present, Absent, Unreachable];
+        let elections: [Option<AnswerState>; 4] =
+            [None, Some(Present), Some(Absent), Some(Unreachable)];
+        for local in states {
+            for election in elections {
+                for first in states {
+                    for second in states {
+                        let records = [first, second];
+                        let verdict = declaration_backing(local, election, &records);
+                        let all_answered_absent = local == Absent
+                            && election != Some(Unreachable)
+                            && records.iter().all(|r| *r == Absent);
+                        assert_eq!(
+                            verdict == DeclarationBacking::Unbacked,
+                            all_answered_absent,
+                            "local={local:?} election={election:?} records={records:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Refinement A (C4): a LOCAL miss is never absence by itself. Only a
+    /// NETWORK-strategy read that also answers absent makes a backing record
+    /// `Absent`; a network read that times out, or was never made, leaves it
+    /// `Unreachable` — and therefore the declaration `Unanswered`, held.
+    #[test]
+    fn a_local_miss_is_absent_only_when_the_network_read_agrees() {
+        use seam_contracts::AnswerState::{self, Absent, Present, Unreachable};
+        assert_eq!(backing_record_answer(Present, None), Present);
+        assert_eq!(backing_record_answer(Unreachable, None), Unreachable);
+        assert_eq!(backing_record_answer(Absent, Some(Present)), Present);
+        assert_eq!(backing_record_answer(Absent, Some(Absent)), Absent);
+        assert_eq!(
+            backing_record_answer(Absent, Some(Unreachable)),
+            Unreachable
+        );
+        assert_eq!(
+            backing_record_answer(Absent, None),
+            Unreachable,
+            "a local miss with no network read establishes nothing"
+        );
+
+        // Through the whole rule: the household repro (local miss, network
+        // agrees) is Unbacked; the same row whose network read timed out — or
+        // whose record the network DOES hold — is not.
+        let fold = |local: AnswerState, network: Option<AnswerState>| {
+            declaration_backing(
+                Absent,
+                Some(Present),
+                &[backing_record_answer(local, network)],
+            )
+        };
+        assert_eq!(fold(Absent, Some(Absent)), DeclarationBacking::Unbacked);
+        assert_eq!(
+            fold(Absent, Some(Unreachable)),
+            DeclarationBacking::Unanswered
+        );
+        assert_eq!(fold(Absent, None), DeclarationBacking::Unanswered);
+        assert_eq!(fold(Absent, Some(Present)), DeclarationBacking::Backed);
+    }
+
+    #[test]
+    fn backing_hashes_are_the_declared_head_then_the_winner_deduplicated() {
+        let none = ElectionSeen::NotProbed;
+        assert_eq!(backing_hashes(Some(" uhCkk-h "), &none), vec!["uhCkk-h"]);
+        let same = ElectionSeen::Present {
+            winner: "uhCkk-h".into(),
+        };
+        assert_eq!(backing_hashes(Some("uhCkk-h"), &same), vec!["uhCkk-h"]);
+        let other = ElectionSeen::Present {
+            winner: "uhCkk-w".into(),
+        };
+        assert_eq!(
+            backing_hashes(Some("uhCkk-h"), &other),
+            vec!["uhCkk-h", "uhCkk-w"]
+        );
+        assert_eq!(backing_hashes(None, &other), vec!["uhCkk-w"]);
+        assert!(backing_hashes(Some("   "), &ElectionSeen::Absent).is_empty());
+        assert_eq!(ElectionSeen::NotProbed.state(), None);
+        assert_eq!(
+            ElectionSeen::Unreachable.state(),
+            Some(seam_contracts::AnswerState::Unreachable)
+        );
+    }
+
+    /// The release re-decides as an UNDECLARED row: author when no peer offers
+    /// fresh evidence, verified peer adoption when one advertises a different
+    /// head — and a peer echoing the unbacked head itself is no evidence (the
+    /// household's adopt → dead → hold loop, 2026-10-07).
+    #[test]
+    fn an_unbacked_release_proceeds_as_an_undeclared_row() {
+        assert_eq!(unbacked_release_decision(false), HeadDecision::Author);
+        assert_eq!(unbacked_release_decision(true), HeadDecision::AdoptPeer);
+
+        assert!(!peer_head_is_fresh_evidence(
+            Some("uhCkk-h"),
+            Some(" uhCkk-h ")
+        ));
+        assert!(peer_head_is_fresh_evidence(
+            Some("uhCkk-h"),
+            Some("uhCkk-other")
+        ));
+        assert!(peer_head_is_fresh_evidence(None, Some("uhCkk-other")));
+        assert!(!peer_head_is_fresh_evidence(Some("uhCkk-h"), None));
+        assert!(!peer_head_is_fresh_evidence(Some("uhCkk-h"), Some("  ")));
+    }
+
+    #[test]
+    fn a_preflight_verdict_records_a_basis_exactly_for_holds() {
+        assert_eq!(
+            PreflightVerdict::settled(AdoptOutcome::Held).hold_basis,
+            Some(HoldBasis::Settled)
+        );
+        assert_eq!(
+            PreflightVerdict::settled(AdoptOutcome::Contested).hold_basis,
+            Some(HoldBasis::Settled)
+        );
+        assert_eq!(
+            PreflightVerdict::settled(AdoptOutcome::Adopted).hold_basis,
+            None
+        );
+        assert_eq!(
+            PreflightVerdict::settled(AdoptOutcome::Author).hold_basis,
+            None
+        );
+        let awaiting = PreflightVerdict::held(HoldBasis::AwaitingChannel);
+        assert_eq!(awaiting.hold_basis, Some(HoldBasis::AwaitingChannel));
+        let unanswered = PreflightVerdict::held(HoldBasis::Unanswered);
+        assert_eq!(unanswered.outcome, AdoptOutcome::Held);
+        assert_eq!(unanswered.hold_basis, Some(HoldBasis::Unanswered));
     }
 }

@@ -23,20 +23,46 @@
 //! Since the anchor-LIVENESS landing the `/p2p/status` pending count sums BOTH
 //! re-anchor arms — never-authored (`remaining`) and dead-anchor
 //! (`dead_remaining`). That tightening is correct and stays. But it made one
-//! failure mode unreadable: a dead-anchor row whose stored `reach` or
-//! `content_type` is outside the DNA vocabulary hits a permanent skip-guard in
-//! `reanchor_backfill` (`RowOutcome::SkippedNonCanonicalReach` /
-//! `SkippedNonCanonicalContentType`). It can never be re-authored until a
-//! seed-data correction lands, so it sits in `dead_remaining` every sweep and
-//! holds `caughtUp=false` forever — indistinguishable, from `/p2p/status`
-//! alone, from a healthy heal actively draining a large backlog.
+//! failure mode unreadable: a dead-anchor population that no sweep moves holds
+//! `caughtUp=false` forever — indistinguishable, from `/p2p/status` alone, from
+//! a healthy heal actively draining a large backlog.
 //!
-//! So this holder remembers the PREVIOUS sweep's `dead_remaining` and how many
-//! consecutive sweeps it has sat unchanged. After
+//! So this holder remembers the PREVIOUS sweep's unhealed dead residue and how
+//! many consecutive sweeps it has sat unchanged. After
 //! [`DEAD_REMAINING_STUCK_SWEEPS`] the surface says `deadRemainingStuck: true`
-//! — "this needs a seed-data correction", not "still healing". The pending
-//! arithmetic and `caughtUp` are untouched: this is an observability split, not
-//! a gate loosening.
+//! — "this is wedged", not "still healing". The verdict says THAT the residue
+//! is wedged, not WHY; the per-arm counts beside it name the arm. Two causes
+//! are known, and the first live instance (adam, 2026-09-11, both skip
+//! counters at 0) was the second, not the first:
+//!
+//! - a stored `reach`/`content_type` outside the vocabulary — the sweep's
+//!   skip-guards refuse the row every time (`reanchorSkippedReach` /
+//!   `reanchorSkippedContentType` non-zero; the cure is a seed-data
+//!   correction);
+//! - the adopt-before-author pre-flight HOLDING the row every sweep
+//!   (`reanchorHeld` + `reanchorHeldBackoff` covering the dead candidates).
+//!
+//! ## Settled by declaration is not unhealed (F3, 2026-10-07)
+//!
+//! A row the pre-flight holds because a declaration whose records ARE on this
+//! network settles it is not waiting for anything this node can do; it is
+//! obeying a canonical channel. Those rows are published as
+//! `deadSettledByDeclaration` beside `reanchorDeadRemaining` and are NOT
+//! laundered to `live` — their anchor stays dead and `reanchorDeadRemaining`
+//! and `reanchorPending` still count them. Only `caughtUp` and the stuck
+//! detector read the genuinely-unhealed residue (dead minus settled). A hold
+//! that rests on an unanswered probe is never settled: it stays residue. A
+//! declaration whose records answered ABSENT is not settled either — the
+//! pre-flight releases it to the author path (F5) instead of holding it.
+//!
+//! ## Awaiting a release channel is not unhealed either
+//!
+//! A NEVER-AUTHORED row whose slug is bound to a release channel
+//! (`metadata.releaseChannel`) is held at the pre-flight's first step: its
+//! channel owns its serving pointer, and it authors when that channel adopts.
+//! It is not work this loop can do. Those rows are published as
+//! `reanchorAwaitingChannel` and leave the `caughtUp` residue exactly as
+//! settled-by-declaration rows do; `reanchorPending` still counts them.
 //!
 //! Category C (operational): a per-process status snapshot, reconstructed in
 //! memory, never persisted, never notarized. Mirrors
@@ -78,6 +104,26 @@ pub struct ReanchorSweepResult {
     /// Rows brought to a settled state this sweep (re-authored + already
     /// anchored + adopted + held).
     pub completed: usize,
+    /// Rows the pre-flight ADOPTED a canonical head for this sweep.
+    pub adopted: usize,
+    /// Rows the pre-flight HELD (or contested) this sweep.
+    pub held: usize,
+    /// Rows skipped this sweep on a standing held verdict (no probe paid).
+    pub held_backoff: usize,
+    /// Rows the pre-flight RELEASED to the author path this sweep because the
+    /// records behind their declaration answered absent on this network (F5).
+    pub held_unbacked: usize,
+    /// Of `held` + `held_backoff`: holds that rest on an unanswered probe or a
+    /// DB-pool error. Never settled.
+    pub held_unanswered: usize,
+    /// DEAD-arm rows whose last pre-flight held them on an ANSWER — settled by
+    /// a declaration. Subtracted from `dead_remaining` for `caughtUp` and the
+    /// stuck detector only.
+    pub dead_settled_by_declaration: usize,
+    /// NEVER-AUTHORED rows held because their release channel owns them —
+    /// awaiting the channel's adoption, not re-anchor work. Subtracted from
+    /// `remaining` for `caughtUp` only.
+    pub awaiting_channel: usize,
     /// Rows that errored re-authoring this sweep (retryable).
     pub failed: usize,
     /// NULL-anchor (never-authored) rows remaining after the sweep.
@@ -93,12 +139,49 @@ pub struct ReanchorSweepResult {
 }
 
 impl ReanchorSweepResult {
-    /// The `/p2p/status` pending count: BOTH arms. Unchanged arithmetic — a
-    /// node with nothing left to author but a standing dead-anchor population
-    /// is NOT caught up.
+    /// The `/p2p/status` pending count: BOTH arms, every row. Unchanged
+    /// arithmetic — rows settled by declaration are still dead-anchored and are
+    /// still counted here.
     pub fn pending(&self) -> usize {
         self.remaining.saturating_add(self.dead_remaining)
     }
+
+    /// Settled-by-declaration rows, clamped to the dead population they are a
+    /// subset of (a ghost sweep may revive a row between the loop and the
+    /// recount).
+    pub fn settled_by_declaration(&self) -> usize {
+        self.dead_settled_by_declaration.min(self.dead_remaining)
+    }
+
+    /// The genuinely-unhealed dead residue — see [`unhealed_dead_residue`].
+    pub fn dead_residue(&self) -> usize {
+        unhealed_dead_residue(self.dead_remaining, self.dead_settled_by_declaration)
+    }
+
+    /// Never-authored rows awaiting their release channel, clamped to
+    /// `remaining` (they are a subset of it).
+    pub fn awaiting_channel(&self) -> usize {
+        self.awaiting_channel.min(self.remaining)
+    }
+
+    /// What `caughtUp` reads: never-authored rows NOT awaiting a release
+    /// channel, plus the unhealed dead residue. A node whose only outstanding
+    /// rows are settled by declaration or awaiting their channel is caught up;
+    /// one with a single genuinely unhealed row is not.
+    pub fn unhealed_pending(&self) -> usize {
+        self.remaining
+            .saturating_sub(self.awaiting_channel)
+            .saturating_add(self.dead_residue())
+    }
+}
+
+/// **Pure.** The dead rows that are genuinely unhealed: `dead_remaining` minus
+/// those settled by a declaration (F3). Saturating, so a settled count that
+/// overshoots the recount (a row revived between loop and recount) can never
+/// underflow into a false "caught up" — it reads 0 only when every dead row is
+/// settled.
+pub fn unhealed_dead_residue(dead_remaining: usize, dead_settled_by_declaration: usize) -> usize {
+    dead_remaining.saturating_sub(dead_settled_by_declaration)
 }
 
 /// Fold this sweep's `dead_remaining` into the consecutive-unchanged run
@@ -120,13 +203,14 @@ pub fn next_unchanged_sweeps(previous: Option<usize>, previous_run: u32, current
     }
 }
 
-/// Verdict: is the dead-anchor population WEDGED (needs a seed-data
-/// correction) rather than draining? Pure + total.
+/// Verdict: is the unhealed dead residue WEDGED rather than draining? Pure +
+/// total. It says THAT, not WHY — see the module doc for the two known causes
+/// and the counters that tell them apart.
 ///
-/// True exactly when a non-zero `dead_remaining` has been observed at the same
-/// value for at least [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive sweeps. A
-/// zero population is never stuck (it is done), and a moving population is
-/// never stuck (it is draining).
+/// True exactly when a non-zero residue has been observed at the same value
+/// for at least [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive sweeps. A zero
+/// residue is never stuck (it is done, or settled by declaration), and a moving
+/// one is never stuck (it is draining).
 pub fn is_dead_remaining_stuck(dead_remaining: usize, unchanged_sweeps: u32) -> bool {
     dead_remaining > 0 && unchanged_sweeps >= DEAD_REMAINING_STUCK_SWEEPS
 }
@@ -190,8 +274,11 @@ pub struct ProvideLoopStatus {
     /// a future boot's sweep).
     #[ts(type = "number")]
     pub reanchor_failed: usize,
-    /// True when the re-anchor backfill has run AND found no NULL-anchor rows
-    /// left to re-author. False before the first run or while candidates remain.
+    /// True when the re-anchor backfill has run AND nothing is left unhealed on
+    /// either arm: no NULL-anchor row to author outside
+    /// `reanchorAwaitingChannel`, and no dead-anchor row outside
+    /// `deadSettledByDeclaration`. False before the first run or while
+    /// unhealed candidates remain.
     pub reanchor_caught_up: bool,
     /// The DEAD-anchor arm of `reanchorPending` on its own: rows anchored under
     /// an action no living chain can present, remaining after the last sweep.
@@ -199,16 +286,21 @@ pub struct ProvideLoopStatus {
     /// "nothing to author, something to re-adopt" is directly readable.
     #[ts(type = "number")]
     pub reanchor_dead_remaining: usize,
-    /// Consecutive sweeps `reanchorDeadRemaining` has sat at the same non-zero
-    /// value. 0 while the population is empty or moving. Watch it climb
-    /// 1 → 2 → 3 to see a heal stall in progress.
+    /// Consecutive sweeps the unhealed dead residue (`reanchorDeadRemaining`
+    /// minus `deadSettledByDeclaration`) has sat at the same non-zero value. 0
+    /// while the residue is empty or moving. Watch it climb 1 → 2 → 3 to see a
+    /// heal stall in progress.
     pub stuck_sweeps: u32,
-    /// True when the dead-anchor population is WEDGED rather than draining:
-    /// `reanchorDeadRemaining > 0` for at least
-    /// [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive sweeps at the same value.
-    /// Read this as *a seed-data correction is needed*, not *still healing* —
-    /// `caughtUp` will not move on its own. `reanchorSkippedReach` /
-    /// `reanchorSkippedContentType` name the likely reason.
+    /// True when the unhealed dead residue is WEDGED rather than draining:
+    /// non-zero for at least [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive
+    /// sweeps at the same value. Read this as *wedged*, not *still healing* —
+    /// `caughtUp` will not move on its own. The verdict does not name the
+    /// cause; the per-arm counts do: non-zero `reanchorSkippedReach` /
+    /// `reanchorSkippedContentType` mean a seed-data correction is needed,
+    /// while `reanchorHeld` / `reanchorHeldBackoff` covering the dead
+    /// candidates (with `reanchorHeldUnanswered` beside them) mean the
+    /// adopt-before-author pre-flight is holding the rows on probes nobody
+    /// answered. Rows settled by a declaration never count toward it.
     pub dead_remaining_stuck: bool,
     /// Rows the LAST sweep skipped for a non-canonical `reach` (the DNA rejects
     /// them, so they are never re-authorable). Non-zero beside
@@ -219,6 +311,41 @@ pub struct ProvideLoopStatus {
     /// class as `reanchorSkippedReach`, same fix (correct the seed data).
     #[ts(type = "number")]
     pub reanchor_skipped_content_type: usize,
+    /// Rows the LAST sweep's pre-flight ADOPTED a canonical head for (no root
+    /// minted).
+    #[ts(type = "number")]
+    pub reanchor_adopted: usize,
+    /// Rows the LAST sweep's pre-flight HELD or contested — neither adopted nor
+    /// authored.
+    #[ts(type = "number")]
+    pub reanchor_held: usize,
+    /// Rows the LAST sweep skipped on a standing held verdict inside the
+    /// held-backoff window (no probe paid). Still unhealed unless settled.
+    #[ts(type = "number")]
+    pub reanchor_held_backoff: usize,
+    /// Rows the LAST sweep's pre-flight released to the author path because
+    /// the records behind their declaration answered ABSENT on this network —
+    /// a declaration pointing at a network that no longer exists (F5).
+    #[ts(type = "number")]
+    pub reanchor_held_unbacked: usize,
+    /// Of `reanchorHeld` + `reanchorHeldBackoff`: holds that rest on an
+    /// unanswered probe or a DB-pool error. Never counted as settled.
+    #[ts(type = "number")]
+    pub reanchor_held_unanswered: usize,
+    /// Dead-anchor rows (of `reanchorDeadRemaining`) whose last pre-flight held
+    /// them on an ANSWER — settled by a declaration whose records are on this
+    /// network. Their anchor stays dead (never laundered to live) and they stay
+    /// in `reanchorDeadRemaining` / `reanchorPending`; `caughtUp` and the stuck
+    /// detector read only the residue beside them.
+    #[ts(type = "number")]
+    pub dead_settled_by_declaration: usize,
+    /// Never-authored rows (of `reanchorPending`'s NULL arm) the LAST sweep held
+    /// because their slug is bound to a release channel
+    /// (`metadata.releaseChannel`), which owns their serving pointer. Not
+    /// re-anchor work: each authors when its channel adopts. They stay in
+    /// `reanchorPending`; `caughtUp` reads only the rows beside them.
+    #[ts(type = "number")]
+    pub reanchor_awaiting_channel: usize,
 }
 
 impl Default for ProvideLoopStatus {
@@ -235,6 +362,13 @@ impl Default for ProvideLoopStatus {
             dead_remaining_stuck: false,
             reanchor_skipped_reach: 0,
             reanchor_skipped_content_type: 0,
+            reanchor_adopted: 0,
+            reanchor_held: 0,
+            reanchor_held_backoff: 0,
+            reanchor_held_unbacked: 0,
+            reanchor_held_unanswered: 0,
+            dead_settled_by_declaration: 0,
+            reanchor_awaiting_channel: 0,
         }
     }
 }
@@ -249,7 +383,8 @@ impl Default for ProvideLoopStatus {
 #[derive(Debug, Default)]
 struct ProvideLoopInner {
     status: ProvideLoopStatus,
-    /// The previous sweep's `dead_remaining`. `None` before the first sweep.
+    /// The previous sweep's unhealed dead residue. `None` before the first
+    /// sweep.
     prev_dead_remaining: Option<usize>,
 }
 
@@ -283,34 +418,45 @@ impl ProvideLoopState {
 
     /// Publish the result of one re-anchor backfill sweep.
     ///
-    /// `pending` is BOTH remaining arms summed and `caught_up` is
-    /// `pending == 0` — unchanged. `completed`/`failed` advance the cumulative
-    /// counters; the remaining/skip counts reflect the LATEST sweep only.
+    /// `pending` is BOTH remaining arms summed, every row. `caught_up` reads
+    /// the UNHEALED pending only — never-authored rows outside
+    /// `awaiting_channel`, plus the dead residue outside
+    /// `dead_settled_by_declaration` (F3). `completed`/`failed` advance
+    /// the cumulative counters; the remaining/skip/per-arm counts reflect the
+    /// LATEST sweep only.
     ///
-    /// Additionally folds the dead arm into the cross-sweep stuck detector: the
-    /// unchanged-run counter advances via [`next_unchanged_sweeps`] and the
+    /// Additionally folds the dead residue into the cross-sweep stuck detector:
+    /// the unchanged-run counter advances via [`next_unchanged_sweeps`] and the
     /// verdict via [`is_dead_remaining_stuck`], both pure.
     pub async fn publish_reanchor_sweep(&self, result: ReanchorSweepResult) {
         let pending = result.pending();
+        let residue = result.dead_residue();
         let mut inner = self.inner.write().await;
 
         let run = next_unchanged_sweeps(
             inner.prev_dead_remaining,
             inner.status.stuck_sweeps,
-            result.dead_remaining,
+            residue,
         );
-        inner.prev_dead_remaining = Some(result.dead_remaining);
+        inner.prev_dead_remaining = Some(residue);
 
         let s = &mut inner.status;
         s.reanchor_completed = s.reanchor_completed.saturating_add(result.completed);
         s.reanchor_failed = s.reanchor_failed.saturating_add(result.failed);
         s.reanchor_pending = pending;
-        s.reanchor_caught_up = pending == 0;
+        s.reanchor_caught_up = result.unhealed_pending() == 0;
         s.reanchor_dead_remaining = result.dead_remaining;
         s.stuck_sweeps = run;
-        s.dead_remaining_stuck = is_dead_remaining_stuck(result.dead_remaining, run);
+        s.dead_remaining_stuck = is_dead_remaining_stuck(residue, run);
         s.reanchor_skipped_reach = result.skipped_reach;
         s.reanchor_skipped_content_type = result.skipped_content_type;
+        s.reanchor_adopted = result.adopted;
+        s.reanchor_held = result.held;
+        s.reanchor_held_backoff = result.held_backoff;
+        s.reanchor_held_unbacked = result.held_unbacked;
+        s.reanchor_held_unanswered = result.held_unanswered;
+        s.dead_settled_by_declaration = result.settled_by_declaration();
+        s.reanchor_awaiting_channel = result.awaiting_channel();
     }
 }
 
@@ -539,5 +685,166 @@ mod tests {
         assert_eq!(snap.stuck_sweeps, 0);
         assert_eq!(snap.reanchor_pending, 11);
         assert!(!snap.reanchor_caught_up);
+    }
+
+    // ── F3: settled by declaration is not unhealed ──────────────────
+
+    #[test]
+    fn residue_is_dead_minus_settled_and_never_underflows() {
+        assert_eq!(unhealed_dead_residue(5, 0), 5);
+        assert_eq!(unhealed_dead_residue(5, 3), 2);
+        assert_eq!(unhealed_dead_residue(5, 5), 0);
+        // A row revived between the loop and the recount can leave the settled
+        // count above the recount: saturate, never wrap into a huge residue.
+        assert_eq!(unhealed_dead_residue(5, 7), 0);
+        assert_eq!(unhealed_dead_residue(0, 0), 0);
+
+        let r = ReanchorSweepResult {
+            remaining: 2,
+            dead_remaining: 5,
+            dead_settled_by_declaration: 7,
+            ..Default::default()
+        };
+        assert_eq!(
+            r.pending(),
+            7,
+            "pending still counts every row on both arms"
+        );
+        assert_eq!(
+            r.settled_by_declaration(),
+            5,
+            "clamped to the dead population"
+        );
+        assert_eq!(r.dead_residue(), 0);
+        assert_eq!(
+            r.unhealed_pending(),
+            2,
+            "the NULL arm is never settled away"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_all_settled_dead_population_reads_caught_up_and_never_stuck() {
+        // The household after F5: every dead row that remains is held by a
+        // declaration whose records ARE here. Not laundered — still dead, still
+        // pending — but nothing is waiting on this node.
+        let state = ProvideLoopState::new();
+        let settled = ReanchorSweepResult {
+            dead_remaining: 4,
+            held_backoff: 4,
+            dead_settled_by_declaration: 4,
+            ..Default::default()
+        };
+        for _ in 0..(DEAD_REMAINING_STUCK_SWEEPS + 2) {
+            state.publish_reanchor_sweep(settled).await;
+        }
+        let snap = state.status().await;
+        assert!(snap.reanchor_caught_up);
+        assert!(!snap.dead_remaining_stuck);
+        assert_eq!(snap.stuck_sweeps, 0);
+        assert_eq!(snap.reanchor_dead_remaining, 4, "never laundered to live");
+        assert_eq!(snap.reanchor_pending, 4, "pending still counts them");
+        assert_eq!(snap.dead_settled_by_declaration, 4);
+        assert_eq!(snap.reanchor_held_backoff, 4);
+    }
+
+    #[tokio::test]
+    async fn an_unsettled_residue_beside_settled_rows_still_reads_stuck() {
+        // Two settled rows must not hide three genuinely unhealed ones.
+        let state = ProvideLoopState::new();
+        let mixed = ReanchorSweepResult {
+            dead_remaining: 5,
+            held: 5,
+            held_unanswered: 3,
+            dead_settled_by_declaration: 2,
+            ..Default::default()
+        };
+        for _ in 0..DEAD_REMAINING_STUCK_SWEEPS {
+            state.publish_reanchor_sweep(mixed).await;
+        }
+        let snap = state.status().await;
+        assert!(!snap.reanchor_caught_up);
+        assert!(snap.dead_remaining_stuck);
+        assert_eq!(snap.stuck_sweeps, DEAD_REMAINING_STUCK_SWEEPS);
+        assert_eq!(snap.dead_settled_by_declaration, 2);
+        assert_eq!(snap.reanchor_held_unanswered, 3);
+    }
+
+    /// Refinement B: never-authored rows awaiting their release channel leave
+    /// the `caughtUp` residue exactly as settled-by-declaration rows do, while
+    /// `reanchorPending` stays raw and the stuck detector (dead arm only) is
+    /// untouched.
+    #[tokio::test]
+    async fn rows_awaiting_their_channel_are_not_unhealed_work() {
+        let r = ReanchorSweepResult {
+            remaining: 13,
+            awaiting_channel: 13,
+            ..Default::default()
+        };
+        assert_eq!(r.pending(), 13);
+        assert_eq!(r.unhealed_pending(), 0);
+        // One genuinely unhealed NULL row beside them still blocks caughtUp.
+        let r = ReanchorSweepResult {
+            remaining: 14,
+            awaiting_channel: 13,
+            ..Default::default()
+        };
+        assert_eq!(r.unhealed_pending(), 1);
+        // Overshoot clamps to the NULL population, never underflows.
+        let r = ReanchorSweepResult {
+            remaining: 2,
+            awaiting_channel: 5,
+            dead_remaining: 3,
+            dead_settled_by_declaration: 1,
+            ..Default::default()
+        };
+        assert_eq!(r.awaiting_channel(), 2);
+        assert_eq!(r.unhealed_pending(), 2, "only the dead residue is left");
+
+        // The household shape: 13 channel-bound NULL rows, every dead row
+        // settled — caught up, not stuck, pending raw.
+        let state = ProvideLoopState::new();
+        let household = ReanchorSweepResult {
+            remaining: 13,
+            awaiting_channel: 13,
+            dead_remaining: 2,
+            dead_settled_by_declaration: 2,
+            ..Default::default()
+        };
+        for _ in 0..(DEAD_REMAINING_STUCK_SWEEPS + 1) {
+            state.publish_reanchor_sweep(household).await;
+        }
+        let snap = state.status().await;
+        assert!(snap.reanchor_caught_up);
+        assert!(!snap.dead_remaining_stuck);
+        assert_eq!(snap.reanchor_pending, 15);
+        assert_eq!(snap.reanchor_awaiting_channel, 13);
+    }
+
+    #[tokio::test]
+    async fn per_arm_counts_are_the_latest_sweep_not_cumulative() {
+        let state = ProvideLoopState::new();
+        state
+            .publish_reanchor_sweep(ReanchorSweepResult {
+                adopted: 3,
+                held: 2,
+                held_backoff: 1,
+                held_unbacked: 4,
+                held_unanswered: 1,
+                ..Default::default()
+            })
+            .await;
+        state
+            .publish_reanchor_sweep(ReanchorSweepResult {
+                adopted: 1,
+                ..Default::default()
+            })
+            .await;
+        let snap = state.status().await;
+        assert_eq!(snap.reanchor_adopted, 1);
+        assert_eq!(snap.reanchor_held, 0);
+        assert_eq!(snap.reanchor_held_backoff, 0);
+        assert_eq!(snap.reanchor_held_unbacked, 0);
+        assert_eq!(snap.reanchor_held_unanswered, 0);
     }
 }

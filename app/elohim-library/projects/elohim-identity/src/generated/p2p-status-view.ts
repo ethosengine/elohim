@@ -154,7 +154,7 @@ export interface P2PStatusView {
      */
     reanchorFailed: number;
     /**
-     * True when the re-anchor backfill ran and found no NULL-anchor rows left. False before the first run or while candidates remain.
+     * True when the re-anchor backfill ran and nothing is left unhealed on either arm: no NULL-anchor row to author outside reanchorAwaitingChannel, and no dead-anchor row outside deadSettledByDeclaration. False before the first run or while unhealed candidates remain.
      */
     reanchorCaughtUp: boolean;
     /**
@@ -162,11 +162,11 @@ export interface P2PStatusView {
      */
     reanchorDeadRemaining?: number;
     /**
-     * Additive/optional. Consecutive sweeps reanchorDeadRemaining has sat at the same non-zero value. 0 while the population is empty or moving. Ephemeral (Category C), in-memory only — resets to 0 on restart and is re-earned over the next few sweeps.
+     * Additive/optional. Consecutive sweeps the unhealed dead residue (reanchorDeadRemaining minus deadSettledByDeclaration) has sat at the same non-zero value. 0 while the residue is empty or moving. Ephemeral (Category C), in-memory only — resets to 0 on restart and is re-earned over the next few sweeps.
      */
     stuckSweeps?: number;
     /**
-     * Additive/optional. True when the dead-anchor population is WEDGED rather than draining (non-zero and unchanged for at least 3 consecutive sweeps). Read as 'a seed-data correction is needed', NOT 'still healing' — caughtUp will not move on its own. Does not affect caughtUp or the pending arithmetic; it is an observability split, not a gate loosening.
+     * Additive/optional. True when the UNHEALED dead residue (reanchorDeadRemaining minus deadSettledByDeclaration) is WEDGED rather than draining (non-zero and unchanged for at least 3 consecutive sweeps). Read as 'wedged', NOT 'still healing'. It does not name the cause; the per-arm counts do: non-zero reanchorSkippedReach / reanchorSkippedContentType mean a seed-data correction is needed, while reanchorHeld / reanchorHeldBackoff covering the dead candidates (with reanchorHeldUnanswered beside them) mean the adopt-before-author pre-flight is holding the rows on probes nobody answered. Rows settled by a declaration never count toward it.
      */
     deadRemainingStuck?: boolean;
     /**
@@ -177,6 +177,34 @@ export interface P2PStatusView {
      * Additive/optional. Rows the LAST sweep skipped because their stored content_type is outside the vocabulary Content::validate() accepts. Same class as reanchorSkippedReach, same fix (correct the seed data).
      */
     reanchorSkippedContentType?: number;
+    /**
+     * Additive/optional. Rows the LAST sweep's adopt-before-author pre-flight ADOPTED a canonical head for (no root minted).
+     */
+    reanchorAdopted?: number;
+    /**
+     * Additive/optional. Rows the LAST sweep's pre-flight HELD or contested — neither adopted nor authored.
+     */
+    reanchorHeld?: number;
+    /**
+     * Additive/optional. Rows the LAST sweep skipped on a standing held verdict inside the held-backoff window (no conductor probe paid). Still unhealed unless settled.
+     */
+    reanchorHeldBackoff?: number;
+    /**
+     * Additive/optional. Rows the LAST sweep's pre-flight released to the author path because the records behind their declaration answered ABSENT on this network — a declaration pointing at a network that no longer exists. Each is then re-authored like an undeclared row.
+     */
+    reanchorHeldUnbacked?: number;
+    /**
+     * Additive/optional. Of reanchorHeld + reanchorHeldBackoff: holds that rest on an unanswered probe or a DB-pool error. Never counted as settled.
+     */
+    reanchorHeldUnanswered?: number;
+    /**
+     * Additive/optional. Dead-anchor rows (of reanchorDeadRemaining) whose last pre-flight held them on an ANSWER — settled by a declaration whose records are on this network. Their anchor stays dead (never laundered to live) and they stay in reanchorDeadRemaining and reanchorPending; reanchorCaughtUp and deadRemainingStuck read only the residue beside them.
+     */
+    deadSettledByDeclaration?: number;
+    /**
+     * Additive/optional. Never-authored rows (of reanchorPending's NULL arm) the LAST sweep held because their slug is bound to a release channel (metadata.releaseChannel), which owns their serving pointer. Not re-anchor work: each authors when its channel adopts. They stay in reanchorPending; reanchorCaughtUp reads only the rows beside them.
+     */
+    reanchorAwaitingChannel?: number;
   } | null;
   /**
    * The co-resident iroh node's NodeId (64-char hex), when this node runs the iroh transport stack alongside libp2p. Additive/optional — OMITTED from the wire on a libp2p-only node (dual-stack boot is mode-exclusive today). Set at the main.rs dual block from iroh_n.node_id().

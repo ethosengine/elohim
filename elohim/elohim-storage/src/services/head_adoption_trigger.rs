@@ -1320,7 +1320,9 @@ async fn process_trigger(
         // NOT OURS TO ACT ON. A sync apply is not evidence that a root should be
         // minted; this worker owns no author path and deliberately will not grow
         // one. The heal / re-anchor sweeps own authoring and are unaffected.
-        AdoptOutcome::Author | AdoptOutcome::AuthorThenAdopt { .. } => {
+        AdoptOutcome::Author
+        | AdoptOutcome::AuthorUnbacked
+        | AdoptOutcome::AuthorThenAdopt { .. } => {
             crate::metrics::inc_head_adoption_trigger("author_deferred");
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",

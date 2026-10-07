@@ -33,8 +33,11 @@ reanchorCompleted: number,
  */
 reanchorFailed: number, 
 /**
- * True when the re-anchor backfill has run AND found no NULL-anchor rows
- * left to re-author. False before the first run or while candidates remain.
+ * True when the re-anchor backfill has run AND nothing is left unhealed on
+ * either arm: no NULL-anchor row to author outside
+ * `reanchorAwaitingChannel`, and no dead-anchor row outside
+ * `deadSettledByDeclaration`. False before the first run or while
+ * unhealed candidates remain.
  */
 reanchorCaughtUp: boolean, 
 /**
@@ -45,18 +48,23 @@ reanchorCaughtUp: boolean,
  */
 reanchorDeadRemaining: number, 
 /**
- * Consecutive sweeps `reanchorDeadRemaining` has sat at the same non-zero
- * value. 0 while the population is empty or moving. Watch it climb
- * 1 → 2 → 3 to see a heal stall in progress.
+ * Consecutive sweeps the unhealed dead residue (`reanchorDeadRemaining`
+ * minus `deadSettledByDeclaration`) has sat at the same non-zero value. 0
+ * while the residue is empty or moving. Watch it climb 1 → 2 → 3 to see a
+ * heal stall in progress.
  */
 stuckSweeps: number, 
 /**
- * True when the dead-anchor population is WEDGED rather than draining:
- * `reanchorDeadRemaining > 0` for at least
- * [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive sweeps at the same value.
- * Read this as *a seed-data correction is needed*, not *still healing* —
- * `caughtUp` will not move on its own. `reanchorSkippedReach` /
- * `reanchorSkippedContentType` name the likely reason.
+ * True when the unhealed dead residue is WEDGED rather than draining:
+ * non-zero for at least [`DEAD_REMAINING_STUCK_SWEEPS`] consecutive
+ * sweeps at the same value. Read this as *wedged*, not *still healing* —
+ * `caughtUp` will not move on its own. The verdict does not name the
+ * cause; the per-arm counts do: non-zero `reanchorSkippedReach` /
+ * `reanchorSkippedContentType` mean a seed-data correction is needed,
+ * while `reanchorHeld` / `reanchorHeldBackoff` covering the dead
+ * candidates (with `reanchorHeldUnanswered` beside them) mean the
+ * adopt-before-author pre-flight is holding the rows on probes nobody
+ * answered. Rows settled by a declaration never count toward it.
  */
 deadRemainingStuck: boolean, 
 /**
@@ -69,4 +77,46 @@ reanchorSkippedReach: number,
  * Rows the LAST sweep skipped for a non-canonical `content_type`. Same
  * class as `reanchorSkippedReach`, same fix (correct the seed data).
  */
-reanchorSkippedContentType: number, };
+reanchorSkippedContentType: number, 
+/**
+ * Rows the LAST sweep's pre-flight ADOPTED a canonical head for (no root
+ * minted).
+ */
+reanchorAdopted: number, 
+/**
+ * Rows the LAST sweep's pre-flight HELD or contested — neither adopted nor
+ * authored.
+ */
+reanchorHeld: number, 
+/**
+ * Rows the LAST sweep skipped on a standing held verdict inside the
+ * held-backoff window (no probe paid). Still unhealed unless settled.
+ */
+reanchorHeldBackoff: number, 
+/**
+ * Rows the LAST sweep's pre-flight released to the author path because
+ * the records behind their declaration answered ABSENT on this network —
+ * a declaration pointing at a network that no longer exists (F5).
+ */
+reanchorHeldUnbacked: number, 
+/**
+ * Of `reanchorHeld` + `reanchorHeldBackoff`: holds that rest on an
+ * unanswered probe or a DB-pool error. Never counted as settled.
+ */
+reanchorHeldUnanswered: number, 
+/**
+ * Dead-anchor rows (of `reanchorDeadRemaining`) whose last pre-flight held
+ * them on an ANSWER — settled by a declaration whose records are on this
+ * network. Their anchor stays dead (never laundered to live) and they stay
+ * in `reanchorDeadRemaining` / `reanchorPending`; `caughtUp` and the stuck
+ * detector read only the residue beside them.
+ */
+deadSettledByDeclaration: number, 
+/**
+ * Never-authored rows (of `reanchorPending`'s NULL arm) the LAST sweep held
+ * because their slug is bound to a release channel
+ * (`metadata.releaseChannel`), which owns their serving pointer. Not
+ * re-anchor work: each authors when its channel adopts. They stay in
+ * `reanchorPending`; `caughtUp` reads only the rows beside them.
+ */
+reanchorAwaitingChannel: number, };
