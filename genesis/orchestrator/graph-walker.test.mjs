@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { walkGraph, topoSort } from './graph-walker.mjs';
@@ -76,6 +77,27 @@ describe('source glob matching', () => {
     ];
     const result = walkGraph(manifests, ['app/tsconfig.app.json']);
     assert.equal(result.projects.length, 1);
+  });
+
+  // A governance file inside a source tree is not a source change: orchestrator
+  // #1987 rebuilt and rolled the edge fleet for elohim/elohim-storage/src/.epr-meta.
+  it('a .epr-meta file or directory under a source glob triggers nothing', () => {
+    const manifests = [
+      makeManifest('app', {
+        build: makeStep(['app/src/**']),
+      }, { projects: { 'my-app': { dir: 'app' } } }),
+    ];
+    assert.equal(walkGraph(manifests, ['app/src/.epr-meta']).projects.length, 0);
+    assert.equal(walkGraph(manifests, ['app/src/.epr-meta/x.habit.md']).projects.length, 0);
+    assert.equal(walkGraph(manifests, ['./app/src/.epr-meta']).projects.length, 0);
+    assert.equal(walkGraph(manifests, ['app/src/.epr-meta', 'app/src/main.ts']).projects.length, 1);
+  });
+
+  it('the Groovy walker carries the same exclusion', () => {
+    const groovy = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'build-graph.groovy'), 'utf8');
+    assert.match(groovy, /def isGovernancePath\(String filePath\)/);
+    assert.match(groovy, /split\('\/'\)\.any \{ it == '\.epr-meta' \}/);
+    assert.match(groovy, /for \(def file : changedFiles\) \{\n\s+if \(isGovernancePath\(file\)\) continue\n/);
   });
 });
 

@@ -217,12 +217,26 @@ def matchesGlob(String filePath, String pattern) {
     return normalizedFile.matches(regex)
 }
 
+// A governance path is never a source change. `.epr-meta` is the compose-gate
+// manifest (a file, or a directory of habit atoms and rules) that sits INSIDE
+// the tree it governs, so a source glob like `elohim/elohim-storage/src/**`
+// matches it. Orchestrator #1987 (2026-10-06) rebuilt and rolled the edge
+// fleet for an edit to elohim/elohim-storage/src/.epr-meta, twenty minutes
+// after a conductor roll. Rules and evidence ledgers change what agents may
+// write, not what the binary does.
+@NonCPS
+def isGovernancePath(String filePath) {
+    def normalized = filePath.startsWith('./') ? filePath.substring(2) : filePath
+    return normalized.split('/').any { it == '.epr-meta' }
+}
+
 @NonCPS
 def checkSourceChanges(List changedFiles, Map step) {
     def sources = step.inputs?.sources ?: []
     if (sources.isEmpty()) return [stale: false]
 
     for (def file : changedFiles) {
+        if (isGovernancePath(file)) continue
         for (def pattern : sources) {
             if (matchesGlob(file, pattern)) {
                 return [stale: true, reason: "source: ${file} matches ${pattern}"]
