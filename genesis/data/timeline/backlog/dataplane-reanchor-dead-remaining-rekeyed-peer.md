@@ -507,3 +507,19 @@ dataplane-reanchor-dead-remaining-rekeyed-peer`.
 Not verified as of 2026-10-07T12:42Z: the condition is live (`stuckSweeps: 4`,
 `reanchorDeadRemaining: 5`). The Loki lines above were read through a delegated query, not
 re-read line by line by the triage author.
+
+## 2026-10-07 — reproduced on the household after a recast (local repro, no fleet needed)
+
+After a `MESH_RESET=1` start (operator-granted, to shed 108 accumulated hosted agents) and the
+Act I prologue, matthew's storage row for `elohim-host-landing` read `dhtAnchorState: dead` with a
+`dhtAnchorHash` that no record on the new network backs; `reanchor_backfill` swept
+`held_backoff: 65, remaining: 13, reanchored: 0` every pass; and the prologue's stage leg failed
+its `blobHash` PATCH with `update_content: canonical root history unavailable — PENDING` for 50+
+minutes while the conductor was otherwise caught up (`conductor_missing: 0`, `caught_up: true`).
+That is this concern's Held arm (`AdoptOutcome::Held` never clears `dead`), seen on seeded content
+whose carried anchor points at a network that no longer exists — exactly what a fresh household
+is. So the household is a repro for F1/F3/F4: run the prologue on a recast household and watch
+`reanchor_backfill: sweep complete … held_backoff` stay flat. Consequence that day: the pre-push
+serving receipt (`epr-app-deliverability`) could not be minted on the tip, and the push went out
+with the hook bypassed under the operator's grant, receipt owed. Logs:
+`genesis/local-dev/testdrive-20261007/receipt-lane-{3,4}.log`, `household-dowell/logs/matthew.log`.

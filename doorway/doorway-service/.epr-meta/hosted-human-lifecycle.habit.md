@@ -120,3 +120,12 @@ review's fixes): the first enroll came before the new conductor could read the i
 commitment, the consent was kept on the device, and `join` run again with the same flags enrolled
 "without asking again" (joining record uhCkkhW8BUGqNfdUoKvqaa_6Dn6kN28NENkPOK27O-fZYfnSp_TsG) — the
 recovery path is proven live, one yes total.
+
+DELTA 2026-10-07c (ON THE FLEET; NO status change): pushed e87ee7c69 (operator-granted, pre-push bypassed because
+the household could not mint the serving receipt — see dataplane-reanchor-dead-remaining-rekeyed-peer.md
+2026-10-07); orchestrator #1996 dispatched eprfs #49 (SUCCESS) and edge #1572 (SUCCESS, Dataplane Validation
+owed to the sibling run). Alpha doorway restarted on the new image and, rendered headless against the
+morning's own approval link, now answers "Can't approve here" with the `epr device approve '<link>'`
+command BEFORE sign-in (probe POST /auth/consent/view -> 404, no redirect to /threshold/login;
+genesis/a2o/reports/look/alpha-consent-after-roll). The hosted path (a doorway that takes approvals) is
+still the named next slice; the household receipt is owed on this tip.

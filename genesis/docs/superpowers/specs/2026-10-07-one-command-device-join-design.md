@@ -217,6 +217,11 @@ collectable. 117 crate tests pass.
 
 ## Proof (2026-10-07)
 
+- On the fleet: pushed as e87ee7c69; edge #1572 rolled alpha; the morning's approval link now
+  refuses before sign-in with the command (render: `genesis/a2o/reports/look/alpha-consent-after-roll`).
+  The household serving receipt is owed on this tip (the recast household reproduced the
+  dead-anchor wedge; see that backlog entry).
+
 - Tests: consent-grant 117; epr-cli 314 (clippy clean); elohim-storage focused 52 (clippy
   clean); elohim-imagodei consent specs 223 (29 pre-existing failures in two untouched files);
   doorway-app 115 + production AOT build; imagodei-portal 87 + build. Portal states rendered

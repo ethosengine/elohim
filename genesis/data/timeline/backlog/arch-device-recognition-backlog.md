@@ -743,6 +743,16 @@ the code alone, as `epr device redeem` does. The steps now do the same.
   holds; the second (`/db/collectives/family-dowell` naming matthew's node among its stewards) is
   still to be read on the fleet.
 
+**Seen again on a recast household, 2026-10-07:** after `MESH_RESET=1 just mesh start` (the operator
+had the 108 accumulated hosted agents cleaned out), the storage peers self-healed their Humans at boot
+(`GENESIS_SELF_HEAL_IDENTITY=1`, `SELF_HUMAN_ID=human-<peer>`), and the prologue's `Seed Conductor
+Identities` leg then refused all three: "Agent profile 'human-matthew-manager' conflicts with the own
+Human/caller; refusing overwrite" (0 created, 3 failed, leg MUST-SUCCEED). On a household whose node
+already embodies the fixture's own id, the seeder should read that as `[~] Embodied as <same id>` and
+succeed, exactly as it does for a different id; refusing to overwrite an identical profile is the
+seeder treating its own fixture as a stranger. Probe: a recast household's first prologue reports the
+three peers embodied, not failed.
+
 ## shift_objective
 
 ```
