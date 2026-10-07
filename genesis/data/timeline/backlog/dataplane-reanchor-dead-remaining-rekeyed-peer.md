@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-06"
+updated: "2026-10-07"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
@@ -383,3 +383,127 @@ stuck), or `reanchorDeadRemaining` reaches 0.
 
 Not verified as of 2026-10-06T19:43Z: the condition is live (`stuckSweeps: 18`,
 `reanchorDeadRemaining: 1`).
+
+## 2026-10-07 — recurrence at poll 246: the residue arm is now named (Held), and the population is growing again
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`first_poll: 246`, 2026-10-07T12:37Z) after
+adam restarted on the `e68c909` edge roll. The finding line:
+`provideLoop.deadRemainingStuck reanchorDeadRemaining=5 reanchorPending=5 stuckSweeps=3`.
+
+Re-fetched live at 2026-10-07T12:41Z, `GET https://elohim.host/p2p/status .provideLoop`
+(three reads between 12:41:32Z and 12:42:29Z, identical):
+
+```json
+{"selfCidSource": "derived-libp2p-peer-id", "active": true, "reanchorPending": 5,
+ "reanchorCompleted": 12, "reanchorFailed": 4, "reanchorCaughtUp": false,
+ "reanchorDeadRemaining": 5, "stuckSweeps": 4, "deadRemainingStuck": true,
+ "reanchorSkippedReach": 0, "reanchorSkippedContentType": 0}
+```
+
+Same read: `projectionReconcile` `divergentAnchor 60`, `converged false`, `failed 1`,
+`sweeps 49`. `GET /admin/self-healing`: admission `shedTotal 0`, the single upstream
+`circuit: "closed"`, `errorStreak 0`, `conductor-6` `Degraded`. The A-side
+(`https://doorway-alpha.elohim.host/p2p/status`) reads `reanchorDeadRemaining 0`,
+`deadRemainingStuck false` at the same time: this is still adam only.
+
+### Which build is running (the 2026-10-06 gap, closed for this roll)
+
+The storage process's own startup line, read from Loki
+(`{namespace="elohim-alpha", pod="elohim-adam-alpha-0", container="elohim-node"}`):
+
+```
+2026-10-07T08:33:12.226634Z INFO elohim-storage starting version=0.1.0 commit=e68c909 build_time=2026-10-07T08:11:03Z
+```
+
+`421fa55ea` (F2, adoption stamps `live`) and `aa55b2e71` (held backoff) are both ancestors of
+`e68c909f5` (`git merge-base --is-ancestor`). **F2 is deployed on adam and the wedge still
+re-earns its verdict.** The 9 → 1 fall recorded on 2026-10-06 was F2; what remains is not the
+`Adopted` arm.
+
+### The arm is Held, every sweep, for every row
+
+`reanchor_backfill: sweep complete` lines from the same Loki stream (13 in the 3h window from
+10:00Z; 9 read, listed here; `reanchored`, `already_anchored`, `adopted`, `failed`, `remaining`
+and both skip counters are 0 in all nine):
+
+| time (Z) | held | held_backoff | dead_candidates | dead_remaining |
+|---|---|---|---|---|
+| 10:00:33 | 0 | 2 | 2 | 2 |
+| 10:06:18 | 1 | 1 | 2 | 2 |
+| 10:10:00 | 1 | 1 | 2 | 2 |
+| 10:32:16 | 1 | 1 | 2 | 2 |
+| 10:35:44 | 0 | 2 | 2 | 2 |
+| 11:06:03 | 3 | 2 | 5 | 5 |
+| 11:12:37 | 1 | 4 | 5 | 5 |
+| 11:14:50 | 0 | 5 | 5 | 5 |
+| 12:40:15 | 2 | 3 | 5 | 5 |
+
+In every sweep read, `held + held_backoff == dead_candidates`. No row was adopted, authored or
+failed. That answers the question the 2026-10-06 entry left open ("its arm cannot be named"):
+the residue sits on the `Held | Contested` arm of the adopt-before-author pre-flight
+(`elohim/elohim-storage/src/services/reanchor_backfill.rs:436`), or on the replay of that
+verdict (`reanchor_backoff::should_skip`, `:354`). Root-cause sites 2, 4 and 7 of the
+2026-09-11 inventory stand unchanged for this arm; F3 is the fix that addresses it and it has
+not landed (no `deadSettledByDeclaration` in `elohim/elohim-storage/src` or the view schema).
+
+What the logs do NOT say is WHY the pre-flight holds — a row settled by a declaration backed
+by an election, or the `Held` that `head_adoption` returns on an unanswered conductor probe or
+a DB-pool error (site 7). No `Held`-reason line at WARN was found in the window.
+
+### The population is growing: the ghost sweep stamped three more rows dead after the roll
+
+```
+2026-10-07T10:35:44.452409Z WARN projection-reconcile[ghost-witness]: rows anchored to actions this conductor cannot resolve — marked dead … marked=2
+2026-10-07T10:57:11.578264Z WARN projection-reconcile[ghost-witness]: rows anchored to actions this conductor cannot resolve — marked dead … marked=1
+```
+
+(`elohim/elohim-storage/src/p2p/projection_reconcile.rs:3046`, the only writer of `dead`.)
+`dead_candidates` went 2 → 5 at the next sweep. So this is no longer only a fixed set of
+pre-re-genesis rows waiting for a cure: on the current build the writer is adding rows, and
+every added row lands on the same Held arm. The same stream carries a recurring WARN,
+`projection-reconcile: conductor get failed; retry next sweep` with `error: "Request timeout:
+heal conductor call exceeded per-attempt timeout 25s"` (seen on `custody-blob-*` ids; not
+counted). A conductor that times out is the condition under which site 5 can stamp `dead`
+from a cached absence and site 7 degrades a probe to `Held`. That link is a hypothesis here,
+not a finding: the logs read do not tie the three marked ids to a timed-out call.
+
+Two smaller observations from the same read:
+
+- Between 11:14:50Z and 12:40:15Z no `sweep complete` line was found, while sweep START lines
+  (`re-authoring NULL-anchor and DEAD-anchor content via conductor`, `dead_candidates: 5`)
+  appear every 3–6 minutes from 12:06Z. Sweeps that start and never report completion fit
+  the `witness_sweep_budget` timeout dropping the `run_once` future
+  (`projection_reconcile.rs:2856-2893`). The budget-exceeded WARN itself was not queried.
+  If so, `stuckSweeps` undercounts stalled time: it only advances on a completed sweep.
+- `/p2p/status` reports `reanchorFailed: 4` while every sweep line read shows `failed: 0`.
+  Four of the 13 sweeps in the window and everything between 08:33Z and 10:00Z were not read,
+  so the four failures are unlocated, not contradicted.
+
+### Current decision — still BLOCKED (2026-10-07)
+
+Unchanged in kind, sharper in scope:
+
+1. **F3 (+ F1, F4) is the fix for the arm that is actually holding the rows**, and it is one
+   wire-shape change across the schema, the Rust struct, the schema-contract cases, both
+   codegens and the generated copies. It carries a semantic choice (whether a row settled by
+   declaration counts toward `caughtUp`) and needs the full `just gate elohim-storage` lane.
+   Not applied by this triage: the dispatch barred heavy cargo and commits, so an edit could
+   not have been gated.
+2. **A new question precedes F3: why does `Held` fire.** If it is site 7's unanswered-probe
+   degradation, F3 would relabel rows as settled-by-declaration that are in fact unprobed.
+   F1 should therefore publish the hold REASON (declared-with-election vs probe-unanswered
+   vs DB error), not just a per-arm count. Until that is readable, F3's counter must not
+   absorb rows whose hold came from a non-answer.
+3. **Growth needs its own read.** Three rows marked dead in the first 2.5h of this process
+   is a rate, not a residue. Whether those verdicts rode a fresh conductor ABSENT or a
+   cached one (`heal_backoff::should_replay`) decides whether the writer or the conductor
+   is the thing to fix. The conductor-timeout side belongs with
+   `self-heal-adam-projection-catchup-exhaustion-full-arc.md`.
+4. **Runtime proof needs an edge roll to adam**, operator-owned.
+
+Ledger line `2b4761b2eaf6` (`first_poll: 246`) is set `status: blocked`, `backlog:
+dataplane-reanchor-dead-remaining-rekeyed-peer`.
+
+Not verified as of 2026-10-07T12:42Z: the condition is live (`stuckSweeps: 4`,
+`reanchorDeadRemaining: 5`). The Loki lines above were read through a delegated query, not
+re-read line by line by the triage author.
