@@ -1,35 +1,33 @@
 {
  "jobs": {
-  "elohim": 1748,
-  "elohim-edge": 1555,
-  "elohim-genesis": 1625,
-  "elohim-holochain": 1490,
-  "elohim-orchestrator": 1978,
+  "elohim": 1750,
+  "elohim-edge": 1564,
+  "elohim-genesis": 1629,
+  "elohim-holochain": 1491,
+  "elohim-orchestrator": 1987,
   "elohim-sophia": 146,
   "elohim-steward": 1,
-  "elohim-storybook": 345
+  "elohim-storybook": 347
  },
  "green": {
-  "elohim-holochain": 1490,
+  "elohim-holochain": 1491,
   "elohim-sophia": 146,
-  "elohim-storybook": 345,
+  "elohim-storybook": 346,
   "elohim": 1697,
-  "elohim-edge": 1555,
-  "elohim-orchestrator": 1965
+  "elohim-edge": 1564,
+  "elohim-orchestrator": 1985
  },
  "green_streak": {
   "elohim": 0,
-  "elohim-edge": 2,
-  "elohim-storybook": 58,
+  "elohim-edge": 1,
+  "elohim-storybook": 0,
   "elohim-orchestrator": 0,
   "elohim-genesis": 0,
-  "elohim-holochain": 24,
+  "elohim-holochain": 25,
   "elohim-sophia": 1
  },
  "recent": {
   "elohim": [
-   "FAILURE",
-   "FAILURE",
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
@@ -42,23 +40,25 @@
    "UNSTABLE",
    "UNSTABLE",
    "UNSTABLE",
-   "UNSTABLE"
+   "UNSTABLE",
+   "UNSTABLE",
+   "FAILURE"
   ],
   "elohim-edge": [
-   "FAILURE",
-   "FAILURE",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
-   "SUCCESS",
    "NOT_BUILT",
    "SUCCESS",
    "SUCCESS",
    "UNSTABLE",
    "SUCCESS",
+   "SUCCESS",
+   "NOT_BUILT",
+   "SUCCESS",
+   "SUCCESS",
+   "FAILURE",
+   "SUCCESS",
+   "SUCCESS",
+   "NOT_BUILT",
+   "UNSTABLE",
    "SUCCESS"
   ],
   "elohim-storybook": [
@@ -76,24 +76,24 @@
    "SUCCESS",
    "SUCCESS",
    "SUCCESS",
-   "SUCCESS"
+   "FAILURE"
   ],
   "elohim-orchestrator": [
+   "UNSTABLE",
+   "UNSTABLE",
+   "FAILURE",
+   "FAILURE",
+   "FAILURE",
+   "UNSTABLE",
+   "SUCCESS",
+   "UNSTABLE",
+   "FAILURE",
+   "UNSTABLE",
+   "UNSTABLE",
    "SUCCESS",
    "SUCCESS",
    "UNSTABLE",
-   "FAILURE",
-   "FAILURE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "UNSTABLE",
-   "FAILURE",
-   "FAILURE",
-   "FAILURE",
-   "UNSTABLE"
+   "FAILURE"
   ],
   "elohim-genesis": [
    "UNSTABLE",
