@@ -313,6 +313,13 @@ pub struct HcClient {
     /// must be able to replace them under every `Arc<HcClient>` already
     /// handed out, not only under its own slot.
     conn: ConnectionSlot<HcConnection>,
+    /// Every signal handler registered through this client, kept so a re-minted
+    /// app websocket gets them again. `AppWebsocket::on_signal` lives and dies
+    /// with ONE connection: after the 2026-10-07 household conductor restart the
+    /// sockets were adopted in place but no handler followed them, and no
+    /// conductor signal reached any storage peer afterwards (a channel root a
+    /// steward had just created never projected; the story's publish refused).
+    signal_handlers: std::sync::Mutex<Vec<SignalHandler>>,
     /// The cell ID for zome calls
     cell_id: CellId,
     /// The mishpat role's cell, when the installed happ provisions one.
@@ -374,6 +381,11 @@ static NEXT_CONNECTION_GENERATION: std::sync::atomic::AtomicU64 =
 fn next_connection_generation() -> u64 {
     NEXT_CONNECTION_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
+
+/// A raw app-signal handler as `AppWebsocket::on_signal` takes it, shared so
+/// the same closure can be registered on each connection the client adopts.
+pub(crate) type SignalHandler =
+    Arc<dyn Fn(holochain_types::signal::Signal) + Send + Sync + 'static>;
 
 /// A value every holder of the enclosing `Arc` reads fresh on each use, and
 /// that one writer can replace for all of them at once.
@@ -707,7 +719,7 @@ impl HcClient {
     /// Take over `fresh`'s sockets IN PLACE, so every `Arc` of `self` already
     /// handed out dials them from its next call on. Returns the adopted
     /// generation, or why adoption is refused (see [`adoption_refusal`]).
-    pub(crate) fn adopt_connection_from(&self, fresh: &HcClient) -> Result<u64, String> {
+    pub(crate) async fn adopt_connection_from(&self, fresh: &HcClient) -> Result<u64, String> {
         if let Some(why) = adoption_refusal(
             (
                 &self.config.app_id,
@@ -726,7 +738,24 @@ impl HcClient {
         }
         let adopted = fresh.connection();
         let generation = adopted.generation;
+        let app_ws = adopted.app_ws.clone();
         self.conn.replace(adopted);
+        // The handlers were registered on the socket that just died; a fresh
+        // websocket knows none of them until they are registered again.
+        let handlers: Vec<SignalHandler> = self
+            .signal_handlers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        for handler in &handlers {
+            let handler = Arc::clone(handler);
+            app_ws.on_signal(move |signal| handler(signal)).await;
+        }
+        info!(
+            generation,
+            handlers = handlers.len(),
+            "signal subscribers re-registered on the adopted app websocket"
+        );
         Ok(generation)
     }
 
@@ -922,10 +951,24 @@ impl HcClient {
                 signer: signer_arc,
                 generation: next_connection_generation(),
             }),
+            signal_handlers: std::sync::Mutex::new(Vec::new()),
             cell_id,
             mishpat_cell_id,
             imagodei_cell_id,
         })
+    }
+
+    /// Register `handler` on the CURRENT app websocket and remember it, so
+    /// [`Self::adopt_connection_from`] can register it again on the next one.
+    async fn register_signal_handler(&self, handler: SignalHandler) -> String {
+        self.signal_handlers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(Arc::clone(&handler));
+        self.connection()
+            .app_ws
+            .on_signal(move |signal| handler(signal))
+            .await
     }
 
     /// Make a signed zome call against the IMAGODEI cell (identity/qahal DNA).
@@ -1620,9 +1663,7 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.connection()
-            .app_ws
-            .on_signal(move |signal| {
+        self.register_signal_handler(Arc::new(move |signal: Signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
                     // Typed msgpack decode — the old `rmp → serde_json::Value`
@@ -1674,8 +1715,8 @@ impl HcClient {
                         }
                     }
                 }
-            })
-            .await
+        }))
+        .await
     }
 
     /// Subscribe to ReaProjectionSignals emitted by the content_store coordinator.
@@ -1698,9 +1739,7 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.connection()
-            .app_ws
-            .on_signal(move |signal| {
+        self.register_signal_handler(Arc::new(move |signal: Signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
                     // Typed msgpack decode — the old `rmp → serde_json::Value`
@@ -1758,8 +1797,8 @@ impl HcClient {
                         }
                     }
                 }
-            })
-            .await
+        }))
+        .await
     }
 
     /// Subscribe to ElohimContentSignals emitted by the elohim DNA's content_store
@@ -1773,9 +1812,7 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.connection()
-            .app_ws
-            .on_signal(move |signal| {
+        self.register_signal_handler(Arc::new(move |signal: Signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
                     // Typed msgpack decode of the REAL `ProjectionSignal::
@@ -1837,8 +1874,8 @@ impl HcClient {
                         }
                     }
                 }
-            })
-            .await
+        }))
+        .await
     }
 
     /// Subscribe to MishpatSignals emitted by the mishpat DNA's coordinator
@@ -1867,9 +1904,7 @@ impl HcClient {
     {
         use holochain_types::signal::Signal;
 
-        self.connection()
-            .app_ws
-            .on_signal(move |signal| {
+        self.register_signal_handler(Arc::new(move |signal: Signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
                     // Typed msgpack decode — the old `rmp → serde_json::Value`
@@ -1924,8 +1959,8 @@ impl HcClient {
                         }
                     }
                 }
-            })
-            .await
+        }))
+        .await
     }
 
     /// Probe the authenticated APP interface used by every zome call.
@@ -2412,6 +2447,58 @@ mod connection_adoption_tests {
         let a = next_connection_generation();
         let b = next_connection_generation();
         assert!(b > a);
+    }
+
+    /// Every subscriber goes through `register_signal_handler`, and adoption
+    /// registers the remembered handlers on the fresh websocket AFTER the slot
+    /// is replaced. `on_signal` is per connection: a handler left on the dead
+    /// socket is the 2026-10-07 household miss (no signal after a conductor
+    /// restart). Source-shape, because the path needs a live conductor.
+    #[test]
+    fn every_signal_subscriber_is_remembered_and_re_registered_on_adoption() {
+        let source = include_str!("hc_client.rs");
+        // Test modules are interleaved with the impl; drop them by name.
+        let body: String = source
+            .split("#[cfg(test)]\nmod ")
+            .enumerate()
+            .map(|(i, part)| {
+                if i == 0 {
+                    part.to_string()
+                } else {
+                    // A test module runs to its closing brace at column 0.
+                    part.split_once("\n}\n")
+                        .map(|(_, rest)| rest)
+                        .unwrap_or("")
+                        .to_string()
+                }
+            })
+            .collect();
+        let body = body.as_str();
+        let direct = body.matches(".on_signal(").count();
+        assert_eq!(
+            direct, 2,
+            "on_signal is called only by register_signal_handler and adopt_connection_from"
+        );
+        assert_eq!(
+            body.matches("self.register_signal_handler(Arc::new(")
+                .count(),
+            4,
+            "the four subscribers register through the remembered path"
+        );
+        let adopt = body
+            .split("async fn adopt_connection_from(")
+            .nth(1)
+            .expect("adopt exists");
+        let replace = adopt
+            .find("self.conn.replace(adopted)")
+            .expect("slot replaced");
+        let again = adopt
+            .find("app_ws.on_signal(move |signal| handler(signal)).await")
+            .expect("handlers registered on the adopted websocket");
+        assert!(
+            replace < again,
+            "the slot is replaced before the handlers follow"
+        );
     }
 
     #[test]

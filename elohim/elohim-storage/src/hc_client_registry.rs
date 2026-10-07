@@ -1360,7 +1360,7 @@ impl HcClientRegistry {
                     // — the boot-captured ones included. Storing `fresh` in the
                     // slot alone is the 2026-09-25 defect: the registry's handle
                     // lived while every long-lived consumer kept the corpse.
-                    let serving = match hc.adopt_connection_from(&fresh) {
+                    let serving = match hc.adopt_connection_from(&fresh).await {
                         Ok(adopted) => {
                             info!(
                                 role,
