@@ -76,7 +76,7 @@ state`.
 | 19 | Dialing up: the bars kept low for now | Recorded: each with its attack, fix and cost to the person |
 | 20 | CI seeders read a node's agent key from the route Row 15 closed | Cured in repo 2026-10-06 (read from the node's own conductor); awaiting a genesis build with custody 7 of 7 |
 | 21 | The story is partly executable: what its held scenarios wait for | Six grant scenarios have step definitions (2026-10-06); 28 are held, each naming its blocker; three blockers had no row until this one |
-| 22 | A node's established identity differs from the id a fixture declares for its person | Seen on alpha (matthew); the seeder now reports it and no longer calls it a conflict; the two ids are not reconciled |
+| 22 | A node's established identity differs from the id a fixture declares for its person | Seen on alpha (matthew); the seeder reports it and no longer calls it a conflict; the two ids are not reconciled. On alpha the household is founded again under the node's current key (operator ruling 2026-10-06) |
 
 ## Row 1 — a remote session that proves the person
 
@@ -721,6 +721,19 @@ the code alone, as `epr device redeem` does. The steps now do the same.
   not one of its stewards. Before this change the stage reported `affirmed=[jessica, james]` and
   could not bind matthew at all; nothing was written to the fleet in either case. This is the
   reconciliation the row already names, seen from the household side.
+- **Ruling, 2026-10-06 (operator, alpha only):** the household on alpha is founded again under the
+  key matthew's node speaks with today. The seeder (`seed-household-formation.ts`) now checks,
+  from the founder node's own chain, whether that node belongs to the projected collective; when it
+  does not and `HOUSEHOLD_REFOUND_WITHOUT_STANDING=1` (set by the alpha genesis pipeline and by
+  nothing else), it founds a new collective under the node's key and invites the others from it.
+  The 2026-09-04 memberships and custody rows stay under the old cid: nothing is re-keyed, wiped or
+  merged, and the storage slug `family-dowell` re-stamps to the newest cid as it already does. The
+  2026-10-05 ruling stands for every network that is not a fixture: two identities for one person
+  are joined by a consent act, never by substitution. What this names is the clash the operator
+  put into words the same day: a real person's node, begun through a doorway, meeting a household
+  that a fixture founded in his name. Probe: the next alpha genesis build reports `affirmed` for
+  jessica and james with no "not a current Steward" refusal, and `/db/collectives/family-dowell`
+  carries a cid whose stewards include matthew's node.
 
 ## shift_objective
 

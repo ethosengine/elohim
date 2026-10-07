@@ -1701,6 +1701,13 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin, S
     sh "IROH_TARGET=${humanConfig.env == 'alpha' ? '1' : '0'} bash scripts/ci/validate-conductor-config.sh ${outputFile}"
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
 
+    // The chain volume's declared size (deployments.json conductorStorage), reconciled
+    // before the roll so a filesystem resize that needs a pod restart gets one. Warn-only:
+    // a class that cannot expand is named with the operator's move; the roll goes on.
+    if (humanConfig.conductorStorage) {
+        sh "bash '${env.WORKSPACE}/scripts/ci/grow-conductor-pvc.sh' 'holochain-data-${humanConfig.resourcePrefix}-0' '${humanConfig.namespace}' '${humanConfig.conductorStorage}'"
+    }
+
     def templateBefore = podInputsFingerprint(outputFile, humanConfig.namespace, 'template')
     def applyLog = "/tmp/kubectl-apply-${stsName}.log"
     def applyCode = sh(script: "kubectl apply -f ${outputFile} > ${applyLog} 2>&1", returnStatus: true)

@@ -1280,7 +1280,7 @@ Given(
 );
 
 Given(
-  "matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it has been unnamed for one minute",
+  "matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it is a minute old and nothing names it",
   { timeout: 60_000 },
   async function () {
     for (const peer of QUICK_PEERS) {

@@ -1790,6 +1790,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         } else if (env.RESOLVED_DOORWAY_HOST) {
                             env.DOORWAY_URL = env.RESOLVED_DOORWAY_HOST
                         }
+                        // Alpha only (this pipeline seeds nothing else): a projected
+                        // household whose founder node is no member of it is founded
+                        // again under that node's current key, instead of reused with
+                        // every invite refused (device-recognition row 22; operator
+                        // ruling 2026-10-06). The 2026-09-04 memberships stay under
+                        // the old cid; nothing is re-keyed or wiped.
+                        env.HOUSEHOLD_REFOUND_WITHOUT_STANDING = '1'
                         def res = runProbedSeeder('Seed Household Formation', 'seed-household-formation.ts',
                             env.SEED_RESULTS_HOUSEHOLD_FORMATION_FILE ?: 'seed-results-household-formation.json')
                         if (res.skipped) return

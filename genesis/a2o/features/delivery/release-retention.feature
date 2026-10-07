@@ -1,7 +1,7 @@
 # Design: genesis/docs/content/elohim-protocol/architecture/2026-10-05-storage-physics-benchmark.md §7
 # (the retention floor for code) and §8 (declared defaults).
 @e2e @delivery @app-bundle @concern:release-retention @requires:household-nodes @act:i
-Feature: A peer keeps the files of a channel's latest releases and lets the files of older ones go
+Feature: A peer keeps the files of a channel's latest releases, lets the files of older ones go, and lets go of a build that nothing names
 
   Every new build of an app adds files to the peers that serve it. Until
   now nothing ever removed them: a peer that had served nineteen builds
@@ -64,11 +64,13 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
   bundle is not let go. So at worst a bundle waits one check for its
   promise to be withdrawn and another to be let go. The scenario allows
   fifteen minutes to cover both with room. It does not test the promise;
-  the promise is here only to explain the fifteen minutes.
+  the promise is here only to explain the fifteen minutes. Whether a
+  promise stands depends on how the household was seeded, so the
+  allowance is headroom, not a prediction.
 
   Three people share this house, and the peers they run are one
   HOUSEHOLD. matthew stewards the channel and publishes the releases.
-  jessica and james run peers of their own. James's peer, like jessica's,
+  jessica and james run peers of their own. james's peer, like jessica's,
   keeps the default of ten; the scenario checks jessica's.
 
   The scenario counts three releases, the FIRST, SECOND and THIRD,
@@ -94,20 +96,28 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
   peer may let it go. A file another peer placed is that peer's to take
   back, and is never let go this way. A file with no note of how it
   arrived is UNRECORDED: the peer cannot tell whose it is, so it reports
-  the file and keeps it.
+  the file and keeps it. Such files exist because not every route that
+  stores bytes writes the note yet; the route that takes a single SHARD
+  (one piece of a file that peers hold in parts) does not. The second
+  scenario's third Given hands matthew's peer a file over that route, so
+  there is a file whose arrival nobody wrote down.
 
   A peer lets an own file go slowly, on purpose. The file must have gone
   unnamed on two checks in a row, and it must have arrived at least a day
   ago. Both are the peer's own settings. The second scenario sets
   matthew's and jessica's peers to check every fifteen seconds and to
   wait one minute instead of a day, so the rule can be seen in minutes.
+  That fifteen seconds is the check that lets own files go. The check
+  that withdraws a standing promise keeps its five minutes, which is why
+  the second scenario still allows fifteen minutes.
   A peer's own account also says how much it holds for each reason, lists
   each own file that nothing names, and lists the files it has lately let
   go.
 
   The second scenario uses one more app, which this run also owns. Its
-  record names its bundle directly and it is bound to no channel. Only
-  matthew's peer is handed its builds. Jessica's peer comes to hold the
+  record names its bundle directly and it is bound to no channel. It has
+  one bundle, the browser bundle, so a build of it is one file. Only
+  matthew's peer is handed its builds. jessica's peer comes to hold the
   first build another way: it is asked for the app's page while it holds
   no copy of the bundle, so it fetches the bundle from another peer and
   then serves the page. That makes the first build an own file on both
@@ -144,7 +154,7 @@ Feature: A peer keeps the files of a channel's latest releases and lets the file
 
   Scenario: A peer lets go of an earlier build that nothing names, and keeps a file it has no record of
     Given one more app this run owns, whose record names its bundle directly and which is bound to no channel
-    And matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it has been unnamed for one minute
+    And matthew's peer and jessica's peer are set to check every 15 seconds and to let an own file go once it is a minute old and nothing names it
     And matthew's peer holds a file with no note of how it arrived
     When matthew hands his peer a first build of that app and points the app's record at it
     And jessica's peer serves that app once, fetching the first build to do so

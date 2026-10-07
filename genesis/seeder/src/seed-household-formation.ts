@@ -694,6 +694,32 @@ export async function resolveFounderChainCollectiveCid(
 }
 
 /**
+ * Does the founder's node belong to `collectiveCid`? Read from its OWN source
+ * chain (`get_my_household_collective_cids`: the households it is a live Person
+ * member of), so no record decoding and no DHT read is needed. `null` when the
+ * chain could not be read: not knowing is not a reason to re-found.
+ */
+export async function founderBelongsTo(
+  founderSession: MemberSession,
+  collectiveCid: string,
+): Promise<boolean | null> {
+  try {
+    const cids = (await founderSession.session.appWs.callZome({
+      cell_id: founderSession.session.imagodeiCell,
+      zome_name: 'imagodei',
+      fn_name: 'get_my_household_collective_cids',
+      payload: null,
+    })) as string[];
+    return Array.isArray(cids) && cids.includes(collectiveCid);
+  } catch (err) {
+    console.warn(
+      `[!] get_my_household_collective_cids membership probe (non-fatal): ${err instanceof Error ? err.message : err}`,
+    );
+    return null;
+  }
+}
+
+/**
  * Pure settle predicate for the household-formation projection (genesis #1182
  * Cluster B). True iff the collective's `collective_cid` is stamped AND every
  * expected member id is present in the projected participants — i.e. the
@@ -937,6 +963,36 @@ async function main(): Promise<void> {
     if (founderChain) {
       probedCid = founderChain.cid;
       founderChainOrphanCount = founderChain.orphanCount;
+    }
+  }
+
+  // A projected collective is reused only if the founder's node belongs to it.
+  // On alpha the household was founded on 2026-09-04 under a key matthew's node
+  // no longer speaks with (device-recognition row 22): every invite issued from
+  // that node is refused as "not a current Steward". Reconciling two identities
+  // for one person is a consent act the protocol does not have yet, so a seeder
+  // never substitutes one id for the other. What the operator ruled for alpha
+  // on 2026-10-06 is narrower: found the household again under the node's
+  // current key, and leave the 2026-09-04 memberships where they are under the
+  // old cid. That is this flag, set only by the alpha genesis pipeline.
+  if (probedCid) {
+    const belongs = await founderBelongsTo(founderSession, probedCid);
+    if (belongs === false) {
+      const agentKey = sessionAgentKey(founderSession.session.imagodeiCell);
+      if (process.env.HOUSEHOLD_REFOUND_WITHOUT_STANDING === '1') {
+        console.warn(
+          `[!] household collective ${probedCid} is projected, but ${founder.humanId}'s node (${agentKey}) ` +
+            `is no member of it: it was founded under another key. Re-founding under this node's key ` +
+            `(HOUSEHOLD_REFOUND_WITHOUT_STANDING=1; operator ruling 2026-10-06, alpha).`,
+        );
+        probedCid = null;
+      } else {
+        console.warn(
+          `[!] household collective ${probedCid} is projected, but ${founder.humanId}'s node (${agentKey}) ` +
+            `is no member of it (device-recognition row 22). Reusing it anyway; its invites will be refused. ` +
+            `Set HOUSEHOLD_REFOUND_WITHOUT_STANDING=1 to found the household again under this node's key.`,
+        );
+      }
     }
   }
 
