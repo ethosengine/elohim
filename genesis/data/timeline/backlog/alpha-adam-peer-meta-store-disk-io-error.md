@@ -65,3 +65,32 @@ Probe: zero `code: 778` lines on any conductor pod in the hour after a roll; eve
 ## DELTA 2026-10-06 (after the conductor roll: eve is full and flooding; adam is at 96 percent)
 
 Prometheus at 23:46Z: `holochain-data-elohim-eve-alpha-0` 100 percent (100 at 23:00Z, 98.1 at 23:30Z, 100 now); `holochain-data-elohim-adam-alpha-0` 96.2 percent (100 at 23:00Z, 94.6 at 23:30Z). Eve's conductor, restarted 23:01:52Z on the new pin, logged 51,163 `code: 778` lines in its first 44 minutes, from 23:31Z at 15,000 to 21,000 per five minutes; the first of them is the peer-meta store's expiry sweep failing (`holochain_p2p::spawn::actor`, `actor.rs:782`, `error returned from database: (code: 778) disk I/O error`), then the gossip-initiate form. Adam logged none. Eve is the same incident on the next node, and adam will be back in it on the next roll's integration. The operator read of the four shem conductor volumes is the open action; nothing here is answered by the conductor change that just landed.
+
+## DELTA 2026-10-07 (the claim says 20Gi, the filesystem is still 7.1 GiB, and adam's conductor crash-loops on the roll)
+
+Edge #1568 (e68c909f5, 08:35Z) ran the declared-size step for the first time: `conductor-pvc:
+holochain-data-elohim-adam-alpha-0: live class=shem-zfs requested=20Gi capacity=20Gi declared=20Gi`
+→ `ok — the live request already meets the declared size`; eve the same. But kubelet reports the
+mounted filesystem at `kubelet_volume_stats_capacity_bytes` = 7,635,075,072 (7.1 GiB), used
+0.89–1.00 since 2026-10-06T12:00Z: the claim object carries 20Gi and the volume underneath it does
+not. That is the shem-zfs provisioner's resize not reaching the dataset's quota (or a volume moved
+under the claim name at the old size) — operator-owned; nothing the repo declares can grow a
+filesystem the storage class does not.
+
+Consequence on the roll: adam's conductor pod was restarted by the pin annotation
+(`conductor-c916eddbed02`); the new instance (uid 1540233e) fails within 2 s on every start —
+`Failed to spawn Lair keystore in process err={"error":"Other"}` (builder.rs:167), holochain exit
+101 — 9 restarts by 09:00Z (`last_terminated_reason=Error`, not OOM); one attempt at 09:03:52Z got
+the keystore up and the conductor ready, so the loop is intermittent, consistent with ENOSPC on the
+keystore directory. The old instance had been logging SQLite 778 `disk I/O error` on peer-meta
+writes and WAL maintenance since at least 07:30Z (restarts 0 — it limped; the restart is what
+exposed the full disk to lair). The rollout timed out, `remaining conductors HELD`, roll gate
+step 6 HALTED, matthew's conductor kept its running process. Storage rolled on all seven peers.
+
+Operator move (unchanged from above, now urgent on adam): give `holochain-data-elohim-adam-alpha-0`
+(and eve's) a filesystem that is actually 20Gi — resize the ZFS dataset's quota behind the PV, or
+move the data to a new volume under the claim name as doorway-B's key volume was moved on
+2026-09-30 — then re-run the edge deploy (or set `CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1` once for
+matthew). Probe: `kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="holochain-data-elohim-adam-alpha-0"}`
+≈ 21.5e9 and adam's conductor restarts flat for an hour.
+
