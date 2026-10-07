@@ -964,6 +964,18 @@ habits:
       DELTA 2026-10-06f (RED preserved; three of the four reds named at 19:18Z read clear on the live doorways at 22:10Z, and adam's has its cause): adam's conductor volume `holochain-data-elohim-adam-alpha-0` read 100 percent used from 17:00Z to 20:00Z (Prometheus), which is the SQLite 778 behind the four million peer-meta lines, and eve's reads 90 percent now (backlog `alpha-adam-peer-meta-store-disk-io-error`; the volume is operator-owned, the repo declares no size for it). Matthew's pull stream: 45 of 45, 0 failed, caught up (it read 45 of 46 with 1 failed at 20:30Z; the 46th was the e2e pin from edge #1560, since caught up; 7 e2e pins active, 1,063 retired at 18:17Z). Jessica: `caughtUp true`, `converged true`, `divergentAnchor 20`; the release `uhCkk6dn7…` reads `applied` on jessica at 18:07Z and on matthew at 17:38Z, and both doorways serve `elohim-host-landing` updated 21:30:37Z naming `runtime:app-bundle:alpha:dev`. Still red: the household's collective on alpha is founded under a key matthew's node does not speak with (device-recognition row 22), and the habit's own check is an edge validation run, not these reads; the next one is the roll that carries conductor `c916eddbe`.
 
       DELTA 2026-10-06g (RED preserved; the conductor cure is on the fleet and adam's probe reads 0 at 38 minutes): edge #1561 rolled all seven conductors to `conductor-c916eddbed02` 22:21Z to 23:15Z. Adam (started 23:07:00Z) to 23:45:30Z: 0 per-op publish-time lines, 0 chunk lines, 0 batch-deferral lines, 7 `database is locked` (integration workflow, not publish), log rate 1 to 3 a second; matthew 0, 0, 0 and 6. The probe's 90-minute window is not closed and the deferral path has not been exercised on the fleet. Eve's conductor volume is at 100 percent and logging SQLite 778 at 15,000 to 21,000 lines per five minutes (backlog `alpha-adam-peer-meta-store-disk-io-error`, DELTA): the same incident on the next node, operator-owned. Genesis #1629 ran inside the roll (23:21Z) and read adam's identity as a 60 s zome-call timeout (row 39), so the custody-row leg of the probe waits for a genesis run that starts after the roll settles. Both doorways read `converged false` at 23:46Z, the usual post-roll churn. Separately, orchestrator #1987 dispatched edge for an edit to `elohim/elohim-storage/src/.epr-meta`; the walkers now skip governance paths (this commit).
+
+      DELTA 2026-10-07 (RED preserved; the dead-anchor Held wedge is cured on dev, not yet on the fleet): 683fb16a7
+      lands F1/F3/F4/F5 of dataplane-reanchor-dead-remaining-rekeyed-peer.md — a declaration that no responsive
+      conductor on this network can back (local miss confirmed by a network-strategy read) no longer holds a dead
+      row forever: the row is re-decided as undeclared and re-authored; unanswered probes stay Held with backoff;
+      Held is never laundered to live; per-arm counts (`reanchorHeldUnbacked`, `reanchorHeldUnanswered`,
+      `deadSettledByDeclaration`, `reanchorAwaitingChannel`, …) are on `/p2p/status .provideLoop`; the ghost sweep
+      stamps `dead` only from a fresh conductor answer. Household proof: a recast with 52 dead rows read
+      `held_unbacked: 25, reanchored: 25` on the first sweep and converged to `reanchorCaughtUp: true,
+      deadRemainingStuck: false` after the deliverability story; a clean recast ran the whole prologue green.
+      Fleet read owed after the next edge roll: alpha-b's `provideLoop.deadRemainingStuck` (fingerprint 2b4761b2eaf6)
+      should read false with `reanchorHeldUnbacked` counting the released rows.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -4173,6 +4185,13 @@ habits:
       command BEFORE sign-in (probe POST /auth/consent/view -> 404, no redirect to /threshold/login;
       genesis/a2o/reports/look/alpha-consent-after-roll). The hosted path (a doorway that takes approvals) is
       still the named next slice; the household receipt is owed on this tip.
+
+      DELTA 2026-10-07d (receipt minted; NO status change): the serving receipt owed on the morning's push is
+      minted on 683fb16a7 — `sprint-report-household-20261007T232705Z-683fb16a` (epr-app-deliverability 5/5
+      scenarios, 102 steps) on a clean recast household whose prologue ran every leg green (`PROLOGUE_EXIT=0`),
+      after the dead-anchor Held wedge and the identity seeder's self-conflict were fixed the same evening
+      (operator ruling: fix what you find). The pre-push T2 leg reads it: "every epr-app-deliverability.feature
+      station passed on current source".
     first_move: >
       Land the step definitions and the close-account route so the @wip scenarios execute and
       this habit measures red on a real run, then move the register/login provisioning

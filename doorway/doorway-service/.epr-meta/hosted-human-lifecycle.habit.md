@@ -129,3 +129,10 @@ morning's own approval link, now answers "Can't approve here" with the `epr devi
 command BEFORE sign-in (probe POST /auth/consent/view -> 404, no redirect to /threshold/login;
 genesis/a2o/reports/look/alpha-consent-after-roll). The hosted path (a doorway that takes approvals) is
 still the named next slice; the household receipt is owed on this tip.
+
+DELTA 2026-10-07d (receipt minted; NO status change): the serving receipt owed on the morning's push is
+minted on 683fb16a7 — `sprint-report-household-20261007T232705Z-683fb16a` (epr-app-deliverability 5/5
+scenarios, 102 steps) on a clean recast household whose prologue ran every leg green (`PROLOGUE_EXIT=0`),
+after the dead-anchor Held wedge and the identity seeder's self-conflict were fixed the same evening
+(operator ruling: fix what you find). The pre-push T2 leg reads it: "every epr-app-deliverability.feature
+station passed on current source".

@@ -523,3 +523,32 @@ is. So the household is a repro for F1/F3/F4: run the prologue on a recast house
 serving receipt (`epr-app-deliverability`) could not be minted on the tip, and the push went out
 with the hook bypassed under the operator's grant, receipt owed. Logs:
 `genesis/local-dev/testdrive-20261007/receipt-lane-{3,4}.log`, `household-dowell/logs/matthew.log`.
+
+## 2026-10-07 — FIXED on dev (683fb16a7), proven on the household
+
+Operator ruling the same evening: fix it, don't record it. Landed in one commit:
+
+- **F5 (the cure):** `head_adoption` distinguishes ABSENT from UNREACHABLE. A declared row's
+  backing records are read locally and, on a local miss, once with the network strategy; only
+  when a responsive conductor answers Absent for every backing hash is the declaration
+  UNBACKED on this network, and the row is re-decided as undeclared (AdoptPeer or Author).
+  Timeouts and DB-pool errors stay Held with backoff. A peer echoing the same unbacked head is
+  not fresh evidence.
+- **F3:** Held is never laundered to live; the residue behind `reanchorCaughtUp` and the stuck
+  detector excludes rows settled by a backed declaration and rows awaiting their channel.
+- **F1:** per-arm counts on the wire — `reanchorAdopted`, `reanchorHeld`, `reanchorHeldBackoff`,
+  `reanchorHeldUnbacked`, `reanchorHeldUnanswered`, `deadSettledByDeclaration`,
+  `reanchorAwaitingChannel` (optional, schema contract case, TS regenerated).
+- **Site 5:** the ghost-witness sweep stamps `dead` only from a fresh conductor answer.
+- The stale-anchor heal in `update_via_conductor` matches the zome's current
+  "canonical root history unavailable" answer.
+- **F4:** the docs name settled-by-declaration instead of the skip-guards.
+
+Household proof (`receipt-lane-5.log`, polluted recast): first sweep `held_unbacked: 25,
+reanchored: 25`, `reanchorDeadRemaining` 52 → 27; every wedged stage leg landed first try;
+after the deliverability story `deadSettledByDeclaration: 27, reanchorHeldUnanswered: 0,
+reanchorCaughtUp: true, deadRemainingStuck: false`. Clean recast (`receipt-lane-6.log`):
+`PROLOGUE_EXIT=0`, loop reads 0 dead / caught up / not stuck, `epr-app-deliverability` 5/5
+scenarios, receipt `sprint-report-household-20261007T232705Z-683fb16a`. The alpha-b fingerprint
+`2b4761b2eaf6` should disappear from the poller once the edge roll carries 683fb16a7; until the
+roll, the ledger row stays `blocked` on evidence, not intention.

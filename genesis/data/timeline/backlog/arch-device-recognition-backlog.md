@@ -751,7 +751,14 @@ Human/caller; refusing overwrite" (0 created, 3 failed, leg MUST-SUCCEED). On a 
 already embodies the fixture's own id, the seeder should read that as `[~] Embodied as <same id>` and
 succeed, exactly as it does for a different id; refusing to overwrite an identical profile is the
 seeder treating its own fixture as a stranger. Probe: a recast household's first prologue reports the
-three peers embodied, not failed.
+three peers embodied, not failed. **Fixed the same evening (683fb16a7):** identity is
+`id` + `holochain_agent_key`; same key with differing profile fields is `[~] Embodied as <same
+id>; profile fields differ: …` and counts as success; another key under the id stays a conflict.
+The polluted household also showed the cascade this prevents: once the identities leg fails,
+hosted registration mints the same ids under hosted-cell keys, and the bindings leg then refuses
+every peer with "signer mismatch". On a clean recast (2026-10-07T23:20Z) the prologue ran every
+leg green (`PROLOGUE_EXIT=0`): identities 3 created / 0 failed, hosted 13 registered, bindings 6
+written / 0 failed, household 3/3 affirmed.
 
 ## shift_objective
 
