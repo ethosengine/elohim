@@ -8,7 +8,7 @@
  *   node codegen-ts.mjs           # Generate all
  *   node codegen-ts.mjs --verify  # Check if generated files are stale
  */
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -17,10 +17,22 @@ import { compile } from 'json-schema-to-typescript';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
 const SCHEMA_DIR = resolve(__dirname, '../current');
-const OUTPUT_DIR = resolve(__dirname, '../generated-ts');
 const ENUM_DIR = resolve(__dirname, '../v1/enums');
 
 const VERIFY = process.argv.includes('--verify');
+
+// The canonical pre-distribution tree is a gitignored local cache (a few early files
+// are still tracked, newer ones never were). `--verify` therefore generates into a
+// temporary directory and compares the distributed copies against THAT, instead of
+// against whatever an earlier local run left behind: on a fresh checkout, or after a
+// pull that added a schema, the old read of the cache failed with ENOENT on a file
+// nobody had generated yet (2026-10-07, create-relationship-input.ts).
+// The temp dir sits INSIDE the cache (gitignored) so Prettier resolves the same
+// config and ignore files as a real run; a path under the OS temp dir is left
+// unformatted and every distributed copy reads as stale.
+const CACHE_DIR = resolve(__dirname, '../generated-ts');
+await mkdir(CACHE_DIR, { recursive: true });
+const OUTPUT_DIR = VERIFY ? await mkdtemp(join(CACHE_DIR, '.verify-')) : CACHE_DIR;
 
 // All locations get identical copies of generated files
 const GENERATED_OUTPUT_DIRS = [
@@ -625,8 +637,8 @@ function collapseUnionAliases(ts, printWidth = 100) {
 }
 
 async function main() {
-  // --- Part 1: Interface generation (existing) ---
-  if (!VERIFY) {
+  // --- Part 1: Interface generation (into the cache, or a temp dir under --verify) ---
+  {
     await mkdir(OUTPUT_DIR, { recursive: true });
 
     const refMap = await loadRefMap(SCHEMA_DIR);
@@ -706,6 +718,7 @@ async function main() {
       }
     }
 
+    await rm(OUTPUT_DIR, { recursive: true, force: true });
     if (hasFailure) {
       process.exit(1);
     }
