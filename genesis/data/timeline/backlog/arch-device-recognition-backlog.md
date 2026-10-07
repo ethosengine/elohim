@@ -734,6 +734,14 @@ the code alone, as `epr device redeem` does. The steps now do the same.
   that a fixture founded in his name. Probe: the next alpha genesis build reports `affirmed` for
   jessica and james with no "not a current Steward" refusal, and `/db/collectives/family-dowell`
   carries a cid whose stewards include matthew's node.
+  **Probe read 2026-10-07 (genesis #1630, e68c909f5, the first alpha genesis build after the ruling
+  landed):** `[!] household collective collective:uhCkkIttwpLijdSBoIdgZC4RE2aPm1WZuZsnRI5O0tvqU3Vi8-Hc-
+  is projected, but human-matthew-manager's node (uhCAkJH75E0ETLDf5oFlfszWtKd26cvP_E0bXOum5ufSb9IjQr-_e)
+  is no member of it: it was founded under another key. Re-founding under this node's key` →
+  `human-jessica-spouse affirmed (steward)`, `human-james-son already affirmed`, `Results: 3/3
+  affirmed, custody ok=0 fail=0`, and no "not a current Steward" line. The first half of the probe
+  holds; the second (`/db/collectives/family-dowell` naming matthew's node among its stewards) is
+  still to be read on the fleet.
 
 ## shift_objective
 
