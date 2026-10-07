@@ -5,19 +5,17 @@ invariant: >
   A peer holds the bytes of the latest releases of each channel it follows, up to its own
   declared depth (default ten), and lets the bytes of older releases go from every store that
   holds them. Nothing a peer serves is ever let go.
-status: red
+status: green
 active: false
 checks:
   - "a2o @concern:release-retention (genesis/a2o/features/delivery/release-retention.feature — Act I household, two scenarios: a peer set to keep two releases lets the first of three go while a peer at the default keeps it; and a peer lets go of an earlier build nothing names, keeps a file with no record of how it arrived, and the doorway still serves)"
   - "cargo test --features 'p2p p2p-iroh' --lib -- retention release_ledger holds blob_arrivals shard_service a_forgotten_blob (elohim/elohim-storage)"
   - "fleet read: elohim_node_holds_bytes{store=blobs,reason} per alpha peer, own_unnamed falling at 64 blobs per pass for bytes older than a day and unrecorded naming what nobody can account for, beside elohim_release_retention_releases{standing}, elohim_release_retention_blobs_held{reason} and elohim_node_store_bytes{store=blobs|blobs_iroh|cache}"
 first_move: >
-  Read elohim_node_store_bytes{store=blobs} on matthew, adam and jessica falling as their
-  own_unnamed goes (the holds counters already show the letting go; the store gauge had not
-  moved by 04:08Z on 2026-10-07), and doorway alpha still serving / and /version.json after
-  matthew's third pass. Those two reads turn this green. Then the standing question: matthew's
-  984 MB that read own_unnamed is twice the 449 MB of nineteen releases the ledger gap named;
-  what the other ~500 MB was is answered by matthew's recentlyLetGo on /admin/adoption.
+  Keep reading what is let go. matthew's recentlyLetGo on GET /admin/adoption names the 232
+  blobs (984 MB) that read own_unnamed on 2026-10-07; the ledger gap had named 449 MB of
+  nineteen releases, so about half of what went was something else this peer put and nothing
+  named. Name it from that list before the next peer class (a hub, a phone) carries the pass.
 refs:
   - "genesis/docs/content/elohim-protocol/architecture/2026-10-05-storage-physics-benchmark.md — §3 fleet read, §7 retention floor, §8 declared defaults"
   - "elohim/elohim-storage/src/services/release_adoption/retention.rs"
@@ -70,3 +68,18 @@ tonight and fixed on dev (a0601e49d): the household's channel-create miss on 202
 lock change but signal handlers left on a dead app websocket after a conductor restart
 (166f7a54c); the conductor-volume grow step died on a missing jq and held every conductor after
 eve's (a0601e49d); neither is this habit's concern, both are recorded in their own.
+
+DELTA 2026-10-07b (status red -> GREEN; the fleet read completes check 3). Read from Prometheus at
+04:23Z, 33 minutes after the roll: the blob store fell by exactly the bytes the holds pass released,
+one gauge step after each pass, on every peer — matthew 1,297 MB -> 492 MB (own_unnamed 238 -> 6
+blobs over five passes of 64, 64, 64, 40; 984 MB released), adam 841 -> 353 MB (134 -> 6; 487 MB),
+jessica 331 -> 294 MB (75 -> 7; 36.6 MB), james -36.6 MB, susan, eve and gertrude -33.5 MB each
+(their eight bundles, all gone at the second pass). matthew's and adam's iroh stores fell with it
+(-265 MB each at 04:16Z: the BLAKE3 alias computed from the bytes before the delete). kept_release
+and served did not move on any peer (matthew and jessica keep 9 releases, 50.9 MB; the others one);
+release_retention_failures_total 0 everywhere. Doorway alpha answered 200 on /, /version.json and
+/db/content/elohim-host-landing at 04:07Z, 04:10Z and 04:23Z, through matthew's second to fifth
+passes. What is left on the fleet is what the rule keeps: kept releases, served bundles, pledged
+bytes, and the unrecorded (matthew 88 MB, adam 84 MB) that nothing deletes. The two scenarios are
+green on the household (DELTA 2026-10-06b), the unit checks pass (87 lib tests under both
+transports), and the fleet gauges read as the rule predicts: green. Retire-when stands as written.
