@@ -16,6 +16,9 @@
 # fail, and the repo records neither which class each live claim has nor
 # whether that class allows expansion.
 set -euo pipefail
+# A defect in this script must never fail a conductor deploy: it is a reconciler
+# of a declared size, and the roll it precedes is the thing that matters.
+trap 'echo "conductor-pvc: ${1:-?}: CONDUCTOR-PVC-GROW-SKIPPED — this script failed at line $LINENO; the roll goes on"; exit 0' ERR
 
 claim="$1"
 namespace="$2"
@@ -41,14 +44,15 @@ to_bytes() { # <k8s quantity> -> integer bytes (Ki/Mi/Gi/Ti and K/M/G/T)
   esac
 }
 
-if ! pvc_json="$(kubectl get pvc "$claim" -n "$namespace" -o json 2>/dev/null)"; then
+# jsonpath, not jq: the edge build container has no jq (the 2026-08-31 fleet
+# dispatch learned the same; edge #1565 learned it again at this line and HELD
+# every conductor after eve's).
+if ! fields="$(kubectl get pvc "$claim" -n "$namespace" \
+  -o jsonpath='{.spec.storageClassName}{"\t"}{.spec.resources.requests.storage}{"\t"}{.status.capacity.storage}' 2>/dev/null)"; then
   say "absent — nothing to grow (the claim appears at the conductor's first boot); declared $size"
   exit 0
 fi
-
-class="$(printf '%s' "$pvc_json" | jq -r '.spec.storageClassName // empty')"
-requested="$(printf '%s' "$pvc_json" | jq -r '.spec.resources.requests.storage // empty')"
-capacity="$(printf '%s' "$pvc_json" | jq -r '.status.capacity.storage // empty')"
+IFS=$'\t' read -r class requested capacity <<<"$fields"
 say "live class=${class:-?} requested=${requested:-?} capacity=${capacity:-?} declared=$size"
 
 if [ -n "$requested" ] && [ "$(to_bytes "$requested")" -ge "$(to_bytes "$size")" ]; then

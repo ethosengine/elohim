@@ -1705,7 +1705,13 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin, S
     // before the roll so a filesystem resize that needs a pod restart gets one. Warn-only:
     // a class that cannot expand is named with the operator's move; the roll goes on.
     if (humanConfig.conductorStorage) {
-        sh "bash '${env.WORKSPACE}/scripts/ci/grow-conductor-pvc.sh' 'holochain-data-${humanConfig.resourcePrefix}-0' '${humanConfig.namespace}' '${humanConfig.conductorStorage}'"
+        // returnStatus: a non-zero exit here is reported, never a failed deploy —
+        // edge #1565 held every conductor after eve's when the script died on a
+        // missing jq. The script also traps its own errors to exit 0.
+        def growCode = sh(script: "bash '${env.WORKSPACE}/scripts/ci/grow-conductor-pvc.sh' 'holochain-data-${humanConfig.resourcePrefix}-0' '${humanConfig.namespace}' '${humanConfig.conductorStorage}'", returnStatus: true)
+        if (growCode != 0) {
+            echo "conductor-pvc: holochain-data-${humanConfig.resourcePrefix}-0: grow step exited ${growCode} — ignored, the roll goes on"
+        }
     }
 
     def templateBefore = podInputsFingerprint(outputFile, humanConfig.namespace, 'template')
