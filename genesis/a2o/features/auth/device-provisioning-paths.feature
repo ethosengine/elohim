@@ -57,6 +57,25 @@ Feature: A person's identity starts on one node and grows to others
   described above. This works whether or not Matthew said in advance that he
   expected the node; the scenarios below show it for a node he expected.
 
+  There is a middle way between carrying both and the private network. When
+  the node that asks can reach a node that speaks for Matthew by its plain
+  address on the network, Matthew still opens the link and approves, but the
+  code never appears: the approving node keeps it, and the node that asked
+  collects it by proving it is the one that asked. The person carries the link
+  once and nothing more. In the scenarios this is "one command and one yes".
+
+  Approving is Matthew's act, and he can do it in two places on a node that
+  speaks for him: in its portal, by opening the link, or in its terminal, by
+  giving the link to `epr device approve`. Either way he is shown which node is
+  asking and that node's key, and he checks it is the same key the asking
+  node's terminal showed him before he says yes. Approving needs a node that
+  already speaks for him; the asking node can never approve itself.
+
+  A doorway may serve the approval page without being able to act on it: the
+  page is part of the app it serves, while taking an approval is a capability
+  of the node behind it that may not have been built or switched on. Such a
+  doorway must say so before asking anyone to sign in.
+
   A doorway is a node run as a service for other people. It can hold a
   person's key for them, so they can sign in from a browser with a password,
   and it can help them recover an account. When a doorway holds the key, an
@@ -139,6 +158,30 @@ Feature: A person's identity starts on one node and grows to others
       When Jessica's node checks for itself whether node "home" belongs to Matthew
       Then Jessica's node answers yes from the joining record it read on the network
       And no doorway was contacted at any step
+
+    # held: needs the one-person multi-node topology (arch-device-recognition-backlog.md row 2); the terminal path is proven first on one machine with two storage processes
+    @wip
+    Scenario: A second node of his own joins with one command and one yes
+      Given Matthew's identity began on node "workspace"
+      And node "home" can reach node "workspace" by its plain address on the network
+      When the terminal on node "home" runs one command to join Matthew's identity, naming itself "home"
+      Then the terminal on node "home" shows its own key and says it is waiting for a node that already speaks for Matthew
+      And no address, port or code was typed on node "home"
+      When Matthew gives the link to the terminal on node "workspace" and is shown that "home" is asking with that same key
+      And Matthew says yes once
+      Then the terminal on node "home" finishes on its own, naming which node approved and for which identity
+      And node "home" is one of Matthew's nodes
+      And no code was shown to Matthew or carried by him
+
+  Rule: A doorway that cannot take approvals says so before anyone signs in
+
+    # held: needs a doorway that serves the approval page without taking approvals (alpha on 2026-10-07)
+    @wip
+    Scenario: A doorway that cannot take approvals says so before sign-in
+      Given a doorway serves the page at the approval link but cannot take approvals
+      When Matthew opens a node's approval link on that doorway
+      Then the page says approvals cannot be taken here, before asking him to sign in
+      And it shows him the terminal command that approves the node on a node that already speaks for him
 
   Rule: An identity can begin on a doorway and grow to a node of the person's own
 

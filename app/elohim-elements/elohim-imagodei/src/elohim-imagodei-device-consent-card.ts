@@ -84,6 +84,7 @@ export interface DeviceConsentStrings {
   copy: string;
   copied: string;
   selectedToCopy: string;
+  commandSelectedToCopy: string;
   countdown: (clock: string) => string;
   announceMinutes: (minutes: number) => string;
   announceSeconds: (seconds: number) => string;
@@ -94,6 +95,9 @@ export interface DeviceConsentStrings {
   /** The code went to the asking device over the private network, not to a terminal here. */
   handedBackOverNetworkHeading: string;
   handedBackOverNetworkBody: string;
+  /** The node holds the code and the asking device collects it itself. */
+  heldHeading: string;
+  heldBody: (label: string) => string;
   declinedHeading: string;
   declinedBody: (label: string) => string;
   refusedHeading: string;
@@ -105,6 +109,9 @@ export interface DeviceConsentStrings {
   refusal: Record<KnownDeviceRefusalCode, string>;
   refusedUnknown: string;
   refusalCodeLabel: string;
+  /** Leads the terminal command a refusal may carry (`command`). */
+  wayThroughLead: string;
+  copyCommand: string;
 }
 
 /**
@@ -159,6 +166,7 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
   copy: 'Copy code',
   copied: 'Copied',
   selectedToCopy: 'The code is selected. Copy it with your keyboard or menu.',
+  commandSelectedToCopy: 'The command is selected. Copy it with your keyboard or menu.',
   countdown: clock => `Good for ${clock} more`,
   announceMinutes: minutes =>
     minutes === 1
@@ -173,10 +181,13 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
   handedBackOverNetworkHeading: 'The device has it',
   handedBackOverNetworkBody:
     'The code reached the device over the private network, and it enrolls itself now. Nothing more is needed here.',
+  heldHeading: 'Done',
+  heldBody: label => `“${label}” will finish joining on its own; nothing to copy.`,
   declinedHeading: 'Nothing was approved',
   declinedBody: label => `“${label}” is not recognized as your device. You can close this tab.`,
   refusedHeading: 'This request can’t go ahead',
   refusalHeading: {
+    consent_unavailable: 'Can’t approve here',
     consent_not_signed_in: 'Sign in first',
     consent_identity_unbootstrapped: 'Not ready to approve yet',
     consent_signing_unavailable: 'Waiting on the signer',
@@ -212,6 +223,8 @@ export const DEVICE_CONSENT_STRINGS_EN: DeviceConsentStrings = {
   },
   refusedUnknown: 'Something stopped this request. Start again from the terminal on your device.',
   refusalCodeLabel: 'Reference',
+  wayThroughLead: 'Approve on a device that is already yours:',
+  copyCommand: 'Copy command',
 };
 
 const ENROLL: DeviceAct = 'device.enroll';
@@ -251,7 +264,10 @@ const ANNOUNCE_SECONDS = [30, 10];
  * device, shows its short key fingerprint for comparison with the terminal,
  * lists each asked act as its own agree/leave-out row, says who will sign, and
  * then walks the phases the host drives: signing → code (paste) or
- * handed-back (same machine) → or declined / refused.
+ * handed-back (same machine, the private network, or held for the device to
+ * collect itself) → or declined / refused. A refusal may carry the way
+ * through as a terminal command to run on a device that is already the
+ * person's (`command`), shown with a copy button.
  *
  * Coherence rule (protocol): a root key can only be bound alongside
  * enrollment. Leaving enrollment out also leaves the root key out and
@@ -272,12 +288,14 @@ const ANNOUNCE_SECONDS = [30, 10];
  * @prop {string} code - One-time code to paste (phase `code`)
  * @prop {number} expiresAt - Code expiry, epoch ms (phase `code`)
  * @prop {string} refusalCode - Machine code for phase `refused`
- * @prop {'this-machine'|'network'} handedBackTo - Where the code went in phase `handed-back` (default this-machine)
+ * @prop {string} command - Phase `refused`: the way through, a terminal command to run on a device that is already the person's (optional)
+ * @prop {'this-machine'|'network'|'held'} handedBackTo - Where the code went in phase `handed-back`: a terminal here, the device over the private network, or held for the device to collect itself (default this-machine)
  * @prop {DeviceConsentStringOverrides} strings - Replace any visible sentence; refusal sentences and headings merge per code (property only)
  *
  * @fires {CustomEvent<{agreedActs: DeviceAct[], declinedActs: DeviceAct[]}>} approve - Person approved; agreed/declined in askedActs order
  * @fires {CustomEvent<{reason: 'user-rejected'}>} decline - Person declined
  * @fires {CustomEvent<{method: 'clipboard'}>} code-copied - The code was written to the clipboard
+ * @fires {CustomEvent<{method: 'clipboard'}>} command-copied - The refusal's command was written to the clipboard
  * @fires {CustomEvent<{expiresAt: number}>} expired - The shown code passed its expiry
  *
  * @cssprop --elohim-device-consent-gap - Grid gap between sections (default: 1rem)
@@ -314,6 +332,9 @@ const ANNOUNCE_SECONDS = [30, 10];
  * @csspart countdown - The visible countdown
  * @csspart message - Body sentence of the handed-back / declined / refused / expired phases
  * @csspart refusal-code - The raw refusal code (small, quotable)
+ * @csspart way-through - The line leading a refusal's terminal command
+ * @csspart command - A refusal's terminal command (selected whole to copy)
+ * @csspart copy-command - The copy button for the command
  *
  * @capabilityMaxLens standard
  * @capabilityThemes light, dark
@@ -504,10 +525,31 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       color: var(--elohim-device-consent-decline-fg, inherit);
     }
 
-    [part='copy'] {
+    [part='copy'],
+    [part='copy-command'] {
       background: transparent;
       color: inherit;
       justify-self: start;
+    }
+
+    /* A command is selected whole to copy; unlike the code it may wrap to
+       fit, since it is pasted as one line whatever the screen showed. */
+    [part='command'] {
+      margin: 0;
+      padding-block: 0.75rem;
+      padding-inline: 1rem;
+      background: var(
+        --elohim-device-consent-code-bg,
+        color-mix(in srgb, currentColor 6%, transparent)
+      );
+      border-radius: var(--elohim-device-consent-radius, 6px);
+      font-family: var(--elohim-device-consent-code-font, ui-monospace, monospace);
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+      user-select: all;
+      unicode-bidi: isolate;
+      direction: ltr;
+      text-align: start;
     }
 
     [part='code'] {
@@ -567,7 +609,8 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
 
     @media (forced-colors: active) {
       [part='device-key'],
-      [part='code'] {
+      [part='code'],
+      [part='command'] {
         background: Canvas;
         color: CanvasText;
         border: 1px solid CanvasText;
@@ -584,7 +627,8 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       }
 
       [part='approve'],
-      [part='copy'] {
+      [part='copy'],
+      [part='copy-command'] {
         border-color: ButtonText;
         background: ButtonFace;
         color: ButtonText;
@@ -640,10 +684,18 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   @property({ attribute: 'refusal-code' }) refusalCode?: string;
 
   /**
-   * Where the code went in phase `handed-back`: a terminal on this machine
-   * (`this-machine`, the default) or the asking device over a private network.
+   * Phase `refused`: the way through, as a terminal command to run on a
+   * device that is already the person's. Shown only when given.
    */
-  @property({ attribute: 'handed-back-to' }) handedBackTo: 'this-machine' | 'network' =
+  @property() command?: string;
+
+  /**
+   * Where the code went in phase `handed-back`: a terminal on this machine
+   * (`this-machine`, the default), the asking device over a private network
+   * (`network`), or held by the node until the asking device collects it
+   * itself (`held` — it finishes joining on its own, nothing to copy).
+   */
+  @property({ attribute: 'handed-back-to' }) handedBackTo: 'this-machine' | 'network' | 'held' =
     'this-machine';
 
   /** Replace any visible sentence; unspecified keys use the English defaults. */
@@ -721,7 +773,7 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
         this._choice = {};
       }
     }
-    if (changed.has('phase') && this.phase !== 'code') {
+    if ((changed.has('phase') && this.phase !== 'code') || changed.has('command')) {
       this._copyNote = '';
     }
     if (changed.has('phase') || changed.has('expiresAt')) {
@@ -855,12 +907,7 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
       case 'code':
         return this._renderCode();
       case 'handed-back':
-        return this.handedBackTo === 'network'
-          ? this._renderMessage(
-              this._s.handedBackOverNetworkHeading,
-              this._s.handedBackOverNetworkBody
-            )
-          : this._renderMessage(this._s.handedBackHeading, this._s.handedBackBody);
+        return this._renderHandedBack();
       case 'declined':
         return this._renderMessage(
           this._s.declinedHeading,
@@ -1007,6 +1054,34 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
     `;
   }
 
+  private _renderHandedBack() {
+    const s = this._s;
+    switch (this.handedBackTo) {
+      case 'network':
+        return this._renderMessage(s.handedBackOverNetworkHeading, s.handedBackOverNetworkBody);
+      case 'held':
+        // Nothing to copy: the device collects the code itself. Its key is
+        // shown once more, the one it printed, so the person knows which.
+        return html`
+          ${this._renderMessage(s.heldHeading, s.heldBody(isolate(this.request.label)))}
+          ${this.request.deviceFingerprint
+            ? html`
+                <div part="device-key">
+                  <p class="key-line">
+                    <span class="key-label">${s.deviceKeyLabel}</span>
+                    <span part="fingerprint" data-key="device">
+                      ${this.request.deviceFingerprint}
+                    </span>
+                  </p>
+                </div>
+              `
+            : nothing}
+        `;
+      default:
+        return this._renderMessage(s.handedBackHeading, s.handedBackBody);
+    }
+  }
+
   private _renderMessage(heading: string, body: string) {
     return html`
       ${this._heading(heading)}
@@ -1025,12 +1100,32 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
     return html`
       ${this._heading(heading)}
       <p part="message">${sentence}</p>
+      ${this.command ? this._renderCommand(this.command) : nothing}
       ${code && !NOT_A_REFUSAL.has(code)
         ? html`
             <p part="refusal-code">
               ${s.refusalCodeLabel}:
               <code>${code}</code>
             </p>
+          `
+        : nothing}
+    `;
+  }
+
+  /** The way through: a command to run on a device that is already the person's. */
+  private _renderCommand(command: string) {
+    const s = this._s;
+    return html`
+      <p part="way-through" id="way-through">${s.wayThroughLead}</p>
+      <p part="command" aria-describedby="way-through">${command}</p>
+      <div class="code-tools">
+        <button type="button" part="copy-command" @click=${this._copyCommand}>
+          ${s.copyCommand}
+        </button>
+      </div>
+      ${this._copyNote
+        ? html`
+            <p class="muted" role="status">${this._copyNote}</p>
           `
         : nothing}
     `;
@@ -1068,27 +1163,39 @@ export class ElohimImagodeiDeviceConsentCard extends CapabilityAwareElement(LitE
   };
 
   private readonly _copy = async (): Promise<void> => {
-    const code = this.code ?? '';
-    if (!code) return;
+    await this._copyText(this.code ?? '', 'code', 'code-copied');
+  };
+
+  private readonly _copyCommand = async (): Promise<void> => {
+    await this._copyText(this.command ?? '', 'command', 'command-copied');
+  };
+
+  /** Write `text` to the clipboard; where that is blocked, select it for the person to copy. */
+  private async _copyText(
+    text: string,
+    part: 'code' | 'command',
+    event: 'code-copied' | 'command-copied'
+  ): Promise<void> {
+    if (!text) return;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(text);
       this._copyNote = this._s.copied;
       this.dispatchEvent(
-        new CustomEvent('code-copied', {
+        new CustomEvent(event, {
           detail: { method: 'clipboard' },
           bubbles: true,
           composed: true,
         })
       );
     } catch {
-      this._selectCode();
-      this._copyNote = this._s.selectedToCopy;
+      this._selectPart(part);
+      this._copyNote = part === 'code' ? this._s.selectedToCopy : this._s.commandSelectedToCopy;
     }
-  };
+  }
 
-  private _selectCode(): void {
-    const target = this.shadowRoot?.querySelector('[part="code"]');
+  private _selectPart(part: 'code' | 'command'): void {
+    const target = this.shadowRoot?.querySelector(`[part="${part}"]`);
     const selection = globalThis.getSelection?.();
     if (!target || !selection) return;
     const range = document.createRange();

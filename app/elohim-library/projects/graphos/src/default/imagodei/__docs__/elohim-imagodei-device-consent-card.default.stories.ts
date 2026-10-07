@@ -308,7 +308,8 @@ export const CodeExpired: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'The countdown has passed: the code is withdrawn and the card says how to start again.',
+        story:
+          'The countdown has passed: the code is withdrawn and the card says how to start again.',
       },
     },
   },
@@ -327,6 +328,27 @@ export const HandedBack: Story = {
     docs: {
       description: {
         story: 'Same machine: the browser handed the code to the terminal. No code is shown.',
+      },
+    },
+  },
+};
+
+export const HeldForDevice: Story = {
+  name: 'HeldForDevice',
+  decorators: [frame],
+  render: () => html`
+    <elohim-imagodei-device-consent-card
+      .request=${enrollOnly}
+      phase="handed-back"
+      handed-back-to="held"
+    ></elohim-imagodei-device-consent-card>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The node holds the code and the asking device collects it itself: done, it finishes ' +
+          'joining on its own, nothing to copy. Its key is shown once more so the person knows which.',
       },
     },
   },
@@ -353,6 +375,29 @@ export const RefusedIncoherent: Story = {
       refusal-code="request_acts_incoherent"
     ></elohim-imagodei-device-consent-card>
   `,
+};
+
+export const RefusedUnavailableWayThrough: Story = {
+  name: 'RefusedUnavailableWayThrough',
+  decorators: [frame],
+  render: () => html`
+    <elohim-imagodei-device-consent-card
+      .request=${enrollOnly}
+      phase="refused"
+      refusal-code="consent_unavailable"
+      command="epr device approve 'https://doorway.example/threshold/consent/device?request=eyJjbGllbnRJZCI6ImVwci1jbGkifQ'"
+    ></elohim-imagodei-device-consent-card>
+  `,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'This host takes no device approvals, said before any sign-in, with the way through: ' +
+          'the same approval as a command to run on a device that is already the person’s, ' +
+          'with a copy button (`command`).',
+      },
+    },
+  },
 };
 
 export const RefusedUnknownAct: Story = {

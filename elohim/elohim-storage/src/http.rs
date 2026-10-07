@@ -3179,6 +3179,13 @@ impl HttpServer {
             // and device key, so it needs no session.
             (Method::POST, "/auth/consent/redeem") => self.handle_consent_redeem(req).await,
 
+            // Device consent ceremony, held return path: the asking terminal
+            // collects the consent this node held for its state, or is told
+            // to keep waiting. Guarded by the terminal's own verifier, client
+            // and device, so it needs no session; under the same Host rule as
+            // redeem (`is_identity_route`).
+            (Method::POST, "/auth/consent/collect") => self.handle_consent_collect(req).await,
+
             // Auth identity endpoint: same wire shape as doorway's /auth/me so
             // the standalone peer OAuth portal bundle can consume either source
             // without knowing which transport is in play (spec §3.2 Transport β).
@@ -13719,7 +13726,11 @@ impl HttpServer {
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
             .to_bytes();
-        Ok(crate::services::device_consent::consent_view(&body))
+        Ok(crate::services::device_consent::consent_view(
+            crate::services::device_consent_hold::ask_states(),
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        ))
     }
 
     /// The local session a request speaks for, resolved one way for every
@@ -13864,12 +13875,27 @@ impl HttpServer {
     }
 
     /// Whether the person is signed in, for a caller [`Self::signing_caller`]
-    /// let through: proven by sign-in, or on this machine with its session.
-    fn caller_signed_in<B>(&self, req: &Request<B>, proven: bool) -> Result<bool, StorageError> {
-        if proven {
+    /// let through: proven by sign-in, or on this machine with its session,
+    /// or on this machine with no session when this node holds a person
+    /// (`device_consent::local_caller_acts_as_person`, dial 1). A caller from
+    /// elsewhere is answered exactly as before.
+    async fn caller_signed_in<B>(
+        &self,
+        req: &Request<B>,
+        proven: bool,
+    ) -> Result<bool, StorageError> {
+        if proven || self.person_signed_in(req)? {
             return Ok(true);
         }
-        self.person_signed_in(req)
+        let cell = self.own_controller_cell();
+        Ok(
+            crate::services::device_consent::local_caller_acts_as_person(
+                caller_is_local(req),
+                cell.as_ref()
+                    .map(|c| c as &dyn crate::services::device_consent::ControllerCell),
+            )
+            .await,
+        )
     }
 
     /// This node's own mishpat cell, as the person's controller.
@@ -13901,7 +13927,7 @@ impl HttpServer {
             if let Some(refused) = cross_site_refusal(req.headers()) {
                 return Ok(refused);
             }
-            self.caller_signed_in(&req, proven)?
+            self.caller_signed_in(&req, proven).await?
         } else {
             if let Some(refused) = foreign_origin_refusal(req.headers()) {
                 return Ok(refused);
@@ -14861,7 +14887,7 @@ impl HttpServer {
             return Ok(refused);
         }
         let signed_in = if deciding {
-            self.caller_signed_in(&req, proven)?
+            self.caller_signed_in(&req, proven).await?
         } else {
             false
         };
@@ -14878,15 +14904,30 @@ impl HttpServer {
                     .and_then(|p| crate::services::identity_declaration::read(&p).ok())
                     .unwrap_or_default();
                 let cell = self.own_controller_cell();
-                carrier::decide_pending(
+                // The ask's state, read before deciding takes it off the
+                // list, so a decline is remembered for a terminal collecting.
+                let now = chrono::Utc::now().timestamp_micros();
+                let state = serde_json::from_slice::<serde_json::Value>(&body)
+                    .ok()
+                    .and_then(|v| v.get("ask").and_then(|a| a.as_str()).map(str::to_string))
+                    .and_then(|ask| carrier::carrier().pending.pick(&ask, now))
+                    .map(|p| p.ask.request.state);
+                let answer = carrier::decide_pending(
                     &self.consent_deliveries,
                     cell.as_ref().map(|c| c as &dyn ControllerCell),
                     &consent_grant::Unattended,
                     link_ref,
                     &declaration,
-                    &carrier::carrier().speaks(chrono::Utc::now().timestamp_micros()),
+                    &carrier::carrier().speaks(now),
                     signed_in,
                     &body,
+                )
+                .await;
+                crate::services::device_consent::note_declined(
+                    crate::services::device_consent_hold::ask_states(),
+                    state,
+                    answer,
+                    chrono::Utc::now().timestamp_micros(),
                 )
                 .await
             }
@@ -14974,7 +15015,7 @@ impl HttpServer {
         if let Some(refused) = cross_site_refusal(req.headers()) {
             return Ok(refused);
         }
-        let signed_in = self.caller_signed_in(&req, proven)?;
+        let signed_in = self.caller_signed_in(&req, proven).await?;
         let cell = self.own_controller_cell();
         Ok(agree(
             &self.consent_deliveries,
@@ -14998,6 +15039,25 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
             .to_bytes();
         Ok(crate::services::device_consent::redeem_code(
+            &self.consent_deliveries,
+            &body,
+            chrono::Utc::now().timestamp_micros(),
+        ))
+    }
+
+    /// POST /auth/consent/collect — the asking terminal collects the consent
+    /// held for its state.
+    async fn handle_consent_collect(
+        &self,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {e}")))?
+            .to_bytes();
+        Ok(crate::services::device_consent::collect_held(
+            crate::services::device_consent_hold::ask_states(),
             &self.consent_deliveries,
             &body,
             chrono::Utc::now().timestamp_micros(),
@@ -22805,6 +22865,13 @@ mod session_exchange_tests {
         // A page that rebinds its name to 127.0.0.1 still sends its name.
         assert!(host("/auth/identity/secret", Some("evil.example:8191")));
         assert!(host("/auth/consent/agree", Some("evil.example")));
+        // Collect answers exactly where redeem does: under this node's names
+        // (and ELOHIM_ALLOWED_HOSTS, how another machine reaches it over
+        // plain http), never under a rebound one.
+        for route in ["/auth/consent/redeem", "/auth/consent/collect"] {
+            assert!(host(route, Some("evil.example:8095")), "{route}");
+            assert!(!host(route, Some("127.0.0.1:8095")), "{route}");
+        }
         assert!(host("/session", Some("evil.example")));
         assert!(host("/auth/device/announce", None));
         assert!(!host("/auth/identity/secret", Some("127.0.0.1:8191")));

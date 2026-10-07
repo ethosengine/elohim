@@ -2,10 +2,18 @@
  * Approve a device — `/threshold/consent/device?request=<base64url GrantRequest>`.
  *
  * The doorway's mount of the shared approval page
- * (`elohim-imagodei/device-consent`, which the native portal mounts too). A
- * hosted person signs in first (the route's authGuard sends them to /login and
- * back), then the shared controller runs the page against this doorway, which
- * holds their key and signs as them.
+ * (`elohim-imagodei/device-consent`, which the native portal mounts too). The
+ * shared controller runs the page against this doorway, which holds a hosted
+ * person's key and signs as them.
+ *
+ * Sign-in is ordered here, not by a route guard: before a signed-out person is
+ * sent to /login, the page asks this doorway whether it takes device approvals
+ * at all (`POST /auth/consent/view`). If it does not (404, or no answer), the
+ * page says so now, with the way through — approve on a device that is
+ * already theirs with `epr device approve '<this link>'` — instead of after
+ * sign-in. If it does (401, or a 200: `view` checks no session), the person
+ * signs in and comes straight back, and the approval is reviewed then. Nothing
+ * about the request is shown before sign-in.
  *
  * This component only supplies what is the doorway's own: who the key holder
  * is called, the session check, the way to sign in and come back, and the
@@ -38,6 +46,8 @@ import { DeviceConsentViewComponent } from './device-consent-view.component';
       <app-device-consent-view
         [phase]="s.phase"
         [request]="s.view"
+        [command]="s.command"
+        [handedBackTo]="handedBackTo(s)"
         [personLabel]="personLabel()"
         [hostLabel]="hostLabel"
         [code]="s.code"
@@ -62,19 +72,15 @@ export class DeviceConsentComponent implements OnInit {
 
   readonly personLabel = signal<string | undefined>(undefined);
   readonly hostLabel = gatewayDomain(globalThis.location.hostname);
-  /** Null until the person is known to be signed in; nothing is shown before. */
+  /** Null until the person's sign-in is known; then the page, from `loading` on. */
   readonly state = signal<DeviceConsentPageState | null>(null);
 
   private controller: DeviceConsentController | null = null;
 
-  ngOnInit(): void {
-    // The route's guard already enforces this; holding the line here too means
-    // nothing about the request is fetched or shown to a signed-out person.
-    if (!this.authState.isAuthenticated()) {
-      this.sendToSignIn();
-      return;
-    }
-    this.personLabel.set(this.authState.account()?.identifier ?? undefined);
+  async ngOnInit(): Promise<void> {
+    if (this.authState.isLoading()) await this.authState.init();
+    const signedIn = this.authState.isAuthenticated();
+    if (signedIn) this.personLabel.set(this.authState.account()?.identifier ?? undefined);
 
     const controller = new DeviceConsentController({
       requestParam: this.route.snapshot.queryParamMap.get('request'),
@@ -82,11 +88,20 @@ export class DeviceConsentComponent implements OnInit {
       client: this.port.client,
       signIn: () => this.sendToSignIn(),
       handBack: url => this.port.handBack(url),
+      // This page's own link: the way through when this doorway takes no approvals.
+      link: () => globalThis.location.href,
       onChange: state => this.state.set(state),
     });
     this.controller = controller;
     this.state.set(controller.state);
-    void controller.start();
+    // Signed out: ask first whether approvals are taken here at all, then sign in.
+    await (signedIn ? controller.start() : controller.startBeforeSignIn());
+  }
+
+  /** Where the code went, for the card: held for the device, over the network, or here. */
+  handedBackTo(state: DeviceConsentPageState): 'this-machine' | 'network' | 'held' {
+    if (state.heldForDevice) return 'held';
+    return state.handedBackOverNetwork ? 'network' : 'this-machine';
   }
 
   onApprove(approval: DeviceConsentApproval): void {

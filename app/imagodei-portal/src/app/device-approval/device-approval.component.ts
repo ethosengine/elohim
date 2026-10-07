@@ -14,6 +14,10 @@
  * Beside the approval it reads what the person's identity rests on. If this
  * node has none yet, the person begins it in place and comes back to the
  * approval, with nothing sent twice.
+ *
+ * The node is asked what the device wants before anything else, so a node
+ * that takes no approvals is said at once, with the way through (approve on
+ * a device that is already theirs), and never after a detour to sign in.
  */
 
 import {
@@ -65,6 +69,8 @@ export class DeviceApprovalComponent implements OnInit {
     client: this.port.client,
     signIn: () => this.port.signIn(),
     handBack: url => this.port.handBack(url),
+    // This page's own link: the way through if this node takes no approvals.
+    link: () => globalThis.location.href,
     onChange: state => {
       this.state.set(state);
       // The node says it holds no identity for the person: offer to begin here.

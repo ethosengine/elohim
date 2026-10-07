@@ -87,3 +87,36 @@ affinities), because every deployed doorway runs DEV_MODE=true and the hosted br
 provisioning under it, recovering the singleton conductor's existing Human. No self-service
 close exists (only an admin soft-delete of the credential row; no cell reclaim, no session
 end). The feature file is written and parses (cucumber --dry-run 2026-09-04); every scenario is @wip until the step definitions land, so the check currently reports 0 passed — red on evidence, not intention.
+
+DELTA 2026-10-07 (NO status change; the device-join path is proven on an isolated network, the
+hosted path is not): registering a Che workspace through alpha took six things from the person the
+system could have done itself (`genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md`),
+and alpha's portal sent him through sign-in to `consent_unavailable` because the doorway serves the
+page and mounts no `/auth/consent/*`. Built across four lanes and proven live on the i1006 network
+on one machine: a new conductor+storage device (generated from the repacked happ, uhCAkFbHc…XU0hn2)
+ran `epr device join --label fresh-device-3`; the node that speaks for Matthew (i1006 workspace,
+uhCAkRpkc…V5RRzP) ran `epr device approve '<link>' --yes` once ("Done. The device will finish
+joining on its own; nothing to copy"); the join collected the consent by its PKCE verifier
+(`POST /auth/consent/collect`, the code never shown), checked it, and enrolled: "This device is
+enrolled. Joining record: uhCkkAh97F_w5OijD61Wy_EOm0fC-nCFZW3yWOH5Gz-gRBhKIvDR6"; the new device's
+standing reads hasIdentity=true. Nothing was carried by hand; no address, port or code was typed on
+the new device (`--node` was needed only because three nodes answer on this one machine, which the
+discovery refuses to guess). Found and fixed on the way: a terminal on the approving node's own
+machine was refused `consent_not_signed_in` on a node nobody had signed in to (dial 1 now governs:
+a local caller on a node that holds a person is signed in for agree); an enroll failure lost the
+collected consent and needed a second yes (the consent is now kept for its window and the next
+`join` enrolls without asking). Found and NOT a code gap: a device whose packed happ carries stale
+mishpat/imagodei coordinators fails `sign_device_enrollment` / `get_human_root_evidence` ("zome
+function doesn't exist"); and a device with no bootstrap/relay cannot read the identity commitment
+("identity commitment unavailable") — the join needs the network, and says what it waits on. Portal
+states rendered (genesis/a2o/reports/look/join-refused, join-held). Crate 117, epr-cli 314,
+storage focused 52 tests; elohim-imagodei consent specs 223 (29 pre-existing failures in two
+untouched files), doorway-app 115, imagodei-portal 87. Read at 16:00Z: the approver's own device list names both devices
+(uhCAkRpkc…V5RRzP, uhCAkFbHc…XU0hn2), so the record travelled; the a2o scenarios stay @wip (step definitions
+follow); the hosted path (a doorway mounting `/auth/consent/*` and relaying between two Che
+workspaces) is the named next slice. Blind-reader loop on device-provisioning-paths.feature: 2
+rounds (0/7/2 → 0/5/3, READY). Second cycle on the final bytes (16:22Z, device uhCAkMIUu…, after the second-model
+review's fixes): the first enroll came before the new conductor could read the identity
+commitment, the consent was kept on the device, and `join` run again with the same flags enrolled
+"without asking again" (joining record uhCkkhW8BUGqNfdUoKvqaa_6Dn6kN28NENkPOK27O-fZYfnSp_TsG) — the
+recovery path is proven live, one yes total.

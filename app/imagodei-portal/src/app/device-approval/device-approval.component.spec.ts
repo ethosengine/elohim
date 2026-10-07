@@ -69,6 +69,7 @@ const unbootstrapped = {
 type Card = HTMLElement & {
   phase?: string;
   refusalCode?: string;
+  command?: string;
   strings?: { signerOwnNode?: (host?: string) => string; refusal?: Record<string, string> };
 };
 
@@ -181,6 +182,35 @@ describe('DeviceApprovalComponent — the native portal’s mount of the shared 
 
     expect(port.signIn).toHaveBeenCalledTimes(1);
     expect((q(fixture, 'device-consent-card') as Card).refusalCode).toBe('consent_not_signed_in');
+  });
+
+  it('a node that takes no approvals: says so before any sign-in, with the way through', async () => {
+    port.client.view.mockResolvedValue({ ok: false, status: 404, body: null });
+    const fixture = await create();
+
+    const card = q(fixture, 'device-consent-card') as Card;
+    expect(port.signIn).not.toHaveBeenCalled();
+    expect(card.phase).toBe('refused');
+    expect(card.refusalCode).toBe('consent_unavailable');
+    expect(card.command).toBe(`epr device approve '${window.location.href}'`);
+    expect(card.strings?.refusal?.['consent_unavailable']).toBe(
+      'The device that holds your key can’t take device approvals right now, so nothing was signed.'
+    );
+  });
+
+  it('when the node holds the code for the device: done, it finishes joining on its own', async () => {
+    port.client.agree.mockResolvedValue(ok(agreed({ returnTarget: { kind: 'held' } })));
+    const fixture = await create();
+    q(fixture, 'device-consent-card')!.dispatchEvent(
+      new CustomEvent('approve', { detail: { agreedActs: ['device.enroll'], declinedActs: [] } })
+    );
+    await settle();
+    fixture.detectChanges();
+
+    const card = q(fixture, 'device-consent-card') as Card;
+    expect(card.phase).toBe('handed-back');
+    expect(card.getAttribute('handed-back-to')).toBe('held');
+    expect(port.handBack).not.toHaveBeenCalled();
   });
 
   it('declining calls nothing', async () => {

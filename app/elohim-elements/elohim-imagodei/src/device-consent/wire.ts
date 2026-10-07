@@ -41,10 +41,15 @@ export interface ConsentAgreeRequest {
   agreedActs: DeviceAct[];
 }
 
-/** Where the one-time code goes: shown to paste, or handed to a terminal on this machine. */
+/**
+ * Where the one-time code goes: shown to paste, handed to a terminal on this
+ * machine, or held by the node until the asking device collects it itself
+ * (nothing to show or hand back).
+ */
 export type ConsentReturnTarget =
   | { kind: 'display'; value: string }
-  | { kind: 'redirect'; url: string };
+  | { kind: 'redirect'; url: string }
+  | { kind: 'held' };
 
 /** How many of the person's own nodes this approval needs, and how many have signed. */
 export interface ConsentControllers {

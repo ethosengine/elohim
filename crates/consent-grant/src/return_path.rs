@@ -8,6 +8,11 @@
 //! - **Paste**: the portal shows the code and the person carries it across.
 //!   Used when the terminal is remote (a workspace, an SSH session) and the
 //!   browser cannot reach its loopback.
+//! - **Hold**: the approving node keeps the code and hands the consent to the
+//!   terminal that asked, when that terminal proves it holds the PKCE
+//!   verifier (`POST /auth/consent/collect`). The person carries nothing; the
+//!   portal only says the device will finish on its own. Used when the
+//!   terminal can reach the approving node over plain HTTP.
 //!
 //! The portal never redirects anywhere else for this grant, so there is no
 //! redirect address for an attacker to register or spoof.
@@ -19,6 +24,7 @@ use serde::{Deserialize, Serialize};
 pub enum ReturnPath {
     Loopback { port: u16 },
     Paste,
+    Hold,
 }
 
 /// What the portal does once the controller has approved.
@@ -28,6 +34,9 @@ pub enum ReturnTarget {
     Redirect(String),
     /// Show this for the person to paste into their terminal.
     Display(String),
+    /// Show nothing to carry: the approving node holds the code for the
+    /// terminal that asked, which collects it with its verifier.
+    Held,
 }
 
 /// Separates code from state in the pasted form. Neither side may contain it:
@@ -49,6 +58,7 @@ pub fn return_target(path: ReturnPath, code: &str, state: &str) -> ReturnTarget 
             "http://127.0.0.1:{port}/callback?code={code}&state={state}"
         )),
         ReturnPath::Paste => ReturnTarget::Display(format!("{code}{PASTE_SEPARATOR}{state}")),
+        ReturnPath::Hold => ReturnTarget::Held,
     }
 }
 

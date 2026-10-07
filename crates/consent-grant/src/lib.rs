@@ -73,8 +73,9 @@ pub use carrier::{
     proof_holds, statement, CarrierKind, CarrierProof, CarryRequest, CarryResponse, CARRIER_DOMAIN,
 };
 pub use ceremony::{
-    attendance, issue, redeem, settle, AgreedView, Attendance, ConsentView, ControllerTally,
-    Delivered, Held, IssueRefusal, MemoryStore, Relation, ReturnTargetView, Taken,
+    attendance, issue, redeem, settle, AgreedView, Attendance, Collection, CollectionRefusal,
+    ConsentView, ControllerTally, Delivered, Held, IssueRefusal, MemoryStore, Relation,
+    ReturnTargetView, Taken,
 };
 pub use consent::{
     consent_message, Agreement, ConsentRecord, ConsentRefusal, ConsentSignature, SignedConsent,

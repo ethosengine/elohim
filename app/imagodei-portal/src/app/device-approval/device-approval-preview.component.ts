@@ -18,6 +18,10 @@
  * - `identifier=<word>` — the sign-in word the node gives with the standing
  * - `code=consent_caller_not_local` — the page open on another machine,
  *   with the terminal command for the same link
+ * - `code=consent_unavailable` (the default refusal) — this node takes no
+ *   approvals, with the way through as the real page gives it
+ * - `to=network|held` (with `phase=handed-back`) — where the code went: over
+ *   the private network, or held for the device to collect itself
  *
  * AppComponent loads this only when `ngDevMode` is on, which optimized
  * (production) builds replace with `false`: the chunk is removed at build
@@ -31,6 +35,7 @@ import {
   keyHolderStep,
   standingFor,
   trailAfterAgreement,
+  wayThroughFor,
   type ConsentViewResponse,
   type DeviceConsentPagePhase,
   type DeviceConsentPageState,
@@ -152,13 +157,22 @@ export class DeviceApprovalPreviewComponent {
           trail: trailAfterAgreement(HOLDER, witnesses),
           standing,
         };
-      case 'handed-back':
-        return { ...base, trail: trailAfterAgreement(HOLDER, witnesses), standing };
+      case 'handed-back': {
+        const to = this.params.get('to');
+        return {
+          ...base,
+          handedBackOverNetwork: to === 'network',
+          heldForDevice: to === 'held',
+          trail: trailAfterAgreement(HOLDER, witnesses),
+          standing,
+        };
+      }
       case 'refused': {
         const code = this.params.get('code') ?? 'consent_unavailable';
         return {
           ...base,
           refusalCode: code,
+          command: wayThroughFor(code, globalThis.location.href),
           refusalReason:
             code === 'consent_reauthentication_asked'
               ? (this.params.get('reason') ?? SAMPLE_REASON)

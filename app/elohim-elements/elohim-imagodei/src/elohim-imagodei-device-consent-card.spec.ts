@@ -518,6 +518,100 @@ describe('<elohim-imagodei-device-consent-card> — phases', () => {
     expect(q(el, '[part="message"]')!.textContent).to.include('terminal on this machine');
   });
 
+  describe('a host that takes no approvals: the way through', () => {
+    const LINK = 'https://doorway-alpha.elohim.host/threshold/consent/device?request=eyJhIjoxfQ';
+    const COMMAND = `epr device approve '${LINK}'`;
+
+    async function unavailable(command?: string) {
+      return fixture<ElohimImagodeiDeviceConsentCard>(html`
+        <elohim-imagodei-device-consent-card
+          .request=${ENROLL_ONLY}
+          phase="refused"
+          refusal-code="consent_unavailable"
+          .command=${command}
+        ></elohim-imagodei-device-consent-card>
+      `);
+    }
+
+    it('shows the command to run on a device that is already theirs, exactly, under the refusal', async () => {
+      const el = await unavailable(COMMAND);
+      expect(q(el, '[part="heading"]')!.textContent).to.include('Can’t approve here');
+      expect(q(el, '[part="way-through"]')!.textContent!.trim()).to.equal(
+        'Approve on a device that is already yours:'
+      );
+      expect(q(el, '[part="command"]')!.textContent!.trim()).to.equal(COMMAND);
+      expect(q(el, '[part="copy-command"]')!.textContent!.trim()).to.equal('Copy command');
+      expect(q(el, '[part="refusal-code"] code')!.textContent).to.equal('consent_unavailable');
+    });
+
+    it('shows no command when none was given', async () => {
+      const el = await unavailable();
+      expect(q(el, '[part="way-through"]')).to.equal(null);
+      expect(q(el, '[part="command"]')).to.equal(null);
+      expect(q(el, '[part="copy-command"]')).to.equal(null);
+    });
+
+    it('copies the command whole and fires command-copied', async () => {
+      const el = await unavailable(COMMAND);
+      const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      let written = '';
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: (t: string) => {
+            written = t;
+            return Promise.resolve();
+          },
+        },
+      });
+      try {
+        setTimeout(() => q(el, '[part="copy-command"]')!.click());
+        const ev = (await oneEvent(el, 'command-copied')) as CustomEvent<{ method: string }>;
+        expect(ev.detail.method).to.equal('clipboard');
+        expect(written).to.equal(COMMAND);
+      } finally {
+        if (original) Object.defineProperty(navigator, 'clipboard', original);
+        else delete (navigator as unknown as Record<string, unknown>).clipboard;
+      }
+    });
+
+    it('without a clipboard it selects the command instead', async () => {
+      const el = await unavailable(COMMAND);
+      const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+      try {
+        q(el, '[part="copy-command"]')!.click();
+        await aTimeout(0);
+        await el.updateComplete;
+        expect(getSelection()!.toString()).to.include(COMMAND);
+        expect(text(el)).to.include('The command is selected');
+      } finally {
+        if (original) Object.defineProperty(navigator, 'clipboard', original);
+        else delete (navigator as unknown as Record<string, unknown>).clipboard;
+      }
+    });
+  });
+
+  it('held for the device: done, it finishes joining on its own, with its key and nothing to copy', async () => {
+    const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
+      <elohim-imagodei-device-consent-card
+        .request=${ENROLL_ONLY}
+        phase="handed-back"
+        handed-back-to="held"
+      ></elohim-imagodei-device-consent-card>
+    `);
+    expect(q(el, '[part="heading"]')!.textContent).to.include('Done');
+    expect(plain(q(el, '[part="message"]')!.textContent!)).to.equal(
+      '“workspace” will finish joining on its own; nothing to copy.'
+    );
+    expect(q(el, '[part="fingerprint"][data-key="device"]')!.textContent!.trim()).to.equal(
+      'uhCAk…8f3a'
+    );
+    expect(q(el, '[part="code"]')).to.equal(null);
+    expect(q(el, '[part="copy"]')).to.equal(null);
+    expect(text(el)).not.to.include('terminal on this machine');
+  });
+
   it('heads a wait as a wait, not as a refusal', async () => {
     const el = await fixture<ElohimImagodeiDeviceConsentCard>(html`
       <elohim-imagodei-device-consent-card
@@ -615,6 +709,27 @@ describe('<elohim-imagodei-device-consent-card> — a11y precondition gate', () 
           .request=${ENROLL_ONLY}
           phase="refused"
           refusal-code="act_unknown"
+        ></elohim-imagodei-device-consent-card>
+      `,
+    ],
+    [
+      'refused with the way through',
+      () => html`
+        <elohim-imagodei-device-consent-card
+          .request=${ENROLL_ONLY}
+          phase="refused"
+          refusal-code="consent_unavailable"
+          command="epr device approve 'https://example.test/consent/device?request=e30'"
+        ></elohim-imagodei-device-consent-card>
+      `,
+    ],
+    [
+      'held for the device',
+      () => html`
+        <elohim-imagodei-device-consent-card
+          .request=${ENROLL_ONLY}
+          phase="handed-back"
+          handed-back-to="held"
         ></elohim-imagodei-device-consent-card>
       `,
     ],

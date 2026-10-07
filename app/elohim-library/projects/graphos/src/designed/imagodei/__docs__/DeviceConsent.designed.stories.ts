@@ -688,10 +688,21 @@ export const RefusedUnavailable: Story = {
           .request=${workspaceEnroll}
           phase="refused"
           refusal-code="consent_unavailable"
+          command="epr device approve 'https://alpha.elohim.host/threshold/consent/device?request=eyJjbGllbnRJZCI6ImVwci1jbGkifQ'"
         ></elohim-imagodei-device-consent-card>
       `,
       { footer: REFUSED_FOOTER }
     ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'This doorway takes no device approvals. Matthew learns it before signing in, not ' +
+          'after, and is shown the way through: run the same approval on a device that is ' +
+          'already his.',
+      },
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------

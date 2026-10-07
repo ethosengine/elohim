@@ -15,7 +15,8 @@ import type { ConsentViewResponse } from './wire.js';
 export type RememberedOutcome =
   | { phase: 'signing' }
   | { phase: 'code'; code?: string; expiresAt: number }
-  | { phase: 'handed-back' }
+  /** `to`: where the code went when it was not a terminal on this machine. */
+  | { phase: 'handed-back'; to?: 'network' | 'held' }
   | { phase: 'declined' }
   | { phase: 'refused'; code: string };
 

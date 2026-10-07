@@ -60,6 +60,7 @@ pub mod device_capacity;
 pub mod device_carrier; // the first device-consent carrier: asks over local discovery, decided on the approving node
 pub mod device_consent; // device recognition ceremony, node-local mount of `consent_grant` // Phase 4 T7 — available bytes helper
 pub mod device_consent_cell; // the controller cell the consent ceremony signs with, over this node's conductor
+pub mod device_consent_hold; // the held return path: asks shown or declined by state, for the terminal collecting with its verifier
 pub mod did_identity_store; // did:elohim assembly store — implements the did-bridge ElohimIdentityStore contract (spec §3.4)
 pub mod disposition_service;
 pub mod distribution;

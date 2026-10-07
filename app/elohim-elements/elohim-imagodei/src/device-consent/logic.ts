@@ -8,6 +8,7 @@
  */
 
 import { isSessionProofRefusal } from '../session-key/index.js';
+import { approveCommand } from '../terminal.js';
 
 import type { WitnessStep, WitnessStepState } from '../witness-step.js';
 import type {
@@ -187,6 +188,36 @@ export function failureFor(
   return unavailable;
 }
 
+/**
+ * A page nobody is signed in to asks the host first whether it takes device
+ * approvals at all, so a person is never sent through sign-in to a page that
+ * then cannot approve. The answer is read as {@link failureFor} reads it:
+ * whatever it calls unavailable (no answer, 404/501, a server error) is said
+ * now, before sign-in. Any other answer — 401, a 200, the node's own refusal —
+ * means this host takes approvals: sign in first, then review here as usual.
+ */
+export function beforeSignIn(result: ConsentWireResult<unknown>): ConsentFailure {
+  if (result.ok) return { kind: 'sign-in' };
+  const failure = failureFor(result);
+  return failure.kind === 'refused' && failure.code === REFUSAL.consentUnavailable
+    ? failure
+    : { kind: 'sign-in' };
+}
+
+/**
+ * The way through a refusal this host cannot get past: the same approval,
+ * run in the terminal of a device that is already the person's. Given only
+ * for `consent_unavailable` (this host takes no approvals), and only when the
+ * host gave the page's own link; none otherwise.
+ */
+// eslint-disable-next-line sonarjs/function-return-type -- a command or none: none when there is no way through to give
+export function wayThroughFor(
+  code: string | undefined,
+  link: string | undefined
+): string | undefined {
+  return code === REFUSAL.consentUnavailable && link ? approveCommand(link) : undefined;
+}
+
 /** Longest reason the node gives for asking the person to sign in again. */
 export const MAX_REASON_LENGTH = 280;
 
@@ -307,11 +338,14 @@ export type AgreementOutcome =
   | { phase: 'code'; code: string; expiresAt: number }
   /** Handed to a terminal on this machine at `url`, or delivered by the node itself (no url). */
   | { phase: 'handed-back'; url?: string }
+  /** The node holds the code until the asking device collects it: nothing to copy here. */
+  | { phase: 'held' }
   | { phase: 'refused'; code: string };
 
 export function outcomeForAgreement(response: ConsentAgreeResponse | null): AgreementOutcome {
   if (response?.delivered === true) return { phase: 'handed-back' };
   const target = response?.returnTarget;
+  if (target?.kind === 'held') return { phase: 'held' };
   if (target?.kind === 'display') {
     return typeof target.value === 'string' &&
       target.value.length > 0 &&

@@ -59,6 +59,8 @@ describe(`${TAG} custom-elements-manifest`, () => {
     'code',
     'expiresAt',
     'refusalCode',
+    'command',
+    'handedBackTo',
   ]) {
     it(`declares the ${name} property`, () => {
       const prop = decl.members?.find(m => m.kind === 'field' && m.name === name);
@@ -66,9 +68,9 @@ describe(`${TAG} custom-elements-manifest`, () => {
     });
   }
 
-  it('declares the four intent events', () => {
+  it('declares the intent events', () => {
     const names = (decl.events ?? []).map(e => e.name);
-    for (const ev of ['approve', 'decline', 'code-copied', 'expired']) {
+    for (const ev of ['approve', 'decline', 'code-copied', 'command-copied', 'expired']) {
       expect(names).to.include(ev);
     }
   });

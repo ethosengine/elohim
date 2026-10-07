@@ -90,6 +90,8 @@ export function approvalWords(holder: KeyHolderWords): ApprovalWords {
       signingOwnNode: signing,
       refusal: {
         act_unknown: `The device asked for something ${inSentence} doesn’t recognize, so there was nothing to approve.`,
+        // The page gives the way through below it: approve on a device that is already theirs.
+        [REFUSAL.consentUnavailable]: `${name} can’t take device approvals right now, so nothing was signed.`,
         consent_identity_unbootstrapped: `${name} hasn’t recorded who you are yet, so it can’t approve anything for you. Nothing is wrong with this request.`,
         consent_signing_unavailable: `${name} can’t reach its signer right now, so nothing was signed. This is a wait, not a refusal: come back to this link in a few minutes and approve again.`,
         consent_caller_not_local: holder.callerNotLocal ?? CALLER_NOT_LOCAL,

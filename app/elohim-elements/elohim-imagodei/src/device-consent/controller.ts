@@ -14,14 +14,18 @@
  *
  * The host supplies everything host-specific through the options: how to
  * reach the node (the client), what the key holder is called in the trail,
- * how to send the person to sign in and back, and how to leave for a
- * terminal. The host renders `state` with the consent card and the witness
+ * how to send the person to sign in and back, how to leave for a terminal,
+ * and the page's own link. A host that knows nobody is signed in calls
+ * {@link DeviceConsentController.startBeforeSignIn} instead of `start`: the
+ * host is asked whether it takes approvals at all before the person is sent
+ * through sign-in, so sign-in never leads to a dead end. The host renders `state` with the consent card and the witness
  * trail; `onChange` fires after every change.
  */
 
 import {
   NODE_CODE,
   REFUSAL,
+  beforeSignIn,
   decodeConsentRequest,
   failureFor,
   isShowableView,
@@ -32,6 +36,7 @@ import {
   signInMayHelp,
   standingFor,
   trailAfterAgreement,
+  wayThroughFor,
   type ApprovalStanding,
   type KeyHolderStep,
 } from './logic.js';
@@ -69,6 +74,16 @@ export interface DeviceConsentPageState {
   refusalReason?: string;
   /** Phase `handed-back`: the node delivered the code over a private network itself. */
   handedBackOverNetwork?: boolean;
+  /**
+   * Phase `handed-back`: the node holds the code, and the asking device
+   * collects it itself — it finishes joining on its own, nothing to copy.
+   */
+  heldForDevice?: boolean;
+  /**
+   * Phase `refused`, when this host takes no approvals: the same approval as
+   * a terminal command, to run on a device that is already the person's.
+   */
+  command?: string;
   /** Who secured the approval: live while signing, settled once it is done. */
   trail: WitnessStep[] | null;
   /** What the approval rests on, as the node counted it. */
@@ -91,6 +106,12 @@ export interface DeviceConsentControllerOptions {
   signIn: () => void;
   /** Hand the code to the asking terminal's listener on this machine (top-level navigation). */
   handBack: (url: string) => void;
+  /**
+   * This page's own full link, read when it is needed. Given, a host that
+   * takes no approvals shows it as `epr device approve '<link>'`, the way
+   * through on a device that is already the person's.
+   */
+  link?: () => string;
   onChange: (state: DeviceConsentPageState) => void;
   /** Where this tab remembers the answer. Defaults to sessionStorage. */
   memory?: ConsentMemory;
@@ -147,6 +168,29 @@ export class DeviceConsentController {
     await this.loadView();
   }
 
+  /**
+   * The page knows nobody is signed in here. Before sending the person to
+   * sign in, ask the host whether it takes device approvals at all: if it
+   * does not, say so now, with the way through, instead of after sign-in.
+   * If it does, sign in and come straight back, where {@link start} runs.
+   * An unreadable link is said now too; signing in would not change it.
+   */
+  async startBeforeSignIn(): Promise<void> {
+    const decoded = decodeConsentRequest(this.requestParam);
+    if (!decoded.ok) {
+      this.refuse(decoded.code, false);
+      return;
+    }
+    this.request = decoded.request;
+    const result = await this.options.client.view(decoded.request).catch(() => NO_ANSWER);
+    const next = beforeSignIn(result);
+    if (next.kind === 'sign-in') {
+      this.sendToSignIn();
+      return;
+    }
+    this.refuse(next.code, false);
+  }
+
   async approve(approval: DeviceConsentApproval): Promise<void> {
     const request = this.request;
     if (this.current.phase !== 'review' || !request || approval.agreedActs.length === 0) return;
@@ -190,8 +234,12 @@ export class DeviceConsentController {
       this.remember({ phase: CODE, code: outcome.code, expiresAt: outcome.expiresAt });
     } else if (outcome.phase === HANDED_BACK) {
       this.set({ phase: HANDED_BACK, handedBackOverNetwork: !outcome.url });
-      this.remember({ phase: HANDED_BACK });
+      this.remember(outcome.url ? { phase: HANDED_BACK } : { phase: HANDED_BACK, to: 'network' });
       if (outcome.url) this.options.handBack(outcome.url);
+    } else if (outcome.phase === 'held') {
+      // The asking device collects the code from the node itself.
+      this.set({ phase: HANDED_BACK, heldForDevice: true });
+      this.remember({ phase: HANDED_BACK, to: 'held' });
     } else {
       this.refuse(outcome.code);
     }
@@ -212,12 +260,13 @@ export class DeviceConsentController {
         phase: 'review',
         refusalCode: undefined,
         refusalReason: undefined,
+        command: undefined,
         trail: null,
         standing: null,
       });
       return;
     }
-    this.set({ phase: 'loading', refusalCode: undefined, trail: null });
+    this.set({ phase: 'loading', refusalCode: undefined, command: undefined, trail: null });
     await this.loadView();
   }
 
@@ -282,6 +331,12 @@ export class DeviceConsentController {
         this.set({ phase: CODE, code: outcome.code, expiresAt: outcome.expiresAt });
         return;
       case HANDED_BACK:
+        this.set({
+          phase: HANDED_BACK,
+          handedBackOverNetwork: outcome.to === 'network',
+          heldForDevice: outcome.to === 'held',
+        });
+        return;
       case 'declined':
         this.set({ phase: outcome.phase });
         return;
@@ -303,7 +358,8 @@ export class DeviceConsentController {
   }
 
   private refuse(code: string, remember = true, reason?: string): void {
-    this.set({ phase: 'refused', refusalCode: code, refusalReason: reason });
+    const command = wayThroughFor(code, this.options.link?.());
+    this.set({ phase: 'refused', refusalCode: code, refusalReason: reason, command });
     if (remember) this.remember({ phase: 'refused', code });
   }
 

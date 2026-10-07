@@ -291,6 +291,19 @@ lazy_static! {
     )
     .unwrap();
 
+    /// A collect of a held consent (`POST /auth/consent/collect`) that did not
+    /// match the ask it named. Nothing is spent and nobody is locked out: a
+    /// budget would let whoever holds the link deny the real terminal. label
+    /// field: "verifier" | "client" | "device".
+    pub static ref CONSENT_COLLECT_MISMATCHES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_consent_collect_mismatch_total",
+            "Collects of a held device consent refused for a verifier, client or device mismatch.",
+        ),
+        &["field"],
+    )
+    .unwrap();
+
     /// The peer's deliverability verdict per judged app head (spec 2026-09-05
     /// §5.3). label reason is the reason CLASS ("missing-asset", "invalid-zip",
     /// "no-index", "none") — never the asset name, which is unbounded.
@@ -3145,6 +3158,7 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(APP_DELIVERABILITY_VERDICTS.clone()));
+        let _ = REGISTRY.register(Box::new(CONSENT_COLLECT_MISMATCHES.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_UNVERIFIED_BINDINGS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_JOINS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_BINDINGS_EXAMINED.clone()));

@@ -51,6 +51,9 @@ const agreed = (partial: Partial<ConsentAgreeResponse>): ConsentAgreeResponse =>
 /** The doorway's mount of the shared approval page: sign-in first, words, selectors. */
 describe('DeviceConsentComponent', () => {
   let signedIn: boolean;
+  /** The sign-in check still running when the page opens; `init` settles it. */
+  let loading: boolean;
+  let initSignsIn: boolean;
   let consent: {
     view: ReturnType<typeof vi.fn>;
     agree: ReturnType<typeof vi.fn>;
@@ -79,6 +82,11 @@ describe('DeviceConsentComponent', () => {
         {
           provide: AuthStateService,
           useValue: {
+            isLoading: () => loading,
+            init: vi.fn(async () => {
+              loading = false;
+              signedIn = initSignsIn;
+            }),
             isAuthenticated: () => signedIn,
             account: () => (signedIn ? { identifier: 'matthew' } : null),
           },
@@ -110,6 +118,8 @@ describe('DeviceConsentComponent', () => {
     refusalCode?: string;
     personLabel?: string;
     signer?: string;
+    command?: string;
+    handedBackTo?: string;
   } {
     return fixture.nativeElement.querySelector('[data-testid="device-consent-card"]');
   }
@@ -125,6 +135,8 @@ describe('DeviceConsentComponent', () => {
   beforeEach(() => {
     sessionStorage.clear();
     signedIn = true;
+    loading = false;
+    initSignsIn = true;
     consent = {
       view: vi.fn().mockResolvedValue(ok(VIEW)),
       agree: vi.fn(),
@@ -139,11 +151,8 @@ describe('DeviceConsentComponent', () => {
 
   afterEach(() => sessionStorage.clear());
 
-  describe('sign-in first', () => {
-    it('sends a signed-out person to sign in and back to this exact page', () => {
-      signedIn = false;
-      const fixture = create();
-
+  describe('before sign-in: does this doorway take approvals at all?', () => {
+    function sentToSignIn() {
       expect(router.createUrlTree).toHaveBeenCalledWith(['/login'], {
         queryParams: { returnUrl: PAGE_URL },
       });
@@ -151,11 +160,80 @@ describe('DeviceConsentComponent', () => {
         commands: ['/login'],
         extras: { queryParams: { returnUrl: PAGE_URL } },
       });
-      // Nothing about the request is fetched or shown before sign-in.
-      expect(consent.view).not.toHaveBeenCalled();
-      expect(card(fixture)).toBeNull();
+    }
+
+    it('when it takes approvals (401): sends the person to sign in and back to this exact page', async () => {
+      signedIn = false;
+      consent.view.mockResolvedValue(refusal(401));
+      const fixture = create();
+      // The doorway is asked first, with the request exactly as the link carried it.
+      expect(consent.view).toHaveBeenCalledWith(GRANT_REQUEST);
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      await ready(fixture);
+
+      sentToSignIn();
+      expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+      // Nothing about the request is shown before sign-in.
+      expect(card(fixture).phase).toBe('refused');
+      expect(card(fixture).refusalCode).toBe('consent_not_signed_in');
+      expect(card(fixture).request?.label).toBe('');
+      expect(card(fixture).command).toBeUndefined();
     });
 
+    it('a 200 says only that approvals are taken here: still sign in first, review nothing', async () => {
+      signedIn = false;
+      const fixture = create();
+      await ready(fixture);
+
+      sentToSignIn();
+      expect(card(fixture).phase).not.toBe('review');
+      expect(card(fixture).request?.label).toBe('');
+      expect(card(fixture).personLabel).toBeUndefined();
+    });
+
+    it.each([
+      ['answers 404 (no consent routes)', () => Promise.resolve(refusal(404))],
+      ['does not answer', () => Promise.reject(new Error('offline'))],
+    ])(
+      'when it %s: says so now, with the way through, and never sends to sign-in',
+      async (_label, answer) => {
+        signedIn = false;
+        consent.view.mockImplementation(answer);
+        const fixture = create();
+        await ready(fixture);
+
+        expect(router.navigateByUrl).not.toHaveBeenCalled();
+        expect(card(fixture).phase).toBe('refused');
+        expect(card(fixture).refusalCode).toBe('consent_unavailable');
+        expect(card(fixture).command).toBe(`epr device approve '${globalThis.location.href}'`);
+        expect(consent.agree).not.toHaveBeenCalled();
+      }
+    );
+
+    it('refuses an unreadable link now, asking nobody and sending nobody to sign in', async () => {
+      signedIn = false;
+      const fixture = create('!!!');
+      await ready(fixture);
+
+      expect(consent.view).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(card(fixture).refusalCode).toBe('request_unreadable');
+    });
+
+    it('waits for the sign-in check before deciding, and reviews when it finds a session', async () => {
+      signedIn = false;
+      loading = true;
+      initSignsIn = true;
+      const fixture = create();
+      await ready(fixture);
+
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(card(fixture).phase).toBe('review');
+      expect(card(fixture).personLabel).toBe('matthew');
+    });
+  });
+
+  describe('sign-in first', () => {
     it('fetches the request only once signed in, and shows it for review', async () => {
       const fixture = create();
       expect(consent.view).toHaveBeenCalledWith(GRANT_REQUEST);
@@ -202,12 +280,13 @@ describe('DeviceConsentComponent', () => {
       expect(card(fixture).refusalCode).toBe('request_acts_incoherent');
     });
 
-    it('says approvals are unavailable when this doorway lacks the endpoint', async () => {
+    it('says approvals are unavailable when this doorway lacks the endpoint, with the way through', async () => {
       consent.view.mockResolvedValue(refusal(404));
       const fixture = create();
       await ready(fixture);
 
       expect(card(fixture).refusalCode).toBe('consent_unavailable');
+      expect(card(fixture).command).toBe(`epr device approve '${globalThis.location.href}'`);
     });
   });
 
@@ -249,6 +328,21 @@ describe('DeviceConsentComponent', () => {
 
       expect(card(fixture).phase).toBe('handed-back');
       expect(consent.handBack).toHaveBeenCalledWith(url);
+    });
+
+    it('when the doorway holds the code for the device: done, nothing to copy or hand back', async () => {
+      consent.agree.mockResolvedValue(ok(agreed({ returnTarget: { kind: 'held' } })));
+      const fixture = create();
+      await ready(fixture);
+
+      approve(fixture, ['device.enroll']);
+      await ready(fixture);
+
+      expect(card(fixture).phase).toBe('handed-back');
+      expect(card(fixture).handedBackTo).toBe('held');
+      expect(card(fixture).request).toEqual(VIEW);
+      expect(card(fixture).code).toBeUndefined();
+      expect(consent.handBack).not.toHaveBeenCalled();
     });
 
     it('never follows a redirect to anywhere but this machine’s terminal', async () => {

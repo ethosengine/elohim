@@ -21,6 +21,10 @@
 //!   and a one-time code is held for the terminal.
 //! - `redeem`: the terminal collects the signed consent and the signed
 //!   enrollment it completes on its own cell.
+//! - `collect`: the same, for a terminal that asked this node to hold its
+//!   code (`returnPath: {kind: "hold"}`): it presents its verifier and the
+//!   request's state instead of a code, and is told to wait until the person
+//!   has answered (`device_consent_hold`).
 //!
 //! Two more for the person's identity on this node:
 //!
@@ -38,10 +42,10 @@
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use consent_grant::{
-    admit_request, attend, check_delivered, issue, redeem, AdmittedRequest, AgreedView,
+    admit_request, attend, check_delivered, issue, redeem, AdmittedRequest, AgreedView, Collection,
     ConsentRecord, ConsentSignature, ConsentView, ControllerProof, ControllerStanding, Delivered,
     Enrollment, EnrollmentIntent, GrantPolicy, GrantRequest, MemoryStore, Redemption, RequestedAct,
-    SignedConsent, SignerRole, StandingView, WitnessBeat,
+    ReturnPath, SignedConsent, SignerRole, StandingView, WitnessBeat,
 };
 use http_body_util::Full;
 use hyper::body::Bytes;
@@ -49,6 +53,7 @@ use hyper::{header, HeaderMap, Response, StatusCode};
 use serde::Deserialize;
 use tracing::warn;
 
+use super::device_consent_hold::{AskStates, NothingHeld, Settled};
 use super::response;
 
 /// The relying parties this node will show a consent screen for. The `epr`
@@ -60,7 +65,7 @@ pub(crate) fn policy() -> GrantPolicy {
 }
 
 /// How long a code waits for the terminal: five minutes.
-const CODE_TTL_MICROS: i64 = 5 * 60 * 1_000_000;
+pub(crate) const CODE_TTL_MICROS: i64 = 5 * 60 * 1_000_000;
 
 /// A refusal on its way out, boxed because a response is large to carry in an
 /// error.
@@ -87,14 +92,21 @@ fn parse<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, Refused> {
 }
 
 /// What the consent screen shows for a terminal's request, or why the request
-/// is not fit to show a person. Reads nothing and writes nothing.
-pub fn consent_view(body: &[u8]) -> Response<Full<Bytes>> {
+/// is not fit to show a person. Reads nothing. When the terminal asked this
+/// node to hold its code, the ask is remembered as shown for the code's
+/// window, only so the terminal collecting meanwhile is told to wait.
+pub fn consent_view(states: &AskStates, body: &[u8], now_micros: i64) -> Response<Full<Bytes>> {
     let request: GrantRequest = match parse(body) {
         Ok(r) => r,
         Err(refused) => return *refused,
     };
     match admit_request(&request, &policy()) {
-        Ok(admitted) => response::ok(&ConsentView::of(&admitted)),
+        Ok(admitted) => {
+            if request.return_path == ReturnPath::Hold {
+                states.shown(&request.state, now_micros);
+            }
+            response::ok(&ConsentView::of(&admitted))
+        }
         Err(r) => refusal(
             StatusCode::BAD_REQUEST,
             "the request cannot be shown for consent",
@@ -123,6 +135,129 @@ pub fn redeem_code(store: &MemoryStore, body: &[u8], now_micros: i64) -> Respons
             r.code(),
         ),
     }
+}
+
+/// Hand the terminal that asked this node to hold its code the signed consent
+/// held for its state, once, when it presents its verifier. Until the person
+/// answers, it is told how long it may keep waiting. Once it is told the ask
+/// was spent, declined or expired, every later collect is told the same until
+/// this node forgets the ask. A wrong verifier, client or device spends
+/// nothing and locks nobody out; it is counted and logged.
+pub fn collect_held(
+    states: &AskStates,
+    store: &MemoryStore,
+    body: &[u8],
+    now_micros: i64,
+) -> Response<Full<Bytes>> {
+    use consent_grant::CollectionRefusal as R;
+    let collection: Collection = match serde_json::from_slice(body) {
+        Ok(c) => c,
+        Err(e) => return response::bad_request(&format!("Invalid JSON: {e}")),
+    };
+    let state = collection.state.as_str();
+    let gone = |told: NothingHeld| match told {
+        NothingHeld::Declined => refusal(
+            StatusCode::GONE,
+            "the person said no; nothing was signed",
+            "consent_declined",
+        ),
+        NothingHeld::Spent => refusal(
+            StatusCode::GONE,
+            "what was held for this ask has already been collected",
+            "consent_spent",
+        ),
+        _ => refusal(
+            StatusCode::GONE,
+            "the ask was not answered, or not collected, in time; ask again",
+            "consent_expired",
+        ),
+    };
+    // A terminal answer, once given, is given again until it is forgotten,
+    // whatever the store holds by now.
+    let remembered = states.answer(state, now_micros);
+    if remembered.is_terminal() {
+        return gone(remembered);
+    }
+    // Collect before sweeping, so a delivery past its window is named expired.
+    let outcome = store.collect(&collection, now_micros);
+    // bounded-work: see `redeem_code`.
+    store.sweep(now_micros);
+    let settled = |answer: Settled, told: NothingHeld| {
+        states.settle(state, answer, now_micros);
+        gone(told)
+    };
+    match outcome {
+        Ok(delivered) => {
+            states.settle(state, Settled::Spent, now_micros);
+            response::ok(&delivered)
+        }
+        Err(R::StateUnknown) => match remembered {
+            NothingHeld::Waiting { seconds_left } => response::json_response(
+                StatusCode::ACCEPTED,
+                &serde_json::json!({ "status": "waiting", "secondsLeft": seconds_left }),
+            ),
+            _ => refusal(
+                StatusCode::NOT_FOUND,
+                "this node holds nothing and has shown nothing for that ask; open the link on a \
+                 device that is already yours, or ask again",
+                "consent_unknown",
+            ),
+        },
+        Err(R::NotHeld) => refusal(
+            StatusCode::NOT_FOUND,
+            "this node holds nothing and has shown nothing for that ask; open the link on a \
+             device that is already yours, or ask again",
+            "consent_unknown",
+        ),
+        Err(R::AlreadyCollected) => settled(Settled::Spent, NothingHeld::Spent),
+        Err(R::Expired) => settled(Settled::Expired, NothingHeld::Expired),
+        Err(r @ (R::ClientMismatch | R::DeviceMismatch | R::VerifierMismatch)) => {
+            let field = match r {
+                R::ClientMismatch => "client",
+                R::DeviceMismatch => "device",
+                _ => "verifier",
+            };
+            crate::metrics::CONSENT_COLLECT_MISMATCHES
+                .with_label_values(&[field])
+                .inc();
+            warn!(
+                field,
+                code = r.code(),
+                "device consent: a collect did not match the ask it named; nothing was spent"
+            );
+            refusal(
+                StatusCode::FORBIDDEN,
+                "this is not the terminal that asked; nothing was handed over and nothing was spent",
+                "verifier_mismatch",
+            )
+        }
+    }
+}
+
+/// Remember that the person declined the ask with `state`, when `answer` (an
+/// authenticated decision on a waiting ask) says they did, and pass the answer
+/// on unchanged.
+pub async fn note_declined(
+    states: &AskStates,
+    state: Option<String>,
+    answer: Response<Full<Bytes>>,
+    now_micros: i64,
+) -> Response<Full<Bytes>> {
+    use http_body_util::BodyExt;
+    let Some(state) = state.filter(|_| answer.status() == StatusCode::OK) else {
+        return answer;
+    };
+    let (parts, body) = answer.into_parts();
+    let bytes = match body.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(never) => match never {},
+    };
+    let declined = serde_json::from_slice::<serde_json::Value>(&bytes)
+        .is_ok_and(|v| v.get("declined") == Some(&serde_json::Value::Bool(true)));
+    if declined {
+        states.declined(&state, now_micros);
+    }
+    Response::from_parts(parts, Full::new(bytes))
 }
 
 // =============================================================================
@@ -448,6 +583,32 @@ pub async fn agree(
         Ok(view) => response::ok(&view),
         Err(refused) => *refused,
     }
+}
+
+/// Whether a caller with no session acts as the person: a caller on this
+/// node's own machine does, when the node holds a person (its cell's standing
+/// is ready), with no session row at all (dial 1 of the device-recognition
+/// backlog). A node nobody has ever signed in to, its identity begun by
+/// declaration, is approved on from its own terminal this way. A caller from
+/// elsewhere never is: it needs a session proven by sign-in.
+pub async fn local_caller_acts_as_person(
+    caller_is_local: bool,
+    cell: Option<&dyn ControllerCell>,
+) -> bool {
+    if !caller_is_local {
+        return false;
+    }
+    let Some(cell) = cell else {
+        return false;
+    };
+    let holds_a_person = matches!(cell.standing().await, Ok(CellStanding::Ready(_)));
+    if holds_a_person {
+        static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            tracing::info!("a caller on this machine acts as the person with no session (dial 1)");
+        }
+    }
+    holds_a_person
 }
 
 fn not_signed_in_to_approve() -> Response<Full<Bytes>> {
@@ -1105,7 +1266,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn the_view_names_the_device_and_what_it_asks() {
         let body = serde_json::to_vec(&request()).unwrap();
-        let (status, view) = json(consent_view(&body)).await;
+        let (status, view) = json(consent_view(&AskStates::new(), &body, NOW)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(view["label"], "workspace");
         assert_eq!(view["askedActs"][0], "device.enroll");
@@ -1117,17 +1278,27 @@ pub(crate) mod tests {
     async fn an_unfit_request_is_refused_by_name() {
         let mut bad = request();
         bad.client_id = "stranger".into();
-        let (status, body) = json(consent_view(&serde_json::to_vec(&bad).unwrap())).await;
+        let (status, body) = json(consent_view(
+            &AskStates::new(),
+            &serde_json::to_vec(&bad).unwrap(),
+            NOW,
+        ))
+        .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "request_client_unknown");
 
         let mut unknown = serde_json::to_value(request()).unwrap();
         unknown["acts"] = serde_json::json!(["content.publish"]);
-        let (status, body) = json(consent_view(&serde_json::to_vec(&unknown).unwrap())).await;
+        let (status, body) = json(consent_view(
+            &AskStates::new(),
+            &serde_json::to_vec(&unknown).unwrap(),
+            NOW,
+        ))
+        .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "act_unknown");
 
-        let (status, _) = json(consent_view(b"not json")).await;
+        let (status, _) = json(consent_view(&AskStates::new(), b"not json", NOW)).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
@@ -1667,6 +1838,334 @@ pub(crate) mod tests {
             &store,
             &serde_json::to_vec(&new).unwrap(),
             NOW + 1,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn a_terminal_on_this_machine_approves_with_no_session_when_the_node_holds_a_person() {
+        // A node nobody has ever signed in to: no session row, so not signed in.
+        let session = false;
+        let cell = FakeCell::new(Ok(ready()));
+        let signed_in = session || local_caller_acts_as_person(true, Some(&cell)).await;
+        assert!(signed_in);
+        let store = MemoryStore::new();
+        let body = agree_body(&request(), &["device.enroll"]);
+        let (status, agreed) =
+            json(agree(&store, Some(&cell), &Unattended, signed_in, &body, NOW).await).await;
+        assert_ne!(agreed["code"], "consent_not_signed_in", "{agreed}");
+        assert_eq!(status, StatusCode::OK, "{agreed}");
+
+        // From another machine, or on a node that holds nobody yet, or with no
+        // conductor, nothing changes: the person must sign in.
+        assert!(!local_caller_acts_as_person(false, Some(&cell)).await);
+        assert!(!local_caller_acts_as_person(true, None).await);
+        for standing in [
+            Ok(CellStanding::NoPerson),
+            Ok(CellStanding::Unbootstrapped {
+                identity_root: IDENTITY.into(),
+            }),
+            Err(CellFailure::Unavailable("down".into())),
+        ] {
+            let cell = FakeCell::new(standing);
+            assert!(!local_caller_acts_as_person(true, Some(&cell)).await);
+        }
+        let (status, refused) =
+            json(agree(&store, Some(&cell), &Unattended, false, &body, NOW).await).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(refused["code"], "consent_not_signed_in");
+    }
+
+    // --- the held return path ---------------------------------------------
+
+    /// A terminal that asks this node to hold its code.
+    fn hold_request() -> GrantRequest {
+        let mut r = request();
+        r.return_path = ReturnPath::Hold;
+        r.state = "h".repeat(32);
+        r
+    }
+
+    fn collection() -> consent_grant::Collection {
+        consent_grant::Collection {
+            state: hold_request().state,
+            code_verifier: VERIFIER.into(),
+            client_id: "epr-cli".into(),
+            device_key: AGENT.into(),
+        }
+    }
+
+    fn collect_at(
+        states: &AskStates,
+        store: &MemoryStore,
+        c: &consent_grant::Collection,
+        now: i64,
+    ) -> Response<Full<Bytes>> {
+        collect_held(states, store, &serde_json::to_vec(c).unwrap(), now)
+    }
+
+    async fn agree_held_at(store: &MemoryStore, now: i64) -> serde_json::Value {
+        let cell = FakeCell::new(Ok(ready()));
+        let body = agree_body(&hold_request(), &["device.enroll"]);
+        let (status, agreed) =
+            json(agree(store, Some(&cell), &Unattended, true, &body, now).await).await;
+        assert_eq!(status, StatusCode::OK, "{agreed}");
+        agreed
+    }
+
+    #[tokio::test]
+    async fn a_held_consent_is_collected_as_redeem_would_hand_it_over() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let agreed = agree_held_at(&store, NOW).await;
+        // The person is told the device finishes on its own: nothing to carry.
+        assert_eq!(agreed["returnTarget"], serde_json::json!({"kind": "held"}));
+
+        let (status, collected) = json(collect_at(&states, &store, &collection(), NOW + 1)).await;
+        assert_eq!(status, StatusCode::OK, "{collected}");
+
+        // The same body a redeem of a pasted code hands over.
+        let pasted = MemoryStore::new();
+        let (_, agreed_paste) = agree_with(
+            &pasted,
+            &FakeCell::new(Ok(ready())),
+            &agree_body(&request(), &["device.enroll"]),
+        )
+        .await;
+        let mut r = redemption();
+        r.code = pasted_code(&agreed_paste);
+        let (_, redeemed) = json(redeem_code(
+            &pasted,
+            &serde_json::to_vec(&r).unwrap(),
+            NOW + 1,
+        ))
+        .await;
+        let keys =
+            |v: &serde_json::Value| v.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+        assert_eq!(keys(&collected), keys(&redeemed));
+        assert_eq!(collected["cid"], agreed["consentCid"]);
+        assert_eq!(collected["signatures"], redeemed["signatures"]);
+        assert_eq!(collected["enrollment"], redeemed["enrollment"]);
+        assert_eq!(collected["record"]["agreedActs"][0], "device.enroll");
+
+        // Collected once: a second collect is told it was spent.
+        let (status, again) = json(collect_at(&states, &store, &collection(), NOW + 2)).await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(again["code"], "consent_spent");
+    }
+
+    #[tokio::test]
+    async fn a_wrong_verifier_gets_nothing_and_spends_nothing() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        agree_held_at(&store, NOW).await;
+        let mut stranger = collection();
+        stranger.code_verifier = "x".repeat(43);
+        let mut other_device = collection();
+        other_device.device_key = AGENT_OTHER_NODE.into();
+        let mut other_client = collection();
+        other_client.client_id = "stranger".into();
+        for wrong in [stranger, other_device, other_client] {
+            let (status, refused) = json(collect_at(&states, &store, &wrong, NOW + 1)).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{wrong:?}");
+            assert_eq!(refused["code"], "verifier_mismatch");
+        }
+        // The real terminal still collects.
+        let (status, _) = json(collect_at(&states, &store, &collection(), NOW + 2)).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn an_ask_nobody_has_seen_is_unknown_and_an_empty_body_is_malformed() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let (status, refused) = json(collect_at(&states, &store, &collection(), NOW)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(refused["code"], "consent_unknown");
+        // `{}` is how a terminal asks whether this node collects at all.
+        let (status, _) = json(collect_held(&states, &store, b"{}", NOW)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        // A pasted code's delivery is not collected by state.
+        let pasted = store_after_agreement();
+        let mut by_state = collection();
+        by_state.state = request().state;
+        let (status, refused) = json(collect_at(&states, &pasted, &by_state, NOW + 1)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(refused["code"], "consent_unknown");
+    }
+
+    #[tokio::test]
+    async fn a_shown_ask_waits_for_the_person_then_expires() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let body = serde_json::to_vec(&hold_request()).unwrap();
+        let (status, _) = json(consent_view(&states, &body, NOW)).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, waiting) =
+            json(collect_at(&states, &store, &collection(), NOW + 1_500_000)).await;
+        assert_eq!(status, StatusCode::ACCEPTED);
+        assert_eq!(
+            waiting,
+            serde_json::json!({"status": "waiting", "secondsLeft": 299})
+        );
+        // Shown but never answered.
+        let (status, refused) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            NOW + CODE_TTL_MICROS,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(refused["code"], "consent_expired");
+
+        // A paste ask shown is not remembered: nobody collects it by state.
+        let paste_states = AskStates::new();
+        let paste = serde_json::to_vec(&request()).unwrap();
+        let _ = consent_view(&paste_states, &paste, NOW);
+        assert!(paste_states.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_held_consent_past_its_window_is_expired() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let body = serde_json::to_vec(&hold_request()).unwrap();
+        let _ = consent_view(&states, &body, NOW);
+        agree_held_at(&store, NOW).await;
+        // Showing the ask again does not disturb what was issued.
+        let _ = consent_view(&states, &body, NOW + 1);
+        let (status, refused) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            NOW + CODE_TTL_MICROS,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(refused["code"], "consent_expired");
+        // Asked again after the delivery is gone, still expired, not unknown.
+        let (status, refused) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            NOW + CODE_TTL_MICROS + 1,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(refused["code"], "consent_expired");
+    }
+
+    #[tokio::test]
+    async fn a_terminal_answer_is_given_again_and_never_reverts_to_waiting() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let view = serde_json::to_vec(&hold_request()).unwrap();
+        agree_held_at(&store, NOW).await;
+        // The link is opened late in the delivery's window, so the wait it
+        // starts outlasts the delivery: the delivery's expiry must stand.
+        let _ = consent_view(&states, &view, NOW + 200_000_000);
+        let expired_at = NOW + CODE_TTL_MICROS;
+        for later in [0, 1, 60_000_000] {
+            let (status, refused) = json(collect_at(
+                &states,
+                &store,
+                &collection(),
+                expired_at + later,
+            ))
+            .await;
+            assert_eq!(status, StatusCode::GONE, "+{later}");
+            assert_eq!(refused["code"], "consent_expired", "+{later}");
+        }
+        // Reopening the link after the window revives nothing.
+        let _ = consent_view(&states, &view, expired_at + 61_000_000);
+        let (_, refused) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            expired_at + 62_000_000,
+        ))
+        .await;
+        assert_eq!(refused["code"], "consent_expired");
+
+        // Spent stays spent after the delivery itself is swept away.
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        agree_held_at(&store, NOW).await;
+        let (status, _) = json(collect_at(&states, &store, &collection(), NOW + 1)).await;
+        assert_eq!(status, StatusCode::OK);
+        let _ = consent_view(&states, &view, NOW + 2);
+        store.sweep(NOW + CODE_TTL_MICROS);
+        assert!(store.is_empty());
+        for at in [NOW + 2, NOW + CODE_TTL_MICROS] {
+            let (status, refused) = json(collect_at(&states, &store, &collection(), at)).await;
+            assert_eq!(status, StatusCode::GONE);
+            assert_eq!(refused["code"], "consent_spent");
+        }
+        // Forgotten one window after it was given.
+        let (status, _) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            NOW + 1 + CODE_TTL_MICROS,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_declined_ask_is_told_so_for_its_window() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        let _ = consent_view(&states, &serde_json::to_vec(&hold_request()).unwrap(), NOW);
+        let decided = |declined: bool| {
+            response::ok(&serde_json::json!({ "number": 1, "declined": declined }))
+        };
+        // An agreement is passed on and remembered as nothing.
+        let passed = note_declined(&states, Some(hold_request().state), decided(false), NOW).await;
+        assert_eq!(passed.status(), StatusCode::OK);
+        let (status, _) = json(collect_at(&states, &store, &collection(), NOW + 1)).await;
+        assert_eq!(status, StatusCode::ACCEPTED);
+
+        let (status, answer) =
+            json(note_declined(&states, Some(hold_request().state), decided(true), NOW + 2).await)
+                .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(answer["declined"], true);
+        let (status, refused) = json(collect_at(&states, &store, &collection(), NOW + 3)).await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(refused["code"], "consent_declined");
+        let (_, refused) = json(collect_at(
+            &states,
+            &store,
+            &collection(),
+            NOW + 2 + CODE_TTL_MICROS,
+        ))
+        .await;
+        assert_eq!(refused["code"], "consent_unknown");
+    }
+
+    #[tokio::test]
+    async fn agreeing_again_leaves_only_the_newest_held_consent_to_collect() {
+        let store = MemoryStore::new();
+        let states = AskStates::new();
+        agree_held_at(&store, NOW).await;
+        let second = agree_held_at(&store, NOW + 10).await;
+        assert_eq!(store.len(), 1);
+        let (status, collected) = json(collect_at(&states, &store, &collection(), NOW + 11)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(collected["cid"], second["consentCid"]);
+        // The newest window applies: past the first's, before the second's.
+        let fresh = MemoryStore::new();
+        let states = AskStates::new();
+        agree_held_at(&fresh, NOW).await;
+        agree_held_at(&fresh, NOW + 10).await;
+        let (status, _) = json(collect_at(
+            &states,
+            &fresh,
+            &collection(),
+            NOW + CODE_TTL_MICROS + 5,
         ))
         .await;
         assert_eq!(status, StatusCode::OK);

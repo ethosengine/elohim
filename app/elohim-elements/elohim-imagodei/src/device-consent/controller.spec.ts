@@ -83,7 +83,7 @@ describe('DeviceConsentController — the approval page both portals mount', () 
     agreeResult = async () => ok(answer());
   });
 
-  function page(param: string | null = PARAM) {
+  function page(param: string | null = PARAM, link?: () => string) {
     const states: DeviceConsentPageState[] = [];
     const client: DeviceConsentClient = {
       view: async request => {
@@ -100,6 +100,7 @@ describe('DeviceConsentController — the approval page both portals mount', () 
       holder: { relation: 'this-device' },
       client,
       memory,
+      link,
       signIn: () => {
         calls.signIn++;
       },
@@ -159,6 +160,65 @@ describe('DeviceConsentController — the approval page both portals mount', () 
     });
   });
 
+  describe('before sign-in — does this host take approvals at all?', () => {
+    const LINK = `https://doorway-alpha.elohim.host/threshold/consent/device?request=${PARAM}`;
+
+    it('on 404: says so now, with the way through, and never sends the person to sign in', async () => {
+      viewResult = async () => refused(404);
+      const { controller } = page(PARAM, () => LINK);
+      await controller.startBeforeSignIn();
+
+      expect(calls.view).to.deep.equal([GRANT_REQUEST]);
+      expect(calls.signIn).to.equal(0);
+      expect(controller.state.phase).to.equal('refused');
+      expect(controller.state.refusalCode).to.equal('consent_unavailable');
+      expect(controller.state.command).to.equal(`epr device approve '${LINK}'`);
+      // Not remembered: a host that gains the routes can be asked again.
+      expect(memory.store.size).to.equal(0);
+    });
+
+    it('on no answer: the same refusal, the same way through', async () => {
+      viewResult = () => Promise.reject(new Error('offline'));
+      const { controller } = page(PARAM, () => LINK);
+      await controller.startBeforeSignIn();
+      expect(controller.state.refusalCode).to.equal('consent_unavailable');
+      expect(controller.state.command).to.equal(`epr device approve '${LINK}'`);
+      expect(calls.signIn).to.equal(0);
+    });
+
+    for (const [label, result] of [
+      ['401', () => Promise.resolve(refused(401))],
+      ['200 (view checks no session)', () => Promise.resolve(ok(VIEW))],
+    ] as const) {
+      it(`on ${label}: the host takes approvals — sign in first, show nothing to review`, async () => {
+        viewResult = result as () => Promise<ConsentWireResult<ConsentViewResponse>>;
+        const { controller } = page(PARAM, () => LINK);
+        await controller.startBeforeSignIn();
+        expect(calls.signIn).to.equal(1);
+        expect(controller.state.phase).to.equal('refused');
+        expect(controller.state.refusalCode).to.equal(NODE_CODE.notSignedIn);
+        expect(controller.state.command).to.equal(undefined);
+      });
+    }
+
+    it('refuses an unreadable link now, without asking anyone or sending to sign-in', async () => {
+      const { controller } = page('!!!', () => LINK);
+      await controller.startBeforeSignIn();
+      expect(calls.view).to.have.length(0);
+      expect(calls.signIn).to.equal(0);
+      expect(controller.state.refusalCode).to.equal('request_unreadable');
+      expect(controller.state.command).to.equal(undefined);
+    });
+
+    it('gives no command when the host gave no link', async () => {
+      viewResult = async () => refused(404);
+      const { controller } = page();
+      await controller.startBeforeSignIn();
+      expect(controller.state.refusalCode).to.equal('consent_unavailable');
+      expect(controller.state.command).to.equal(undefined);
+    });
+  });
+
   describe('approving', () => {
     it('shows a wait on the key holder while it signs, and nothing else', async () => {
       let release!: (r: ConsentWireResult<ConsentAgreeResponse>) => void;
@@ -198,6 +258,27 @@ describe('DeviceConsentController — the approval page both portals mount', () 
       await controller.approve({ agreedActs: ['device.enroll'] });
       expect(controller.state.phase).to.equal('handed-back');
       expect(calls.handBack).to.deep.equal([url]);
+    });
+
+    it('when the node holds the code for the device: done, nothing to copy, nothing handed back', async () => {
+      agreeResult = async () => ok(answer({ returnTarget: { kind: 'held' } }));
+      const { controller } = await reviewing();
+      await controller.approve({ agreedActs: ['device.enroll'] });
+
+      expect(controller.state.phase).to.equal('handed-back');
+      expect(controller.state.heldForDevice).to.equal(true);
+      expect(controller.state.handedBackOverNetwork).to.equal(undefined);
+      expect(controller.state.code).to.equal(undefined);
+      expect(controller.state.view).to.deep.equal(VIEW);
+      expect(calls.handBack).to.have.length(0);
+
+      // Coming back shows the same, without asking again.
+      const again = page();
+      await again.controller.start();
+      expect(calls.view).to.have.length(1);
+      expect(again.controller.state.phase).to.equal('handed-back');
+      expect(again.controller.state.heldForDevice).to.equal(true);
+      expect(again.controller.state.view).to.deep.equal(VIEW);
     });
 
     it('never follows a redirect to anywhere but this machine’s terminal', async () => {

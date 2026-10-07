@@ -31,10 +31,8 @@ use consent_grant::{
     StandingView,
 };
 
-use crate::device::{http_with, json_call_with, refusal_text};
+use crate::device::{capable, http_timed, http_with, json_call_with, refusal_text};
 use crate::device_key;
-
-const DEFAULT_NODE: &str = "http://127.0.0.1:8090";
 
 type Outcome<T> = Result<T, String>;
 
@@ -46,7 +44,10 @@ pub fn usage() -> &'static str {
      (reads the secret from this terminal without echo, or from stdin; never from an argument)\n  \
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
-     epr device approve <number | key fingerprint> --decline   (says no: nothing is signed)"
+     epr device approve <number | key fingerprint> --decline   (says no: nothing is signed)\n\
+     This machine's node is --node, else ELOHIM_NODE_URL, else the one node of this machine \
+     that answers on 8090/8095/8091/8092/8093. A node built before device joining is refused \
+     before anything is asked of it."
 }
 
 /// `epr identity …`.
@@ -104,16 +105,24 @@ impl Options {
         Ok(o)
     }
 
-    /// This machine's node. A node elsewhere is refused: it would not sign for
-    /// this terminal anyway, and its answers would not be about this person.
+    /// This machine's node, named or found (`device::this_node`). A node
+    /// elsewhere is refused: it would not sign for this terminal anyway, and
+    /// its answers would not be about this person.
     fn node(&self) -> Outcome<String> {
-        let node = self.node.clone().unwrap_or_else(|| DEFAULT_NODE.into());
+        let node = crate::device::this_node(self.node.as_deref())?;
         if !names_this_machine(&node) {
             return Err(format!(
                 "{node}: these steps talk only to this machine's own node (127.0.0.1, ::1 or localhost)"
             ));
         }
         Ok(node.trim_end_matches('/').to_string())
+    }
+
+    /// [`Self::node`], refused when its build predates device joining.
+    fn capable_node(&self) -> Outcome<String> {
+        let node = self.node()?;
+        capable(&node)?;
+        Ok(node)
     }
 }
 
@@ -215,6 +224,70 @@ pub(crate) fn node_declaration(node: &str) -> DeclarationAnswer {
     )
     .map(|(answer, _)| answer)
     .unwrap_or_default()
+}
+
+/// Whom the node at `node` already speaks for, by the name the person gave,
+/// when its standing says it is one of their devices. A node with an identity
+/// but no one signed in cannot show its standing; its declaration, read
+/// without a session, then names the person it holds. A node that cannot say
+/// is taken to speak for nobody: the person is then simply not told.
+pub(crate) fn speaks_for(node: &str) -> Option<String> {
+    let node = node.trim_end_matches('/');
+    let cookie = session_cookie();
+    let (status, _, bytes) = http_timed(
+        "GET",
+        &format!("{node}/auth/identity/standing"),
+        None,
+        &cookie_headers(&cookie),
+        std::time::Duration::from_secs(10),
+    )
+    .ok()?;
+    speaker_from(status, &bytes, || node_declaration(node).current)
+}
+
+/// [`speaks_for`] from the standing answer, asking `declared` for the node's
+/// identity only when the standing needs someone signed in.
+pub(crate) fn speaker_from(
+    status: u16,
+    bytes: &[u8],
+    declared: impl FnOnce() -> Option<CurrentIdentity>,
+) -> Option<String> {
+    if (200..300).contains(&status) {
+        return speaker_name(&serde_json::from_slice(bytes).ok()?);
+    }
+    let code = serde_json::from_slice::<serde_json::Value>(bytes)
+        .ok()
+        .and_then(|v| v["code"].as_str().map(str::to_string))
+        .unwrap_or_default();
+    if status != 401 && !code.contains("not_signed_in") {
+        return None;
+    }
+    declared().map(|c| c.display_name)
+}
+
+/// The person a node's standing says it speaks for, when it is one of the
+/// devices that speak for them.
+pub(crate) fn speaker_name(s: &StandingView) -> Option<String> {
+    s.this_node_is_controller.then(|| {
+        s.display_name
+            .clone()
+            .or_else(|| s.identifier.clone())
+            .unwrap_or_else(|| {
+                format!(
+                    "identity {}",
+                    consent_grant::hash_shape::fingerprint(&s.identity_root)
+                )
+            })
+    })
+}
+
+/// What a node that already speaks for someone is for, in a join.
+pub(crate) fn role_words(name: &str) -> String {
+    format!(
+        "this node already speaks for {name}; to approve another device run `epr device \
+         pending` or `epr device approve '<link>'`; to join it to a different person's \
+         identity run join with --portal"
+    )
 }
 
 /// The words for a declared approvals count the node cannot yet hold to.
@@ -357,7 +430,7 @@ fn read_secret() -> Outcome<String> {
 /// with, from this node's own machine.
 fn secret(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
-    let node = opts.node()?;
+    let node = opts.capable_node()?;
     let secret = read_secret()?;
     let mut body = serde_json::json!({ "secret": secret });
     if let Some(id) = &opts.identifier {
@@ -391,7 +464,7 @@ fn begin(args: &[String]) -> Outcome<ExitCode> {
         .name
         .clone()
         .ok_or("begin needs --name: what you are called")?;
-    let node = opts.node()?;
+    let node = opts.capable_node()?;
     let mut body = serde_json::json!({ "displayName": name });
     if let Some(id) = &opts.identifier {
         body["identifier"] = serde_json::Value::String(id.clone());
@@ -429,7 +502,7 @@ fn begin(args: &[String]) -> Outcome<ExitCode> {
 
 fn standing(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
-    let node = opts.node()?;
+    let node = opts.capable_node()?;
     let cookie = session_cookie();
     let (status, _, bytes) = http_with(
         "GET",
@@ -531,7 +604,7 @@ fn show(args: &[String]) -> Outcome<ExitCode> {
     if !opts.declare {
         return Err(format!("show needs --declare\n{}", usage()));
     }
-    let node = opts.node()?;
+    let node = opts.capable_node()?;
     let answer = node_declaration(&node);
     if let Some(e) = &answer.read_error {
         eprintln!("note: the declared file does not read: {e}");
@@ -675,7 +748,7 @@ pub(crate) fn pending_lines(view: &PendingView) -> Vec<String> {
 /// `epr device pending`: what is asking this node over its private network.
 pub fn pending(args: &[String]) -> Outcome<ExitCode> {
     let opts = Options::parse(args)?;
-    let node = opts.node()?;
+    let node = opts.capable_node()?;
     let (answer, _): (PendingAnswer, String) =
         json_call_with("GET", &format!("{node}/auth/consent/pending"), None, &[])?;
     if answer.carrier == "absent" {
@@ -862,6 +935,7 @@ pub fn approve(args: &[String]) -> Outcome<ExitCode> {
         ));
     };
     if names_pending(text) {
+        capable(&node)?;
         return approve_pending(&opts, &node, text.trim());
     }
     if opts.decline {
@@ -881,6 +955,7 @@ pub fn approve(args: &[String]) -> Outcome<ExitCode> {
              device without --loopback to paste the code"
         ));
     }
+    capable(&node)?;
     let body = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
     let (view, _): (ConsentView, String) = json_call_with(
         "POST",
@@ -969,12 +1044,20 @@ pub(crate) fn agreed_lines(view: &AgreedView, now_millis: i64) -> Vec<String> {
         consent_grant::ReturnTargetView::Redirect { url } => {
             lines.push(format!("Open this on the device's machine: {url}"));
         }
+        consent_grant::ReturnTargetView::Held => {
+            lines.push(
+                "Done. The device will finish joining on its own; nothing to copy.".to_string(),
+            );
+        }
     }
     let minutes = ((view.expires_at - now_millis).max(0) + 59_999) / 60_000;
-    lines.push(format!(
-        "It is good for {minutes} minute{}.",
-        if minutes == 1 { "" } else { "s" }
-    ));
+    let plural = if minutes == 1 { "" } else { "s" };
+    lines.push(match view.return_target {
+        consent_grant::ReturnTargetView::Held => {
+            format!("This node holds it for the device for {minutes} minute{plural}.")
+        }
+        _ => format!("It is good for {minutes} minute{plural}."),
+    });
     let c = view.controllers;
     lines.push(format!(
         "Signed by {} node{} that speak{} for you; your identity asks for {}.",
@@ -1269,6 +1352,81 @@ mod tests {
         assert!(lines
             .iter()
             .any(|l| l.starts_with("This node also speaks for identity uhCkkRrEN")));
+    }
+
+    #[test]
+    fn a_node_that_already_speaks_for_someone_says_which_side_it_is() {
+        let mut speaking = view(true, 1, 1);
+        speaking.display_name = Some("Matthew".into());
+        assert_eq!(speaker_name(&speaking).as_deref(), Some("Matthew"));
+        assert_eq!(
+            role_words("Matthew"),
+            "this node already speaks for Matthew; to approve another device run `epr device \
+             pending` or `epr device approve '<link>'`; to join it to a different person's \
+             identity run join with --portal"
+        );
+        let unnamed = view(true, 1, 1);
+        assert!(speaker_name(&unnamed)
+            .unwrap()
+            .starts_with("identity uhCkkRrEN"));
+        let mut not_one = view(false, 2, 1);
+        not_one.this_node_is_controller = false;
+        assert_eq!(speaker_name(&not_one), None);
+    }
+
+    #[test]
+    fn a_node_with_no_one_signed_in_names_its_person_from_its_declaration() {
+        let matthew = || {
+            Some(CurrentIdentity {
+                human_id: "h-1".into(),
+                display_name: "Matthew".into(),
+                profile_reach: "private".into(),
+            })
+        };
+        let not_signed_in = br#"{"code":"consent_not_signed_in","error":"sign in"}"#;
+        assert_eq!(
+            speaker_from(401, not_signed_in, matthew).as_deref(),
+            Some("Matthew")
+        );
+        assert_eq!(
+            speaker_from(403, not_signed_in, matthew).as_deref(),
+            Some("Matthew")
+        );
+        // Signed in but nobody declared yet: nothing to say.
+        assert_eq!(speaker_from(401, not_signed_in, || None), None);
+        // No identity begun on this node: the declaration is not asked.
+        let never = || -> Option<CurrentIdentity> { panic!("only asked when sign-in is needed") };
+        assert_eq!(
+            speaker_from(409, br#"{"code":"identity_not_begun"}"#, never),
+            None
+        );
+        // Standing that answers is the authority, and is not second-guessed.
+        let mut not_one = view(false, 2, 1);
+        not_one.this_node_is_controller = false;
+        let bytes = serde_json::to_vec(&not_one).unwrap();
+        assert_eq!(speaker_from(200, &bytes, never), None);
+        let mut speaking = view(true, 1, 1);
+        speaking.display_name = Some("Matthew".into());
+        let bytes = serde_json::to_vec(&speaking).unwrap();
+        assert_eq!(speaker_from(200, &bytes, never).as_deref(), Some("Matthew"));
+    }
+
+    #[test]
+    fn a_held_code_asks_the_person_to_carry_nothing() {
+        let view: AgreedView = serde_json::from_value(serde_json::json!({
+            "returnTarget": {"kind": "held"},
+            "expiresAt": 300_000,
+            "consentCid": "bafy",
+            "controllers": {"required": 1, "signed": 1},
+            "witnesses": []
+        }))
+        .unwrap();
+        let lines = agreed_lines(&view, 0);
+        assert_eq!(
+            lines[0],
+            "Done. The device will finish joining on its own; nothing to copy."
+        );
+        assert_eq!(lines[1], "This node holds it for the device for 5 minutes.");
     }
 
     #[test]

@@ -84,6 +84,8 @@ const EMPTY_REQUEST: ConsentViewResponse = {
             [code]="code()"
             [expiresAt]="expiresAt()"
             [refusalCode]="refusalCode()"
+            [command]="command()"
+            [handedBackTo]="handedBackTo()"
             [strings]="cardStrings"
             (approve)="onApprove($event)"
             (decline)="declined.emit()"
@@ -147,6 +149,13 @@ export class DeviceConsentViewComponent {
   readonly code = input<string | undefined>(undefined);
   readonly expiresAt = input<number | undefined>(undefined);
   readonly refusalCode = input<string | undefined>(undefined);
+  /**
+   * The way through a refusal this doorway cannot get past (it takes no
+   * approvals): the same approval as a command for a device already theirs.
+   */
+  readonly command = input<string | undefined>(undefined);
+  /** Where the code went once approved: a terminal here, the device over the network, or held for it. */
+  readonly handedBackTo = input<'this-machine' | 'network' | 'held'>('this-machine');
   /** The node's own plain reason, when it gave one (asked to sign in again). */
   readonly refusalReason = input<string | undefined>(undefined);
   /** Who secured the approval; live while signing, settled under a code. */

@@ -5,7 +5,10 @@
  * `/threshold/consent/device/preview?…`
  * - device approval: `phase=review|signing|code|handed-back|declined|refused`,
  *   `acts=1|2`, `code=<refusal code>`, `witnesses=1` (sample reported
- *   witnesses), `required=<n>&signed=<n>` (the node's count; default 1 of 1)
+ *   witnesses), `required=<n>&signed=<n>` (the node's count; default 1 of 1),
+ *   `to=network|held` (where the code went in `handed-back`); a
+ *   `consent_unavailable` refusal carries the way through, built from this
+ *   page's own link as the real page builds it
  * - sign-in / create account in flight: `page=login|register`,
  *   `step=working|failed`
  * - `reveal=now` pins the witness trail's reveal delay to 0 so a render shows
@@ -30,6 +33,7 @@ import {
   keyHolderStep,
   standingFor,
   trailAfterAgreement,
+  wayThroughFor,
   type ConsentViewResponse,
   type KeyHolderStep,
 } from 'elohim-imagodei/device-consent';
@@ -96,6 +100,8 @@ const SAMPLE_WITNESSES: WitnessStep[] = [
           [code]="phase() === 'code' ? 'K7QF-2MXD-9PLA' : undefined"
           [expiresAt]="expiresAt"
           [refusalCode]="refusalCode()"
+          [command]="command()"
+          [handedBackTo]="handedBackTo()"
           [refusalReason]="refusalReason()"
           [trail]="trail()"
           [standing]="standing()"
@@ -120,6 +126,18 @@ export class DeviceConsentPreviewComponent {
   readonly request = computed(() => (this.params()?.get('acts') === '1' ? ONE_ACT : TWO_ACTS));
 
   readonly refusalCode = computed(() => this.params()?.get('code') ?? 'consent_unavailable');
+
+  /** The way through, exactly as the real page gives it for this refusal. */
+  readonly command = computed(() =>
+    this.phase() === 'refused'
+      ? wayThroughFor(this.refusalCode(), globalThis.location.href)
+      : undefined
+  );
+
+  readonly handedBackTo = computed<'this-machine' | 'network' | 'held'>(() => {
+    const to = this.params()?.get('to');
+    return to === 'network' || to === 'held' ? to : 'this-machine';
+  });
 
   /** For `code=consent_reauthentication_asked`: the node's reason (`reason=`), or a sample. */
   readonly refusalReason = computed(() =>

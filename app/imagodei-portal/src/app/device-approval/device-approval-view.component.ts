@@ -79,7 +79,8 @@ const EMPTY_REQUEST = { clientId: '', label: '', deviceFingerprint: '', askedAct
         <elohim-imagodei-device-consent-card
           data-testid="device-consent-card"
           signer="peer-conductor"
-          [attr.handed-back-to]="state.handedBackOverNetwork ? 'network' : 'this-machine'"
+          [attr.handed-back-to]="handedBackTo"
+          [command]="state.command"
           [request]="cardRequest"
           [phase]="state.phase"
           [personLabel]="cardPersonLabel"
@@ -302,6 +303,12 @@ export class DeviceApprovalViewComponent {
     return phase === 'code' || phase === 'handed-back'
       ? THIS_DEVICE_WORDS.standing(standing)
       : undefined;
+  }
+
+  /** Where the code went once approved: held for the device, over the network, or here. */
+  get handedBackTo(): 'this-machine' | 'network' | 'held' {
+    if (this.state.heldForDevice) return 'held';
+    return this.state.handedBackOverNetwork ? 'network' : 'this-machine';
   }
 
   /** No identity on this node yet: the begin step stands in for the card. */

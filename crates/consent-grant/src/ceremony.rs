@@ -42,8 +42,9 @@ use crate::delivery::{
 };
 use crate::enrollment::{Enrollment, EnrollmentIntent};
 use crate::hash_shape;
+use crate::pkce;
 use crate::request::AdmittedRequest;
-use crate::return_path::{return_target, ReturnTarget};
+use crate::return_path::{return_target, ReturnPath, ReturnTarget};
 
 /// What a consent screen shows. Everything a person needs to decide, and
 /// nothing they could not check against their own terminal. This is the wire
@@ -219,12 +220,16 @@ impl MemoryStore {
     }
 
     /// Hold a delivery. One request has one live delivery: anything already
-    /// held for the same request (the same PKCE challenge) is dropped, so a
-    /// person who agrees again leaves only the newest code working.
+    /// held for the same request (the same PKCE challenge) OR the same state
+    /// is dropped, so a person who agrees again leaves only the newest code
+    /// working, and a state names at most one delivery for [`Self::collect`].
     pub fn insert(&self, held: Held) {
         let mut map = self.lock();
         // bounded-work: one pass over deliveries that each live minutes.
-        map.retain(|_, h| h.delivery.code_challenge != held.delivery.code_challenge);
+        map.retain(|_, h| {
+            h.delivery.code_challenge != held.delivery.code_challenge
+                && h.delivery.state != held.delivery.state
+        });
         map.insert(held.delivery.code_digest.clone(), held);
     }
 
@@ -286,6 +291,104 @@ pub fn redeem(
     outcome
 }
 
+/// What the terminal that asked presents to collect a held consent without the
+/// code: the state it chose and the verifier only it holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub state: String,
+    pub code_verifier: String,
+    pub client_id: String,
+    pub device_key: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CollectionRefusal {
+    /// Nothing is held for that state.
+    StateUnknown,
+    /// Something is held, but its terminal chose to be shown or redirected
+    /// the code; it is not collected this way.
+    NotHeld,
+    AlreadyCollected,
+    Expired,
+    ClientMismatch,
+    DeviceMismatch,
+    VerifierMismatch,
+}
+
+impl CollectionRefusal {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::StateUnknown => "collection_state_unknown",
+            Self::NotHeld => "collection_not_held",
+            Self::AlreadyCollected => "collection_already_collected",
+            Self::Expired => "collection_expired",
+            Self::ClientMismatch => "collection_client_mismatch",
+            Self::DeviceMismatch => "collection_device_mismatch",
+            Self::VerifierMismatch => "collection_verifier_mismatch",
+        }
+    }
+}
+
+impl MemoryStore {
+    /// Hand over the consent held for `collection.state` to the terminal
+    /// that proves it asked, and mark it collected, in one step. Only a
+    /// delivery whose terminal chose [`ReturnPath::Hold`] is collectable.
+    /// Every check reads the fields bound when the code was issued, never a
+    /// request seen since; a mismatch spends nothing, so a holder of the
+    /// link cannot burn the real terminal's consent by guessing.
+    pub fn collect(
+        &self,
+        collection: &Collection,
+        now_micros: i64,
+    ) -> Result<Delivered, CollectionRefusal> {
+        use CollectionRefusal as R;
+        let mut held = self.lock();
+        let Some((digest, entry)) = held
+            .iter_mut()
+            .find(|(_, h)| h.delivery.state == collection.state)
+        else {
+            return Err(R::StateUnknown);
+        };
+        if entry.delivery.return_path != ReturnPath::Hold {
+            return Err(R::NotHeld);
+        }
+        if now_micros >= entry.delivery.expires_at_micros {
+            let digest = digest.clone();
+            held.remove(&digest);
+            return Err(R::Expired);
+        }
+        if collection.client_id != entry.delivery.client_id {
+            return Err(R::ClientMismatch);
+        }
+        if collection.device_key != entry.delivery.device_key {
+            return Err(R::DeviceMismatch);
+        }
+        if !pkce::verifier_matches(&collection.code_verifier, &entry.delivery.code_challenge) {
+            return Err(R::VerifierMismatch);
+        }
+        if entry.delivery.redeemed {
+            return Err(R::AlreadyCollected);
+        }
+        entry.delivery.redeemed = true;
+        let fresh = entry.clone();
+        Ok(Delivered {
+            consent: fresh.consent,
+            enrollment: fresh.enrollment,
+        })
+    }
+
+    /// Whether a delivery is held for `state` and not yet collected or past
+    /// its window: what a terminal that is still waiting may be told.
+    pub fn holds_for_state(&self, state: &str, now_micros: i64) -> bool {
+        self.lock().values().any(|h| {
+            h.delivery.state == state
+                && !h.delivery.redeemed
+                && now_micros < h.delivery.expires_at_micros
+        })
+    }
+}
+
 /// Where the code goes once the person has agreed, as the consent screen is
 /// told it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -295,6 +398,9 @@ pub enum ReturnTargetView {
     Display { value: String },
     /// Send the browser to `url`, the terminal's own listener.
     Redirect { url: String },
+    /// Nothing to carry: the terminal that asked collects the consent from
+    /// this node itself. The screen says the device will finish on its own.
+    Held,
 }
 
 impl From<ReturnTarget> for ReturnTargetView {
@@ -302,6 +408,7 @@ impl From<ReturnTarget> for ReturnTargetView {
         match target {
             ReturnTarget::Display(value) => Self::Display { value },
             ReturnTarget::Redirect(url) => Self::Redirect { url },
+            ReturnTarget::Held => Self::Held,
         }
     }
 }
@@ -458,6 +565,148 @@ mod tests {
         store
     }
 
+    /// A store holding one consent whose terminal asked to collect it itself.
+    fn holding_store() -> MemoryStore {
+        let mut request = peer_request();
+        request.return_path = ReturnPath::Hold;
+        let admitted = admit_request(&request, &policy()).unwrap();
+        let (held, target) = issue(&admitted, signed(), enrollment(), CODE, NOW, TTL).unwrap();
+        assert_eq!(target, ReturnTarget::Held);
+        let store = MemoryStore::new();
+        store.insert(held);
+        store
+    }
+
+    fn collection() -> Collection {
+        let r = redemption();
+        Collection {
+            state: peer_request().state,
+            code_verifier: r.code_verifier,
+            client_id: r.client_id,
+            device_key: r.device_key,
+        }
+    }
+
+    #[test]
+    fn a_held_consent_is_collected_once_by_the_terminal_that_proves_it_asked() {
+        let store = holding_store();
+        assert!(store.holds_for_state(&collection().state, NOW));
+        let delivered = store.collect(&collection(), NOW + 1).unwrap();
+        assert_eq!(delivered.consent.cid, signed().cid);
+        assert!(!store.holds_for_state(&collection().state, NOW));
+        assert_eq!(
+            store.collect(&collection(), NOW + 2),
+            Err(CollectionRefusal::AlreadyCollected)
+        );
+    }
+
+    #[test]
+    fn a_wrong_verifier_spends_nothing_and_the_right_one_still_collects() {
+        let store = holding_store();
+        let mut wrong = collection();
+        wrong.code_verifier = "not-the-verifier-not-the-verifier-not-the-verifier".into();
+        assert_eq!(
+            store.collect(&wrong, NOW + 1),
+            Err(CollectionRefusal::VerifierMismatch)
+        );
+        let mut other_device = collection();
+        other_device.device_key = sample_key(8);
+        assert_eq!(
+            store.collect(&other_device, NOW + 1),
+            Err(CollectionRefusal::DeviceMismatch)
+        );
+        let mut other_client = collection();
+        other_client.client_id = "someone-else".into();
+        assert_eq!(
+            store.collect(&other_client, NOW + 1),
+            Err(CollectionRefusal::ClientMismatch)
+        );
+        assert!(store.collect(&collection(), NOW + 1).is_ok());
+    }
+
+    #[test]
+    fn only_a_consent_held_for_collection_is_collected_by_state() {
+        let store = store(); // the terminal chose to paste the code
+        assert_eq!(
+            store.collect(&collection(), NOW + 1),
+            Err(CollectionRefusal::NotHeld)
+        );
+        let mut unknown = collection();
+        unknown.state = "some-other-state-nobody-asked-with".into();
+        assert_eq!(
+            store.collect(&unknown, NOW + 1),
+            Err(CollectionRefusal::StateUnknown)
+        );
+    }
+
+    #[test]
+    fn a_held_consent_past_its_window_is_gone() {
+        let store = holding_store();
+        assert_eq!(
+            store.collect(&collection(), NOW + TTL),
+            Err(CollectionRefusal::Expired)
+        );
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn agreeing_again_leaves_only_the_newest_held_consent_collectable() {
+        let store = holding_store();
+        let mut request = peer_request();
+        request.return_path = ReturnPath::Hold;
+        let admitted = admit_request(&request, &policy()).unwrap();
+        let (again, _) = issue(
+            &admitted,
+            signed(),
+            enrollment(),
+            "an0therc0dean0therc0dean0therc0de",
+            NOW + 5,
+            TTL,
+        )
+        .unwrap();
+        store.insert(again);
+        assert_eq!(store.len(), 1);
+        let delivered = store.collect(&collection(), NOW + 6).unwrap();
+        assert_eq!(delivered.consent.cid, signed().cid);
+    }
+
+    #[test]
+    fn a_state_names_at_most_one_held_delivery_whatever_its_challenge() {
+        // A holder of the link can submit another well-formed request with
+        // the same state and a different verifier. Only the newest held
+        // delivery answers to the state, so collect can never pick the wrong one.
+        let store = holding_store();
+        let other_verifier = "an-0ther-verifier-nobody-asked-with-an-0ther-verifier";
+        let mut request = peer_request();
+        request.return_path = ReturnPath::Hold;
+        request.code_challenge = crate::pkce::challenge(other_verifier);
+        let admitted = admit_request(&request, &policy()).unwrap();
+        let mut record = peer_record();
+        record.request_binding = admitted.request().code_challenge.clone();
+        let consent = SignedConsent::new(record)
+            .unwrap()
+            .with_signature(signed().signatures[0].clone());
+        let (again, _) = issue(
+            &admitted,
+            consent,
+            enrollment(),
+            "an0therc0dean0therc0dean0therc0de",
+            NOW + 5,
+            TTL,
+        )
+        .unwrap();
+        store.insert(again);
+        assert_eq!(store.len(), 1, "the same state holds one delivery, not two");
+        assert_eq!(
+            store.collect(&collection(), NOW + 6),
+            Err(CollectionRefusal::VerifierMismatch),
+            "the earlier verifier no longer collects anything"
+        );
+        let mut newest = collection();
+        newest.code_verifier = other_verifier.into();
+        assert!(store.collect(&newest, NOW + 6).is_ok());
+    }
+
     #[test]
     fn the_view_shows_what_the_person_must_decide() {
         let view = ConsentView::of(&admitted());
@@ -583,8 +832,9 @@ mod tests {
         second.code = SECOND.into();
         assert!(redeem(&store, &second, NOW + 1).is_ok());
 
-        // Another request's delivery is left alone.
+        // Another request's delivery (its own state, its own challenge) is left alone.
         let mut other = peer_request();
+        other.state = "an0ther-state-an0ther-state-an0ther-state".into();
         other.code_challenge = crate::pkce::challenge(&"v".repeat(43));
         let other = admit_request(&other, &policy()).unwrap();
         let mut record = peer_record();

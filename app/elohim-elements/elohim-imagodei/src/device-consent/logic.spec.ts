@@ -8,6 +8,7 @@ import {
   MAX_REQUEST_BYTES,
   NODE_CODE,
   REFUSAL,
+  beforeSignIn,
   decodeConsentRequest,
   failureFor,
   isShowableView,
@@ -18,6 +19,7 @@ import {
   reasonOf,
   standingFor,
   trailAfterAgreement,
+  wayThroughFor,
 } from './logic.js';
 import { approveCommand, approvePendingCommand } from '../terminal.js';
 
@@ -202,6 +204,58 @@ describe('failureFor — what a failed call means for the page', () => {
   });
 });
 
+describe('beforeSignIn — whether this host takes approvals, asked before sign-in', () => {
+  const failed = (status: number, body: unknown = null) => ({ ok: false as const, status, body });
+  const unavailable = { kind: 'refused', code: REFUSAL.consentUnavailable };
+
+  for (const [label, status] of [
+    ['no answer', 0],
+    ['no consent routes here (404)', 404],
+    ['not implemented here (501)', 501],
+    ['a server error', 502],
+  ] as const) {
+    it(`on ${label}: says now that approvals can’t be taken here, without sign-in`, () => {
+      expect(beforeSignIn(failed(status))).to.deep.equal(unavailable);
+    });
+  }
+
+  it('on 401: the host takes approvals, so the person signs in first', () => {
+    expect(beforeSignIn(failed(401))).to.deep.equal({ kind: 'sign-in' });
+  });
+
+  it('on 200: the host takes approvals, but nobody is signed in yet — sign in first', () => {
+    // `view` checks no session, so a 200 says only that approvals are taken here.
+    expect(beforeSignIn({ ok: true, body: {} })).to.deep.equal({ kind: 'sign-in' });
+  });
+
+  it('on the node’s own refusal or a wait on its signer: signs in first, as today', () => {
+    expect(
+      beforeSignIn(failed(400, { error: 'x', code: 'request_acts_incoherent' }))
+    ).to.deep.equal({ kind: 'sign-in' });
+    expect(
+      beforeSignIn(failed(503, { error: 'x', code: NODE_CODE.signingUnavailable }))
+    ).to.deep.equal({ kind: 'sign-in' });
+  });
+});
+
+describe('wayThroughFor — the way through a host that takes no approvals', () => {
+  const LINK = 'https://doorway-alpha.elohim.host/threshold/consent/device?request=e30';
+
+  it('gives the page’s own link as a command to run on a device that is already theirs', () => {
+    expect(wayThroughFor(REFUSAL.consentUnavailable, LINK)).to.equal(
+      `epr device approve '${LINK}'`
+    );
+    expect(wayThroughFor(REFUSAL.consentUnavailable, LINK)).to.equal(approveCommand(LINK));
+  });
+
+  it('gives none for any other refusal, or when the host gave no link', () => {
+    expect(wayThroughFor('request_acts_incoherent', LINK)).to.equal(undefined);
+    expect(wayThroughFor(NODE_CODE.notSignedIn, LINK)).to.equal(undefined);
+    expect(wayThroughFor(REFUSAL.consentUnavailable, undefined)).to.equal(undefined);
+    expect(wayThroughFor(REFUSAL.consentUnavailable, '')).to.equal(undefined);
+  });
+});
+
 describe('isShowableView', () => {
   it('needs a label, a fingerprint and at least one asked act', () => {
     const view = {
@@ -240,6 +294,12 @@ describe('outcomeForAgreement — where an approval leaves the page', () => {
     expect(
       outcomeForAgreement(agreement({ returnTarget: { kind: 'redirect', url } }))
     ).to.deep.equal({ phase: 'handed-back', url });
+  });
+
+  it('leaves nothing to copy when the node holds the code for the device to collect', () => {
+    expect(outcomeForAgreement(agreement({ returnTarget: { kind: 'held' } }))).to.deep.equal({
+      phase: 'held',
+    });
   });
 
   it('refuses to follow a redirect anywhere else, and never yields the URL', () => {

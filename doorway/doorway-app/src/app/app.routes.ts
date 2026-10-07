@@ -60,10 +60,13 @@ export const routes: Routes = [
     title: 'Create Account',
   },
   {
+    // No authGuard: the page asks this doorway whether it takes device
+    // approvals BEFORE sending a signed-out person to sign in, so sign-in never
+    // leads to a page that then can't approve. The component orders the two,
+    // and still shows nothing about the request before sign-in.
     path: 'consent/device',
     loadComponent: loadDeviceConsent,
     title: 'Approve a device',
-    canActivate: [authGuard],
   },
   ...devOnlyRoutes,
   {
