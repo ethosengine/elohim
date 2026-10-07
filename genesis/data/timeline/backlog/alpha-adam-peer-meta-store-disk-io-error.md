@@ -48,7 +48,9 @@ kitsune2 cannot record a peer's metadata, so every gossip initiation with that p
 
 ## Where the size is declared
 
-Nowhere in the repo any more. `holochain-data-<prefix>-0` was minted by the storage StatefulSet's retired `holochain-data` volumeClaimTemplate and is now mounted by `_edgenode-conductor.template.yaml` (and `adam-firstman-conductor.yaml`) by explicit `claimName`; the PVC is Retained on an openebs-hostpath PV with node affinity. Its 7.4 GB is whatever the PV carried when it was minted; the live `storage-data` template says 20Gi. So this is operator-owned volume state, not a manifest the next pipeline reconciles.
+**DELTA 2026-10-07 (declared, since dev `2f4679293`):** adam and eve carry `conductorStorage: 20Gi` in `genesis/orchestrator/data/deployments.json`, and `deployHumanConductor` runs `scripts/ci/grow-conductor-pvc.sh` before each roll: it reads the live claim, raises the request when the storage class allows expansion, and otherwise prints `CONDUCTOR-PVC-GROW-REFUSED` with the operator's move (warn-only; a roll is never failed by it). The next edge roll is the probe for whether the class expands; gertrude and susan are not declared. The paragraph below describes the state before that commit.
+
+Before 2026-10-07: nowhere in the repo. `holochain-data-<prefix>-0` was minted by the storage StatefulSet's retired `holochain-data` volumeClaimTemplate and is now mounted by `_edgenode-conductor.template.yaml` (and `adam-firstman-conductor.yaml`) by explicit `claimName`; the PVC is Retained on an openebs-hostpath PV with node affinity. Its 7.4 GB is whatever the PV carried when it was minted; the live `storage-data` template says 20Gi. So this is operator-owned volume state, not a manifest the next pipeline reconciles.
 
 ## Fix shape
 
