@@ -18,7 +18,7 @@ The Elohim Protocol addresses content through an **Elohim Protocol Record (EPR)*
 
 - **lamad** (knowledge): what this content is, how it relates to other knowledge, and how people have learned from it.
 - **shefa** (value): who stewards it, what recognition has accumulated, and what economic flows attach to it.
-- **qahal** (governance): what authority ratified it, how far it may travel (its [reach](glossary.md), one of eight levels from `private` to `commons`), and which constitutional layer, from the individual to the global, binds it.
+- **qahal** (governance): what authority ratified it, how far it may travel on the serving plane (its [reach](glossary.md) label, one of eight rings from `private` to `commons`; reach is answered per plane, and this label is one dimension of it), and which constitutional layer, from the individual to the global, binds it.
 
 This specification reads the same EPR as a Reference while it is being composed and as a Record once it is at rest. Appendix E.1 explains the two names.
 
@@ -427,7 +427,7 @@ Attestations are designed to meet access gates (a head's `qahal.attestationRequi
 
 An observation is a signed record of something a peer sensed: `EprKind::Observation` in the `elohim-epr` crate, coupled to knowledge only, kept on the observer's own append-only log and addressed by observer and offset (`iroh://{observer}@{log}#{offset}`). It is not notarized and is not served over `/elohim/epr`. The [Observability epic](observability/epic.md) states the planes it belongs to, the boundaries on it, and its proof obligations.
 
-A pillar manifest declares each observation kind with a retention class, a reach on the observation plane's own ladder, a diversity threshold and a `graduates_to` target. Graduation is the only crossing into this specification: enough distinct witnesses within one window yield one `Attestation` (or one summary economic event), issued by an evaluator, with the observation references carried in `evidence`.
+A pillar manifest declares each observation kind with a retention class, an `ObservationReach` label (Appendix A) for who may receive its raw rows, a diversity threshold and a `graduates_to` target. The label is one dimension of the kind's scope; the governing object is a content-addressed scope declaration (shape: a missing node, see the backlog row), named by CID, that answers reach per plane, custody, freshness, linkability, cost bearer and retention. Graduation is the only crossing into this specification: enough distinct witnesses within one window yield one `Attestation` (or one summary economic event), issued by an evaluator, with the observation references carried in `evidence`.
 
 A quantity carries its confidence: what kind of claim it is (`ClaimKind`), its interval, and, when the interval is unknown, why (`UnknownReason`). A missing measurement is never encoded as zero.
 
@@ -760,7 +760,7 @@ These are the places where the design is not complete.
 - Identifiers. How `id` slugs are allocated and kept unique across communities is not specified. Converting a DID to an `epr:` URI drops the host, so the conversion is lossless only while ids are unique across hosts. A client cannot tell from `epr:{id}` alone whether it names content or a path. The shape of a path record, and whether step positions start at 0 or 1, are left to the lamad domain.
 - Steward identity and the system issuer. A hosted steward's DID names a doorway's host (`did:web:{host}:humans:{id}`), while doorways are replaceable; keeping that identity when the steward moves is the Identity Portability Protocol's concern (Scope). Who operates the protocol system issuer, `did:web:elohim-protocol.org:system`, what it may issue, and where recognition credited to it goes (for example from deliveries of the landing page in Appendix D), are not specified here.
 - Dormant heads. What a peer does differently with a head marked dormant (Part IV) is not specified.
-- Observation reach. The observation plane's ladder (`agent-private`, `household`, `community`, `commons`, `commons-attested`; `observation-kind.schema.json`) and this specification's eight-level `Reach` are distinct vocabularies with a named bridge (the [Observability epic](observability/epic.md)'s graduation bridge): a raw observation never carries `Reach` and never crosses its holon; only the attestation it graduates into is gated by Part IV. Unifying the vocabularies is open; canonizing either as the other is refused.
+- Reach is a per-plane declaration; the ring enums are labels. How far an object goes is not one level. It is answered plane by plane: the reach of its bytes and, separately, of each reference to it; custody (holder set, threshold, how independence of holders is observed); freshness (how stale a read may be, at what stakes); linkability (what holding, serving or viewing it reveals about the one who does); cost bearer; and retention. The governing object is a content-addressed scope declaration named by CID (shape: a missing node, see the backlog row). `Reach` (Appendix A) labels one plane, who the reach gate admits to a head and its bytes; `ObservationReach` (`observation-kind.schema.json`) labels one dimension of an observation kind's scope, who may receive its raw rows. Neither label is the declaration, and neither is the other: a raw observation never carries `Reach` and never crosses its holon; only the attestation it graduates into is gated by Part IV. A capture grant or the [Observability epic](observability/epic.md)'s graduation bridge names the declaration, not a level or a mapping between levels. The declaration's shape is open; canonizing either label as the other is refused.
 - Evidence class. No record in this specification says whether a fixture or a real participant produced it; fixture-ness is known only network-wide (the declared network stage) and in harness lane tags. An `evidence_class: fixture | real` on observation rows and attestation metadata, descending only through graduation, is proposed; it enters Appendix A when `observation-kind.schema.json` carries it.
 - Reserved. `epr:{id}@{version}` is reserved until content versions are defined (Appendix E.1). The protocol ID `/elohim/cluster/1.0.0` is reserved for hub-internal cluster coordination; it is not the observation plane.
 
@@ -794,6 +794,8 @@ private | self | intimate | trusted | familiar | community | public | commons
 ```
 
 Part IV shows who passes the reach gate at each level. For access, `private` and `self` behave alike, as do `public` and `commons`; a standing policy can require different standing to grant `public` and `commons` (Part III, Rule 2).
+
+`Reach` is the ring label for one plane's reach: on a head, who the reach gate admits to the head and its bytes. It does not answer the other dimensions of how far content goes (the reach of each reference to it, custody, freshness, linkability, cost bearer, retention); a content-addressed scope declaration answers those (shape: a missing node; Open Issues, "Reach is a per-plane declaration").
 
 ### ConstitutionalLayer (from narrowest to widest)
 
@@ -881,7 +883,7 @@ The types this specification relies on, in the manifest's terms:
 agent-private | household | community | commons | commons-attested
 ```
 
-Source: `elohim/sdk/schemas/v1/manifest/observation-kind.schema.json`. This ladder scopes who may receive an observer's raw rows. It is not `Reach`, and no level of it equals a level of `Reach`: an observation never carries `Reach`; the attestation it graduates into does, bounded by the graduation bridge in the [Observability epic](observability/epic.md). `commons-attested` names a graduation outcome rather than a scope.
+Source: `elohim/sdk/schemas/v1/manifest/observation-kind.schema.json`. This ladder labels who may receive an observer's raw rows. It is one dimension of an observation kind's scope declaration, not the declaration: a capture grant or a graduation bridge names the declaration by CID, never a level of this ladder. It is not `Reach`, and no level of it equals a level of `Reach`: an observation never carries `Reach`; the attestation it graduates into does, bounded by the graduation bridge in the [Observability epic](observability/epic.md). `commons-attested` names a graduation outcome rather than a receiver ring.
 
 ### ClaimKind and UnknownReason (the confidence of a quantity)
 
