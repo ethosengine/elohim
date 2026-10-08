@@ -145,6 +145,25 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     And each peer counts the visit as held by the app's release channel, not as a heal
     And within 75 seconds doorway "alpha" still serves the first app's page naming the new browser bundle's entry script
 
+  @wip @regression
+  Scenario: A doorway serves only what the peer it reads has taken up, so that peer joins the channel
+    # Provenance: alpha, 2026-10-08. After the stamped-head cure above, the channel's vehicle is the
+    # only writer of an app's record. elohim.host reads adam's peer, and adam followed no app-bundle
+    # channel — the fleet's declaration of who follows it believed that doorway read jessica, which
+    # stopped being true on 2026-05-27. Nothing was left that could move adam's record: elohim.host
+    # served the 2026-09-22 build while doorway-alpha served the new one, and the release ledger
+    # read "adopted" on every peer that was measured, because the stale peer was never measured.
+    Given a doorway in this household reads jessica's peer for every app it serves
+    And jessica's peer follows no app-bundle channel
+    And every other household peer follows that channel as a canary
+    When matthew publishes a new build of both apps as one release through doorway "alpha"
+    And every other household peer has taken the release up
+    Then jessica's record for each app still names the earlier bundles, held by the channel and moved by nobody
+    And that doorway still serves each app's earlier page
+    When jessica's peer joins the channel as a canary through its own door
+    Then on jessica's peer each app's record names the release's browser bundle and its server bundle
+    And within 75 seconds that doorway serves each app's page naming the new browser bundle's entry script
+
   Scenario: A build that cannot start is refused by every peer, and nothing moves
     Given every household peer has taken up the channel's earned head
     When matthew publishes a build whose first app's page names an entry script its browser bundle does not contain

@@ -16,7 +16,7 @@
 // The substitution strings are rebuilt here from the documented rule so the test
 // fails if the Groovy drifts from it (the static pin) or if sed's semantics do.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -215,7 +215,7 @@ test("alpha humans WITH the field render the real workspace channel line at thei
     ["james", "canary", ""],
     ["matthew", "observe", appBundleCanary],
     ["jessica", "observe", appBundleCanary],
-    ["adam", "observe", ""],
+    ["adam", "observe", appBundleCanary],
     ["gertrude", "observe", ""],
     ["susan", "observe", ""],
     ["eve", "observe", ""],
@@ -236,20 +236,39 @@ test("alpha humans WITH the field render the real workspace channel line at thei
     );
   }
 
-  // adam never follows the app-bundle channel -- the canary flip is scoped
-  // to the serving pair (matthew, jessica) only.
-  const adamChannels = humanNamed("adam").runtimeConfig?.ELOHIM_RELEASE_CHANNELS ?? "";
-  assert.doesNotMatch(
-    adamChannels,
-    /runtime:app-bundle:alpha:dev=canary/,
-    "adam: does not follow app-bundle at canary",
-  );
-  assert.doesNotMatch(
-    adamChannels,
-    /runtime:app-bundle:alpha:dev=apply/,
-    "adam: does not follow app-bundle at apply",
-  );
+  // 2026-10-08: the follow set is DERIVED from the doorway manifests, not a
+  // hand list. Every storage a doorway reads (its STORAGE_URL) must follow the
+  // app-bundle channel: after the slug-pointer cure (5ead7671a) the channel's
+  // vehicle is the ONLY writer of a bound slug, so a serving peer that follows
+  // no channel is pinned to its last pointer forever. That is exactly what
+  // happened on alpha -- this test's previous rule ("adam never follows") was
+  // built on doorway B reading jessica, but alpha-b.yaml has named adam since
+  // 2026-05-27, and elohim.host served the 2026-09-22 lamad bundle while
+  // doorway-alpha served the new one.
+  const canaryEntry = new RegExp(`(^|,)${APP_BUNDLE_CHANNEL_ID.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=canary(,|$)`);
+  for (const [doorway, backing] of doorwayBackingStorages()) {
+    const channels = humanNamed(backing).runtimeConfig?.ELOHIM_RELEASE_CHANNELS ?? "";
+    assert.match(
+      channels,
+      canaryEntry,
+      `${backing} (the storage doorway ${doorway} reads) follows the app-bundle channel at canary`,
+    );
+  }
 });
+
+// [doorway manifest, human name] for every doorway manifest that names a
+// STORAGE_URL: the human whose storage that doorway serves from.
+function doorwayBackingStorages() {
+  const dir = new URL("genesis/orchestrator/manifests/doorway/", ROOT);
+  const pairs = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort()) {
+    const text = readFileSync(new URL(file, dir), "utf8");
+    const m = text.match(/-\s*name:\s*STORAGE_URL\s*\n\s*value:\s*"http:\/\/elohim-([a-z0-9-]+)-alpha\./);
+    if (m) pairs.push([file, m[1]]);
+  }
+  assert.ok(pairs.length >= 2, `both alpha doorway manifests name a STORAGE_URL (found ${pairs.length})`);
+  return pairs;
+}
 
 const MANIFEST_PLACEHOLDER = "RUNTIME_MANIFEST_CID_PLACEHOLDER";
 const conductorTemplate = read("genesis/orchestrator/manifests/humans/_edgenode-conductor.template.yaml");

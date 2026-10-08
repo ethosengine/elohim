@@ -674,12 +674,16 @@ def appReleaseBundles(List<Map> bundles) {
     return bundles.collect { b -> "${b.slug}:${b.kind ?: 'browser'}:${b.distDir}${b.mount ? ':' + b.mount : ''}" }.join(' ')
 }
 
-// The peers whose adoption the native path measures: the alpha serving pair
-// behind doorway A / B (verify-app-adoption.sh reads each one's own report
-// through the publishing doorway). A constant, not a param: which peers must
-// adopt is a property of the fleet, not of a build.
+// The peers whose adoption the native path measures: every storage a doorway
+// reads (doorway A -> matthew, doorway B -> adam, per the STORAGE_URL in
+// genesis/orchestrator/manifests/doorway/*.yaml; runtime-config-render.test.mjs
+// derives the follow set from the same lines) plus jessica, the household's
+// non-serving adopter. verify-app-adoption.sh reads each one's own report
+// through the publishing doorway. A constant, not a param: which peers must
+// adopt is a property of the fleet, not of a build. 2026-10-08: adam added —
+// elohim.host served a bundle two weeks stale because nobody measured him.
 def appReleasePeers() {
-    return 'matthew,jessica'
+    return 'matthew,adam,jessica'
 }
 
 // Native path (native-delivery N6): one release, peers adopt. The retired per-host
