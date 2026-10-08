@@ -60,6 +60,14 @@
       "type": "string",
       "enum": ["live", "cached"],
       "description": "Where earned came from. Present ONLY on a live-election read (GET /db/content/{id}/head?election=live); absent on a plain read, which keeps that response identical to one from a peer that predates it. live: this peer's own conductor answered its local canonical election and earned was read from it (true when the winner is EARNED and is the declared head; an earned tier already recorded here for the same head is never lowered by a local link view lacking the earned declaration) — a live answer that finds the projection behind also heals the projection's election columns in the same request, never the head. cached: the conductor could not answer inside the read's budget (absent, errored or timed out), so earned is the projection's recorded column."
+    },
+    "canonicalDeclaredAt": {
+      "type": ["integer", "null"],
+      "description": "The DHT timestamp (microseconds since the Unix epoch — same convention as ProjectionInventoryEntry.declaredHeadAt) of the canonical-head declaration link that select_canonical_winner elected, as this peer's projection recorded it (content.canonical_declared_at). The election clock: with canonicalLinkHash it lets a reader tell a stale election from a different one. null = no election recorded on this row (single provenance: the row answered). Additive: absent from older serving nodes."
+    },
+    "canonicalLinkHash": {
+      "type": ["string", "null"],
+      "description": "The election's tiebreak (content.canonical_link_hash, Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. null = unknown (no election recorded, or one recorded before the tiebreak travelled). Additive: absent from older serving nodes."
     }
   }
 }

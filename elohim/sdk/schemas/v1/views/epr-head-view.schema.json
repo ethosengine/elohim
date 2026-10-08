@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:view:epr-head-view",
   "title": "EprHeadView",
-  "description": "Source of truth: DHT (Notarized HEAD projection, Category A) — a read projection of `content.declared_head_action_hash` / `declared_head_at`. The envelope's cid is a function of the declared head alone: `version`, `id`, `content`, `lamad`, `shefa`, `qahal`, `relationships`, `author` and `updated` are exactly the canonical dag-cbor bytes served verbatim at the `Accept: application/vnd.ipld.dag-cbor` arm of GET /epr-head/{id}; `cid` is that address (CIDv1, codec 0x71), minted per request over those same bytes — two peers agreeing on the declared head mint identical bytes and therefore identical cid, regardless of local row mtime. `updated` is rendered from `content.declared_head_at` (the DHT declaration act's own Timestamp) — NEVER the row's `updated_at` mtime, which is bumped by every stamp including no-ops and cannot be a fact about the content. `updated` is OMITTED (never a substitute value) when `declared_head_at` is NULL — honest absence, per Rule 11's single-provenance case (this row has not recorded a declaration timestamp), not the answer-envelope pattern. Per-peer operational facts (replica counts, projector counts, diversity, caller role) are NOT carried here — a document whose whole point is to be the same everywhere must not embed a fact two honest peers can honestly disagree on. Those are served separately at GET /api/v1/blob/{hash}/distribution/summary, which genuinely differs between honest peers and is intentionally NOT peer-invariant.",
+  "description": "Source of truth: DHT (Notarized HEAD projection, Category A) — a read projection of `content.declared_head_action_hash` / `declared_head_at`. The envelope's cid is a function of the declared head alone: `version`, `id`, `content`, `lamad`, `shefa`, `qahal`, `relationships`, `author` and `updated` are exactly the canonical dag-cbor bytes served verbatim at the `Accept: application/vnd.ipld.dag-cbor` arm of GET /epr-head/{id}; `cid` is that address (CIDv1, codec 0x71), minted per request over those same bytes — two peers agreeing on the declared head mint identical bytes and therefore identical cid, regardless of local row mtime. `updated` is rendered from `content.declared_head_at` (the DHT declaration act's own Timestamp) — NEVER the row's `updated_at` mtime, which is bumped by every stamp including no-ops and cannot be a fact about the content. `updated` is OMITTED (never a substitute value) when `declared_head_at` is NULL — honest absence, per Rule 11's single-provenance case (this row has not recorded a declaration timestamp), not the answer-envelope pattern. `election` is the one field that rides beside the address unaddressed: a witness of the election that chose the head, omitted when none is recorded, never part of the dag-cbor bytes or the cid. Per-peer operational facts (replica counts, projector counts, diversity, caller role) are NOT carried here — a document whose whole point is to be the same everywhere must not embed a fact two honest peers can honestly disagree on. Those are served separately at GET /api/v1/blob/{hash}/distribution/summary, which genuinely differs between honest peers and is intentionally NOT peer-invariant.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "id", "content", "lamad", "shefa", "qahal", "relationships"],
@@ -103,6 +103,27 @@
     "cid": {
       "type": "string",
       "description": "CIDv1 dag-cbor (codec 0x71, Sha2_256) address of this envelope's canonical bytes: version, id, content, lamad, shefa, qahal, relationships, author, updated — nothing else. Recomputed per request; a function of the declared head alone. Omitted only on the (should-not-occur) internal encoding failure that also collapses distribution-free bytes to nothing servable via the dag-cbor arm."
+    },
+    "election": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalDeclaredAt", "earned"],
+      "description": "The election that chose this head, as this peer's projection recorded it — an UNADDRESSED witness riding beside the envelope. NOT covered by `cid` and NOT part of the dag-cbor bytes served at the `Accept: application/vnd.ipld.dag-cbor` arm: two peers that agree on the declared head mint the same `cid` whether or not their projections recorded the same election. It exists so a reader can tell a stale election (same linkHash, earlier canonicalDeclaredAt or a lagging peer) from a different one (different linkHash). Projected from content.canonical_declared_at / canonical_earned / canonical_link_hash (Category A, projection of the DHT election). Omitted — never a substitute value — when canonical_declared_at is NULL (no election recorded on this row): Rule 11 single-provenance case, the row answered and there is no recorded election.",
+      "properties": {
+        "canonicalDeclaredAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC3339 UTC with microsecond precision (six fractional digits), rendered from content.canonical_declared_at — the DHT timestamp of the canonical-head declaration LINK that select_canonical_winner elected. Microseconds so two elections order losslessly; NOT declared_head_at (the head action's timestamp, rendered as `updated`)."
+        },
+        "earned": {
+          "type": "boolean",
+          "description": "Election tier: true iff content.canonical_earned = 1 (EARNED — beats any staging declaration regardless of recency); false for a staging/unmarked election (0) or an unrecorded tier (NULL)."
+        },
+        "linkHash": {
+          "type": "string",
+          "description": "The election's tiebreak, from content.canonical_link_hash (Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. Omitted when NULL — an election recorded before the tiebreak travelled."
+        }
+      }
     }
   }
 }

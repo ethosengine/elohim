@@ -120,4 +120,20 @@ stagingCandidateState?: StagingCandidateState,
  * Absent (not `null`) on a plain read, so a response without the
  * parameter is byte-identical to one from a peer that predates it.
  */
-earnedSource?: EarnedSource, };
+earnedSource?: EarnedSource, 
+/**
+ * The election clock: the DHT timestamp (microseconds since the Unix
+ * epoch, same convention as `ProjectionInventoryEntry.declared_head_at`)
+ * of the canonical-head declaration LINK `select_canonical_winner`
+ * elected, as this peer's projection recorded it
+ * (`content.canonical_declared_at`). With [`Self::canonical_link_hash`]
+ * it lets a reader tell a stale election from a different one. `None` =
+ * no election recorded on this row (wire: `canonicalDeclaredAt`).
+ */
+canonicalDeclaredAt?: number | null, 
+/**
+ * The election's tiebreak (`content.canonical_link_hash`, u-prefixed
+ * base64). `None` = no election recorded, or one recorded before the
+ * tiebreak travelled (wire: `canonicalLinkHash`).
+ */
+canonicalLinkHash?: string, };
