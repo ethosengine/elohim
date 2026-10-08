@@ -1,6 +1,7 @@
 ---
 id: observer-protocol
 cites:
+  - "observability-epic | the companion that turns this epic's witness inward onto the network itself: self-sense, witness and fruit, with Part VIII's safeguards restated for peers, hubs and health | path: genesis/docs/content/elohim-protocol/observability/epic.md"
   - "elohim-protocol-manifesto | The vision this epic deepens; its Witnessed Humanity section (Part III) is the digital half of the Sybil answer whose physical half is written here: humanity witnessed by those who know you, attunement over filters, the sense that notices a counterfeit, the privacy line. | sha256:8ce1acd2670cf1f1 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "shefa-economic-infrastructure | The economic pillar where social attestation against Sybil rings was first written (§5): people who know you attest, staking their own standing; the Observer adds the physical witness to that same relational shape. | sha256:74323616b4696d99 | path: genesis/docs/content/elohim-protocol/shefa.md"
 ---
@@ -261,6 +262,8 @@ Complete implementation where desired. Work, civic, community spaces joining. Li
 - Deletion rights (forgotten when requested)
 
 ---
+
+The network's observation of itself — its peers, hubs and health — under these same safeguards is written in the [Observability epic](observability/epic.md): the same witness, turned inward.
 
 ## **Part IX: Beyond Surveillance Capitalism**
 

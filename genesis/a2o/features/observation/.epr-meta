@@ -1,0 +1,32 @@
+---
+epr-meta-version: 1
+id: a2o-observation
+covers: subtree
+purpose: >
+  Acceptance stories for the Observability epic — how a peer senses itself, how a sibling
+  witnesses it, how fruit graduates, and what an outside observer may never learn. One
+  @concern tag per feature, matching a habit atom declared where the behaviour lives
+  (elohim/holochain, elohim/elohim-storage, doorway/doorway-service, the repo root). Every
+  scenario here reads the service's own surface and is Act I; the single scenario that
+  queries the fleet's aggregator carries @requires:observability (LAYERS.md reserves that
+  cap for exactly that) and lives in sensor-labels-bounded.feature as an Act II sibling.
+  Governed as a whole; the parent a2o CLAUDE.md and the dataplane README carry the
+  authoring conventions — no additional edit-time gate is needed for this subtree.
+cites:
+  - genesis/docs/content/elohim-protocol/observability/epic.md
+  - genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md
+  - genesis/docs/architecture/private-thought-governed-fruit.md
+---
+# observation/ — the network observing itself
+
+Six features, one per habit rung, plus the local-first story (a reading lands with no doorway
+reachable) and the outside-observer story (participation is not learnable from the plane). The
+directory is named `observation/` and not `observability/` because the harness reserves the
+`observability` capability for scenarios that query Grafana, Loki or Prometheus; all but one
+scenario here deliberately do not.
+
+Every scenario is born `@wip`: the stations are declared before the code exists, which is the
+RED-FIRST discipline the parent CLAUDE.md asks for. Step glue lives in
+`steps/observation/*.steps.ts` when it is written; until then the dry run lists the steps as
+undefined, which is the honest state.

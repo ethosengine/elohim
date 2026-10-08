@@ -130,3 +130,12 @@ Feature: Operator verbs are commitment-gated protocol acts, not cluster surgery
     When peer "alpha-A" is asked for its runtime status directly
     Then peer "alpha-A" reports its own sync, reconcile and peer counts
     And the answer does not traverse the operator's observability cluster
+
+  @wip
+  Scenario: A verb's success is a post-action observation, not the handler's word
+    Given matthew holds a valid delegates-compute grant for the operator-reconcile capability
+    When the reconcile verb is accepted and its sweep completes
+    Then the peer holds an observation row of kind "infrastructure:operator-effect" with phase "post"
+    And that row's event id equals the accepted verb's attestation event id
+    And that row's observer is the peer's own sampler, not the verb handler
+    And a verb with no post row inside its window is listed by the compute dashboard's anomalies as "unverified-effect"

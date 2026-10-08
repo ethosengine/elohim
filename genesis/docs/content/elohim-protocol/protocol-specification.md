@@ -50,12 +50,13 @@ Several concerns that the [manifesto](manifesto.md) and the [constitution](const
 | Concern | Governed by | Why it is outside this specification |
 |---------|-------------|--------------------------------------|
 | Physical privacy controls | [Observer Protocol](observer-protocol.md) and [Hardware Specification](hardware-spec.md) | Hardware and firmware layer, not wire protocol |
+| How a peer, a household, a holon and the commons observe their own health and activity without an aggregator | [Observability epic](observability/epic.md), with the [observation/event layer design](architecture/2026-05-11-observation-event-layer-design.md) as its substrate | Evidence plane, not content addressing: an observation is never a head, never a gate and never an authority; only what graduates from it becomes an `Attestation` (Part III) |
 | Harm response and protection of those harmed | Elohim Agent Constitution (planned) | Agent behavior, not content addressing |
 | Recognition circulation: decay, thresholds, redistribution | Shefa Economic Protocol (planned; see [Shefa](shefa.md)) | Economic policy, not content format |
 | How ratifiers are chosen; cryptographic sortition is one possible mechanism | Constitutional Council Protocol (planned) | Governance mechanism, not content delivery |
 | Identity across the participation stages: Visitor (browsing, no account), Hosted (a doorway holds the person's keys and runs their cell), App Steward (the desktop app, with self-custodied keys) and Node Steward (always-on infrastructure) | Identity Portability Protocol (planned) | Identity lifecycle, not content references |
 
-This specification provides the hooks these companions attach to: the `ratifierId` on each stewardship allocation connects to how ratifiers are chosen, `recognitionPolicy` connects to the economic rules, and `reach` connects to privacy. It does not define the rules themselves.
+This specification provides the hooks these companions attach to: the `ratifierId` on each stewardship allocation connects to how ratifiers are chosen, `recognitionPolicy` connects to the economic rules, `reach` connects to privacy, and the `Attestation` record is the only crossing from the observation plane into this specification: an observation that graduates lands as an attestation whose `evidence` carries the references an auditor can re-fetch. It does not define the rules themselves.
 
 ---
 
@@ -422,6 +423,16 @@ An attestation's history is append-only. An attestation cannot be sold or transf
 
 Attestations are designed to meet access gates (a head's `qahal.attestationRequirements`, a Document's `attestationsRequired`), and they feed the three meaning maps that [lamad](lamad.md) builds for a learner (knowledge, love and self: how they relate to a subject, to other people and to themselves). They are the protocol's alternative to engagement metrics.
 
+### Observations (informative)
+
+An observation is a signed record of something a peer sensed: `EprKind::Observation` in the `elohim-epr` crate, coupled to knowledge only, kept on the observer's own append-only log and addressed by observer and offset (`iroh://{observer}@{log}#{offset}`). It is not notarized and is not served over `/elohim/epr`. The [Observability epic](observability/epic.md) states the planes it belongs to, the boundaries on it, and its proof obligations.
+
+A pillar manifest declares each observation kind with a retention class, a reach on the observation plane's own ladder, a diversity threshold and a `graduates_to` target. Graduation is the only crossing into this specification: enough distinct witnesses within one window yield one `Attestation` (or one summary economic event), issued by an evaluator, with the observation references carried in `evidence`.
+
+A quantity carries its confidence: what kind of claim it is (`ClaimKind`), its interval, and, when the interval is unknown, why (`UnknownReason`). A missing measurement is never encoded as zero.
+
+Nothing in this specification reads an observation, a health attestation or a rollup to decide the reach gate (Part IV). Evidence informs placement, temperature and an operator's work; it confers no authority.
+
 ---
 
 ## Part IV: Resolution Protocol, `/elohim/epr`
@@ -732,7 +743,7 @@ These are the places where the design is not complete.
 - Requester identity on batch and feed requests. `ResolveBatch` and the feed messages carry no requester identity, so the reach gate has no requester to check for heads narrower than `public`.
 - Requester authentication. `agent_pubkey` is a claim. Nothing in version 1.0.0 binds it to the connection's authenticated peer identity.
 - The gate for Kademlia. Every head may be published to Kademlia, and a Kademlia record, readable by any peer, cannot apply the reach gate, so where the gate sits for heads served from Kademlia is open.
-- The gate for bytes, and the delivery event. `ShardRequest::Get` names only a hash, with neither a requester nor the EPR it serves. A Bitswap request also names no requester, and one blob can sit behind several EPRs with different stewards. How to gate bytes that sit behind an EPR narrower than `public` is therefore open. Bytes fetched by address over HTTP, from an IPFS node or over Bitswap pass outside EPR resolution. Rule 3 needs a byte request that names the EPR, and a witness to the event other than the delivering peer, so that a peer cannot log deliveries it never made. Whether the delivering peer shares in the recognition is left to the Shefa economic protocol.
+- The gate for bytes, and the delivery event. `ShardRequest::Get` names only a hash, with neither a requester nor the EPR it serves. A Bitswap request also names no requester, and one blob can sit behind several EPRs with different stewards. How to gate bytes that sit behind an EPR narrower than `public` is therefore open. Bytes fetched by address over HTTP, from an IPFS node or over Bitswap pass outside EPR resolution. Rule 3 needs a byte request that names the EPR, and a witness to the event other than the delivering peer, so that a peer cannot log deliveries it never made. The witness half now has a home: the receiving peer's `infrastructure:blob-served` observation (declared in the infrastructure manifest, graduating to `event:served-blob-summary`), so a delivering peer cannot log what no receiver witnessed. The byte request still names no EPR; that half stays open. Whether the delivering peer shares in the recognition is left to the Shefa economic protocol.
 - Evidence for the gate. The gate reads collective memberships, relationships between people, mastery records and the records that bind an agent key to a person and their DID; this specification defines none of them. The `Attestation` record binds a person to a content CID, which changes when the content is revised, while gates name a content id; the fields that would let an attestation meet a gate are not specified, nor whether one an elohim issues can meet a gate that asks for a person's witness.
 - Private content on the Holochain DHT. The lamad DNA's content entry has no visibility attribute, so the title, reach and content address of private content, and its body when stored inline, are readable by any participant in that DNA's network.
 - Who declares, and what a declaration fixes. How the content record that a declaration names relates to the content EPR's atom is not specified, nor who may make a canonical declaration that chooses among independent chains for one `id`. A declaration names a version of the content record but not the stewardship, governance or graph records that a head's `shefa`, `layer`, `relationships` and `attestationRequirements` are derived from, so two peers can derive different heads from one declaration.
@@ -740,7 +751,7 @@ These are the places where the design is not complete.
 - Which community. A head carries no community identifier: `reach: community` admits a member of any collective, and a head with `layer: community` does not say which community's constitution governs it. Only the EPR Document's `constitution.contextId` names it. This specification also does not define what distinguishes `self` from `private`, or `commons` from `public`, beyond the standing a policy may require to grant each.
 - Document resolution. No 1.0.0 message delivers an EPR Document. Still to specify: the document response and its access rule; how `policyChain` restricts access to Tier 3; bounds or paging for `economicEvents`, which grows by one event per delivery; an invalidation rule for accumulating fields such as `recognition`; where per-learner state such as `bloomLevel` belongs, given that many peers share and cache one document; and what the `supported` agent role in an economic event means.
 - `QueryDelivery` disclosure. `QueryDelivery` needs no authorization, so anyone who knows a hash can learn whether a peer holds that blob warm in its extraction cache, including a blob behind non-public EPRs.
-- Evidence of constitutional verification. A peer verifies its own stack, but no 1.0.0 message carries evidence of the check to a requester. How a peer establishes the household, communities and places its stack draws on is not specified, nor whether it must hold the constitution that governs a piece of content before serving it.
+- Evidence of constitutional verification. A peer verifies its own stack, but no 1.0.0 message carries evidence of the check to a requester. How a peer establishes the household, communities and places its stack draws on is not specified, nor whether it must hold the constitution that governs a piece of content before serving it. The evidence of a check is an observation the peer authors about itself (self-sense, in the [Observability epic](observability/epic.md)) and may graduate to an attestation; which message carries it to a requester stays open.
 - Checking a received head directly. A head travels as MessagePack, and its Holochain declaration names a version of the content record rather than the head's CID. Carrying the head's DAG-CBOR bytes, with a CID that the declaration records, would let a receiver check a head without re-deriving it.
 - MessagePack and absent fields. The reference implementation encodes a head in MessagePack as a positional array (Appendix C) and leaves absent optional fields and empty lists out of it, as the DAG-CBOR form does. That moves every later field to an earlier position, so a decoder cannot always tell which field a value belongs to. How absent head fields are encoded in MessagePack is not specified.
 - HTTP projections. `GET /db/content/{id}` returns a flat content record, with the content address as `blobCid` and possibly an inline body, not a head. `GET /epr-head/{id}` returns a head-shaped projection derived from the declared content record alone, so its stewardship, relationships and attestation requirements can be empty and it is not the head a peer serves over `/elohim/epr`. Content whose body is stored inline has no blob, so its head has no address to carry in `content`. The alignment of the HTTP projections with the head is open.
@@ -749,7 +760,9 @@ These are the places where the design is not complete.
 - Identifiers. How `id` slugs are allocated and kept unique across communities is not specified. Converting a DID to an `epr:` URI drops the host, so the conversion is lossless only while ids are unique across hosts. A client cannot tell from `epr:{id}` alone whether it names content or a path. The shape of a path record, and whether step positions start at 0 or 1, are left to the lamad domain.
 - Steward identity and the system issuer. A hosted steward's DID names a doorway's host (`did:web:{host}:humans:{id}`), while doorways are replaceable; keeping that identity when the steward moves is the Identity Portability Protocol's concern (Scope). Who operates the protocol system issuer, `did:web:elohim-protocol.org:system`, what it may issue, and where recognition credited to it goes (for example from deliveries of the landing page in Appendix D), are not specified here.
 - Dormant heads. What a peer does differently with a head marked dormant (Part IV) is not specified.
-- Reserved. `epr:{id}@{version}` is reserved until content versions are defined (Appendix E.1). The protocol ID `/elohim/cluster/1.0.0` is reserved.
+- Observation reach. The observation plane's ladder (`agent-private`, `household`, `community`, `commons`, `commons-attested`; `observation-kind.schema.json`) and this specification's eight-level `Reach` are distinct vocabularies with a named bridge (the [Observability epic](observability/epic.md)'s graduation bridge): a raw observation never carries `Reach` and never crosses its holon; only the attestation it graduates into is gated by Part IV. Unifying the vocabularies is open; canonizing either as the other is refused.
+- Evidence class. No record in this specification says whether a fixture or a real participant produced it; fixture-ness is known only network-wide (the declared network stage) and in harness lane tags. An `evidence_class: fixture | real` on observation rows and attestation metadata, descending only through graduation, is proposed; it enters Appendix A when `observation-kind.schema.json` carries it.
+- Reserved. `epr:{id}@{version}` is reserved until content versions are defined (Appendix E.1). The protocol ID `/elohim/cluster/1.0.0` is reserved for hub-internal cluster coordination; it is not the observation plane.
 
 ---
 
@@ -862,6 +875,24 @@ The types this specification relies on, in the manifest's terms:
 - `TEACHES`: the source teaches the target concept
 - `STEP`: the source path's step at a given position is the target, with the position carried as `orderIndex`
 
+### ObservationReach (observation plane; distinct from Reach)
+
+```
+agent-private | household | community | commons | commons-attested
+```
+
+Source: `elohim/sdk/schemas/v1/manifest/observation-kind.schema.json`. This ladder scopes who may receive an observer's raw rows. It is not `Reach`, and no level of it equals a level of `Reach`: an observation never carries `Reach`; the attestation it graduates into does, bounded by the graduation bridge in the [Observability epic](observability/epic.md). `commons-attested` names a graduation outcome rather than a scope.
+
+### ClaimKind and UnknownReason (the confidence of a quantity)
+
+```
+ClaimKind:      witnessed | instrument-measured | estimated | modelled | imputed
+UnknownReason:  no-observations | not-yet-instrumented | undefined-division |
+                indeterminate-form | zero-base | malformed-input | incommensurable
+```
+
+Source: `elohim/epr/src/measure.rs` (no JSON schema declares these yet; the crate is authoritative). A quantity whose interval is unknown states why, and a confidence can only be widened. Absence is never zero.
+
 ---
 
 ## Appendix B: DID Methods
@@ -939,6 +970,8 @@ libp2p                       iroh ALPN              Purpose
 /elohim/id/1.0.0                                    Peer identification (libp2p identify)
 /elohim/cluster/1.0.0                               Cluster coordination (reserved)
 ```
+
+The observation plane's gossip topics are namespaced `elohim/observations/{pillar}` and declared per kind in the pillar manifests; they are not request-response protocols and carry no protocol ID.
 
 ---
 

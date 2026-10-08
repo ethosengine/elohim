@@ -8,6 +8,7 @@ authors: Matthew Dowell + Opus 4.7
 pillar coupling: elohim (substrate primitive), infrastructure + lamad + mishpat + shefa + imagodei (manifest layers)
 realizes:
   - genesis/docs/content/elohim-protocol/observer-protocol.md (the elohim-observer epic)
+  - genesis/docs/content/elohim-protocol/observability/epic.md (the self-observation epic; this spec is its witness plane and graduation path)
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md (sibling spec; this is the operational half of the cut attestation drew from the notary side)
   - genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md (Track 2 substrate plane this spec extends)
@@ -386,6 +387,8 @@ Controls visibility, mirroring Content reach:
 - `commons-attested` — gossiped commons-wide AND graduated observations land on DHT for cross-network anchoring
 
 `agent-private` is the elohim-observer epic's privacy-switch state — observer running, but no peer sees raw data, only the structured story it produces.
+
+This ladder is bridged to the content `Reach` enum only by graduation: a raw observation never carries `Reach`; the attestation it graduates into does, under the per-rung ceiling the [Observability epic](../observability/epic.md) names as the graduation bridge.
 
 ## 8. Graduation paths
 

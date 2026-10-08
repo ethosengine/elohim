@@ -65,3 +65,5 @@ signing, because the key that signs decides which id is canonical.
 authorship to the person's own devices, and it grants no reach. The retire-when of the habit
 `attention-witnessed-privately` (a signed, persisted, agent-private-encrypted iroh log) is the
 far end of this line. This atom is the first step toward it.
+
+**Canon home (2026-10-08):** the [Observability epic](genesis/docs/content/elohim-protocol/observability/epic.md) carries this concern — §3 (witness plane), §7 step 3; habit `witness-rows-signed` (born red) names this atom as its first move.

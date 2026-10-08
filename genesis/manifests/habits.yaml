@@ -2348,10 +2348,11 @@ habits:
       reconciliation as commitment-gated protocol verbs — with peer-local
       telemetry served by the peer itself. The dev surface and the operator
       OS-settings surface are the same surface.
-    status: green
+    status: red
     active: false
     checks:
       - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
+      - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
       - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
     evidence: >
       DELTA 2026-09-25 (delegated compute via just measure, rung H — household stand-in, no offload proven): the compute-agreement chain ran end to end on the household under the sprint's code, six times, by the developer verb: measure-stage grant on jessica (uhCkk5djd…), work request, accept, execute under the ark envelope as UID 65534, complete with a CID-bound receipt, requester-side verification of the grant window + activation at startedAt and a minted compute-fulfilled event (observed.verified: true). Run 5 (04-doorway-serves, request uhCkka-xfWbXI3fMDOn0Ea6vVhBz4bsj-3xjoAt3gE_FQKV8d0uyx, receiptCid bafyreigeomsyi2hm2lww55w7vd5nz63ygffllfyfwmxwc6qjdymd4zyn2i) and run 6 (doorway-fixture-readiness, request uhCkkIbIARyZIZHRvEQeRfLtyUEcxlN_JleGU1cBfhpCXmMqkKZUF) PASSED with framed reports, durable copies and sprint-report-peer-stage-*.json; run 6's DELTA was written by the listener onto doorway-failover. Records: genesis/a2o/reports/compute-agreements-2026-09-25/rung-H-20260925T154700Z-run1.md, rung-H-20260925T155800Z-runs2-5.md. Skipped honestly: the brit validate ref (no brit-build-ref on this host) and the T2 admission leg. Status unchanged (green).
@@ -3372,6 +3373,29 @@ habits:
       - "elohim/eprfs/epr-cli/src/repository_validators.rs — `sovereignty_guard` / `ownership_guard` with hand-rolled PHRASES consts, the guards this rebinds"
       - ".eprfs/status/gap-items/specs__2026-07-15-sense-respond-governance-classifier-design.json — the classifier spec's gap items, all OPEN at declaration"
 
+  - id: ledgers-fold-once
+    declared: .epr-meta/ledgers-fold-once.habit.md
+    invariant: >
+      Every dev-system witness — a berth claim or shed, a guard event, a harvested finding, a
+      quiesce verdict, a sovereignty landing, a governance decision — is one FlowEvent on one
+      SidecarFlowStore per host, read through epr flow report; a second JSONL that a reader other
+      than its own appender parses with its own cursor and closure rule is a defect.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:ledgers-fold-once (genesis/a2o/features/devflow/ledgers-fold-once.feature — four kinds of witness land as four folds on one store and the scoreboard derives from the report; @wip @act:host)"
+      - "epr flow report --bound ledger-planes-ceiling@1 (hard 1 over ledger-planes@1: .claude/data/*.jsonl and the berth ledger parsed by a script other than their appender; today 7)"
+    evidence: >
+      DELTA 2026-10-08 (BORN red): the runtime inventory of 2026-10-08 counts seven accumulated JSONL ledgers with seven cursors and closure rules, of which two reach the shared fold. Tests the first code pass adds: `python3 -m unittest genesis.agentic.berth_test -k fold` (every Ledger.record(kind) emits dev-berth-events@1 through _observation.emit; a missing emitter costs the fold, never the lease) and a ledger-fold test over the harvesters and guards. FIRST MOVE: berth emits on every kind (consolidation order step 6), then the harvesters fold findings instead of keeping their own files. NO status change.
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §7 (the fold is the dev system's one store), §13 ('.epr-meta is not the telemetry store')"
+      - "the seven planes today: $CLAUDE_CONFIG_DIR/berth/ledger.jsonl; ram-guard and io-guard events.jsonl; .claude/data/{runtime-findings,ci-findings,quiesce-timeline,sovereignty-guard,governance-findings}.jsonl — each with its own cursor and closure rule; only dev-berth-held-by-measure@1 and sovereignty-landings reach the shared fold"
+      - "the emitter: .claude/hooks/_observation.py (already the home of the JSON-accumulator retirement); the rotation question: genesis/data/timeline/backlog/witness-ledger-rotation-is-an-unsolved-design-question.md"
+      - "sibling: dev-system-equilibrium (every stock drains at least as fast as it fills); measure-honesty-local (the kinds the folds must carry); the ark's <peer>/ark/.eprfs/status/flows.jsonl is one store per host and not a violation"
+    retire-when: >
+      when the scripts that mint dev findings obtain their writer from epr flow by construction and
+      no .claude/data/*.jsonl appender remains.
+
   - id: recall-reaches-authority
     declared: .epr-meta/recall-reaches-authority.habit.md
     invariant: >
@@ -4043,6 +4067,37 @@ habits:
       when CI stages run as native peer-executed steps and every consuming app is served only gifts,
       with its observations graduated by peer evaluation rather than read by the bridge that wrote them.
 
+  - id: health-attests-on-transition
+    declared: doorway/doorway-service/.epr-meta/health-attests-on-transition.habit.md
+    invariant: >
+      A peer's health reaches the chain only as a record that closes a period or marks a
+      transition, written by graduation at the manifest's diversity threshold — never by a timer,
+      never by one observer about itself, and never while unchanged; the reader of that record
+      ships with it; silence after period_end reads unobserved.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:health-attests-on-transition (genesis/a2o/features/doorway/health-attests-on-transition.feature — twenty unchanged minutes write nothing; a return records one transition and the closed period is readable through the attestations reader; graduation refuses a single-household pool naming distinct_households; all @wip; default profile: just test mesh features/doorway/health-attests-on-transition.feature)"
+      - "epr flow report --bound period-records-per-peer-day-ceiling@1 (hard 24 = 86400 / the manifest's 3600 s window, over period-records-per-peer-day@1 from a stopped-conductor sniff; reads skipped until folded)"
+    evidence: >
+      DELTA 2026-10-08 (BORN red): the household idle baseline of the gradient sprint reads attestation:device-health as about one third of ~17,000 lamad actions a day against a 5,000 ceiling (idle-is-free DELTA 2026-10-08), every doorway probe is a DHT write, and `get_doorway_attestations` is a stub. Lane 3's attest_decision (two-round hold; Unchanged writes nothing) is code-complete with 92 tests passing in wt-lane3b and gate-blocked by the disk ceiling. Cargo tests the first code pass adds: `cargo test -p doorway-service --lib services::federation::attest_decision` and `cargo test --lib graduation::evaluator -- doorway_health_summary_requires_distinct_households` (the issuer may not be the sole observer of its own evidence). FIRST MOVE: land Lane 3, then the doorway writes infrastructure:doorway-heartbeat observation rows instead of per-probe attestations, then the evaluator ticks with its reader. NO status change.
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §3 (fruit), §7 steps 3–4, §12 rung 4"
+      - "rulings: genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md §5 rulings 1–4 and §8 rows §5.1–2; records-lifecycle §D.5 hard cutover (evaluator green with its reader before the per-probe writes retire)"
+      - "the writer today: doorway/doorway-service/src/services/federation.rs ProbeRoster — every ~5 min probe calls record_health_attestation, which issues attestation:device-health; the Lane 3 attest_decision two-round hysteresis is +383 lines uncommitted in .worktrees/wt-lane3b (gradient sprint 2026-10-08)"
+      - "the kind: elohim/sdk/domains/infrastructure/manifest.json infrastructure:doorway-heartbeat (community reach; distinct_households 3, min_count 5; graduates_to attestation:doorway-health-summary; window 3600) and elohim/sdk/schemas/v1/attestation/subtypes/doorway-health-summary-metadata.schema.json (period_start, period_end)"
+      - "the bill: idle-is-free (the registration heartbeat and this writer are its two largest idle writers); the review rule: genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md row 16 (capture cannot review itself)"
+    guard: >
+      Regression risks: (1) a scenario that asserts the write and not the read asserts an unread
+      record (ruling 3); (2) proving graduation on the household mesh, where distinct_households: 3
+      is unreachable by design — the household finish line is zero chain writes plus the health read
+      from the observation substrate, and graduation is proven by the evaluator's fixture test;
+      (3) node-registry HealthAttestation as the home (ruling 4: no period field, no validation).
+    retire-when: >
+      when idle-is-free is green with the doorway as the only health attester for 30 days and
+      get_doorway_attestations is the wired reader — the writer then holds the ceiling and nothing
+      watches it from outside.
+
   - id: hosted-cell-promised
     declared: doorway/doorway-service/.epr-meta/hosted-cell-promised.habit.md
     invariant: >
@@ -4483,6 +4538,31 @@ habits:
       when the attention log is a signed, persisted, agent-private-encrypted iroh log with the
       graduation evaluator — privacy is then a property of the log itself, not a practice under watch.
 
+  - id: evidence-class-descends
+    declared: elohim/elohim-storage/.epr-meta/evidence-class-descends.habit.md
+    invariant: >
+      Every observation row, attestation and summary event carries evidence_class ∈ {fixture,
+      real}; the class only descends through graduation — a fixture observation graduates into a
+      fixture attestation and never into a summary EconomicEvent that settles; a row with no class
+      is refused at write, never defaulted to real.
+    status: unwired
+    active: false
+    evidence: >
+      DELTA 2026-10-08 (BORN unwired — no column, no schema field; a test today fails to compile, which is not a failing check, so the census admits no checks): the only legal first move is the schema field, after which this atom is written red with its three checks. Planned in the Observability epic §10 and §12 rung 2. NO status change.
+    first_move: >
+      Add evidence_class to elohim/sdk/schemas/v1/manifest/observation-kind.schema.json's payload
+      rules and to elohim/sdk/schemas/v1/attestation/attestation-metadata.schema.json, then write
+      `cargo test --lib graduation::evaluator -- fixture_observations_never_settle` red; only then
+      declare checks (that test; pnpm run schema:test; a2o @concern:evidence-class-descends in
+      genesis/a2o/features/observation/evidence-class-descends.feature, already scaffolded @wip).
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §10 (keep fixtures out of settlement), the one hard rule of the Prometheus survey"
+      - "the rows: genesis/data/timeline/backlog/measure-family-borrows-backlog.md row 28 (the class) and row 29 (domain identity, which rides the same evaluator change but is dedupe, not class); genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md row 15 (the integrity floor rides the next [dna:migrate])"
+      - "today: fixture-ness is known only network-wide (crates/seam-contracts/src/freshness.rs NetworkStage) and in a2o lane tags; no row says it came from a seeder"
+    retire-when: >
+      when the integrity zome refuses an unclassed or class-raising attestation (row 15 landed),
+      leaving the storage-side refusal a shim.
+
   - id: idle-is-free
     declared: elohim/elohim-storage/.epr-meta/idle-is-free.habit.md
     invariant: >
@@ -4519,6 +4599,31 @@ habits:
       bounded timer) and its settled-state memory by construction — so that a loop which re-asks
       what it already knows cannot be written — and a running node reports its own idle cost
       against a declared ceiling, making a separate household rehearsal redundant.
+
+  - id: liveness-has-one-source
+    declared: elohim/elohim-storage/.epr-meta/liveness-has-one-source.habit.md
+    invariant: >
+      On a peer, "is this peer here now" has one writer and one cadence — substrate presence,
+      armed on every transport with a short TTL — and every consumer (shard placement, the
+      resilience card, network posture, the doorway roster) reads it; posture (lifecycle, pool
+      flags, archetype) is a standing declaration written on change; a killed peer never has to
+      write that it left; unarmed presence reads unmeasured, never alive.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:liveness-has-one-source (genesis/a2o/features/observation/liveness-has-one-source.feature — a killed peer leaves placement within 35 s with zero chain actions about liveness (plane-separation §8 row §5.5 verbatim); unarmed presence reads unmeasured; all @wip; default profile: just test mesh features/observation/liveness-has-one-source.feature)"
+      - "epr flow report --bound liveness-sources-ceiling@1 (hard 1 over liveness-sources@1: distinct liveness writers that produced a fact about one peer in a 10-minute household rest; reads skipped until folded)"
+    evidence: >
+      DELTA 2026-10-08 (BORN red): liveness is derived five ways at four cadences and notarized twice; an idle household writes chain actions about peers that did not change. Cargo test the first code pass adds: `cargo test --lib services::peer_liveness -- armed_on_iroh_and_unarmed_reads_unmeasured`. FIRST MOVE: arm presence on iroh and define the unarmed fallback (ruling 5 step one), with the readers moved before the writer. Planned in the Observability epic §7 step 5. NO status change.
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §3 (posture vs liveness), §7 step 5, §11 (five writers at four cadences)"
+      - "ruling: genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md §5 ruling 5 — order is binding: arm presence on iroh, define the unarmed fallback, move the readers, only then change the writer"
+      - "the five writers today: elohim/elohim-storage/src/heartbeat.rs (60 s → infrastructure.record_peer_status, a DHT PeerStatus, stale at 120/900 s); src/services/peer_liveness.rs (35 s in-memory, armed only from the libp2p path at src/p2p/mod.rs ~3821); doorway ProbeRoster (attestation per ~5 min); infrastructure:doorway-heartbeat (declared, no producer); doorway self_uptime (hourly strip in Mongo)"
+      - "the absence bug this atom also owns: elohim/elohim-storage/src/heartbeat.rs ~368–372 defaults free storage to 100% when the probe fails (absence read as health)"
+      - "sibling: dataplane-convergence (active) owns placement; the reader move in step 3 of the consolidation order is sequenced inside its work"
+    retire-when: >
+      when the transport layer is the only thing that can say a peer is present and no code path
+      can write a liveness fact to a chain — the habit then describes the transport.
 
   - id: nachalah-allotment
     declared: elohim/elohim-storage/.epr-meta/nachalah-allotment.habit.md
@@ -5046,6 +5151,31 @@ habits:
       in the arc doc — the CI roll is then no longer a delivery path for the class and the
       register describes a product, not a practice.
 
+  - id: witness-rows-signed
+    declared: elohim/elohim-storage/.epr-meta/witness-rows-signed.habit.md
+    invariant: >
+      Every observation row a peer keeps either carries a signature the peer verified against the
+      observer's key (device key at a repo node, agent key at a peer) or says plainly that it is
+      unsigned — in the write ack, in every view, and in graduation, where an unsigned row counts
+      toward no diversity threshold and never graduates.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:witness-rows-signed (genesis/a2o/features/observation/witness-rows-signed.feature — signed ack, unsigned-labelled-and-excluded, browser-signs-with-session-key; and genesis/a2o/features/observation/observed-without-a-doorway.feature — the local-first station: a reading lands signed on a peer with both doorways stopped; all @wip; default profile: just test mesh features/observation/witness-rows-signed.feature)"
+      - "epr flow report --bound observation-rows-unsigned-ceiling@1 (hard 0 over observation-rows-unsigned@1: rows with an empty signature per peer; reads skipped until folded)"
+    evidence: >
+      DELTA 2026-10-08 (BORN red): `POST /api/v1/observations` accepts an empty `signature_b64` and the stream emits a signature-absent omission line; nothing verifies a signature against the observer's key, and the graduation evaluator does not yet exclude unsigned rows (it is referenced by nothing outside its module). Cargo tests the first code pass adds: `cargo test --test api -- observations::signing` (a stored signature verifies against the X-Agent-Cid key; an unsigned post acks signed: absent) and `cargo test --lib graduation::evaluator -- unsigned_rows_never_graduate`. FIRST MOVE: the signing graduation backlog atom's first step, then the evaluator exclusion. Planned in the Observability epic §7 step 3. NO status change.
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §3 (witness plane), §10 (witness with diversity)"
+      - "first move: genesis/data/timeline/backlog/observation-signing-graduation.md (device key at the repo node, agent key at the peer, one observer_cid per person)"
+      - "today: elohim/elohim-storage/src/observation/stream.rs ~38–40 ('observations are unsigned until the signing graduation'); src/api/observations.rs ('the row is unsigned and the ack says so'); src/observation/projector.rs"
+      - "design: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md §6.3 trust-then-verify"
+      - "siblings: attention-witnessed-privately owns privacy (never gossiped, never joined); this atom owns provenance; acts-attributed-to-participants owns the observer-namespace split"
+    retire-when: >
+      when the observation log is the signed, persisted, agent-private-encrypted iroh log named in
+      attention-witnessed-privately's retire-when — a row that cannot be appended unsigned leaves
+      nothing to say "absent" about.
+
   - id: happ-lineage-migration
     declared: elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
     invariant: >
@@ -5453,6 +5583,38 @@ habits:
       with every witness verified and zero records re-seeded from outside, each with its cycle-time
       row in the arc doc — the wipe is then not a delivery path for any class and the register
       describes a product, not a practice.
+
+  - id: sensor-labels-bounded
+    declared: elohim/holochain/.epr-meta/sensor-labels-bounded.habit.md
+    invariant: >
+      A peer's self-sense never leaves the host carrying a participant: every label on every
+      exposition the runtime serves (the conductor's metrics port, storage /metrics, doorway
+      /metrics) is drawn from a declared bounded vocabulary, no label value is an agent key, a cell
+      id or anything derivable to one person, and on a per-human conductor the exposition itself is
+      served to the host and folded by the peer, never scraped off it.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:sensor-labels-bounded (genesis/a2o/features/observation/sensor-labels-bounded.feature — three scenarios, all @wip: no exposition on a household peer carries a participant label; a refused label is counted by key; the fleet's Prometheus holds no per-participant conductor series (@act:ii @requires:observability); default profile: just test mesh features/observation/sensor-labels-bounded.feature)"
+      - "epr flow report --bound sensor-participant-labels-ceiling@1 (hard 0 over sensor-label-cardinality@1: distinct label values matching ^uhCAk or a cell id across the three expositions on a peer; reads skipped until folded, never zero)"
+    evidence: >
+      DELTA 2026-10-08 (BORN red — the invariant is measured NOT held): read from the fork at pin c916eddbe, `ribosome.rs` pushes `agent` (the source-chain agent pubkey) onto every zome-call duration measurement when a workspace exists, and `emit_signal.rs` labels every emitted signal with `cell_id`; the fleet scrapes :9464 every 30 s, so today a cluster Prometheus holds a per-participant activity ledger for every hosted human on alpha. Storage's own /metrics carries no participant label (closed vocabularies, read from src/metrics.rs). Cargo tests the first code pass adds: `cargo test -p holochain --lib metrics::label_vocabulary` (the KeyValue set at the two sites equals the declared vocabulary; fails on any key named agent or cell_id and on any value matching ^uhCAk) and `cargo test --lib metrics::label_vocabulary` in elohim-storage and doorway-service. FIRST MOVE: delete the `agent` push, replace `cell_id` with `dna_hash`, add the render denylist test, change the documented listen example to loopback. Planned in the Observability epic §7 step 1; declared here where the fork's habits live. NO status change until the fork test is green at the pin and a household scrape reads 0 twice.
+    refs:
+      - "canon: genesis/docs/content/elohim-protocol/observability/epic.md §7 step 1, §8 promise 3, §9 boundary 5"
+      - "the leak: elohim/holochain-conductor crates/holochain/src/core/ribosome.rs ~891–905 (agent label on zome-call duration) and crates/holochain/src/core/ribosome/host_fn/emit_signal.rs ~50 (cell_id on emitted signals); the exporter crates/holochain_metrics/src/prometheus.rs renders whatever the instrument pushed"
+      - "the scrape that leaves the host: genesis/orchestrator/manifests/infra/alpha-edgenode-podmonitor.yaml (storage :8090 and conductor :9464 every 30 s)"
+      - "boundary: genesis/docs/architecture/private-thought-governed-fruit.md §4 boundary 6 (participation is sensitive; the surveillable surface is a design quantity)"
+      - "sibling: zome-call-cost-bounded (its ceiling's metric may carry zome and fn, never agent); attention-witnessed-privately (the person plane; this atom is the machine plane)"
+    guard: >
+      Regression risks: (1) hashing the agent label instead of deleting it — a stable hash of a key is
+      a pseudonym linkable over time and fails this invariant; (2) stripping at render without
+      re-aggregating, which emits duplicate series and leaves the per-agent cardinality alive in the
+      SDK aggregator; (3) greening this off the storage exposition alone — it already passes; the
+      conductor's is the one that leaks.
+    retire-when: >
+      when the conductor's exporter registers its label vocabulary at compile time (a KeyValue with
+      an undeclared key does not build) and the peer is the only reader of its own conductor's
+      exposition, so nothing is left for a scrape test to catch.
 
   - id: zome-call-cost-bounded
     declared: elohim/holochain/.epr-meta/zome-call-cost-bounded.habit.md

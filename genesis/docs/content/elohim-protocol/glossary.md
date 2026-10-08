@@ -18,6 +18,8 @@ cites:
 ## People and agents
 
 - **elohim** (lowercase, used as a noun) — the protocol's AI agents. Drawn from the Hebrew *elohim* in its divine-council sense (Psalm 82): messengers and servants, never to be worshipped. In the software, an *elohim* is an AI agent that runs locally, on a participant's own hardware, and acts on that person's and community's behalf under the constitution's values.
+- **elohim-operator** — the elohim that tends a household's hardware and runtime: a software steward bounded by the household's commitments, never the owner of the rack and not the human who runs it. It carries the sensing, folding, signing and first escalation the Observability epic describes.
+- **holon** — a space that holds its own activity ledger: a person, a household, a collective, a region. Each holon sees inside itself; nothing outside it may join its ledger to another's.
 - **imago dei** — "the image of God" (Genesis 1:27): the conviction that every human bears inherent, unearnable dignity. The protocol's model of identity rests on this rather than on ownership or credentials.
 - **El Roi** — "the God who sees me" (Hagar's name for God, Genesis 16:13): the protocol's ideal of being genuinely *known* — recognized as a person — rather than surveilled as a data source.
 
@@ -32,7 +34,7 @@ cites:
 
 ## The machinery
 
-- **the witness** / **the Observer** — the protocol's capacity to observe and record what actually happens (for example, inside a household), so that care and harm can be seen truthfully. Designed to be a witness, not a security camera, and bounded by consent and constitutional limits.
+- **the witness** / **the Observer** — the protocol's capacity to observe and record what actually happens (for example, inside a household), so that care and harm can be seen truthfully. Designed to be a witness, not a security camera, and bounded by consent and constitutional limits. The Observability epic splits the network's own observation into three records: *self-sense* (what a peer keeps about itself), *a witness* (what a sibling signs about what it saw), and *fruit* (a crossed threshold that becomes an attestation).
 - **REA / the REA engine** — Resource–Event–Agent accounting: the layer that records real contributions of care and labor as economic events, making invisible work (a parent's hours, an afternoon with a sick child) visible and valuable.
 - **conductor · source chain · DNA** — terms from Holochain, the peer-to-peer framework the protocol is built on. A *conductor* is the local runtime a participant runs on their own device; a *source chain* is each participant's own private, tamper-evident log of their actions; a *DNA* is an application's rule-set, whose content hash defines a distinct network (change the rules, and you have a new, separate network).
 - **compute-commitment** — a grant of authority that is scoped, time-limited, revocable, and cryptographically attested — as opposed to a permanent access key. It is how the protocol delegates bounded authority without handing over standing control.

@@ -104,3 +104,5 @@ distribution-plane provenance manifest IS the commit graph. Scope note
 (operator: "a bit of a rabbit hole"): route the design session to
 brit's roadmap — do not expand this backlog entry's view-honesty fix
 (part 1) to wait on it.
+
+**Canon home (2026-10-08):** the [Observability epic](genesis/docs/content/elohim-protocol/observability/epic.md) carries this concern — §10 ('sense honestly': unmeasured never reads as zero) and §6 (the count of the unobserved is the honest denominator that crosses a rung).

@@ -160,6 +160,8 @@ Why Holochain and not a blockchain? Because agent-centric architecture means you
 
 [elohim/holochain/research/](../../elohim/holochain/research/)
 
+**Letter to Holo and Holochain core (2026-10-08)** — written in reply to a one-paragraph question about our conductor Prometheus exporter, it carries the whole arc: how core observes itself today (Influx, built for Wind Tunnel; a real Nomad cluster for thirty minutes on Thursdays), why our fleet is on k8s and what duration measures that breadth cannot, what core should take and the label audit that is the real risk for production users, upgrade and rollback as the defence of DHT integrity, arcs and our dataplane as two halves of one scaling story, and the finding that capture is an undeclared stewardship relationship on both sides — the Observability epic's opening claim. [Letter →](epr:letter-to-holochain-observability-capture-2026-10-08)
+
 ---
 
 ## The Content Addressing Problem
@@ -265,6 +267,18 @@ The one-line verdict: **Hypha is the closest philosophical fellow-traveler the p
 **⚠ Name-collision guard** — this is the `hypha*` scar tissue the index warns about, and it has already cost confusion once. **`hypha-dao`** (this survey, the collective) ≠ **`hyphacoop` / Distributed Press** (the doorway survey, `2026-06-23`) ≠ **hypha-network**. Check the date suffix before citing.
 
 [Cross-pollination survey →](epr:hypha-dao-autonomous-collectives-cross-pollination-2026-06-24)
+
+---
+
+## The Evidence Problem — Prometheus (Permaculture DAO)
+
+[Permaculture DAO / Prometheus](https://github.com/Permaculture-DAO) is a one-steward, verification-first project recording regenerative land evidence (soil, water, biomass, 27 MRV indicators from a Sicily pilot in pre-registration) on a single-DNA Holochain 0.6.1 hApp behind a GPG-signed canon. It is the closest external mirror for the *evidence ladder* itself: claim → observation → evidence → provenance → integrity → verified indicator → admissibility → value, with the lowest unresolved gate controlling the permitted claim.
+
+The one-line verdict: **a sibling in discipline and a stranger in substrate.** Their honesty rails are small and exact — a `TEST|REAL` evidence class the integrity zome refuses to blur (`REAL_DATA_PERSISTENCE_GATE_CLOSED`), capture that cannot self-review, an ordered claim tier that refuses investor-facing overclaims, a prose linter that fails "guaranteed return", a ratification note naming what is unmet — and every one is a cheap lift into a tree that already has the observation plane, consolidated attestation, the reach ladder, release manifests with thresholds and the household-to-fleet evidence ladder they are still building toward. Their runtime (one cell, one key, `validate` that accepts every link) is left behind. The survey closes in outreach: the partnership shape is a consuming app on the bridges seam (they bring the domain, devices and reviewers; we bring the plane), and a context-isolated agent reads the survey from their side and amends the who-takes-what table.
+
+**⚠ Name guard** — their "Prometheus" is not the metrics system our conductors export to; their DNA "hearth" is not `topeuph-ai/hearth` on hAppRadar; their "Genesis" line is not our `genesis/` tree; "DAO" is a name, there is no token or chain.
+
+[Cross-pollination survey →](epr:permaculture-dao-prometheus-cross-pollination-2026-10-08) · minted into [measure-family-borrows-backlog](epr:measure-family-borrows-backlog), [arch-authority-in-integrity-backlog](epr:arch-authority-in-integrity-backlog), [design-legibility-borrows-backlog](epr:design-legibility-borrows-backlog), [arch-workspace-discipline-backlog](epr:arch-workspace-discipline-backlog) · manifest: `prometheus-happ`, `prometheus-canon`, `prometheus-runtime` (not cloned by default).
 
 ---
 
