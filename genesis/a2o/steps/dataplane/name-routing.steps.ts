@@ -493,9 +493,10 @@ async function landingBundles(
 }
 
 Given(
-  'doorways {string} and {string} have converged on the bundle each serves at the landing mount',
+  'doorways {string} and {string} have converged on the bundle each serves at the landing mount, the root path {string}',
   { timeout: LANDING_CONVERGENCE_BOUND_MS + 30_000 },
-  async function (this: E2EWorld, first: string, second: string) {
+  async function (this: E2EWorld, first: string, second: string, mount: string) {
+    assert.equal(mount, '/', `the landing mount is "/", got "${mount}"`);
     const state = stateOf(this);
     const deadline = Date.now() + LANDING_CONVERGENCE_BOUND_MS;
     let last = '';

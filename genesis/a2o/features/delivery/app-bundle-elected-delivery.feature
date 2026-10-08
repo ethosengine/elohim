@@ -59,7 +59,10 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   when that peer's own runtime is told to look at it. An app bound to a
   channel on a peer that does not follow it is still held by the channel —
   nothing else may move its record — but nobody takes releases up for it, so
-  that peer keeps serving whatever bundles the record named last. A CANARY is a peer that takes up staging
+  that peer keeps serving whatever bundles the record named last. A release's
+  ADOPTION MEASURE asks every peer that follows the channel whether its
+  records name the release, and reads "adopted" once all of them do; a peer
+  that follows no channel is never asked. A CANARY is a peer that takes up staging
   releases as well as earned ones. In this household every peer is a canary
   for this channel, so a staged release reaches all three.
 
