@@ -102,7 +102,7 @@ Holochain is the foundation: agent-centric source chains, a DHT that notarises, 
 - The system's state is a list of the things it must reliably do, each marked green only on evidence.
 - Observation is witness, not surveillance: held by the group it describes, confirmed by several observers, and governed by the same permission that governs every other act one person takes on behalf of another.
 
-The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. All of it runs on Holochain.
+The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. The pattern is the same each time. Holochain supplies the part that has to be true: the sensor, the hash, the notary. We add the part that says who holds it, who may change it, and how far it travels. Neither project does the other's half. That is why the Prometheus question matters to us more than an exporter should: it is the first place the two halves meet on something core ships.
 
 With respect,
 Matthew Dowell, for the Elohim Protocol
