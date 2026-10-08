@@ -424,6 +424,60 @@ Then(
   }
 );
 
+/**
+ * THE APP ROUTE. `/apps/{slug}/…` and `/apps/{address}/…` serve one app bundle
+ * two ways; both must answer as the content route and the byte route would.
+ * The address is read from the row's public head (`/epr-head/{id}` carries
+ * `content`, the bundle's address), exactly as the byte-route step does.
+ */
+When(
+  'I fetch the app {string} on peer {string} by its slug and by its content address anonymously',
+  async function (this: E2EWorld, appId: string, peerName: string) {
+    const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
+    peerMap(this).set(peerName, base);
+    const head = await getRaw(`${base}/epr-head/${appId}`);
+    let address: string | undefined;
+    if (head.status === 200) {
+      try {
+        address = (JSON.parse(head.text) as { content?: string }).content;
+      } catch {
+        address = undefined;
+      }
+    }
+    assert.ok(
+      address,
+      `Could not resolve a bundle address for "${appId}" from /epr-head (status ` +
+        `${head.status}). The scenario needs a bundle-bearing app row.`
+    );
+    const bySlug = await getRaw(`${base}/apps/${encodeURIComponent(appId)}/index.html`);
+    const byAddress = await getRaw(`${base}/apps/${encodeURIComponent(address)}/index.html`);
+    appProbe(this).set(appId, { bySlug: bySlug.status, byAddress: byAddress.status });
+  }
+);
+
+Then(
+  'both app fetches of {string} were refused with a non-success status',
+  function (this: E2EWorld, appId: string) {
+    const probe = appProbe(this).get(appId);
+    assert.ok(probe, `No app-route probe captured for "${appId}" — the When step must run first.`);
+    for (const [form, status] of Object.entries(probe)) {
+      assert.ok(
+        status < 200 || status >= 300,
+        `REACH BYPASS (app route, ${form}): the bundle of "${appId}" was served to an ` +
+          `anonymous caller (status ${status}) even though the content route refuses the ` +
+          `same row. /apps must be judged as /db/content and /blob are.`
+      );
+    }
+  }
+);
+
+/** Per-scenario app-route probe results, keyed by app row id. */
+function appProbe(world: E2EWorld): Map<string, { bySlug: number; byAddress: number }> {
+  const w = world as unknown as { __appProbe?: Map<string, { bySlug: number; byAddress: number }> };
+  w.__appProbe ??= new Map();
+  return w.__appProbe;
+}
+
 /** Per-scenario head-PUT probe results, keyed by head id. */
 function headPutProbe(world: E2EWorld): Map<string, number> {
   const w = world as unknown as { __headPutProbe?: Map<string, number> };

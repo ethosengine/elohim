@@ -42,6 +42,11 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   how much content each row carried. Same rows with fuller bodies is still a
   leak, so both must match the anonymous answer exactly.
 
+  The write side is part of the same promise. A head written onto a peer over
+  HTTP is content that peer then serves under its own name, so who may write
+  one decides who receives it. Writing a head is therefore an act only the
+  peer's own machine may perform, never an open HTTP write.
+
   Background:
     # "alpha-A" is the A-side doorway of the alpha fleet's A/B pair, resolved to
     # a URL by the shared dataplane peer resolver (E2E_DOORWAY_ALPHA). Every
@@ -143,5 +148,27 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
   # the edge validation from reddening on the known defect.
   @wip @regression
   Scenario: An anonymous PUT of a declared head is refused
-    When I PUT a well-formed head for "reach-probe-unowned-head" on peer "alpha-A" anonymously
-    Then the head PUT for "reach-probe-unowned-head" was refused with a non-success status
+    When I PUT a well-formed head for "reach-probe-remote-head-put" on peer "alpha-A" anonymously
+    Then the head PUT for "reach-probe-remote-head-put" was refused with a non-success status
+
+  # The third way out. An app bundle — a web application the peer serves at
+  # `/apps/{name}/…` — is a content row plus the bytes it points at, and it can
+  # be asked for two ways: by its SLUG (the short name its row is filed under)
+  # or by its content address (the bundle's own hash). Neither asked the reach
+  # gate: a restricted app served to anyone who knew either name, and the
+  # capability probe beside it disclosed the bundle's address. The cure judges
+  # `/apps/{slug}` exactly as the content route judges the row, and
+  # `/apps/{address}` exactly as the byte route judges the bytes — no third
+  # verifier — before any cache is read, so a cached copy never widens who may
+  # have it. "Refused" is any non-success status, as above.
+  #
+  # @wip until both of these exist: a fleet build carrying the cure, and a
+  # restricted app-bundle row in a seeded corpus. No corpus holds one today
+  # (every seeded app bundle is commons), so the fixture named below is the
+  # row this scenario needs, not one that exists; the non-vacuity control
+  # fails loudly until it does.
+  @wip @regression
+  Scenario: A restricted app bundle is refused by slug and by content address alike
+    Given peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "reach-probe-restricted-app"
+    When I fetch the app "reach-probe-restricted-app" on peer "alpha-A" by its slug and by its content address anonymously
+    Then both app fetches of "reach-probe-restricted-app" were refused with a non-success status
