@@ -58,9 +58,12 @@ pub struct EprHeadFingerprint {
     /// legacy any-host contract; absent decodes empty during a rolling deploy.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hostnames: Vec<String>,
-    /// The DECLARED HEAD this doorway currently serves at this mount: the
-    /// browser bundle blob address its bundle-heads reconciler last read from
-    /// its storage for this EPR on this contract's channel. `None` when this
+    /// The bundle this doorway currently serves at this mount: the browser
+    /// bundle blob address its bundle-heads reconciler last read from its
+    /// storage for this EPR on this contract's channel. Named for what it is —
+    /// the bytes this doorway serves, not an authority it holds: the head is
+    /// declared by the peer, and the doorway only reports which bundle it
+    /// took up. `None` when this
     /// doorway has observed no head for it (not a bundle app, or not yet
     /// reconciled). Read by a sibling that is a member of the same public name
     /// to decide whether it may serve that name itself or must hand the
@@ -70,14 +73,24 @@ pub struct EprHeadFingerprint {
     /// clears it): the digest says which routes a doorway holds, and a head
     /// move is not a route change — it must not fire the doorbell or a
     /// coherence divergence alarm on every publish.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub declared_head: Option<String>,
+    ///
+    /// On the wire `servedBundle`; `declaredHead` (the name an older sibling
+    /// writes) still decodes, so a mid-roll pair keeps reading each other.
+    #[serde(
+        default,
+        rename = "servedBundle",
+        alias = "declaredHead",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub served_bundle: Option<String>,
 }
 
 /// This doorway's full routing-table fingerprint. `digest` is a content-stable
-/// **CIDv1 dag-cbor** (`bafyrei…`) over the sorted
-/// `(url_path, epr_id, commitment_id, hostnames)` set, so
-/// two edges agree iff their digests match. `build_id` is the deploy git SHA
+/// **CIDv1 dag-cbor** (`bafyrei…`) over the sorted `(url_path, epr_id,
+/// hostnames)` set, so two edges agree iff their digests match. Each
+/// doorway's own `commitment_id` (and `served_bundle`) rides beside the
+/// digest, never inside it: two doorways holding one EPR at one mount under
+/// their own commitments hold the same route. `build_id` is the deploy git SHA
 /// (the operator's "two EPR heads" symptom was actually build_id skew, not
 /// content divergence) — carried alongside so deploy-skew is reported, never
 /// confused with content skew.
@@ -121,14 +134,26 @@ pub fn mint_head_set_digest(heads: &mut [EprHeadFingerprint]) -> String {
             .then(a.commitment_id.cmp(&b.commitment_id))
             .then(a.hostnames.cmp(&b.hostnames))
     });
-    // The declared head is served beside the route, never part of it.
-    let routes: Vec<EprHeadFingerprint> = heads
+    // The served bundle and the doorway's own commitment ride beside the
+    // route, never inside it: a commitment is each doorway's own undertaking,
+    // so folding it in made two doorways holding one EPR never agree.
+    let mut routes: Vec<EprHeadFingerprint> = heads
         .iter()
         .map(|head| EprHeadFingerprint {
-            declared_head: None,
+            commitment_id: None,
+            served_bundle: None,
             ..head.clone()
         })
         .collect();
+    // Re-sort without the commitment so one route held under several
+    // commitments collapses to one entry, as `compare_to_peer` reads it.
+    routes.sort_by(|a, b| {
+        a.url_path
+            .cmp(&b.url_path)
+            .then(a.epr_id.cmp(&b.epr_id))
+            .then(a.hostnames.cmp(&b.hostnames))
+    });
+    routes.dedup();
     // dag-cbor of this string-only fingerprint set is infallible.
     let preimage = serde_ipld_dagcbor::to_vec(&routes)
         .expect("dag-cbor encode of EprHeadFingerprint set is infallible");
@@ -146,26 +171,26 @@ pub fn router_fingerprint(
     router_fingerprint_with_heads(router, doorway_id, build_id, |_| None)
 }
 
-/// [`router_fingerprint`], with each head's `declared_head` filled from
-/// `declared_head_of` (the served manifest reads the bundle-heads store). The
-/// digest is identical either way — see [`EprHeadFingerprint::declared_head`].
+/// [`router_fingerprint`], with each head's `served_bundle` filled from
+/// `served_bundle_of` (the served manifest reads the bundle-heads store). The
+/// digest is identical either way — see [`EprHeadFingerprint::served_bundle`].
 pub fn router_fingerprint_with_heads(
     router: &EprRouter,
     doorway_id: &str,
     build_id: Option<&str>,
-    declared_head_of: impl Fn(&elohim_views::projection::EprProjectionView) -> Option<String>,
+    served_bundle_of: impl Fn(&elohim_views::projection::EprProjectionView) -> Option<String>,
 ) -> CoherenceManifest {
     let mut heads: Vec<EprHeadFingerprint> = router
         .projections()
         .into_iter()
         .map(|projection| {
-            let declared_head = declared_head_of(&projection);
+            let served_bundle = served_bundle_of(&projection);
             EprHeadFingerprint {
                 url_path: projection.url_path,
                 epr_id: projection.epr_id,
                 commitment_id: Some(projection.commitment_id),
                 hostnames: projection.hostnames,
-                declared_head,
+                served_bundle,
             }
         })
         .collect();
@@ -333,8 +358,10 @@ pub fn compare_to_peer(
                     .chain(p.heads.iter())
                     .map(|head| head.url_path.as_str())
                     .collect();
+                // The same identity the digest is minted over: a doorway's
+                // own commitment is not part of the route it holds.
                 let identities_at = |manifest: &CoherenceManifest, path: &str| {
-                    let mut identities: Vec<(String, Option<String>, Vec<String>)> = manifest
+                    let mut identities: Vec<(String, Vec<String>)> = manifest
                         .heads
                         .iter()
                         .filter(|head| head.url_path == path)
@@ -342,7 +369,7 @@ pub fn compare_to_peer(
                             let mut hostnames = head.hostnames.clone();
                             hostnames.sort();
                             hostnames.dedup();
-                            (head.epr_id.clone(), head.commitment_id.clone(), hostnames)
+                            (head.epr_id.clone(), hostnames)
                         })
                         .collect();
                     identities.sort();
@@ -460,11 +487,11 @@ pub fn should_recompute_self_manifest(cached: Option<&(u64, CoherenceManifest)>,
     }
 }
 
-/// The declared head this doorway serves for one projection: its bundle-heads
+/// The bundle this doorway serves for one projection: its bundle-heads
 /// store's browser head for (EPR, the contract's channel). ONE definition, used
 /// both for what this doorway advertises and for what it compares against a
 /// holder's advertisement, so the two sides can never read different fields.
-pub fn declared_head_for(
+pub fn served_bundle_for(
     bundle_heads: &crate::render::bundle_heads::BundleHeadStore,
     projection: &elohim_views::projection::EprProjectionView,
 ) -> Option<String> {
@@ -492,7 +519,7 @@ pub async fn handle_federation_coherence(state: Arc<AppState>) -> Response<Full<
         state.epr_router.as_ref(),
         &doorway_id,
         Some(SELF_BUILD_COMMIT.as_str()),
-        |projection| declared_head_for(&bundle_heads, projection),
+        |projection| served_bundle_for(&bundle_heads, projection),
     );
     match serde_json::to_string(&manifest) {
         Ok(json) => Response::builder()
@@ -580,13 +607,13 @@ mod tests {
     }
 
     #[test]
-    fn name_routing_declared_head_rides_beside_the_digest_not_inside_it() {
-        let head = |declared: Option<&str>| EprHeadFingerprint {
+    fn name_routing_served_bundle_rides_beside_the_digest_not_inside_it() {
+        let head = |served: Option<&str>| EprHeadFingerprint {
             url_path: "/".into(),
             epr_id: "elohim-host-landing".into(),
             commitment_id: Some("project-epr-a".into()),
             hostnames: Vec::new(),
-            declared_head: declared.map(str::to_string),
+            served_bundle: served.map(str::to_string),
         };
         let mut none = vec![head(None)];
         let mut one = vec![head(Some("sha256-aaa"))];
@@ -595,16 +622,23 @@ mod tests {
         assert_eq!(digest, mint_head_set_digest(&mut one));
         assert_eq!(digest, mint_head_set_digest(&mut two));
         assert_eq!(
-            one[0].declared_head.as_deref(),
+            one[0].served_bundle.as_deref(),
             Some("sha256-aaa"),
-            "the head is kept"
+            "the bundle is kept"
         );
         let wire = serde_json::to_value(&one[0]).unwrap();
-        assert_eq!(wire["declaredHead"], "sha256-aaa");
+        assert_eq!(wire["servedBundle"], "sha256-aaa");
+        assert!(wire.get("declaredHead").is_none(), "{wire}");
         assert!(serde_json::to_value(&none[0])
             .unwrap()
-            .get("declaredHead")
+            .get("servedBundle")
             .is_none());
+        // An older sibling mid-roll still writes `declaredHead`; it decodes.
+        let older: EprHeadFingerprint = serde_json::from_str(
+            r#"{"urlPath":"/","eprId":"elohim-host-landing","declaredHead":"sha256-old"}"#,
+        )
+        .unwrap();
+        assert_eq!(older.served_bundle.as_deref(), Some("sha256-old"));
     }
 
     #[test]
@@ -644,7 +678,7 @@ mod tests {
                 epr_id: (*epr_id).to_string(),
                 commitment_id: Some(format!("test-{epr_id}")),
                 hostnames: Vec::new(),
-                declared_head: None,
+                served_bundle: None,
             })
             .collect();
         // Shared mint sorts `heads` in place and returns the CIDv1 digest.
@@ -687,15 +721,39 @@ mod tests {
     }
 
     #[test]
-    fn commitment_identity_is_part_of_coherence_and_divergence_evidence() {
+    fn commitment_identity_rides_beside_the_digest_not_inside_it() {
         let mut me = sample_manifest("alpha", &[("/", "A")]);
         me.heads[0].commitment_id = Some("project-epr-a".into());
         me.digest = mint_head_set_digest(&mut me.heads);
         let peer = sample_manifest("apex", &[("/", "A")]);
 
         let comparison = compare_to_peer(&me, "apex", true, Some(&peer));
-        assert!(!comparison.agrees);
-        assert_eq!(comparison.divergent_paths, vec!["/".to_string()]);
+        assert!(comparison.agrees, "{comparison:?}");
+        assert!(comparison.divergent_paths.is_empty());
+        assert_eq!(
+            me.heads[0].commitment_id.as_deref(),
+            Some("project-epr-a"),
+            "the commitment is still carried for exact routing"
+        );
+    }
+
+    #[test]
+    fn two_doorways_with_their_own_commitments_for_one_epr_agree() {
+        let mut a = sample_manifest("alpha", &[("/", "elohim-host-landing")]);
+        a.heads[0].commitment_id = Some("commitment-of-alpha".into());
+        a.digest = mint_head_set_digest(&mut a.heads);
+        let mut b = sample_manifest("beta", &[("/", "elohim-host-landing")]);
+        b.heads[0].commitment_id = Some("commitment-of-beta".into());
+        b.digest = mint_head_set_digest(&mut b.heads);
+
+        assert_eq!(a.digest, b.digest);
+        assert!(compare_to_peer(&a, "beta", true, Some(&b)).agrees);
+        assert!(compare_to_peer(&b, "alpha", true, Some(&a)).agrees);
+        // A different EPR at the mount is still a real divergence.
+        let c = sample_manifest("gamma", &[("/", "some-other-epr")]);
+        let verdict = compare_to_peer(&a, "gamma", true, Some(&c));
+        assert!(!verdict.agrees);
+        assert_eq!(verdict.divergent_paths, vec!["/".to_string()]);
     }
 
     #[test]

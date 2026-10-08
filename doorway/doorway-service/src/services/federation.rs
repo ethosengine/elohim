@@ -1509,7 +1509,7 @@ fn holder_contracts_and_liveness(
                     contracts.push(
                         HolderContract::any_host(&doorway_id, peer_url, &head.url_path)
                             .with_projection(head.commitment_id.clone(), Some(head.epr_id.clone()))
-                            .with_declared_head(head.declared_head.clone()),
+                            .with_served_bundle(head.served_bundle.clone()),
                     );
                 } else {
                     for hostname in &head.hostnames {
@@ -1528,7 +1528,7 @@ fn holder_contracts_and_liveness(
                             host: Some(host),
                             commitment_id: head.commitment_id.clone(),
                             epr_id: Some(head.epr_id.clone()),
-                            declared_head: head.declared_head.clone(),
+                            served_bundle: head.served_bundle.clone(),
                         });
                     }
                 }
@@ -2374,7 +2374,7 @@ mod tests {
                     epr_id: (*e).to_string(),
                     commitment_id: Some(format!("test-{e}")),
                     hostnames: Vec::new(),
-                    declared_head: None,
+                    served_bundle: None,
                 })
                 .collect();
             let digest = crate::routes::coherence::mint_head_set_digest(&mut hv);
@@ -2403,7 +2403,7 @@ mod tests {
                 epr_id: "candidate-epr".into(),
                 commitment_id: Some("project-epr-candidate".into()),
                 hostnames: vec!["Candidate.Example:443".into()],
-                declared_head: None,
+                served_bundle: None,
             }];
             let manifest = CoherenceManifest {
                 doorway_id: "alpha".into(),

@@ -398,7 +398,26 @@ interface AdvertisedHead {
   urlPath: string;
   eprId: string;
   hostnames?: string[];
+  /** The bundle the doorway serves at this mount (`servedBundle` on the wire). */
+  servedBundle?: string;
+  /** The same value under the name an older doorway still writes mid-roll. */
   declaredHead?: string;
+}
+
+/** The bundle a coherence head says its doorway serves, under either wire name. */
+function servedBundleOf(head: AdvertisedHead): string | undefined {
+  return head.servedBundle ?? head.declaredHead;
+}
+
+/** Every head a doorway's coherence endpoint advertises. */
+async function advertisedHeads(
+  state: NameRoutingState,
+  doorway: string
+): Promise<AdvertisedHead[]> {
+  const url = `${doorwayUrl(state, doorway)}/api/v1/federation/coherence`;
+  const res = await getRawWithHeaders(url, { timeoutMs: FETCH_TIMEOUT_MS });
+  assert.equal(res.status, 200, `doorway "${doorway}" GET ${url} answered ${res.status}`);
+  return (JSON.parse(res.text) as { heads?: AdvertisedHead[] }).heads ?? [];
 }
 
 /**
@@ -412,16 +431,13 @@ async function landingBundleFor(
   doorway: string,
   name: string
 ): Promise<AdvertisedHead> {
-  const url = `${doorwayUrl(state, doorway)}/api/v1/federation/coherence`;
-  const res = await getRawWithHeaders(url, { timeoutMs: FETCH_TIMEOUT_MS });
-  assert.equal(res.status, 200, `doorway "${doorway}" GET ${url} answered ${res.status}`);
-  const heads = (JSON.parse(res.text) as { heads?: AdvertisedHead[] }).heads ?? [];
+  const heads = await advertisedHeads(state, doorway);
   const atRoot = heads.filter(head => head.urlPath === '/');
   const bound = atRoot.find(head => (head.hostnames ?? []).includes(name));
   const head = bound ?? atRoot.find(head => (head.hostnames ?? []).length === 0);
   assert.ok(head, `doorway "${doorway}" advertises no mount at "/" for "${name}"`);
   assert.ok(
-    head.declaredHead,
+    servedBundleOf(head),
     `doorway "${doorway}" advertises no landing bundle for "${name}" at "/" (EPR ${head.eprId})`
   );
   return head;
@@ -440,10 +456,74 @@ Then(
       `under "${name}" doorway "${member}" mounts EPR ${mine.eprId}, the holder "${holder}" mounts ${theirs.eprId}`
     );
     assert.equal(
-      mine.declaredHead,
-      theirs.declaredHead,
-      `under "${name}" doorway "${member}" serves bundle ${String(mine.declaredHead)}, ` +
-        `the holder "${holder}" serves ${String(theirs.declaredHead)}`
+      servedBundleOf(mine),
+      servedBundleOf(theirs),
+      `under "${name}" doorway "${member}" serves bundle ${String(servedBundleOf(mine))}, ` +
+        `the holder "${holder}" serves ${String(servedBundleOf(theirs))}`
+    );
+  }
+);
+
+/**
+ * THE RELAY WINDOW, named. Each doorway takes up a newly declared landing
+ * bundle on its own clock: its bundle-heads reconciler re-reads storage every
+ * `BUNDLE_HEADS_TICK_SECS` (30 s, doorway render/bundle_heads.rs) and the
+ * pair learns each other's advertisement on the next federation discovery
+ * tick. Until both have, a listed non-holder serves a different bundle from
+ * the holder and correctly hands the request on — which is not what the
+ * scenarios below are about. 120 s = the reconcile tick plus one discovery
+ * tick, with margin; past it the pair has not converged and that is the
+ * finding. No wire change: the existing coherence endpoint is the read.
+ */
+const LANDING_CONVERGENCE_BOUND_MS = 120_000;
+const LANDING_CONVERGENCE_POLL_MS = 5_000;
+
+/** `eprId|sorted hostnames` -> served bundle, for every head a doorway advertises at `/`. */
+async function landingBundles(
+  state: NameRoutingState,
+  doorway: string
+): Promise<Map<string, string | undefined>> {
+  const atRoot = (await advertisedHeads(state, doorway)).filter(head => head.urlPath === '/');
+  return new Map(
+    atRoot.map(head => [
+      `${head.eprId}|${[...(head.hostnames ?? [])].sort((x, y) => x.localeCompare(y)).join(',')}`,
+      servedBundleOf(head),
+    ])
+  );
+}
+
+Given(
+  'doorways {string} and {string} have converged on the bundle each serves at the landing mount, the root path {string}',
+  { timeout: LANDING_CONVERGENCE_BOUND_MS + 30_000 },
+  async function (this: E2EWorld, first: string, second: string, mount: string) {
+    assert.equal(mount, '/', `the landing mount is "/", got "${mount}"`);
+    const state = stateOf(this);
+    const deadline = Date.now() + LANDING_CONVERGENCE_BOUND_MS;
+    let last = '';
+    for (;;) {
+      const [a, b] = await Promise.all([
+        landingBundles(state, first),
+        landingBundles(state, second),
+      ]);
+      const mounts = [...new Set([...a.keys(), ...b.keys()])].sort((x, y) => x.localeCompare(y));
+      const apart = mounts.filter(key => !a.get(key) || a.get(key) !== b.get(key));
+      if (mounts.length > 0 && apart.length === 0) return;
+      last =
+        mounts.length === 0
+          ? 'neither doorway advertises a mount at "/"'
+          : apart
+              .map(
+                key =>
+                  `${key}: "${first}" serves ${String(a.get(key))}, "${second}" serves ${String(b.get(key))}`
+              )
+              .join('; ');
+      if (Date.now() >= deadline) break;
+      await new Promise(resolve => setTimeout(resolve, LANDING_CONVERGENCE_POLL_MS));
+    }
+    assert.fail(
+      `doorways "${first}" and "${second}" did not converge on one landing bundle within ` +
+        `${LANDING_CONVERGENCE_BOUND_MS / 1000} s (one bundle-heads tick plus one discovery tick, ` +
+        `with margin): ${last}`
     );
   }
 );

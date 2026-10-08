@@ -598,8 +598,9 @@ pub struct HttpServer {
     /// R-S11, S1). One per request is the invariant; a test reads it before and after a request
     /// to prove the gate did not come back per row.
     reach_gates_prepared: Arc<std::sync::atomic::AtomicUsize>,
-    /// In-memory index: slug -> blobHash (avoids per-request SQLite scan)
-    slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
+    /// In-memory index: slug -> the bundle and the row that governs its reach
+    /// (avoids per-request SQLite scan).
+    slug_index: Arc<RwLock<std::collections::HashMap<String, SlugEntry>>>,
     /// The `content_diesel::pointer_generation` the slug index was last loaded
     /// at; `u64::MAX` until the first load.
     slug_index_generation: Arc<std::sync::atomic::AtomicU64>,
@@ -803,6 +804,16 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
             Ok(None)
         }
     }
+}
+
+/// One `/apps/{slug}` index entry: the bundle the slug serves, and the content
+/// row whose reach decides who may receive it. The row id is carried so the
+/// slug form is judged by the same verifier as `/db/content/{id}`
+/// (`content_reach_gate::reach_refusal`), never by a second one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SlugEntry {
+    blob_hash: String,
+    content_id: String,
 }
 
 /// Check whether an identifier is a content address rather than a
@@ -1245,6 +1256,12 @@ fn caller_is_local<B>(req: &Request<B>) -> bool {
         HttpServer::trusted_proxies(),
         forwarded,
     )
+}
+
+/// PUT /epr-head/{id} is a this-machine act: the device steps' refusal for
+/// any other caller, by the same predicate (`caller_is_local`).
+fn epr_head_put_refusal<B>(req: &Request<B>) -> Option<Response<Full<Bytes>>> {
+    crate::services::device_consent::remote_caller_refusal(caller_is_local(req))
 }
 
 /// The headers a proxy adds: a loopback request carrying any of them came
@@ -2040,12 +2057,16 @@ impl HttpServer {
                         // /apps/{epr_id}) AND by the inner content_body slug, so a
                         // row whose inner slug differs from its id (lamad-spa's
                         // inner slug is "lamad") still resolves by either key.
-                        index.insert(item.content.id.clone(), blob_hash.clone());
+                        let entry = SlugEntry {
+                            blob_hash: blob_hash.clone(),
+                            content_id: item.content.id.clone(),
+                        };
+                        index.insert(item.content.id.clone(), entry.clone());
                         if let Some(ref content_body) = item.content.content_body {
                             if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body)
                             {
                                 if let Some(slug) = obj.get("slug").and_then(|v| v.as_str()) {
-                                    index.insert(slug.to_string(), blob_hash.clone());
+                                    index.insert(slug.to_string(), entry);
                                 }
                             }
                         }
@@ -3067,14 +3088,21 @@ impl HttpServer {
             // Lightweight probe for delivery negotiation — no body, just headers.
             // Reports whether extraction cache is warm for this app.
             (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
-                self.handle_app_capability(p).await
+                // The caller's identity, read as the `/blob` arm reads it: an
+                // app bundle is judged exactly as its row or its bytes would be.
+                let agent_cid = crate::api::account::extract_agent_cid_explicit(&req)
+                    .or_else(|| Self::extract_agent_id(&req));
+                self.handle_app_capability(p, agent_cid.as_deref()).await
             }
 
             // HTML5 App serving: /apps/{slug}/{file_path}
             (Method::GET, p) if p.starts_with("/apps/") => {
                 if self.db_pool.is_some() {
                     let query = req.uri().query().unwrap_or("");
-                    self.handle_app_request(&path, query).await
+                    let agent_cid = crate::api::account::extract_agent_cid_explicit(&req)
+                        .or_else(|| Self::extract_agent_id(&req));
+                    self.handle_app_request(&path, query, agent_cid.as_deref())
+                        .await
                 } else {
                     Ok(Response::builder()
                         .status(StatusCode::SERVICE_UNAVAILABLE)
@@ -11290,6 +11318,7 @@ impl HttpServer {
     async fn handle_app_capability(
         &self,
         path: &str,
+        agent_cid: Option<&str>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         let identifier = path
             .strip_prefix("/apps/")
@@ -11310,13 +11339,26 @@ impl HttpServer {
         let canonical = canonical_content_address(identifier)
             .filter(|_| is_cid)
             .unwrap_or_else(|| identifier.to_string());
-        let (resolved_slug, blob_hash) = if is_cid {
-            (None, Some(canonical.clone()))
+        let (resolved_slug, slug_entry) = if is_cid {
+            (None, None)
         } else {
             self.refresh_slug_index_if_moved().await;
-            let hash = self.slug_index.read().await.get(identifier).cloned();
-            (Some(identifier.to_string()), hash)
+            let entry = self.slug_index.read().await.get(identifier).cloned();
+            (Some(identifier.to_string()), entry)
         };
+        let blob_hash = if is_cid {
+            Some(canonical.clone())
+        } else {
+            slug_entry.as_ref().map(|e| e.blob_hash.clone())
+        };
+        // A restricted bundle's address is not disclosed to a caller who may
+        // not read it: the probe is refused before `X-Blob-Hash` is written.
+        if let Some(refused) = self
+            .app_reach_refusal(&canonical, is_cid, slug_entry.as_ref(), agent_cid)
+            .await?
+        {
+            return Ok(refused);
+        }
 
         // Cache key: use slug when available, otherwise the canonical address
         let cache_key = resolved_slug.as_deref().unwrap_or(canonical.as_str());
@@ -11365,6 +11407,7 @@ impl HttpServer {
         &self,
         path: &str,
         query: &str,
+        agent_cid: Option<&str>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         use std::io::Read;
         use zip::ZipArchive;
@@ -11421,16 +11464,35 @@ impl HttpServer {
         let canonical = canonical_content_address(identifier)
             .filter(|_| is_cid)
             .unwrap_or_else(|| identifier.to_string());
-        let (resolved_slug, cached_blob_hash) = if is_cid {
-            (None, Some(canonical.clone()))
+        let (resolved_slug, slug_entry) = if is_cid {
+            (None, None)
         } else {
             self.refresh_slug_index_if_moved().await;
-            let hash = {
+            let indexed = {
                 let index = self.slug_index.read().await;
                 index.get(identifier).cloned()
             };
-            (Some(identifier.to_string()), hash)
+            let entry = match indexed {
+                Some(entry) => Some(entry),
+                None => self.lookup_slug_entry(identifier).await?,
+            };
+            (Some(identifier.to_string()), entry)
         };
+        let cached_blob_hash = if is_cid {
+            Some(canonical.clone())
+        } else {
+            slug_entry.as_ref().map(|e| e.blob_hash.clone())
+        };
+
+        // The reach gate sits BEFORE the extraction cache: a cache hit must
+        // never widen an audience. `/apps/{x}` is judged exactly as
+        // `/db/content/{x}` (slug form) or `/blob/{x}` (address form) would be.
+        if let Some(refused) = self
+            .app_reach_refusal(&canonical, is_cid, slug_entry.as_ref(), agent_cid)
+            .await?
+        {
+            return Ok(refused);
+        }
 
         // Cache key: use slug when available, otherwise the canonical address
         let cache_key = resolved_slug.as_deref().unwrap_or(canonical.as_str());
@@ -11619,19 +11681,16 @@ impl HttpServer {
                         ))))
                         .unwrap());
                 }
-                match self.lookup_slug_blob_hash(identifier).await? {
-                    Some(h) => h,
-                    None => {
-                        return Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "App not found: {}"}}"#,
-                                identifier
-                            ))))
-                            .unwrap());
-                    }
-                }
+                // The slug was already looked up (index, then DB) before the
+                // reach gate; nothing resolved it.
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "App not found: {}"}}"#,
+                        identifier
+                    ))))
+                    .unwrap());
             }
         };
 
@@ -11875,8 +11934,49 @@ impl HttpServer {
         Ok(builder.body(Full::new(Bytes::from(contents))).unwrap())
     }
 
-    /// Look up blob hash for an app by querying DB and updating slug_index.
-    async fn lookup_slug_blob_hash(&self, slug: &str) -> Result<Option<String>, StorageError> {
+    /// The reach verdict for one `/apps/{identifier}` request, by the shared
+    /// verifiers only: an address is judged as `GET /blob/{x}` would be
+    /// (`blob_reach_refusal`, both renderings of the digest), a slug as
+    /// `GET /db/content/{row}` would be (`content_reach_gate::reach_refusal`,
+    /// Layers 1/1.5, by the row the slug resolved to). `None` = serve, or the
+    /// route answers its own 404 for an unresolved slug.
+    async fn app_reach_refusal(
+        &self,
+        canonical: &str,
+        is_cid: bool,
+        slug_entry: Option<&SlugEntry>,
+        agent_cid: Option<&str>,
+    ) -> Result<Option<Response<Full<Bytes>>>, StorageError> {
+        if is_cid {
+            return Ok(self.blob_reach_refusal(canonical, agent_cid).await);
+        }
+        let Some(entry) = slug_entry else {
+            return Ok(None);
+        };
+        let mut conn = self.get_conn()?;
+        let ctx = db::AppContext::default_lamad();
+        let Some(reach) = db::content_diesel::reach_for(&mut conn, &ctx, &entry.content_id)? else {
+            // The row behind an indexed slug is gone: serve nothing under it.
+            return Ok(Some(
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error": "App not found"}"#)))
+                    .unwrap(),
+            ));
+        };
+        Ok(crate::api::content_reach_gate::reach_refusal(
+            &mut conn,
+            &ctx,
+            &entry.content_id,
+            &reach,
+            agent_cid,
+            self.memo_store.clone(),
+        ))
+    }
+
+    /// Look up an app's index entry by querying DB and updating slug_index.
+    async fn lookup_slug_entry(&self, slug: &str) -> Result<Option<SlugEntry>, StorageError> {
         let mut conn = self.get_conn()?;
         let app_ctx = db::AppContext::default_lamad();
         // External HTTP slug resolution — only consider rows that carry a
@@ -11907,22 +12007,26 @@ impl HttpServer {
                 }
                 // Resolve by row id (the EPR router requests /apps/{epr_id}) AND
                 // by the inner content_body slug, warming the index by both keys.
+                let entry = SlugEntry {
+                    blob_hash: hash.clone(),
+                    content_id: item.content.id.clone(),
+                };
                 {
                     let mut index = self.slug_index.write().await;
-                    index.insert(item.content.id.clone(), hash.clone());
+                    index.insert(item.content.id.clone(), entry.clone());
                 }
                 if item.content.id == slug {
-                    found_hash = Some(hash.clone());
+                    found_hash = Some(entry.clone());
                 }
                 if let Some(ref content_body) = item.content.content_body {
                     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content_body) {
                         if let Some(content_slug) = obj.get("slug").and_then(|v| v.as_str()) {
                             {
                                 let mut index = self.slug_index.write().await;
-                                index.insert(content_slug.to_string(), hash.clone());
+                                index.insert(content_slug.to_string(), entry.clone());
                             }
                             if content_slug == slug {
-                                found_hash = Some(hash.clone());
+                                found_hash = Some(entry.clone());
                             }
                         }
                     }
@@ -15502,10 +15606,33 @@ impl HttpServer {
     // =========================================================================
 
     /// PUT /epr-head/{id} — Accept JSON, encode as DAG-CBOR, store blob, return CID.
+    ///
+    /// A this-machine act: the route writes a head blob the peer then serves
+    /// under its own name, and no client of it exists off the node. A remote
+    /// caller gets the device steps' refusal (403 `device_caller_not_local`),
+    /// judged by the one predicate those steps use (`caller_is_local`), before
+    /// the body is read.
     async fn handle_put_epr_head(
         &self,
         req: Request<Incoming>,
         id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Some(refused) = epr_head_put_refusal(&req) {
+            return Ok(refused);
+        }
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        self.store_epr_head(id, &body.to_bytes()).await
+    }
+
+    /// The PUT /epr-head body, once the caller is known to be this machine.
+    /// Split from `Request<Incoming>` (which cannot be built in a test).
+    async fn store_epr_head(
+        &self,
+        id: &str,
+        data: &[u8],
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if id.is_empty() {
             return Ok(Response::builder()
@@ -15515,14 +15642,8 @@ impl HttpServer {
                 .unwrap());
         }
 
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-        let data = body.to_bytes();
-
         // Parse JSON input
-        let input: EprHeadInputView = match serde_json::from_slice(&data) {
+        let input: EprHeadInputView = match serde_json::from_slice(data) {
             Ok(v) => v,
             Err(e) => {
                 return Ok(Response::builder()
@@ -21351,6 +21472,119 @@ mod tests {
         resp.into_body().collect().await.unwrap().to_bytes()
     }
 
+    /// [`spa_bundle_server`] with a database holding ONE html5-app row for the
+    /// bundle, at `reach`, filed under row id `id` and inner slug `slug`.
+    async fn spa_bundle_server_with_row(id: &str, slug: &str, reach: &str) -> (HttpServer, String) {
+        let (server, hash) = spa_bundle_server().await;
+        let pool = crate::test_util::test_pool();
+        {
+            let mut conn = pool.get().unwrap();
+            db::content_diesel::create_content(
+                &mut conn,
+                &AppContext::default_lamad(),
+                db::content_diesel::CreateContentInput {
+                    id: id.into(),
+                    title: id.into(),
+                    description: None,
+                    content_type: "app".into(),
+                    content_format: "html5-app".into(),
+                    blob_hash: Some(hash.clone()),
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: reach.into(),
+                    created_by: None,
+                    tags: Vec::new(),
+                    content_body: Some(serde_json::json!({ "slug": slug }).to_string()),
+                    dht_anchor_hash: Some(format!("uhCkk-{id}")),
+                },
+            )
+            .unwrap();
+        }
+        (server.with_db_pool(pool), hash)
+    }
+
+    // The slug path slipped the reach gate: `/apps/{slug}` resolved through
+    // the slug index and served the bundle with no verdict at all.
+    #[tokio::test]
+    async fn apps_slug_of_a_restricted_row_is_refused_anonymously() {
+        let (server, _) =
+            spa_bundle_server_with_row("household-app", "household", "community").await;
+        for slug in ["household-app", "household"] {
+            let resp = server
+                .handle_app_request(&format!("/apps/{slug}/index.html"), "", None)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{slug}");
+            let body = body_bytes(resp).await;
+            assert!(
+                String::from_utf8_lossy(&body).contains("requiredReach"),
+                "{slug}: {body:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn apps_cid_of_a_restricted_row_is_refused_anonymously() {
+        let (server, hash) =
+            spa_bundle_server_with_row("household-app", "household", "community").await;
+        let cid = crate::blob_store::BlobStore::parse_content_address(&hash)
+            .ok()
+            .and_then(|h| crate::blob_store::BlobStore::hash_to_cid(&h).ok())
+            .map(|c| c.to_string())
+            .expect("the bundle's CIDv1 rendering");
+        // Both spellings of one address are refused alike.
+        for address in [hash.as_str(), cid.as_str()] {
+            let resp = server
+                .handle_app_request(&format!("/apps/{address}/index.html"), "", None)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{address}");
+        }
+    }
+
+    #[tokio::test]
+    async fn apps_public_slug_still_serves() {
+        let (server, _) = spa_bundle_server_with_row("open-app", "open", "commons").await;
+        for slug in ["open-app", "open"] {
+            let resp = server
+                .handle_app_request(&format!("/apps/{slug}/index.html"), "", None)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::OK, "{slug}");
+            assert!(body_bytes(resp).await.starts_with(b"<!doctype html>"));
+        }
+    }
+
+    #[tokio::test]
+    async fn apps_capability_probe_hides_a_restricted_blob_hash() {
+        let (server, hash) =
+            spa_bundle_server_with_row("household-app", "household", "community").await;
+        // Warm the index the way a prior request would have.
+        server.load_slug_index().await;
+        for identifier in ["household-app", hash.as_str()] {
+            let resp = server
+                .handle_app_capability(&format!("/apps/{identifier}/_capability"), None)
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{identifier}");
+            assert!(resp.headers().get("X-Blob-Hash").is_none(), "{identifier}");
+            assert!(resp.headers().get("X-Content-Address").is_none());
+        }
+        // A public bundle's probe still answers with its address.
+        let (open, open_hash) = spa_bundle_server_with_row("open-app", "open", "commons").await;
+        open.load_slug_index().await;
+        let resp = open
+            .handle_app_capability("/apps/open-app/_capability", None)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get("X-Blob-Hash").unwrap(),
+            open_hash.as_str()
+        );
+    }
+
     /// ROUTE miss → 200 + the bundle's index.html + `X-SPA-Fallback: 1`.
     #[tokio::test]
     async fn app_request_route_miss_serves_index_html_fallback() {
@@ -21359,6 +21593,7 @@ mod tests {
             .handle_app_request(
                 &format!("/apps/{cid}/path/foundations-christian-technology"),
                 "",
+                None,
             )
             .await
             .unwrap();
@@ -21385,6 +21620,7 @@ mod tests {
             .handle_app_request(
                 &format!("/apps/{cid}/path/foundations-christian-technology"),
                 "spaFallback=0",
+                None,
             )
             .await
             .unwrap();
@@ -21399,7 +21635,7 @@ mod tests {
     async fn app_request_asset_miss_stays_404() {
         let (server, cid) = spa_bundle_server().await;
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/main-DEADBEEF.js"), "")
+            .handle_app_request(&format!("/apps/{cid}/main-DEADBEEF.js"), "", None)
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -21414,7 +21650,7 @@ mod tests {
     async fn app_request_existing_file_served_verbatim() {
         let (server, cid) = spa_bundle_server().await;
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/main-7J5AOAQZ.js"), "")
+            .handle_app_request(&format!("/apps/{cid}/main-7J5AOAQZ.js"), "", None)
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -21611,7 +21847,7 @@ mod apps_resolver_heal_tests {
         // path, cached_blob_hash = Some(identifier).
         let cid = format!("sha256-{}", "a".repeat(64));
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
             .await
             .unwrap();
         let (status, body) = body_string(resp).await;
@@ -21636,7 +21872,7 @@ mod apps_resolver_heal_tests {
         assert!(cid.starts_with("sha256-"), "store yields sha256- form");
 
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
             .await
             .unwrap();
         let (status, body) = body_string(resp).await;
@@ -21895,7 +22131,7 @@ mod apps_resolver_heal_tests {
         assert!(cid.starts_with("baf"), "CIDv1 identifier, got {cid}");
 
         let resp = server
-            .handle_app_request(&format!("/apps/{cid}/index.html"), "")
+            .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
             .await
             .unwrap();
         let (status, body) = body_string(resp).await;
@@ -21915,7 +22151,7 @@ mod apps_resolver_heal_tests {
         let sha = format!("sha256-{}", "c".repeat(64));
         let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
         let resp = server
-            .handle_app_capability(&format!("/apps/{cid}/_capability"))
+            .handle_app_capability(&format!("/apps/{cid}/_capability"), None)
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
@@ -22961,6 +23197,64 @@ mod session_exchange_tests {
                 "{forwarded}"
             );
         }
+    }
+
+    fn epr_head_put_from(addr: &str, headers: &[(&str, &str)]) -> Request<()> {
+        let mut req = Request::builder()
+            .method(Method::PUT)
+            .uri("/epr-head/some-concept")
+            .body(())
+            .unwrap();
+        req.extensions_mut()
+            .insert(CallerAddr(addr.parse().unwrap()));
+        for (name, value) in headers {
+            req.headers_mut().insert(
+                hyper::header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                value.parse().unwrap(),
+            );
+        }
+        req
+    }
+
+    // PUT /epr-head/{id} had no auth: anyone who could reach the port could
+    // mint a head blob the peer then served under its own name. It is now a
+    // this-machine act, refused to everyone else with the device steps' 403.
+    #[tokio::test]
+    async fn put_epr_head_from_a_remote_caller_is_refused() {
+        for (addr, headers) in [
+            ("10.1.19.170:5000", &[][..]),
+            ("192.168.1.20:5000", &[][..]),
+            // A proxy on the machine (the doorway) forwards from anywhere.
+            ("127.0.0.1:5000", &[("x-forwarded-for", "198.51.100.7")][..]),
+        ] {
+            let refused = epr_head_put_refusal(&epr_head_put_from(addr, headers))
+                .unwrap_or_else(|| panic!("{addr} {headers:?} must be refused"));
+            assert_eq!(status_of(&refused), StatusCode::FORBIDDEN);
+            let body = body_json(refused).await;
+            assert_eq!(body["code"], "device_caller_not_local", "{body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn put_epr_head_from_this_machine_still_stores() {
+        assert!(epr_head_put_refusal(&epr_head_put_from("127.0.0.1:5000", &[])).is_none());
+        let server = test_server().await;
+        let head = serde_json::json!({
+            "id": "ignored-the-path-wins",
+            "content": "a concept",
+            "lamad": { "title": "A concept", "contentType": "concept" },
+        });
+        let resp = server
+            .store_epr_head("some-concept", head.to_string().as_bytes())
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::CREATED);
+        let body = body_json(resp).await;
+        assert_eq!(body["head"]["id"], "some-concept", "{body}");
+        assert!(
+            body["cid"].as_str().is_some_and(|c| !c.is_empty()),
+            "{body}"
+        );
     }
 
     #[test]

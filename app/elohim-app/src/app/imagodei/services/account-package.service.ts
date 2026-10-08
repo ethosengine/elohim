@@ -21,6 +21,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { resolveDoorwayUrl } from '../../elohim/utils/runtime-doorway';
 
 import type {
   AccountImportResultView,
@@ -50,10 +51,12 @@ export class AccountPackageService {
   private readonly http = inject(HttpClient);
 
   constructor() {
-    this.baseUrl =
+    // Same rule as StorageApiService: a browser talks to its serving origin,
+    // a native shell to its configured sidecar or doorway.
+    this.baseUrl = resolveDoorwayUrl(
       environment.holochain?.storageUrl ??
-      (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??
-      '';
+        (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl
+    );
   }
 
   /**
