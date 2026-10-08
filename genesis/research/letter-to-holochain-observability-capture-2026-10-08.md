@@ -104,15 +104,5 @@ Holochain is the foundation: agent-centric source chains, a DHT that notarises, 
 
 The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. All of it runs on Holochain.
 
-## What we ask
-
-Three things:
-
-1. Tell us what we cannot see: whether core has a Prometheus or OTLP exporter in flight (OTLP is OpenTelemetry's own wire format), and how a Holo host collects port-side metrics today.
-2. Take a `DumpMetrics` admin request with the label audit, as one clean pull request from our side if you want it.
-3. A 45-minute call in the next two weeks with one engineer who owns host-side metrics at Holo. We bring a one-page draft of a scoped capture grant (what a host may collect about a hosted participant, at what reach, for how long, reviewable by whom); we leave with a yes, a no, or a counter-shape.
-
-We're a small project, and many of our own checks are still failing. We'd like to compare notes with people running the same conductor at a different scale.
-
 With respect,
 Matthew Dowell, for the Elohim Protocol
