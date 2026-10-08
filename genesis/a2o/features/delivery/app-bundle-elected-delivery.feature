@@ -120,6 +120,19 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     Then on matthew's, jessica's, and james's peers each app's record names the earlier release's bundles again
     And within 75 seconds doorway "alpha" serves each app's earlier page
 
+  @wip @regression
+  Scenario: A slug's own older head never pulls a released build back
+    # alpha, 2026-10-07: the vehicle moved lamad-spa to the new build at 21:07:51Z; at
+    # 21:08:41Z the pointer-audit sweep, trusting the legacy head the pipeline had stamped
+    # on the slug in September, put the sixteen-day-old blob back, and the adoption ledger
+    # kept reading "applied". A slug's record names its elector once; nothing else moves it.
+    Given every household peer has taken up matthew's new release
+    And the first app's record still carries the head the old pipeline once stamped on it, whose own record names the earlier browser bundle
+    When each peer's pointer-audit sweep next visits the first app's record
+    Then on matthew's, jessica's, and james's peers the first app's record still names the release's browser bundle
+    And each peer counts the visit as held by the app's release channel, not as a heal
+    And within 75 seconds doorway "alpha" still serves the first app's page naming the new browser bundle's entry script
+
   Scenario: A build that cannot start is refused by every peer, and nothing moves
     Given every household peer has taken up the channel's earned head
     When matthew publishes a build whose first app's page names an entry script its browser bundle does not contain

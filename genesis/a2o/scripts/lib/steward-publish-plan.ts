@@ -70,10 +70,19 @@ function norm(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === '' ? null : value;
 }
 
-function sameTags(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
-  const sa = [...new Set(a ?? [])].sort();
-  const sb = [...new Set(b ?? [])].sort();
-  return sa.length === sb.length && sa.every((t, i) => t === sb[i]);
+/**
+ * `public` and `commons` name the same grade on every peer (the operator accepted the
+ * alias 2026-09-29; storage serves both anonymously), so a publish never treats a move
+ * between them as a reach change.
+ */
+export function sameReach(a: string | null | undefined, b: string | null | undefined): boolean {
+  const alias = (r: string | null | undefined) => (r === 'public' ? 'commons' : (r ?? null));
+  return alias(a) === alias(b);
+}
+
+/** Is `reach` the open grade every peer serves anonymously? */
+function isOpenReach(reach: string | null | undefined): boolean {
+  return reach === 'commons' || reach === 'public';
 }
 
 /**
@@ -81,24 +90,29 @@ function sameTags(a: string[] | null | undefined, b: string[] | null | undefined
  * this existing row. Empty means every authored field either already matches or rides
  * the PATCH.
  *
- * - An ANCHORED row re-notarizes through the zome's `update_content`, which carries the
- *   body and format (and every peer adopts them from the verified entry), but not the
- *   content type. Tags reach the entry and this peer's row, but other peers do not adopt
- *   them yet, so a tag change is still refused rather than landing on one peer only.
- * - An UNANCHORED row is bootstrapped through `create_content`, which does take the
- *   body, format and tags from the PATCH, but still takes the content type from the
- *   existing row.
+ * - An ANCHORED row re-notarizes through the zome's `update_content`. Since
+ *   2026-09-27 (storage 7920095ed, F17) that signed version carries the body, format,
+ *   content type and tags, and every adopting peer fills them from the verified entry
+ *   — so a type or tag change rides the PATCH like the body does.
+ * - An UNANCHORED row is bootstrapped through `create_content`, which takes the body,
+ *   format and tags from the PATCH but still takes the content type from the existing
+ *   row.
+ * - Reach: a move between `public` and `commons` is no change. Widening an anchored row
+ *   to the open grade travels with an EARNED head (F19, re-landed 2026-09-29: adopting
+ *   peers widen to the verified entry's more-open reach). Any other reach move is still
+ *   refused: adoption deliberately never narrows (RC-4), so it would land on this peer
+ *   only.
  * - A description can be replaced but never cleared (a null PATCH field means "leave").
  */
 export function uncarriedFields(input: CreateContentInput, row: ExistingRow): string[] {
   const out: string[] = [];
   const anchored = Boolean(row.dhtAnchorHash);
-  if ((row.contentType ?? null) !== (input.contentType ?? 'concept')) out.push('contentType');
-  if (anchored && !sameTags(row.tags, input.tags)) out.push('tags');
-  // Adopting peers deliberately never take a reach change from a head (storage's
-  // non-narrowing guard), so it would land on this peer only.
-  if (anchored && (row.reach ?? null) !== (input.reach ?? null)) {
-    out.push('reach (other peers do not adopt a reach change)');
+  if (!anchored && (row.contentType ?? null) !== (input.contentType ?? 'concept')) {
+    out.push('contentType (create_content keeps the stored type)');
+  }
+  if (anchored && !sameReach(row.reach, input.reach)) {
+    const widensToOpen = isOpenReach(input.reach) && !isOpenReach(row.reach);
+    if (!widensToOpen) out.push('reach (other peers do not adopt a reach change)');
   }
   if (norm(row.description) !== null && norm(input.description) === null) {
     out.push('description (cannot be cleared)');
@@ -161,6 +175,7 @@ export function publishPatch(input: CreateContentInput, seedHash: string): Recor
   const patch: Record<string, unknown> = {
     title: input.title,
     reach: input.reach,
+    contentType: input.contentType ?? 'concept',
     tags: input.tags ?? [],
     metadata: { ...asObject(input.metadata), [SEED_HASH_KEY]: seedHash },
   };
@@ -182,7 +197,7 @@ export function landedMismatches(
 ): string[] {
   const out: string[] = [];
   if (asObject(row.metadata)[SEED_HASH_KEY] !== seedHash) out.push('metadata.seedHash');
-  if ((row.reach ?? null) !== (input.reach ?? null)) out.push('reach');
+  if (!sameReach(row.reach, input.reach)) out.push('reach');
   if ((row.title ?? null) !== input.title) out.push('title');
   if (norm(row.contentBody) !== norm(input.contentBody)) out.push('contentBody');
   if (input.blobHash && row.blobHash !== input.blobHash) out.push('blobHash');

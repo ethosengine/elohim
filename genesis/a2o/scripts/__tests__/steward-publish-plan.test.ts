@@ -116,10 +116,38 @@ describe('planItem', () => {
     assert.deepEqual(planItem(path, row).uncarried, []);
   });
 
-  it('still blocks an anchored tag change — other peers do not adopt tags yet', () => {
+  it('updates an anchored row whose tags changed — the signed version carries tags (F17)', () => {
     const plan = planItem(content, anchoredRow({ tags: ['older'] }));
-    assert.equal(plan.action, 'blocked');
-    assert.deepEqual(plan.uncarried, ['tags']);
+    assert.equal(plan.action, 'update');
+    assert.deepEqual(plan.uncarried, []);
+  });
+
+  it('updates an anchored row whose content type changed — the signed version carries it (F17)', () => {
+    const plan = planItem(content, anchoredRow({ contentType: 'reference' }));
+    assert.equal(plan.action, 'update');
+    assert.deepEqual(plan.uncarried, []);
+  });
+
+  it('treats public and commons as one grade, and lets an anchored row widen to it', () => {
+    assert.deepEqual(planItem(content, anchoredRow({ reach: 'public' })).uncarried, []);
+    assert.deepEqual(planItem(content, anchoredRow({ reach: 'private' })).uncarried, []);
+    const narrowed = buildContentInput({
+      id: 'c1',
+      title: 'A lesson',
+      content: '# body',
+      contentFormat: 'markdown',
+      reach: 'community',
+      tags: ['b', 'a'],
+    });
+    assert.deepEqual(planItem(narrowed, anchoredRow()).uncarried, [
+      'reach (other peers do not adopt a reach change)',
+    ]);
+    assert.deepEqual(
+      landedMismatches(content, seedHashFor(content), {
+        ...anchoredRow({ reach: 'public', metadata: { seedHash: seedHashFor(content) } }),
+      }),
+      []
+    );
   });
 
   it('lets an UNANCHORED row take a new body (create_content bootstrap carries it)', () => {
@@ -130,10 +158,10 @@ describe('planItem', () => {
     assert.equal(plan.action, 'update');
   });
 
-  it('blocks a content-type change on any row', () => {
+  it('still blocks a content-type change on an UNANCHORED row — create_content keeps the stored type', () => {
     assert.deepEqual(
       planItem(content, anchoredRow({ dhtAnchorHash: null, contentType: 'path' })).uncarried,
-      ['contentType']
+      ['contentType (create_content keeps the stored type)']
     );
   });
 });
@@ -143,6 +171,7 @@ describe('publishPatch', () => {
     const h = seedHashFor(content);
     const patch = publishPatch(content, h);
     assert.equal(patch.reach, 'commons');
+    assert.equal(patch.contentType, 'concept');
     assert.deepEqual((patch.metadata as Record<string, unknown>).seedHash, h);
     assert.equal(patch.contentBody, '# body');
     assert.equal('blobHash' in patch, false);
@@ -167,9 +196,20 @@ describe('landedMismatches', () => {
 });
 
 describe('reach on an anchored row', () => {
-  it('is refused when it differs, because other peers do not adopt a reach change', () => {
-    const plan = planItem(content, anchoredRow({ reach: 'public' }));
+  it('is refused when it would move to a grade adoption does not carry (anything but a widening to the open grade)', () => {
+    const toCommunity = buildContentInput({
+      id: 'c1',
+      title: 'A lesson',
+      content: '# body',
+      contentFormat: 'markdown',
+      reach: 'community',
+      tags: ['b', 'a'],
+    });
+    const plan = planItem(toCommunity, anchoredRow({ reach: 'commons' }));
     assert.equal(plan.action, 'blocked');
     assert.deepEqual(plan.uncarried, ['reach (other peers do not adopt a reach change)']);
+    // public -> commons is the same grade; private -> commons is the F19 widening.
+    assert.equal(planItem(content, anchoredRow({ reach: 'public' })).action, 'update');
+    assert.equal(planItem(content, anchoredRow({ reach: 'private' })).action, 'update');
   });
 });
