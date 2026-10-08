@@ -1053,7 +1053,11 @@ const ADOPTION_SERIES = 'elohim_head_adoption_trigger_total';
 const ADOPTION_LABEL = 'outcome';
 /** `probe` exists today; `election_refreshed` lands with the carried-ordering change. */
 const ADOPTION_OUTCOMES = ['probe', 'election_refreshed'] as const;
-const TOLD_WAIT_MS = 30_000;
+// The receiver's trigger answers a carried ordering its conductor cannot yet walk with ONE slow
+// re-probe after SLOW_REPROBE_DELAY (30 s, head_adoption_trigger.rs), then the earned link must have
+// gossiped in: measured 2026-10-08 20:24:07Z on james, 30.1 s after the announce. Budget one slow
+// retry plus gossip; the reconcile sweep (300 s) stays far outside it, so step 5's "before any sweep" holds.
+const TOLD_WAIT_MS = 90_000;
 const HEAD_POLL_INTERVAL_MS = 2_000;
 
 interface HeadOnlyState {
@@ -1233,7 +1237,7 @@ When(
 
 Then(
   "peer {string} is told that the page's declared head changed",
-  { timeout: 60_000 },
+  { timeout: TOLD_WAIT_MS + 30_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
     assert.strictEqual(

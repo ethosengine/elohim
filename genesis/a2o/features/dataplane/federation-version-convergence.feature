@@ -183,7 +183,7 @@ Feature: Federation version convergence — two doorways that disagree serve the
   # The missing node, in the author's own words: a head-only declaration must change what the device
   # announces (the declared head and its ordering clock), so a peer that holds the page is told, and
   # its own conductor verifies the carried declaration exactly as the scenario above requires.
-  @wip @regression @requires:owned-substrate
+  @regression @requires:owned-substrate
   Scenario: a new earned head declared with the same text still reaches a peer that already holds the page
     Given peer "alpha-A" and peer "elohim.host" both hold a page this run authored, at the same head
     And the page's root author on peer "alpha-A" declares a NEW earned canonical head whose text is unchanged
