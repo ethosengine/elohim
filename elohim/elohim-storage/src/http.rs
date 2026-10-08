@@ -350,6 +350,54 @@ pub(crate) fn admission_exempt_path(path: &str) -> bool {
     )
 }
 
+/// What `/health` can honestly say about the conductor child this process
+/// supervises — read with `try_lock`, never awaited, so a probe never queues
+/// behind an actuator restart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConductorChildState {
+    /// No manager is attached: a storage pod, or a conductor reached externally.
+    NotSupervised,
+    /// `try_wait` found the child alive.
+    Running,
+    /// `try_wait` found the child gone — its admin and app sockets with it.
+    Exited,
+    /// The manager mutex is held: the arc actuator is mid-restart.
+    Restarting,
+}
+
+impl ConductorChildState {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::NotSupervised => "not-supervised",
+            Self::Running => "running",
+            Self::Exited => "exited",
+            Self::Restarting => "restarting",
+        }
+    }
+}
+
+/// The status `/health` answers with, given what kind of pod this is and what
+/// its conductor child is doing.
+///
+/// A pure decision so the test pins the whole contract: only an
+/// embedded-conductor pod whose child has EXITED goes 503. A storage pod never
+/// does (it still serves every projection it holds, and `/health/serving` is
+/// its status-bearing probe); a running, restarting or unsupervised child
+/// stays 200. Provenance: gertrude's conductor pod on alpha, 2026-10-08 — the
+/// child died at 10:41Z on an `AddrInUse` bind, `/health` kept answering 200
+/// for hours, and both doorways answered every hosted registration routed to
+/// that slot with 503.
+pub(crate) fn health_status_for(
+    embedded_conductor: bool,
+    child: ConductorChildState,
+) -> StatusCode {
+    if embedded_conductor && child == ConductorChildState::Exited {
+        StatusCode::SERVICE_UNAVAILABLE
+    } else {
+        StatusCode::OK
+    }
+}
+
 /// Percent-decode one path segment that names a row by id (`/db/content/{id}`,
 /// `/db/allocations/content/{id}`, and the entity-nested `{id}/schedule` ·
 /// `/head` · `/head-record` · `/canonical-head` arms). Content ids are slugs,
@@ -3491,11 +3539,44 @@ impl HttpServer {
 
         let build = elohim_compute::BuildInfo::new("elohim-storage");
 
+        // A CONDUCTOR POD's health is its conductor child. This process is
+        // then the supervisor of a `holochain` child whose admin/app sockets
+        // are the only thing the pod exists to offer; when that child has
+        // exited there is nothing here worth keeping Ready, and a green probe
+        // over a dead child is exactly how gertrude's pod stayed in the
+        // doorway's hosted pool for hours (alpha, 2026-10-08 10:41Z: the child
+        // died on an `AddrInUse` bind after a respawn, `/health` kept
+        // answering 200, both doorways answered every hosted registration on
+        // that slot with 503 `Handshake not finished`). The storage-pod
+        // rationale below — stay 200 because projections still serve — does
+        // not apply: an embedded-conductor pod serves no projection.
+        //
+        // `try_lock`, never `lock`: the arc actuator holds this mutex across a
+        // deliberate restart, and a probe must not queue behind it. A held
+        // lock reads as `restarting`, which stays green.
+        let conductor_child = match &self.conductor_manager {
+            None => ConductorChildState::NotSupervised,
+            Some(manager) => match manager.try_lock() {
+                Ok(mut m) => {
+                    if m.is_running() {
+                        ConductorChildState::Running
+                    } else {
+                        ConductorChildState::Exited
+                    }
+                }
+                Err(_) => ConductorChildState::Restarting,
+            },
+        };
+        let status = health_status_for(self.embedded_conductor, conductor_child);
+
         // error + warn level: always present
         let mut body = serde_json::json!({
-            "status": "ok",
+            "status": if status == StatusCode::OK { "ok" } else { "conductor-exited" },
             "build": build,
         });
+        if conductor_child != ConductorChildState::NotSupervised {
+            body["conductorChild"] = serde_json::json!(conductor_child.as_str());
+        }
         // Promoted to default detail (was Trace-only) so any caller — incl.
         // doorway honoring backpressure — can read remaining admission headroom.
         body["semaphorePermits"] = serde_json::json!(self.request_semaphore.available_permits());
@@ -3521,13 +3602,15 @@ impl HttpServer {
             // healthy while every write landed NULL-anchored. `zomePath` is the
             // one field here that can only be true by having crossed the wire.
             //
-            // The BODY stays 200 on purpose. `/health` is simultaneously the
-            // startup, readiness AND liveness probe for the storage container
+            // On a STORAGE pod the status stays 200 whatever this block says.
+            // `/health` is simultaneously the startup, readiness AND liveness
+            // probe for the storage container
             // (genesis/orchestrator/manifests/edgenode/*.yaml), so demoting its
             // status when the bridge dies would CrashLoop a pod that can still
             // serve every projection read, blob and EPR it holds. The
             // status-code-bearing signal lives at `/health/serving` — the same
-            // split doorway made for the same reason.
+            // split doorway made for the same reason. The one exception is
+            // decided above: a CONDUCTOR pod whose child has exited.
             body["conductor"] = crate::conductor_bridge_health::health_block(
                 if self.embedded_conductor {
                     "embedded"
@@ -3606,9 +3689,13 @@ impl HttpServer {
             body["extractionCacheEnabled"] = serde_json::json!(self.extraction_cache.is_some());
         }
 
-        Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
+        let mut builder = Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, "application/json");
+        if status != StatusCode::OK {
+            builder = builder.header("Retry-After", Self::SERVING_RETRY_AFTER_SECS.to_string());
+        }
+        Ok(builder
             .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
     }
@@ -23328,6 +23415,53 @@ mod admission_tests {
         // gated path sheds
         assert!(!exempt(&Method::GET, "/db/content/x"));
         assert!(sem.try_acquire().is_err(), "0 permits => gated path sheds");
+    }
+
+    /// A conductor pod's `/health` goes 503 exactly when its child has exited;
+    /// a storage pod's never does, whatever the child state reads.
+    ///
+    /// Table over the real decision function (`health_status_for`), not a
+    /// mirror: the handler needs a whole `HttpServer`, the decision does not.
+    #[test]
+    fn a_conductor_pod_whose_child_has_exited_is_not_healthy_a_storage_pod_always_is() {
+        use super::{health_status_for, ConductorChildState as C};
+        use hyper::StatusCode;
+        let cases = [
+            (true, C::Exited, StatusCode::SERVICE_UNAVAILABLE),
+            (true, C::Running, StatusCode::OK),
+            (true, C::Restarting, StatusCode::OK),
+            (true, C::NotSupervised, StatusCode::OK),
+            (false, C::Exited, StatusCode::OK),
+            (false, C::Running, StatusCode::OK),
+            (false, C::Restarting, StatusCode::OK),
+            (false, C::NotSupervised, StatusCode::OK),
+        ];
+        for (embedded, child, expected) in cases {
+            assert_eq!(
+                health_status_for(embedded, child),
+                expected,
+                "embedded={embedded} child={child:?}"
+            );
+        }
+        // The body word every state renders as, so a reader of the JSON and a
+        // reader of the status code cannot disagree about the same pod.
+        assert_eq!(C::Exited.as_str(), "exited");
+        assert_eq!(C::Restarting.as_str(), "restarting");
+    }
+
+    /// A never-started manager reads as an exited child: `is_running` is the
+    /// same `try_wait` the probe consults, so this is the probe's own eye.
+    #[test]
+    fn a_manager_with_no_child_reads_as_not_running() {
+        use std::path::PathBuf;
+        let mut m = crate::conductor::ConductorManager::new(
+            PathBuf::from("/nonexistent/holochain"),
+            PathBuf::from("/nonexistent/conductor-config.yaml"),
+            PathBuf::from("/nonexistent/data"),
+            4444,
+            std::time::Duration::from_secs(1),
+        );
+        assert!(!m.is_running());
     }
 
     /// The serving probe's decision, asserted against the real snapshot policy.
