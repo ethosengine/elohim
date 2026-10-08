@@ -1372,7 +1372,7 @@ pub fn ghost_decay_blocked_leg(
 // through the same DHT channels as any other field.
 
 /// The `metadata_json` key a slug names its release channel under.
-pub const RELEASE_CHANNEL_KEY: &str = "releaseChannel";
+pub use crate::release_channel::RELEASE_CHANNEL_KEY;
 
 /// The `arm` label on `elohim_content_adopt_held_total` for a slug whose
 /// release channel owns its serving pointer.
@@ -1408,7 +1408,7 @@ pub fn pretouch_adopt_held_metric() {
     std::sync::LazyLock::force(&ADOPT_HELD);
 }
 
-fn note_held_bound_to_release_channel() {
+pub(crate) fn note_held_bound_to_release_channel() {
     ADOPT_HELD
         .with_label_values(&[HELD_BOUND_TO_RELEASE_CHANNEL])
         .inc();
@@ -1422,9 +1422,7 @@ fn note_held_bound_to_release_channel() {
 /// declaration of anything, and reading it as one would strand the slug with
 /// neither its own head nor a channel to follow.
 pub fn bound_release_channel(metadata_json: Option<&str>) -> Option<String> {
-    let parsed: serde_json::Value = serde_json::from_str(metadata_json?.trim()).ok()?;
-    let channel = parsed.get(RELEASE_CHANNEL_KEY)?.as_str()?.trim();
-    crate::services::release_adoption::verify::is_channel_id(channel).then(|| channel.to_string())
+    crate::release_channel::binding_in_metadata(metadata_json)
 }
 
 /// Read ONE row's binding. `Ok(None)` when there is no row, no metadata, or no

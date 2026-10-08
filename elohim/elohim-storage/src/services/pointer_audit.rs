@@ -39,6 +39,21 @@
 //! `sync::projector::heal_half_rows_from_docs`. Operational (Category C):
 //! nothing here is notarized, and a row this sweep skips is picked up again
 //! on a later lap.
+//!
+//! ## What this sweep never touches: a slug a release channel owns
+//!
+//! An app slug bound to a release channel (`metadata.releaseChannel`, the
+//! slice-2 mutual binding) is pointed at its bytes by the channel's vehicle
+//! (`release_adoption::apply::AppBundleVehicle`), not by its own head. Its
+//! declared head is the legacy head the pipeline once stamped, and that
+//! head's record names an OLD blob — so to this sweep the row looks exactly
+//! like the torn pointer it exists to heal. Alpha, 2026-10-07 21:07:51Z: the
+//! vehicle moved `lamad-spa` to the new build; at 21:08:41Z this sweep
+//! "refreshed" it back to the 2026-09-22 blob (size 42), and the fleet served
+//! a sixteen-day-old bundle while the adoption ledger read `applied`.
+//! `head_adoption`'s pre-flight already holds such a slug at step (-1); this
+//! sweep is a separate entry and must hold it the same way, BEFORE it spends
+//! a conductor call.
 
 use std::sync::Arc;
 
@@ -92,6 +107,7 @@ pub struct PointerAuditStats {
     pub not_canonical: usize,
     pub unreadable: usize,
     pub error: usize,
+    pub held_by_release_channel: usize,
 }
 
 /// One sweep batch: select up to `batch` candidates after `after`, probe
@@ -136,6 +152,7 @@ fn record(stats: &mut PointerAuditStats, outcome: crate::metrics::PointerAuditOu
         NotCanonical => stats.not_canonical += 1,
         Unreadable => stats.unreadable += 1,
         Error => stats.error += 1,
+        HeldByReleaseChannel => stats.held_by_release_channel += 1,
     }
 }
 
@@ -159,6 +176,7 @@ pub(crate) enum PointerAuditDecision {
 }
 
 pub(crate) fn decide(
+    bound_to_release_channel: bool,
     head_canonical: bool,
     local_declared: Option<&str>,
     head_action_hash: &str,
@@ -166,6 +184,13 @@ pub(crate) fn decide(
     record_blob_cid: Option<&str>,
     record_size_bytes: Option<u64>,
 ) -> PointerAuditDecision {
+    // (-1) A slug a release channel owns is never this sweep's to heal,
+    // whatever its own head's record says — see the module docs.
+    if bound_to_release_channel {
+        return PointerAuditDecision::Skip(
+            crate::metrics::PointerAuditOutcome::HeldByReleaseChannel,
+        );
+    }
     if !head_canonical {
         return PointerAuditDecision::Skip(crate::metrics::PointerAuditOutcome::NotCanonical);
     }
@@ -199,6 +224,36 @@ async fn heal_one(
     id: &str,
 ) -> crate::metrics::PointerAuditOutcome {
     use crate::metrics::PointerAuditOutcome;
+
+    // (-1) Who owns this row's pointer? Asked FIRST, off the local row alone,
+    // so a slug a release channel owns costs this sweep no conductor call at
+    // all — the same hold `head_adoption`'s pre-flight applies, counted on
+    // the same `elohim_content_adopt_held_total{arm}` series.
+    {
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(content_id = %id, error = %e, "pointer_audit: db conn for binding read");
+                return PointerAuditOutcome::Error;
+            }
+        };
+        match crate::services::head_adoption::row_release_channel(&mut conn, ctx, id) {
+            Ok(Some(channel)) => {
+                tracing::debug!(
+                    content_id = %id, channel = %channel,
+                    "pointer_audit: held — the slug is bound to a release channel, which owns \
+                     its serving pointer; its own head's record is not consulted"
+                );
+                crate::services::head_adoption::note_held_bound_to_release_channel();
+                return PointerAuditOutcome::HeldByReleaseChannel;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(content_id = %id, error = %e, "pointer_audit: binding read failed");
+                return PointerAuditOutcome::Error;
+            }
+        }
+    }
 
     // Own-conductor resolve, BACKGROUND-classed — never the row's declared
     // head compared against a peer, never a network hint. `Err` and `Ok(None)`
@@ -253,6 +308,7 @@ async fn heal_one(
     };
 
     let (healed_cid, size_bytes) = match decide(
+        false,
         head.canonical,
         local_declared.as_deref(),
         head.head_action_hash.as_str(),
@@ -320,6 +376,7 @@ mod tests {
             crate::metrics::PointerAuditOutcome::NotCanonical,
             crate::metrics::PointerAuditOutcome::Unreadable,
             crate::metrics::PointerAuditOutcome::Error,
+            crate::metrics::PointerAuditOutcome::HeldByReleaseChannel,
         ] {
             record(&mut stats, outcome);
         }
@@ -328,6 +385,29 @@ mod tests {
         assert_eq!(stats.not_canonical, 1);
         assert_eq!(stats.unreadable, 1);
         assert_eq!(stats.error, 1);
+        assert_eq!(stats.held_by_release_channel, 1);
+    }
+
+    /// LIVE RED, alpha 2026-10-07: a slug bound to a release channel declares
+    /// the legacy head the pipeline once stamped, and that head's record names
+    /// the OLD blob — everything else here says "heal". The vehicle moved the
+    /// pointer to the release's bytes at 21:07:51Z; this sweep put the old
+    /// blob back at 21:08:41Z. A bound slug is held before anything else is
+    /// weighed, and counted on its own label.
+    #[test]
+    fn a_slug_a_release_channel_owns_is_held_whatever_its_own_head_says() {
+        assert_eq!(
+            decide(
+                true,
+                true,
+                Some(HEAD_A),
+                HEAD_A,
+                Some("sha256-released-by-the-vehicle"),
+                Some("sha256-named-by-the-legacy-head"),
+                Some(42),
+            ),
+            PointerAuditDecision::Skip(crate::metrics::PointerAuditOutcome::HeldByReleaseChannel)
+        );
     }
 
     #[test]
@@ -358,6 +438,7 @@ mod tests {
     fn a_torn_declared_row_is_healed_pointer_and_size_move_together() {
         assert_eq!(
             decide(
+                false,
                 true,
                 Some(HEAD_A),
                 HEAD_A,
@@ -378,6 +459,7 @@ mod tests {
     fn a_row_whose_record_names_a_different_head_is_untouched() {
         assert_eq!(
             decide(
+                false,
                 true,
                 Some(HEAD_A),
                 HEAD_B,
@@ -397,6 +479,7 @@ mod tests {
         assert_eq!(
             decide(
                 false,
+                false,
                 Some(HEAD_A),
                 HEAD_A,
                 Some("sha256-stale"),
@@ -414,6 +497,7 @@ mod tests {
     fn an_already_converged_row_is_in_step() {
         assert_eq!(
             decide(
+                false,
                 true,
                 Some(HEAD_A),
                 HEAD_A,

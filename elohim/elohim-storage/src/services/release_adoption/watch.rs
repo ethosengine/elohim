@@ -921,6 +921,42 @@ impl AdoptionController {
         true
     }
 
+    /// The bound slugs whose rows no longer carry the browser bytes the
+    /// release at `head_metadata_json` names — empty for a non-app-bundle
+    /// release, an unparseable manifest, or a controller without a database
+    /// (nothing to compare, so nothing to re-apply). One DB read per slug,
+    /// never a conductor call. See the idempotence exit for why.
+    fn applied_pointers_drifted(&self, head_metadata_json: &str) -> Vec<String> {
+        let Some(db) = self.db.as_ref() else {
+            return Vec::new();
+        };
+        let Ok(Some(body)) = extract_release_body(head_metadata_json) else {
+            return Vec::new();
+        };
+        let Ok(manifest) = verify::verify_shape(&body) else {
+            return Vec::new();
+        };
+        if !matches!(manifest.artifact_class, super::ArtifactClass::AppBundle) {
+            return Vec::new();
+        }
+        let expected = super::apply::expected_browser_pointers(&manifest);
+        if expected.is_empty() {
+            return Vec::new();
+        }
+        let Ok(mut conn) = db.get() else {
+            return Vec::new();
+        };
+        let ctx = crate::db::AppContext::default_lamad();
+        let mut actual = std::collections::BTreeMap::new();
+        for (slug, _) in &expected {
+            let pointer = crate::db::content_diesel::blob_hash_for(&mut conn, &ctx, slug)
+                .ok()
+                .flatten();
+            actual.insert(slug.clone(), pointer);
+        }
+        super::apply::drifted_pointers(&expected, &actual)
+    }
+
     /// Resolve one channel's canonical head through THIS node's conductor —
     /// `resolve_content_head_local` (`GetStrategy::Local`), never the network
     /// variant. This controller reads what gossip has already delivered to
@@ -1485,31 +1521,56 @@ impl AdoptionController {
         // guard, read once instead of twice.
         if let Some(applied) = applied {
             if applied.cid == release_cid {
-                // The ONE thing this exit still owes: an installed-reality
-                // snapshot that is not a lie. A fresh snapshot costs nothing
-                // here (see `refresh_installed_reality_if_stale`); an
-                // invalidated one — which is exactly what this node's own apply
-                // leaves behind, one sweep ago — is re-read once. Without this,
-                // the exit's zero-call purity preserved a PRE-apply reality on
-                // `/admin/adoption` forever (alpha, 2026-09-06).
-                if self.refresh_installed_reality_if_stale(now).await {
-                    tracing::info!(
+                // **Installed reality below the passport: the slugs' own rows.**
+                // An app-bundle release is applied when the bound slugs' rows
+                // point at its bytes — and a row is one UPDATE away from not
+                // doing so. Alpha, 2026-10-07: the vehicle applied
+                // `uhCkkUhk9…` at 21:07:51Z, the pointer-audit sweep put the
+                // old blob back at 21:08:41Z, and this exit reported `applied`
+                // for the next three hours while the fleet served a
+                // sixteen-day-old build. The row-write guard
+                // (`crate::release_channel`) now refuses that write; this read
+                // is the controller's own half of the promise — a DB read, no
+                // conductor call, so C6b's cost contract holds — and when a
+                // pointer has drifted the exit is NOT taken, so the sweep
+                // falls through to verify and re-apply.
+                let drifted = self.applied_pointers_drifted(&head.content.metadata_json);
+                if !drifted.is_empty() {
+                    tracing::warn!(
                         channel = %channel.channel_id,
                         release_cid = %release_cid,
-                        "release-adoption: re-read installed reality on the idempotence exit — \
-                         the snapshot was invalidated or past its TTL, and a converged peer must \
-                         not report a reality it no longer has"
+                        slugs = ?drifted,
+                        "release-adoption: the applied release's slugs no longer point at its \
+                         bytes — another writer moved them; re-applying instead of reporting \
+                         already_current"
                     );
+                } else {
+                    // The ONE thing this exit still owes: an installed-reality
+                    // snapshot that is not a lie. A fresh snapshot costs nothing
+                    // here (see `refresh_installed_reality_if_stale`); an
+                    // invalidated one — which is exactly what this node's own apply
+                    // leaves behind, one sweep ago — is re-read once. Without this,
+                    // the exit's zero-call purity preserved a PRE-apply reality on
+                    // `/admin/adoption` forever (alpha, 2026-09-06).
+                    if self.refresh_installed_reality_if_stale(now).await {
+                        tracing::info!(
+                            channel = %channel.channel_id,
+                            release_cid = %release_cid,
+                            "release-adoption: re-read installed reality on the idempotence exit — \
+                             the snapshot was invalidated or past its TTL, and a converged peer must \
+                             not report a reality it no longer has"
+                        );
+                    }
+                    return CheckOutcome::Checked {
+                        head: Some(resolved),
+                        verdict: Verdict::Applied {
+                            release_cid,
+                            vehicle: applied.vehicle,
+                            already_current: true,
+                        },
+                        attestations: None,
+                    };
                 }
-                return CheckOutcome::Checked {
-                    head: Some(resolved),
-                    verdict: Verdict::Applied {
-                        release_cid,
-                        vehicle: applied.vehicle,
-                        already_current: true,
-                    },
-                    attestations: None,
-                };
             }
         }
 

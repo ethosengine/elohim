@@ -224,22 +224,10 @@ fn refuse(reason: RefusalReason, detail: impl Into<String>) -> AdoptionRefusal {
 }
 
 /// `^runtime:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$`
-pub fn is_channel_id(s: &str) -> bool {
-    let Some(rest) = s.strip_prefix("runtime:") else {
-        return false;
-    };
-    let parts: Vec<&str> = rest.split(':').collect();
-    parts.len() == 3 && parts.iter().all(|p| is_lower_slug(p))
-}
-
-fn is_lower_slug(s: &str) -> bool {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit() => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
+// The channel-id shape is the slug's declaration (`crate::release_channel`);
+// this module reads the same predicate the row-write guard reads.
+pub use crate::release_channel::is_channel_id;
+pub(crate) use crate::release_channel::is_lower_slug;
 
 /// `^[a-z][a-z0-9_-]*$` — the schema's role-name shape.
 fn is_role_name(s: &str) -> bool {

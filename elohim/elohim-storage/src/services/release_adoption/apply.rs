@@ -1517,8 +1517,43 @@ pub struct AppMountPlan {
 /// and `verify-served-shell.sh` all read. The same digest the manifest's
 /// `blobCid` addresses (`blob_store::compute_addresses` returns both and stores
 /// ONE file), so writing it changes no reader.
-fn row_blob_hash(sha256: &str) -> String {
+pub(crate) fn row_blob_hash(sha256: &str) -> String {
     format!("sha256-{}", sha256.to_ascii_lowercase())
+}
+
+/// **Pure.** The browser pointer every bound slug's row must carry once
+/// `manifest` is applied: `(slug, sha256-<hex>)`, for the slugs whose binding
+/// names a browser half. The installed-reality check the adoption controller
+/// runs on its idempotence exit compares these against the rows, so a pointer
+/// another writer moved underneath an applied release is re-applied instead
+/// of being reported `applied` forever (alpha, 2026-10-07).
+pub fn expected_browser_pointers(manifest: &super::ReleaseManifest) -> Vec<(String, String)> {
+    use super::AppArtifactKind;
+    let mut out = Vec::new();
+    for (slug, binding) in &manifest.applies_to.apps {
+        if !binding.kinds.contains(&AppArtifactKind::Browser) {
+            continue;
+        }
+        if let Some(artifact) = manifest.artifacts.iter().find(|a| {
+            a.app.as_deref() == Some(slug.as_str()) && a.kind == Some(AppArtifactKind::Browser)
+        }) {
+            out.push((slug.clone(), row_blob_hash(&artifact.sha256)));
+        }
+    }
+    out
+}
+
+/// **Pure.** The slugs whose row pointer (`actual`, `None` = no row or no
+/// pointer) does not carry the browser bytes the applied release names.
+pub fn drifted_pointers(
+    expected: &[(String, String)],
+    actual: &std::collections::BTreeMap<String, Option<String>>,
+) -> Vec<String> {
+    expected
+        .iter()
+        .filter(|(slug, hash)| actual.get(slug).and_then(|v| v.as_deref()) != Some(hash.as_str()))
+        .map(|(slug, _)| slug.clone())
+        .collect()
 }
 
 /// **Pure.** What every bound slug's row should point at after `verified`.
@@ -2377,6 +2412,72 @@ mod tests {
     /// receipt and any harness arm that consumes the slot read exactly this
     /// string, so it is pinned here rather than left to a format! at a call
     /// site.
+    /// The pointers an applied app-bundle release expects on its slugs' rows,
+    /// and the drift check the controller's idempotence exit runs over them —
+    /// read from the same fixture the shape floor is measured against, so the
+    /// expectation can never disagree with what the vehicle would write.
+    #[test]
+    fn an_applied_release_names_its_slugs_browser_pointers_and_drift_is_the_rows_disagreeing() {
+        let text = std::fs::read_to_string(
+            "../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-app-bundle.json",
+        )
+        .expect("the app-bundle fixture is readable");
+        let body: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let manifest = super::super::verify::verify_shape(&body).unwrap();
+
+        let expected = expected_browser_pointers(&manifest);
+        assert_eq!(
+            expected,
+            vec![
+                (
+                    "elohim-host-landing".to_string(),
+                    "sha256-44092a11c534311df7b183bf84af669b8d3df27c7fdf6ed4f5f018e50e770239"
+                        .to_string()
+                ),
+                (
+                    "lamad-spa".to_string(),
+                    "sha256-bdad7de66087d90d682839862bb3817316dc534206b0062c9348d9f76be8d2f9"
+                        .to_string()
+                ),
+            ]
+        );
+
+        // Every row in step: nothing drifted, the exit may be taken.
+        let in_step: std::collections::BTreeMap<String, Option<String>> = expected
+            .iter()
+            .map(|(slug, hash)| (slug.clone(), Some(hash.clone())))
+            .collect();
+        assert!(drifted_pointers(&expected, &in_step).is_empty());
+
+        // Alpha, 2026-10-07: lamad-spa pulled back to the legacy head's blob,
+        // the landing untouched — exactly one slug to re-apply.
+        let mut pulled_back = in_step.clone();
+        pulled_back.insert(
+            "lamad-spa".to_string(),
+            Some(
+                "sha256-dcd51e262f5073e81491e63918b11add3015ae71634a75158c39c4b00fb639de"
+                    .to_string(),
+            ),
+        );
+        assert_eq!(
+            drifted_pointers(&expected, &pulled_back),
+            vec!["lamad-spa".to_string()]
+        );
+
+        // A row with no pointer, or no row at all, is drift too: the release
+        // says the slug serves these bytes and the peer serves nothing.
+        let mut missing = in_step.clone();
+        missing.insert("elohim-host-landing".to_string(), None);
+        assert_eq!(
+            drifted_pointers(&expected, &missing),
+            vec!["elohim-host-landing".to_string()]
+        );
+        assert_eq!(
+            drifted_pointers(&expected, &std::collections::BTreeMap::new()).len(),
+            2
+        );
+    }
+
     #[test]
     fn the_staged_binary_slot_path_is_normative() {
         let root = PathBuf::from("/tmp/elohim-local-mesh/release-adoption/matthew");

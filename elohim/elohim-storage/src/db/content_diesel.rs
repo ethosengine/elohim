@@ -987,7 +987,21 @@ pub fn update_content(
     // this guard kept the NULL; jessica's warm recovery plateaued on the same
     // shape. Guarding an absent value is empty-wins, the inverse of the rule.
     let green_hash_present = existing_is_green && existing.content.blob_hash.is_some();
-    let new_blob_hash = if is_amber_write && green_hash_present {
+    // A slug a release channel owns takes its pointer from that channel's
+    // vehicle alone (`crate::release_channel`); any other update keeps the
+    // row's pointer, whatever it carries. Same guard the head stamp applies.
+    let bound_to_release_channel =
+        crate::release_channel::binding_in_metadata(existing.content.metadata_json.as_deref());
+    if let (Some(channel), Some(_)) = (&bound_to_release_channel, &input.blob_hash) {
+        tracing::debug!(
+            content_id = %id, channel = %channel,
+            "update_content: the slug is bound to a release channel, which owns its serving \
+             pointer — the update's blob_hash is not applied"
+        );
+    }
+    let new_blob_hash = if bound_to_release_channel.is_some() {
+        existing.content.blob_hash.as_deref()
+    } else if is_amber_write && green_hash_present {
         // Amber must not clobber a notarized (green) blob_hash.
         existing.content.blob_hash.as_deref()
     } else {
@@ -2540,6 +2554,7 @@ fn stamp_declared_head_mode_transaction(
         Option<String>,
         String,
         Option<String>,
+        Option<String>,
     )> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
@@ -2551,6 +2566,7 @@ fn stamp_declared_head_mode_transaction(
             content::canonical_link_hash,
             content::reach,
             content::blob_hash,
+            content::metadata_json,
         ))
         .first(conn)
         .optional()
@@ -2564,10 +2580,35 @@ fn stamp_declared_head_mode_transaction(
         stored_canonical_link,
         stored_reach,
         stored_blob_hash,
+        stored_metadata_json,
     ) = match existing {
         None => return Ok((StampOutcome::NoRow, false)),
         Some(row) => row,
     };
+
+    // A slug a release channel owns takes its pointer from that channel's
+    // vehicle alone (`crate::release_channel`). A head stamp — a heal, an
+    // adoption, a legacy declare — may still record the head and every other
+    // field it carries, but its pointer and length are dropped here, at the
+    // one layer every stamp passes, rather than at each sweep that might
+    // forget to ask. Alpha, 2026-10-07: the pointer-audit sweep put a
+    // sixteen-day-old build back fifty seconds after the vehicle moved it.
+    let patch = patch.map(|mut p| {
+        if p.blob_cid.is_some() || p.content_size_bytes.is_some() {
+            if let Some(channel) =
+                crate::release_channel::binding_in_metadata(stored_metadata_json.as_deref())
+            {
+                tracing::debug!(
+                    content_id = %id, head = %head_action_hash, channel = %channel,
+                    "head stamp: the slug is bound to a release channel, which owns its \
+                     serving pointer — the stamp's pointer and length are not applied"
+                );
+                p.blob_cid = None;
+                p.content_size_bytes = None;
+            }
+        }
+        p
+    });
 
     // The stored election, reassembled. The columns are written together, so a
     // half-populated pair cannot occur; a defensive `zip` treats one as none.
@@ -5298,6 +5339,140 @@ mod tests {
             content_body: None,
             dht_anchor_hash: None,
         }
+    }
+
+    /// A slug a release channel owns (`metadata.releaseChannel`) keeps the
+    /// pointer its vehicle wrote, whichever other writer comes through this
+    /// layer: a converged-doc update, a legacy head's heal. Alpha,
+    /// 2026-10-07: the pointer-audit sweep put `lamad-spa` back on a
+    /// sixteen-day-old blob fifty seconds after the vehicle moved it. The
+    /// head itself still lands — the stamp records the head and drops only
+    /// the pointer and its length.
+    #[test]
+    fn a_slug_a_release_channel_owns_keeps_the_vehicles_pointer_through_every_other_writer() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mut bound = mk_plain("lamad-spa");
+        bound.blob_hash = Some("sha256-released-by-the-vehicle".to_string());
+        bound.blob_cid = Some("sha256-released-by-the-vehicle".to_string());
+        bound.content_size_bytes = Some(3_097_083);
+        bound.metadata_json =
+            Some(r#"{"releaseChannel":"runtime:app-bundle:alpha:dev"}"#.to_string());
+        create_content(&mut conn, &ctx, bound).unwrap();
+        // The legacy head the pipeline once stamped on the slug.
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "lamad-spa",
+            "uhCkk-legacy-head",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+
+        // The pointer-audit heal: same head, the record's (old) blob and length.
+        let healed = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "lamad-spa",
+            "uhCkk-legacy-head",
+            None,
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-named-by-the-legacy-head".to_string()),
+                content_size_bytes: Some(42),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            healed,
+            StampOutcome::Refreshed,
+            "the head itself is still recorded"
+        );
+
+        // The converged-doc heal: a blob_hash a peer served before it took the release up.
+        update_content(
+            &mut conn,
+            &ctx,
+            UpdateContentInput {
+                id: "lamad-spa".to_string(),
+                blob_hash: Some("sha256-what-a-peer-served-before".to_string()),
+                crdt_converged_at: Some("2026-10-07T21:08:41Z".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let row = get_content(&mut conn, &ctx, "lamad-spa", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-released-by-the-vehicle")
+        );
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("sha256-released-by-the-vehicle")
+        );
+        assert_eq!(row.content_size_bytes, Some(3_097_083));
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-legacy-head")
+        );
+
+        // The vehicle's own write path is untouched: it points the slug at the release.
+        apply_content_patch_fields(
+            &mut conn,
+            &ctx,
+            "lamad-spa",
+            &ContentProjectionPatch {
+                blob_cid: Some("sha256-the-next-release".to_string()),
+                content_size_bytes: Some(7),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "lamad-spa", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-the-next-release"));
+
+        // An unbound row keeps the ordinary semantics: the heal lands.
+        create_content(&mut conn, &ctx, mk_plain("plain")).unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "plain",
+            "uhCkk-P",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+        stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "plain",
+            "uhCkk-P",
+            None,
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-healed".to_string()),
+                content_size_bytes: Some(9),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            None,
+        )
+        .unwrap();
+        let row = get_content(&mut conn, &ctx, "plain", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-healed"));
     }
 
     /// HEAD-election (i), `Declare` mode: unchanged behavior — the committed

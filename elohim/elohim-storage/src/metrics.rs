@@ -5166,6 +5166,13 @@ pub enum PointerAuditOutcome {
     Unreadable,
     /// The conductor call, or a local DB read the decision needed, failed.
     Error,
+    /// The row is an app slug bound to a release channel
+    /// (`metadata.releaseChannel`): that channel's vehicle owns its serving
+    /// pointer, and this sweep never asks the slug's own head about it. Alpha,
+    /// 2026-10-07: the sweep "refreshed" `lamad-spa` back to the blob its
+    /// 2026-09-22 head named, fifty seconds after the release vehicle had
+    /// moved it.
+    HeldByReleaseChannel,
 }
 
 impl seam_contracts::ReasonLabel for PointerAuditOutcome {
@@ -5175,6 +5182,7 @@ impl seam_contracts::ReasonLabel for PointerAuditOutcome {
         PointerAuditOutcome::NotCanonical,
         PointerAuditOutcome::Unreadable,
         PointerAuditOutcome::Error,
+        PointerAuditOutcome::HeldByReleaseChannel,
     ];
 
     fn label(&self) -> &'static str {
@@ -5184,6 +5192,7 @@ impl seam_contracts::ReasonLabel for PointerAuditOutcome {
             PointerAuditOutcome::NotCanonical => "not_canonical",
             PointerAuditOutcome::Unreadable => "unreadable",
             PointerAuditOutcome::Error => "error",
+            PointerAuditOutcome::HeldByReleaseChannel => "held_by_release_channel",
         }
     }
 }

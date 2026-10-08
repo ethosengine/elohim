@@ -682,6 +682,25 @@ pub async fn reverse_project_content_doc(
         return Ok(false); // absent row → the shard/replication plane's job
     };
 
+    // An app slug bound to a release channel is pointed at its bytes by the
+    // channel's vehicle (slice 2), never by what peers' docs converged on —
+    // those docs carry whatever each peer served before it took the release
+    // up. Alpha, 2026-10-07: this heal logged `lamad-spa` 0196c8…→dcd51e…
+    // one second before the pointer-audit sweep wrote the same regression.
+    // Guard test: `a_bound_slug_keeps_the_vehicles_pointer`.
+    if let Some(channel) =
+        crate::services::head_adoption::bound_release_channel(existing.metadata_json.as_deref())
+    {
+        tracing::debug!(
+            target: "elohim_storage::sync_heal",
+            content_id = %id,
+            channel = %channel,
+            "reverse projection: the slug is bound to a release channel, which owns its \
+             serving pointer — the converged blobHash is not applied"
+        );
+        return Ok(false);
+    }
+
     // Idempotent per-field: a row already naming the converged value leaves
     // that field untouched (no `updated_at` churn per sync round from a field
     // that never moved), and a field that DIFFERS is named at INFO before the
@@ -2241,6 +2260,81 @@ mod tests {
 
     /// REQ-N5 laundering guard: a converged doc carrying `headActionHash` NEVER
     /// stamps `dht_anchor_hash` or `declared_head_action_hash` on the SQL row.
+    /// A slug bound to a release channel keeps the pointer its vehicle wrote,
+    /// whatever blobHash the peers' docs converged on — the converged value
+    /// is what each peer served BEFORE it took the release up. Alpha,
+    /// 2026-10-07: `lamad-spa` was pulled back to a sixteen-day-old build.
+    #[tokio::test]
+    async fn a_bound_slug_keeps_the_vehicles_pointer() {
+        use crate::db::content_diesel::{self, CreateContentInput};
+        use crate::db::context::AppContext;
+
+        let (sync, _temp) = test_sync_manager().await;
+        let pool = crate::test_util::test_pool();
+        let ctx = AppContext::default_lamad();
+        {
+            let mut conn = pool.get().unwrap();
+            content_diesel::create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: "bound-slug".to_string(),
+                    title: "t".to_string(),
+                    description: None,
+                    content_type: "application".to_string(),
+                    content_format: "html5-app".to_string(),
+                    blob_hash: Some("sha256-released-by-the-vehicle".to_string()),
+                    blob_cid: Some("sha256-released-by-the-vehicle".to_string()),
+                    content_size_bytes: Some(3_097_083),
+                    metadata_json: Some(
+                        r#"{"releaseChannel":"runtime:app-bundle:household:dev"}"#.to_string(),
+                    ),
+                    reach: "commons".to_string(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                    dht_anchor_hash: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let mut peer = sample_content("bound-slug", "t");
+        peer.blob_hash = Some("sha256-what-a-peer-served-before".to_string());
+        super::project_content_doc(&sync, &peer).await.unwrap();
+        assert_eq!(
+            sync.get_doc_field("elohim", "node:bound-slug", "blobHash")
+                .await
+                .unwrap(),
+            "sha256-what-a-peer-served-before",
+            "precondition: the converged doc names the stale pointer"
+        );
+
+        assert!(
+            !super::reverse_project_content_doc(&sync, &pool, "node:bound-slug")
+                .await
+                .unwrap(),
+            "a bound slug is left to its vehicle"
+        );
+        let mut conn = pool.get().unwrap();
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "bound-slug",
+            content_diesel::MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-released-by-the-vehicle")
+        );
+        assert!(
+            row.crdt_converged_at.is_none(),
+            "no amber marker on a pointer that did not move"
+        );
+    }
+
     /// The reverse projection heals `blobHash` ONLY (amber-marked) — anchors
     /// are written exclusively by conductor-verified paths, and consuming the
     /// doc's head hint here would launder unauthenticated peer input into
