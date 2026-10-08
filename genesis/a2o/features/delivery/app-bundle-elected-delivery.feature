@@ -19,7 +19,9 @@ Feature: A new build of an app reaches every peer by election, not by being writ
 
   An APP here is a web application the household serves. Each one has a
   RECORD — the entry every peer keeps that says which files are the app
-  right now. An app has two halves: the BROWSER BUNDLE (the files a
+  right now. A record is filed under the app's SLUG, the short name a
+  visitor's address uses for it; a "bound slug" is the slug of an app bound
+  to a channel (see BOUND below). An app has two halves: the BROWSER BUNDLE (the files a
   visitor's browser downloads and runs) and the SERVER BUNDLE (the files a
   doorway uses to render the first page before the browser takes over). A
   bundle's files are addressed by their content, so "the same bundle" means
@@ -95,8 +97,11 @@ Feature: A new build of an app reaches every peer by election, not by being writ
   released build back. The seventh guards a second regression and overrides
   the Background's healthy household to do it: a doorway serving a stale
   build because the peer it reads never joined the channel, and the peer
-  joining by its own act. The last stands alone, as a guard against a build
-  that cannot boot.
+  joining by its own act. The eighth names a stage that is not built yet: a
+  doorway's answer saying on whose authority it serves the app and where the
+  bytes came from, so that a visitor (or a test) can tell a stale peer from a
+  stale doorway without reading either one's insides. The last stands alone,
+  as a guard against a build that cannot boot.
 
   Three people share this house. matthew stewards the channel and runs the
   ceremonies. jessica and james run peers of their own; nobody asks either
@@ -175,6 +180,21 @@ Feature: A new build of an app reaches every peer by election, not by being writ
     When jessica's peer joins the channel as a canary by its own act, through its own admin endpoint, with no steward writing onto it
     Then on jessica's peer each app's record names the release's browser bundle and its server bundle
     And within 75 seconds the second doorway serves each app's page naming the new browser bundle's entry script
+
+  @wip
+  Scenario: A doorway names the authority it serves a bound slug under, and the provenance of the bytes
+    # Not built. The scenario above could only find its stale doorway by asking every peer
+    # behind it; the doorway's own answer said nothing about why it served what it served.
+    # This is the missing stage between "a peer took the release up" and "a doorway serves it":
+    # the doorway states the channel and release it is serving under, and which peer's record
+    # and which bundle the bytes came from. The doorway only reports; the peer's record stays the
+    # sole authority. The cure is deferred: the peer side that would hand the doorway those
+    # facts is being changed elsewhere at the same time.
+    Given every household peer has taken up matthew's new release
+    When a visitor asks doorway "alpha" for the first app
+    Then the answer names this run's release channel and the release the first app's record is bound to on matthew's peer
+    And the answer names matthew's peer as the one whose record it read, and the release's browser bundle as the bytes it served
+    And asking a doorway that reads jessica's peer instead names jessica's peer and the same channel, release and bundle
 
   Scenario: A build that cannot start is refused by every peer, and nothing moves
     Given every household peer has taken up the channel's earned head
