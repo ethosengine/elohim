@@ -267,6 +267,54 @@ Feature: Doorways stay responsive and expose recovery evidence during failures
     And the liveness probe keeps returning healthy
     And the pod is not restarted
 
+  # Engineering constraint (2026-10-08, gertrude's dead conductor). Two kinds of peer stand
+  # behind a doorway. A STORAGE peer holds the household's records and serves them. A
+  # CONDUCTOR-ONLY peer holds nothing but a CONDUCTOR PROCESS, which the doorway's pool lends
+  # to HOSTED HUMANS — people who sign up at the doorway instead of running a peer of their
+  # own; the doorway provisions each of them a cell on one pool conductor, and that choice is
+  # called PLACEMENT. On either kind of peer the conductor process runs under a SUPERVISOR
+  # PROCESS: one binary that, on a storage peer, serves records and keeps a conductor, and on a
+  # conductor-only peer has nothing to serve and only starts, watches and restarts the
+  # conductor. The supervisor owns the peer's health probe. A storage peer's probe stays green
+  # when its conductor dies, because the records still serve; a conductor-only peer's green
+  # answer over a dead conductor is a lie. gertrude (a conductor-only peer in the alpha pool)
+  # died that way at 10:41Z: its conductor process tried to bind its ports while the previous
+  # one still held them, exited, and the supervisor kept answering 200 for hours while the
+  # doorway kept placing new hosted humans on that slot and telling them "provisioning failed".
+  # Constraint pinned here (numbered within this section):
+  # 1. a conductor-only peer's probe answers for the conductor process, not the supervisor:
+  #    503, naming the conductor as exited, the next time it is asked after the process dies.
+  # Operational parameters (2026-10-08, parameter-bearing):
+  #   probe cadence                  the supervisor checks the process on every probe, no
+  #                                  timer of its own — red on the next ask
+  #   readiness (alpha)              6 failures x 10s: the pod leaves the doorway's reach in ~1 min
+  #   liveness (alpha)               10 failures x 30s: the pod is restarted in ~5 min
+  #   placement fallover             NOT IMPLEMENTED — the second scenario below is its claim
+
+  @wip @regression @act:i @requires:owned-substrate
+  Scenario: A conductor-only peer whose conductor process has died answers its health probe red
+    Given a conductor-only peer in the pool, its conductor process running under its supervisor process
+    When the conductor process is killed and the supervisor process is left running
+    Then the next time the supervisor's health probe is asked it answers 503 and names the conductor as exited
+
+  @wip @regression @act:i @requires:owned-substrate
+  Scenario: A restarted conductor-only peer's health probe returns to green
+    Given a conductor-only peer in the pool whose conductor process has died and whose probe answers 503
+    When the supervisor process is restarted
+    Then once the conductor process is listening again the health probe answers 200
+
+  @wip @regression @act:i @requires:owned-substrate
+  Scenario: A new hosted human registering while one pool conductor's probe is red is placed on a healthy conductor
+    # The open half of the 2026-10-08 incident: once the probe tells the truth, the doorway
+    # still has to act on it. Today it answers "provisioning failed" instead of trying the
+    # next conductor (genesis/data/timeline/backlog/alpha-gertrude-conductor-dead-child-ready-pod.md).
+    Given the doorway provisions each new hosted human a cell on one pool conductor
+    And a conductor-only peer in the pool whose health probe answers 503
+    When a new hosted human registers on doorway "alpha"
+    Then the doorway places them on a conductor whose probe answers 200
+    And their cell is provisioned there and they can sign in
+    And they are never told that provisioning failed
+
   # Operational parameters (2026-06-15 crashloop fix — parameter-bearing):
   #   conductor DNS resolve         tokio::net::lookup_host (async, off the worker
   #                                 pool), bounded by a 5s timeout; applied at all
