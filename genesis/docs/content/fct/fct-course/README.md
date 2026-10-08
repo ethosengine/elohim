@@ -9,8 +9,10 @@ browsable site from it.
 
 ## Prerequisites (for building and editing)
 
-Python 3 and the `markdown` package (`pip install markdown`). Nothing else.
-Pushing the course to the learning platform needs more; see that section.
+Python 3 and the `markdown` package (`pip install markdown`). Nothing else
+for building. Recomposing the course into content nodes also needs PyYAML
+(`pip install pyyaml`); pushing the course to the learning platform needs
+more. Each is named in its own section below.
 
 ## First run
 
@@ -145,9 +147,13 @@ says whether the committed nodes match this directory.
 
 ## Recomposing into content nodes
 
-Needs Python 3 and PyYAML (`pip install pyyaml`); it does not need the
-platform running. With no arguments it recomposes the whole course; name
-modules to regenerate a slice.
+Needs Python 3 and PyYAML (`pip install pyyaml`); it reads `content/*.md`
+directly, so it needs neither `build.py` to have run nor the platform
+running. It writes one JSON file per atom into `../../../data/lamad/content/`
+(from the repository root: `genesis/data/lamad/content/`) and the course path
+into `../../../data/lamad/paths/foundations-christian-technology.json`;
+`--check` compares those files with what it would write. With no arguments it
+recomposes the whole course; name modules to regenerate a slice.
 
     python3 recompose.py                  # the whole course (modules 1-15)
     python3 recompose.py --modules 1-4    # Movement I only
@@ -159,7 +165,9 @@ module's assessment questions and the simulations it points to, lives in
 purpose: the retrospective is consecration, not content, so it carries only
 its two covenant reflections). The two simulation labs the course threads
 through — Module 4's Evolution of Trust and Module 6's Parable of the
-Polygons — are named there and stand as their own steps on the path. Everything else is read from the markdown: the anchor
+Polygons — are named there and stand as their own steps on the path.
+
+Everything else is read from the markdown: the anchor
 and supporting scripture from the module's first lines, the three practice
 lanes from the Application bullets, and callbacks from every "Module N"
 mention. Existing curated scripture nodes (with verse text) are inputs and
