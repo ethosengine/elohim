@@ -5255,3 +5255,64 @@ decisionPoints:
       kind: unit
     gapNote: Live selected-CapGrant invocation, complete controller-history witness, household publication
       and independent receiver verification remain unproven; unit and WASM checks are not those proofs.
+
+  - name: attest_decision
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/federation.rs
+      modulePath: services::federation::ProbeRoster::attest_decision
+      line: 647
+    summary: >
+      Decides whether one peer-health observation (a doorway operator probing a sibling
+      doorway) is notarized on the operator's lamad chain. Only a TRANSITION is: the first
+      observation of a reachable sibling, or a changed status that has held for two
+      consecutive probe rounds (round-keyed, no clock). An unchanged observation, a pending
+      change, and a first sighting of an unreachable sibling are samples, not attestations,
+      and cost no chain action. Implements the doorway half of the recorded placement
+      decision (conductor store-growth report §7.1; native-delivery plan lane H2: samples are
+      ephemeral, transitions are notarized). DOORWAY_HEALTH_ATTEST_ON_TRANSITION=0 restores
+      the legacy attest-every-probe path as the explicit `Legacy` variant. The two-round hold
+      is the reset-and-time half of hysteresis that elohim_epr::algedonic does not yet carry;
+      it stays local until algedonic emission has a second consumer.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          Chain writes per sibling are bounded to transitions: a steady sibling costs zero
+          actions after its first observation, a flapping sibling costs zero until a status
+          holds two rounds, and a fetch outage cannot re-mint first observations because
+          refresh_peer_cache keeps the last known roster when every seed answers nothing.
+          an_unchanged_status_is_never_re_attested, a_status_that_flaps_every_round_is_never_attested,
+          a_first_observation_of_unreachable_is_held_not_attested and
+          a_failed_roster_fetch_keeps_the_previous_peer_cache pin the bound.
+      - id: C2
+        status: n-a
+        justification: >
+          The predicate decides only WHEN the doorway writes its own observation; it never
+          decides a head, an authority or who may read. The attestation itself is the same
+          record_health_attestation zome call as before, on the operator's own chain.
+    contractTests:
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_first_observation_is_attested
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: an_unchanged_status_is_never_re_attested
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_status_change_is_attested_only_after_it_holds_two_rounds
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_status_that_flaps_every_round_is_never_attested
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_first_observation_of_unreachable_is_held_not_attested
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_failed_attestation_write_is_retried_next_round
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: a_failed_roster_fetch_keeps_the_previous_peer_cache
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: attest_on_transition_env_off_restores_every_probe
+        kind: unit
