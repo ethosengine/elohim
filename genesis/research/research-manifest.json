@@ -161,6 +161,27 @@
    "path": "genesis/research/repos/backstitch",
    "relevance": "Realtime-SCM survey — Ink & Switch's version-control project (backstitch.dev): whether live CRDT-synced collaboration and git-shaped history can be one substrate; read against brit (covenantal git), the elohim-storage Automerge content-sync plane, and the concurrent-agent-sessions-one-worktree pain.",
    "pillar": "elohim"
+  },
+  {
+   "name": "prometheus-happ",
+   "url": "https://github.com/Permaculture-DAO/prometheus-happ.git",
+   "path": "genesis/research/repos/prometheus-happ",
+   "relevance": "Evidence Problem survey (2026-10-08) — Permaculture DAO's single-DNA Holochain 0.6.1 hApp for regenerative MRV evidence: TEST|REAL evidence_class refused in INTEGRITY (REAL_DATA_PERSISTENCE_GATE_CLOSED), capture-cannot-self-review, ordered claim tiers with investor-facing overclaim refusal, RAVEL shadow-mode invariants in the DNA, MQTT gateway (gateway/src/evidence.mjs, 27-indicator allowlist). Read zome_integrity/src/entry_types.rs first; validate() checks StoreEntry only. UNLICENSED — read, never vendor.",
+   "pillar": "shefa"
+  },
+  {
+   "name": "prometheus-canon",
+   "url": "https://github.com/Permaculture-DAO/prometheus-canon.git",
+   "path": "genesis/research/repos/prometheus-canon",
+   "relevance": "Evidence Problem survey (2026-10-08) — the GPG-signed canon (DOCX controlling, strict-MD provenance): ontology OHE→MRV→PRU→RAVEL→RAP, verification progression claim→observation→evidence→provenance→integrity→verified indicator→admissibility→value, the normative-stack hard-dependency rule, ci/claims_discipline_check.sh (the prose linter we lift), RATIFICATION custody disclosure. Large binaries (4 MB DOCX, 2 MB MD); clone by name only.",
+   "pillar": "elohim"
+  },
+  {
+   "name": "prometheus-runtime",
+   "url": "https://github.com/Permaculture-DAO/prometheus-runtime.git",
+   "path": "genesis/research/repos/prometheus-runtime",
+   "relevance": "Evidence Problem survey (2026-10-08) — Python S0–S6 ingestion/evidence-batch pipeline with JSON data contracts (contracts/*.schema.json: sensor event, observation, evidence batch, admissibility decision, review attestation), gated intake (423 until gates), 'Holochain remains a provenance and batch-reference layer, not a raw telemetry database'; open PR #17 is their 0.6.1→0.7 compatibility gate (our first gift).",
+   "pillar": "elohim"
   }
  ]
 }

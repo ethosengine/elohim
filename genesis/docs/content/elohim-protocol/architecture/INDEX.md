@@ -197,6 +197,7 @@ Each epic that has been realized by an architecture spec carries a "Technical Re
 - `value_scanner/epic.md` → records-lifecycle + mint-monarch (care-stewardship)
 - `social_medium/epic.md` → records-lifecycle + meta-facebook + drive + photos + patreon
 - `living_memory/epic.md` → records-lifecycle (and memory-lifecycle sibling)
+- `observability/epic.md` → observation-event-layer + attestation-consolidation + seam-map §3.16 (reader: records-lifecycle D.5)
 
 New architecture specs (including new application archetypes and horizon graduations) MUST add their backlinks to the epics they realize before being marked Landed.
 

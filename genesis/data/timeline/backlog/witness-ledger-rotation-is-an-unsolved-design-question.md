@@ -113,3 +113,5 @@ this row was authored about.
 stop-write versus keep-writing-and-forget-on-a-rule. The audit that re-measured this recommends
 scoping the stop-write separately from any deletion, because deleting first guarantees the file
 returns before the scoped change lands.
+
+**Canon home (2026-10-08):** the [Observability epic](genesis/docs/content/elohim-protocol/observability/epic.md) carries this concern — §11 (open frontier) and the consolidation order's step 7: once seven ledgers collapse into one fold, rotation becomes more load-bearing, not less; the question moves here, not away.

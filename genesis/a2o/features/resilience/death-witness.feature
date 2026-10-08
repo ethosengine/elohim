@@ -178,3 +178,11 @@ Feature: Death witness — a peer's runtime tells its household why a child died
     And another household peer can fetch the anchored incident by its content hash
     And the incident counts exactly one death and one restart
     And Jessica's passport records the new incarnation and the verdict "restart"
+
+  @wip @station-5
+  Scenario: The witness is also an observation row held by three observers
+    Given Jessica's peer has ingested a death witness for its conductor
+    When the two custodians receive their custody copies
+    Then Jessica's peer holds an observation row of kind "infrastructure:death-witness" naming the witness
+    And each custodian holds its own row naming the same witness
+    And a diversity read over the three rows counts three distinct observers of one witness

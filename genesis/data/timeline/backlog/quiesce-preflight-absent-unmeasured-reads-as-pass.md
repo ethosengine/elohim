@@ -98,3 +98,5 @@ absence rate is a live number and the A-side "never lit" claim is bounded by
 30-day retention, not by history.
 
 **RECONCILED 2026-10-02** (shem, fork 2b334df7973d, superproject 4a80267f3, code read only, nothing measured): PRESENT at doc level, correct in the gate. CLAUDE.md:335 and AGENTS.md:420 still give `unmeasured=0` with no absence rule and no preflight script exists beside the gate; the gate fails closed on an absent series (scripts/ci/fleet-quiesce-gate.sh:258-262,336,341). Same mechanism as: fleet-quiesce-pass-not-convergence. Confirming measurement: fleet only, the entry's five PromQL queries against alpha Prometheus.
+
+**Canon home (2026-10-08):** the [Observability epic](genesis/docs/content/elohim-protocol/observability/epic.md) carries this concern — §10 ('fail safe under absence') and §11 (named as a sharp edge).

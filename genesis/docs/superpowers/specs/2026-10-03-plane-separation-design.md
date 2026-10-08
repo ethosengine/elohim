@@ -209,6 +209,8 @@ the device-health history (code: `get_doorway_attestations` is a stub).
    after 900 s.
 6. **The latest-status read is bounded** regardless of the above. Coordinator-only.
 
+Canon: these rulings are restated as the witness plane and the six boundaries of the [Observability epic](../../content/elohim-protocol/observability/epic.md).
+
 ## 6. Head plane, machine side — nominate is an authority act; obey is not a chain act
 
 **Rulings.**
