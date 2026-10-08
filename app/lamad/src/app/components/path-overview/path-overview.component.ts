@@ -32,6 +32,7 @@ import {
   PathChapter,
   PathModule,
   PathSection,
+  findItemCriteria,
   findItemTitle,
 } from '../../models';
 import { RecommendationListComponent } from '../../quiz-engine/components/recommendation-list/recommendation-list.component';
@@ -75,6 +76,55 @@ export function moduleHeading(title: string, index: number): string {
   return LEADING_ORDINAL.test(title) ? title : `${index + 1}. ${title}`;
 }
 
+/** A chapter title that already names its own unit ("Movement I: …", "Unit 3 …"). */
+const NAMED_UNIT = /^\s*(Movement|Unit|Part|Week|Chapter|Section)\s+([IVXLC]+|\d+)\b/i;
+
+/**
+ * The word a path uses for its top-level divisions: taken from the chapter's
+ * own title when it names one, "Chapter" otherwise.
+ */
+export function unitWord(title: string): string {
+  const m = NAMED_UNIT.exec(title);
+  return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase() : 'Chapter';
+}
+
+/**
+ * The small kicker above a chapter title: "Chapter N" for an untitled division,
+ * nothing when the title already says which movement or unit it is.
+ */
+export function chapterKicker(title: string, index: number): string {
+  return NAMED_UNIT.test(title) ? '' : `Chapter ${index + 1}`;
+}
+
+/** The label over a chapter's description: "About this movement". */
+export function aboutLabel(title: string): string {
+  return `About this ${unitWord(title).toLowerCase()}`;
+}
+
+/** One column of a lesson's step list. */
+export interface LessonColumn {
+  /** "Learn" / "Practice", or empty for a single undivided list */
+  label: string;
+  concepts: ConceptDisplay[];
+}
+
+/**
+ * A lesson's steps in two columns — what is read and gathered around on the left,
+ * its practice (checks, reflections, labs) on the right — when the lesson has
+ * both; one undivided list otherwise. Only a module that is its own lesson is
+ * split, so generic section lists keep their order.
+ */
+export function lessonColumns(concepts: ConceptDisplay[], ownLesson: boolean): LessonColumn[] {
+  const practice = concepts.filter(c => c.track === 'practice');
+  if (!ownLesson || practice.length === 0 || practice.length === concepts.length) {
+    return [{ label: '', concepts }];
+  }
+  return [
+    { label: 'Learn', concepts: concepts.filter(c => c.track === 'learn') },
+    { label: 'Practice', concepts: practice },
+  ];
+}
+
 /**
  * Concept display for hierarchical paths using conceptIds
  */
@@ -86,6 +136,8 @@ interface ConceptDisplay {
   isGlobalCompletion: boolean;
   icon: string;
   contentType?: string;
+  /** What the author asks of the learner here: read/gather, or practice */
+  track: 'learn' | 'practice';
 }
 
 /**
@@ -94,6 +146,8 @@ interface ConceptDisplay {
 interface SectionDisplay {
   section: PathSection;
   concepts: ConceptDisplay[];
+  /** The concepts as the template lists them: one list, or Learn beside Practice */
+  columns: LessonColumn[];
   /** Completion percentage for progress indicator */
   completionPercentage: number;
   /** Total concepts in this section */
@@ -220,6 +274,10 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   /** localStorage key for resume position */
   private readonly RESUME_KEY_PREFIX = 'lamad-resume-';
+
+  readonly chapterKicker = chapterKicker;
+  readonly aboutLabel = aboutLabel;
+  readonly unitWord = unitWord;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -665,8 +723,10 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           isGlobalCompletion: false,
           icon: getIconForContent(step.resourceId, inferredType),
           contentType: inferredType,
+          track: 'learn' as const,
         };
       }),
+      columns: [],
       totalConcepts: steps.length,
       completedConcepts: steps.filter(step => {
         const conceptData = this.conceptProgress.find(c => c.conceptId === step.resourceId);
@@ -675,6 +735,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       completionPercentage: 0,
       isExpanded: true,
     };
+    sectionDisplay.columns = lessonColumns(sectionDisplay.concepts, false);
 
     return [
       {
@@ -697,6 +758,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     return modules.map((module, index) => {
       const sections = this.buildSectionDisplays(module.sections ?? []);
       const isOwnLesson = module.sections?.length === 1 && module.sections[0].id === module.id;
+      for (const sec of sections) {
+        sec.columns = lessonColumns(sec.concepts, isOwnLesson);
+      }
       const totalConcepts = sections.reduce((sum, s) => sum + s.totalConcepts, 0);
       const completedConcepts = sections.reduce((sum, s) => sum + s.completedConcepts, 0);
       const completionPercentage =
@@ -729,6 +793,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       return {
         section,
         concepts,
+        columns: [{ label: '', concepts }],
         totalConcepts,
         completedConcepts,
         completionPercentage,
@@ -745,6 +810,22 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     return section.conceptIds.map(conceptId => {
       const conceptData = this.conceptProgress.find(c => c.conceptId === conceptId);
       const inferredType = inferContentTypeFromId(conceptId);
+      // The author's completion criterion names the practice of a lesson: a check
+      // or reflection is scored, a lab is interacted with; the rest is read or gathered.
+      const criteria = findItemCriteria(section, conceptId);
+      const track: ConceptDisplay['track'] =
+        criteria === 'score' || criteria === 'interaction' ? 'practice' : 'learn';
+      // An id the inference does not recognise still tells the learner what it asks
+      // of them: a scored step is an assessment, an interactive one a simulation.
+      const contentType =
+        inferredType !== 'concept'
+          ? inferredType
+          : criteria === 'score'
+            ? 'assessment'
+            : criteria === 'interaction'
+              ? 'simulation'
+              : inferredType;
+      const icon = getIconForContent(conceptId, contentType);
 
       return {
         conceptId,
@@ -755,8 +836,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           this.formatConceptTitle(conceptId),
         isCompleted: this.isConceptCompleted(conceptId),
         isGlobalCompletion: this.isConceptGloballyComplete(conceptId),
-        icon: getIconForContent(conceptId, inferredType),
-        contentType: inferredType,
+        icon,
+        contentType,
+        track,
       };
     });
   }

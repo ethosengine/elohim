@@ -1,7 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute, Router } from '@angular/router';
 import { of, throwError, BehaviorSubject, Subject } from 'rxjs';
-import { PathOverviewComponent, moduleHeading } from './path-overview.component';
+import {
+  PathOverviewComponent,
+  aboutLabel,
+  chapterKicker,
+  lessonColumns,
+  moduleHeading,
+  unitWord,
+} from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { PathAdaptationService } from '../../quiz-engine/services/path-adaptation.service';
 import { LAMAD_AGENT, type ILamadAgent } from '../../interfaces/agent.interface';
@@ -195,13 +202,21 @@ describe('PathOverviewComponent', () => {
         },
         {
           provide: LAMAD_EPR_NAV,
-          useValue: { navigate: vi.fn(), ownsPath: vi.fn(() => true), recordHandoff: vi.fn() },
+          useValue: {
+            navigate: vi.fn(),
+            ownsPath: vi.fn(() => true),
+            recordHandoff: vi.fn(),
+          },
         },
       ],
     }).compileComponents();
 
-    pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
-    agentService = TestBed.inject(LAMAD_AGENT) as { [K in keyof ILamadAgent]?: Mock };
+    pathService = TestBed.inject(PathService) as {
+      [K in keyof PathService]?: Mock;
+    };
+    agentService = TestBed.inject(LAMAD_AGENT) as {
+      [K in keyof ILamadAgent]?: Mock;
+    };
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate');
 
@@ -443,13 +458,23 @@ describe('PathOverviewComponent', () => {
                 description: 'from assuming → to lament',
                 level: 'lesson',
                 items: [
-                  { ref: 'fct-module-01-church-dilemma', role: 'step', title: 'The Church Dilemma' },
+                  {
+                    ref: 'fct-module-01-church-dilemma',
+                    role: 'step',
+                    title: 'The Church Dilemma',
+                  },
                   {
                     ref: 'fct-module-01-church-dilemma-story',
                     role: 'step',
                     title: 'Story: A People Inside a System',
                   },
                   { ref: 'fct-course', role: 'step' },
+                  {
+                    ref: 'fct-module-01-church-dilemma-quiz',
+                    role: 'step',
+                    title: 'Check your understanding',
+                    completionCriteria: { type: 'score' },
+                  },
                 ],
               },
             ],
@@ -467,12 +492,12 @@ describe('PathOverviewComponent', () => {
         of([
           {
             chapter: chapteredPath.chapters![0],
-            totalUniqueContent: 3,
+            totalUniqueContent: 4,
             completedUniqueContent: 0,
             contentCompletionPercentage: 0,
             sharedContentCompleted: 0,
             completedSteps: 0,
-            totalSteps: 3,
+            totalSteps: 4,
           },
         ])
       );
@@ -500,6 +525,67 @@ describe('PathOverviewComponent', () => {
         'The Church Dilemma',
         'Story: A People Inside a System',
         'Fct Course',
+        'Check your understanding',
+      ]);
+    });
+
+    it('sets a scored step beside the lesson as its practice, under its own label', () => {
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      const labels = Array.from(el.querySelectorAll('.column-label')).map(l =>
+        l.textContent?.trim()
+      );
+      expect(labels).toEqual(['Learn', 'Practice']);
+      const practice = Array.from(el.querySelectorAll('.practice-column .concept-name')).map(n =>
+        n.textContent?.trim()
+      );
+      expect(practice).toEqual(['Check your understanding']);
+      expect(el.querySelector('.lesson-columns.two-column')).not.toBeNull();
+    });
+
+    it('does not repeat "Chapter 1" over a title that names its own movement', () => {
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.chapter-number')).toBeNull();
+      expect(el.querySelector('.about-label')?.textContent?.trim()).toBeUndefined();
+      expect(
+        el.querySelector('.chapter-actions .btn')?.textContent?.replace(/\s+/g, ' ').trim()
+      ).toBe('Start Movement');
+    });
+  });
+
+  describe('chapter labels', () => {
+    it('keeps "Chapter N" for an untitled division and drops it for a named unit', () => {
+      expect(chapterKicker('Getting Started', 0)).toBe('Chapter 1');
+      expect(chapterKicker('Movement I: Waking Up — Lament & Sight', 0)).toBe('');
+      expect(chapterKicker('Unit 3: Early Agrarian Societies', 2)).toBe('');
+      expect(unitWord('Movement II: Turning')).toBe('Movement');
+      expect(unitWord('Getting Started')).toBe('Chapter');
+      expect(aboutLabel('Movement II: Turning')).toBe('About this movement');
+    });
+  });
+
+  describe('lessonColumns', () => {
+    const concept = (conceptId: string, track: 'learn' | 'practice') => ({
+      conceptId,
+      title: conceptId,
+      isCompleted: false,
+      isGlobalCompletion: false,
+      icon: '',
+      track,
+    });
+
+    it('splits a lesson with practice into Learn and Practice, and leaves the rest whole', () => {
+      const mixed = [concept('a', 'learn'), concept('b', 'practice'), concept('c', 'learn')];
+      expect(
+        lessonColumns(mixed, true).map(c => [c.label, c.concepts.map(x => x.conceptId)])
+      ).toEqual([
+        ['Learn', ['a', 'c']],
+        ['Practice', ['b']],
+      ]);
+      expect(lessonColumns(mixed, false)).toEqual([{ label: '', concepts: mixed }]);
+      expect(lessonColumns([concept('a', 'learn')], true)).toEqual([
+        { label: '', concepts: [concept('a', 'learn')] },
       ]);
     });
   });

@@ -495,6 +495,25 @@ export function findItemTitle(section: PathSection, contentId: string): string |
 }
 
 /**
+ * The path author's completion criterion for a content ref within a section
+ * subtree (`items[].completionCriteria.type`), or undefined when none was set.
+ * `score` and `interaction` mark a lesson's practice — a check, a reflection, a
+ * lab — as distinct from what is read or gathered around.
+ */
+export function findItemCriteria(section: PathSection, contentId: string): string | undefined {
+  for (const item of section.items ?? []) {
+    if (resolveRef(item.ref) === contentId && item.completionCriteria?.type) {
+      return item.completionCriteria.type;
+    }
+  }
+  for (const child of section.sections ?? []) {
+    const type = findItemCriteria(child, contentId);
+    if (type) return type;
+  }
+  return undefined;
+}
+
+/**
  * Enrich a raw section from JSON body with backward-compat fields.
  */
 function enrichSection(raw: Section, index: number): PathSection {

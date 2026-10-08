@@ -212,6 +212,21 @@ export function getContentIcon(
 export function inferContentTypeFromId(contentId: string): ContentType {
   const id = contentId.toLowerCase();
 
+  // The forms a recomposed course names in its atom ids (lesson, story, gathering,
+  // practice lanes, the one assignment, check, reflection, lab, scripture).
+  if (/-(counter-)?story$/.test(id)) return 'narrative';
+  if (id.endsWith('-discussion')) return 'discussion';
+  if (/-(lane-[a-z-]+|application|homework|practice)$/.test(id)) return 'practice';
+  if (/-reflection(-\d+)?$/.test(id)) return 'reflection';
+  if (id.startsWith('fct-bible-') || id.includes('bible-verse')) return 'bible-verse';
+  if (id.includes('-lab-') || id === 'evolution-of-trust') return 'simulation';
+  if (
+    /^fct-module-\d{2}-[a-z0-9]+(-[a-z0-9]+)*$/.test(id) &&
+    !/-(quiz|dashboard|covenant|liturgy|holds|gap)$/.test(id)
+  ) {
+    return 'lesson';
+  }
+
   if (id.includes('quiz') || id.includes('assessment')) return 'assessment';
   if (id.includes('discovery-assessment')) return 'discovery-assessment';
   if (id.includes('video')) return 'reference';

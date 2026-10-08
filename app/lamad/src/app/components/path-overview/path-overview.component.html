@@ -109,7 +109,9 @@
               <!-- Chapter Header -->
               <div class="chapter-header">
                 <div class="chapter-header-left">
-                  <span class="chapter-number">Chapter {{ chapterIdx + 1 }}</span>
+                  @if (chapterKicker(item.chapter.title, chapterIdx); as kicker) {
+                    <span class="chapter-number">{{ kicker }}</span>
+                  }
                   <h3>{{ item.chapter.title }}</h3>
                   @if (item.chapter.optional) {
                     <span class="optional-badge">Optional</span>
@@ -139,9 +141,12 @@
               <!-- Chapter Body -->
               <div class="chapter-body">
                 @if (item.chapter.description) {
-                  <p class="chapter-description">
-                    {{ item.chapter.description }}
-                  </p>
+                  <div class="chapter-about">
+                    <span class="about-label">{{ aboutLabel(item.chapter.title) }}</span>
+                    <p class="chapter-description">
+                      {{ item.chapter.description }}
+                    </p>
+                  </div>
                 }
 
                 <!-- Modules -->
@@ -252,49 +257,69 @@
                                   </p>
                                 }
 
-                                <!-- Concepts -->
-                                @if (sec.concepts.length > 0) {
-                                  <ul class="concept-list">
-                                    @for (
-                                      concept of sec.concepts;
-                                      track concept.conceptId || $index
-                                    ) {
-                                      <li>
-                                        <button
-                                          type="button"
-                                          class="concept-item"
-                                          [ngClass]="{
-                                            completed: concept.isCompleted,
-                                            'global-complete': concept.isGlobalCompletion,
-                                          }"
-                                          (click)="goToConcept(concept.conceptId)"
-                                        >
-                                          <span class="concept-status-icon">
-                                            @if (concept.isCompleted) {
-                                              <span class="checkmark">✓</span>
-                                            } @else if (concept.isGlobalCompletion) {
-                                              <span
-                                                class="checkmark global"
-                                                title="Mastered in another journey"
+                                <!-- Concepts: a lesson's practice (checks, reflections,
+                                     labs) stands beside what is read and gathered. -->
+                                <div
+                                  class="lesson-columns"
+                                  [class.two-column]="sec.columns.length > 1"
+                                >
+                                  @for (col of sec.columns; track col.label) {
+                                    <div
+                                      class="lesson-column"
+                                      [class.practice-column]="col.label === 'Practice'"
+                                    >
+                                      @if (col.label) {
+                                        <h6 class="column-label">
+                                          {{ col.label }}
+                                        </h6>
+                                      }
+                                      @if (col.concepts.length > 0) {
+                                        <ul class="concept-list">
+                                          @for (
+                                            concept of col.concepts;
+                                            track concept.conceptId || $index
+                                          ) {
+                                            <li>
+                                              <button
+                                                type="button"
+                                                class="concept-item"
+                                                [ngClass]="{
+                                                  completed: concept.isCompleted,
+                                                  'global-complete': concept.isGlobalCompletion,
+                                                }"
+                                                (click)="goToConcept(concept.conceptId)"
                                               >
-                                                ✓
-                                              </span>
-                                            } @else {
-                                              <span class="circle">○</span>
-                                            }
-                                          </span>
-                                          <span class="concept-icon">{{ concept.icon }}</span>
-                                          <span class="concept-name">{{ concept.title }}</span>
-                                          @if (concept.contentType) {
-                                            <span class="content-type-tag">
-                                              {{ concept.contentType }}
-                                            </span>
+                                                <span class="concept-status-icon">
+                                                  @if (concept.isCompleted) {
+                                                    <span class="checkmark">✓</span>
+                                                  } @else if (concept.isGlobalCompletion) {
+                                                    <span
+                                                      class="checkmark global"
+                                                      title="Mastered in another journey"
+                                                    >
+                                                      ✓
+                                                    </span>
+                                                  } @else {
+                                                    <span class="circle">○</span>
+                                                  }
+                                                </span>
+                                                <span class="concept-icon">{{ concept.icon }}</span>
+                                                <span class="concept-name">
+                                                  {{ concept.title }}
+                                                </span>
+                                                @if (concept.contentType) {
+                                                  <span class="content-type-tag">
+                                                    {{ concept.contentType }}
+                                                  </span>
+                                                }
+                                              </button>
+                                            </li>
                                           }
-                                        </button>
-                                      </li>
-                                    }
-                                  </ul>
-                                }
+                                        </ul>
+                                      }
+                                    </div>
+                                  }
+                                </div>
                               </div>
                             </div>
                           }
@@ -311,7 +336,7 @@
                     (click)="startChapter(item.chapter.id)"
                   >
                     {{ item.completedConcepts > 0 ? 'Continue' : 'Start' }}
-                    Chapter
+                    {{ unitWord(item.chapter.title) }}
                   </button>
                 </div>
               </div>

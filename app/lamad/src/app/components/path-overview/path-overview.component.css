@@ -1670,3 +1670,52 @@
   border: none;
   padding: 0;
 }
+
+/* About this movement: the chapter's description, labelled */
+.chapter-about {
+  margin: 0 0 1rem;
+}
+
+.about-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lamad-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+/* A lesson's steps: Learn beside Practice when it has both */
+.lesson-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem 1.5rem;
+}
+
+.lesson-columns.two-column {
+  grid-template-columns: 3fr 2fr;
+}
+
+.lesson-column {
+  min-width: 0;
+}
+
+.column-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lamad-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.practice-column .concept-item {
+  background: var(--lamad-bg-secondary, #f9fafb);
+}
+
+@media (width <= 700px) {
+  .lesson-columns.two-column {
+    grid-template-columns: 1fr;
+  }
+}
