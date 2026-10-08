@@ -131,3 +131,10 @@ meets the declared size while the filesystem under it is full — it reads `df` 
 and prints `CONDUCTOR-VOLUME-FULL` naming the snapshot-quota mechanism and the move above (warn-only; the roll goes
 on). Regression: `scripts/ci/grow-conductor-pvc.test.sh`.
 
+SEEN 2026-10-08 10:40Z (edge #1578, the first roll with the reading in place): eve's conductor container was
+CrashLoopBackOff on the full volume, so the step could not exec `df` into it and printed only "answered nothing";
+the rollout then timed out at 600 s and adam's and matthew's conductors were HELD behind it. The step now names
+the exec error and says a container that is not running cannot be asked — read the claim's kubelet capacity series
+instead. The reading this incident needs will come from adam's or eve's conductor once it runs again, which is after
+the `refquota` move above. Until then the "0 free" fact lives only in Prometheus and this file.
+

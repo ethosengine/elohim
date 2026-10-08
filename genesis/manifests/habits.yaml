@@ -981,6 +981,23 @@ habits:
       should read false with `reanchorHeldUnbacked` counting the released rows.
 
       DELTA 2026-10-08d (RED preserved; the slug-pointer cure is ON THE FLEET and it exposed a declaration gap, now cured on dev): edge #1578 (09:01Z–10:50Z, UNSTABLE only for gertrude's roll-gate deadline) rolled all seven storages to b29b7248, which carries 5ead7671a (a slug bound to a release channel is written by the channel's vehicle alone); app #1756 then published release uhCkkoMJRgJp… on `runtime:app-bundle:alpha:dev` (lamad-spa browser sha256-219cd20c…) and read APP-ADOPTED matthew,jessica — doorway-alpha served `/lamad/version.json` b29b7248 from 11:05Z. elohim.host kept serving b65fa335: it reads adam (alpha-b.yaml STORAGE_URL since 2026-05-27), adam's `/db/p2p/adoption` listed no app-bundle channel, and his lamad-spa row sat at sha256-dcd51e26… with `updatedAt 09:57:38Z` (the boot re-apply). Before the cure a converged doc or heal moved that row as a side effect; now nothing may, so a serving peer that follows no channel is pinned to its last pointer — by design, and the design is right: the gap was the DECLARATION. deployments.json gave the channel to "the serving pair (matthew, jessica)" and runtime-config-render.test.mjs asserted adam never follows it, both on the belief that doorway B reads jessica. Cured: adam follows `runtime:app-bundle:alpha:dev=canary`; the test derives the follow set from every doorway manifest's STORAGE_URL (alpha.yaml → matthew, alpha-b.yaml → adam) instead of a hand list, and fails on an unenrolled backing storage (mutation-checked); the App pipeline measures adoption on matthew, adam and jessica. The ConfigMap change reaches adam's rung-4 watcher without a pod restart (`reconcile_followed`); whether adam then APPLIES depends on his conductor resolving the channel head, which at 11:19Z still answered the stale head on the full shem dataset (backlog `alpha-adam-peer-meta-store-disk-io-error`). Story: the @wip scenario "A doorway serves only what the peer it reads has taken up, so that peer joins the channel" in app-bundle-elected-delivery.feature (household-runnable through `POST /admin/runtime-config/follow`). Fleet read owed after the next edge roll: `elohim.host/lamad/version.json` moves off b65fa335 and `elohim.host/db/p2p/adoption` lists the app-bundle channel as applied.
+
+      DELTA 2026-10-08e (RED preserved; the dead-anchor cure is on the fleet and the A-side loop reads clean): the same
+      edge #1578 roll carried 683fb16a7 (DELTA 2026-10-07). At 12:10Z doorway-alpha `/p2p/status .provideLoop` reads
+      `deadRemainingStuck false, stuckSweeps 0, reanchorDeadRemaining 0, reanchorHeldUnbacked 0, reanchorCaughtUp true`
+      — the per-arm fields are on the wire. elohim.host (adam) reads `deadRemainingStuck false, stuckSweeps 1,
+      reanchorDeadRemaining 9, reanchorHeld 9` (all `reanchorHeldUnanswered`), `reanchorFailed 339, reanchorPending 94,
+      reanchorCaughtUp false`: Held and not laundered, and every held row is an unanswered conductor probe — downstream
+      of adam's full ZFS dataset (backlog `alpha-adam-peer-meta-store-disk-io-error`), not of the re-anchor seam.
+      Validation: edge #1579 (validate-only, 10:50Z) SUCCESS — quiesce PASS with A and B caught up, `federation-deploy
+      passed=2`, `inventory-convergence passed=1`, `doorway-failover passed=3`; 9 of 133 scenarios ran, 124 HELD on
+      substrate. Roll cost beyond gertrude's deadline: eve's conductor is CrashLoopBackOff on its full volume, so its
+      rollout timed out at 600 s and `grow-conductor-pvc.sh`'s first live filesystem read answered nothing (it cannot
+      exec into a container that is not running; the step now names the exec error), and adam's and matthew's conductors
+      were HELD (templates byte-stable, nothing missing). Edge #1577, the dispatch from the b29b7248e push, ABORTED at
+      its 4 h wall clock inside the storage image build (cause not read; ci fingerprint 92e17ac6788b); the timer run
+      built the same sha in 108 min. Runtime fingerprint 2b4761b2eaf6 clears by harvest, not by hand. Still red: adam's
+      and eve's datasets are operator-owned, and the habit's checks beyond the three stories are HELD on substrate.
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

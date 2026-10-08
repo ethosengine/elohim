@@ -12,6 +12,8 @@
 #   d. request meets, no pod mounts the claim                → "filesystem not read", exit 0
 #   e. claim absent                                          → "absent — nothing to grow", exit 0
 #   f. the stub's df answers nothing                         → "answered nothing", exit 0
+#   g. 10Gi request vs 20Gi declared, class cannot expand    → GROW-REFUSED (64-bit bytes)
+#   h. the container is not running, exec fails              → the exec error is named, exit 0
 set -euo pipefail
 
 # No git: the deploy container may run this beside the script it covers.
@@ -42,6 +44,7 @@ case "$1 $2" in
     echo false ;;
   "exec "*)
     echo "$*" >> "$SCENARIO/exec.log"
+    if [ -f "$SCENARIO/exec-fails" ]; then cat "$SCENARIO/exec-fails" >&2; exit 1; fi
     cat "$SCENARIO/df" 2>/dev/null ;;
   *) echo "stub: unexpected kubectl $*" >&2; exit 2 ;;
 esac
@@ -132,5 +135,15 @@ grep -q "CONDUCTOR-PVC-GROW-REFUSED" <<<"$OUT" || fail "g: no GROW-REFUSED: $OUT
 [ "$(bash -c "$(sed -n '/^to_bytes()/,/^}/p' "$SCRIPT"); to_bytes 1.5Gi")" = "1610612736" ] || fail "g: to_bytes 1.5Gi"
 [ "$(bash -c "$(sed -n '/^to_bytes()/,/^}/p' "$SCRIPT"); to_bytes 20Gi")" = "21474836480" ] || fail "g: to_bytes 20Gi"
 echo "g ok"
+
+# h. the container is not running (eve's conductor, CrashLoopBackOff on a full
+#    volume, edge #1578): the exec's own error is the reading, not "nothing"
+scenario crashloop
+printf 'error: unable to upgrade connection: container not found ("elohim-conductor")\n' > "$SCENARIO/exec-fails"
+run
+[ "$CODE" -eq 0 ] || fail "h: exit $CODE"
+grep -q 'answered nothing (error: unable to upgrade connection: container not found ("elohim-conductor"))' <<<"$OUT" || fail "h: exec error not named: $OUT"
+grep -q "cannot be asked" <<<"$OUT" || fail "h: no not-running reading: $OUT"
+echo "h ok"
 
 echo "grow-conductor-pvc.test.sh: all scenarios pass"

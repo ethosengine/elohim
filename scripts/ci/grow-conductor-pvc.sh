@@ -87,9 +87,16 @@ read_filesystem() {
     say "filesystem not read — pod $pod mounts the claim as volume '${volname:-?}' but no container mounts that volume"
     return 0
   fi
-  line="$(kubectl exec -n "$namespace" "$pod" -c "$container" -- df -P -k "$mount" 2>/dev/null | awk 'NR == 2' || true)"
+  # The exec's error is the reading when the container is not running: eve's
+  # conductor was CrashLoopBackOff on its full volume (edge #1578) and this line
+  # said only "answered nothing", hiding the one fact the operator needed.
+  local err why
+  err="$(mktemp)"
+  line="$(kubectl exec -n "$namespace" "$pod" -c "$container" -- df -P -k "$mount" 2>"$err" | awk 'NR == 2' || true)"
+  why="$(head -n 1 "$err" 2>/dev/null || true)"
+  rm -f "$err"
   if [ -z "$line" ]; then
-    say "filesystem not read — df $mount in $pod/$container answered nothing"
+    say "filesystem not read — df $mount in $pod/$container answered nothing${why:+ ($why)}; a container that is not running cannot be asked (a conductor crash-looping on a full volume is the 2026-10-08 shape) — read the claim's kubelet capacity series instead"
     return 0
   fi
   read -r _ total used avail _ <<<"$line"

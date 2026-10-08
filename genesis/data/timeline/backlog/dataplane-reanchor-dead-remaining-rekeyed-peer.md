@@ -552,3 +552,20 @@ reanchorCaughtUp: true, deadRemainingStuck: false`. Clean recast (`receipt-lane-
 scenarios, receipt `sprint-report-household-20261007T232705Z-683fb16a`. The alpha-b fingerprint
 `2b4761b2eaf6` should disappear from the poller once the edge roll carries 683fb16a7; until the
 roll, the ledger row stays `blocked` on evidence, not intention.
+
+## 2026-10-08 — ON THE FLEET (edge #1578, storage `1.0.0-dev-b29b7248`)
+
+All seven alpha storage pods rolled 10:00Z to 10:40Z. Read at 12:10Z from `/p2p/status .provideLoop`:
+
+| doorway | deadRemainingStuck | stuckSweeps | reanchorDeadRemaining | reanchorHeld (unbacked / unanswered) | reanchorFailed | reanchorPending | reanchorCaughtUp |
+|---|---|---|---|---|---|---|---|
+| doorway-alpha (matthew, ethosengine) | false | 0 | 0 | 0 (0 / 0) | 0 | 0 | true |
+| elohim.host (adam, shem) | false | 1 | 9 | 9 (0 / 9) | 339 | 94 | false |
+
+The A side is the clean read of this fix: no dead rows, no held rows, caught up. The B side is
+downstream of the disk incident, not of this seam: every one of adam's 9 held rows is
+`reanchorHeldUnanswered` — a conductor probe that timed out — and adam's conductor is the one
+logging SQLite 778 on a full ZFS dataset (`alpha-adam-peer-meta-store-disk-io-error`, DELTA
+2026-10-08). Held is not laundered to live, which is F3 holding on the fleet. Re-read elohim.host
+after the operator sets `refquota` on adam's dataset and recycles the conductor; until then its
+numbers are the disk's, and the ledger row `2b4761b2eaf6` clears by the poller's own clean streak.
