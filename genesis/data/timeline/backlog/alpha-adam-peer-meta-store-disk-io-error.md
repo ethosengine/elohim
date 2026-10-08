@@ -138,3 +138,17 @@ the exec error and says a container that is not running cannot be asked — read
 instead. The reading this incident needs will come from adam's or eve's conductor once it runs again, which is after
 the `refquota` move above. Until then the "0 free" fact lives only in Prometheus and this file.
 
+SEEN 2026-10-08 13:52Z (edge #1580, the roll after it): adam's conductor is now in the same crash loop — its
+rollout timed out at 600 s in #1580, and at 14:02Z `kube_pod_container_status_restarts_total` reads adam 9, eve 10
+(Loki: `/elohim-conductor/8.log` on adam is the holochain banner then death). elohim.host's `status.json` reads
+conductor `connected_workers 0/4` (doorway A 4/4), so every conductor-backed path on elohim.host — hosted sessions,
+head resolves, the lamad slug move — is down, and adam's app-bundle verdict reads `refused conductor_unavailable`
+3 of 3 sweeps even though his follow of `runtime:app-bundle:alpha:dev` is live (the declaration cure landed in
+#1580; `/db/p2p/adoption` lists it from 13:35Z). The datasets behind the four shem conductor claims are
+`tank/k8s/pvc-087fffec-c7aa-440c-bbb2-749c4b2d486d` (adam), `pvc-809ec440-f9ca-4376-a16b-5f194e8a120e` (eve),
+`pvc-5dacb871-c96c-491a-b5b6-8dc2d0e7384b` (gertrude), `pvc-86e2faa2-5edd-4fc2-b530-efcad9146786` (susan); the Che
+workspace claim is `pvc-2145483b-50a9-4b41-84ac-841c9ca5517f`. At 14:00Z adam and eve read 0 bytes available,
+gertrude 1.6 GiB, susan 6.5 GiB. Recovery is the `refquota` move above, then
+`kubectl delete pod elohim-{adam,eve}-alpha-conductor-0 -n elohim-alpha`; a conductor that still crash-loops
+afterwards on a SQLite corruption line (not 778) is the one case that needs the syncoid snapshot under `backup/tank`.
+
