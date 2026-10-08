@@ -6,10 +6,11 @@ invariant: >
   reconciliation as commitment-gated protocol verbs — with peer-local
   telemetry served by the peer itself. The dev surface and the operator
   OS-settings surface are the same surface.
-status: green
+status: red
 active: false
 checks:
   - "a2o @concern:operator-runtime-surface (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — @wip DROPPED 2026-08-18 by operator decision: COUNTS in the edge Dataplane Validation byConcern rollup; also runnable locally with npx cucumber-js --tags '@concern:operator-runtime-surface')"
+  - "a2o @concern:operator-runtime-surface effect station (genesis/a2o/features/dataplane/operator-commitment-gated-verbs.feature — the scenario named A verb success is a post-action observation, not the handler word: an accepted reconcile has an infrastructure:operator-effect row of phase post whose event id equals the verb attestation event id and whose observer is the peer sampler; a verb with no post row is listed by the compute dashboard as unverified-effect; @wip)"
   - "cargo test --test operator_verbs (elohim/elohim-storage — 9 tests: holder accepted + attestation names grant cid AND recorded event id; no-grant refused; revoked refused; no verified performer refused; loopless peer honest 503 with no phantom rate charge; accepted use recorded bounded_by the grant; refusals record nothing; rate_per_hour ceiling refuses the over-limit use)"
 refs:
   - "task #10 (operator directive 2026-07-02)"

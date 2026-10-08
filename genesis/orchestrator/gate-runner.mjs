@@ -235,7 +235,7 @@ function cargoEnvOf(childEnv) {
 
 function usage() {
   console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names]');
-  console.error('  env: GATE_ORACLE=shadow|rakia|path (default shadow) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
+  console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a rakia binary every mode is path-only) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
