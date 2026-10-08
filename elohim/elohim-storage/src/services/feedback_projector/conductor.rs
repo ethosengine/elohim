@@ -4,6 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::*;
 use crate::hc_client::HcClient;
+use crate::services::conductor_writes::decode_action_hash;
 
 pub struct ConductorReader(pub Arc<HcClient>);
 
@@ -72,7 +73,7 @@ impl FeedbackDhtReader for ConductorReader {
             .call(
                 "get_feedback_signal_refs_for_target",
                 Input {
-                    target_action_hash: parse_action(target)?,
+                    target_action_hash: decode_action_hash(target)?,
                     resolve: false,
                 },
             )
@@ -88,7 +89,7 @@ impl FeedbackDhtReader for ConductorReader {
     }
 
     async fn signal_record(&self, hash: &str) -> Result<Option<FetchedRecord>, StorageError> {
-        let requested = parse_action(hash)?;
+        let requested = decode_action_hash(hash)?;
         let record: Option<Record> = self
             .call("get_feedback_signal_record", requested.clone())
             .await?;
@@ -104,8 +105,9 @@ impl FeedbackDhtReader for ConductorReader {
             let Some(evidence) = entry.evidence_cid.as_deref() else {
                 return Err(invalid("correction has no evidence"));
             };
-            let content: Option<lamad_types::ContentOutput> =
-                self.call("get_content", parse_action(evidence)?).await?;
+            let content: Option<lamad_types::ContentOutput> = self
+                .call("get_content", decode_action_hash(evidence)?)
+                .await?;
             let Some(content) = content else {
                 return Ok(None);
             };
@@ -141,7 +143,7 @@ impl FeedbackDhtReader for ConductorReader {
             .call(
                 "get_content_lineage",
                 Input {
-                    action_hash: parse_action(hash)?,
+                    action_hash: decode_action_hash(hash)?,
                     local: true,
                 },
             )
@@ -226,14 +228,4 @@ fn decode_record(record: Record, requested: &ActionHash) -> Result<FetchedRecord
         entry,
         entry_bytes_len: len,
     })
-}
-
-fn parse_action(value: &str) -> Result<ActionHash, StorageError> {
-    let encoded = value
-        .strip_prefix('u')
-        .ok_or_else(|| invalid("missing hash prefix"))?;
-    let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(encoded)
-        .map_err(invalid)?;
-    ActionHash::try_from_raw_39(raw).map_err(invalid)
 }
