@@ -1053,7 +1053,11 @@ const ADOPTION_SERIES = 'elohim_head_adoption_trigger_total';
 const ADOPTION_LABEL = 'outcome';
 /** `probe` exists today; `election_refreshed` lands with the carried-ordering change. */
 const ADOPTION_OUTCOMES = ['probe', 'election_refreshed'] as const;
-const TOLD_WAIT_MS = 30_000;
+// The receiver's trigger answers a carried ordering its conductor cannot yet walk with ONE slow
+// re-probe after SLOW_REPROBE_DELAY (30 s, head_adoption_trigger.rs), then the earned link must have
+// gossiped in: measured 2026-10-08 20:24:07Z on james, 30.1 s after the announce. Budget one slow
+// retry plus gossip; the reconcile sweep (300 s) stays far outside it, so step 5's "before any sweep" holds.
+const TOLD_WAIT_MS = 90_000;
 const HEAD_POLL_INTERVAL_MS = 2_000;
 
 interface HeadOnlyState {
@@ -1196,8 +1200,13 @@ Given(
     // "New head" here means a new EARNED declaration for the SAME action hash: the text and the
     // action are unchanged, only the declaration's ordering (earned tier, notarized clock) is new.
     await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
+    // The AUTHOR's own storage asking its OWN conductor (`?election=live`): trustful-self, the
+    // path the steward-publish flow takes after declaring. It is not the receiver, so it masks
+    // nothing about delivery; step 5 (the receiver) deliberately reads WITHOUT `?election=live`.
     const earned = await pollUntil(PROJECTION_WAIT_MS, async () => {
-      const head = await readHead(s.winner, s.eprId);
+      const r = await fetch(`${s.winner.storageUrl}/db/content/${s.eprId}/head?election=live`);
+      if (!r.ok) return false;
+      const head = (await r.json().catch(() => null)) as HeadRead | null;
       return head?.earned === true;
     });
     assert.ok(
@@ -1228,7 +1237,7 @@ When(
 
 Then(
   "peer {string} is told that the page's declared head changed",
-  { timeout: 60_000 },
+  { timeout: TOLD_WAIT_MS + 30_000 },
   async function (this: E2EWorld, alias: string) {
     const s = headOnly(this);
     assert.strictEqual(

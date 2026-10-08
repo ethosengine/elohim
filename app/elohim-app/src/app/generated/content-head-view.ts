@@ -57,4 +57,20 @@ export interface ContentHeadView {
    * Where earned came from. Present ONLY on a live-election read (GET /db/content/{id}/head?election=live); absent on a plain read, which keeps that response identical to one from a peer that predates it. live: this peer's own conductor answered its local canonical election and earned was read from it (true when the winner is EARNED and is the declared head; an earned tier already recorded here for the same head is never lowered by a local link view lacking the earned declaration) — a live answer that finds the projection behind also heals the projection's election columns in the same request, never the head. cached: the conductor could not answer inside the read's budget (absent, errored or timed out), so earned is the projection's recorded column.
    */
   earnedSource?: 'live' | 'cached';
+  /**
+   * The DHT timestamp (microseconds since the Unix epoch — same convention as ProjectionInventoryEntry.declaredHeadAt) of the canonical-head declaration link that select_canonical_winner elected, as this peer's projection recorded it (content.canonical_declared_at). The election clock: with canonicalLinkHash it lets a reader tell a stale election from a different one. null = no election recorded on this row (single provenance: the row answered). Additive: absent from older serving nodes.
+   */
+  canonicalDeclaredAt?: number | null;
+  /**
+   * The ELECTOR — the agent (Holochain AgentPubKey, u-prefixed base64) that signed the winning canonical-head declaration link — as this peer's own conductor answered it on a live-election read (?election=live) whose winner IS the declared head. Never projected or cached: absent on a plain read, absent when the conductor did not answer in budget, absent when the live winner is a different head or the coordinator predates the field. electorSource says which.
+   */
+  elector?: string;
+  /**
+   * Present ONLY on a live-election read. live: the conductor answered and named the elector. cached: no live elector was answered, and because the projection never stores an elector, elector is absent.
+   */
+  electorSource?: 'live' | 'cached';
+  /**
+   * The election's tiebreak (content.canonical_link_hash, Holochain u-prefixed base64): the winning declaration link, or the root-accepted head action for a delegated declaration. null = unknown (no election recorded, or one recorded before the tiebreak travelled). Additive: absent from older serving nodes.
+   */
+  canonicalLinkHash?: string | null;
 }

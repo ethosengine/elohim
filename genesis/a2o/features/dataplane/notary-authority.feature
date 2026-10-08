@@ -168,3 +168,58 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
     Given EPR "elohim-host-landing" has a declared canonical head on peer "alpha-A"
     When the canonical head declaration is announced to the federation
     Then EPR "elohim-host-landing" resolves the same canonical head across peers "alpha-A" and "elohim.host" within one sync window
+
+  # ── A name is answered by a binding (row 17 design gate, 2026-10-08) ─────────
+  # Observed 2026-10-08: elohim.host and doorway-alpha answered "lamad-spa" with two CIDs.
+  # Doorway B reads adam's storage; adam followed no app-bundle channel, and the channel's
+  # vehicle is the only writer of a bound slug's pointer, so adam stayed on its last pointer.
+  # Neither answer named who elected it or when, so a stale election and a different one read
+  # the same. The ruling: a slug is a projection of a NameBinding (name x elector x scope CID x
+  # head x election clock x standing proof). Two answers for one name are legitimate only when
+  # they name two electors or two clocks; one binding with two heads is the defect.
+  #
+  # @wip: no name answer carries its elector or clock yet; the coordinator bridge view
+  # (resolve_name_binding) is owed. Design: genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md
+  @wip @regression @requires:multi-node
+  Scenario: Two doorways answering one name with two addresses name two electors or two clocks, never one binding
+    Given peer "alpha-A" and peer "elohim.host" each answer the name "lamad-spa"
+    When the two answers name different CIDs
+    Then each answer names the elector and the election clock of the binding behind it
+    And the two answers differ in elector or in election clock
+    And no single binding of "lamad-spa" is answered with two heads
+
+  # ── A head answer names its election (2026-10-08) ────────────────────────────
+  # Observed 2026-10-08: two doorways answered one name with two addresses, and nothing in
+  # either answer said which election it had read — a doorway whose record of the election is
+  # behind and a doorway that read a different election looked exactly alike.
+  #
+  # Terms used below. A doorway is the HTTP entrance in front of a peer: reading
+  # `/epr-head/<id>` at a peer's doorway returns that peer's head answer for the EPR (the
+  # protocol's named, versioned content record — here the site landing). The head answer is
+  # the record's current version plus its address, a content hash computed from the head's
+  # own bytes. The election is the DHT process that chose that head among competing
+  # declarations. Each head answer now also carries a witness of that election: its clock
+  # (when the winning declaration was made, to the microsecond), its tier (earned or
+  # staging) and its tiebreak (which declaration won).
+  #
+  # The witness rides BESIDE the address, never inside it, so two doorways that agree on the
+  # head agree on the address even while one still holds an older record of the election.
+  # That is what makes the pair readable three ways: same address and same witness (in
+  # step), same address and a different witness (one doorway's record is behind), different
+  # addresses (two heads). On a settled household both doorways must read in step.
+  @requires:multi-node
+  Scenario: A head answer names the election that chose it, beside an address the election cannot move
+    When the head of EPR "elohim-host-landing" is read from doorways "alpha-A" and "elohim.host"
+    Then both answers carry the same address
+    And both answers name the same election, by its clock and its tiebreak
+    And the address in each answer is computed from bytes that do not include the election witness
+
+  # The elector — the agent that signed the winning declaration — is named only when a
+  # doorway's own conductor is asked live and answers the same election the witness records;
+  # it is never remembered between reads.
+  # @wip: needs the coordinator that reports the winning declaration's author on the household binary.
+  @wip @requires:multi-node
+  Scenario: A live head answer names who elected the head
+    When the live head of EPR "elohim-host-landing" is read from doorways "alpha-A" and "elohim.host"
+    Then both answers carry the same address
+    And both answers name the same elector for the same election

@@ -206,8 +206,15 @@ fn content_head_view_matches_schema() {
         staging_candidate_blob_hash: Some("bafkrei-candidate".to_string()),
         staging_candidate_state: Some(StagingCandidateState::Staged),
         earned_source: Some(EarnedSource::Live),
+        canonical_declared_at: Some(1_791_446_400_123_456),
+        canonical_link_hash: Some(
+            "uhCkkLINK0123456789012345678901234567890123456789012345678901".to_string(),
+        ),
+        elector: Some("uhCAkELECTOR012345678901234567890123456789012345678901".to_string()),
+        elector_source: Some(EarnedSource::Live),
     };
     let json = serde_json::to_value(&declared).unwrap();
+    assert_eq!(json["canonicalDeclaredAt"], 1_791_446_400_123_456_i64);
     validate_against_schema("views/content-head.schema.json", &json);
     assert_source_of_truth_declared(
         &load_schema("views/content-head.schema.json"),
@@ -232,6 +239,11 @@ fn content_head_view_matches_schema() {
         staging_candidate_blob_hash: None,
         staging_candidate_state: Some(StagingCandidateState::None),
         earned_source: None,
+        // No election recorded: both fields serialize as null.
+        canonical_declared_at: None,
+        canonical_link_hash: None,
+        elector: None,
+        elector_source: None,
     };
     let json = serde_json::to_value(&anchor_only).unwrap();
     assert!(
@@ -243,10 +255,16 @@ fn content_head_view_matches_schema() {
     // Live-election read whose conductor did not answer: the column stands.
     let cached = ContentHeadView {
         earned_source: Some(EarnedSource::Cached),
+        elector_source: Some(EarnedSource::Cached),
         ..anchor_only
     };
     let json = serde_json::to_value(&cached).unwrap();
     assert_eq!(json["earnedSource"], "cached");
+    assert!(
+        json.get("elector").is_none(),
+        "no live elector answered: the field is absent and electorSource says so"
+    );
+    assert_eq!(json["electorSource"], "cached");
     validate_against_schema("views/content-head.schema.json", &json);
 }
 
@@ -6494,7 +6512,7 @@ fn epr_head_view_matches_schema() {
     use elohim_storage::epr_codec::{
         EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
     };
-    use elohim_storage::views_convert::epr::EprHeadView;
+    use elohim_storage::views_convert::epr::{EprHeadElectionView, EprHeadView};
 
     // Full variant — every optional populated.
     let full = EprHeadView {
@@ -6525,8 +6543,20 @@ fn epr_head_view_matches_schema() {
         author: Some("did:key:z6Mk".to_string()),
         updated: Some("2026-09-20T02:00:30Z".to_string()),
         cid: Some("bafyreifnahxlgzodfqcjfrkc3ipiaqka3w67i2duf3nzlmc5gzjn3ylfxa".to_string()),
+        election: Some(EprHeadElectionView {
+            canonical_declared_at: "2026-10-08T14:00:00.123456Z".to_string(),
+            earned: true,
+            link_hash: Some(
+                "uhCkkLINK0123456789012345678901234567890123456789012345678901".to_string(),
+            ),
+            elector: Some("uhCAkELECTOR012345678901234567890123456789012345678901".to_string()),
+        }),
     };
     let json = serde_json::to_value(&full).unwrap();
+    assert_eq!(
+        json["election"]["canonicalDeclaredAt"], "2026-10-08T14:00:00.123456Z",
+        "the election clock renders with microsecond precision"
+    );
     validate_against_schema("views/epr-head-view.schema.json", &json);
     assert!(
         json.get("distribution").is_none(),
@@ -6558,8 +6588,27 @@ fn epr_head_view_matches_schema() {
         author: None,
         updated: None,
         cid: None,
+        election: None,
     };
     let json = serde_json::to_value(&minimal).unwrap();
+    assert!(
+        json.get("election").is_none(),
+        "no recorded election omits the key entirely (not null): {json}"
+    );
+    validate_against_schema("views/epr-head-view.schema.json", &json);
+
+    // An election recorded before the tiebreak travelled: linkHash omitted.
+    let untied = EprHeadView {
+        election: Some(EprHeadElectionView {
+            canonical_declared_at: "2026-10-08T14:00:00.000001Z".to_string(),
+            earned: false,
+            link_hash: None,
+            elector: None,
+        }),
+        ..minimal
+    };
+    let json = serde_json::to_value(&untied).unwrap();
+    assert!(json["election"].get("linkHash").is_none());
     validate_against_schema("views/epr-head-view.schema.json", &json);
 
     assert_source_of_truth_declared(

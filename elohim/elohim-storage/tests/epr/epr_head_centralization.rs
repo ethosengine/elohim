@@ -23,7 +23,9 @@ use diesel::{prelude::*, RunQueryDsl};
 use elohim_storage::db::content_diesel::{create_content, CreateContentInput};
 use elohim_storage::db::context::AppContext;
 use elohim_storage::epr_codec::{decode_epr_head, encode_epr_head};
-use elohim_storage::epr_head::{compose_head_view, derive_epr_head};
+use elohim_storage::epr_head::{
+    compose_head_view, derive_epr_head, derive_epr_head_with_election, live_elector_for_witness,
+};
 use elohim_storage::test_util::test_pool;
 
 // ---------------------------------------------------------------------------
@@ -104,6 +106,30 @@ fn set_declared_head_at(conn: &mut SqliteConnection, id: &str, micros: i64) {
     ))
     .execute(conn)
     .expect("set_declared_head_at failed");
+}
+
+/// Stamp the three election columns — the clock (`canonical_declared_at`,
+/// microseconds), the tier (`canonical_earned`, 1 = EARNED) and the tiebreak
+/// (`canonical_link_hash`) — directly, as a projection that has recorded an
+/// election would hold them. `None` writes NULL.
+fn set_election(
+    conn: &mut SqliteConnection,
+    id: &str,
+    declared_at_micros: Option<i64>,
+    earned: Option<i32>,
+    link_hash: Option<&str>,
+) {
+    use diesel::sql_types::{Integer, Nullable, Text};
+    diesel::sql_query(
+        "UPDATE content SET canonical_declared_at = ?, canonical_earned = ?, \
+         canonical_link_hash = ? WHERE id = ?",
+    )
+    .bind::<Nullable<diesel::sql_types::BigInt>, _>(declared_at_micros)
+    .bind::<Nullable<Integer>, _>(earned)
+    .bind::<Nullable<Text>, _>(link_hash)
+    .bind::<Text, _>(id)
+    .execute(conn)
+    .expect("set_election failed");
 }
 
 /// Force `content.updated_at` (the local row mtime) to an explicit value —
@@ -659,5 +685,225 @@ fn epr_head_json_and_cbor_agree_on_every_addressed_field() {
         decoded_from_cbor, decoded_from_json,
         "the dag-cbor arm and the JSON arm must agree on every addressed \
          field for one content id"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The election witness — envelope, not addressed (2026-10-08 lamad-spa: two
+// doorways, two CIDs, and nothing on the wire said which election either read)
+// ---------------------------------------------------------------------------
+
+/// Two peers agreeing on the declared head mint ONE cid even when their
+/// projections recorded different elections (a lagging projection: earlier
+/// clock, staging tier, different tiebreak) — and the JSON witness is what
+/// differs. The election is envelope; the cid stays a function of the
+/// declared head alone.
+#[test]
+fn epr_head_cid_is_invariant_to_election_columns() {
+    let pool_a = test_pool();
+    let mut conn_a = pool_a.get().expect("pool connection A");
+    let pool_b = test_pool();
+    let mut conn_b = pool_b.get().expect("pool connection B");
+    let ctx = AppContext::default_lamad();
+    let id = "lamad-spa";
+
+    for conn in [&mut conn_a, &mut conn_b] {
+        seed_content(conn, id);
+        mark_dht_notarised(conn, id);
+        set_declared_head_at(conn, id, 1_700_000_000_000_000);
+    }
+    set_election(
+        &mut conn_a,
+        id,
+        Some(1_791_446_400_123_456),
+        Some(1),
+        Some("uhCkkLinkA"),
+    );
+    set_election(
+        &mut conn_b,
+        id,
+        Some(1_791_446_399_000_001),
+        Some(0),
+        Some("uhCkkLinkB"),
+    );
+
+    let (head_a, el_a) = derive_epr_head_with_election(&mut conn_a, &ctx, id, true, false)
+        .expect("no DB error on peer A")
+        .expect("head present on peer A");
+    let (head_b, el_b) = derive_epr_head_with_election(&mut conn_b, &ctx, id, true, false)
+        .expect("no DB error on peer B")
+        .expect("head present on peer B");
+    let (bytes_a, cid_a) = encode_epr_head(&head_a).expect("encode A");
+    let (bytes_b, cid_b) = encode_epr_head(&head_b).expect("encode B");
+    assert_eq!(bytes_a, bytes_b, "the dag-cbor bytes carry no election");
+    assert_eq!(cid_a, cid_b, "the election columns must not move the cid");
+    assert_ne!(
+        el_a, el_b,
+        "the witnesses differ — that is what a reader reads"
+    );
+
+    let view_a = compose_head_view(&mut conn_a, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    let view_b = compose_head_view(&mut conn_b, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(view_a.cid, view_b.cid, "the JSON arm's cid agrees too");
+    assert_eq!(view_a.cid, Some(cid_a.to_string()));
+    assert_ne!(view_a.election, view_b.election);
+
+    // And the cid with an election recorded equals the cid with none.
+    set_election(&mut conn_b, id, None, None, None);
+    let view_none = compose_head_view(&mut conn_b, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(view_none.cid, view_a.cid);
+}
+
+/// `canonical_declared_at` NULL omits `election` entirely — no key, not
+/// `null`, not a zeroed clock — even when the other two columns hold values.
+#[test]
+fn epr_head_election_is_omitted_when_no_election_recorded() {
+    let pool = test_pool();
+    let mut conn = pool.get().expect("pool connection");
+    let ctx = AppContext::default_lamad();
+    let id = "content-no-election";
+
+    seed_content(&mut conn, id);
+    mark_dht_notarised(&mut conn, id);
+    set_declared_head_at(&mut conn, id, 1_700_000_000_000_000);
+
+    let view = compose_head_view(&mut conn, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(view.election, None);
+    let json = serde_json::to_value(&view).expect("serialize");
+    assert!(json.get("election").is_none(), "no `election` key: {json}");
+
+    // Tier and tiebreak without a clock are not an election record.
+    set_election(&mut conn, id, None, Some(1), Some("uhCkkOrphanLink"));
+    let view = compose_head_view(&mut conn, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    let json = serde_json::to_value(&view).expect("serialize");
+    assert!(
+        json.get("election").is_none(),
+        "clock is the presence key: {json}"
+    );
+}
+
+/// The witness renders the clock at microsecond precision (two elections in
+/// one second still order), the tier as a boolean, and the tiebreak verbatim;
+/// a NULL tiebreak omits `linkHash`.
+#[test]
+fn epr_head_election_renders_clock_tier_and_tiebreak() {
+    let pool = test_pool();
+    let mut conn = pool.get().expect("pool connection");
+    let ctx = AppContext::default_lamad();
+    let id = "content-election-render";
+
+    seed_content(&mut conn, id);
+    mark_dht_notarised(&mut conn, id);
+    // 2026-09-20T02:00:30.123456Z in microseconds since the Unix epoch.
+    set_election(
+        &mut conn,
+        id,
+        Some(1_789_869_630_123_456),
+        Some(1),
+        Some("uhCkkWinningLink"),
+    );
+
+    let view = compose_head_view(&mut conn, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    let json = serde_json::to_value(&view).expect("serialize");
+    assert_eq!(
+        json["election"],
+        serde_json::json!({
+            "canonicalDeclaredAt": "2026-09-20T02:00:30.123456Z",
+            "earned": true,
+            "linkHash": "uhCkkWinningLink",
+        })
+    );
+
+    // Staging tier, tiebreak not yet travelled.
+    set_election(&mut conn, id, Some(1_789_869_630_000_001), Some(0), None);
+    let view = compose_head_view(&mut conn, &ctx, id, true)
+        .unwrap()
+        .unwrap();
+    let json = serde_json::to_value(&view).expect("serialize");
+    assert_eq!(
+        json["election"],
+        serde_json::json!({
+            "canonicalDeclaredAt": "2026-09-20T02:00:30.000001Z",
+            "earned": false,
+        })
+    );
+}
+
+/// The elector rides only on a live answer for the SAME election the witness
+/// records (matched on the effective tiebreak) — never borrowed from another.
+#[test]
+fn epr_head_elector_is_named_only_by_a_live_answer_for_the_recorded_election() {
+    use elohim_storage::services::live_earned::{ElectionUnavailable, LocalElection};
+    use elohim_storage::views_convert::epr::EprHeadElectionView;
+
+    let witness = EprHeadElectionView {
+        canonical_declared_at: "2026-10-08T14:00:00.123456Z".to_string(),
+        earned: true,
+        link_hash: Some("uhCkkRecordedLink".to_string()),
+        elector: None,
+    };
+    let wire = |link: &str, ordering: Option<&str>, author: Option<&str>| {
+        LocalElection::Answered(Some(
+            serde_json::from_value(serde_json::json!({
+                "winner_target": "uhCkkWinner",
+                "canonical_declared_at": 1,
+                "canonical_earned": true,
+                "canonical_link_hash": link,
+                "canonical_ordering_hash": ordering,
+                "winner_author": author,
+            }))
+            .expect("election wire"),
+        ))
+    };
+
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire("uhCkkRecordedLink", None, Some("uhCAkElector"))
+        ),
+        Some("uhCAkElector".to_string())
+    );
+    // A delegated election: the ordering hash is the tiebreak the column holds.
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire(
+                "uhCkkActualLink",
+                Some("uhCkkRecordedLink"),
+                Some("uhCAkDelegate")
+            )
+        ),
+        Some("uhCAkDelegate".to_string())
+    );
+    // A different election, an author-less coordinator, no answer: absent.
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &wire("uhCkkOtherLink", None, Some("uhCAkElector"))
+        ),
+        None
+    );
+    assert_eq!(
+        live_elector_for_witness(&witness, &wire("uhCkkRecordedLink", None, None)),
+        None
+    );
+    assert_eq!(
+        live_elector_for_witness(
+            &witness,
+            &LocalElection::Unavailable(ElectionUnavailable::NoClient)
+        ),
+        None
     );
 }

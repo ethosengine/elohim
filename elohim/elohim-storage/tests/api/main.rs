@@ -13,6 +13,8 @@ mod api_observations_stream_test;
 mod api_observations_test;
 mod api_observations_write_test;
 mod api_placement_gaps;
+mod content_head_election_witness;
+mod apps_reach_gate;
 mod content_head_live_election;
 mod content_read_reach_gate;
 mod db_content_list_tags;

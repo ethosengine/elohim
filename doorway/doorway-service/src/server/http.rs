@@ -7204,7 +7204,7 @@ mod name_relay_request_tests {
             host: None,
             commitment_id: None,
             epr_id: None,
-            declared_head: None,
+            served_bundle: None,
             liveness: HolderLiveness::Serving,
             relay_mode: RelayMode::Proxy,
             shed_weight: WEIGHT_UNCONSTRAINED,
@@ -7510,7 +7510,7 @@ async fn answer_under_name_standing(
     };
     let key = RouteKey::new(ctx.host.as_deref(), path);
     // The holder's contract for this (host, path), if it has reached this
-    // doorway's name-route table: its advertised declared head, and its id.
+    // doorway's name-route table: the bundle it advertises serving, and its id.
     let holder_contract = |holder: &crate::services::name_routing::standing::PublicNameMember| {
         state
             .name_routes
@@ -7523,12 +7523,12 @@ async fn answer_under_name_standing(
             .epr_router
             .dispatch(ctx.host.as_deref(), path)
             .and_then(|projection| {
-                crate::routes::coherence::declared_head_for(
+                crate::routes::coherence::served_bundle_for(
                     &state.renderer_registry.bundle_heads(),
                     &projection,
                 )
             });
-        let theirs = holder_contract(holder).and_then(|contract| contract.declared_head);
+        let theirs = holder_contract(holder).and_then(|contract| contract.served_bundle);
         head_agreement(own.as_deref(), theirs.as_deref())
     })?;
 
@@ -7557,7 +7557,7 @@ async fn answer_under_name_standing(
                 host: ctx.host.clone(),
                 commitment_id: None,
                 epr_id: None,
-                declared_head: None,
+                served_bundle: None,
                 liveness: HolderLiveness::default(),
                 relay_mode: RelayMode::Proxy,
                 shed_weight: WEIGHT_UNCONSTRAINED,
@@ -9055,10 +9055,11 @@ async fn handle_request(
         }
 
         // EPR Head proxy routes (proxied to elohim-storage)
-        // GET/PUT /epr-head/{id} - Three-pillar metadata envelope (DAG-CBOR)
-        (method, p)
-            if matches!(method, Method::GET | Method::PUT) && p.starts_with("/epr-head/") =>
-        {
+        // GET /epr-head/{id} - Three-pillar metadata envelope (DAG-CBOR).
+        // Read only: PUT is a this-machine act on the peer (storage refuses
+        // a remote caller), and a doorway on the peer's own loopback would
+        // otherwise carry anyone's write in as the machine's own.
+        (Method::GET, p) if p.starts_with("/epr-head/") => {
             let id = p.strip_prefix("/epr-head/").unwrap_or("");
             debug!(path = %p, id = %id, "Forwarding EPR Head request to elohim-storage");
             let storage_url = match &state.args.storage_url {
@@ -12912,6 +12913,75 @@ mod root_projection_shadow_regression_tests {
                  projection's SPA shell (status={status}, content-type={content_type})"
             );
         }
+    }
+
+    /// `PUT /epr-head/{id}` is never carried to storage: the doorway reads
+    /// heads, it does not write them. A GET still reaches storage, so the
+    /// mock proves the arm (not a dead storage) is what kept the PUT out.
+    #[tokio::test]
+    async fn epr_head_put_is_not_proxied() {
+        use std::sync::Mutex;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let storage = listener.local_addr().unwrap();
+        let seen: Arc<Mutex<Vec<(Method, String)>>> = Arc::default();
+        let seen_by_storage = Arc::clone(&seen);
+        tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                let seen = Arc::clone(&seen_by_storage);
+                tokio::spawn(async move {
+                    let service = service_fn(move |req: Request<Incoming>| {
+                        seen.lock()
+                            .unwrap()
+                            .push((req.method().clone(), req.uri().path().to_string()));
+                        async {
+                            Ok::<_, std::convert::Infallible>(
+                                Response::builder()
+                                    .status(StatusCode::OK)
+                                    .header("Content-Type", "application/json")
+                                    .body(Full::new(Bytes::from("{}")))
+                                    .unwrap(),
+                            )
+                        }
+                    });
+                    let _ = http1::Builder::new()
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await;
+                });
+            }
+        });
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(format!("http://{storage}"));
+        let addr = spawn_test_doorway(Arc::new(AppState::new(args))).await;
+
+        let put = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            reqwest::Client::new()
+                .put(format!("http://{addr}/epr-head/some-concept"))
+                .header("content-type", "application/json")
+                .body(r#"{"id":"x","content":"c","lamad":{"title":"t","contentType":"concept"}}"#)
+                .send(),
+        )
+        .await
+        .expect("PUT answered within 5s")
+        .expect("PUT transport");
+        assert!(
+            !put.status().is_success(),
+            "a PUT of a head must not succeed through the doorway: {}",
+            put.status()
+        );
+        let get = get(addr, "/epr-head/some-concept").await;
+        assert_eq!(get.status(), reqwest::StatusCode::OK);
+
+        let seen = seen.lock().unwrap().clone();
+        assert!(
+            !seen.iter().any(|(m, _)| *m == Method::PUT),
+            "storage must never see the PUT: {seen:?}"
+        );
+        assert!(
+            seen.iter()
+                .any(|(m, p)| *m == Method::GET && p == "/epr-head/some-concept"),
+            "the GET still reaches storage: {seen:?}"
+        );
     }
 
     /// A bare `AppState` at the default declared stage — deliberately NO root

@@ -69,6 +69,7 @@ retire-when: >
   authentication is a property of the zomes' shape and this habit is describing the compiler,
   not a practice under watch.
 ---
+DELTA 2026-10-08e (RED preserved; row 17 gated): the NameBinding design gate ran as genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md; classification channel/council binding Linked (A2) with the CreateLink on the `canonical_head` anchor as the atom (row 17's "Notarized" guess corrected), petname Private (B) (the "Attested-Private" guess corrected), follow set Attested-Private (B2), scope declaration a referenced missing node (measure-family row 32); four of six components already ride the link, the elector is dropped by CanonicalCandidate/CanonicalElectionOutput, and standing is HeadDelegation, not StewardshipGrant; integrity rules hash-moving, bridge view neutral; @wip scenario "Two doorways answering one name with two addresses name two electors or two clocks, never one binding" in notary-authority.feature; owed next: review of the spec, then the coordinator bridge view.
 2026-09-19 (later same day): RED WRITTEN (`unwired` -> `red`, first_move option 1 completed) —
 `.claude/scripts/_lib/probes/authority_in_integrity_source_shape.py` measures the three
 known-open shapes textually across the five live integrity zomes. Run today: 24 hits, all five
