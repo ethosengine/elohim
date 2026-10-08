@@ -316,6 +316,43 @@ mod tests {
     }
 
     #[test]
+    fn healed_election_columns_announce_the_touch() {
+        use crate::rea_projection::touch_capture::TouchCapture;
+        let pool = crate::test_util::test_pool();
+        let mut conn = pool.get().unwrap();
+        let ctx = AppContext::new("lamad");
+        row(&mut conn, &ctx, "announced", None);
+        row(&mut conn, &ctx, "unchanged", Some(1));
+        let mut touches = TouchCapture::start();
+
+        // A heal that wrote the columns announces the row: the sync doc carries
+        // this ordering, so its projection is stale until it is reprojected.
+        let verdict = live_earned_verdict(HEAD, false, &answered(HEAD, true));
+        assert_eq!(
+            heal_behind_column(&mut conn, &ctx, "announced", HEAD, &verdict).unwrap(),
+            Some(ElectionColumnHeal::Healed)
+        );
+        assert!(touches.touched("announced"), "a healed row is announced");
+
+        // A heal that wrote nothing stays silent.
+        assert_eq!(
+            content_diesel::heal_election_columns(
+                &mut conn,
+                &ctx,
+                "unchanged",
+                HEAD,
+                election(HEAD, false).ordering()
+            )
+            .unwrap(),
+            ElectionColumnHeal::Unchanged
+        );
+        assert!(
+            touches.drain().is_empty(),
+            "an unchanged row is not announced"
+        );
+    }
+
+    #[test]
     fn the_heal_records_the_election_on_a_behind_row_and_nothing_else() {
         let pool = crate::test_util::test_pool();
         let mut conn = pool.get().unwrap();

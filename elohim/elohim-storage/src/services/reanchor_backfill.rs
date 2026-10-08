@@ -49,7 +49,7 @@ use crate::StorageError;
 /// prefixes that are enumerated separately (`generated_attestation_kinds`),
 /// never in the content-type list itself.
 pub(crate) fn is_canonical_content_type(content_type: &str) -> bool {
-    content_type.starts_with("attestation:")
+    content_type.starts_with(crate::db::content_diesel::ATTESTATION_KIND_PREFIX)
         || content_type.starts_with("governance-action:")
         || ALL_CONTENT_TYPES.contains(&content_type)
 }

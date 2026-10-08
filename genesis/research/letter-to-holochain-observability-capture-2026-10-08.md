@@ -1,8 +1,9 @@
 ---
 title: "A Letter to Holo and Holochain Core: Why We Added a Prometheus Endpoint to the Conductor"
 id: letter-to-holochain-observability-capture-2026-10-08
-status: Capture
+status: Sent
 date: 2026-10-08
+sent: 2026-10-08 14:19 CT, by email from Matthew Dowell to Rob Lyón (Holo, Head of Growth), in reply to his 09:29 question; a follow-up at 14:21 carried the TL;DR
 sovereignty-frame: bridge-legibility
 ---
 
@@ -36,7 +37,7 @@ Our theory of the gap, in the order we would bet on it: the instruments were bui
 
 We run two things. A household mesh: three conductors, three storage peers, two doorways (our web-facing gateways) and a relay on one machine, started and stopped by one command, where every protocol scenario runs first. And an alpha neighbourhood: seven long-lived pods on a cluster we operate, with real network paths, hosted accounts on the doorways (the hosting path is real; the people in it are still our test fixtures, because we are designing for hosted people before anyone real signs in), a dataplane above the conductor (our own storage peers on libp2p and iroh with SQLite, and doorways serving it to the web), and months of accumulated state.
 
-This part is personal, so I'll write it as me. I never had a HoloPort. I learned Kubernetes as a developer hoping that its whole model of scaling containers would solve the reliability problems of self-hosting, if I could only work out how it worked. Once I had, I saw that it is built for hyperscalers, not for self-hosters or for ordinary people behind a dynamic DNS address: it is superpowers of scale for a datacenter. When this project started, the edge-node release was the first point where I could begin from what I already knew, cloud-native as a homelab hobbyist and a corporate web-app developer by day, bring Holochain into my cloud-native workspace, and work from the other direction: use those datacenter superpowers to give peer-to-peer technology, Holochain included, the powers a hyperscaler has. I never seriously considered Wind Tunnel or the hc tooling, because Kubernetes solved that problem more or less out of the box; I only needed to make it legible to my own bench. To be clear, we use Kubernetes only for compute and hardware; we don't model protocol behaviour in it. It's our test bench, not the network. The goal of the whole architecture is the inversion: bring hyperscaler superpowers to everyday peer-to-peer, and with them subsume and escape the internet's existing capture by the corporate datacenter.
+This part is personal, so I'll write it as me. I never had a HoloPort. I learned Kubernetes as a developer hoping that its whole model of scaling containers would solve the reliability problems of self-hosting, if I could only work out how it worked. Once I had, I saw that it is built for hyperscalers, not for self-hosters or for ordinary people behind a dynamic DNS address: it is superpowers of scale for a datacenter. When this project started, the Holochain edgenode release was the first point where I could begin from what I already knew, cloud-native as a homelab hobbyist and a corporate web-app developer by day, bring Holochain into my cloud-native workspace, and work from the other direction: use those datacenter superpowers to design for peer-to-peer technology. I never seriously considered Wind Tunnel or the hc tooling, because Kubernetes solved that problem more or less out of the box; I only needed to make it legible to my own bench. To be clear, we use Kubernetes only for compute and hardware; we don't model protocol behaviour in it. It's our test bench, not the network. The goal of the whole architecture is the inversion: bring hyperscaler superpowers to everyday peer-to-peer, and with them subsume and escape the internet's existing capture by the corporate datacenter.
 
 What it lets us measure, and a 30-minute run can't, is how a conductor behaves after a month. Every serious defect we found this quarter lived there. One was a zome call whose fixed cost grew with the caller's chain length (a no-op went from 7 ms at about 120 actions to 469 ms at about 18,300). Others were a validation loop retrying a record nobody had, a write lock held for an entire publish sweep, and two sync bugs in our own storage layer. None of them showed up until the network had been running for weeks.
 
@@ -46,15 +47,17 @@ Our test reports do the same job as your `summariser` output. Yours uploads to o
 
 ## 4. What we think core should take, and why
 
-Take the exposition as a fourth backend beside the three Influx ones, behind the same environment-variable convention, with Prometheus taking precedence when both are set, or a documented rule either way. Reasons:
+Everything above assumes something core does not: that the operator and the person are different. Holochain's conductor is built for one person on their own device, and that person is the operator. The admin interface binds localhost, checks origins and mints the tokens; every operator read (the dump requests, network metrics, network stats) is a local call by the device's owner. That is the right model for that person, and we are not asking core to change it.
 
-- Most operators run the conductor inside something that already scrapes. Pull needs no process, no download, no push target.
-- The metrics stay OpenTelemetry. Prometheus is just another way to read them.
-- It is one crate change, opt-in, off by default. It has run in one place for a week; we haven't tested it anywhere else.
+We run a different shape, and so does Holo: one operator running many conductors for people who are not the operator. At that scale the admin interface stops fitting. You cannot port-forward an admin websocket per conductor and dump state by hand across a fleet, so you add a scrape endpoint. We did. Ours binds every interface, plain HTTP, no auth, and is safe only because our cluster has a network policy the conductor knows nothing about. On a HoloPort or a home machine behind dynamic DNS, that is a public port. It found real bugs for us. It is not the shape we are asking core to adopt.
 
-**The condition that matters more:** audit the labels before any exposition ships. The `agent` and `cell_id` labels must not leave the process by default, and `dna_hash` deserves a decision, because it says which networks a node participates in. This affects every production Holochain user today, with or without our exporter. Any operator who turns on the Influx child service, or points Telegraf at the line-protocol file, is already building a per-participant activity ledger they did not mean to build. A Holo host collecting port metrics holds one for every hosted participant. Our exporter didn't create the problem, but it makes the data much easier to collect. The fix is at the exposition: drop or hash those labels unless the scraper is the peer itself.
+What we would ask instead:
 
-Wind Tunnel does not compete with any of this. Wind Tunnel keeps Influx for the bench, and operators get a Prometheus endpoint for the fleet. Both read the same metrics.
+- Keep the read behind the admin interface. A `DumpMetrics` admin request that returns Prometheus text rides the policy core already has. A sidecar bridges it to a scraper, and the sidecar is the host's problem, ours or Holo's, not core's. The metrics stay OpenTelemetry; this is one more way to read them.
+- If a listener is added at all, default it to 127.0.0.1 with a `danger_` override, matching core's own convention.
+- Audit the labels before either ships. `agent` and `cell_id` must not leave the process by default. `dna_hash` is an exposure decision, not a cardinality one: it tells a reader which networks a node is on and, with the per-function timings, when its person is active. This affects every production user today. Anyone who turns on the Influx child service or points Telegraf at the line-protocol file is already building a per-participant activity ledger, and a Holo host collecting port metrics holds one for every hosted participant. Our exporter didn't create the problem; it made the data much easier to collect.
+
+Wind Tunnel does not compete with any of this. It keeps Influx for the bench; hosts get a fleet-shaped read under the admin interface's policy. Both read the same metrics.
 
 ## 5. Upgrade and rollback
 
@@ -72,13 +75,13 @@ Ours sits alongside it. Above the conductor we run a separate storage layer for 
 
 The commons question sits on top of both. We have a research line on commons data pools (shared indexes, shared models, shared compute on committed devices) whose design decision is that a pool is a collective holding a resource, with contributions as notarised commitments and draws admitted by membership and reach. Sharding decides who holds which bytes; the pool decides who may draw on them and under what standing. We think the two fit together.
 
-## 7. Capture: the problem neither bench solved
+## 7. Another capture vector: the problem neither bench solved
 
 Our exporter did not just expose the conductor to Prometheus. It also meant our cluster's Prometheus was collecting per-person data, and nobody had decided it should. Whoever holds the collector is responsible for what it captures, and on our fleet nobody held that responsibility: the cluster's Prometheus held per-agent series for every hosted account, with no record of who allowed it, what it covered, how long it was kept, or how someone could object. Those accounts are still test fixtures, so nobody was harmed; but the data was being collected all the same, and it would not have changed shape on the day a real person signed in. A Holo host holds the same for every hosted participant on a port. We did not declare it, and we suspect no host has had reason to yet. A bench never has this problem because a bench has no subjects; Wind Tunnel's agents are fixtures. Our fleet runs the hosting path with fixture people in it, so now, before real people sign in, is when to fix it.
 
-The claim we are building on, and would like tested by someone who runs a different fleet: whoever collects monitoring data about a person should hold an explicit, limited permission for it, the same way anyone acting for someone else does in our system. That's based on one fleet, so treat it as a hypothesis. Our identity layer already has the object for it: a stewardship grant, with a steward and a subject, an authority basis, evidence and a verifier, capability flags (one of them is literally activity monitoring), a mandatory expiry and review date, delegation depth, and an appeal. What it lacks is scope: which kinds of observation, which labels, how widely shared, kept how long. That is one field, not a new primitive.
+The claim we are building on, and would like tested by someone who runs a different fleet: whoever collects monitoring data about a person should hold an explicit, limited permission for it, the same way anyone acting for someone else does in our system. That's based on one fleet, so treat it as a hypothesis. Our identity layer already has the object for it: a stewardship grant, with a steward and a subject, an authority basis, evidence and a verifier, capability flags (one of them is literally activity monitoring), a mandatory expiry and review date, delegation depth, and an appeal. What it lacks is scope: a declaration of what the grant covers, which the grant names by its hash. The declaration answers, for each kind of observation: which labels may leave; which planes are covered, with a separate answer for the raw rows, the summaries, and the references to them; who may hold them and how many holders; how stale a read may be; what holding or viewing them reveals about the subject; who pays to carry them; and how long they are kept. "How widely shared" is not one dial. It is a different answer per plane, so the grant points at a declaration rather than picking a level. That is one field, not a new primitive.
 
-With that field added, there are four levels:
+With that field added, the relationships look like this. They are examples of declarations a grant could name, not rungs on a ladder:
 
 - **Self.** A peer reads its own instruments. No grant, no cost, nothing leaves.
 - **Declared.** A steward of capture holds a grant for a subject: a hub for its members, a gateway for the people it hosts, an operator for the fleet they run, a Holo host for the ports it serves. The grant names scope, reach and expiry; the subject sees it in their activity log and can appeal. Series carry only the labels the scope allows.
@@ -89,7 +92,7 @@ How this lands in our tree, each step useful alone. First, strip the per-person 
 
 Wind Tunnel already uses observers. Its `dht_sync_lag` run splits the fleet 85/15 into writers and a minority whose only job is to watch what the writers did. We want that observer role to be permanent and permission-based, not a weekly test.
 
-## 8. How it fits together
+## 8. How Holochain and the Elohim Protocol fit together
 
 Holochain is the foundation: agent-centric source chains, a DHT that notarises, integrity zomes that every peer validates, a conductor that can be upgraded by hot-swap or by lineage. On top of it we build a layer we call EPR, with these rules:
 
@@ -100,17 +103,9 @@ Holochain is the foundation: agent-centric source chains, a DHT that notarises, 
 - The system's state is a list of the things it must reliably do, each marked green only on evidence.
 - Observation is witness, not surveillance: held by the group it describes, confirmed by several observers, and governed by the same permission that governs every other act one person takes on behalf of another.
 
-The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. All of it runs on Holochain.
+The exporter is a tiny instance of that: keep the sensor Holochain built, declare who holds the collector, limit what leaves. The upgrade manifest is another: keep the DNA hash Holochain mints, declare the lineage and the soak. The storage layer is another: keep the notary, move the bytes. The pattern is the same each time. Holochain supplies the part that has to be true: the sensor, the hash, the notary. We add the part that says who holds it, who may change it, and how far it travels. Neither project does the other's half. That is why the Prometheus question matters to us more than an exporter should: it is the first place the two halves meet on something core ships.
 
-## What we ask
-
-Three things:
-
-1. Tell us what we cannot see: whether core has a Prometheus or OTLP exporter in flight (OTLP is OpenTelemetry's own wire format), and how a Holo host collects port-side metrics today.
-2. Take the exposition with the label audit, as one clean pull request from our side if you want it.
-3. A 45-minute call in the next two weeks with one engineer who owns host-side metrics at Holo. We bring a one-page draft of a scoped capture grant (what a host may collect about a hosted participant, at what reach, for how long, reviewable by whom); we leave with a yes, a no, or a counter-shape.
-
-We're a small project, and many of our own checks are still failing. We'd like to compare notes with people running the same conductor at a different scale.
-
-With respect,
+Sincerely,
 Matthew Dowell, for the Elohim Protocol
+
+*As sent, the email led with a TL;DR: "We needed to make the metrics logs legible in our Kubernetes test bench", and a follow-up added "Holochain core should add a listener, but default it to 127.0.0.1 with a `danger_` override, matching core's own convention." The letter's first ask (the read behind the admin interface, `DumpMetrics` plus a sidecar) is the stronger form; the TL;DR names the floor.*

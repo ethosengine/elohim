@@ -1041,3 +1041,275 @@ Then(
     );
   }
 );
+
+// ===========================================================================
+// Head-only re-declaration — the announcement must carry the declaration's ordering
+// (features/dataplane/federation-version-convergence.feature, "a new earned head declared
+// with the same text still reaches a peer that already holds the page")
+// ===========================================================================
+
+const SWEEPS_SERIES = 'elohim_projection_reconcile_sweeps_total';
+const ADOPTION_SERIES = 'elohim_head_adoption_trigger_total';
+const ADOPTION_LABEL = 'outcome';
+/** `probe` exists today; `election_refreshed` lands with the carried-ordering change. */
+const ADOPTION_OUTCOMES = ['probe', 'election_refreshed'] as const;
+const TOLD_WAIT_MS = 30_000;
+const HEAD_POLL_INTERVAL_MS = 2_000;
+
+interface HeadOnlyState {
+  eprId: string;
+  winner: PeerRef;
+  laggard: PeerRef;
+  winnerRail: CarriedElectionRail;
+  winnerHead: string;
+  /** Laggard `/head` `earned` when both peers first held the page (expected false). */
+  laggardEarnedBefore?: boolean;
+  ledgerAfterGiven?: number;
+  announce?: { ledger: number; sweeps: number | null; adoption: number };
+}
+
+const headOnlyStates = new WeakMap<E2EWorld, HeadOnlyState>();
+
+function headOnly(world: E2EWorld): HeadOnlyState {
+  const s = headOnlyStates.get(world);
+  assert.ok(
+    s,
+    'no head-only fixture in this scenario — the Given that stages the shared page must run first'
+  );
+  return s;
+}
+
+interface HeadRead {
+  headActionHash?: string;
+  earned?: boolean;
+  declared?: boolean;
+}
+
+/** The storage head route, read WITHOUT `?election=live` — that branch heals on read and would mask the defect. */
+async function readHead(peer: PeerRef, id: string): Promise<HeadRead | null> {
+  const r = await fetch(`${peer.storageUrl}/db/content/${id}/head`);
+  if (!r.ok) return null;
+  return (await r.json().catch(() => null)) as HeadRead | null;
+}
+
+async function pollUntil(budgetMs: number, check: () => Promise<boolean>): Promise<boolean> {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    if (await check()) return true;
+    await new Promise(resolve => setTimeout(resolve, HEAD_POLL_INTERVAL_MS));
+  }
+  return check();
+}
+
+async function metricsText(peer: PeerRef): Promise<string> {
+  const { status, text } = await getRaw(`${peer.storageUrl}/metrics`);
+  assert.strictEqual(status, 200, `${peer.alias}: GET /metrics returned ${status}`);
+  return text;
+}
+
+/** The unlabelled reconcile-sweep counter; `null` when the series is absent. */
+async function reconcileSweeps(peer: PeerRef): Promise<number | null> {
+  const text = await metricsText(peer);
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('#') || !line.startsWith(SWEEPS_SERIES)) continue;
+    const after = line.slice(SWEEPS_SERIES.length);
+    if (after.length > 0 && !after.startsWith(' ') && !after.startsWith('{')) continue;
+    const value = Number(line.split(/\s+/).pop());
+    if (!Number.isNaN(value)) return value;
+  }
+  return null;
+}
+
+/** Fleet-wide (not per id) sum of the adoption-trigger outcomes that can mean "told". */
+async function adoptionTriggers(peer: PeerRef): Promise<number> {
+  const text = await metricsText(peer);
+  return ADOPTION_OUTCOMES.reduce(
+    (sum, outcome) =>
+      sum + (parseLabeledPrometheusMetric(text, ADOPTION_SERIES, ADOPTION_LABEL, outcome) ?? 0),
+    0
+  );
+}
+
+Given(
+  'peer {string} and peer {string} both hold a page this run authored, at the same head',
+  { timeout: 180_000 },
+  async function (this: E2EWorld, winnerAlias: string, laggardAlias: string) {
+    resetStagingWrites();
+    const eprId = `federation-head-only-${Date.now()}`;
+    const winner = resolvePeer(winnerAlias);
+    const laggard = resolvePeer(laggardAlias);
+    const winnerPorts = conductorPorts(winner);
+    const winnerRail = await connectConductor(winnerPorts.adminPort, winnerPorts.appPort);
+    this.onCleanup(async () => {
+      await winnerRail.close().catch(() => undefined);
+    });
+
+    const stamp = new Date().toISOString();
+    const winnerHead = await authorDeclare({
+      storageUrl: winner.storageUrl,
+      id: eprId,
+      body: `# ${eprId}\n\nRoot revision authored on ${winner.alias} at ${stamp}.`,
+      agent: winnerRail.agent,
+      ensureLocalRoot: true,
+      title: `Federation head-only fixture (${stamp})`,
+      description: 'a page this run authored, so it may declare an earned canonical head for it',
+    });
+
+    const arrived = await pollUntil(PROJECTION_WAIT_MS, async () => {
+      const probe = await fetch(`${laggard.storageUrl}/db/content/${eprId}`);
+      if (!probe.ok) return false;
+      const row = (await probe.json().catch(() => null)) as { dhtAnchorHash?: string } | null;
+      return (
+        Boolean(row?.dhtAnchorHash) && (await servedHead(laggard.storageUrl, eprId)) === winnerHead
+      );
+    });
+    assert.ok(
+      arrived,
+      `${laggard.alias} never held "${eprId}" at head ${winnerHead} within ${PROJECTION_WAIT_MS / 1000}s ` +
+        `of ${winner.alias} authoring it — no shared page, so there is nothing for a head-only change to reach`
+    );
+
+    const laggardHead = await readHead(laggard, eprId);
+    headOnlyStates.set(this, {
+      eprId,
+      winner,
+      laggard,
+      winnerRail,
+      winnerHead,
+      laggardEarnedBefore: laggardHead?.earned,
+      ledgerAfterGiven: stagingWriteCount(),
+    });
+  }
+);
+
+Given(
+  "the page's root author on peer {string} declares a NEW earned canonical head whose text is unchanged",
+  { timeout: 120_000 },
+  async function (this: E2EWorld, alias: string) {
+    const s = headOnly(this);
+    assert.strictEqual(
+      alias,
+      s.winner.alias,
+      `"${alias}" is not the peer that authored the page (${s.winner.alias})`
+    );
+    // "New head" here means a new EARNED declaration for the SAME action hash: the text and the
+    // action are unchanged, only the declaration's ordering (earned tier, notarized clock) is new.
+    await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
+    const earned = await pollUntil(PROJECTION_WAIT_MS, async () => {
+      const head = await readHead(s.winner, s.eprId);
+      return head?.earned === true;
+    });
+    assert.ok(
+      earned,
+      `${s.winner.alias}'s /head never read earned=true for "${s.eprId}" after the declaration`
+    );
+  }
+);
+
+When(
+  'peer {string} announces the change to its federation',
+  { timeout: 60_000 },
+  async function (this: E2EWorld, alias: string) {
+    const s = headOnly(this);
+    assert.strictEqual(
+      alias,
+      s.winner.alias,
+      `"${alias}" is not the declaring peer (${s.winner.alias})`
+    );
+    // No write: announcing is the substrate's own act. This only snapshots what "before" is.
+    s.announce = {
+      ledger: stagingWriteCount(),
+      sweeps: await reconcileSweeps(s.laggard),
+      adoption: await adoptionTriggers(s.laggard),
+    };
+  }
+);
+
+Then(
+  "peer {string} is told that the page's declared head changed",
+  { timeout: 60_000 },
+  async function (this: E2EWorld, alias: string) {
+    const s = headOnly(this);
+    assert.strictEqual(
+      alias,
+      s.laggard.alias,
+      `"${alias}" is not the receiving peer (${s.laggard.alias})`
+    );
+    assert.ok(s.announce, 'the announce snapshot is missing — the When step must run first');
+    const before = s.announce.adoption;
+    const told = await pollUntil(
+      TOLD_WAIT_MS,
+      async () => (await adoptionTriggers(s.laggard)) > before
+    );
+    assert.ok(
+      told,
+      `${s.laggard.alias} was never told: ${ADOPTION_SERIES}{${ADOPTION_LABEL}=${ADOPTION_OUTCOMES.join('|')}} ` +
+        `stayed at ${before} for ${TOLD_WAIT_MS / 1000}s after ${s.winner.alias} re-declared the head — a head-only ` +
+        `declaration announced nothing`
+    );
+  }
+);
+
+Then(
+  'peer {string} verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs',
+  { timeout: PROJECTION_WAIT_MS + 60_000 },
+  async function (this: E2EWorld, alias: string) {
+    const s = headOnly(this);
+    assert.strictEqual(
+      alias,
+      s.laggard.alias,
+      `"${alias}" is not the receiving peer (${s.laggard.alias})`
+    );
+    assert.ok(s.announce, 'the announce snapshot is missing — the When step must run first');
+    const moved = await pollUntil(PROJECTION_WAIT_MS, async () => {
+      const head = await readHead(s.laggard, s.eprId);
+      return head?.earned === true && head.headActionHash === s.winnerHead;
+    });
+    const last = await readHead(s.laggard, s.eprId);
+    assert.ok(
+      moved,
+      `${s.laggard.alias} /head did not reach earned=true at ${s.winnerHead} within ${PROJECTION_WAIT_MS / 1000}s ` +
+        `(last read: ${JSON.stringify(last)}; earned before: ${s.laggardEarnedBefore})`
+    );
+    assert.strictEqual(
+      await reconcileSweeps(s.laggard),
+      s.announce.sweeps,
+      `${SWEEPS_SERIES} on ${s.laggard.alias} moved while waiting — the head moved by the sweep, not by the carried declaration`
+    );
+    assert.strictEqual(
+      stagingWriteCount(),
+      s.announce.ledger,
+      `the fixture made a mutating call after the announcement — the move is not the organic path`
+    );
+  }
+);
+
+Then(
+  'no doorway credential, seed or deploy is involved anywhere in the chain',
+  function (this: E2EWorld) {
+    const s = headOnly(this);
+    assert.ok(s.announce, 'the announce snapshot is missing — the When step must run first');
+    // Writes after Given 1: only the earned declaration (Given 2), none after the announcement.
+    assert.strictEqual(
+      stagingWriteCount(),
+      s.announce.ledger,
+      'a write happened after the announcement'
+    );
+    const doorways = [s.winner.doorwayUrl, s.laggard.doorwayUrl].filter(Boolean);
+    for (const write of stagingWrites()) {
+      const viaPeerStorage =
+        write.target.startsWith(s.winner.storageUrl) ||
+        write.target.startsWith(s.laggard.storageUrl);
+      const viaZomeRail = write.method === 'zome';
+      assert.ok(
+        viaPeerStorage || viaZomeRail,
+        `staging write ${write.method} ${write.target} targets neither a peer's storage nor a zome rail`
+      );
+      assert.ok(
+        !doorways.some(d => write.target.startsWith(d)),
+        `staging write ${write.method} ${write.target} went through a doorway`
+      );
+    }
+  }
+);
