@@ -1196,8 +1196,13 @@ Given(
     // "New head" here means a new EARNED declaration for the SAME action hash: the text and the
     // action are unchanged, only the declaration's ordering (earned tier, notarized clock) is new.
     await declareEarnedCanonicalHead(s.winnerRail, s.eprId, s.winnerHead);
+    // The AUTHOR's own storage asking its OWN conductor (`?election=live`): trustful-self, the
+    // path the steward-publish flow takes after declaring. It is not the receiver, so it masks
+    // nothing about delivery; step 5 (the receiver) deliberately reads WITHOUT `?election=live`.
     const earned = await pollUntil(PROJECTION_WAIT_MS, async () => {
-      const head = await readHead(s.winner, s.eprId);
+      const r = await fetch(`${s.winner.storageUrl}/db/content/${s.eprId}/head?election=live`);
+      if (!r.ok) return false;
+      const head = (await r.json().catch(() => null)) as HeadRead | null;
       return head?.earned === true;
     });
     assert.ok(

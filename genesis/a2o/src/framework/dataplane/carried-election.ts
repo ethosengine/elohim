@@ -43,13 +43,25 @@
  * carries. {@link meshConductorPorts} is the one derivation both this module's
  * callers use, so a mesh-layout change lands in one place.
  */
+import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import {
   AdminWebsocket,
   AppWebsocket,
+  decodeHashFromBase64,
   encodeHashToBase64,
+  generateSigningKeyPair,
   getSigningCredentials,
+  setSigningCredentials,
   type CellId,
 } from '@holochain/client';
+
+import {
+  scopedCapability,
+  type InvocationMandate,
+} from '../../../scripts/lib/steward-credential.js';
 
 /** The app id every household-mesh conductor installs. */
 export const MESH_APP_ID = 'elohim';
@@ -128,10 +140,74 @@ export function resetStagingWrites(): void {
 export interface CarriedElectionRail {
   /** Call a `content_store` coordinator function on this conductor. */
   call: (fnName: string, payload: unknown) => Promise<unknown>;
+  /**
+   * Call a gated `content_store` mutator under a freshly minted, assigned,
+   * function-listed, mandate-tagged grant (see {@link mintMandatedCredentials}).
+   * Absent on rails that cannot mint (unit-test doubles); callers then fall back to `call`.
+   */
+  callMandated?: (fnName: string, payload: unknown, scope: MandateScope) => Promise<unknown>;
   /** This cell's agent public key, base64 — the `X-Agent-Cid` a declaration presents. */
   agent: string;
   /** Close both websockets. Always call it; an open AppWebsocket keeps node alive. */
   close: () => Promise<void>;
+}
+
+/** What a mandated call is authorized for: one operation on exact content roots. */
+export interface MandateScope {
+  operation: string;
+  subjects: { id: string; root: string }[];
+  /** Notarized device-binding action hash (base64) whose device is the cell agent. */
+  binding: string;
+}
+
+/**
+ * The household device binding the earned-declaration gate needs. `A2O_DEVICE_BINDING` names a
+ * binding.json; absent that, the household ceremony's persisted default is used when present.
+ */
+export function householdDeviceBinding(): string | undefined {
+  const path = resolve(
+    process.env.A2O_DEVICE_BINDING ??
+      resolve(
+        // The a2o lane runs from genesis/a2o; the loader may not define import.meta.dirname.
+        process.cwd(),
+        '../local-dev/household-dowell/device-ceremony/binding.json'
+      )
+  );
+  if (!existsSync(path)) return undefined;
+  const state = JSON.parse(readFileSync(path, 'utf8')) as { binding?: string };
+  return state.binding;
+}
+
+/**
+ * Mint per-call credentials presenting an assigned, function-listed grant tagged with an
+ * InvocationMandate (issuer = cell agent, requester = fresh signing key, delegate = cell agent,
+ * subject = exact {id, root}, 10-minute expiry), the shape `invocation::authorize_at` accepts.
+ */
+export async function mintMandatedCredentials(
+  admin: AdminWebsocket,
+  cell: CellId,
+  scope: MandateScope
+): Promise<Parameters<typeof setSigningCredentials>[1]> {
+  const [keyPair, signingKey] = await generateSigningKeyPair();
+  const issuer = encodeHashToBase64(cell[1]);
+  const mandate: InvocationMandate = {
+    issuer,
+    requester: encodeHashToBase64(signingKey),
+    dna: encodeHashToBase64(cell[0]),
+    delegate: issuer,
+    subjects: scope.subjects,
+    operations: [scope.operation],
+    valid_until: (Date.now() + 10 * 60_000) * 1000,
+    binding: scope.binding,
+    policy: 'a2o-household-earned-declaration-v1',
+    exact_payload_json: null,
+  };
+  const secret = new Uint8Array(randomBytes(64));
+  await admin.grantZomeCallCapability({
+    cell_id: cell,
+    cap_grant: scopedCapability(mandate, CONTENT_STORE_ZOME, secret),
+  });
+  return { capSecret: secret, keyPair, signingKey };
 }
 
 const SIGNING_AUTH_BACKOFFS_MS = [100, 200, 400] as const;
@@ -281,6 +357,7 @@ export async function connectConductor(
       .token,
     wsClientOptions,
   });
+  const broad = getSigningCredentials(cell);
   return {
     call: async (fnName: string, payload: unknown) =>
       appWs.callZome({
@@ -289,6 +366,20 @@ export async function connectConductor(
         fn_name: fnName,
         payload,
       }),
+    callMandated: async (fnName: string, payload: unknown, scope: MandateScope) => {
+      const mandated = await mintMandatedCredentials(admin, cell, scope);
+      // callZome signs synchronously before its first await, so the process-global
+      // credential can be restored the moment the request is issued.
+      setSigningCredentials(cell, mandated);
+      const pending = appWs.callZome({
+        cell_id: cell,
+        zome_name: CONTENT_STORE_ZOME,
+        fn_name: fnName,
+        payload,
+      });
+      if (broad) setSigningCredentials(cell, broad);
+      return pending;
+    },
     agent: encodeHashToBase64(cell[1]),
     close: async () => {
       await closeTransport(appWs.client);
@@ -587,12 +678,36 @@ export async function declareEarnedCanonicalHead(
 ): Promise<{ canonical?: boolean } | null> {
   return retryOnSourceChainHeadMoved(`declareEarnedCanonicalHead(${id})`, async () => {
     recordStagingWrite('zome', `${CONTENT_STORE_ZOME}.declare_earned_canonical_head`);
-    return (await rail.call('declare_earned_canonical_head', {
+    const payload = {
       id,
       head_action_hash: headActionHash,
       carried_record: null,
       adopt_before_author: false,
       delegation: null,
+    };
+    const binding = householdDeviceBinding();
+    if (!rail.callMandated || !binding) {
+      return (await rail.call('declare_earned_canonical_head', payload)) as {
+        canonical?: boolean;
+      } | null;
+    }
+    // Since 2026-10-01 (e9e0b3b63, "constrain FCT publication to witnessed device authority")
+    // the zome's invocation::authorize_at refuses the unscoped all-functions grant that
+    // connectConductor mints: it admits only the cell's own chain author or an Assigned,
+    // function-Listed RemoteAgent grant tagged with an InvocationMandate naming this exact
+    // {id, root}, the cell agent as issuer and delegate, and a notarized device binding.
+    // So each declaration mints its own grant (subject = the id's canonical root, found via the
+    // unscoped, ungated get_content_lineage read) and presents the household binding persisted
+    // by scripts/household-device-ceremony.ts (2026-10-08). connectConductor's unscoped
+    // credential keeps serving every ungated call.
+    const lineage = (await rail.call('get_content_lineage', {
+      action_hash: decodeHashFromBase64(headActionHash),
+      local: false,
+    })) as { root_action_hash: Uint8Array };
+    return (await rail.callMandated('declare_earned_canonical_head', payload, {
+      operation: 'declare_earned_canonical_head',
+      subjects: [{ id, root: encodeHashToBase64(new Uint8Array(lineage.root_action_hash)) }],
+      binding,
     })) as { canonical?: boolean } | null;
   });
 }
