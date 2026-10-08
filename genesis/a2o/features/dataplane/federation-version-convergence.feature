@@ -42,6 +42,17 @@ Feature: Federation version convergence — two doorways that disagree serve the
   are only ever believed after the receiving peer's own conductor re-derives the claim from them
   and gets the same answer.
 
+  Four terms the steps themselves lean on. The ROOT AUTHOR of a page is the identity that created
+  its first record; an EARNED declaration can be issued only by the root author, a device the root
+  author delegated, or the bootstrap steward (the federation's founding authority) — the conductor
+  refuses anyone else in wasm. A CARRIED record (a carried declaration, a carried election) is one
+  that a peer who holds it hands to a peer who does not, so the receiver's own conductor can
+  re-derive it; carrying moves evidence, never trust. The DECLARED HEAD is the version a peer's own
+  record names as current; the SERVED HEAD is the version its running doorway actually hands a
+  visitor — the two are projected separately and can drift apart, heads equal and pages different.
+  An ANNOUNCEMENT is the small notice a peer sends its federation when its record of a page changes,
+  so each peer can fetch and verify the new state at once instead of waiting for a sweep.
+
 
   One piece of test vocabulary, because this file's tag line uses it: an ACT names the substrate a
   scenario is measured on. Act I runs against a household mesh the test run OWNS and may write to;
@@ -51,7 +62,9 @@ Feature: Federation version convergence — two doorways that disagree serve the
 
   The two peers: alpha-A is the author peer (the one the deploy pipeline authors from). Peer
   "elohim.host" is a second federation doorway serving the same content from a different premises.
-  On the household lane both are peers of a mesh this run owns.
+  On the household lane both are peers of a mesh this run owns — the HOUSEHOLD is the small local
+  mesh of named peers a test run controls end to end, and a LANE is one run of the scenarios against
+  one substrate.
 
   WHY THE DIVERGENCE PERSISTED, which is what the cure had to address: each doorway's head only
   ever moved when a deploy or seed wrote to that host DIRECTLY, while the declarations that should
@@ -135,6 +148,7 @@ Feature: Federation version convergence — two doorways that disagree serve the
     # SCOPE CHANGES HERE, and the next line is what entitles it to. Everything above concerns the
     # page this run authored. The two checks after it read a REAL, seeded page instead — so the
     # first thing asserted about that page is that this run never wrote to it.
+    # ON A PAGE THIS RUN NEVER TOUCHED — the next line is the pivot, and what entitles the two after it.
     And EPR "elohim-host-landing" was never staged by this run
     And the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
     And the served head for EPR "elohim-host-landing" matches the declared head on peer "elohim.host"
@@ -151,3 +165,28 @@ Feature: Federation version convergence — two doorways that disagree serve the
     And the elected head carries the EARNED canonical declaration, and that declaration carries a notarized timestamp
     # ANTI-REGRESSION: the move must be an ELECTION OBEYED, never a trust-the-peer copy.
     And a carried declaration link whose signature or binding fails wasm verification moves nothing
+
+  # FOUND 2026-10-08 publishing the FCT course from the author's own device to alpha. The scenario
+  # above stages a disagreement and lets the reconcile sweep heal it. This one is upstream of it: the
+  # moment a root author declares a NEW earned head for a page every peer already holds, nothing
+  # leaves the author's device unless the page's TEXT also changed.
+  #
+  # Measured: the announcement is sent when the fields it carries change — title, type, format,
+  # reach, description, body, blob — and the head is NOT one of those fields. So a re-declaration
+  # that changes only the head is "already current" on the author's device, no notice goes out, and
+  # the peers learn of the new head only through the DHT's sweep — which FILLS a missing head and
+  # never MOVES a declared one. 21 pages re-declared from the author's device that evening sat at
+  # their 2025 head on every other peer; the 9 whose body also changed moved within seconds.
+  #
+  # The missing node, in the author's own words: a head-only declaration must change what the device
+  # announces (the declared head and its ordering clock), so a peer that holds the page is told, and
+  # its own conductor verifies the carried declaration exactly as the scenario above requires.
+  @wip @regression @requires:owned-substrate
+  Scenario: a new earned head declared with the same text still reaches a peer that already holds the page
+    Given peer "alpha-A" and peer "elohim.host" both hold a page this run authored, at the same head
+    And the page's root author on peer "alpha-A" declares a NEW earned canonical head whose text is unchanged
+    When peer "alpha-A" announces the change to its federation
+    Then peer "elohim.host" is told that the page's declared head changed
+    And peer "elohim.host" verifies the carried declaration in wasm and moves its served head to it before any reconcile sweep runs
+    # The same trust principle as the scenario above: the move is peer-verified, never credential-mediated.
+    And no doorway credential, seed or deploy is involved anywhere in the chain
