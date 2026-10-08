@@ -11,6 +11,8 @@ import { ELOHIM_CLIENT } from '@elohim/service';
 import { LearningPath, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@elohim/service/angular/models/agent.model';
 import { of, throwError, BehaviorSubject } from 'rxjs';
+
+import { ContentHeldError } from '../models/content-node.model';
 import { vi, Mock } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
@@ -288,6 +290,56 @@ describe('DataLoaderService', () => {
           error: () => {
             throw new Error('Should not throw error, should return placeholder');
           },
+        });
+      }));
+  });
+
+  describe('getContent — held by reach', () => {
+    it('names the reach that holds the content instead of calling it unseeded', () =>
+      new Promise<void>(done => {
+        mockContentService.getContent.mockReturnValue(
+          throwError(() => new ContentHeldError('fct-module-01-church-dilemma', 'private'))
+        );
+
+        service.getContent('fct-module-01-church-dilemma').subscribe({
+          next: content => {
+            expect(content.contentType).toBe('placeholder');
+            expect(content.tags).toContain('held');
+            expect(content.title).toBe('Held at private reach: fct-module-01-church-dilemma');
+            expect(content.content).toContain('held at **private** reach');
+            expect(content.content).not.toContain('not yet available');
+            expect(content.metadata?.['requiredReach']).toBe('private');
+            done();
+          },
+          error: () => {
+            throw new Error('A hold is answered with a placeholder, never thrown');
+          },
+        });
+      }));
+
+    it('reads the hold out of a raw 403 whose body names requiredReach', () =>
+      new Promise<void>(done => {
+        mockContentService.getContent.mockReturnValue(
+          throwError(() => ({ status: 403, error: { requiredReach: 'community' } }))
+        );
+
+        service.getContent('held-content').subscribe(content => {
+          expect(content.tags).toContain('held');
+          expect(content.metadata?.['requiredReach']).toBe('community');
+          done();
+        });
+      }));
+
+    it('does not serve a held page from the offline cache', () =>
+      new Promise<void>(done => {
+        mockContentService.getContent.mockReturnValue(
+          throwError(() => new ContentHeldError('held-content', 'private'))
+        );
+
+        service.getContent('held-content').subscribe(content => {
+          expect(mockIndexedDBCache.getContent).not.toHaveBeenCalled();
+          expect(content.tags).toContain('held');
+          done();
         });
       }));
   });

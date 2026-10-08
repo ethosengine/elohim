@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 
 import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
 import type { ContentSearchView } from '../../generated/content-search-view';
+import { ContentHeldError } from '../models/content-node.model';
 import { ContentBackendService } from './content-backend.service';
 import { ProjectionAPIService } from './projection-api.service';
 
@@ -121,6 +122,54 @@ describe('ContentBackendService transformContent', () => {
     expect(byId.get('o')?.trustScore).toBe(0.25);
     // Tags served by /db/content reach the node untouched.
     expect(byId.get('n')?.tags).toEqual(['a', 'b']);
+  });
+});
+
+describe('ContentBackendService getContent — held by reach', () => {
+  it('raises ContentHeldError on a 403 instead of answering null', async () => {
+    // The shape ElohimClient throws (ElohimHttpError: status + raw body); duck-typed here so
+    // the spec does not depend on the library's built dist being current.
+    const get = vi.fn().mockRejectedValue(
+      Object.assign(new Error('HTTP 403'), {
+        status: 403,
+        body: '{"error":"Authentication required","requiredReach":"private"}',
+      })
+    );
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        { provide: ELOHIM_CLIENT, useValue: { get } },
+        { provide: BLOB_FETCHER, useValue: {} },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: {} },
+      ],
+    });
+
+    const answer = firstValueFrom(
+      TestBed.inject(ContentBackendService).getContent('fct-module-01-church-dilemma')
+    );
+    await expect(answer).rejects.toBeInstanceOf(ContentHeldError);
+    await expect(answer).rejects.toMatchObject({
+      resourceId: 'fct-module-01-church-dilemma',
+      requiredReach: 'private',
+    });
+  });
+
+  it('still answers null for an outage, so a missing page stays a placeholder', async () => {
+    const get = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('HTTP 502'), { status: 502, body: 'bad gateway' }));
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        { provide: ELOHIM_CLIENT, useValue: { get } },
+        { provide: BLOB_FETCHER, useValue: {} },
+        { provide: LAMAD_STORAGE_CLIENT, useValue: {} },
+      ],
+    });
+
+    expect(await firstValueFrom(TestBed.inject(ContentBackendService).getContent('x'))).toBeNull();
   });
 });
 

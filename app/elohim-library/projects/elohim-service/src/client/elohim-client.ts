@@ -172,6 +172,35 @@ export class ReachEnforcer {
  * Content operations: browser → doorway, tauri → local elohim-storage
  * Agent operations: separate holochain connection (if configured)
  */
+/**
+ * A non-2xx answer from a storage/doorway read, carrying the status and the raw body so a
+ * consumer can tell a reach hold (403 `{"requiredReach":"private"}`) from an outage instead of
+ * flattening every failure into "not found".
+ */
+export class ElohimHttpError extends Error {
+  /** The reach a 403 body named, when it named one. */
+  readonly requiredReach: string | undefined;
+
+  constructor(
+    public readonly status: number,
+    public readonly body: string
+  ) {
+    super(`HTTP ${status} - ${body}`);
+    this.name = 'ElohimHttpError';
+    let reach: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(body);
+      if (parsed !== null && typeof parsed === 'object') {
+        const named = (parsed as { requiredReach?: unknown }).requiredReach;
+        if (typeof named === 'string') reach = named;
+      }
+    } catch {
+      // not JSON: no reach named
+    }
+    this.requiredReach = reach;
+  }
+}
+
 export class ElohimClient {
   private readonly mode: ClientMode;
   private readonly doorwayResolver?: DoorwayAddressResolver;
@@ -488,7 +517,7 @@ export class ElohimClient {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`HTTP ${response.status} - ${body}`);
+      throw new ElohimHttpError(response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -656,7 +685,7 @@ export class ElohimClient {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`HTTP ${response.status} - ${body}`);
+      throw new ElohimHttpError(response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -708,7 +737,7 @@ export class ElohimClient {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`HTTP ${response.status} - ${body}`);
+      throw new ElohimHttpError(response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -749,7 +778,7 @@ export class ElohimClient {
     }
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`HTTP ${response.status} - ${body}`);
+      throw new ElohimHttpError(response.status, body);
     }
 
     // elohim-storage returns { items: [...], count, limit, offset }
@@ -793,7 +822,7 @@ export class ElohimClient {
     }
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`HTTP ${response.status} - ${body}`);
+      throw new ElohimHttpError(response.status, body);
     }
 
     // The view is the peer's answer, whole and untransformed.
