@@ -7,7 +7,7 @@ title: "The read path serves an unauthenticated doc blob under a verified head â
 slug: "declared-head-blob-serves-unauthenticated-content-under-verified-head"
 written: "2026-09-21"
 author: "serving-edge failover-balance-stream campaign, 2026-09-21 review"
-status: "open"
+status: "done"
 priority: "high"
 jobs: [elohim]
 cluster: "arch-dataplane-refactor-backlog"
@@ -67,3 +67,5 @@ doc-blob preference (`declared_head_served_blob`, `SyncManager::declared_head_bl
 `sync/mod.rs`, and `read_head_blob_hash` / `doc_head_action_hash` survive only as test helpers. A head moves only
 with the pointer its own proven record names, and only once those bytes are held. The row keeps its status until
 the fleet serves the same bytes from both doorways (seam 6 `OK`), which only a post-push reading can show.
+
+**Done 2026-10-08:** serve path fixed by `06e9587f8` (touches `http.rs`, `sync/mod.rs`, `content_service.rs`; verified in the slug-leftovers sprint). The seam-6 fleet reading noted above stays the evidence for the dataplane habit, not this row.

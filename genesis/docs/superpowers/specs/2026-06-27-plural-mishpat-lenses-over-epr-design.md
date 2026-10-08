@@ -172,7 +172,7 @@ hash-neutral except for one isolated, deferrable risk (the forward-index link ty
 | Entity | Class | Address | Track / Source of truth | Coordinator (reuse) | Projection | Hash-neutral? |
 |--------|-------|---------|-------------------------|---------------------|------------|---------------|
 | **Lens** (deterministic policy/contract) | A (Notarized) | **CID = `entry_hash`** (`bafyrei…` dag-cbor; rule+trigger+telos immutable; new rule = new CID, version-chained) | T1 / DHT | `mishpat::author_lens` (new `Commitment` action) | `lenses` (dht_anchor ✓) | ✅ |
-| **Lens↔EPR binding** (forward index — *net-new*) | A2 (Derived/Link) | anchored on EPR `EntryHash`; tag `{role: floor\|ceiling\|lens, context-scope, school}` | T1 / DHT link | link in `author_lens`; reverse-index query "all lenses governing EPR X" | `epr_lens_bindings` (dht_anchor → parent EPR) | ✅ if reuses scope link; ⚠ new LinkType = hash move (isolated) |
+| **Lens↔EPR binding** (forward index — *net-new*) | A2 (Derived/Link) | anchored on the EPR slug-id (e.g. `epr:lamad-spa`) as the scope key; tag `{role: floor\|ceiling\|lens, context-scope, school}` | T1 / DHT link | link in `author_lens`; reverse-index query "all lenses governing EPR X" | `epr_lens_bindings` (dht_anchor → parent EPR) | ✅ if reuses scope link; ⚠ new LinkType = hash move (isolated) |
 | **Ballot / Exercise** | B2 (Agent-scoped + Attestation) | Agent-scoped composite `(agent_cid, lens_cid, context)` | private source-chain (raw) + DHT (tally attestation, reuse imagodei `Attestation`) | `mishpat::cast_ballot` → `certify_tally` | `ballots` (no anchor) + `ballot_tallies` (dht_anchor ✓) | ✅ |
 | **Affinity** | C (Operational) | n/a (keyed `(lens_cid, context-scope)`) | T2 / SQLite fold; reconstruct = re-fold tallies+selections | facing fold | `lens_affinity` (no anchor) | ✅ |
 | **Contention** | C (score) + signed signal (breach) | n/a / `SignalKind::ContentionBreach` (analog `DelayBreach`) | T2 fold → T1 signal | facing fold + signal emit | `epr_contention` (no anchor) | ✅ |
@@ -320,7 +320,7 @@ A uniformly-blocked wave is held by an `@requires:` tag on its gap-items; Wave 1
 ## 13. Open questions
 
 - **Forward-index link reuse vs new LinkType** — does an existing scope/`bounded_by` link cover
-  EPR→Lens (hash-neutral), or is a new integrity LinkType required (the lone DNA-move risk)? Resolve in
+  EPR→Lens (hash-neutral), or is a new integrity LinkType required (the lone DNA-move risk, which applies only if a notarized index is required)? Resolve in
   Wave-2 planning against the current Mishpat link inventory.
 - **Default contention metric: constitutional or seeded-replaceable?** The floor fixes *a* default; is
   the spread metric itself un-electable, or a seeded lens that a collective may replace above the floor?
