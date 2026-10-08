@@ -46,15 +46,17 @@ Our test reports do the same job as your `summariser` output. Yours uploads to o
 
 ## 4. What we think core should take, and why
 
-Take the exposition as a fourth backend beside the three Influx ones, behind the same environment-variable convention, with Prometheus taking precedence when both are set, or a documented rule either way. Reasons:
+Everything above assumes something core does not: that the operator and the person are different. Holochain's conductor is built for one person on their own device, and that person is the operator. The admin interface binds localhost, checks origins and mints the tokens; every operator read (the dump requests, network metrics, network stats) is a local call by the device's owner. That is the right model for that person, and we are not asking core to change it.
 
-- Most operators run the conductor inside something that already scrapes. Pull needs no process, no download, no push target.
-- The metrics stay OpenTelemetry. Prometheus is just another way to read them.
-- It is one crate change, opt-in, off by default. It has run in one place for a week; we haven't tested it anywhere else.
+We run a different shape, and so does Holo: one operator running many conductors for people who are not the operator. At that scale the admin interface stops fitting. You cannot port-forward an admin websocket per conductor and dump state by hand across a fleet, so you add a scrape endpoint. We did. Ours binds every interface, plain HTTP, no auth, and is safe only because our cluster has a network policy the conductor knows nothing about. On a HoloPort or a home machine behind dynamic DNS, that is a public port. It found real bugs for us. It is not the shape we are asking core to adopt.
 
-**The condition that matters more:** audit the labels before any exposition ships. The `agent` and `cell_id` labels must not leave the process by default, and `dna_hash` deserves a decision, because it says which networks a node participates in. This affects every production Holochain user today, with or without our exporter. Any operator who turns on the Influx child service, or points Telegraf at the line-protocol file, is already building a per-participant activity ledger they did not mean to build. A Holo host collecting port metrics holds one for every hosted participant. Our exporter didn't create the problem, but it makes the data much easier to collect. The fix is at the exposition: drop or hash those labels unless the scraper is the peer itself.
+What we would ask instead:
 
-Wind Tunnel does not compete with any of this. Wind Tunnel keeps Influx for the bench, and operators get a Prometheus endpoint for the fleet. Both read the same metrics.
+- Keep the read behind the admin interface. A `DumpMetrics` admin request that returns Prometheus text rides the policy core already has. A sidecar bridges it to a scraper, and the sidecar is the host's problem, ours or Holo's, not core's. The metrics stay OpenTelemetry; this is one more way to read them.
+- If a listener is added at all, default it to 127.0.0.1 with a `danger_` override, matching core's own convention.
+- Audit the labels before either ships. `agent` and `cell_id` must not leave the process by default. `dna_hash` is an exposure decision, not a cardinality one: it tells a reader which networks a node is on and, with the per-function timings, when its person is active. This affects every production user today. Anyone who turns on the Influx child service or points Telegraf at the line-protocol file is already building a per-participant activity ledger, and a Holo host collecting port metrics holds one for every hosted participant. Our exporter didn't create the problem; it made the data much easier to collect.
+
+Wind Tunnel does not compete with any of this. It keeps Influx for the bench; hosts get a fleet-shaped read under the admin interface's policy. Both read the same metrics.
 
 ## 5. Upgrade and rollback
 
@@ -107,7 +109,7 @@ The exporter is a tiny instance of that: keep the sensor Holochain built, declar
 Three things:
 
 1. Tell us what we cannot see: whether core has a Prometheus or OTLP exporter in flight (OTLP is OpenTelemetry's own wire format), and how a Holo host collects port-side metrics today.
-2. Take the exposition with the label audit, as one clean pull request from our side if you want it.
+2. Take a `DumpMetrics` admin request with the label audit, as one clean pull request from our side if you want it.
 3. A 45-minute call in the next two weeks with one engineer who owns host-side metrics at Holo. We bring a one-page draft of a scoped capture grant (what a host may collect about a hosted participant, at what reach, for how long, reviewable by whom); we leave with a yes, a no, or a counter-shape.
 
 We're a small project, and many of our own checks are still failing. We'd like to compare notes with people running the same conductor at a different scale.
