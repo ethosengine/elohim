@@ -1162,6 +1162,122 @@ measures:
     status: active
     established_by: native-delivery-sprint-2026-09-24
 
+  # ---- observability epic (2026-10-08): the plane's own readings. All default-authority
+  # observation; teeth live in the lenses below; each lens names the habit it serves.
+  - id: sensor-label-cardinality
+    version: 1
+    family: sensor-hygiene
+    unit: label-values
+    procedure: >
+      On one peer, scrape each exposition the runtime serves (storage :8090/metrics, doorway
+      /metrics, conductor :9464/metrics) and count distinct label VALUES matching ^uhCAk or a
+      cell id; fold once per exposition with `--env exporter=<storage|doorway|conductor> --env
+      peer=<name>`. A participant label is a value that names a person, never a key name.
+    provenance: Observability epic §7 step 1, §8 promise 3; habit sensor-labels-bounded
+    status: active
+    env-sensitivity: [exporter, peer]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "a scraped conductor is a per-participant activity ledger until its labels are bounded"
+  - id: observation-rows-unsigned
+    version: 1
+    family: observation-plane
+    unit: rows
+    procedure: >
+      Per peer: `select count(*) from observations where signature_b64 = ''` on the storage
+      SQLite projection; fold with `--env peer=<name>`.
+    provenance: Observability epic §3 (witness plane); habit witness-rows-signed
+    status: active
+    env-sensitivity: [peer]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "an unsigned witness is self-sense in a witness's costume"
+  - id: evidence-class-unset
+    version: 1
+    family: observation-plane
+    unit: rows
+    procedure: >
+      Per peer: rows in the observations and attestation projections whose evidence_class is
+      null; SKIPPED (never zero) until the column exists.
+    provenance: Observability epic §10; habit evidence-class-descends
+    status: active
+    env-sensitivity: [peer]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "a fixture that settles as real is the one promotion the plane may never make"
+  - id: period-records-per-peer-day
+    version: 1
+    family: health-attestation
+    unit: records/day
+    procedure: >
+      Household: a stopped-conductor sniff (`app/elohim-app/scripts/conductor-store-sniff.py`,
+      the subject-anchor-links@1 query shape) counting attestation:device-health plus
+      attestation:doorway-health-summary actions per subject per UTC day; fold with `--env
+      subject=<peer>`. Fleet: `get_doorway_attestations` once it is the wired reader.
+    provenance: plane-separation §5 rulings 1–2; Observability epic §7 steps 3–4; habit health-attests-on-transition
+    status: active
+    env-sensitivity: [subject]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "one record closes a period; a per-probe write is a timer, not a record"
+  - id: liveness-sources
+    version: 1
+    family: liveness
+    unit: writers
+    procedure: >
+      Household at rest for 10 minutes: for one peer X, count which of {peer_statuses row
+      updated (SQL), doorway attestations about X in the window (sniff), the doorway /status
+      self-uptime strip advanced, peer_liveness moved} produced a fact about X; fold with
+      `--env peer=<X>`.
+    provenance: plane-separation §5 ruling 5; Observability epic §11; habit liveness-has-one-source
+    status: active
+    env-sensitivity: [peer]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "the same trustful-self fact derived five ways is trust paid five times"
+  - id: ledger-planes
+    version: 1
+    family: dev-ledgers
+    unit: ledgers
+    procedure: >
+      Count the files among .claude/data/*.jsonl and $CLAUDE_CONFIG_DIR/berth/ledger.jsonl whose
+      basename a script under .claude/scripts other than its own appender parses; subject `.`.
+    provenance: Observability epic §13; habit ledgers-fold-once
+    status: active
+    env-sensitivity: []
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "seven ledgers with seven cursors is the dev system's own aggregator problem"
+  - id: dev-berth-events
+    version: 1
+    family: berth
+    unit: events
+    procedure: >
+      Emitted by `berth` Ledger.record() for EVERY kind (moor, unmoor, claim, renew, release,
+      refuse, override, overrun, shed) through _observation.emit, value 1, `--env kind=<kind>
+      --env class=<class> --env resource=<resource>`; sits beside dev-berth-held-by-measure@1.
+      Not yet emitted for most kinds (consolidation order step 6).
+    provenance: Observability epic §7; habit ledgers-fold-once; feeds idle-is-free's idle window
+    status: active
+    env-sensitivity: [kind, class, resource]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "the idle window should derive from the fold, not from berth's private file"
+  - id: operator-claims-unobserved
+    version: 1
+    family: operator-effect
+    unit: claims
+    procedure: >
+      Per peer: economic_events rows recorded by operator verbs with no infrastructure:operator-effect
+      observation of phase post naming their event_id within the verb's window; SKIPPED until the
+      kind exists.
+    provenance: hardware-providence §1 item 5; Observability epic §4; habit operator-runtime-surface
+    status: active
+    env-sensitivity: [peer]
+    default-authority: observation
+    established_by: observability-epic-2026-10-08
+    why: "every claim of success is supported by a post-action observation, never by the handler"
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -1941,3 +2057,96 @@ lenses:
       stays on the headline until the algedonic-designer registers the sensor that would have felt
       it and appends the reset, so a surfaced pain cannot scroll away unaddressed. No `subject:` —
       folds name the concern the pain was about, and every one of them counts.
+
+  # ---- observability epic (2026-10-08) lenses: each names the habit it serves; --bound readers.
+  - id: sensor-participant-labels-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [sensor-label-cardinality@1]
+    subject: .
+    context: peer-expositions
+    hard: 0
+    concern: sensor-labels-bounded
+    retire-when: when the conductor's exporter registers its label vocabulary at compile time
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "zero participant label values across the three expositions on a peer"
+  - id: observation-rows-unsigned-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [observation-rows-unsigned@1]
+    subject: .
+    context: storage-projection
+    hard: 0
+    concern: witness-rows-signed
+    retire-when: when a row cannot be appended unsigned
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "no witness row without a verified signature or an explicit absent"
+  - id: evidence-class-unset-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [evidence-class-unset@1]
+    subject: .
+    context: storage-projection
+    hard: 0
+    concern: evidence-class-descends
+    retire-when: when the integrity floor refuses an unclassed attestation
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "a row with no class is refused at write"
+  - id: period-records-per-peer-day-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [period-records-per-peer-day@1]
+    subject: .
+    context: stopped-conductor-store
+    hard: 24
+    concern: health-attests-on-transition
+    retire-when: when idle-is-free is green with the doorway as the only health attester
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "at most one record per manifest window (3600 s) per subject per day"
+  - id: liveness-sources-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [liveness-sources@1]
+    subject: .
+    context: household-at-rest
+    hard: 1
+    concern: liveness-has-one-source
+    retire-when: when the transport is the only thing that can say a peer is present
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "one liveness writer per peer"
+  - id: ledger-planes-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [ledger-planes@1]
+    subject: .
+    context: workspace
+    hard: 1
+    concern: ledgers-fold-once
+    retire-when: when no .claude/data/*.jsonl appender remains
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "one fold store per host"
+  - id: operator-claims-unobserved-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [operator-claims-unobserved@1]
+    subject: .
+    context: storage-projection
+    hard: 0
+    concern: operator-runtime-surface
+    retire-when: when every accepted verb has an effect row within one sweep interval by construction
+    status: active
+    established_by: observability-epic-2026-10-08
+    why: "a verb with no post row is unverified, never success"

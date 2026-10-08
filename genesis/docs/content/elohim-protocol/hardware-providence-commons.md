@@ -8,6 +8,7 @@ sovereignty-frame: adversary
 companion_to:
   - genesis/docs/content/elohim-protocol/hardware-spec.md
 cites:
+  - "observability-epic | the sibling proof epic that answers this one's first refusal: where the network's telemetry lives, who holds the aggregate, and the operator's bands applied to observation | path: genesis/docs/content/elohim-protocol/observability/epic.md"
   - "hardware-spec | the physical form-factor, participation, power, serviceability, and sustainability vision whose cybernetic proof obligations this companion makes explicit | sha256:b0400feead19f37f | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/hardware-spec.md"
   - "resilience-protocol-spec | the operator-as-household-complexity-collapse canon and live-versus-gap substrate assessment this epic extends from digital resilience into physical care | sha256:396d7d7a2b8b354c | path: genesis/docs/content/elohim-protocol/resilience/README.md"
   - "values-forward | the strict owned-by-no-one, non-extractive, structurally unenclosable commons claim this rack proof must earn rather than merely repeat | sha256:58f62ae2be4a704a | status: stale — target content moved on; re-verify | path: genesis/docs/content/elohim-protocol/values-forward.md"
@@ -627,7 +628,8 @@ cybernetic loop.
 
 ## 13. What This Epic Refuses to Claim
 
-- `.epr-meta` is not the runtime telemetry store.
+- `.epr-meta` is not the runtime telemetry store; what is, is answered by the
+  [Observability epic](observability/epic.md).
 - The DHT is not a monitoring database.
 - A declared device archetype is not an observed inventory.
 - An alert is not a repair.

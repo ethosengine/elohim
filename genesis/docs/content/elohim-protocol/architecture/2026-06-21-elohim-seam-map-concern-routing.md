@@ -412,6 +412,24 @@ canonical home · the adjacent-seam confusion to avoid.**
   allocator). "The phone is getting flooded" or "the breaker is stuck open" is this seam — not
   the hardware seam (capability) nor the dataplane (records).
 
+
+### 3.16 Observation / self-sense (the audit channel)
+- **Problem-class:** how a peer, a holon and the commons know their own state without an
+  aggregator — self-sense (what a peer keeps about itself), witness (what a sibling signs about
+  what it saw), fruit (a crossed threshold that becomes an attestation); the viable-system
+  audit channel (System 3*) and the algedonic pain channel.
+- **Add a new X (metric / health signal / observation kind):** declare an `observation_kind` in
+  the pillar manifest (reach on the observation ladder, retention class, diversity threshold,
+  `graduates_to`), run `p2p-design-gate`, name the reader — never a DHT entry, never a route.
+- **Home:** `genesis/docs/content/elohim-protocol/observability/epic.md` (canon);
+  `elohim/elohim-storage/src/observation/` and `graduation/`; `elohim/sdk/domains/*/manifest.json`
+  (`observation_kinds`); `elohim/epr/src/{witness,measure,algedonic}.rs`;
+  `.claude/epr-meta/measures.yaml` (the dev system's own folds).
+- **Confusion:** self-sense is not a witness (a peer's `/metrics` is self-sense served by the peer,
+  never evidence to anyone else); a self-report is self-sense dressed as a witness; the Grafana
+  stack is a reader, never the store; a hub's aggregate is 3.11's rollup over fruit; a per-agent
+  label on a series is 3.15's resource-governance seam wearing a surveillance costume.
+
 ---
 
 ## 4. The Concern-Routing Table (the heart)
@@ -421,6 +439,7 @@ bites, and the **home** to go read/edit. Rows span the full spectrum and every s
 
 | The concern you have | Seam | Device-scale | Home (where to go) |
 |---|---|---|---|
+| Is a peer / hub / region healthy; add a metric or a health signal | Observation / self-sense (3.16) | any | `observability/epic.md`; 2026-05-11 observation design; the pillar manifest's `observation_kinds` |
 | A device is too small to run a conductor | Hardware gradient + T3 spoke (3.1, 3.10) | smartwatch/fob/sensor (L0-1) | device-archetypes-design `:33-41`; complementarity §Track 3 `:225-238` |
 | A wearable must contribute a signal without a node | T3 spoke bridge (3.10) | wearable/IoT (L0-1) | `peer_map.rs:483-489` (Track3Bridge); `peer-hoster-async-sync-readiness` (B7) |
 | A phone keeps OOM'ing / sync floods it | Hardware gradient + runtime footprint (3.1, 3.3) | phone (L2) | device-archetypes `:105`; backpressure; cargo `[features]` thin flavor |
@@ -548,7 +567,7 @@ build-state, see the dated assessments in §6.)
 | Messaging / event streaming / queues | DHT signals + signal harness + NATS (orchestrator) |
 | Scheduler / Step-Functions / cron | temporal plane (3.14) |
 | Throttling / quotas / autoscaling | resource governance (3.15) + elohim-operator |
-| Observability / monitoring | `/metrics` + `/health` + Grafana stack + self-heal |
+| Observability / monitoring | observation / self-sense (3.16) over the witness log, graduating to attestations; rollup over fruit (3.11); the Grafana stack is a reader, never the store |
 | Analytics / ML platform | recursive aggregation / `CoverageRollup` (3.11) + local inference |
 | IaC / CI-CD | orchestrator + build-manifests + rakia + `deployments.json` |
 | Marketplace / service catalog | "monorepo IS the catalog" (one-SDK-many-APIs) |
