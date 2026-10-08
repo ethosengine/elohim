@@ -27,21 +27,29 @@ size="$3"
 say() { echo "conductor-pvc: $claim: $*"; }
 
 to_bytes() { # <k8s quantity> -> integer bytes (Ki/Mi/Gi/Ti and K/M/G/T)
-  local q="$1" n unit
+  # Bash 64-bit arithmetic, not awk: the CI agent's awk prints any `%d` above
+  # 2^31 as 2147483647, so 20Gi read as 2 GiB there and every comparison past
+  # that line was wrong (edge #1576, where the regression test caught it first).
+  local q="$1" n unit mult int frac scale
   n="${q%%[^0-9.]*}"
   unit="${q#"$n"}"
   case "$unit" in
-    Ki) awk -v n="$n" 'BEGIN{printf "%d", n*1024}' ;;
-    Mi) awk -v n="$n" 'BEGIN{printf "%d", n*1024*1024}' ;;
-    Gi) awk -v n="$n" 'BEGIN{printf "%d", n*1024*1024*1024}' ;;
-    Ti) awk -v n="$n" 'BEGIN{printf "%d", n*1024*1024*1024*1024}' ;;
-    K|k) awk -v n="$n" 'BEGIN{printf "%d", n*1000}' ;;
-    M) awk -v n="$n" 'BEGIN{printf "%d", n*1000000}' ;;
-    G) awk -v n="$n" 'BEGIN{printf "%d", n*1000000000}' ;;
-    T) awk -v n="$n" 'BEGIN{printf "%d", n*1000000000000}' ;;
-    "") printf '%d' "${n%.*}" ;;
-    *) echo 0 ;;
+    Ki) mult=1024 ;;
+    Mi) mult=$((1024 * 1024)) ;;
+    Gi) mult=$((1024 * 1024 * 1024)) ;;
+    Ti) mult=$((1024 * 1024 * 1024 * 1024)) ;;
+    K|k) mult=1000 ;;
+    M) mult=1000000 ;;
+    G) mult=1000000000 ;;
+    T) mult=1000000000000 ;;
+    "") mult=1 ;;
+    *) echo 0; return 0 ;;
   esac
+  int="${n%%.*}"
+  frac=""
+  case "$n" in *.*) frac="${n#*.}" ;; esac
+  scale=$((10 ** ${#frac}))
+  echo $(( (10#${int:-0} * scale + 10#${frac:-0}) * mult / scale ))
 }
 
 # jsonpath, not jq: the edge build container has no jq (the 2026-08-31 fleet

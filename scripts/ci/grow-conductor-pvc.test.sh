@@ -38,6 +38,8 @@ case "$1 $2" in
     cat "$SCENARIO/pods" 2>/dev/null ;;
   "get pod")
     cat "$SCENARIO/pod" 2>/dev/null ;;
+  "get storageclass")
+    echo false ;;
   "exec "*)
     echo "$*" >> "$SCENARIO/exec.log"
     cat "$SCENARIO/df" 2>/dev/null ;;
@@ -116,5 +118,19 @@ run
 [ "$CODE" -eq 0 ] || fail "f: exit $CODE"
 grep -q "answered nothing" <<<"$OUT" || fail "f: $OUT"
 echo "f ok"
+
+# g. the live request is 10Gi against a declared 20Gi on a class that cannot
+#    expand → GROW-REFUSED. Guards the size arithmetic past 2^31: an awk that
+#    clamps `%d` read both as 2 GiB and said `ok` (edge #1576).
+scenario tenGi
+printf 'shem-zfs\t10Gi\t10Gi' > "$SCENARIO/pvc"
+run
+[ "$CODE" -eq 0 ] || fail "g: exit $CODE"
+grep -q "ok — the live request already meets" <<<"$OUT" && fail "g: 10Gi read as meeting 20Gi: $OUT"
+grep -q "CONDUCTOR-PVC-GROW-REFUSED" <<<"$OUT" || fail "g: no GROW-REFUSED: $OUT"
+# and a fractional quantity parses to the byte
+[ "$(bash -c "$(sed -n '/^to_bytes()/,/^}/p' "$SCRIPT"); to_bytes 1.5Gi")" = "1610612736" ] || fail "g: to_bytes 1.5Gi"
+[ "$(bash -c "$(sed -n '/^to_bytes()/,/^}/p' "$SCRIPT"); to_bytes 20Gi")" = "21474836480" ] || fail "g: to_bytes 20Gi"
+echo "g ok"
 
 echo "grow-conductor-pvc.test.sh: all scenarios pass"
