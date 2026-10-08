@@ -124,3 +124,24 @@ Feature: Reach is enforced at the HTTP egress, not inferred from a header
     Given peer "alpha-A" holds a restricted-reach fixture an anonymous caller is refused, named "community-garden-club"
     When I fetch the blob of "community-garden-club" on peer "alpha-A" anonymously
     Then the blob fetch of "community-garden-club" was refused with a non-success status
+
+  # The write side of the same door. `PUT /epr-head/{id}` took a JSON head from
+  # anyone who could reach it, encoded it, and stored the bytes the peer then
+  # served under its own name; no client of it exists anywhere off the node.
+  # The cure makes it a this-machine act: storage refuses any caller not on its
+  # own loopback (the device steps' 403 `device_caller_not_local`), and the
+  # doorway no longer forwards the write at all — a doorway beside the peer
+  # would otherwise carry anyone's write in over that loopback.
+  #
+  # The body is a well-formed head on purpose: a malformed one is refused as
+  # malformed even by the defect, which would make this scenario pass while
+  # proving nothing. "Refused" is any non-success status, for the same reason
+  # the byte-route scenario above accepts any.
+  #
+  # @wip until a fleet build carries both halves; against a fleet that predates
+  # them the PUT is accepted (and writes one small head blob), so the tag keeps
+  # the edge validation from reddening on the known defect.
+  @wip @regression
+  Scenario: An anonymous PUT of a declared head is refused
+    When I PUT a well-formed head for "reach-probe-unowned-head" on peer "alpha-A" anonymously
+    Then the head PUT for "reach-probe-unowned-head" was refused with a non-success status

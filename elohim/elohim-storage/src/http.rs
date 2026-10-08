@@ -1247,6 +1247,12 @@ fn caller_is_local<B>(req: &Request<B>) -> bool {
     )
 }
 
+/// PUT /epr-head/{id} is a this-machine act: the device steps' refusal for
+/// any other caller, by the same predicate (`caller_is_local`).
+fn epr_head_put_refusal<B>(req: &Request<B>) -> Option<Response<Full<Bytes>>> {
+    crate::services::device_consent::remote_caller_refusal(caller_is_local(req))
+}
+
 /// The headers a proxy adds: a loopback request carrying any of them came
 /// from wherever the proxy was reached.
 const FORWARDING_HEADERS: [&str; 5] = [
@@ -15496,10 +15502,33 @@ impl HttpServer {
     // =========================================================================
 
     /// PUT /epr-head/{id} — Accept JSON, encode as DAG-CBOR, store blob, return CID.
+    ///
+    /// A this-machine act: the route writes a head blob the peer then serves
+    /// under its own name, and no client of it exists off the node. A remote
+    /// caller gets the device steps' refusal (403 `device_caller_not_local`),
+    /// judged by the one predicate those steps use (`caller_is_local`), before
+    /// the body is read.
     async fn handle_put_epr_head(
         &self,
         req: Request<Incoming>,
         id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Some(refused) = epr_head_put_refusal(&req) {
+            return Ok(refused);
+        }
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        self.store_epr_head(id, &body.to_bytes()).await
+    }
+
+    /// The PUT /epr-head body, once the caller is known to be this machine.
+    /// Split from `Request<Incoming>` (which cannot be built in a test).
+    async fn store_epr_head(
+        &self,
+        id: &str,
+        data: &[u8],
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if id.is_empty() {
             return Ok(Response::builder()
@@ -15509,14 +15538,8 @@ impl HttpServer {
                 .unwrap());
         }
 
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
-        let data = body.to_bytes();
-
         // Parse JSON input
-        let input: EprHeadInputView = match serde_json::from_slice(&data) {
+        let input: EprHeadInputView = match serde_json::from_slice(data) {
             Ok(v) => v,
             Err(e) => {
                 return Ok(Response::builder()
@@ -22937,6 +22960,64 @@ mod session_exchange_tests {
                 "{forwarded}"
             );
         }
+    }
+
+    fn epr_head_put_from(addr: &str, headers: &[(&str, &str)]) -> Request<()> {
+        let mut req = Request::builder()
+            .method(Method::PUT)
+            .uri("/epr-head/some-concept")
+            .body(())
+            .unwrap();
+        req.extensions_mut()
+            .insert(CallerAddr(addr.parse().unwrap()));
+        for (name, value) in headers {
+            req.headers_mut().insert(
+                hyper::header::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                value.parse().unwrap(),
+            );
+        }
+        req
+    }
+
+    // PUT /epr-head/{id} had no auth: anyone who could reach the port could
+    // mint a head blob the peer then served under its own name. It is now a
+    // this-machine act, refused to everyone else with the device steps' 403.
+    #[tokio::test]
+    async fn put_epr_head_from_a_remote_caller_is_refused() {
+        for (addr, headers) in [
+            ("10.1.19.170:5000", &[][..]),
+            ("192.168.1.20:5000", &[][..]),
+            // A proxy on the machine (the doorway) forwards from anywhere.
+            ("127.0.0.1:5000", &[("x-forwarded-for", "198.51.100.7")][..]),
+        ] {
+            let refused = epr_head_put_refusal(&epr_head_put_from(addr, headers))
+                .unwrap_or_else(|| panic!("{addr} {headers:?} must be refused"));
+            assert_eq!(status_of(&refused), StatusCode::FORBIDDEN);
+            let body = body_json(refused).await;
+            assert_eq!(body["code"], "device_caller_not_local", "{body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn put_epr_head_from_this_machine_still_stores() {
+        assert!(epr_head_put_refusal(&epr_head_put_from("127.0.0.1:5000", &[])).is_none());
+        let server = test_server().await;
+        let head = serde_json::json!({
+            "id": "ignored-the-path-wins",
+            "content": "a concept",
+            "lamad": { "title": "A concept", "contentType": "concept" },
+        });
+        let resp = server
+            .store_epr_head("some-concept", head.to_string().as_bytes())
+            .await
+            .unwrap();
+        assert_eq!(status_of(&resp), StatusCode::CREATED);
+        let body = body_json(resp).await;
+        assert_eq!(body["head"]["id"], "some-concept", "{body}");
+        assert!(
+            body["cid"].as_str().is_some_and(|c| !c.is_empty()),
+            "{body}"
+        );
     }
 
     #[test]

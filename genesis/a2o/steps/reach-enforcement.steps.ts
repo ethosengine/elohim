@@ -378,3 +378,55 @@ function byteProbe(world: E2EWorld): Map<string, number> {
   w.__byteProbe ??= new Map();
   return w.__byteProbe;
 }
+
+/**
+ * THE WRITE SIDE. `PUT /epr-head/{id}` once accepted a head from anyone and
+ * stored the bytes the peer then served under its own name. It is now a
+ * this-machine act (storage `epr_head_put_refusal`; the doorway forwards only
+ * GET). The body is well-formed so a refusal cannot be mistaken for the parse
+ * error the defect would also have produced.
+ */
+When(
+  'I PUT a well-formed head for {string} on peer {string} anonymously',
+  async function (this: E2EWorld, headId: string, peerName: string) {
+    const base = peerMap(this).get(peerName) ?? resolvePeerUrl(peerName);
+    peerMap(this).set(peerName, base);
+    const head = {
+      id: headId,
+      content: 'a head no one on this machine declared',
+      lamad: { title: 'Reach probe', contentType: 'concept' },
+    };
+    const res = await fetch(`${base}/epr-head/${encodeURIComponent(headId)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(head),
+      signal: AbortSignal.timeout(15_000),
+    });
+    await res.arrayBuffer();
+    headPutProbe(this).set(headId, res.status);
+  }
+);
+
+Then(
+  'the head PUT for {string} was refused with a non-success status',
+  function (this: E2EWorld, headId: string) {
+    const status = headPutProbe(this).get(headId);
+    assert.ok(
+      status !== undefined,
+      `No head PUT captured for "${headId}" — the When step must run first.`
+    );
+    assert.ok(
+      status < 200 || status >= 300,
+      `UNAUTHENTICATED HEAD WRITE: an anonymous PUT /epr-head/${headId} was accepted ` +
+        `(status ${status}). The route is a this-machine act; a remote caller must be ` +
+        `refused by storage, and the doorway must not forward the write.`
+    );
+  }
+);
+
+/** Per-scenario head-PUT probe results, keyed by head id. */
+function headPutProbe(world: E2EWorld): Map<string, number> {
+  const w = world as unknown as { __headPutProbe?: Map<string, number> };
+  w.__headPutProbe ??= new Map();
+  return w.__headPutProbe;
+}
