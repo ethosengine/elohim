@@ -379,3 +379,72 @@ Statuses read from each atom on 2026-10-02; `just status habits --full` is the l
 
 Tag at the source when an entry is written or touched. Regenerate this page from the tag query when
 a deep-dive pass closes; do not add rows here that have no entry behind them.
+
+## Sprint 2026-10-08 (gradient sprint; tags corrected at the source, this is the snapshot)
+
+- `conductor-cap-grant-scan-per-zome-call` → cured (fleet-settled 2026-10-04; storage-side difference-in-differences 2026-10-08: matthew p50 1050.0→62.7 ms, susan 731.7→75.9, DiD p50 −331.6 ms, p95 −2154.5 ms).
+- `storage-sqlite-locked-surfaces-as-500-despite-busy-timeout` → cured (one shared BEGIN IMMEDIATE helper; fresh-household probe clean 2026-10-06).
+- `conductor-residual-cpu-full-chain-read-and-perpetual-republish` → cured-unverified (Option E shipped; lock deferral rolled, window unclosed; full-chain read cured; residual idle CPU open).
+- `feedback-discovery-sweep-is-o-n-in-history` gains `perf-cpu perf-queue trustful-self friction-mechanical unit-history phase-steady lane-background`: the unenumerable-member class (census 2026-10-08: drill-fixture collectives seeded with a blob sha as anchor, visited every tick since 2026-10-04).
+- New concerns this sprint, carried on their habits rather than new entries: head-only re-election invisible to the sync document (dataplane-convergence 2026-10-08c, `perf-convergence trustful-declared friction-blind plane-head fused-planes unit-item phase-steady`); the serving slug's three writers (dataplane-convergence 2026-10-08b, cured, `perf-convergence trustful-self friction-mechanical plane-head`); peer-health attestation cadence (zome-call-cost-bounded, Lane 3, `fused-planes plane-attention→plane-notary unit-peer phase-steady`).
+- Tally tables above are NOT regenerated in this pass; re-derive with the grep commands at the top of this page when the sprint's code lands.
+
+## Tallies re-derived 2026-10-08
+
+Recomputed from the current `tags:` lines of `genesis/data/timeline/backlog/*.md` (the snapshot above is not edited). Run the block below from the repository root; it reads backlog frontmatter only, with the Python standard library in isolated mode.
+
+```bash
+python3 -I - /projects/elohim/genesis/data/timeline/backlog <<'PY'
+import glob, os, re, sys
+TOK = re.compile(r'[^\s\[\],"\']+')
+perf = []
+for f in sorted(glob.glob(os.path.join(sys.argv[1], '*.md'))):
+    tags = set()
+    with open(f, encoding='utf-8') as fh:
+        for line in fh:
+            if line.startswith('tags:'):
+                tags.update(TOK.findall(line[len('tags:'):]))
+    if 'performance' in tags:
+        perf.append((os.path.basename(f), tags))
+print('indexed (performance tag, all files):', len(perf))
+print('indexed excluding performance-concern-index.md:', sum(1 for n, _ in perf if n != 'performance-concern-index.md'))
+for m in ['perf-cpu','perf-memory','perf-io','perf-latency','perf-queue','perf-convergence','perf-scale','perf-telemetry']:
+    print(m, sum(1 for _, t in perf if m in t))
+trust = ['trustful-self','trustful-declared','trustful-earned','trustless']
+fr = ['friction-verify','friction-wait','friction-mechanical','friction-blind']
+for tr in trust + ['no trust tag']:
+    cells = []
+    for fk in fr:
+        if tr == 'no trust tag':
+            cells.append(sum(1 for _, t in perf if not (t & set(trust)) and fk in t))
+        else:
+            cells.append(sum(1 for _, t in perf if tr in t and fk in t))
+    print(tr, *cells)
+for p in sorted({x for _, t in perf for x in t if x.startswith('plane-')}):
+    print(p, sum(1 for _, t in perf if p in t))
+print('fused-planes', sum(1 for _, t in perf if 'fused-planes' in t))
+for pre in ['unit-', 'phase-', 'lane-']:
+    for p in sorted({x for _, t in perf for x in t if x.startswith(pre)}):
+        print(p, sum(1 for _, t in perf if p in t))
+PY
+```
+
+Headline numbers, 2026-10-02 against 2026-10-08. The indexed count is 71 entries carrying the tag (the grep over all files returns 72 because this index file carries `performance` itself); the 2026-10-02 headline of 74 also counted the three untagged † entries by reference, which no tag query can see. The four trust-row totals are unchanged: trustful-self 42, trustful-declared 29, trustful-earned 0, trustless 1, no trust tag 32. Mechanism counts moved where tags were corrected since 10-02: perf-cpu 14→15, perf-memory 9→6, perf-queue 25→26, perf-telemetry 18→17; the others are unchanged.
+
+## Tallies 2026-10-08 — result
+
+Indexed (performance tag): 72 by the raw grep, 71 excluding this index. By mechanism: perf-cpu 15, perf-memory 6, perf-io 8, perf-latency 19, perf-queue 26, perf-convergence 24, perf-scale 10, perf-telemetry 17.
+
+Trust × friction (verify / wait / mechanical / blind):
+
+| Trust context | verify | wait | mechanical | blind |
+|---|---|---|---|---|
+| trustful-self | 5 | 12 | 22 | 3 |
+| trustful-declared | 2 | 12 | 12 | 3 |
+| trustful-earned | 0 | 0 | 0 | 0 |
+| trustless | 0 | 1 | 0 | 0 |
+| no trust tag | 1 | 7 | 14 | 10 |
+
+Plane: plane-notary 18, plane-custody 9, plane-projection 13, plane-head 6, plane-authority 2, plane-bytes 1, plane-reference 1; fused-planes 27.
+
+Unit: unit-call 16, unit-item 15, unit-once 13, unit-peer 8, unit-history 5, unit-agent 2. Phase: phase-steady 37, phase-transition 23, phase-growth 6. Lane: lane-operator 24, lane-interactive 21, lane-background 15, lane-borrowed 8.

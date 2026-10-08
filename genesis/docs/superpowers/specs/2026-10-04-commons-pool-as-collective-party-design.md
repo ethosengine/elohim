@@ -330,3 +330,144 @@ Carried from the capture's §8 with its recommendations. These are decisions, no
   decided here.
 - Its §3 rows 1, 3–14, its risks and its survey stand as they are and are cited, not restated.
 - Its §9 outputs that this decides are minted as backlog rows in their existing files.
+
+## Design gate, 2026-10-08
+
+§3 gated the pool, a contribution and a draw together. This section separates the two objects a
+first slice actually touches, a **pool draw** and a **pool membership**, for the first slice §7
+names: a storage-only pool of public things among the household mesh's three peers. Paths
+abbreviate as: *integ* = `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/`, *coord* =
+`elohim/holochain/dna/imagodei/zomes/imagodei/src/`, *mishpat* = `elohim/holochain/dna/mishpat/zomes/`.
+
+### 1. The five questions
+
+**Pool membership.**
+
+1. *Class:* Notarized (A). A withdrawal is an update to it, not a new thing.
+2. *Existing type:* `Membership` in imagodei's `#[hdk_entry_types]` (integ `lib.rs:947`; struct
+   `qahal.rs:37-48`), with `member_kind` Person | Collective | ElohimAgent (`qahal.rs:9-13`) and
+   `role` Steward | Contributor | Observer (`qahal.rs:16-20`). No new type; DNA-hash-neutral.
+3. *Head plane at one year:* one head per member per pool; three on the household slice. A pool
+   built before standing exists stays well under 500; past that, the composite-root argument of §3
+   holds — the count grows with members, never with items. Order of magnitude, not computed.
+4. *Identity:* agent-scoped composite (`member_cid`, `collective_cid`) inside the entry; the
+   collective is its own salted entry (`qahal.rs:29`).
+5. *Coordinator + signal:* `affirm_membership` (coord `qahal_coordinator.rs:967`), the founder's
+   through `create_collective` (`:58`), withdrawal `withdraw_membership_clean` (`:716`), currency
+   test `membership_is_current` (`:628`); post_commit emits `MembershipCommitted` (coord
+   `lib.rs:356-358`).
+
+**Pool draw** (in this slice: a byte fetch from a pool holder).
+
+1. *Class:* not notarized per draw. Today a fetched blob is booked as a `serve-blob` row the
+   *fetching* peer writes into its own `economic_events` in one SQLite transaction
+   (`elohim-storage/src/p2p/blob_fetch.rs:389-423`) — Ephemeral (C), local. Keep it so. What a
+   draw rests on is Notarized: the membership and the contribution commitment. When carrying must
+   be witnessed, the shape is Attested-Private (B2): a periodic aggregate attestation — the
+   consumer-blinded census, specified and not built.
+2. *Existing type:* `Commitment` in mishpat's `#[hdk_entry_types]` (`mishpat_integrity/src/lib.rs:320`).
+   Integrity asks `delegates-compute` only for non-blank `provider`/`recipient` and the bound keys
+   (`:859-886`); `replicates-content` has no integrity arm (falls to `_ => None`, `:897`; only the
+   `replicates-commons` alias is checked, `:841`). A compute draw is `rakia-compute-request-v1` on
+   the elohim DNA (`content_store/src/compute_task.rs:252-253`), outside this slice.
+3. *Head plane:* zero heads per draw; one commitment per member per kind (§3).
+4. *Identity:* none minted; the local row is keyed by blob hash and serving peer.
+5. *Coordinator + signal:* no zome function creates a draw. The contribution is
+   `create_commitment` (mishpat `mishpat/src/commitments.rs:32`), payload checked from
+   `validate_commitment_payload` (`:689`), signal `CommitmentCommitted` (mishpat
+   `mishpat/src/lib.rs:1644`). The admission arm is coordinator- and storage-side; storage still
+   refuses any recipient that is not an agent key (`elohim-storage/src/api/compute_grants.rs:97-98`).
+
+### 2. The gradient's design-time declaration
+
+- **Reach.** Bytes: commons only. References: the member→pool edge is public as built (`HasMember`,
+  integ `lib.rs:1085`), and a commitment naming the collective in `recipient` is network-readable.
+  Two reaches, both public — acceptable only because the slice is public-purpose (§3).
+- **Custody.** Need: low; the originals stay on each contributor's device (§5.2). Smallest set:
+  n = 3 full replicas, k = 1 (any holder serves). Independence: the three peers are one household,
+  one failure domain; the collective-diversity floor is unreachable on a one-household mesh
+  (`genesis/manifests/habits.yaml:1282`). Independence is not observable today: 3,549 of 3,574
+  shards list one known holder (`habits.yaml:1069`).
+  - *Missing node:* chain `pool custody` / between `a member's commitment to the pool` → `k of n
+    readable` / missing node: each blob's holder set, read by a non-holder; probe: a fourth reader
+    lists three holders per pool blob / current state: absent.
+- **Freshness.** Bytes are content-addressed: any copy is correct and the readable head serves.
+  Membership must be current (`membership_is_current`), floor-protected at every stage.
+- **Linkability.** Holding reveals membership. Serving reveals to the holder which member fetched
+  which blob. The drawer's own row names the peer that served it (`blob_fetch.rs:417`).
+- **Cost bearer.** The holders, bounded by `collective_pct`. Today only the drawer books the
+  event, so carrying is recorded on the beneficiary's side, not the bearer's.
+
+### 3. The agency curve
+
+Vocabulary in place: steward and subject (`StewardshipGrant.steward_id`/`subject_id`, integ
+`stewardship.rs:135-136`), the `guardian` tier (`STEWARD_CAPABILITY_TIERS`, `:35`), authority basis
+(`:139`, values `:42-49`), mandatory `expires_at`/`review_at` (`:157-158`), `delegatable`/
+`delegation_depth` capped at 3 (`:151-153`, `:344-348`), and delegation that only narrows (coord
+`stewardship.rs:519-522`).
+
+**Does drawing FOR a subject ride an existing scope?** No. The five scope booleans
+(`stewardship.rs:144-148`) are `content_filtering`, `time_limits`, `feature_restrictions`,
+`activity_monitoring`, `policy_delegation`: four restrict or observe, one delegates. None authorizes
+an affirmative act on the subject's account. A new boolean edits `StewardshipGrant`, which is in
+imagodei's `#[hdk_entry_types]` (integ `lib.rs:927`), and moves the imagodei DNA hash.
+
+**Recommendation: no new boolean.** The subject draws in their own right — their own `Membership`
+with `member_kind: Person` (the household's son is cast in `resilience/household-reciprocity.feature`)
+and their own key. A guardian may narrow a draw only through `feature_restrictions` and
+`DevicePolicy.disabled_features_json` (`:201`), which compose one-way. Variety stays with the
+subject: they can draw, see and appeal; a guardian can only narrow, and visibly.
+
+**Where the subject sees it.** Not in `ActivityLog` as built. `log_activity` writes only the caller's
+own log (coord `stewardship.rs:1342-1376`), so a steward's act never appears there.
+`subject_can_view` is a `DevicePolicy` field (`:210`), not an `ActivityLog` one (`:278`; the doc
+comment at `:275` says otherwise), and it composes restrictively: any one policy author can turn it
+off (coord `:1078`), after which `get_my_activity_logs` refuses the subject (`:1435`) — against
+`INALIENABLE_FEATURES` `capabilities_dashboard` (`:112`), which nothing enforces. In this design the
+draw is the subject's own act, recorded on their own device. A restriction is seen through
+`get_grants_for_subject` (coord `:710`) and `get_my_computed_policy` (`:926`).
+
+**How they appeal.** `file_appeal` (coord `:1163`) against the grant, `appeal_type` `scope` or
+`excessive` (integ `:69-70`); a specific draw or restriction goes in `grounds_json`/`evidence_json`
+(`:242-243`). No integrity change.
+
+- *Missing node:* chain `acting on another's account` / between `StewardshipGrant` → `a draw on a
+  pool` / missing node: a draw record that names both the acting human and the subject; probe: the
+  subject's own read lists a draw made under the grant / current state: absent, and not needed by
+  the first slice.
+
+### 4. The scenario and the habit
+
+`genesis/a2o/features/qahal/commons-pool-public-storage.feature`, tagged `@concern:commons-pool-draw`
+`@requires:household-nodes` `@act:i`. Background: the household mesh's three storage peers; matthew
+founds a collective whose charter names a `commons-pool:storage` resource; jessica and james affirm
+memberships. Scenarios: jessica and james each commit `replicates-content` naming the collective in
+`recipient`; matthew, named in neither commitment, draws a public blob jessica holds and receives
+it; a caller with no membership is refused, and the refusal names step 3 of the draw check; james
+withdraws and his next draw is refused; with every pool holder stopped, each member's own things
+still read from their own device.
+
+Habit: **no habit yet — held.** `blob-durability` (green) covers commitments honoured but not a
+collective counterparty; `reach-enforced-everywhere` (red) covers only step 5.
+
+### 5. Open questions for the orchestrator
+
+1. Mint a habit for "a collective is party to a commitment", or keep the slice held?
+2. Should `replicates-content` gain an integrity arm (DNA-hash-moving), or stay coordinator-checked?
+3. Should the serving holder book carrying, so the bearer's side holds the record?
+4. Is a one-household pool acceptable as a first proof when its holders share a failure domain?
+5. Is drawing FOR a subject out of scope until the standing redraft lands?
+6. Should `subject_can_view` composition be repaired to honour `capabilities_dashboard` first?
+7. Does `recipient` carry the collective's action hash or its `collective_cid` string?
+
+### Orchestrator decisions on the gate's open questions, 2026-10-08
+
+1. **No habit yet; the slice stays held.** `custodial-authority-answerable` (imagodei `.epr-meta`, red, not active) owns the agency-curve half of this design and its first move is a stewardship scenario, not a pool; the pool's own habit is declared when the slice is scheduled, not before (a plan citing no habit belongs in held/).
+2. **`replicates-content` stays coordinator-checked.** An integrity check moves the mishpat DNA hash; a coordinator-only rule is hot-swappable. Debt row, not this design.
+3. **The holder that bears the cost records the carrying.** Today the fetcher records `serve-blob` locally (`blob_fetch.rs:417`), so the record sits on the beneficiary. The missing node, in mintable shape: `chain / between serve→credit / missing node: holder-side carrying record on the observation plane (observer = holder, subject = blob CID, kind = infrastructure:blob-served) / current state: fetcher-side SQLite row only, nothing notarized`. Gradient: cost bearer ≠ record keeper today.
+4. **A one-household pool is a functional proof only.** Its custody declaration must say k = 1 of n = 3 in ONE failure domain; independence is not observed, so it proves the draw admission, not resilience (gradient guard: independence has to be observed, not assumed).
+5. **Drawing on behalf of a subject is out of scope.** The subject draws in their own right with their own `Membership` and key; a guardian may only narrow (`feature_restrictions`, `DevicePolicy`). That is variety amplified with the subject, not attenuated to them, and it needs no integrity change.
+6. **Yes, `subject_can_view` composition is fixed first** — a subject losing sight of their own log contradicts `INALIENABLE_FEATURES` `capabilities_dashboard`. Recorded as evidence on `custodial-authority-answerable` with the five sibling defects the gate found.
+7. **`recipient` holds the collective's ActionHash**, the notarized reference, never the `collective_cid` string — the same kind rule the 2026-10-08 census enforced on feedback members (a content address is not an action reference). Confirm against `Membership`'s own reference form before the slice.
+
+Spec corrections owed (not applied here): §3's "serving bytes emits a serve-blob event" (the fetcher records it); §3's integrity claim (only `delegates-compute` and the `replicates-commons` alias are checked); the stale `commitments.rs` line cites; the frontmatter `serves: recall-reaches-authority` (wrong habit; should name `custodial-authority-answerable` until the pool habit is born).
